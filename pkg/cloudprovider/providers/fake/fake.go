@@ -26,9 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
-const ProviderName = "fake"
+const defaultProviderName = "fake"
 
 // FakeBalancer is a fake storage of balancer information
 type FakeBalancer struct {
@@ -61,6 +62,8 @@ type FakeCloud struct {
 	UpdateCalls   []FakeUpdateBalancerCall
 	RouteMap      map[string]*FakeRoute
 	Lock          sync.Mutex
+	Provider      string
+	addCallLock   sync.Mutex
 	cloudprovider.Zone
 }
 
@@ -70,6 +73,8 @@ type FakeRoute struct {
 }
 
 func (f *FakeCloud) addCall(desc string) {
+	f.addCallLock.Lock()
+	defer f.addCallLock.Unlock()
 	f.Calls = append(f.Calls, desc)
 }
 
@@ -77,6 +82,9 @@ func (f *FakeCloud) addCall(desc string) {
 func (f *FakeCloud) ClearCalls() {
 	f.Calls = []string{}
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (f *FakeCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 func (f *FakeCloud) ListClusters() ([]string, error) {
 	return f.ClusterList, f.Err
@@ -92,7 +100,10 @@ func (f *FakeCloud) Clusters() (cloudprovider.Clusters, bool) {
 
 // ProviderName returns the cloud provider ID.
 func (f *FakeCloud) ProviderName() string {
-	return ProviderName
+	if f.Provider == "" {
+		return defaultProviderName
+	}
+	return f.Provider
 }
 
 // ScrubDNS filters DNS settings for pods.
@@ -185,6 +196,13 @@ func (f *FakeCloud) NodeAddresses(instance types.NodeName) ([]v1.NodeAddress, er
 	return f.Addresses, f.Err
 }
 
+// NodeAddressesByProviderID is a test-spy implementation of Instances.NodeAddressesByProviderID.
+// It adds an entry "node-addresses-by-provider-id" into the internal method call record.
+func (f *FakeCloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+	f.addCall("node-addresses-by-provider-id")
+	return f.Addresses, f.Err
+}
+
 // ExternalID is a test-spy implementation of Instances.ExternalID.
 // It adds an entry "external-id" into the internal method call record.
 // It returns an external id to the mapped instance name, if not found, it will return "ext-{instance}"
@@ -203,6 +221,12 @@ func (f *FakeCloud) InstanceID(nodeName types.NodeName) (string, error) {
 func (f *FakeCloud) InstanceType(instance types.NodeName) (string, error) {
 	f.addCall("instance-type")
 	return f.InstanceTypes[instance], nil
+}
+
+// InstanceTypeByProviderID returns the type of the specified instance.
+func (f *FakeCloud) InstanceTypeByProviderID(providerID string) (string, error) {
+	f.addCall("instance-type-by-provider-id")
+	return f.InstanceTypes[types.NodeName(providerID)], nil
 }
 
 // List is a test-spy implementation of Instances.List.

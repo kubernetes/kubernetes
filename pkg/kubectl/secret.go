@@ -38,6 +38,8 @@ type SecretGeneratorV1 struct {
 	FileSources []string
 	// LiteralSources to derive the secret from (optional)
 	LiteralSources []string
+	// EnvFileSource to derive the secret from (optional)
+	EnvFileSource string
 }
 
 // Ensure it supports the generator pattern that uses parameter injection
@@ -66,10 +68,19 @@ func (s SecretGeneratorV1) Generate(genericParams map[string]interface{}) (runti
 	if found {
 		fromLiteralArray, isArray := fromLiteralStrings.([]string)
 		if !isArray {
-			return nil, fmt.Errorf("expected []string, found :%v", fromFileStrings)
+			return nil, fmt.Errorf("expected []string, found :%v", fromLiteralStrings)
 		}
 		delegate.LiteralSources = fromLiteralArray
 		delete(genericParams, "from-literal")
+	}
+	fromEnvFileString, found := genericParams["from-env-file"]
+	if found {
+		fromEnvFile, isString := fromEnvFileString.(string)
+		if !isString {
+			return nil, fmt.Errorf("expected string, found :%v", fromEnvFileString)
+		}
+		delegate.EnvFileSource = fromEnvFile
+		delete(genericParams, "from-env-file")
 	}
 	params := map[string]string{}
 	for key, value := range genericParams {
@@ -91,6 +102,7 @@ func (s SecretGeneratorV1) ParamNames() []GeneratorParam {
 		{"type", false},
 		{"from-file", false},
 		{"from-literal", false},
+		{"from-env-file", false},
 		{"force", false},
 	}
 }
@@ -116,6 +128,11 @@ func (s SecretGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 			return nil, err
 		}
 	}
+	if len(s.EnvFileSource) > 0 {
+		if err := handleFromEnvFileSource(secret, s.EnvFileSource); err != nil {
+			return nil, err
+		}
+	}
 	return secret, nil
 }
 
@@ -123,6 +140,9 @@ func (s SecretGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 func (s SecretGeneratorV1) validate() error {
 	if len(s.Name) == 0 {
 		return fmt.Errorf("name must be specified")
+	}
+	if len(s.EnvFileSource) > 0 && (len(s.FileSources) > 0 || len(s.LiteralSources) > 0) {
+		return fmt.Errorf("from-env-file cannot be combined with from-file or from-literal")
 	}
 	return nil
 }
@@ -134,8 +154,7 @@ func handleFromLiteralSources(secret *api.Secret, literalSources []string) error
 		if err != nil {
 			return err
 		}
-		err = addKeyFromLiteralToSecret(secret, keyName, []byte(value))
-		if err != nil {
+		if err = addKeyFromLiteralToSecret(secret, keyName, []byte(value)); err != nil {
 			return err
 		}
 	}
@@ -170,21 +189,40 @@ func handleFromFileSources(secret *api.Secret, fileSources []string) error {
 				itemPath := path.Join(filePath, item.Name())
 				if item.Mode().IsRegular() {
 					keyName = item.Name()
-					err = addKeyFromFileToSecret(secret, keyName, itemPath)
-					if err != nil {
+					if err = addKeyFromFileToSecret(secret, keyName, itemPath); err != nil {
 						return err
 					}
 				}
 			}
 		} else {
-			err = addKeyFromFileToSecret(secret, keyName, filePath)
-			if err != nil {
+			if err := addKeyFromFileToSecret(secret, keyName, filePath); err != nil {
 				return err
 			}
 		}
 	}
 
 	return nil
+}
+
+// handleFromEnvFileSource adds the specified env file source information
+// into the provided secret
+func handleFromEnvFileSource(secret *api.Secret, envFileSource string) error {
+	info, err := os.Stat(envFileSource)
+	if err != nil {
+		switch err := err.(type) {
+		case *os.PathError:
+			return fmt.Errorf("error reading %s: %v", envFileSource, err.Err)
+		default:
+			return fmt.Errorf("error reading %s: %v", envFileSource, err)
+		}
+	}
+	if info.IsDir() {
+		return fmt.Errorf("must be a file")
+	}
+
+	return addFromEnvFile(envFileSource, func(key, value string) error {
+		return addKeyFromLiteralToSecret(secret, key, []byte(value))
+	})
 }
 
 func addKeyFromFileToSecret(secret *api.Secret, keyName, filePath string) error {

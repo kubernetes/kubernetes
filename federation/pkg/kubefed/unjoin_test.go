@@ -119,7 +119,7 @@ func TestUnjoinFederation(t *testing.T) {
 			kubeconfigGlobal:   fakeKubeFiles[0],
 			kubeconfigExplicit: "",
 			expectedServer:     "https://10.20.30.40",
-			expectedErr:        fmt.Sprintf("WARNING: secret %q not found in the host cluster, so it couldn't be deleted", "noexist"),
+			expectedErr:        fmt.Sprintf("WARNING: secret %q not found in the host cluster, so it couldn't be deleted. Cluster has already been removed from the federation.", "noexist"),
 		},
 		// TODO: Figure out a way to test the scenarios of configmap deletion
 		// As of now we delete the config map after deriving the clientset using
@@ -171,7 +171,7 @@ func TestUnjoinFederation(t *testing.T) {
 func testUnjoinFederationFactory(name, server, secret string) cmdutil.Factory {
 	urlPrefix := "/clusters/"
 
-	cluster := fakeCluster(name, name, server)
+	cluster := fakeCluster(name, name, server, true)
 	if secret != "" {
 		cluster.Spec.SecretRef.Name = secret
 	}
@@ -212,8 +212,11 @@ func testUnjoinFederationFactory(name, server, secret string) cmdutil.Factory {
 	return f
 }
 
-func fakeUnjoinHostFactory(name string) cmdutil.Factory {
-	urlPrefix := "/api/v1/namespaces/federation-system/secrets/"
+func fakeUnjoinHostFactory(clusterName string) cmdutil.Factory {
+	secretsPrefix := "/api/v1/namespaces/federation-system/secrets/"
+	clusterRolePrefix := "/apis/rbac.authorization.k8s.io/v1beta1/clusterroles/"
+	serviceAccountPrefix := "/api/v1/namespaces/federation-system/serviceaccounts/"
+	clusterRoleBindingPrefix := "/apis/rbac.authorization.k8s.io/v1beta1/clusterrolebindings/"
 
 	// Using dummy bytes for now
 	configBytes, _ := clientcmd.Write(clientcmdapi.Config{})
@@ -223,7 +226,7 @@ func fakeUnjoinHostFactory(name string) cmdutil.Factory {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
+			Name:      clusterName,
 			Namespace: util.DefaultFederationSystemNamespace,
 		},
 		Data: map[string][]byte{
@@ -239,11 +242,11 @@ func fakeUnjoinHostFactory(name string) cmdutil.Factory {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, urlPrefix):
+			case strings.HasPrefix(p, secretsPrefix):
 				switch m {
 				case http.MethodDelete:
-					got := strings.TrimPrefix(p, urlPrefix)
-					if got != name {
+					got := strings.TrimPrefix(p, secretsPrefix)
+					if got != clusterName {
 						return nil, errors.NewNotFound(api.Resource("secrets"), got)
 					}
 					status := metav1.Status{
@@ -251,14 +254,47 @@ func fakeUnjoinHostFactory(name string) cmdutil.Factory {
 					}
 					return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
 				case http.MethodGet:
-					got := strings.TrimPrefix(p, urlPrefix)
-					if got != name {
+					got := strings.TrimPrefix(p, secretsPrefix)
+					if got != clusterName {
 						return nil, errors.NewNotFound(api.Resource("secrets"), got)
 					}
 					return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &secretObject)}, nil
 				default:
 					return nil, fmt.Errorf("unexpected request method: %#v\n%#v", req.URL, req)
 				}
+			case strings.HasPrefix(p, serviceAccountPrefix) && m == http.MethodDelete:
+				got := strings.TrimPrefix(p, serviceAccountPrefix)
+				want := serviceAccountName(clusterName)
+				if got != want {
+					return nil, errors.NewNotFound(api.Resource("serviceaccounts"), got)
+				}
+
+				status := metav1.Status{
+					Status: "Success",
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
+			case strings.HasPrefix(p, clusterRoleBindingPrefix) && m == http.MethodDelete:
+				got := strings.TrimPrefix(p, clusterRoleBindingPrefix)
+				want := util.ClusterRoleName(testFederationName, serviceAccountName(clusterName))
+				if got != want {
+					return nil, errors.NewNotFound(api.Resource("clusterrolebindings"), got)
+				}
+
+				status := metav1.Status{
+					Status: "Success",
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
+			case strings.HasPrefix(p, clusterRolePrefix) && m == http.MethodDelete:
+				got := strings.TrimPrefix(p, clusterRolePrefix)
+				want := util.ClusterRoleName(testFederationName, serviceAccountName(clusterName))
+				if got != want {
+					return nil, errors.NewNotFound(api.Resource("clusterroles"), got)
+				}
+
+				status := metav1.Status{
+					Status: "Success",
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
 			default:
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}

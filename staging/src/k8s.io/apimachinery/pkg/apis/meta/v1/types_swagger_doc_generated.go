@@ -49,12 +49,13 @@ func (APIGroupList) SwaggerDoc() map[string]string {
 }
 
 var map_APIResource = map[string]string{
-	"":           "APIResource specifies the name of a resource and whether it is namespaced.",
-	"name":       "name is the name of the resource.",
-	"namespaced": "namespaced indicates if a resource is namespaced or not.",
-	"kind":       "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
-	"verbs":      "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
-	"shortNames": "shortNames is a list of suggested short names of the resource.",
+	"":             "APIResource specifies the name of a resource and whether it is namespaced.",
+	"name":         "name is the plural name of the resource.",
+	"singularName": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
+	"namespaced":   "namespaced indicates if a resource is namespaced or not.",
+	"kind":         "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
+	"verbs":        "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
+	"shortNames":   "shortNames is a list of suggested short names of the resource.",
 }
 
 func (APIResource) SwaggerDoc() map[string]string {
@@ -104,8 +105,9 @@ func (ExportOptions) SwaggerDoc() map[string]string {
 }
 
 var map_GetOptions = map[string]string{
-	"":                "GetOptions is the standard query options to the standard REST get call.",
-	"resourceVersion": "When specified: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+	"":                     "GetOptions is the standard query options to the standard REST get call.",
+	"resourceVersion":      "When specified: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+	"includeUninitialized": "If true, partially initialized resources are included in the response.",
 }
 
 func (GetOptions) SwaggerDoc() map[string]string {
@@ -120,6 +122,25 @@ var map_GroupVersionForDiscovery = map[string]string{
 
 func (GroupVersionForDiscovery) SwaggerDoc() map[string]string {
 	return map_GroupVersionForDiscovery
+}
+
+var map_Initializer = map[string]string{
+	"":     "Initializer is information about an initializer that has not yet completed.",
+	"name": "name of the process that is responsible for initializing this object.",
+}
+
+func (Initializer) SwaggerDoc() map[string]string {
+	return map_Initializer
+}
+
+var map_Initializers = map[string]string{
+	"":        "Initializers tracks the progress of initialization.",
+	"pending": "Pending is a list of initializers that must execute in order before this object is visible. When the last pending initializer is removed, and no failing result is set, the initializers struct will be set to nil and the object is considered as initialized and visible to all clients.",
+	"result":  "If result is set with the Failure field, the object will be persisted to storage and then deleted, ensuring that other clients can observe the deletion.",
+}
+
+func (Initializers) SwaggerDoc() map[string]string {
+	return map_Initializers
 }
 
 var map_LabelSelector = map[string]string{
@@ -154,12 +175,13 @@ func (ListMeta) SwaggerDoc() map[string]string {
 }
 
 var map_ListOptions = map[string]string{
-	"":                "ListOptions is the query options to a standard REST list call.",
-	"labelSelector":   "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-	"fieldSelector":   "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-	"watch":           "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-	"resourceVersion": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-	"timeoutSeconds":  "Timeout for the list/watch call.",
+	"":                     "ListOptions is the query options to a standard REST list call.",
+	"labelSelector":        "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+	"fieldSelector":        "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+	"includeUninitialized": "If true, partially initialized resources are included in the response.",
+	"watch":                "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+	"resourceVersion":      "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+	"timeoutSeconds":       "Timeout for the list/watch call.",
 }
 
 func (ListOptions) SwaggerDoc() map[string]string {
@@ -181,6 +203,7 @@ var map_ObjectMeta = map[string]string{
 	"labels":                     "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels",
 	"annotations":                "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations",
 	"ownerReferences":            "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
+	"initializers":               "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user.",
 	"finalizers":                 "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed.",
 	"clusterName":                "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.",
 }
@@ -269,6 +292,7 @@ var map_StatusDetails = map[string]string{
 	"name":              "The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described).",
 	"group":             "The group attribute of the resource associated with the status StatusReason.",
 	"kind":              "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+	"uid":               "UID of the resource. (when there is a single resource which can be described). More info: http://kubernetes.io/docs/user-guide/identifiers#uids",
 	"causes":            "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
 	"retryAfterSeconds": "If specified, the time in seconds before the operation should be retried.",
 }

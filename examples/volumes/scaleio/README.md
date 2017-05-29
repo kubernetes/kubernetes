@@ -93,7 +93,7 @@ The Kubernetes ScaleIO volume spec supports the following attributes:
 | storagePool| the name of the volume storage pool (default `default`)|
 | storageMode| the storage provision mode: `ThinProvisionned` (default) or `ThickProvisionned`|
 | volumeName| the name of an existing volume in ScaleIO (required)|
-| secretRef:name| reference to a configuered Secret object (required, see Secret earlier)|
+| secretRef:name| reference to a configured Secret object (required, see Secret earlier)|
 | readOnly| specifies the access mode to the mounted volume (default `false`)|
 | fsType| the file system to use for the volume (default `ext4`)|
 
@@ -170,7 +170,7 @@ The ScaleIO volume plugin is a dynamic provisioner identified as `kubernetes.io/
 | protectionDomain| the name of the ScaleIO protection domain (default `default`)|
 | storagePool| the name of the volume storage pool (default `default`)|
 | storageMode| the storage provision mode: `ThinProvisionned` (default) or `ThickProvisionned`|
-| secretRef| reference to the name of a configuered Secret object (required)|
+| secretRef| reference to the name of a configured Secret object (required)|
 | readOnly| specifies the access mode to the mounted volume (default `false`)|
 | fsType| the file system to use for the volume (default `ext4`)|
 
@@ -211,7 +211,7 @@ sio-small   kubernetes.io/scaleio
 
 ### PVC for the StorageClass
 
-The next step is to define/deploy a `PeristentVolumeClaim` that will use the StorageClass.
+The next step is to define/deploy a `PersistentVolumeClaim` that will use the StorageClass.
 
 File [sc-pvc.yaml](sc-pvc.yaml)
 

@@ -49,9 +49,13 @@ type FakeCmd struct {
 	CombinedOutputScript []FakeCombinedOutputAction
 	CombinedOutputCalls  int
 	CombinedOutputLog    [][]string
+	RunScript            []FakeRunAction
+	RunCalls             int
+	RunLog               [][]string
 	Dirs                 []string
 	Stdin                io.Reader
 	Stdout               io.Writer
+	Stderr               io.Writer
 }
 
 func InitFakeCmd(fake *FakeCmd, cmd string, args ...string) Cmd {
@@ -60,6 +64,7 @@ func InitFakeCmd(fake *FakeCmd, cmd string, args ...string) Cmd {
 }
 
 type FakeCombinedOutputAction func() ([]byte, error)
+type FakeRunAction func() ([]byte, []byte, error)
 
 func (fake *FakeCmd) SetDir(dir string) {
 	fake.Dirs = append(fake.Dirs, dir)
@@ -71,6 +76,30 @@ func (fake *FakeCmd) SetStdin(in io.Reader) {
 
 func (fake *FakeCmd) SetStdout(out io.Writer) {
 	fake.Stdout = out
+}
+
+func (fake *FakeCmd) SetStderr(out io.Writer) {
+	fake.Stderr = out
+}
+
+func (fake *FakeCmd) Run() error {
+	if fake.RunCalls > len(fake.RunScript)-1 {
+		panic("ran out of Run() actions")
+	}
+	if fake.RunLog == nil {
+		fake.RunLog = [][]string{}
+	}
+	i := fake.RunCalls
+	fake.RunLog = append(fake.RunLog, append([]string{}, fake.Argv...))
+	fake.RunCalls++
+	stdout, stderr, err := fake.RunScript[i]()
+	if stdout != nil {
+		fake.Stdout.Write(stdout)
+	}
+	if stderr != nil {
+		fake.Stderr.Write(stderr)
+	}
+	return err
 }
 
 func (fake *FakeCmd) CombinedOutput() ([]byte, error) {

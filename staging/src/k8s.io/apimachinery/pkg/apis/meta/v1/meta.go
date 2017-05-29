@@ -17,38 +17,9 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
-
-// ObjectMetaFor returns a pointer to a provided object's ObjectMeta.
-// TODO: allow runtime.Unknown to extract this object
-// TODO: Remove this function and use meta.ObjectMetaAccessor() instead.
-func ObjectMetaFor(obj runtime.Object) (*ObjectMeta, error) {
-	v, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	var meta *ObjectMeta
-	err = runtime.FieldPtr(v, "ObjectMeta", &meta)
-	return meta, err
-}
-
-// ListMetaFor returns a pointer to a provided object's ListMeta,
-// or an error if the object does not have that pointer.
-// TODO: allow runtime.Unknown to extract this object
-// TODO: Remove this function and use meta.ObjectMetaAccessor() instead.
-func ListMetaFor(obj runtime.Object) (*ListMeta, error) {
-	v, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	var meta *ListMeta
-	err = runtime.FieldPtr(v, "ListMeta", &meta)
-	return meta, err
-}
 
 // TODO: move this, Object, List, and Type to a different package
 type ObjectMetaAccessor interface {
@@ -70,16 +41,22 @@ type Object interface {
 	SetUID(uid types.UID)
 	GetResourceVersion() string
 	SetResourceVersion(version string)
+	GetGeneration() int64
+	SetGeneration(generation int64)
 	GetSelfLink() string
 	SetSelfLink(selfLink string)
 	GetCreationTimestamp() Time
 	SetCreationTimestamp(timestamp Time)
 	GetDeletionTimestamp() *Time
 	SetDeletionTimestamp(timestamp *Time)
+	GetDeletionGracePeriodSeconds() *int64
+	SetDeletionGracePeriodSeconds(*int64)
 	GetLabels() map[string]string
 	SetLabels(labels map[string]string)
 	GetAnnotations() map[string]string
 	SetAnnotations(annotations map[string]string)
+	GetInitializers() *Initializers
+	SetInitializers(initializers *Initializers)
 	GetFinalizers() []string
 	SetFinalizers(finalizers []string)
 	GetOwnerReferences() []OwnerReference
@@ -146,6 +123,8 @@ func (meta *ObjectMeta) GetUID() types.UID                   { return meta.UID }
 func (meta *ObjectMeta) SetUID(uid types.UID)                { meta.UID = uid }
 func (meta *ObjectMeta) GetResourceVersion() string          { return meta.ResourceVersion }
 func (meta *ObjectMeta) SetResourceVersion(version string)   { meta.ResourceVersion = version }
+func (meta *ObjectMeta) GetGeneration() int64                { return meta.Generation }
+func (meta *ObjectMeta) SetGeneration(generation int64)      { meta.Generation = generation }
 func (meta *ObjectMeta) GetSelfLink() string                 { return meta.SelfLink }
 func (meta *ObjectMeta) SetSelfLink(selfLink string)         { meta.SelfLink = selfLink }
 func (meta *ObjectMeta) GetCreationTimestamp() Time          { return meta.CreationTimestamp }
@@ -156,10 +135,16 @@ func (meta *ObjectMeta) GetDeletionTimestamp() *Time { return meta.DeletionTimes
 func (meta *ObjectMeta) SetDeletionTimestamp(deletionTimestamp *Time) {
 	meta.DeletionTimestamp = deletionTimestamp
 }
+func (meta *ObjectMeta) GetDeletionGracePeriodSeconds() *int64 { return meta.DeletionGracePeriodSeconds }
+func (meta *ObjectMeta) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds *int64) {
+	meta.DeletionGracePeriodSeconds = deletionGracePeriodSeconds
+}
 func (meta *ObjectMeta) GetLabels() map[string]string                 { return meta.Labels }
 func (meta *ObjectMeta) SetLabels(labels map[string]string)           { meta.Labels = labels }
 func (meta *ObjectMeta) GetAnnotations() map[string]string            { return meta.Annotations }
 func (meta *ObjectMeta) SetAnnotations(annotations map[string]string) { meta.Annotations = annotations }
+func (meta *ObjectMeta) GetInitializers() *Initializers               { return meta.Initializers }
+func (meta *ObjectMeta) SetInitializers(initializers *Initializers)   { meta.Initializers = initializers }
 func (meta *ObjectMeta) GetFinalizers() []string                      { return meta.Finalizers }
 func (meta *ObjectMeta) SetFinalizers(finalizers []string)            { meta.Finalizers = finalizers }
 

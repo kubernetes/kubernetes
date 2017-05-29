@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 .PHONY:	build push
 
-TAG = v4.6.1-1
+TAG = v5.4.0
 PREFIX = gcr.io/google_containers
 
 build:

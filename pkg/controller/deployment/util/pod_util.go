@@ -17,7 +17,7 @@ limitations under the License.
 package util
 
 import (
-	"hash/adler32"
+	"encoding/binary"
 	"hash/fnv"
 
 	"github.com/golang/glog"
@@ -31,22 +31,17 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
-func GetPodTemplateSpecHash(template v1.PodTemplateSpec) uint32 {
-	podTemplateSpecHasher := adler32.New()
-	hashutil.DeepHashObject(podTemplateSpecHasher, template)
-	return podTemplateSpecHasher.Sum32()
-}
-
-// TODO: remove the duplicate
-func GetInternalPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
-	podTemplateSpecHasher := adler32.New()
-	hashutil.DeepHashObject(podTemplateSpecHasher, template)
-	return podTemplateSpecHasher.Sum32()
-}
-
-func GetPodTemplateSpecHashFnv(template v1.PodTemplateSpec) uint32 {
+func GetPodTemplateSpecHash(template *v1.PodTemplateSpec, uniquifier *int64) uint32 {
 	podTemplateSpecHasher := fnv.New32a()
-	hashutil.DeepHashObject(podTemplateSpecHasher, template)
+	hashutil.DeepHashObject(podTemplateSpecHasher, *template)
+
+	// Add uniquifier in the hash if it exists.
+	if uniquifier != nil {
+		uniquifierBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(uniquifierBytes, uint64(*uniquifier))
+		podTemplateSpecHasher.Write(uniquifierBytes)
+	}
+
 	return podTemplateSpecHasher.Sum32()
 }
 

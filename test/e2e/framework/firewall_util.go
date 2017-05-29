@@ -18,12 +18,16 @@ package framework
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
+	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -41,7 +45,7 @@ const (
 )
 
 // MakeFirewallNameForLBService return the expected firewall name for a LB service.
-// This should match the formatting of makeFirewallName() in pkg/cloudprovider/providers/gce/gce.go
+// This should match the formatting of makeFirewallName() in pkg/cloudprovider/providers/gce/gce_loadbalancer.go
 func MakeFirewallNameForLBService(name string) string {
 	return fmt.Sprintf("k8s-fw-%s", name)
 }
@@ -64,6 +68,32 @@ func ConstructFirewallForLBService(svc *v1.Service, nodesTags []string) *compute
 			IPProtocol: strings.ToLower(string(sp.Protocol)),
 			Ports:      []string{strconv.Itoa(int(sp.Port))},
 		})
+	}
+	return &fw
+}
+
+func MakeHealthCheckFirewallNameForLBService(clusterID, name string, isNodesHealthCheck bool) string {
+	return gcecloud.MakeHealthCheckFirewallName(clusterID, name, isNodesHealthCheck)
+}
+
+// ConstructHealthCheckFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
+func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service, nodesTags []string, isNodesHealthCheck bool) *compute.Firewall {
+	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
+		Failf("can not construct firewall rule for non-loadbalancer type service")
+	}
+	fw := compute.Firewall{}
+	fw.Name = MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.GetLoadBalancerName(svc), isNodesHealthCheck)
+	fw.TargetTags = nodesTags
+	fw.SourceRanges = gcecloud.LoadBalancerSrcRanges()
+	healthCheckPort := gcecloud.GetNodesHealthCheckPort()
+	if !isNodesHealthCheck {
+		healthCheckPort = apiservice.GetServiceHealthCheckNodePort(svc)
+	}
+	fw.Allowed = []*compute.FirewallAllowed{
+		{
+			IPProtocol: "tcp",
+			Ports:      []string{fmt.Sprintf("%d", healthCheckPort)},
+		},
 	}
 	return &fw
 }
@@ -120,12 +150,11 @@ func GetClusterName(instancePrefix string) string {
 }
 
 // GetClusterIpRange returns the CLUSTER_IP_RANGE env we set for e2e cluster.
-// From cluster/gce/config-test.sh, cluster ip range is set up using below command:
-// CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.180.0.0/14}"
-// Warning: this need to be consistent with the CLUSTER_IP_RANGE in startup scripts,
-// which is hardcoded currently.
+//
+// Warning: this MUST be consistent with the CLUSTER_IP_RANGE set in
+// gce/config-test.sh.
 func GetClusterIpRange() string {
-	return "10.180.0.0/14"
+	return "10.100.0.0/14"
 }
 
 // GetE2eFirewalls returns all firewall rules we create for an e2e cluster.
@@ -304,6 +333,9 @@ func SameStringArray(result, expected []string, include bool) error {
 // VerifyFirewallRule verifies whether the result firewall is consistent with the expected firewall.
 // When `portsSubset` is false, match given ports exactly. Otherwise, only check ports are included.
 func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset bool) error {
+	if res == nil || exp == nil {
+		return fmt.Errorf("res and exp must not be nil")
+	}
 	if res.Name != exp.Name {
 		return fmt.Errorf("incorrect name: %v, expected %v", res.Name, exp.Name)
 	}
@@ -325,4 +357,41 @@ func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset 
 		return fmt.Errorf("incorrect target tags %v, expected %v: %v", res.TargetTags, exp.TargetTags, err)
 	}
 	return nil
+}
+
+func WaitForFirewallRule(gceCloud *gcecloud.GCECloud, fwName string, exist bool, timeout time.Duration) (*compute.Firewall, error) {
+	Logf("Waiting up to %v for firewall %v exist=%v", timeout, fwName, exist)
+	var fw *compute.Firewall
+	var err error
+
+	condition := func() (bool, error) {
+		fw, err = gceCloud.GetFirewall(fwName)
+		if err != nil && exist ||
+			err == nil && !exist ||
+			err != nil && !exist && !IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
+			return false, nil
+		}
+		return true, nil
+	}
+
+	if err := wait.PollImmediate(5*time.Second, timeout, condition); err != nil {
+		return nil, fmt.Errorf("error waiting for firewall %v exist=%v", fwName, exist)
+	}
+	return fw, nil
+}
+
+func GetClusterID(c clientset.Interface) (string, error) {
+	cm, err := c.Core().ConfigMaps(metav1.NamespaceSystem).Get(gcecloud.UIDConfigMapName, metav1.GetOptions{})
+	if err != nil || cm == nil {
+		return "", fmt.Errorf("error getting cluster ID: %v", err)
+	}
+	clusterID, clusterIDExists := cm.Data[gcecloud.UIDCluster]
+	providerID, providerIDExists := cm.Data[gcecloud.UIDProvider]
+	if !clusterIDExists {
+		return "", fmt.Errorf("cluster ID not set")
+	}
+	if providerIDExists {
+		return providerID, nil
+	}
+	return clusterID, nil
 }

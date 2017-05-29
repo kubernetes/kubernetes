@@ -1,25 +1,26 @@
 repo: https://github.com/kubernetes/kubernetes.git
 includes:
   - 'layer:basic'
+  - 'layer:snap'
   - 'layer:tls-client'
   - 'layer:leadership'
   - 'layer:debug'
+  - 'layer:metrics'
   - 'layer:nagios'
   - 'interface:ceph-admin'
   - 'interface:etcd'
   - 'interface:http'
   - 'interface:kubernetes-cni'
   - 'interface:kube-dns'
+  - 'interface:kube-control'
   - 'interface:public-address'
 options:
   basic:
     packages:
       - socat
   tls-client:
-    ca_certificate_path: '/srv/kubernetes/ca.crt'
-    server_certificate_path: '/srv/kubernetes/server.crt'
-    server_key_path: '/srv/kubernetes/server.key'
-    client_certificate_path: '/srv/kubernetes/client.crt'
-    client_key_path: '/srv/kubernetes/client.key'
-tactics:
-  - 'tactics.update_addons.UpdateAddonsTactic'
+    ca_certificate_path: '/root/cdk/ca.crt'
+    server_certificate_path: '/root/cdk/server.crt'
+    server_key_path: '/root/cdk/server.key'
+    client_certificate_path: '/root/cdk/client.crt'
+    client_key_path: '/root/cdk/client.key'

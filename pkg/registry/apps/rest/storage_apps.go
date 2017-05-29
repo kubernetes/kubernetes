@@ -24,7 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsapiv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	statefulsetstore "k8s.io/kubernetes/pkg/registry/apps/petset/storage"
+	controllerrevisionsstore "k8s.io/kubernetes/pkg/registry/apps/controllerrevision/storage"
+	statefulsetstore "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
 	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
 )
 
@@ -56,6 +57,10 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 		statefulsetStorage, statefulsetStatusStorage := statefulsetstore.NewREST(restOptionsGetter)
 		storage["statefulsets"] = statefulsetStorage
 		storage["statefulsets/status"] = statefulsetStatusStorage
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("controllerrevisions")) {
+		historyStorage := controllerrevisionsstore.NewREST(restOptionsGetter)
+		storage["controllerrevisions"] = historyStorage
 	}
 	return storage
 }

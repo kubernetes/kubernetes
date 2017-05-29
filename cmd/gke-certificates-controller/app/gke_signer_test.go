@@ -26,6 +26,7 @@ import (
 	"text/template"
 	"time"
 
+	"k8s.io/client-go/tools/record"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 )
 
@@ -103,12 +104,12 @@ func TestGKESigner(t *testing.T) {
 			t.Fatalf("error closing kubeconfig template: %v", err)
 		}
 
-		signer, err := NewGKESigner(kubeConfig.Name(), time.Duration(500)*time.Millisecond)
+		signer, err := NewGKESigner(kubeConfig.Name(), time.Duration(500)*time.Millisecond, record.NewFakeRecorder(10), nil)
 		if err != nil {
 			t.Fatalf("error creating GKESigner: %v", err)
 		}
 
-		cert, err := signer.Sign(&certificates.CertificateSigningRequest{})
+		cert, err := signer.sign(&certificates.CertificateSigningRequest{})
 
 		if c.wantErr {
 			if err == nil {

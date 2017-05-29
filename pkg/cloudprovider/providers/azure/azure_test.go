@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -35,12 +34,19 @@ var testClusterName = "testCluster"
 // Test additional of a new service/port.
 func TestReconcileLoadBalancerAddPort(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80)
-	pip := getTestPublicIP()
+	svc := getTestService("servicea", v1.ProtocolTCP, 80)
+	configProperties := getTestPublicFipConfigurationProperties()
 	lb := getTestLoadBalancer()
 	nodes := []*v1.Node{}
 
-	lb, updated, err := az.reconcileLoadBalancer(lb, &pip, testClusterName, &svc, nodes)
+	svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
+		Name:     fmt.Sprintf("port-udp-%d", 1234),
+		Protocol: v1.ProtocolUDP,
+		Port:     1234,
+		NodePort: getBackendPort(1234),
+	})
+
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -59,17 +65,15 @@ func TestReconcileLoadBalancerAddPort(t *testing.T) {
 
 func TestReconcileLoadBalancerNodeHealth(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80)
-	svc.Annotations = map[string]string{
-		serviceapi.BetaAnnotationExternalTraffic:     serviceapi.AnnotationValueExternalTrafficLocal,
-		serviceapi.BetaAnnotationHealthCheckNodePort: "32456",
-	}
-	pip := getTestPublicIP()
+	svc := getTestService("servicea", v1.ProtocolTCP, 80)
+	svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+	svc.Spec.HealthCheckNodePort = int32(32456)
+	configProperties := getTestPublicFipConfigurationProperties()
 	lb := getTestLoadBalancer()
 
 	nodes := []*v1.Node{}
 
-	lb, updated, err := az.reconcileLoadBalancer(lb, &pip, testClusterName, &svc, nodes)
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -87,19 +91,51 @@ func TestReconcileLoadBalancerNodeHealth(t *testing.T) {
 }
 
 // Test removing all services results in removing the frontend ip configuration
-func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) {
+func TestReconcileLoadBalancerRemoveService(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80)
+	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
 	lb := getTestLoadBalancer()
-	pip := getTestPublicIP()
+	configProperties := getTestPublicFipConfigurationProperties()
 	nodes := []*v1.Node{}
 
-	lb, updated, err := az.reconcileLoadBalancer(lb, &pip, testClusterName, &svc, nodes)
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+	validateLoadBalancer(t, lb, svc)
+
+	lb, updated, err = az.reconcileLoadBalancer(lb, nil, testClusterName, &svc, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 
-	svcUpdated := getTestService("servicea")
+	if !updated {
+		t.Error("Expected the loadbalancer to need an update")
+	}
+
+	// ensure we abandoned the frontend ip configuration
+	if len(*lb.FrontendIPConfigurations) != 0 {
+		t.Error("Expected the loadbalancer to have no frontend ip configuration")
+	}
+
+	validateLoadBalancer(t, lb)
+}
+
+// Test removing all service ports results in removing the frontend ip configuration
+func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) {
+	az := getTestCloud()
+	svc := getTestService("servicea", v1.ProtocolTCP, 80)
+	lb := getTestLoadBalancer()
+	configProperties := getTestPublicFipConfigurationProperties()
+	nodes := []*v1.Node{}
+
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+	validateLoadBalancer(t, lb, svc)
+
+	svcUpdated := getTestService("servicea", v1.ProtocolTCP)
 	lb, updated, err = az.reconcileLoadBalancer(lb, nil, testClusterName, &svcUpdated, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
@@ -120,14 +156,14 @@ func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) 
 // Test removal of a port from an existing service.
 func TestReconcileLoadBalancerRemovesPort(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80, 443)
-	pip := getTestPublicIP()
+	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
+	configProperties := getTestPublicFipConfigurationProperties()
 	nodes := []*v1.Node{}
 
 	existingLoadBalancer := getTestLoadBalancer(svc)
 
-	svcUpdated := getTestService("servicea", 80)
-	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &pip, testClusterName, &svcUpdated, nodes)
+	svcUpdated := getTestService("servicea", v1.ProtocolTCP, 80)
+	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &configProperties, testClusterName, &svcUpdated, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -138,19 +174,19 @@ func TestReconcileLoadBalancerRemovesPort(t *testing.T) {
 // Test reconciliation of multiple services on same port
 func TestReconcileLoadBalancerMultipleServices(t *testing.T) {
 	az := getTestCloud()
-	svc1 := getTestService("servicea", 80, 443)
-	svc2 := getTestService("serviceb", 80)
-	pip := getTestPublicIP()
+	svc1 := getTestService("servicea", v1.ProtocolTCP, 80, 443)
+	svc2 := getTestService("serviceb", v1.ProtocolTCP, 80)
+	configProperties := getTestPublicFipConfigurationProperties()
 	nodes := []*v1.Node{}
 
 	existingLoadBalancer := getTestLoadBalancer()
 
-	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &pip, testClusterName, &svc1, nodes)
+	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &configProperties, testClusterName, &svc1, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 
-	updatedLoadBalancer, _, err = az.reconcileLoadBalancer(updatedLoadBalancer, &pip, testClusterName, &svc2, nodes)
+	updatedLoadBalancer, _, err = az.reconcileLoadBalancer(updatedLoadBalancer, &configProperties, testClusterName, &svc2, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -160,11 +196,11 @@ func TestReconcileLoadBalancerMultipleServices(t *testing.T) {
 
 func TestReconcileSecurityGroupNewServiceAddsPort(t *testing.T) {
 	az := getTestCloud()
-	svc1 := getTestService("serviceea", 80)
+	svc1 := getTestService("serviceea", v1.ProtocolTCP, 80)
 
 	sg := getTestSecurityGroup()
 
-	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svc1)
+	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svc1, true)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -172,14 +208,44 @@ func TestReconcileSecurityGroupNewServiceAddsPort(t *testing.T) {
 	validateSecurityGroup(t, sg, svc1)
 }
 
+func TestReconcileSecurityGroupNewInternalServiceAddsPort(t *testing.T) {
+	az := getTestCloud()
+	svc1 := getInternalTestService("serviceea", 80)
+
+	sg := getTestSecurityGroup()
+
+	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svc1, true)
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, svc1)
+}
+
+func TestReconcileSecurityGroupRemoveService(t *testing.T) {
+	service1 := getTestService("servicea", v1.ProtocolTCP, 81)
+	service2 := getTestService("serviceb", v1.ProtocolTCP, 82)
+
+	sg := getTestSecurityGroup(service1, service2)
+
+	validateSecurityGroup(t, sg, service1, service2)
+	az := getTestCloud()
+	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &service1, false)
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+
+	validateSecurityGroup(t, sg, service2)
+}
+
 func TestReconcileSecurityGroupRemoveServiceRemovesPort(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80, 443)
+	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
 
 	sg := getTestSecurityGroup(svc)
 
-	svcUpdated := getTestService("servicea", 80)
-	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svcUpdated)
+	svcUpdated := getTestService("servicea", v1.ProtocolTCP, 80)
+	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svcUpdated, true)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -189,14 +255,14 @@ func TestReconcileSecurityGroupRemoveServiceRemovesPort(t *testing.T) {
 
 func TestReconcileSecurityWithSourceRanges(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80, 443)
+	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
 	svc.Spec.LoadBalancerSourceRanges = []string{
-		"192.168.0.1/24",
-		"10.0.0.1/32",
+		"192.168.0.0/24",
+		"10.0.0.0/32",
 	}
 
 	sg := getTestSecurityGroup(svc)
-	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svc)
+	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svc, true)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -223,18 +289,18 @@ func getBackendPort(port int32) int32 {
 	return port + 10000
 }
 
-func getTestPublicIP() network.PublicIPAddress {
-	pip := network.PublicIPAddress{}
-	pip.ID = to.StringPtr("/this/is/a/public/ip/address/id")
-	return pip
+func getTestPublicFipConfigurationProperties() network.FrontendIPConfigurationPropertiesFormat {
+	return network.FrontendIPConfigurationPropertiesFormat{
+		PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("/this/is/a/public/ip/address/id")},
+	}
 }
 
-func getTestService(identifier string, requestedPorts ...int32) v1.Service {
+func getTestService(identifier string, proto v1.Protocol, requestedPorts ...int32) v1.Service {
 	ports := []v1.ServicePort{}
 	for _, port := range requestedPorts {
 		ports = append(ports, v1.ServicePort{
-			Name:     fmt.Sprintf("port-%d", port),
-			Protocol: v1.ProtocolTCP,
+			Name:     fmt.Sprintf("port-tcp-%d", port),
+			Protocol: proto,
 			Port:     port,
 			NodePort: getBackendPort(port),
 		})
@@ -249,6 +315,14 @@ func getTestService(identifier string, requestedPorts ...int32) v1.Service {
 	svc.Name = identifier
 	svc.Namespace = "default"
 	svc.UID = types.UID(identifier)
+	svc.Annotations = make(map[string]string)
+
+	return svc
+}
+
+func getInternalTestService(identifier string, requestedPorts ...int32) v1.Service {
+	svc := getTestService(identifier, v1.ProtocolTCP, requestedPorts...)
+	svc.Annotations[ServiceAnnotationLoadBalancerInternal] = "true"
 
 	return svc
 }
@@ -259,7 +333,7 @@ func getTestLoadBalancer(services ...v1.Service) network.LoadBalancer {
 
 	for _, service := range services {
 		for _, port := range service.Spec.Ports {
-			ruleName := getRuleName(&service, port)
+			ruleName := getLoadBalancerRuleName(&service, port)
 			rules = append(rules, network.LoadBalancingRule{
 				Name: to.StringPtr(ruleName),
 				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
@@ -288,8 +362,11 @@ func getTestLoadBalancer(services ...v1.Service) network.LoadBalancer {
 
 func getServiceSourceRanges(service *v1.Service) []string {
 	if len(service.Spec.LoadBalancerSourceRanges) == 0 {
-		return []string{"Internet"}
+		if !requiresInternalLoadBalancer(service) {
+			return []string{"Internet"}
+		}
 	}
+
 	return service.Spec.LoadBalancerSourceRanges
 }
 
@@ -298,10 +375,9 @@ func getTestSecurityGroup(services ...v1.Service) network.SecurityGroup {
 
 	for _, service := range services {
 		for _, port := range service.Spec.Ports {
-			ruleName := getRuleName(&service, port)
-
 			sources := getServiceSourceRanges(&service)
 			for _, src := range sources {
+				ruleName := getSecurityRuleName(&service, port, src)
 				rules = append(rules, network.SecurityRule{
 					Name: to.StringPtr(ruleName),
 					SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
@@ -324,10 +400,15 @@ func getTestSecurityGroup(services ...v1.Service) network.SecurityGroup {
 
 func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, services ...v1.Service) {
 	expectedRuleCount := 0
+	expectedFrontendIPCount := 0
+	expectedProbeCount := 0
 	for _, svc := range services {
+		if len(svc.Spec.Ports) > 0 {
+			expectedFrontendIPCount++
+		}
 		for _, wantedRule := range svc.Spec.Ports {
 			expectedRuleCount++
-			wantedRuleName := getRuleName(&svc, wantedRule)
+			wantedRuleName := getLoadBalancerRuleName(&svc, wantedRule)
 			foundRule := false
 			for _, actualRule := range *loadBalancer.LoadBalancingRules {
 				if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
@@ -341,6 +422,12 @@ func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, servi
 				t.Errorf("Expected load balancer rule but didn't find it: %q", wantedRuleName)
 			}
 
+			// if UDP rule, there is no probe
+			if wantedRule.Protocol == v1.ProtocolUDP {
+				continue
+			}
+
+			expectedProbeCount++
 			foundProbe := false
 			if serviceapi.NeedsHealthCheck(&svc) {
 				path, port := serviceapi.GetServiceHealthCheckPathPort(&svc)
@@ -371,12 +458,18 @@ func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, servi
 		}
 	}
 
+	frontendIPCount := len(*loadBalancer.FrontendIPConfigurations)
+	if frontendIPCount != expectedFrontendIPCount {
+		t.Errorf("Expected the loadbalancer to have %d frontend IPs. Found %d.\n%v", expectedFrontendIPCount, frontendIPCount, loadBalancer.FrontendIPConfigurations)
+	}
+
 	lenRules := len(*loadBalancer.LoadBalancingRules)
 	if lenRules != expectedRuleCount {
 		t.Errorf("Expected the loadbalancer to have %d rules. Found %d.\n%v", expectedRuleCount, lenRules, loadBalancer.LoadBalancingRules)
 	}
+
 	lenProbes := len(*loadBalancer.Probes)
-	if lenProbes != expectedRuleCount {
+	if lenProbes != expectedProbeCount {
 		t.Errorf("Expected the loadbalancer to have %d probes. Found %d.", expectedRuleCount, lenProbes)
 	}
 }
@@ -386,10 +479,9 @@ func validateSecurityGroup(t *testing.T, securityGroup network.SecurityGroup, se
 	for _, svc := range services {
 		for _, wantedRule := range svc.Spec.Ports {
 			sources := getServiceSourceRanges(&svc)
-
 			for _, source := range sources {
+				wantedRuleName := getSecurityRuleName(&svc, wantedRule, source)
 				expectedRuleCount++
-				wantedRuleName := getRuleName(&svc, wantedRule)
 				foundRule := false
 				for _, actualRule := range *securityGroup.SecurityRules {
 					if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
@@ -461,22 +553,28 @@ func TestProtocolTranslationTCP(t *testing.T) {
 		t.Error(err)
 	}
 
-	if transportProto != network.TransportProtocolTCP {
+	if *transportProto != network.TransportProtocolTCP {
 		t.Errorf("Expected TCP LoadBalancer Rule Protocol. Got %v", transportProto)
 	}
-	if securityGroupProto != network.TCP {
+	if *securityGroupProto != network.TCP {
 		t.Errorf("Expected TCP SecurityGroup Protocol. Got %v", transportProto)
 	}
-	if probeProto != network.ProbeProtocolTCP {
+	if *probeProto != network.ProbeProtocolTCP {
 		t.Errorf("Expected TCP LoadBalancer Probe Protocol. Got %v", transportProto)
 	}
 }
 
 func TestProtocolTranslationUDP(t *testing.T) {
 	proto := v1.ProtocolUDP
-	_, _, _, err := getProtocolsFromKubernetesProtocol(proto)
-	if err == nil {
-		t.Error("Expected an error. UDP is unsupported.")
+	transportProto, securityGroupProto, probeProto, _ := getProtocolsFromKubernetesProtocol(proto)
+	if *transportProto != network.TransportProtocolUDP {
+		t.Errorf("Expected UDP LoadBalancer Rule Protocol. Got %v", transportProto)
+	}
+	if *securityGroupProto != network.UDP {
+		t.Errorf("Expected UDP SecurityGroup Protocol. Got %v", transportProto)
+	}
+	if probeProto != nil {
+		t.Errorf("Expected UDP LoadBalancer Probe Protocol. Got %v", transportProto)
 	}
 }
 
@@ -577,26 +675,5 @@ func TestDecodeInstanceInfo(t *testing.T) {
 
 	if *faultDomain != "99" {
 		t.Error("got incorrect fault domain")
-	}
-}
-
-func TestFilterNodes(t *testing.T) {
-	nodes := []compute.VirtualMachine{
-		{Name: to.StringPtr("test")},
-		{Name: to.StringPtr("test2")},
-		{Name: to.StringPtr("3test")},
-	}
-
-	filteredNodes, err := filterNodes(nodes, "^test$")
-	if err != nil {
-		t.Errorf("Unexpeted error when filtering: %q", err)
-	}
-
-	if len(filteredNodes) != 1 {
-		t.Error("Got too many nodes after filtering")
-	}
-
-	if *filteredNodes[0].Name != "test" {
-		t.Error("Get the wrong node after filtering")
 	}
 }

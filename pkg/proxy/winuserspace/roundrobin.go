@@ -233,69 +233,117 @@ func (lb *LoadBalancerRR) updateAffinityMap(svcPort proxy.ServicePortName, newEn
 	}
 }
 
-// OnEndpointsUpdate manages the registered service endpoints.
-// Registered endpoints are updated if found in the update set or
-// unregistered if missing from the update set.
-func (lb *LoadBalancerRR) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
-	registeredEndpoints := make(map[proxy.ServicePortName]bool)
+// buildPortsToEndpointsMap builds a map of portname -> all ip:ports for that
+// portname. Explode Endpoints.Subsets[*] into this structure.
+func buildPortsToEndpointsMap(endpoints *api.Endpoints) map[string][]hostPortPair {
+	portsToEndpoints := map[string][]hostPortPair{}
+	for i := range endpoints.Subsets {
+		ss := &endpoints.Subsets[i]
+		for i := range ss.Ports {
+			port := &ss.Ports[i]
+			for i := range ss.Addresses {
+				addr := &ss.Addresses[i]
+				portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortPair{addr.IP, int(port.Port)})
+				// Ignore the protocol field - we'll get that from the Service objects.
+			}
+		}
+	}
+	return portsToEndpoints
+}
+
+func (lb *LoadBalancerRR) OnEndpointsAdd(endpoints *api.Endpoints) {
+	portsToEndpoints := buildPortsToEndpointsMap(endpoints)
+
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 
-	// Update endpoints for services.
-	for i := range allEndpoints {
-		svcEndpoints := &allEndpoints[i]
+	for portname := range portsToEndpoints {
+		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}, Port: portname}
+		newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
+		state, exists := lb.services[svcPort]
 
-		// We need to build a map of portname -> all ip:ports for that
-		// portname.  Explode Endpoints.Subsets[*] into this structure.
-		portsToEndpoints := map[string][]hostPortPair{}
-		for i := range svcEndpoints.Subsets {
-			ss := &svcEndpoints.Subsets[i]
-			for i := range ss.Ports {
-				port := &ss.Ports[i]
-				for i := range ss.Addresses {
-					addr := &ss.Addresses[i]
-					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortPair{addr.IP, int(port.Port)})
-					// Ignore the protocol field - we'll get that from the Service objects.
-				}
-			}
-		}
+		if !exists || state == nil || len(newEndpoints) > 0 {
+			glog.V(1).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", svcPort, newEndpoints)
+			lb.updateAffinityMap(svcPort, newEndpoints)
+			// OnEndpointsAdd can be called without NewService being called externally.
+			// To be safe we will call it here.  A new service will only be created
+			// if one does not already exist.  The affinity will be updated
+			// later, once NewService is called.
+			state = lb.newServiceInternal(svcPort, api.ServiceAffinity(""), 0)
+			state.endpoints = slice.ShuffleStrings(newEndpoints)
 
-		for portname := range portsToEndpoints {
-			svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: svcEndpoints.Namespace, Name: svcEndpoints.Name}, Port: portname}
-			state, exists := lb.services[svcPort]
-			curEndpoints := []string{}
-			if state != nil {
-				curEndpoints = state.endpoints
-			}
-			newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
-
-			if !exists || state == nil || len(curEndpoints) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpoints), newEndpoints) {
-				glog.V(1).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", svcPort, newEndpoints)
-				lb.updateAffinityMap(svcPort, newEndpoints)
-				// OnEndpointsUpdate can be called without NewService being called externally.
-				// To be safe we will call it here.  A new service will only be created
-				// if one does not already exist.  The affinity will be updated
-				// later, once NewService is called.
-				state = lb.newServiceInternal(svcPort, api.ServiceAffinity(""), 0)
-				state.endpoints = slice.ShuffleStrings(newEndpoints)
-
-				// Reset the round-robin index.
-				state.index = 0
-			}
-			registeredEndpoints[svcPort] = true
+			// Reset the round-robin index.
+			state.index = 0
 		}
 	}
-	// Remove endpoints missing from the update.
-	for k := range lb.services {
-		if _, exists := registeredEndpoints[k]; !exists {
-			glog.V(2).Infof("LoadBalancerRR: Removing endpoints for %s", k)
+}
+
+func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {
+	portsToEndpoints := buildPortsToEndpointsMap(endpoints)
+	oldPortsToEndpoints := buildPortsToEndpointsMap(oldEndpoints)
+	registeredEndpoints := make(map[proxy.ServicePortName]bool)
+
+	lb.lock.Lock()
+	defer lb.lock.Unlock()
+
+	for portname := range portsToEndpoints {
+		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}, Port: portname}
+		newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
+		state, exists := lb.services[svcPort]
+
+		curEndpoints := []string{}
+		if state != nil {
+			curEndpoints = state.endpoints
+		}
+
+		if !exists || state == nil || len(curEndpoints) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpoints), newEndpoints) {
+			glog.V(1).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", svcPort, newEndpoints)
+			lb.updateAffinityMap(svcPort, newEndpoints)
+			// OnEndpointsUpdate can be called without NewService being called externally.
+			// To be safe we will call it here.  A new service will only be created
+			// if one does not already exist.  The affinity will be updated
+			// later, once NewService is called.
+			state = lb.newServiceInternal(svcPort, api.ServiceAffinity(""), 0)
+			state.endpoints = slice.ShuffleStrings(newEndpoints)
+
+			// Reset the round-robin index.
+			state.index = 0
+		}
+		registeredEndpoints[svcPort] = true
+	}
+
+	for portname := range oldPortsToEndpoints {
+		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}, Port: portname}
+		if _, exists := registeredEndpoints[svcPort]; !exists {
+			glog.V(2).Infof("LoadBalancerRR: Removing endpoints for %s", svcPort)
 			// Reset but don't delete.
-			state := lb.services[k]
+			state := lb.services[svcPort]
 			state.endpoints = []string{}
 			state.index = 0
 			state.affinity.affinityMap = map[string]*affinityState{}
 		}
 	}
+}
+
+func (lb *LoadBalancerRR) OnEndpointsDelete(endpoints *api.Endpoints) {
+	portsToEndpoints := buildPortsToEndpointsMap(endpoints)
+
+	lb.lock.Lock()
+	defer lb.lock.Unlock()
+
+	for portname := range portsToEndpoints {
+		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}, Port: portname}
+		glog.V(2).Infof("LoadBalancerRR: Removing endpoints for %s", svcPort)
+		// If the service is still around, reset but don't delete.
+		if state, ok := lb.services[svcPort]; ok {
+			state.endpoints = []string{}
+			state.index = 0
+			state.affinity.affinityMap = map[string]*affinityState{}
+		}
+	}
+}
+
+func (lb *LoadBalancerRR) OnEndpointsSynced() {
 }
 
 // Tests whether two slices are equivalent.  This sorts both slices in-place.

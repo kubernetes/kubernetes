@@ -175,6 +175,9 @@ func SetList(list runtime.Object, objects []runtime.Object) error {
 	slice := reflect.MakeSlice(items.Type(), len(objects), len(objects))
 	for i := range objects {
 		dest := slice.Index(i)
+		if dest.Type() == reflect.TypeOf(runtime.RawExtension{}) {
+			dest = dest.FieldByName("Object")
+		}
 
 		// check to see if you're directly assignable
 		if reflect.TypeOf(objects[i]).AssignableTo(dest.Type()) {

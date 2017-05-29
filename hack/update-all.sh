@@ -22,7 +22,6 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/cluster/lib/util.sh"
 
 SILENT=true
 ALL=false
@@ -71,6 +70,9 @@ BASH_TARGETS="
 	update-openapi-spec
 	update-api-reference-docs
 	update-federation-openapi-spec
+	update-federation-swagger-spec
+	update-federation-generated-swagger-docs
+	update-federation-api-reference-docs
 	update-staging-client-go
 	update-staging-godeps
 	update-bazel"

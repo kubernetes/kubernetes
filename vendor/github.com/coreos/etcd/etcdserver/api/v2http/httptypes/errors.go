@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	plog = capnslog.NewPackageLogger("github.com/coreos/etcd/etcdserver/api/v2http", "httptypes")
+	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "etcdserver/api/v2http/httptypes")
 )
 
 type HTTPError struct {

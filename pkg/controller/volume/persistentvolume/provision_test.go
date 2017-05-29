@@ -22,7 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 )
 
 var class1Parameters = map[string]string{
@@ -359,36 +359,6 @@ func TestProvisionSync(t *testing.T) {
 	runSyncTests(t, tests, storageClasses)
 }
 
-func TestAlphaProvisionSync(t *testing.T) {
-	tests := []controllerTest{
-		{
-			// Provision a volume with alpha annotation
-			"14-1 - successful alpha provisioning",
-			novolumes,
-			newVolumeArray("pvc-uid14-1", "1Gi", "uid14-1", "claim14-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, annBoundByController, annDynamicallyProvisioned),
-			newClaimArray("claim14-1", "uid14-1", "1Gi", "", v1.ClaimPending, nil, v1.AlphaStorageClassAnnotation),
-			// Binding will be completed in the next syncClaim
-			newClaimArray("claim14-1", "uid14-1", "1Gi", "", v1.ClaimPending, nil, v1.AlphaStorageClassAnnotation, annStorageProvisioner),
-			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provisionAlphaSuccess}, testSyncClaim),
-		},
-		{
-			// Provision success - there is already a volume available, still
-			// we provision a new one when requested.
-			"14-2 - no alpha provisioning when there is a volume available",
-			newVolumeArray("volume14-2", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classEmpty),
-			[]*v1.PersistentVolume{
-				newVolume("volume14-2", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classEmpty),
-				newVolume("pvc-uid14-2", "1Gi", "uid14-2", "claim14-2", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, annBoundByController, annDynamicallyProvisioned),
-			},
-			newClaimArray("claim14-2", "uid14-2", "1Gi", "", v1.ClaimPending, nil, v1.AlphaStorageClassAnnotation),
-			// Binding will be completed in the next syncClaim
-			newClaimArray("claim14-2", "uid14-2", "1Gi", "", v1.ClaimPending, nil, v1.AlphaStorageClassAnnotation, annStorageProvisioner),
-			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provisionAlphaSuccess}, testSyncClaim),
-		},
-	}
-	runSyncTests(t, tests, []*storage.StorageClass{})
-}
-
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
 // volume/claims. The test follows this pattern:
 // 0. Load the controller with initial data.
@@ -421,7 +391,10 @@ func TestProvisionMultiSync(t *testing.T) {
 
 // When provisioning is disabled, provisioning a claim should instantly return nil
 func TestDisablingDynamicProvisioner(t *testing.T) {
-	ctrl := newTestController(nil, nil, false)
+	ctrl, err := newTestController(nil, nil, false)
+	if err != nil {
+		t.Fatalf("Construct PersistentVolume controller failed: %v", err)
+	}
 	retVal := ctrl.provisionClaim(nil)
 	if retVal != nil {
 		t.Errorf("Expected nil return but got %v", retVal)

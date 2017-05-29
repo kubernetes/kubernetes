@@ -20,8 +20,8 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // IsDefaultStorageClassAnnotation represents a StorageClass annotation that
 // marks a class as the default StorageClass
-//TODO: Update IsDefaultStorageClassannotation and remove Beta when no longer used
-const IsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
+//TODO: remove Beta when no longer used
+const IsDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-class"
 const BetaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
 
 // IsDefaultAnnotationText returns a pretty Yes/No String if

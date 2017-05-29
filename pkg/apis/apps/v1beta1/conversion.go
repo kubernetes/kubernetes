@@ -66,7 +66,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	if err != nil {
 		return err
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("apps/v1beta1", "Deployment",
+	err = scheme.AddFieldLabelConversionFunc("apps/v1beta1", "Deployment",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace":
@@ -110,6 +110,7 @@ func Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *StatefulSetSpec
 		out.VolumeClaimTemplates = nil
 	}
 	out.ServiceName = in.ServiceName
+	out.PodManagementPolicy = apps.PodManagementPolicyType(in.PodManagementPolicy)
 	return nil
 }
 
@@ -140,6 +141,7 @@ func Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSe
 		out.VolumeClaimTemplates = nil
 	}
 	out.ServiceName = in.ServiceName
+	out.PodManagementPolicy = PodManagementPolicyType(in.PodManagementPolicy)
 	return nil
 }
 

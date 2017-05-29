@@ -17,6 +17,7 @@ limitations under the License.
 package initialresources
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -112,8 +113,40 @@ func expectNoAnnotation(t *testing.T, pod *api.Pod) {
 func admit(t *testing.T, ir admission.Interface, pods []*api.Pod) {
 	for i := range pods {
 		p := pods[i]
-		if err := ir.Admit(admission.NewAttributesRecord(p, nil, api.Kind("Pod").WithVersion("version"), "test", p.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil)); err != nil {
+
+		podKind := api.Kind("Pod").WithVersion("version")
+		podRes := api.Resource("pods").WithVersion("version")
+		attrs := admission.NewAttributesRecord(p, nil, podKind, "test", p.ObjectMeta.Name, podRes, "", admission.Create, nil)
+		if err := ir.Admit(attrs); err != nil {
 			t.Error(err)
+		}
+	}
+}
+
+func testAdminScenarios(t *testing.T, ir admission.Interface, p *api.Pod) {
+	podKind := api.Kind("Pod").WithVersion("version")
+	podRes := api.Resource("pods").WithVersion("version")
+
+	var tests = []struct {
+		attrs       admission.Attributes
+		expectError bool
+	}{
+		{
+			admission.NewAttributesRecord(p, nil, podKind, "test", p.ObjectMeta.Name, podRes, "foo", admission.Create, nil),
+			false,
+		},
+		{
+			admission.NewAttributesRecord(&api.ReplicationController{}, nil, podKind, "test", "", podRes, "", admission.Create, nil),
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		err := ir.Admit(test.attrs)
+		if err != nil && test.expectError == false {
+			t.Error(err)
+		} else if err == nil && test.expectError == true {
+			t.Error("Error expected for Admit but received none")
 		}
 	}
 }
@@ -121,6 +154,7 @@ func admit(t *testing.T, ir admission.Interface, pods []*api.Pod) {
 func performTest(t *testing.T, ir admission.Interface) {
 	pods := getPods()
 	admit(t, ir, pods)
+	testAdminScenarios(t, ir, pods[0])
 
 	verifyPod(t, pods[0], 100, 100)
 	verifyPod(t, pods[1], 100, 300)
@@ -133,6 +167,14 @@ func performTest(t *testing.T, ir admission.Interface) {
 	expectNoAnnotation(t, pods[3])
 }
 
+func TestEstimateReturnsErrorFromSource(t *testing.T) {
+	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
+		return 0, 0, errors.New("Example error")
+	}
+	ir := newInitialResources(&fakeSource{f: f}, 90, false)
+	admit(t, ir, getPods())
+}
+
 func TestEstimationBasedOnTheSameImageSameNamespace7d(t *testing.T) {
 	f := func(_ api.ResourceName, _ int64, _, ns string, exactMatch bool, start, end time.Time) (int64, int64, error) {
 		if exactMatch && end.Sub(start) == week && ns == "test-ns" {
@@ -141,7 +183,6 @@ func TestEstimationBasedOnTheSameImageSameNamespace7d(t *testing.T) {
 		return 200, 120, nil
 	}
 	performTest(t, newInitialResources(&fakeSource{f: f}, 90, false))
-
 }
 
 func TestEstimationBasedOnTheSameImageSameNamespace30d(t *testing.T) {

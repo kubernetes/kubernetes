@@ -18,12 +18,12 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:golang.org/x/oauth2",
-        "//vendor:golang.org/x/oauth2/google",
-        "//vendor:golang.org/x/oauth2/jwt",
-        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/golang.org/x/oauth2:go_default_library",
+        "//vendor/golang.org/x/oauth2/google:go_default_library",
+        "//vendor/golang.org/x/oauth2/jwt:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
     ],
 )
 
@@ -37,7 +37,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
     ],
 )
 

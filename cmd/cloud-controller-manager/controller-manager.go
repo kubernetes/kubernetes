@@ -52,6 +52,10 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
+	if s.CloudProvider == "" {
+		glog.Errorf("--cloud-provider cannot be empty")
+	}
+
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	if err != nil {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)

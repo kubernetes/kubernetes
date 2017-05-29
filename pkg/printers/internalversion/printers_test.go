@@ -236,7 +236,7 @@ func TestFormatResourceName(t *testing.T) {
 		{"kind", "name", "kind/name"},
 	}
 	for _, tt := range tests {
-		if got := formatResourceName(tt.kind, tt.name, true); got != tt.want {
+		if got := printers.FormatResourceName(tt.kind, tt.name, true); got != tt.want {
 			t.Errorf("formatResourceName(%q, %q) = %q, want %q", tt.kind, tt.name, got, tt.want)
 		}
 	}
@@ -825,6 +825,43 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 	}
 }
 
+func TestPrintNodeName(t *testing.T) {
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+		Wide: true,
+	})
+	AddHandlers(printer)
+	table := []struct {
+		node api.Node
+		Name string
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
+				Status:     api.NodeStatus{},
+			},
+			Name: "127.0.0.1",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: ""},
+				Status:     api.NodeStatus{},
+			},
+			Name: "<unknown>",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.node, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Node: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.Name) {
+			t.Fatalf("Expect printing node %s with node name %#v, got: %#v", test.node.Name, test.Name, buffer.String())
+		}
+	}
+}
+
 func TestPrintNodeExternalIP(t *testing.T) {
 	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 		Wide: true,
@@ -852,7 +889,6 @@ func TestPrintNodeExternalIP(t *testing.T) {
 			node: api.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
 				Status: api.NodeStatus{Addresses: []api.NodeAddress{
-					{Type: api.NodeLegacyHostIP, Address: "1.1.1.1"},
 					{Type: api.NodeExternalIP, Address: "2.2.2.2"},
 					{Type: api.NodeInternalIP, Address: "3.3.3.3"},
 					{Type: api.NodeExternalIP, Address: "4.4.4.4"},
@@ -2143,13 +2179,14 @@ func TestPrintService(t *testing.T) {
 		printService(&test.service, buf, printers.PrintOptions{})
 		// We ignore time
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s %d", test.expect, buf.String(), strings.Compare(test.expect, buf.String()))
+			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
 }
 
 func TestPrintPodDisruptionBudget(t *testing.T) {
+	minAvailable := intstr.FromInt(22)
 	tests := []struct {
 		pdb    policy.PodDisruptionBudget
 		expect string
@@ -2162,13 +2199,13 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: policy.PodDisruptionBudgetSpec{
-					MinAvailable: intstr.FromInt(22),
+					MinAvailable: &minAvailable,
 				},
 				Status: policy.PodDisruptionBudgetStatus{
 					PodDisruptionsAllowed: 5,
 				},
 			},
-			"pdb1\t22\t5\t0s\n",
+			"pdb1\t22\tN/A\t5\t0s\n",
 		}}
 
 	buf := bytes.NewBuffer([]byte{})

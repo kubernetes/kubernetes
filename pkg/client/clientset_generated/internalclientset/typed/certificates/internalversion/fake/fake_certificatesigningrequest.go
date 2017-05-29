@@ -33,6 +33,8 @@ type FakeCertificateSigningRequests struct {
 
 var certificatesigningrequestsResource = schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "", Resource: "certificatesigningrequests"}
 
+var certificatesigningrequestsKind = schema.GroupVersionKind{Group: "certificates.k8s.io", Version: "", Kind: "CertificateSigningRequest"}
+
 func (c *FakeCertificateSigningRequests) Create(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(certificatesigningrequestsResource, certificateSigningRequest), &certificates.CertificateSigningRequest{})
@@ -84,7 +86,7 @@ func (c *FakeCertificateSigningRequests) Get(name string, options v1.GetOptions)
 
 func (c *FakeCertificateSigningRequests) List(opts v1.ListOptions) (result *certificates.CertificateSigningRequestList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(certificatesigningrequestsResource, opts), &certificates.CertificateSigningRequestList{})
+		Invokes(testing.NewRootListAction(certificatesigningrequestsResource, certificatesigningrequestsKind, opts), &certificates.CertificateSigningRequestList{})
 	if obj == nil {
 		return nil, err
 	}

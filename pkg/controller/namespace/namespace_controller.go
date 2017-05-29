@@ -50,20 +50,12 @@ const (
 
 // NamespaceController is responsible for performing actions dependent upon a namespace phase
 type NamespaceController struct {
-	// client that purges namespace content, must have list/delete privileges on all content
-	kubeClient clientset.Interface
-	// clientPool manages a pool of dynamic clients
-	clientPool dynamic.ClientPool
 	// lister that can list namespaces from a shared cache
 	lister corelisters.NamespaceLister
 	// returns true when the namespace cache is ready
 	listerSynced cache.InformerSynced
 	// namespaces that have been queued up for processing by workers
 	queue workqueue.RateLimitingInterface
-	// function to list of preferred resources for namespace deletion
-	discoverResourcesFn func() ([]*metav1.APIResourceList, error)
-	// finalizerToken is the finalizer token managed by this controller
-	finalizerToken v1.FinalizerName
 	// helper to delete all resources in the namespace when the namespace is deleted.
 	namespacedResourcesDeleter deletion.NamespacedResourcesDeleterInterface
 }
@@ -79,11 +71,7 @@ func NewNamespaceController(
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
-		kubeClient:                 kubeClient,
-		clientPool:                 clientPool,
-		queue:                      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
-		discoverResourcesFn:        discoverResourcesFn,
-		finalizerToken:             finalizerToken,
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
 		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.Core().Namespaces(), clientPool, kubeClient.Core(), discoverResourcesFn, finalizerToken, true),
 	}
 
@@ -119,6 +107,13 @@ func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
+
+	namespace := obj.(*v1.Namespace)
+	// don't queue if we aren't deleted
+	if namespace.DeletionTimestamp == nil || namespace.DeletionTimestamp.IsZero() {
+		return
+	}
+
 	// delay processing namespace events to allow HA api servers to observe namespace deletion,
 	// and HA etcd servers to observe last minute object creations inside the namespace
 	nm.queue.AddAfter(key, namespaceDeletionGracePeriod)
@@ -167,7 +162,9 @@ func (nm *NamespaceController) worker() {
 // syncNamespaceFromKey looks for a namespace with the specified key in its store and synchronizes it
 func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 	startTime := time.Now()
-	defer glog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Now().Sub(startTime))
+	defer func() {
+		glog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Now().Sub(startTime))
+	}()
 
 	namespace, err := nm.lister.Get(key)
 	if errors.IsNotFound(err) {
@@ -186,18 +183,14 @@ func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer nm.queue.ShutDown()
 
-	glog.Info("Starting the NamespaceController")
-
-	if !cache.WaitForCacheSync(stopCh, nm.listerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("namespace", stopCh, nm.listerSynced) {
 		return
 	}
 
+	glog.V(5).Info("Starting workers")
 	for i := 0; i < workers; i++ {
 		go wait.Until(nm.worker, time.Second, stopCh)
 	}
-
 	<-stopCh
-
-	glog.Info("Shutting down NamespaceController")
+	glog.V(1).Infof("Shutting down")
 }

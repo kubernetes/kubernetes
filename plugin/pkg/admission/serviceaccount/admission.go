@@ -36,7 +36,6 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -54,8 +53,9 @@ const DefaultAPITokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
 // PluginName is the name of this admission plugin
 const PluginName = "ServiceAccount"
 
-func init() {
-	admission.RegisterPlugin(PluginName, func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		serviceAccountAdmission := NewServiceAccount()
 		return serviceAccountAdmission, nil
 	})
@@ -146,7 +146,7 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// Don't modify the spec of mirror pods.
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
-	if _, isMirrorPod := pod.Annotations[kubelet.ConfigMirrorAnnotationKey]; isMirrorPod {
+	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
 		if len(pod.Spec.ServiceAccountName) != 0 {
 			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference service accounts"))
 		}
@@ -287,18 +287,20 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.Se
 
 // getServiceAccountTokens returns all ServiceAccountToken secrets for the given ServiceAccount
 func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAccount) ([]*api.Secret, error) {
-	tokens, err := s.secretLister.Secrets(serviceAccount.Namespace).List(labels.Everything())
+	secrets, err := s.secretLister.Secrets(serviceAccount.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	for _, token := range tokens {
-		if token.Type != api.SecretTypeServiceAccountToken {
+	tokens := []*api.Secret{}
+
+	for _, secret := range secrets {
+		if secret.Type != api.SecretTypeServiceAccountToken {
 			continue
 		}
 
-		if serviceaccount.InternalIsServiceAccountToken(token, serviceAccount) {
-			tokens = append(tokens, token)
+		if serviceaccount.InternalIsServiceAccountToken(secret, serviceAccount) {
+			tokens = append(tokens, secret)
 		}
 	}
 	return tokens, nil

@@ -42,7 +42,7 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("parameters"), "updates to parameters are forbidden."))
 	}
 
-	if strings.Compare(storageClass.Provisioner, oldStorageClass.Provisioner) != 0 {
+	if storageClass.Provisioner != oldStorageClass.Provisioner {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("provisioner"), "updates to provisioner are forbidden."))
 	}
 	return allErrs

@@ -206,9 +206,9 @@ func TestOpenPodHostports(t *testing.T) {
 
 	// Socket
 	hostPortMap := map[hostport]closeable{
-		hostport{123, "tcp"}:  &fakeSocket{123, "tcp", false},
-		hostport{4567, "tcp"}: &fakeSocket{4567, "tcp", false},
-		hostport{5678, "udp"}: &fakeSocket{5678, "udp", false},
+		{123, "tcp"}:  &fakeSocket{123, "tcp", false},
+		{4567, "tcp"}: &fakeSocket{4567, "tcp", false},
+		{5678, "udp"}: &fakeSocket{5678, "udp", false},
 	}
 	if !reflect.DeepEqual(hostPortMap, h.hostPortMap) {
 		t.Fatalf("Mismatch in expected hostPortMap. Expected '%v', got '%v'", hostPortMap, h.hostPortMap)

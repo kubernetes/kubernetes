@@ -93,7 +93,7 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 		opts := &PortForwardOptions{}
 		cmd := NewCmdPortForward(f, os.Stdout, os.Stderr)
 		cmd.Run = func(cmd *cobra.Command, args []string) {
-			if err = opts.Complete(f, cmd, args, os.Stdout, os.Stderr); err != nil {
+			if err = opts.Complete(f, cmd, args); err != nil {
 				return
 			}
 			opts.PortForwarder = ff

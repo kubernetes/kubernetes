@@ -29,12 +29,12 @@ import (
 type SwaggerUI struct{}
 
 // Install adds the SwaggerUI webservice to the given mux.
-func (l SwaggerUI) Install(c *mux.APIContainer) {
+func (l SwaggerUI) Install(c *mux.PathRecorderMux) {
 	fileServer := http.FileServer(&assetfs.AssetFS{
 		Asset:    swagger.Asset,
 		AssetDir: swagger.AssetDir,
 		Prefix:   "third_party/swagger-ui",
 	})
 	prefix := "/swagger-ui/"
-	c.NonSwaggerRoutes.Handle(prefix, http.StripPrefix(prefix, fileServer))
+	c.HandlePrefix(prefix, http.StripPrefix(prefix, fileServer))
 }

@@ -25,17 +25,20 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kcache "k8s.io/client-go/tools/cache"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
+	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // DesiredStateOfWorldPopulator periodically verifies that the pods in the
-// desired state of th world still exist, if not, it removes them.
-// TODO: it also loops through the list of active pods and ensures that
+// desired state of the world still exist, if not, it removes them.
+// It also loops through the list of active pods and ensures that
 // each one exists in the desired state of the world cache
 // if it has volumes.
 type DesiredStateOfWorldPopulator interface {
@@ -50,19 +53,32 @@ type DesiredStateOfWorldPopulator interface {
 // desiredStateOfWorld - the cache to populate
 func NewDesiredStateOfWorldPopulator(
 	loopSleepDuration time.Duration,
+	listPodsRetryDuration time.Duration,
 	podLister corelisters.PodLister,
-	desiredStateOfWorld cache.DesiredStateOfWorld) DesiredStateOfWorldPopulator {
+	desiredStateOfWorld cache.DesiredStateOfWorld,
+	volumePluginMgr *volume.VolumePluginMgr,
+	pvcLister corelisters.PersistentVolumeClaimLister,
+	pvLister corelisters.PersistentVolumeLister) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
-		loopSleepDuration:   loopSleepDuration,
-		podLister:           podLister,
-		desiredStateOfWorld: desiredStateOfWorld,
+		loopSleepDuration:     loopSleepDuration,
+		listPodsRetryDuration: listPodsRetryDuration,
+		podLister:             podLister,
+		desiredStateOfWorld:   desiredStateOfWorld,
+		volumePluginMgr:       volumePluginMgr,
+		pvcLister:             pvcLister,
+		pvLister:              pvLister,
 	}
 }
 
 type desiredStateOfWorldPopulator struct {
-	loopSleepDuration   time.Duration
-	podLister           corelisters.PodLister
-	desiredStateOfWorld cache.DesiredStateOfWorld
+	loopSleepDuration     time.Duration
+	podLister             corelisters.PodLister
+	desiredStateOfWorld   cache.DesiredStateOfWorld
+	volumePluginMgr       *volume.VolumePluginMgr
+	pvcLister             corelisters.PersistentVolumeClaimLister
+	pvLister              corelisters.PersistentVolumeLister
+	listPodsRetryDuration time.Duration
+	timeOfLastListPods    time.Time
 }
 
 func (dswp *desiredStateOfWorldPopulator) Run(stopCh <-chan struct{}) {
@@ -72,6 +88,18 @@ func (dswp *desiredStateOfWorldPopulator) Run(stopCh <-chan struct{}) {
 func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
 	return func() {
 		dswp.findAndRemoveDeletedPods()
+
+		// findAndAddActivePods is called periodically, independently of the main
+		// populator loop.
+		if time.Since(dswp.timeOfLastListPods) < dswp.listPodsRetryDuration {
+			glog.V(5).Infof(
+				"Skipping findAndAddActivePods(). Not permitted until %v (listPodsRetryDuration %v).",
+				dswp.timeOfLastListPods.Add(dswp.listPodsRetryDuration),
+				dswp.listPodsRetryDuration)
+
+			return
+		}
+		dswp.findAndAddActivePods()
 	}
 }
 
@@ -99,11 +127,18 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			glog.Errorf("podLister Get failed for pod %q (UID %q) with %v", dswPodKey, dswPodUID, err)
 			continue
 		default:
-			informerPodUID := volumehelper.GetUniquePodName(informerPod)
-			// Check whether the unique identifier of the pod from dsw matches the one retrieved from pod informer
-			if informerPodUID == dswPodUID {
-				glog.V(10).Infof("Verified pod %q (UID %q) from dsw exists in pod informer.", dswPodKey, dswPodUID)
-				continue
+			volumeActionFlag := util.DetermineVolumeAction(
+				informerPod,
+				dswp.desiredStateOfWorld,
+				true /* default volume action */)
+
+			if volumeActionFlag {
+				informerPodUID := volumehelper.GetUniquePodName(informerPod)
+				// Check whether the unique identifier of the pod from dsw matches the one retrieved from pod informer
+				if informerPodUID == dswPodUID {
+					glog.V(10).Infof("Verified pod %q (UID %q) from dsw exists in pod informer.", dswPodKey, dswPodUID)
+					continue
+				}
 			}
 		}
 
@@ -112,4 +147,24 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		glog.V(1).Infof("Removing pod %q (UID %q) from dsw because it does not exist in pod informer.", dswPodKey, dswPodUID)
 		dswp.desiredStateOfWorld.DeletePod(dswPodUID, dswPodToAdd.VolumeName, dswPodToAdd.NodeName)
 	}
+}
+
+func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
+	pods, err := dswp.podLister.List(labels.Everything())
+	if err != nil {
+		glog.Errorf("podLister List failed: %v", err)
+		return
+	}
+	dswp.timeOfLastListPods = time.Now()
+
+	for _, pod := range pods {
+		if volumehelper.IsPodTerminated(pod, pod.Status) {
+			// Do not add volumes for terminated pods
+			continue
+		}
+		util.ProcessPodVolumes(pod, true,
+			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister)
+
+	}
+
 }

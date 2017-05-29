@@ -1,4 +1,4 @@
-heat_template_version: 2014-10-16
+heat_template_version: 2016-10-14
 
 description: >
   Kubernetes cluster with one master and one or more worker nodes
@@ -161,6 +161,11 @@ parameters:
     type: string
     description: Comma seperated list of domains/addresses that bypass proxying.
     default: localhost
+    
+  assign_floating_ip:
+    type: boolean
+    description: Indicates whether floating IPs will be generated for minions
+    default: true
 
 resources:
 
@@ -435,6 +440,7 @@ resources:
           https_proxy: {get_param: https_proxy }
           socks_proxy: {get_param: socks_proxy }
           no_proxy: {get_param: no_proxy }
+          assign_floating_ip: {get_param: assign_floating_ip }
       min_size: {get_param: number_of_minions}
       desired_capacity: {get_param: number_of_minions}
       max_size: {get_param: max_number_of_minions}

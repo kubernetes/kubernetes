@@ -40,6 +40,7 @@ func toStatusKV(status info.DockerStatus) ([]keyVal, []keyVal) {
 	}
 	return []keyVal{
 		{Key: "Docker Version", Value: status.Version},
+		{Key: "Docker API Version", Value: status.APIVersion},
 		{Key: "Kernel Version", Value: status.KernelVersion},
 		{Key: "OS Version", Value: status.OS},
 		{Key: "Host Name", Value: status.Hostname},

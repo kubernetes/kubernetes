@@ -43,6 +43,7 @@ ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}"
 
 KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-false}
 
-# Indicates if the values (eg. kube password) in metadata should be treated as
-# canonical, and therefore disk copies ought to be recreated/clobbered.
+# Indicates if the values (i.e. KUBE_USER and KUBE_PASSWORD for basic
+# authentication) in metadata should be treated as canonical, and therefore disk
+# copies ought to be recreated/clobbered.
 METADATA_CLOBBERS_CONFIG=true

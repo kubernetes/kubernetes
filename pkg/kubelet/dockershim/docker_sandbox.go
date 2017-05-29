@@ -18,6 +18,8 @@ package dockershim
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
@@ -25,10 +27,10 @@ import (
 	"github.com/golang/glog"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -105,8 +107,8 @@ func (ds *dockerService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (str
 			return createResp.ID, fmt.Errorf("failed to inspect sandbox container for pod %q: %v", config.Metadata.Name, err)
 		}
 
-		if err := dockertools.RewriteResolvFile(containerInfo.ResolvConfPath, dnsConfig.Servers, dnsConfig.Searches, len(dnsConfig.Options) > 0); err != nil {
-			return createResp.ID, fmt.Errorf("rewrite resolf.conf faield for pod %q: %v", config.Metadata.Name, err)
+		if err := rewriteResolvFile(containerInfo.ResolvConfPath, dnsConfig.Servers, dnsConfig.Searches, dnsConfig.Options); err != nil {
+			return createResp.ID, fmt.Errorf("rewrite resolv.conf failed for pod %q: %v", config.Metadata.Name, err)
 		}
 	}
 
@@ -159,7 +161,7 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 		// actions will only have sandbox ID and not have pod namespace and name information.
 		// Return error if encounter any unexpected error.
 		if checkpointErr != nil {
-			if dockertools.IsContainerNotFoundError(statusErr) && checkpointErr == errors.CheckpointNotFoundError {
+			if libdocker.IsContainerNotFoundError(statusErr) && checkpointErr == errors.CheckpointNotFoundError {
 				glog.Warningf("Both sandbox container and checkpoint for id %q could not be found. "+
 					"Proceed without further sandbox information.", podSandboxID)
 			} else {
@@ -204,7 +206,7 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 	if err := ds.client.StopContainer(podSandboxID, defaultSandboxGracePeriod); err != nil {
 		glog.Errorf("Failed to stop sandbox %q: %v", podSandboxID, err)
 		// Do not return error if the container does not exist
-		if !dockertools.IsContainerNotFoundError(err) {
+		if !libdocker.IsContainerNotFoundError(err) {
 			errList = append(errList, err)
 		}
 	}
@@ -216,14 +218,34 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 // sandbox, they should be forcibly removed.
 func (ds *dockerService) RemovePodSandbox(podSandboxID string) error {
 	var errs []error
-	if err := ds.client.RemoveContainer(podSandboxID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); err != nil && !dockertools.IsContainerNotFoundError(err) {
+	opts := dockertypes.ContainerListOptions{All: true}
+
+	opts.Filter = dockerfilters.NewArgs()
+	f := newDockerFilter(&opts.Filter)
+	f.AddLabel(sandboxIDLabelKey, podSandboxID)
+
+	containers, err := ds.client.ListContainers(opts)
+	if err != nil {
 		errs = append(errs, err)
 	}
+
+	// Remove all containers in the sandbox.
+	for i := range containers {
+		if err := ds.RemoveContainer(containers[i].ID); err != nil && !libdocker.IsContainerNotFoundError(err) {
+			errs = append(errs, err)
+		}
+	}
+
+	// Remove the sandbox container.
+	if err := ds.client.RemoveContainer(podSandboxID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true, Force: true}); err != nil && !libdocker.IsContainerNotFoundError(err) {
+		errs = append(errs, err)
+	}
+
+	// Remove the checkpoint of the sandbox.
 	if err := ds.checkpointHandler.RemoveCheckpoint(podSandboxID); err != nil {
 		errs = append(errs, err)
 	}
 	return utilerrors.NewAggregate(errs)
-	// TODO: remove all containers in the sandbox.
 }
 
 // getIPFromPlugin interrogates the network plugin for an IP.
@@ -283,7 +305,7 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 		return nil, err
 	}
 
-	// Parse the timstamps.
+	// Parse the timestamps.
 	createdAt, _, _, err := getContainerTimestamps(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", podSandboxID, err)
@@ -300,7 +322,6 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 		return nil, err
 	}
 	network := &runtimeapi.PodSandboxNetworkStatus{Ip: IP}
-	netNS := getNetworkNamespace(r)
 	hostNetwork := sharesHostNetwork(r)
 
 	// If the sandbox has no containerTypeLabelKey label, treat it as a legacy sandbox.
@@ -329,7 +350,6 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 		Network:     network,
 		Linux: &runtimeapi.LinuxPodSandboxStatus{
 			Namespaces: &runtimeapi.Namespace{
-				Network: netNS,
 				Options: &runtimeapi.NamespaceOption{
 					HostNetwork: hostNetwork,
 					HostPid:     sharesHostPid(r),
@@ -453,7 +473,12 @@ func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig
 	}
 	hc.CgroupParent = cgroupParent
 	// Apply security context.
-	applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator)
+	if err = applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator); err != nil {
+		return err
+	}
+
+	// Set sysctls.
+	hc.Sysctls = lc.Sysctls
 
 	return nil
 }
@@ -486,13 +511,6 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 		HostConfig: hc,
 	}
 
-	// Set sysctls if requested
-	sysctls, err := getSysctlsFromAnnotations(c.Annotations)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sysctls from annotations %v for sandbox %q: %v", c.Annotations, c.Metadata.Name, err)
-	}
-	hc.Sysctls = sysctls
-
 	// Apply linux-specific options.
 	if lc := c.GetLinux(); lc != nil {
 		if err := ds.applySandboxLinuxOptions(hc, lc, createConfig, image, securityOptSep); err != nil {
@@ -519,7 +537,7 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	}
 
 	// Set security options.
-	securityOpts, err := getSandboxSecurityOpts(c, ds.seccompProfileRoot, securityOptSep)
+	securityOpts, err := getSeccompSecurityOpts(sandboxContainerName, c, ds.seccompProfileRoot, securityOptSep)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.Name, err)
 	}
@@ -556,7 +574,7 @@ func sharesHostIpc(container *dockertypes.ContainerJSON) bool {
 
 func setSandboxResources(hc *dockercontainer.HostConfig) {
 	hc.Resources = dockercontainer.Resources{
-		MemorySwap: dockertools.DefaultMemorySwap(),
+		MemorySwap: DefaultMemorySwap(),
 		CPUShares:  defaultSandboxCPUshares,
 		// Use docker's default cpu quota/period.
 	}
@@ -586,4 +604,53 @@ func toCheckpointProtocol(protocol runtimeapi.Protocol) Protocol {
 	}
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
 	return protocolTCP
+}
+
+// rewriteResolvFile rewrites resolv.conf file generated by docker.
+func rewriteResolvFile(resolvFilePath string, dns []string, dnsSearch []string, dnsOptions []string) error {
+	if len(resolvFilePath) == 0 {
+		glog.Errorf("ResolvConfPath is empty.")
+		return nil
+	}
+
+	if _, err := os.Stat(resolvFilePath); os.IsNotExist(err) {
+		return fmt.Errorf("ResolvConfPath %q does not exist", resolvFilePath)
+	}
+
+	var resolvFileContent []string
+	for _, srv := range dns {
+		resolvFileContent = append(resolvFileContent, "nameserver "+srv)
+	}
+
+	if len(dnsSearch) > 0 {
+		resolvFileContent = append(resolvFileContent, "search "+strings.Join(dnsSearch, " "))
+	}
+
+	if len(dnsOptions) > 0 {
+		resolvFileContent = append(resolvFileContent, "options "+strings.Join(dnsOptions, " "))
+	}
+
+	if len(resolvFileContent) > 0 {
+		resolvFileContentStr := strings.Join(resolvFileContent, "\n")
+		resolvFileContentStr += "\n"
+
+		glog.V(4).Infof("Will attempt to re-write config file %s with: \n%s", resolvFilePath, resolvFileContent)
+		if err := rewriteFile(resolvFilePath, resolvFileContentStr); err != nil {
+			glog.Errorf("resolv.conf could not be updated: %v", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func rewriteFile(filePath, stringToWrite string) error {
+	f, err := os.OpenFile(filePath, os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(stringToWrite)
+	return err
 }

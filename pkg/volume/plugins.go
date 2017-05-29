@@ -68,9 +68,10 @@ type VolumePlugin interface {
 	// depend on this.
 	Init(host VolumeHost) error
 
-	// Name returns the plugin's name.  Plugins should use namespaced names
-	// such as "example.com/volume".  The "kubernetes.io" namespace is
-	// reserved for plugins which are bundled with kubernetes.
+	// Name returns the plugin's name.  Plugins must use namespaced names
+	// such as "example.com/volume" and contain exactly one '/' character.
+	// The "kubernetes.io" namespace is reserved for plugins which are
+	// bundled with kubernetes.
 	GetPluginName() string
 
 	// GetVolumeName returns the name/ID to uniquely identifying the actual
@@ -156,8 +157,6 @@ const (
 	// Name of a volume in external cloud that is being provisioned and thus
 	// should be ignored by rest of Kubernetes.
 	ProvisionedVolumeName = "placeholder-for-provisioning"
-	// Mount options annotations
-	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
 )
 
 // ProvisionableVolumePlugin is an extended interface of VolumePlugin and is

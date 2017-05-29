@@ -11,3 +11,18 @@ options:
     type: string
     default: 10.152.183.0/24
     description: CIDR to user for Kubernetes services. Cannot be changed after deployment.
+  allow-privileged:
+    type: string
+    default: "auto"
+    description: |
+      Allow kube-apiserver to run in privileged mode. Supported values are
+      "true", "false", and "auto". If "true", kube-apiserver will run in
+      privileged mode by default. If "false", kube-apiserver will never run in
+      privileged mode. If "auto", kube-apiserver will not run in privileged
+      mode by default, but will switch to privileged mode if gpu hardware is
+      detected on a worker node.
+  channel:
+    type: string
+    default: "stable"
+    description: |
+      Snap channel to install Kubernetes master services from

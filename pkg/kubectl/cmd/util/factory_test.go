@@ -25,12 +25,12 @@ import (
 	"os"
 	"os/user"
 	"path"
-	"reflect"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -281,8 +281,11 @@ func TestRefetchSchemaWhenValidationFails(t *testing.T) {
 			}
 		}),
 	}
-	dir := os.TempDir() + "/schemaCache"
-	os.RemoveAll(dir)
+	dir, err := ioutil.TempDir("", "schemaCache")
+	if err != nil {
+		t.Fatalf("Error getting tempDir: %v", err)
+	}
+	defer os.RemoveAll(dir)
 
 	fullDir, err := substituteUserHome(dir)
 	if err != nil {
@@ -339,8 +342,11 @@ func TestValidateCachesSchema(t *testing.T) {
 			}
 		}),
 	}
-	dir := os.TempDir() + "/schemaCache"
-	os.RemoveAll(dir)
+	dir, err := ioutil.TempDir("", "schemaCache")
+	if err != nil {
+		t.Fatalf("Error getting tempDir: %v", err)
+	}
+	defer os.RemoveAll(dir)
 
 	obj := &api.Pod{}
 	data, err := runtime.Encode(testapi.Default.Codec(), obj)
@@ -623,7 +629,7 @@ func TestGetFirstPod(t *testing.T) {
 			t.Errorf("%s: expected %d pods, got %d", test.name, test.expectedNum, numPods)
 			continue
 		}
-		if !reflect.DeepEqual(test.expected, pod) {
+		if !apiequality.Semantic.DeepEqual(test.expected, pod) {
 			t.Errorf("%s:\nexpected pod:\n%#v\ngot:\n%#v\n\n", test.name, test.expected, pod)
 		}
 	}
@@ -740,12 +746,12 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 		{
 			name:     "all-replacement",
 			arg:      "all",
-			expected: "pods,replicationcontrollers,services,statefulsets,horizontalpodautoscalers,jobs,deployments,replicasets",
+			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,deployments.extensions,replicasets.extensions",
 		},
 		{
 			name:     "alias-in-comma-separated-arg",
 			arg:      "all,secrets",
-			expected: "pods,replicationcontrollers,services,statefulsets,horizontalpodautoscalers,jobs,deployments,replicasets,secrets",
+			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,deployments.extensions,replicasets.extensions,secrets",
 		},
 	}
 
@@ -754,7 +760,7 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to create shortcut expander, err = %s", err.Error())
 	}
-	b := resource.NewBuilder(mapper, api.Scheme, fakeClient(), testapi.Default.Codec())
+	b := resource.NewBuilder(mapper, resource.LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec())
 
 	for _, test := range tests {
 		replaced := b.ReplaceAliases(test.arg)

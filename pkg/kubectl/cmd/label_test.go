@@ -325,7 +325,7 @@ func TestLabelErrors(t *testing.T) {
 			cmd.Flags().Set(k, v)
 		}
 		opts := LabelOptions{}
-		err := opts.Complete(f, buf, cmd, testCase.args)
+		err := opts.Complete(buf, cmd, testCase.args)
 		if err == nil {
 			err = opts.Validate()
 		}
@@ -382,7 +382,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	cmd := NewCmdLabel(f, buf)
 	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}}}
-	err := opts.Complete(f, buf, cmd, []string{"a=b"})
+	err := opts.Complete(buf, cmd, []string{"a=b"})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -415,7 +415,7 @@ func TestLabelLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}}}
-	err := opts.Complete(f, buf, cmd, []string{"a=b"})
+	err := opts.Complete(buf, cmd, []string{"a=b"})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -470,7 +470,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 	cmd.Flags().Set("all", "true")
 
 	opts := LabelOptions{}
-	err := opts.Complete(f, buf, cmd, []string{"pods", "a=b"})
+	err := opts.Complete(buf, cmd, []string{"pods", "a=b"})
 	if err == nil {
 		err = opts.Validate()
 	}

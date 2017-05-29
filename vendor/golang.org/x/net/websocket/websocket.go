@@ -4,6 +4,12 @@
 
 // Package websocket implements a client and server for the WebSocket protocol
 // as specified in RFC 6455.
+//
+// This package currently lacks some features found in an alternative
+// and more actively maintained WebSocket package:
+//
+//     https://godoc.org/github.com/gorilla/websocket
+//
 package websocket
 
 import (
@@ -32,6 +38,8 @@ const (
 	PingFrame         = 9
 	PongFrame         = 10
 	UnknownFrame      = 255
+
+	DefaultMaxPayloadBytes = 32 << 20 // 32MB
 )
 
 // ProtocolError represents WebSocket protocol errors.
@@ -57,6 +65,10 @@ var (
 	ErrBadRequestMethod     = &ProtocolError{"bad method"}
 	ErrNotSupported         = &ProtocolError{"not supported"}
 )
+
+// ErrFrameTooLarge is returned by Codec's Receive method if payload size
+// exceeds limit set by Conn.MaxPayloadBytes
+var ErrFrameTooLarge = errors.New("websocket: frame payload size exceeds limit")
 
 // Addr is an implementation of net.Addr for WebSocket.
 type Addr struct {
@@ -85,6 +97,9 @@ type Config struct {
 
 	// Additional header fields to be sent in WebSocket opening handshake.
 	Header http.Header
+
+	// Dialer used when opening websocket connections.
+	Dialer *net.Dialer
 
 	handshakeData map[string]string
 }
@@ -163,6 +178,10 @@ type Conn struct {
 	frameHandler
 	PayloadType        byte
 	defaultCloseStatus int
+
+	// MaxPayloadBytes limits the size of frame payload received over Conn
+	// by Codec's Receive method. If zero, DefaultMaxPayloadBytes is used.
+	MaxPayloadBytes int
 }
 
 // Read implements the io.Reader interface:
@@ -299,7 +318,12 @@ func (cd Codec) Send(ws *Conn, v interface{}) (err error) {
 	return err
 }
 
-// Receive receives single frame from ws, unmarshaled by cd.Unmarshal and stores in v.
+// Receive receives single frame from ws, unmarshaled by cd.Unmarshal and stores
+// in v. The whole frame payload is read to an in-memory buffer; max size of
+// payload is defined by ws.MaxPayloadBytes. If frame payload size exceeds
+// limit, ErrFrameTooLarge is returned; in this case frame is not read off wire
+// completely. The next call to Receive would read and discard leftover data of
+// previous oversized frame before processing next frame.
 func (cd Codec) Receive(ws *Conn, v interface{}) (err error) {
 	ws.rio.Lock()
 	defer ws.rio.Unlock()
@@ -321,6 +345,19 @@ again:
 	}
 	if frame == nil {
 		goto again
+	}
+	maxPayloadBytes := ws.MaxPayloadBytes
+	if maxPayloadBytes == 0 {
+		maxPayloadBytes = DefaultMaxPayloadBytes
+	}
+	if hf, ok := frame.(*hybiFrameReader); ok && hf.header.Length > int64(maxPayloadBytes) {
+		// payload size exceeds limit, no need to call Unmarshal
+		//
+		// set frameReader to current oversized frame so that
+		// the next call to this function can drain leftover
+		// data before processing the next frame
+		ws.frameReader = frame
+		return ErrFrameTooLarge
 	}
 	payloadType := frame.PayloadType()
 	data, err := ioutil.ReadAll(frame)

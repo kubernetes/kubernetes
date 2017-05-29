@@ -140,7 +140,7 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 		return "", fmt.Errorf("failed to convert deployment, %v", err)
 	}
 	versionedClient := versionedClientsetForDeployment(c)
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSetsV15(externalDeployment, versionedClient)
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(externalDeployment, versionedClient)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", deployment.Name, err)
 	}
@@ -172,7 +172,8 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 		}
-		printersinternal.DescribePodTemplate(internalTemplate, buf)
+		w := printersinternal.NewPrefixWriter(buf)
+		printersinternal.DescribePodTemplate(internalTemplate, w)
 		return buf.String(), nil
 	}
 
@@ -190,6 +191,7 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 	}
-	printersinternal.DescribePodTemplate(internalTemplate, buf)
+	w := printersinternal.NewPrefixWriter(buf)
+	printersinternal.DescribePodTemplate(internalTemplate, w)
 	return buf.String(), nil
 }

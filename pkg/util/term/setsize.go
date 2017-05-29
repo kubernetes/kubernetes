@@ -20,9 +20,10 @@ package term
 
 import (
 	"github.com/docker/docker/pkg/term"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 // SetSize sets the terminal size associated with fd.
-func SetSize(fd uintptr, size Size) error {
+func SetSize(fd uintptr, size remotecommand.TerminalSize) error {
 	return term.SetWinsize(fd, &term.Winsize{Height: size.Height, Width: size.Width})
 }

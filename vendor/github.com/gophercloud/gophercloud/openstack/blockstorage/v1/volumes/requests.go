@@ -15,15 +15,15 @@ type CreateOptsBuilder interface {
 // the volumes.Create function. For more information about these parameters,
 // see the Volume object.
 type CreateOpts struct {
-	Size         int               `json:"size" required:"true"`
-	Availability string            `json:"availability,omitempty"`
-	Description  string            `json:"display_description,omitempty"`
-	Metadata     map[string]string `json:"metadata,omitempty"`
-	Name         string            `json:"display_name,omitempty"`
-	SnapshotID   string            `json:"snapshot_id,omitempty"`
-	SourceVolID  string            `json:"source_volid,omitempty"`
-	ImageID      string            `json:"imageRef,omitempty"`
-	VolumeType   string            `json:"volume_type,omitempty"`
+	Size             int               `json:"size" required:"true"`
+	AvailabilityZone string            `json:"availability_zone,omitempty"`
+	Description      string            `json:"display_description,omitempty"`
+	Metadata         map[string]string `json:"metadata,omitempty"`
+	Name             string            `json:"display_name,omitempty"`
+	SnapshotID       string            `json:"snapshot_id,omitempty"`
+	SourceVolID      string            `json:"source_volid,omitempty"`
+	ImageID          string            `json:"imageRef,omitempty"`
+	VolumeType       string            `json:"volume_type,omitempty"`
 }
 
 // ToVolumeCreateMap assembles a request body based on the contents of a

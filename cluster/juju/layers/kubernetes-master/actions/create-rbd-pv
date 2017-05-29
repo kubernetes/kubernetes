@@ -28,6 +28,9 @@ import os
 import sys
 
 
+os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
+
+
 def main():
     ''' Control logic to enlist Ceph RBD volumes as PersistentVolumes in
     Kubernetes. This will invoke the validation steps, and only execute if

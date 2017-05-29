@@ -27,13 +27,13 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/install"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/validation"
 )
 
-func init() {
-	admission.RegisterPlugin("ResourceQuota",
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("ResourceQuota",
 		func(config io.Reader) (admission.Interface, error) {
 			// load the configuration provided (if any)
 			configuration, err := LoadConfiguration(config)
@@ -46,10 +46,7 @@ func init() {
 					return nil, errs.ToAggregate()
 				}
 			}
-			// NOTE: we do not provide informers to the registry because admission level decisions
-			// does not require us to open watches for all items tracked by quota.
-			registry := install.NewRegistry(nil, nil)
-			return NewResourceQuota(registry, configuration, 5, make(chan struct{}))
+			return NewResourceQuota(configuration, 5, make(chan struct{}))
 		})
 }
 
@@ -65,6 +62,7 @@ type quotaAdmission struct {
 }
 
 var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&quotaAdmission{})
+var _ = kubeapiserveradmission.WantsQuotaRegistry(&quotaAdmission{})
 
 type liveLookupEntry struct {
 	expiry time.Time
@@ -74,7 +72,7 @@ type liveLookupEntry struct {
 // NewResourceQuota configures an admission controller that can enforce quota constraints
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
-func NewResourceQuota(registry quota.Registry, config *resourcequotaapi.Configuration, numEvaluators int, stopCh <-chan struct{}) (admission.Interface, error) {
+func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int, stopCh <-chan struct{}) (admission.Interface, error) {
 	quotaAccessor, err := newQuotaAccessor()
 	if err != nil {
 		return nil, err
@@ -83,11 +81,9 @@ func NewResourceQuota(registry quota.Registry, config *resourcequotaapi.Configur
 	return &quotaAdmission{
 		Handler:       admission.NewHandler(admission.Create, admission.Update),
 		stopCh:        stopCh,
-		registry:      registry,
 		numEvaluators: numEvaluators,
 		config:        config,
 		quotaAccessor: quotaAccessor,
-		evaluator:     NewQuotaEvaluator(quotaAccessor, registry, nil, config, numEvaluators, stopCh),
 	}, nil
 }
 
@@ -97,6 +93,11 @@ func (a *quotaAdmission) SetInternalKubeClientSet(client internalclientset.Inter
 
 func (a *quotaAdmission) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	a.quotaAccessor.lister = f.Core().InternalVersion().ResourceQuotas().Lister()
+}
+
+func (a *quotaAdmission) SetQuotaRegistry(r quota.Registry) {
+	a.registry = r
+	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.registry, nil, a.config, a.numEvaluators, a.stopCh)
 }
 
 // Validate ensures an authorizer is set.
@@ -109,6 +110,9 @@ func (a *quotaAdmission) Validate() error {
 	}
 	if a.quotaAccessor.lister == nil {
 		return fmt.Errorf("missing quotaAccessor.lister")
+	}
+	if a.registry == nil {
+		return fmt.Errorf("missing registry")
 	}
 	if a.evaluator == nil {
 		return fmt.Errorf("missing evaluator")

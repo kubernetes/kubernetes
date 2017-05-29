@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -289,5 +290,40 @@ func TestThirdPartyResourceDataListEncoding(t *testing.T) {
 	if targetOutput.APIVersion != gv.String() {
 		t.Errorf("apiversion mismatch %v != %v", targetOutput.APIVersion, gv.String())
 	}
+}
 
+func TestDecodeNumbers(t *testing.T) {
+	gv := schema.GroupVersion{Group: "stable.foo.faz", Version: "v1"}
+	gvk := gv.WithKind("Foo")
+	e := &thirdPartyResourceDataEncoder{delegate: testapi.Extensions.Codec(), gvk: gvk}
+	d := &thirdPartyResourceDataDecoder{kind: "Foo", delegate: testapi.Extensions.Codec()}
+
+	// Use highest int64 number and 1000000.
+	subject := &extensions.ThirdPartyResourceDataList{
+		Items: []extensions.ThirdPartyResourceData{
+			{
+				Data: []byte(`{"num1": 9223372036854775807, "num2": 1000000}`),
+			},
+		},
+	}
+
+	// Encode to get original JSON.
+	originalJSON := bytes.NewBuffer([]byte{})
+	err := e.Encode(subject, originalJSON)
+	if err != nil {
+		t.Errorf("encoding unexpected error: %v", err)
+	}
+
+	// Decode original JSON.
+	var into runtime.Object
+	into, _, err = d.Decode(originalJSON.Bytes(), &gvk, into)
+	if err != nil {
+		t.Errorf("decoding unexpected error: %v", err)
+	}
+
+	// Check if int is preserved.
+	decodedJSON := into.(*extensions.ThirdPartyResourceDataList).Items[0].Data
+	if !strings.Contains(string(decodedJSON), `"num1":9223372036854775807,"num2":1000000`) {
+		t.Errorf("Expected %s, got %s", `"num1":9223372036854775807,"num2":1000000`, string(decodedJSON))
+	}
 }

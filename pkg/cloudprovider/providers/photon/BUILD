@@ -14,11 +14,13 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/helper:go_default_library",
         "//pkg/cloudprovider:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/vmware/photon-controller-go-sdk/photon",
-        "//vendor:gopkg.in/gcfg.v1",
-        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//pkg/controller:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/vmware/photon-controller-go-sdk/photon:go_default_library",
+        "//vendor/gopkg.in/gcfg.v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 
@@ -29,8 +31,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/util/rand",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
     ],
 )
 

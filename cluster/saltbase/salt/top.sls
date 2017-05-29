@@ -63,9 +63,6 @@ base:
     - kube-client-tools
     - kube-master-addons
     - kube-admission-controls
-{% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] == 'gcp' %}
-    - fluentd-gcp
-{% endif %}
 {% if grains['cloud'] is defined and grains['cloud'] != 'vagrant' %}
     - logrotate
 {% endif %}
@@ -86,7 +83,4 @@ base:
 {% endif %}
 {% if pillar.get('enable_rescheduler', '').lower() == 'true' %}
     - rescheduler
-{% endif %}
-{% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
-    - calico.master
 {% endif %}

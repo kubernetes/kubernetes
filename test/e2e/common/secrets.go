@@ -29,6 +29,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = framework.KubeDescribe("Secrets", func() {
@@ -45,8 +46,8 @@ var _ = framework.KubeDescribe("Secrets", func() {
 
 	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Conformance] [Volume]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
-		fsGroup := int64(1001)
-		uid := int64(1000)
+		fsGroup := types.UnixGroupID(1001)
+		uid := types.UnixUserID(1000)
 		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), &fsGroup, &uid)
 	})
 
@@ -453,7 +454,8 @@ func secretForTest(namespace, name string) *v1.Secret {
 	}
 }
 
-func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secretName string, fsGroup *int64, uid *int64) {
+func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secretName string,
+	fsGroup *types.UnixGroupID, uid *types.UnixUserID) {
 	var (
 		volumeName      = "secret-volume"
 		volumeMountPath = "/etc/secret-volume"

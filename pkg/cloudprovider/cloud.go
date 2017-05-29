@@ -23,10 +23,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
+	// Initialize provides the cloud with a kubernetes client builder and may spawn goroutines
+	// to perform housekeeping activities within the cloud provider.
+	Initialize(clientBuilder controller.ControllerClientBuilder)
 	// LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 	LoadBalancer() (LoadBalancer, bool)
 	// Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.
@@ -112,6 +116,12 @@ type Instances interface {
 	// returns the address of the calling instance. We should do a rename to
 	// make this clearer.
 	NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error)
+	// NodeAddressesByProviderID returns the addresses of the specified instance.
+	// The instance is specified using the providerID of the node. The
+	// ProviderID is a unique identifier of the node. This will not be called
+	// from the node whose nodeaddresses are being queried. i.e. local metadata
+	// services cannot be used in this method to obtain nodeaddresses
+	NodeAddressesByProviderID(providerId string) ([]v1.NodeAddress, error)
 	// ExternalID returns the cloud provider ID of the node with the specified NodeName.
 	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 	ExternalID(nodeName types.NodeName) (string, error)
@@ -119,6 +129,8 @@ type Instances interface {
 	InstanceID(nodeName types.NodeName) (string, error)
 	// InstanceType returns the type of the specified instance.
 	InstanceType(name types.NodeName) (string, error)
+	// InstanceTypeByProviderID returns the type of the specified instance.
+	InstanceTypeByProviderID(providerID string) (string, error)
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 	// expected format for the key is standard ssh-keygen format: <protocol> <blob>
 	AddSSHKeyToAllInstances(user string, keyData []byte) error

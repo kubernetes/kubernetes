@@ -404,7 +404,7 @@ func TestAnnotateErrors(t *testing.T) {
 			cmd.Flags().Set(k, v)
 		}
 		options := &AnnotateOptions{}
-		err := options.Complete(f, buf, cmd, testCase.args)
+		err := options.Complete(buf, cmd, testCase.args)
 		if err == nil {
 			err = options.Validate()
 		}
@@ -461,7 +461,7 @@ func TestAnnotateObject(t *testing.T) {
 	cmd.SetOutput(buf)
 	options := &AnnotateOptions{}
 	args := []string{"pods/foo", "a=b", "c-"}
-	if err := options.Complete(f, buf, cmd, args); err != nil {
+	if err := options.Complete(buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(); err != nil {
@@ -513,7 +513,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	options := &AnnotateOptions{}
 	options.Filenames = []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}
 	args := []string{"a=b", "c-"}
-	if err := options.Complete(f, buf, cmd, args); err != nil {
+	if err := options.Complete(buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(); err != nil {
@@ -543,7 +543,7 @@ func TestAnnotateLocal(t *testing.T) {
 	options := &AnnotateOptions{}
 	options.Filenames = []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}
 	args := []string{"a=b"}
-	if err := options.Complete(f, buf, cmd, args); err != nil {
+	if err := options.Complete(buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(); err != nil {
@@ -597,7 +597,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	cmd.Flags().Set("all", "true")
 	options := &AnnotateOptions{}
 	args := []string{"pods", "a=b", "c-"}
-	if err := options.Complete(f, buf, cmd, args); err != nil {
+	if err := options.Complete(buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(); err != nil {

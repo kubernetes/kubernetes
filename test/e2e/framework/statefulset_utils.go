@@ -35,6 +35,7 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/generated"
@@ -213,7 +214,7 @@ func (s *StatefulSetTester) Scale(ss *apps.StatefulSet, count int32) error {
 	if pollErr != nil {
 		unhealthy := []string{}
 		for _, statefulPod := range statefulPodList.Items {
-			delTs, phase, readiness := statefulPod.DeletionTimestamp, statefulPod.Status.Phase, v1.IsPodReady(&statefulPod)
+			delTs, phase, readiness := statefulPod.DeletionTimestamp, statefulPod.Status.Phase, podutil.IsPodReady(&statefulPod)
 			if delTs != nil || phase != v1.PodRunning || !readiness {
 				unhealthy = append(unhealthy, fmt.Sprintf("%v: deletion %v, phase %v, readiness %v", statefulPod.Name, delTs, phase, readiness))
 			}
@@ -264,14 +265,21 @@ func (s *StatefulSetTester) GetPodList(ss *apps.StatefulSet) *v1.PodList {
 
 // ConfirmStatefulPodCount asserts that the current number of Pods in ss is count waiting up to timeout for ss to
 // to scale to count.
-func (s *StatefulSetTester) ConfirmStatefulPodCount(count int, ss *apps.StatefulSet, timeout time.Duration) {
+func (s *StatefulSetTester) ConfirmStatefulPodCount(count int, ss *apps.StatefulSet, timeout time.Duration, hard bool) {
 	start := time.Now()
 	deadline := start.Add(timeout)
 	for t := time.Now(); t.Before(deadline); t = time.Now() {
 		podList := s.GetPodList(ss)
 		statefulPodCount := len(podList.Items)
 		if statefulPodCount != count {
-			Failf("StatefulSet %v scaled unexpectedly scaled to %d -> %d replicas: %+v", ss.Name, count, len(podList.Items), podList)
+			logPodStates(podList.Items)
+			if hard {
+				Failf("StatefulSet %v scaled unexpectedly scaled to %d -> %d replicas", ss.Name, count, len(podList.Items))
+			} else {
+				Logf("StatefulSet %v has not reached scale %d, at %d", ss.Name, count, statefulPodCount)
+			}
+			time.Sleep(1 * time.Second)
+			continue
 		}
 		Logf("Verifying statefulset %v doesn't scale past %d for another %+v", ss.Name, count, deadline.Sub(t))
 		time.Sleep(1 * time.Second)
@@ -290,7 +298,7 @@ func (s *StatefulSetTester) waitForRunning(numStatefulPods int32, ss *apps.State
 				return false, fmt.Errorf("Too many pods scheduled, expected %d got %d", numStatefulPods, len(podList.Items))
 			}
 			for _, p := range podList.Items {
-				isReady := v1.IsPodReady(&p)
+				isReady := podutil.IsPodReady(&p)
 				desiredReadiness := shouldBeReady == isReady
 				Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
 				if p.Status.Phase != v1.PodRunning || !desiredReadiness {

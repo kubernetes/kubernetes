@@ -55,6 +55,7 @@ func TestCreate(t *testing.T) {
 		v1.DefaultSchedulerName,
 		client,
 		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -85,6 +86,7 @@ func TestCreateFromConfig(t *testing.T) {
 		v1.DefaultSchedulerName,
 		client,
 		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -138,6 +140,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		v1.DefaultSchedulerName,
 		client,
 		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -193,6 +196,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		v1.DefaultSchedulerName,
 		client,
 		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -278,7 +282,9 @@ func TestBind(t *testing.T) {
 			continue
 		}
 		expectedBody := runtime.EncodeOrDie(testapi.Default.Codec(), item.binding)
-		handler.ValidateRequest(t, testapi.Default.ResourcePath("bindings", metav1.NamespaceDefault, ""), "POST", &expectedBody)
+		handler.ValidateRequest(t,
+			testapi.Default.SubResourcePath("pods", metav1.NamespaceDefault, "foo", "binding"),
+			"POST", &expectedBody)
 	}
 }
 
@@ -302,6 +308,7 @@ func TestResponsibleForPod(t *testing.T) {
 		v1.DefaultSchedulerName,
 		client,
 		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -315,6 +322,7 @@ func TestResponsibleForPod(t *testing.T) {
 		"foo-scheduler",
 		client,
 		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -383,6 +391,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 		v1.DefaultSchedulerName,
 		client,
 		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -427,6 +436,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 			v1.DefaultSchedulerName,
 			client,
 			informerFactory.Core().V1().Nodes(),
+			informerFactory.Core().V1().Pods(),
 			informerFactory.Core().V1().PersistentVolumes(),
 			informerFactory.Core().V1().PersistentVolumeClaims(),
 			informerFactory.Core().V1().ReplicationControllers(),

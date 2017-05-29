@@ -28,6 +28,7 @@ if [[ "${KUBERNETES_PROVIDER:-gce}" != "gce" ]]; then
 fi
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 function usage() {
@@ -74,6 +75,13 @@ function print-node-version-info() {
 }
 
 function upgrade-master() {
+  local num_masters
+  num_masters=$(get-master-replicas-count)
+  if [[ "${num_masters}" -gt 1 ]]; then
+    echo "Upgrade of master not supported if more than one master replica present. The current number of master replicas: ${num_masters}"
+    exit 1
+  fi
+
   echo "== Upgrading master to '${SERVER_BINARY_TAR_URL}'. Do not interrupt, deleting master instance. =="
 
   # Tries to figure out KUBE_USER/KUBE_PASSWORD by first looking under
@@ -123,7 +131,7 @@ function backfile-kubeletauth-certs() {
   echo "${CA_KEY_BASE64}" | base64 -d > "${KUBE_TEMP}/pki/ca.key"
   echo "${CA_CERT_BASE64}" | base64 -d > "${KUBE_TEMP}/pki/ca.crt"
   (cd "${KUBE_TEMP}/pki"
-    download-cfssl
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
     cat <<EOF > ca-config.json
 {
   "signing": {
@@ -142,13 +150,13 @@ EOF
     # subpaths required for the apiserver to hit proxy
     # endpoints on the kubelet's handler.
     cat <<EOF \
-      | "${KUBE_TEMP}/cfssl/cfssl" gencert \
+      | "${CFSSL_BIN}" gencert \
         -ca=ca.crt \
         -ca-key=ca.key \
         -config=ca-config.json \
         -profile=client \
         - \
-      | "${KUBE_TEMP}/cfssl/cfssljson" -bare kube-apiserver
+      | "${CFSSLJSON_BIN}" -bare kube-apiserver
 {
   "CN": "kube-apiserver"
 }
@@ -185,7 +193,7 @@ function wait-for-master() {
 # Assumed vars
 #   KUBE_VERSION
 function prepare-upgrade() {
-  ensure-temp-dir
+  kube::util::ensure-temp-dir
   detect-project
   detect-node-names # sets INSTANCE_GROUPS
   write-cluster-name
@@ -445,6 +453,32 @@ fi
 if [[ "${master_upgrade}" == "false" ]] && [[ "${node_upgrade}" == "false" ]]; then
   echo "Can't specify both -M and -N" >&2
   exit 1
+fi
+
+# prompt if etcd storage media type isn't set unless using etcd2 when doing master upgrade
+if [[ -z "${STORAGE_MEDIA_TYPE:-}" ]] && [[ "${STORAGE_BACKEND:-}" != "etcd2" ]] && [[ "${master_upgrade}" == "true" ]]; then
+  echo "The default etcd storage media type in 1.6 has changed from application/json to application/vnd.kubernetes.protobuf."
+  echo "Documentation about the change can be found at https://kubernetes.io/docs/admin/etcd_upgrade."
+  echo ""
+  echo "ETCD2 DOES NOT SUPPORT PROTOBUF: If you wish to have to ability to downgrade to etcd2 later application/json must be used."
+  echo ""
+  echo "It's HIGHLY recommended that etcd be backed up before this step!!"
+  echo ""
+  echo "To enable using json, before running this script set:"
+  echo "export STORAGE_MEDIA_TYPE=application/json"
+  echo ""
+  if [ -t 0 ] && [ -t 1 ]; then
+    read -p "Would you like to continue with the new default, and lose the ability to downgrade to etcd2? [y/N] " confirm
+    if [[ "${confirm}" != "y" ]]; then
+      exit 1
+    fi
+  else
+    echo "To enable using protobuf, before running this script set:"
+    echo "export STORAGE_MEDIA_TYPE=application/vnd.kubernetes.protobuf"
+    echo ""
+    echo "STORAGE_MEDIA_TYPE must be specified when run non-interactively." >&2
+    exit 1
+  fi
 fi
 
 print-node-version-info "Pre-Upgrade"

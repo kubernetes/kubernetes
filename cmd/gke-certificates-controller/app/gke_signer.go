@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -25,13 +26,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	capi "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/controller/certificates"
 )
 
 var (
-	groupVersions = []schema.GroupVersion{certificates.SchemeGroupVersion}
+	groupVersions = []schema.GroupVersion{capi.SchemeGroupVersion}
 )
 
 // GKESigner uses external calls to GKE in order to sign certificate signing
@@ -40,10 +44,12 @@ type GKESigner struct {
 	webhook        *webhook.GenericWebhook
 	kubeConfigFile string
 	retryBackoff   time.Duration
+	recorder       record.EventRecorder
+	client         clientset.Interface
 }
 
 // NewGKESigner will create a new instance of a GKESigner.
-func NewGKESigner(kubeConfigFile string, retryBackoff time.Duration) (*GKESigner, error) {
+func NewGKESigner(kubeConfigFile string, retryBackoff time.Duration, recorder record.EventRecorder, client clientset.Interface) (*GKESigner, error) {
 	webhook, err := webhook.NewGenericWebhook(api.Registry, api.Codecs, kubeConfigFile, groupVersions, retryBackoff)
 	if err != nil {
 		return nil, err
@@ -53,18 +59,38 @@ func NewGKESigner(kubeConfigFile string, retryBackoff time.Duration) (*GKESigner
 		webhook:        webhook,
 		kubeConfigFile: kubeConfigFile,
 		retryBackoff:   retryBackoff,
+		recorder:       recorder,
+		client:         client,
 	}, nil
 }
 
+func (s *GKESigner) handle(csr *capi.CertificateSigningRequest) error {
+	if !certificates.IsCertificateRequestApproved(csr) {
+		return nil
+	}
+	csr, err := s.sign(csr)
+	if err != nil {
+		return fmt.Errorf("error auto signing csr: %v", err)
+	}
+	_, err = s.client.Certificates().CertificateSigningRequests().UpdateStatus(csr)
+	if err != nil {
+		return fmt.Errorf("error updating signature for csr: %v", err)
+	}
+	return nil
+}
+
 // Sign will make an external call to GKE order to sign the given
-// *certificates.CertificateSigningRequest, using the GKESigner's
+// *capi.CertificateSigningRequest, using the GKESigner's
 // kubeConfigFile.
-func (s *GKESigner) Sign(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
+func (s *GKESigner) sign(csr *capi.CertificateSigningRequest) (*capi.CertificateSigningRequest, error) {
 	result := s.webhook.WithExponentialBackoff(func() rest.Result {
 		return s.webhook.RestClient.Post().Body(csr).Do()
 	})
 
 	if err := result.Error(); err != nil {
+		if bodyErr := s.resultBodyError(result); bodyErr != nil {
+			return nil, s.webhookError(csr, bodyErr)
+		}
 		return nil, s.webhookError(csr, err)
 	}
 
@@ -73,7 +99,7 @@ func (s *GKESigner) Sign(csr *certificates.CertificateSigningRequest) (*certific
 		return nil, s.webhookError(csr, fmt.Errorf("received unsuccessful response code from webhook: %d", statusCode))
 	}
 
-	result_csr := &certificates.CertificateSigningRequest{}
+	result_csr := &capi.CertificateSigningRequest{}
 
 	if err := result.Into(result_csr); err != nil {
 		return nil, s.webhookError(result_csr, err)
@@ -84,7 +110,28 @@ func (s *GKESigner) Sign(csr *certificates.CertificateSigningRequest) (*certific
 	return csr, nil
 }
 
-func (s *GKESigner) webhookError(csr *certificates.CertificateSigningRequest, err error) error {
+func (s *GKESigner) webhookError(csr *capi.CertificateSigningRequest, err error) error {
 	glog.V(2).Infof("error contacting webhook backend: %s", err)
+	s.recorder.Eventf(csr, "Warning", "SigningError", "error while calling GKE: %v", err)
 	return err
+}
+
+// signResultError represents the structured response body of a failed call to
+// GKE's SignCertificate API.
+type signResultError struct {
+	Error struct {
+		Code    int
+		Message string
+		Status  string
+	}
+}
+
+// resultBodyError attempts to extract an error out of a response body.
+func (s *GKESigner) resultBodyError(result rest.Result) error {
+	body, _ := result.Raw()
+	var sre signResultError
+	if err := json.Unmarshal(body, &sre); err == nil {
+		return fmt.Errorf("server responded with error: %s", sre.Error.Message)
+	}
+	return nil
 }

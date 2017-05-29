@@ -17,6 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"os"
 	"reflect"
 	"testing"
 
@@ -26,6 +27,7 @@ import (
 
 func TestSecretGenerate(t *testing.T) {
 	tests := []struct {
+		setup     func(t *testing.T, params map[string]interface{}) func()
 		params    map[string]interface{}
 		expected  *api.Secret
 		expectErr bool
@@ -108,9 +110,84 @@ func TestSecretGenerate(t *testing.T) {
 			},
 			expectErr: false,
 		},
+		{
+			setup: setupEnvFile("key1=value1", "#", "", "key2=value2"),
+			params: map[string]interface{}{
+				"name":          "valid_env",
+				"from-env-file": "file.env",
+			},
+			expected: &api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid_env",
+				},
+				Data: map[string][]byte{
+					"key1": []byte("value1"),
+					"key2": []byte("value2"),
+				},
+			},
+			expectErr: false,
+		},
+		{
+			setup: func() func(t *testing.T, params map[string]interface{}) func() {
+				os.Setenv("g_key1", "1")
+				os.Setenv("g_key2", "2")
+				return setupEnvFile("g_key1", "g_key2=")
+			}(),
+			params: map[string]interface{}{
+				"name":          "getenv",
+				"from-env-file": "file.env",
+			},
+			expected: &api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "getenv",
+				},
+				Data: map[string][]byte{
+					"g_key1": []byte("1"),
+					"g_key2": []byte(""),
+				},
+			},
+			expectErr: false,
+		},
+		{
+			params: map[string]interface{}{
+				"name":          "too_many_args",
+				"from-literal":  []string{"key1=value1"},
+				"from-env-file": "file.env",
+			},
+			expectErr: true,
+		},
+		{
+			setup: setupEnvFile("key.1=value1"),
+			params: map[string]interface{}{
+				"name":          "invalid_key",
+				"from-env-file": "file.env",
+			},
+			expectErr: true,
+		},
+		{
+			setup: setupEnvFile("  key1=  value1"),
+			params: map[string]interface{}{
+				"name":          "with_spaces",
+				"from-env-file": "file.env",
+			},
+			expected: &api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "with_spaces",
+				},
+				Data: map[string][]byte{
+					"key1": []byte("  value1"),
+				},
+			},
+			expectErr: false,
+		},
 	}
 	generator := SecretGeneratorV1{}
 	for _, test := range tests {
+		if test.setup != nil {
+			if teardown := test.setup(t, test.params); teardown != nil {
+				defer teardown()
+			}
+		}
 		obj, err := generator.Generate(test.params)
 		if !test.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)

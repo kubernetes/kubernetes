@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/emicklei/go-restful/swagger"
+	"github.com/emicklei/go-restful-swagger12"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -42,6 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -277,6 +279,10 @@ func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper
 	return expander, typer, err
 }
 
+func (f *FakeFactory) CategoryExpander() resource.CategoryExpander {
+	return resource.LegacyCategoryExpander
+}
+
 func (f *FakeFactory) Decoder(bool) runtime.Decoder {
 	return f.Codec
 }
@@ -376,7 +382,7 @@ func (f *FakeFactory) LabelsForObject(runtime.Object) (map[string]string, error)
 	return nil, nil
 }
 
-func (f *FakeFactory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
+func (f *FakeFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
 	return nil, nil
 }
 
@@ -398,6 +404,10 @@ func (f *FakeFactory) Validator(validate bool, cacheDir string) (validation.Sche
 
 func (f *FakeFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {
 	return nil, nil
+}
+
+func (f *FakeFactory) OpenAPISchema(cacheDir string) (*openapi.Resources, error) {
+	return &openapi.Resources{}, nil
 }
 
 func (f *FakeFactory) DefaultNamespace() (string, bool, error) {
@@ -423,7 +433,7 @@ func (f *FakeFactory) CanBeAutoscaled(schema.GroupKind) error {
 	return nil
 }
 
-func (f *FakeFactory) AttachablePodForObject(ob runtime.Object) (*api.Pod, error) {
+func (f *FakeFactory) AttachablePodForObject(ob runtime.Object, timeout time.Duration) (*api.Pod, error) {
 	return nil, nil
 }
 
@@ -470,6 +480,14 @@ func (f *FakeFactory) DefaultResourceFilterFunc() kubectl.Filters {
 
 func (f *FakeFactory) SuggestedPodTemplateResources() []schema.GroupResource {
 	return []schema.GroupResource{}
+}
+
+func (f *FakeFactory) PluginLoader() plugins.PluginLoader {
+	return &plugins.DummyPluginLoader{}
+}
+
+func (f *FakeFactory) PluginRunner() plugins.PluginRunner {
+	return &plugins.ExecPluginRunner{}
 }
 
 type fakeMixedFactory struct {
@@ -613,7 +631,7 @@ func (f *fakeAPIFactory) Printer(mapping *meta.RESTMapping, options printers.Pri
 	return f.tf.Printer, f.tf.Err
 }
 
-func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
+func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
 	c, err := f.ClientSet()
 	if err != nil {
 		panic(err)
@@ -635,7 +653,7 @@ func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object) (*restcli
 	}
 }
 
-func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object) (*api.Pod, error) {
+func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {
 	switch t := object.(type) {
 	case *api.Pod:
 		return t, nil
@@ -689,7 +707,7 @@ func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RES
 func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
 
-	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
 }
 
 func (f *fakeAPIFactory) SuggestedPodTemplateResources() []schema.GroupResource {

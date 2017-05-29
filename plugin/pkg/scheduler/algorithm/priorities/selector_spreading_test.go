@@ -739,6 +739,29 @@ func TestZoneSpreadPriority(t *testing.T) {
 	}
 }
 
+func TestGetNodeClassificationByLabels(t *testing.T) {
+	const machine01 = "machine01"
+	const machine02 = "machine02"
+	const zoneA = "zoneA"
+	zone1 := map[string]string{
+		"zone": zoneA,
+	}
+	labeledNodes := map[string]map[string]string{
+		machine01: zone1,
+	}
+	expectedNonLabeledNodes := []string{machine02}
+	serviceAffinity := ServiceAntiAffinity{label: "zone"}
+	newLabeledNodes, noNonLabeledNodes := serviceAffinity.getNodeClassificationByLabels(makeLabeledNodeList(labeledNodes))
+	noLabeledNodes, newnonLabeledNodes := serviceAffinity.getNodeClassificationByLabels(makeNodeList(expectedNonLabeledNodes))
+	label, _ := newLabeledNodes[machine01]
+	if label != zoneA && len(noNonLabeledNodes) != 0 {
+		t.Errorf("Expected only labeled node with label zoneA and no noNonLabeledNodes")
+	}
+	if len(noLabeledNodes) != 0 && newnonLabeledNodes[0] != machine02 {
+		t.Errorf("Expected only non labled nodes")
+	}
+}
+
 func makeLabeledNodeList(nodeMap map[string]map[string]string) []*v1.Node {
 	nodes := make([]*v1.Node, 0, len(nodeMap))
 	for nodeName, labels := range nodeMap {

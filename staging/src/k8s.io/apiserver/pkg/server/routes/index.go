@@ -18,33 +18,52 @@ package routes
 
 import (
 	"net/http"
-	"sort"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/server/mux"
 )
+
+// ListedPathProvider is an interface for providing paths that should be reported at /.
+type ListedPathProvider interface {
+	// ListedPaths is an alphabetically sorted list of paths to be reported at /.
+	ListedPaths() []string
+}
+
+// ListedPathProviders is a convenient way to combine multiple ListedPathProviders
+type ListedPathProviders []ListedPathProvider
+
+// ListedPaths unions and sorts the included paths.
+func (p ListedPathProviders) ListedPaths() []string {
+	ret := sets.String{}
+	for _, provider := range p {
+		for _, path := range provider.ListedPaths() {
+			ret.Insert(path)
+		}
+	}
+
+	return ret.List()
+}
 
 // Index provides a webservice for the http root / listing all known paths.
 type Index struct{}
 
 // Install adds the Index webservice to the given mux.
-func (i Index) Install(c *mux.APIContainer) {
-	c.UnlistedRoutes.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		status := http.StatusOK
-		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
-			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler api.Registry.
-			// We want to return a 404 status with a list of all valid paths, incase of an invalid URL request.
-			status = http.StatusNotFound
-		}
-		var handledPaths []string
-		// Extract the paths handled using restful.WebService
-		for _, ws := range c.RegisteredWebServices() {
-			handledPaths = append(handledPaths, ws.RootPath())
-		}
-		// Extract the paths handled using mux handler.
-		handledPaths = append(handledPaths, c.NonSwaggerRoutes.HandledPaths()...)
-		sort.Strings(handledPaths)
-		responsewriters.WriteRawJSON(status, metav1.RootPaths{Paths: handledPaths}, w)
-	})
+func (i Index) Install(pathProvider ListedPathProvider, mux *mux.PathRecorderMux) {
+	handler := IndexLister{StatusCode: http.StatusOK, PathProvider: pathProvider}
+
+	mux.UnlistedHandle("/", handler)
+	mux.UnlistedHandle("/index.html", handler)
+}
+
+// IndexLister lists the available indexes with the status code provided
+type IndexLister struct {
+	StatusCode   int
+	PathProvider ListedPathProvider
+}
+
+// ServeHTTP serves the available paths.
+func (i IndexLister) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	responsewriters.WriteRawJSON(i.StatusCode, metav1.RootPaths{Paths: i.PathProvider.ListedPaths()}, w)
 }

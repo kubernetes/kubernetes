@@ -13,6 +13,7 @@
 // See https://http2.github.io/ for more information on HTTP/2.
 //
 // See https://http2.golang.org/ for a test server running this code.
+//
 package http2
 
 import (
@@ -35,6 +36,7 @@ var (
 	VerboseLogs    bool
 	logFrameWrites bool
 	logFrameReads  bool
+	inTests        bool
 )
 
 func init() {
@@ -76,13 +78,23 @@ var (
 
 type streamState int
 
+// HTTP/2 stream states.
+//
+// See http://tools.ietf.org/html/rfc7540#section-5.1.
+//
+// For simplicity, the server code merges "reserved (local)" into
+// "half-closed (remote)". This is one less state transition to track.
+// The only downside is that we send PUSH_PROMISEs slightly less
+// liberally than allowable. More discussion here:
+// https://lists.w3.org/Archives/Public/ietf-http-wg/2016JulSep/0599.html
+//
+// "reserved (remote)" is omitted since the client code does not
+// support server push.
 const (
 	stateIdle streamState = iota
 	stateOpen
 	stateHalfClosedLocal
 	stateHalfClosedRemote
-	stateResvLocal
-	stateResvRemote
 	stateClosed
 )
 
@@ -91,8 +103,6 @@ var stateName = [...]string{
 	stateOpen:             "Open",
 	stateHalfClosedLocal:  "HalfClosedLocal",
 	stateHalfClosedRemote: "HalfClosedRemote",
-	stateResvLocal:        "ResvLocal",
-	stateResvRemote:       "ResvRemote",
 	stateClosed:           "Closed",
 }
 
@@ -252,12 +262,25 @@ func newBufferedWriter(w io.Writer) *bufferedWriter {
 	return &bufferedWriter{w: w}
 }
 
+// bufWriterPoolBufferSize is the size of bufio.Writer's
+// buffers created using bufWriterPool.
+//
+// TODO: pick a less arbitrary value? this is a bit under
+// (3 x typical 1500 byte MTU) at least. Other than that,
+// not much thought went into it.
+const bufWriterPoolBufferSize = 4 << 10
+
 var bufWriterPool = sync.Pool{
 	New: func() interface{} {
-		// TODO: pick something better? this is a bit under
-		// (3 x typical 1500 byte MTU) at least.
-		return bufio.NewWriterSize(nil, 4<<10)
+		return bufio.NewWriterSize(nil, bufWriterPoolBufferSize)
 	},
+}
+
+func (w *bufferedWriter) Available() int {
+	if w.bw == nil {
+		return bufWriterPoolBufferSize
+	}
+	return w.bw.Available()
 }
 
 func (w *bufferedWriter) Write(p []byte) (n int, err error) {
@@ -342,10 +365,23 @@ func (s *sorter) Keys(h http.Header) []string {
 }
 
 func (s *sorter) SortStrings(ss []string) {
-	// Our sorter works on s.v, which sorter owners, so
+	// Our sorter works on s.v, which sorter owns, so
 	// stash it away while we sort the user's buffer.
 	save := s.v
 	s.v = ss
 	sort.Sort(s)
 	s.v = save
+}
+
+// validPseudoPath reports whether v is a valid :path pseudo-header
+// value. It must be either:
+//
+//     *) a non-empty string starting with '/', but not with with "//",
+//     *) the string '*', for OPTIONS requests.
+//
+// For now this is only used a quick check for deciding when to clean
+// up Opaque URLs before sending requests from the Transport.
+// See golang.org/issue/16847
+func validPseudoPath(v string) bool {
+	return (len(v) > 0 && v[0] == '/' && (len(v) == 1 || v[1] != '/')) || v == "*"
 }

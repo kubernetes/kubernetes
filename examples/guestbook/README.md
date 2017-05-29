@@ -81,7 +81,7 @@ redis-master   10.0.0.170   <none>        6379/TCP   20s
 redis-slave    10.0.0.201   <none>        6379/TCP   20s
 ```
 
-Now you can access the guestbook on each node with frontend Service's `<Cluster-IP>:<PORT>`, e.g. `10.0.0.117:80` in this guide. `<Cluster-IP>` is a cluster-internal IP. If you want to access the guestbook from outside of the cluster, add `type: NodePort` to the frontend Service `spec` field. Then you can access the guestbook with `<NodeIP>:NodePort` from outside of the cluster. On cloud providers which support external load balancers, adding `type: LoadBalancer` to the frontend Service `spec` field will provision a load balancer for your Service. There are several ways for you to access the guestbook. You may learn from [Accessing services running on the cluster](http://kubernetes.io/docs/user-guide/accessing-the-cluster/#accessing-services-running-on-the-cluster).
+Now you can access the guestbook on each node with frontend Service's `<Cluster-IP>:<PORT>`, e.g. `10.0.0.117:80` in this guide. `<Cluster-IP>` is a cluster-internal IP. If you want to access the guestbook from outside of the cluster, add `type: NodePort` to the frontend Service `spec` field. Then you can access the guestbook with `<NodeIP>:NodePort` from outside of the cluster. On cloud providers which support external load balancers, adding `type: LoadBalancer` to the frontend Service `spec` field will provision a load balancer for your Service. There are several ways for you to access the guestbook. You may learn from [Accessing services running on the cluster](https://kubernetes.io/docs/concepts/cluster-administration/access-cluster/#accessing-services-running-on-the-cluster).
 
 Clean up the guestbook:
 
@@ -142,7 +142,7 @@ spec:
     spec:
       containers:
       - name: master
-        image: gcr.io/google_containers/redis:e2e  # or just image: redis
+        image: gcr.io/google_containers/redis:e2e
         resources:
           requests:
             cpu: 100m
@@ -223,11 +223,11 @@ Kubernetes supports two primary modes of finding a Service — environment varia
 
 ##### Environment variables
 
-The services in a Kubernetes cluster are discoverable inside other containers via [environment variables](http://kubernetes.io/docs/user-guide/services/#environment-variables).
+The services in a Kubernetes cluster are discoverable inside other containers via [environment variables](https://kubernetes.io/docs/concepts/services-networking/service/#environment-variables).
 
 ##### DNS service
 
-An alternative is to use the [cluster's DNS service](http://kubernetes.io/docs/user-guide/services/#dns), if it has been enabled for the cluster.  This lets all pods do name resolution of services automatically, based on the Service name.
+An alternative is to use the [cluster's DNS service](https://kubernetes.io/docs/concepts/services-networking/service/#dns), if it has been enabled for the cluster.  This lets all pods do name resolution of services automatically, based on the Service name.
 
 This example has been configured to use the DNS service by default.
 
@@ -652,7 +652,7 @@ Then, see the [troubleshooting documentation](http://kubernetes.io/docs/troubles
 
 You'll want to set up your guestbook Service so that it can be accessed from outside of the internal Kubernetes network. Above, we introduced one way to do that, by setting `type: LoadBalancer` to Service `spec`.
 
-More generally, Kubernetes supports two ways of exposing a Service onto an external IP address: `NodePort`s and `LoadBalancer`s , as described [here](http://kubernetes.io/docs/user-guide/services/#publishing-services---service-types).
+More generally, Kubernetes supports two ways of exposing a Service onto an external IP address: `NodePort`s and `LoadBalancer`s , as described [here](https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services---service-types).
 
 If the `LoadBalancer` specification is used, it can take a short period for an external IP to show up in `kubectl get services` output, but you should then see it listed as well, e.g. like this:
 

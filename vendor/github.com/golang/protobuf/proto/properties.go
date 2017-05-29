@@ -844,7 +844,15 @@ func RegisterType(x Message, name string) {
 }
 
 // MessageName returns the fully-qualified proto name for the given message type.
-func MessageName(x Message) string { return revProtoTypes[reflect.TypeOf(x)] }
+func MessageName(x Message) string {
+	type xname interface {
+		XXX_MessageName() string
+	}
+	if m, ok := x.(xname); ok {
+		return m.XXX_MessageName()
+	}
+	return revProtoTypes[reflect.TypeOf(x)]
+}
 
 // MessageType returns the message type (pointer to struct) for a named message.
 func MessageType(name string) reflect.Type { return protoTypes[name] }

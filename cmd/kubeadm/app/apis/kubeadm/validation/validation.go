@@ -52,7 +52,7 @@ var cloudproviders = []string{
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateCloudProvider(c.CloudProvider, field.NewPath("cloudprovider"))...)
-	allErrs = append(allErrs, ValidateAuthorizationMode(c.AuthorizationMode, field.NewPath("authorization-mode"))...)
+	allErrs = append(allErrs, ValidateAuthorizationModes(c.AuthorizationModes, field.NewPath("authorization-mode"))...)
 	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateAPIServerCertSANs(c.APIServerCertSANs, field.NewPath("cert-altnames"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificates-dir"))...)
@@ -70,11 +70,23 @@ func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 	return allErrs
 }
 
-func ValidateAuthorizationMode(authzMode string, fldPath *field.Path) field.ErrorList {
-	if !authzmodes.IsValidAuthorizationMode(authzMode) {
-		return field.ErrorList{field.Invalid(fldPath, authzMode, "invalid authorization mode")}
+func ValidateAuthorizationModes(authzModes []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, authzMode := range authzModes {
+		if !authzmodes.IsValidAuthorizationMode(authzMode) {
+			allErrs = append(allErrs, field.Invalid(fldPath, authzMode, "invalid authorization mode"))
+		}
 	}
-	return field.ErrorList{}
+
+	found := map[string]bool{}
+	for _, authzMode := range authzModes {
+		if found[authzMode] {
+			allErrs = append(allErrs, field.Invalid(fldPath, authzMode, "duplicate authorization mode"))
+			continue
+		}
+		found[authzMode] = true
+	}
+	return allErrs
 }
 
 func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {

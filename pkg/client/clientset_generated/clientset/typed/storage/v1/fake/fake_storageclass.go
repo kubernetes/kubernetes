@@ -33,6 +33,8 @@ type FakeStorageClasses struct {
 
 var storageclassesResource = schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1", Resource: "storageclasses"}
 
+var storageclassesKind = schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}
+
 func (c *FakeStorageClasses) Create(storageClass *v1.StorageClass) (result *v1.StorageClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(storageclassesResource, storageClass), &v1.StorageClass{})
@@ -75,7 +77,7 @@ func (c *FakeStorageClasses) Get(name string, options meta_v1.GetOptions) (resul
 
 func (c *FakeStorageClasses) List(opts meta_v1.ListOptions) (result *v1.StorageClassList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(storageclassesResource, opts), &v1.StorageClassList{})
+		Invokes(testing.NewRootListAction(storageclassesResource, storageclassesKind, opts), &v1.StorageClassList{})
 	if obj == nil {
 		return nil, err
 	}

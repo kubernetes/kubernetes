@@ -147,7 +147,7 @@ func (s *BuiltInAuthenticationOptions) WithRequestHeader() *BuiltInAuthenticatio
 }
 
 func (s *BuiltInAuthenticationOptions) WithServiceAccounts() *BuiltInAuthenticationOptions {
-	s.ServiceAccounts = &ServiceAccountAuthenticationOptions{}
+	s.ServiceAccounts = &ServiceAccountAuthenticationOptions{Lookup: true}
 	return s
 }
 
@@ -163,8 +163,14 @@ func (s *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptio
 	return s
 }
 
+// Validate checks invalid config combination
 func (s *BuiltInAuthenticationOptions) Validate() []error {
 	allErrors := []error{}
+
+	if s.OIDC != nil && (len(s.OIDC.IssuerURL) > 0) != (len(s.OIDC.ClientID) > 0) {
+		allErrors = append(allErrors, fmt.Errorf("oidc-issuer-url and oidc-client-id should be specified together"))
+	}
+
 	return allErrors
 }
 
@@ -257,7 +263,7 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"The API server will query the remote service to determine authentication for bearer tokens.")
 
 		fs.DurationVar(&s.WebHook.CacheTTL, "authentication-token-webhook-cache-ttl", s.WebHook.CacheTTL,
-			"The duration to cache responses from the webhook token authenticator. Default is 2m.")
+			"The duration to cache responses from the webhook token authenticator.")
 	}
 }
 

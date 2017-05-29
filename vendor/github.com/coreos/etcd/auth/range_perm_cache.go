@@ -49,46 +49,37 @@ func isRangeEqual(a, b *rangePerm) bool {
 
 // removeSubsetRangePerms removes any rangePerms that are subsets of other rangePerms.
 // If there are equal ranges, removeSubsetRangePerms only keeps one of them.
-func removeSubsetRangePerms(perms []*rangePerm) []*rangePerm {
-	// TODO(mitake): currently it is O(n^2), we need a better algorithm
-	newp := make([]*rangePerm, 0)
-
+// It returns a sorted rangePerm slice.
+func removeSubsetRangePerms(perms []*rangePerm) (newp []*rangePerm) {
+	sort.Sort(RangePermSliceByBegin(perms))
+	var prev *rangePerm
 	for i := range perms {
-		skip := false
-
-		for j := range perms {
-			if i == j {
-				continue
-			}
-
-			if isRangeEqual(perms[i], perms[j]) {
-				// if ranges are equal, we only keep the first range.
-				if i > j {
-					skip = true
-					break
-				}
-			} else if isSubset(perms[i], perms[j]) {
-				// if a range is a strict subset of the other one, we skip the subset.
-				skip = true
-				break
-			}
-		}
-
-		if skip {
+		if i == 0 {
+			prev = perms[i]
+			newp = append(newp, perms[i])
 			continue
 		}
-
+		if isRangeEqual(perms[i], prev) {
+			continue
+		}
+		if isSubset(perms[i], prev) {
+			continue
+		}
+		if isSubset(prev, perms[i]) {
+			prev = perms[i]
+			newp[len(newp)-1] = perms[i]
+			continue
+		}
+		prev = perms[i]
 		newp = append(newp, perms[i])
 	}
-
 	return newp
 }
 
 // mergeRangePerms merges adjacent rangePerms.
 func mergeRangePerms(perms []*rangePerm) []*rangePerm {
-	merged := make([]*rangePerm, 0)
+	var merged []*rangePerm
 	perms = removeSubsetRangePerms(perms)
-	sort.Sort(RangePermSliceByBegin(perms))
 
 	i := 0
 	for i < len(perms) {

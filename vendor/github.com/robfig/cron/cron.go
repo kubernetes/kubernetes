@@ -1,5 +1,3 @@
-// This library implements a cron spec parser and runner.  See the README for
-// more details.
 package cron
 
 import (
@@ -146,6 +144,15 @@ func (c *Cron) Start() {
 	go c.run()
 }
 
+// Run the cron scheduler, or no-op if already running.
+func (c *Cron) Run() {
+	if c.running {
+		return
+	}
+	c.running = true
+	c.run()
+}
+
 func (c *Cron) runWithRecovery(j Job) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -183,6 +190,7 @@ func (c *Cron) run() {
 		timer := time.NewTimer(effective.Sub(now))
 		select {
 		case now = <-timer.C:
+			now = now.In(c.location)
 			// Run every entry whose next time was this effective time.
 			for _, e := range c.entries {
 				if e.Next != effective {

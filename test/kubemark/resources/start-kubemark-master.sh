@@ -231,7 +231,6 @@ function load-docker-images {
 function compute-kubelet-params {
 	local params="${KUBELET_TEST_ARGS:-}"
 	params+=" --allow-privileged=true"
-	params+=" --babysit-daemons=true"
 	params+=" --cgroup-root=/"
 	params+=" --cloud-provider=gce"
 	params+=" --pod-manifest-path=/etc/kubernetes/manifests"
@@ -456,7 +455,7 @@ fi
 	mkdir -p "${main_etcd_mount_point}/srv/kubernetes"
 	ln -s -f "${main_etcd_mount_point}/srv/kubernetes" /etc/srv/kubernetes
 	# Copy the files to the PD only if they don't exist (so we do it only the first time).
-	if [[ "$(ls -A {main_etcd_mount_point}/srv/kubernetes/)" == "" ]]; then
+	if [[ "$(ls -A ${main_etcd_mount_point}/srv/kubernetes/)" == "" ]]; then
 		cp -r "${KUBE_ROOT}"/k8s_auth_data/* "${main_etcd_mount_point}/srv/kubernetes/"
 	fi
 	# Directory for kube-apiserver to store SSH key (if necessary).

@@ -30,7 +30,7 @@ import (
 	_ "k8s.io/kube-aggregator/pkg/apis/apiregistration/validation"
 	_ "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	_ "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
-	_ "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1alpha1"
+	_ "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1"
 )
 
 func main() {

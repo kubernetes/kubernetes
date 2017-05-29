@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/route53"
 )
 
@@ -32,24 +33,24 @@ type ResourceRecordSet struct {
 }
 
 func (rrset ResourceRecordSet) Name() string {
-	return *rrset.impl.Name
+	return aws.StringValue(rrset.impl.Name)
 }
 
 func (rrset ResourceRecordSet) Rrdatas() []string {
 	// Sigh - need to unpack the strings out of the route53 ResourceRecords
 	result := make([]string, len(rrset.impl.ResourceRecords))
 	for i, record := range rrset.impl.ResourceRecords {
-		result[i] = *record.Value
+		result[i] = aws.StringValue(record.Value)
 	}
 	return result
 }
 
 func (rrset ResourceRecordSet) Ttl() int64 {
-	return *rrset.impl.TTL
+	return aws.Int64Value(rrset.impl.TTL)
 }
 
 func (rrset ResourceRecordSet) Type() rrstype.RrsType {
-	return rrstype.RrsType(*rrset.impl.Type)
+	return rrstype.RrsType(aws.StringValue(rrset.impl.Type))
 }
 
 // Route53ResourceRecordSet returns the route53 ResourceRecordSet object for the ResourceRecordSet

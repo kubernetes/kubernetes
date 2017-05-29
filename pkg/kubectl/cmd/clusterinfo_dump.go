@@ -40,26 +40,27 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 		Long:    dumpLong,
 		Example: dumpExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(dumpClusterInfo(f, cmd, args, cmdOut))
+			cmdutil.CheckErr(dumpClusterInfo(f, cmd, cmdOut))
 		},
 	}
 	cmd.Flags().String("output-directory", "", i18n.T("Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"))
 	cmd.Flags().StringSlice("namespaces", []string{}, "A comma separated list of namespaces to dump.")
 	cmd.Flags().Bool("all-namespaces", false, "If true, dump all namespaces.  If true, --namespaces is ignored.")
+	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
 	return cmd
 }
 
 var (
-	dumpLong = templates.LongDesc(`
+	dumpLong = templates.LongDesc(i18n.T(`
     Dumps cluster info out suitable for debugging and diagnosing cluster problems.  By default, dumps everything to
     stdout. You can optionally specify a directory with --output-directory.  If you specify a directory, kubernetes will
     build a set of files in that directory.  By default only dumps things in the 'kube-system' namespace, but you can
     switch to a different namespace with the --namespaces flag, or specify --all-namespaces to dump all namespaces.
 
     The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories
-    based on namespace and pod name.`)
+    based on namespace and pod name.`))
 
-	dumpExample = templates.Examples(`
+	dumpExample = templates.Examples(i18n.T(`
     # Dump current cluster state to stdout
     kubectl cluster-info dump
 
@@ -70,7 +71,7 @@ var (
     kubectl cluster-info dump --all-namespaces
 
     # Dump a set of namespaces to /path/to/cluster-state
-    kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state`)
+    kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state`))
 )
 
 func setupOutputWriter(cmd *cobra.Command, defaultWriter io.Writer, filename string) io.Writer {
@@ -87,7 +88,12 @@ func setupOutputWriter(cmd *cobra.Command, defaultWriter io.Writer, filename str
 	return file
 }
 
-func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
+	timeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)
+	if err != nil {
+		return cmdutil.UsageError(cmd, err.Error())
+	}
+
 	clientset, err := f.ClientSet()
 	if err != nil {
 		return err
@@ -186,21 +192,34 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, args []string, out i
 			return err
 		}
 
-		for ix := range pods.Items {
-			pod := &pods.Items[ix]
-			writer := setupOutputWriter(cmd, out, path.Join(namespace, pod.Name, "logs.txt"))
-			writer.Write([]byte(fmt.Sprintf("==== START logs for %s/%s ====\n", pod.Namespace, pod.Name)))
-			request, err := f.LogsForObject(pod, &api.PodLogOptions{})
+		printContainer := func(writer io.Writer, container api.Container, pod *api.Pod) {
+			writer.Write([]byte(fmt.Sprintf("==== START logs for container %s of pod %s/%s ====\n", container.Name, pod.Namespace, pod.Name)))
+			defer writer.Write([]byte(fmt.Sprintf("==== END logs for container %s of pod %s/%s ====\n", container.Name, pod.Namespace, pod.Name)))
+
+			request, err := f.LogsForObject(pod, &api.PodLogOptions{Container: container.Name}, timeout)
 			if err != nil {
-				return err
+				// Print error and return.
+				writer.Write([]byte(fmt.Sprintf("Create log request error: %s\n", err.Error())))
+				return
 			}
 
 			data, err := request.DoRaw()
 			if err != nil {
-				return err
+				// Print error and return.
+				writer.Write([]byte(fmt.Sprintf("Request log error: %s\n", err.Error())))
+				return
 			}
 			writer.Write(data)
-			writer.Write([]byte(fmt.Sprintf("==== END logs for %s/%s ====\n", pod.Namespace, pod.Name)))
+		}
+
+		for ix := range pods.Items {
+			pod := &pods.Items[ix]
+			containers := pod.Spec.Containers
+			writer := setupOutputWriter(cmd, out, path.Join(namespace, pod.Name, "logs.txt"))
+
+			for i := range containers {
+				printContainer(writer, containers[i], pod)
+			}
 		}
 	}
 	dir := cmdutil.GetFlagString(cmd, "output-directory")

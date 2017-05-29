@@ -36,6 +36,8 @@ type ClusterSpec struct {
 	// This is to help clients reach servers in the most network-efficient way possible.
 	// Clients can use the appropriate server address as per the CIDR that they match.
 	// In case of multiple matches, clients should use the longest matching CIDR.
+	// +patchMergeKey=clientCIDR
+	// +patchStrategy=merge
 	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" patchStrategy:"merge" patchMergeKey:"clientCIDR" protobuf:"bytes,1,rep,name=serverAddressByClientCIDRs"`
 	// Name of the secret containing kubeconfig to access this cluster.
 	// The secret is read from the kubernetes cluster that is hosting federation control plane.
@@ -97,7 +99,7 @@ type ClusterStatus struct {
 type Cluster struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -113,7 +115,7 @@ type Cluster struct {
 type ClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -121,7 +123,32 @@ type ClusterList struct {
 	Items []Cluster `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// Expressed as value of annotation for selecting the clusters on which a resource is created.
+type ClusterSelector []ClusterSelectorRequirement
+
+// ClusterSelectorRequirement contains values, a key, and an operator that relates the key and values.
+// The zero value of ClusterSelectorRequirement is invalid.
+// ClusterSelectorRequirement implements both set based match and exact match
+type ClusterSelectorRequirement struct {
+	// +patchMergeKey=key
+	// +patchStrategy=merge
+	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	// The Operator defines how the Key is matched to the Values. One of "in", "notin",
+	// "exists", "!", "=", "!=", "gt" or "lt".
+	Operator string `json:"operator" protobuf:"bytes,2,opt,name=operator"`
+	// An array of string values. If the operator is "in" or "notin",
+	// the values array must be non-empty. If the operator is "exists" or "!",
+	// the values array must be empty. If the operator is "gt" or "lt", the values
+	// array must have a single element, which will be interpreted as an integer.
+	// This array is replaced during a strategic merge patch.
+	// +optional
+	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
+}
+
 const (
 	// FederationNamespaceSystem is the system namespace where we place federation control plane components.
 	FederationNamespaceSystem string = "federation-system"
+
+	// FederationClusterSelectorAnnotation is used to determine placement of objects on federated clusters
+	FederationClusterSelectorAnnotation string = "federation.alpha.kubernetes.io/cluster-selector"
 )

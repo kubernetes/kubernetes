@@ -358,12 +358,9 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	errList := []error{}
 	for i := range podList.Items {
 		pod := &podList.Items[i]
-		// Since the client must maintain compatibility with a v1.5 server,
-		// we can't assume the Pods will have ControllerRefs pointing to 'ss'.
-		// However, we can at least avoid interfering with other controllers
-		// that do use ControllerRef.
 		controllerRef := controller.GetControllerOf(pod)
-		if controllerRef != nil && controllerRef.UID != ss.UID {
+		// Ignore Pod if it's an orphan or owned by someone else.
+		if controllerRef == nil || controllerRef.UID != ss.UID {
 			continue
 		}
 		if err := pods.Delete(pod.Name, gracePeriod); err != nil {
@@ -458,7 +455,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	}
 
 	// Stop all replica sets belonging to this Deployment.
-	rss, err := deploymentutil.ListReplicaSetsInternalV15(deployment,
+	rss, err := deploymentutil.ListReplicaSetsInternal(deployment,
 		func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
 			rsList, err := reaper.rsClient.ReplicaSets(namespace).List(options)
 			if err != nil {

@@ -19,6 +19,7 @@ package user
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -44,7 +45,7 @@ func NewMustRunAs(options *extensions.RunAsUserStrategyOptions) (RunAsUserStrate
 }
 
 // Generate creates the uid based on policy rules.  MustRunAs returns the first range's Min.
-func (s *mustRunAs) Generate(pod *api.Pod, container *api.Container) (*int64, error) {
+func (s *mustRunAs) Generate(pod *api.Pod, container *api.Container) (*types.UnixUserID, error) {
 	return &s.opts.Ranges[0].Min, nil
 }
 
@@ -74,9 +75,9 @@ func (s *mustRunAs) Validate(pod *api.Pod, container *api.Container) field.Error
 	return allErrs
 }
 
-func (s *mustRunAs) isValidUID(id int64) bool {
+func (s *mustRunAs) isValidUID(id types.UnixUserID) bool {
 	for _, rng := range s.opts.Ranges {
-		if psputil.FallsInRange(id, rng) {
+		if psputil.UserFallsInRange(id, rng) {
 			return true
 		}
 	}

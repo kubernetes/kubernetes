@@ -61,7 +61,7 @@ func NewSelectorSpreadPriority(
 
 // Returns selectors of services, RCs and RSs matching the given pod.
 func getSelectors(pod *v1.Pod, sl algorithm.ServiceLister, cl algorithm.ControllerLister, rsl algorithm.ReplicaSetLister, ssl algorithm.StatefulSetLister) []labels.Selector {
-	selectors := make([]labels.Selector, 0, 3)
+	var selectors []labels.Selector
 	if services, err := sl.GetPodServices(pod); err == nil {
 		for _, service := range services {
 			selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
@@ -206,6 +206,21 @@ func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister
 	return antiAffinity.CalculateAntiAffinityPriority
 }
 
+// Classifies nodes into ones with labels and without labels.
+func (s *ServiceAntiAffinity) getNodeClassificationByLabels(nodes []*v1.Node) (map[string]string, []string) {
+	labeledNodes := map[string]string{}
+	nonLabeledNodes := []string{}
+	for _, node := range nodes {
+		if labels.Set(node.Labels).Has(s.label) {
+			label := labels.Set(node.Labels).Get(s.label)
+			labeledNodes[node.Name] = label
+		} else {
+			nonLabeledNodes = append(nonLabeledNodes, node.Name)
+		}
+	}
+	return labeledNodes, nonLabeledNodes
+}
+
 // CalculateAntiAffinityPriority spreads pods by minimizing the number of pods belonging to the same service
 // on machines with the same value for a particular label.
 // The label to be considered is provided to the struct (ServiceAntiAffinity).
@@ -228,17 +243,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *v1.Pod, nodeNam
 	}
 
 	// separate out the nodes that have the label from the ones that don't
-	otherNodes := []string{}
-	labeledNodes := map[string]string{}
-	for _, node := range nodes {
-		if labels.Set(node.Labels).Has(s.label) {
-			label := labels.Set(node.Labels).Get(s.label)
-			labeledNodes[node.Name] = label
-		} else {
-			otherNodes = append(otherNodes, node.Name)
-		}
-	}
-
+	labeledNodes, nonLabeledNodes := s.getNodeClassificationByLabels(nodes)
 	podCounts := map[string]int{}
 	for _, pod := range nsServicePods {
 		label, exists := labeledNodes[pod.Spec.NodeName]
@@ -247,7 +252,6 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *v1.Pod, nodeNam
 		}
 		podCounts[label]++
 	}
-
 	numServicePods := len(nsServicePods)
 	result := []schedulerapi.HostPriority{}
 	//score int - scale of 0-maxPriority
@@ -261,9 +265,8 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *v1.Pod, nodeNam
 		result = append(result, schedulerapi.HostPriority{Host: node, Score: int(fScore)})
 	}
 	// add the open nodes with a score of 0
-	for _, node := range otherNodes {
+	for _, node := range nonLabeledNodes {
 		result = append(result, schedulerapi.HostPriority{Host: node, Score: 0})
 	}
-
 	return result, nil
 }

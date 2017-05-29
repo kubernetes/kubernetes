@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 func TestReplicationControllerStop(t *testing.T) {
@@ -441,7 +440,6 @@ func TestDeploymentStop(t *testing.T) {
 			Replicas: 0,
 		},
 	}
-	template := deploymentutil.GetNewReplicaSetTemplateInternal(&deployment)
 	trueVar := true
 	tests := []struct {
 		Name            string
@@ -492,9 +490,7 @@ func TestDeploymentStop(t *testing.T) {
 									},
 								},
 							},
-							Spec: extensions.ReplicaSetSpec{
-								Template: template,
-							},
+							Spec: extensions.ReplicaSetSpec{},
 						},
 						// ReplicaSet owned by something else (should be ignored).
 						{
@@ -512,55 +508,7 @@ func TestDeploymentStop(t *testing.T) {
 									},
 								},
 							},
-							Spec: extensions.ReplicaSetSpec{
-								Template: template,
-							},
-						},
-					},
-				},
-			},
-			StopError: nil,
-			ExpectedActions: []string{"get:deployments", "update:deployments",
-				"get:deployments", "list:replicasets", "get:replicasets",
-				"get:replicasets", "update:replicasets", "get:replicasets",
-				"get:replicasets", "delete:replicasets", "delete:deployments"},
-		},
-		{
-			Name: "Deployment with single replicaset, no ControllerRef (old cluster)",
-			Objs: []runtime.Object{
-				&deployment, // GET
-				&extensions.ReplicaSetList{ // LIST
-					Items: []extensions.ReplicaSet{
-						// ReplicaSet that matches but with no ControllerRef.
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      name,
-								Namespace: ns,
-								Labels:    map[string]string{"k1": "v1"},
-							},
-							Spec: extensions.ReplicaSetSpec{
-								Template: template,
-							},
-						},
-						// ReplicaSet owned by something else (should be ignored).
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "rs2",
-								Namespace: ns,
-								Labels:    map[string]string{"k1": "v1"},
-								OwnerReferences: []metav1.OwnerReference{
-									{
-										APIVersion: extensions.SchemeGroupVersion.String(),
-										Kind:       "Deployment",
-										Name:       "somethingelse",
-										UID:        uuid.NewUUID(),
-										Controller: &trueVar,
-									},
-								},
-							},
-							Spec: extensions.ReplicaSetSpec{
-								Template: template,
-							},
+							Spec: extensions.ReplicaSetSpec{},
 						},
 					},
 				},
@@ -755,7 +703,6 @@ func TestDeploymentNotFoundError(t *testing.T) {
 			Replicas: 0,
 		},
 	}
-	template := deploymentutil.GetNewReplicaSetTemplateInternal(deployment)
 
 	fake := fake.NewSimpleClientset(
 		deployment,
@@ -765,9 +712,7 @@ func TestDeploymentNotFoundError(t *testing.T) {
 					Name:      name,
 					Namespace: ns,
 				},
-				Spec: extensions.ReplicaSetSpec{
-					Template: template,
-				},
+				Spec: extensions.ReplicaSetSpec{},
 			},
 		},
 		},

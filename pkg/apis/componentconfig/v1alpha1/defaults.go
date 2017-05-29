@@ -17,13 +17,16 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
+	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -55,24 +58,22 @@ var (
 )
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
-	RegisterDefaults(scheme)
-	return scheme.AddDefaultingFuncs(
-		SetDefaults_KubeProxyConfiguration,
-		SetDefaults_KubeSchedulerConfiguration,
-		SetDefaults_LeaderElectionConfiguration,
-		SetDefaults_KubeletConfiguration,
-	)
+	return RegisterDefaults(scheme)
 }
 
 func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
-	if obj.BindAddress == "" {
+	if len(obj.BindAddress) == 0 {
 		obj.BindAddress = "0.0.0.0"
 	}
-	if obj.HealthzPort == 0 {
-		obj.HealthzPort = 10249
-	}
 	if obj.HealthzBindAddress == "" {
-		obj.HealthzBindAddress = "127.0.0.1"
+		obj.HealthzBindAddress = fmt.Sprintf("0.0.0.0:%v", ports.ProxyHealthzPort)
+	} else if !strings.Contains(obj.HealthzBindAddress, ":") {
+		obj.HealthzBindAddress += fmt.Sprintf(":%v", ports.ProxyHealthzPort)
+	}
+	if obj.MetricsBindAddress == "" {
+		obj.MetricsBindAddress = fmt.Sprintf("127.0.0.1:%v", ports.ProxyStatusPort)
+	} else if !strings.Contains(obj.MetricsBindAddress, ":") {
+		obj.MetricsBindAddress += fmt.Sprintf(":%v", ports.ProxyStatusPort)
 	}
 	if obj.OOMScoreAdj == nil {
 		temp := int32(qos.KubeProxyOOMScoreAdj)
@@ -81,31 +82,31 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if obj.ResourceContainer == "" {
 		obj.ResourceContainer = "/kube-proxy"
 	}
-	if obj.IPTablesSyncPeriod.Duration == 0 {
-		obj.IPTablesSyncPeriod = metav1.Duration{Duration: 30 * time.Second}
+	if obj.IPTables.SyncPeriod.Duration == 0 {
+		obj.IPTables.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
 	}
 	zero := metav1.Duration{}
 	if obj.UDPIdleTimeout == zero {
 		obj.UDPIdleTimeout = metav1.Duration{Duration: 250 * time.Millisecond}
 	}
 	// If ConntrackMax is set, respect it.
-	if obj.ConntrackMax == 0 {
+	if obj.Conntrack.Max == 0 {
 		// If ConntrackMax is *not* set, use per-core scaling.
-		if obj.ConntrackMaxPerCore == 0 {
-			obj.ConntrackMaxPerCore = 32 * 1024
+		if obj.Conntrack.MaxPerCore == 0 {
+			obj.Conntrack.MaxPerCore = 32 * 1024
 		}
-		if obj.ConntrackMin == 0 {
-			obj.ConntrackMin = 128 * 1024
+		if obj.Conntrack.Min == 0 {
+			obj.Conntrack.Min = 128 * 1024
 		}
 	}
-	if obj.IPTablesMasqueradeBit == nil {
+	if obj.IPTables.MasqueradeBit == nil {
 		temp := int32(14)
-		obj.IPTablesMasqueradeBit = &temp
+		obj.IPTables.MasqueradeBit = &temp
 	}
-	if obj.ConntrackTCPEstablishedTimeout == zero {
-		obj.ConntrackTCPEstablishedTimeout = metav1.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
+	if obj.Conntrack.TCPEstablishedTimeout == zero {
+		obj.Conntrack.TCPEstablishedTimeout = metav1.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
 	}
-	if obj.ConntrackTCPCloseWaitTimeout == zero {
+	if obj.Conntrack.TCPCloseWaitTimeout == zero {
 		// See https://github.com/kubernetes/kubernetes/issues/32551.
 		//
 		// CLOSE_WAIT conntrack state occurs when the the Linux kernel
@@ -126,7 +127,20 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 		//
 		// We set CLOSE_WAIT to one hour by default to better match
 		// typical server timeouts.
-		obj.ConntrackTCPCloseWaitTimeout = metav1.Duration{Duration: 1 * time.Hour}
+		obj.Conntrack.TCPCloseWaitTimeout = metav1.Duration{Duration: 1 * time.Hour}
+	}
+	if obj.ConfigSyncPeriod.Duration == 0 {
+		obj.ConfigSyncPeriod.Duration = 15 * time.Minute
+	}
+
+	if len(obj.ClientConnection.ContentType) == 0 {
+		obj.ClientConnection.ContentType = "application/vnd.kubernetes.protobuf"
+	}
+	if obj.ClientConnection.QPS == 0.0 {
+		obj.ClientConnection.QPS = 5.0
+	}
+	if obj.ClientConnection.Burst == 0 {
+		obj.ClientConnection.Burst = 10
 	}
 }
 
@@ -158,6 +172,15 @@ func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
 	if obj.FailureDomains == "" {
 		obj.FailureDomains = api.DefaultFailureDomains
 	}
+	if obj.LockObjectNamespace == "" {
+		obj.LockObjectNamespace = SchedulerDefaultLockObjectNamespace
+	}
+	if obj.LockObjectName == "" {
+		obj.LockObjectName = SchedulerDefaultLockObjectName
+	}
+	if obj.PolicyConfigMapNamespace == "" {
+		obj.PolicyConfigMapNamespace = api.NamespaceSystem
+	}
 }
 
 func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {
@@ -170,6 +193,9 @@ func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {
 	}
 	if obj.RetryPeriod == zero {
 		obj.RetryPeriod = metav1.Duration{Duration: 2 * time.Second}
+	}
+	if obj.ResourceLock == "" {
+		obj.ResourceLock = rl.EndpointsResourceLock
 	}
 }
 
@@ -267,7 +293,8 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.ImageMinimumGCAge = metav1.Duration{Duration: 2 * time.Minute}
 	}
 	if obj.ImageGCHighThresholdPercent == nil {
-		temp := int32(90)
+		// default is below docker's default dm.min_free_space of 90%
+		temp := int32(85)
 		obj.ImageGCHighThresholdPercent = &temp
 	}
 	if obj.ImageGCLowThresholdPercent == nil {
@@ -408,8 +435,15 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = defaultNodeAllocatableEnforcement
 	}
-	if obj.EnableCRI == nil {
-		obj.EnableCRI = boolVar(true)
+	if obj.ExperimentalDockershim == nil {
+		obj.ExperimentalDockershim = boolVar(false)
+	}
+	if obj.RemoteRuntimeEndpoint == "" {
+		if runtime.GOOS == "linux" {
+			obj.RemoteRuntimeEndpoint = "unix:///var/run/dockershim.sock"
+		} else if runtime.GOOS == "windows" {
+			obj.RemoteRuntimeEndpoint = "tcp://localhost:3735"
+		}
 	}
 }
 

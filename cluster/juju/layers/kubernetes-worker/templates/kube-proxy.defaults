@@ -1,1 +1,0 @@
-KUBE_PROXY_ARGS="{{ kube_proxy_opts }}"

@@ -24,11 +24,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
 	fcache "k8s.io/client-go/tools/cache/testing"
-	"k8s.io/client-go/util/clock"
 )
 
 type testListener struct {
@@ -98,11 +98,11 @@ func (l *testListener) satisfiedExpectations() bool {
 func TestListenerResyncPeriods(t *testing.T) {
 	// source simulates an apiserver object endpoint.
 	source := fcache.NewFakeControllerSource()
-	source.Add(&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
-	source.Add(&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
 
 	// create the shared informer and resync every 1s
-	informer := NewSharedInformer(source, &api.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
 
 	clock := clock.NewFakeClock(time.Now())
 	informer.clock = clock
@@ -187,7 +187,7 @@ func TestResyncCheckPeriod(t *testing.T) {
 	source := fcache.NewFakeControllerSource()
 
 	// create the shared informer and resync every 12 hours
-	informer := NewSharedInformer(source, &api.Pod{}, 12*time.Hour).(*sharedIndexInformer)
+	informer := NewSharedInformer(source, &v1.Pod{}, 12*time.Hour).(*sharedIndexInformer)
 
 	clock := clock.NewFakeClock(time.Now())
 	informer.clock = clock

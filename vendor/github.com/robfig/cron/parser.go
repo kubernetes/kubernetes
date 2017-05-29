@@ -8,88 +8,114 @@ import (
 	"time"
 )
 
-// ParseStandard returns a new crontab schedule representing the given standardSpec
-// (https://en.wikipedia.org/wiki/Cron). It differs from Parse requiring to always
-// pass 5 entries representing: minute, hour, day of month, month and day of week,
-// in that order. It returns a descriptive error if the spec is not valid.
+// Configuration options for creating a parser. Most options specify which
+// fields should be included, while others enable features. If a field is not
+// included the parser will assume a default value. These options do not change
+// the order fields are parse in.
+type ParseOption int
+
+const (
+	Second      ParseOption = 1 << iota // Seconds field, default 0
+	Minute                              // Minutes field, default 0
+	Hour                                // Hours field, default 0
+	Dom                                 // Day of month field, default *
+	Month                               // Month field, default *
+	Dow                                 // Day of week field, default *
+	DowOptional                         // Optional day of week field, default *
+	Descriptor                          // Allow descriptors such as @monthly, @weekly, etc.
+)
+
+var places = []ParseOption{
+	Second,
+	Minute,
+	Hour,
+	Dom,
+	Month,
+	Dow,
+}
+
+var defaults = []string{
+	"0",
+	"0",
+	"0",
+	"*",
+	"*",
+	"*",
+}
+
+// A custom Parser that can be configured.
+type Parser struct {
+	options   ParseOption
+	optionals int
+}
+
+// Creates a custom Parser with custom options.
 //
-// It accepts
-//   - Standard crontab specs, e.g. "* * * * ?"
-//   - Descriptors, e.g. "@midnight", "@every 1h30m"
-func ParseStandard(standardSpec string) (Schedule, error) {
-	if standardSpec[0] == '@' {
-		return parseDescriptor(standardSpec)
+//  // Standard parser without descriptors
+//  specParser := NewParser(Minute | Hour | Dom | Month | Dow)
+//  sched, err := specParser.Parse("0 0 15 */3 *")
+//
+//  // Same as above, just excludes time fields
+//  subsParser := NewParser(Dom | Month | Dow)
+//  sched, err := specParser.Parse("15 */3 *")
+//
+//  // Same as above, just makes Dow optional
+//  subsParser := NewParser(Dom | Month | DowOptional)
+//  sched, err := specParser.Parse("15 */3")
+//
+func NewParser(options ParseOption) Parser {
+	optionals := 0
+	if options&DowOptional > 0 {
+		options |= Dow
+		optionals++
 	}
-
-	// Split on whitespace.  We require exactly 5 fields.
-	// (minute) (hour) (day of month) (month) (day of week)
-	fields := strings.Fields(standardSpec)
-	if len(fields) != 5 {
-		return nil, fmt.Errorf("Expected exactly 5 fields, found %d: %s", len(fields), standardSpec)
-	}
-
-	var err error
-	field := func(field string, r bounds) uint64 {
-		if err != nil {
-			return uint64(0)
-		}
-		var bits uint64
-		bits, err = getField(field, r)
-		return bits
-	}
-	var (
-		minute     = field(fields[0], minutes)
-		hour       = field(fields[1], hours)
-		dayofmonth = field(fields[2], dom)
-		month      = field(fields[3], months)
-		dayofweek  = field(fields[4], dow)
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &SpecSchedule{
-		Second: 1 << seconds.min,
-		Minute: minute,
-		Hour:   hour,
-		Dom:    dayofmonth,
-		Month:  month,
-		Dow:    dayofweek,
-	}, nil
+	return Parser{options, optionals}
 }
 
 // Parse returns a new crontab schedule representing the given spec.
 // It returns a descriptive error if the spec is not valid.
-//
-// It accepts
-//   - Full crontab specs, e.g. "* * * * * ?"
-//   - Descriptors, e.g. "@midnight", "@every 1h30m"
-func Parse(spec string) (Schedule, error) {
-	if spec[0] == '@' {
+// It accepts crontab specs and features configured by NewParser.
+func (p Parser) Parse(spec string) (Schedule, error) {
+	if len(spec) == 0 {
+		return nil, fmt.Errorf("Empty spec string")
+	}
+	if spec[0] == '@' && p.options&Descriptor > 0 {
 		return parseDescriptor(spec)
 	}
 
-	// Split on whitespace.  We require 5 or 6 fields.
-	// (second) (minute) (hour) (day of month) (month) (day of week, optional)
+	// Figure out how many fields we need
+	max := 0
+	for _, place := range places {
+		if p.options&place > 0 {
+			max++
+		}
+	}
+	min := max - p.optionals
+
+	// Split fields on whitespace
 	fields := strings.Fields(spec)
-	if len(fields) != 5 && len(fields) != 6 {
-		return nil, fmt.Errorf("Expected 5 or 6 fields, found %d: %s", len(fields), spec)
+
+	// Validate number of fields
+	if count := len(fields); count < min || count > max {
+		if min == max {
+			return nil, fmt.Errorf("Expected exactly %d fields, found %d: %s", min, count, spec)
+		}
+		return nil, fmt.Errorf("Expected %d to %d fields, found %d: %s", min, max, count, spec)
 	}
 
-	// If a sixth field is not provided (DayOfWeek), then it is equivalent to star.
-	if len(fields) == 5 {
-		fields = append(fields, "*")
-	}
+	// Fill in missing fields
+	fields = expandFields(fields, p.options)
 
 	var err error
 	field := func(field string, r bounds) uint64 {
 		if err != nil {
-			return uint64(0)
+			return 0
 		}
 		var bits uint64
 		bits, err = getField(field, r)
 		return bits
 	}
+
 	var (
 		second     = field(fields[0], seconds)
 		minute     = field(fields[1], minutes)
@@ -110,6 +136,53 @@ func Parse(spec string) (Schedule, error) {
 		Month:  month,
 		Dow:    dayofweek,
 	}, nil
+}
+
+func expandFields(fields []string, options ParseOption) []string {
+	n := 0
+	count := len(fields)
+	expFields := make([]string, len(places))
+	copy(expFields, defaults)
+	for i, place := range places {
+		if options&place > 0 {
+			expFields[i] = fields[n]
+			n++
+		}
+		if n == count {
+			break
+		}
+	}
+	return expFields
+}
+
+var standardParser = NewParser(
+	Minute | Hour | Dom | Month | Dow | Descriptor,
+)
+
+// ParseStandard returns a new crontab schedule representing the given standardSpec
+// (https://en.wikipedia.org/wiki/Cron). It differs from Parse requiring to always
+// pass 5 entries representing: minute, hour, day of month, month and day of week,
+// in that order. It returns a descriptive error if the spec is not valid.
+//
+// It accepts
+//   - Standard crontab specs, e.g. "* * * * ?"
+//   - Descriptors, e.g. "@midnight", "@every 1h30m"
+func ParseStandard(standardSpec string) (Schedule, error) {
+	return standardParser.Parse(standardSpec)
+}
+
+var defaultParser = NewParser(
+	Second | Minute | Hour | Dom | Month | DowOptional | Descriptor,
+)
+
+// Parse returns a new crontab schedule representing the given spec.
+// It returns a descriptive error if the spec is not valid.
+//
+// It accepts
+//   - Full crontab specs, e.g. "* * * * * ?"
+//   - Descriptors, e.g. "@midnight", "@every 1h30m"
+func Parse(spec string) (Schedule, error) {
+	return defaultParser.Parse(spec)
 }
 
 // getField returns an Int with the bits set representing all of the times that
@@ -138,18 +211,17 @@ func getRange(expr string, r bounds) (uint64, error) {
 		lowAndHigh       = strings.Split(rangeAndStep[0], "-")
 		singleDigit      = len(lowAndHigh) == 1
 		err              error
-		zero             = uint64(0)
 	)
 
-	var extra_star uint64
+	var extra uint64
 	if lowAndHigh[0] == "*" || lowAndHigh[0] == "?" {
 		start = r.min
 		end = r.max
-		extra_star = starBit
+		extra = starBit
 	} else {
 		start, err = parseIntOrName(lowAndHigh[0], r.names)
 		if err != nil {
-			return zero, err
+			return 0, err
 		}
 		switch len(lowAndHigh) {
 		case 1:
@@ -157,10 +229,10 @@ func getRange(expr string, r bounds) (uint64, error) {
 		case 2:
 			end, err = parseIntOrName(lowAndHigh[1], r.names)
 			if err != nil {
-				return zero, err
+				return 0, err
 			}
 		default:
-			return zero, fmt.Errorf("Too many hyphens: %s", expr)
+			return 0, fmt.Errorf("Too many hyphens: %s", expr)
 		}
 	}
 
@@ -170,7 +242,7 @@ func getRange(expr string, r bounds) (uint64, error) {
 	case 2:
 		step, err = mustParseInt(rangeAndStep[1])
 		if err != nil {
-			return zero, err
+			return 0, err
 		}
 
 		// Special handling: "N/step" means "N-max/step".
@@ -178,23 +250,23 @@ func getRange(expr string, r bounds) (uint64, error) {
 			end = r.max
 		}
 	default:
-		return zero, fmt.Errorf("Too many slashes: %s", expr)
+		return 0, fmt.Errorf("Too many slashes: %s", expr)
 	}
 
 	if start < r.min {
-		return zero, fmt.Errorf("Beginning of range (%d) below minimum (%d): %s", start, r.min, expr)
+		return 0, fmt.Errorf("Beginning of range (%d) below minimum (%d): %s", start, r.min, expr)
 	}
 	if end > r.max {
-		return zero, fmt.Errorf("End of range (%d) above maximum (%d): %s", end, r.max, expr)
+		return 0, fmt.Errorf("End of range (%d) above maximum (%d): %s", end, r.max, expr)
 	}
 	if start > end {
-		return zero, fmt.Errorf("Beginning of range (%d) beyond end of range (%d): %s", start, end, expr)
+		return 0, fmt.Errorf("Beginning of range (%d) beyond end of range (%d): %s", start, end, expr)
 	}
 	if step == 0 {
-		return zero, fmt.Errorf("Step of range should be a positive number: %s", expr)
+		return 0, fmt.Errorf("Step of range should be a positive number: %s", expr)
 	}
 
-	return getBits(start, end, step) | extra_star, nil
+	return getBits(start, end, step) | extra, nil
 }
 
 // parseIntOrName returns the (possibly-named) integer contained in expr.

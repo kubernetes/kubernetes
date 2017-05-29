@@ -161,7 +161,7 @@ func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
 	defer cache.mu.Unlock()
 
 	currState, ok := cache.podStates[key]
-	if currState.pod.Spec.NodeName != pod.Spec.NodeName {
+	if ok && currState.pod.Spec.NodeName != pod.Spec.NodeName {
 		return fmt.Errorf("pod %v state was assumed on a different node", key)
 	}
 

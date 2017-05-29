@@ -31,7 +31,9 @@ var _ = math.Inf
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
-const _ = proto.ProtoPackageIsVersion1
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 type Event_EventType int32
 
@@ -103,91 +105,91 @@ func init() {
 	proto.RegisterType((*Event)(nil), "mvccpb.Event")
 	proto.RegisterEnum("mvccpb.Event_EventType", Event_EventType_name, Event_EventType_value)
 }
-func (m *KeyValue) Marshal() (data []byte, err error) {
+func (m *KeyValue) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *KeyValue) MarshalTo(data []byte) (int, error) {
+func (m *KeyValue) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if len(m.Key) > 0 {
-		data[i] = 0xa
+		dAtA[i] = 0xa
 		i++
-		i = encodeVarintKv(data, i, uint64(len(m.Key)))
-		i += copy(data[i:], m.Key)
+		i = encodeVarintKv(dAtA, i, uint64(len(m.Key)))
+		i += copy(dAtA[i:], m.Key)
 	}
 	if m.CreateRevision != 0 {
-		data[i] = 0x10
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintKv(data, i, uint64(m.CreateRevision))
+		i = encodeVarintKv(dAtA, i, uint64(m.CreateRevision))
 	}
 	if m.ModRevision != 0 {
-		data[i] = 0x18
+		dAtA[i] = 0x18
 		i++
-		i = encodeVarintKv(data, i, uint64(m.ModRevision))
+		i = encodeVarintKv(dAtA, i, uint64(m.ModRevision))
 	}
 	if m.Version != 0 {
-		data[i] = 0x20
+		dAtA[i] = 0x20
 		i++
-		i = encodeVarintKv(data, i, uint64(m.Version))
+		i = encodeVarintKv(dAtA, i, uint64(m.Version))
 	}
 	if len(m.Value) > 0 {
-		data[i] = 0x2a
+		dAtA[i] = 0x2a
 		i++
-		i = encodeVarintKv(data, i, uint64(len(m.Value)))
-		i += copy(data[i:], m.Value)
+		i = encodeVarintKv(dAtA, i, uint64(len(m.Value)))
+		i += copy(dAtA[i:], m.Value)
 	}
 	if m.Lease != 0 {
-		data[i] = 0x30
+		dAtA[i] = 0x30
 		i++
-		i = encodeVarintKv(data, i, uint64(m.Lease))
+		i = encodeVarintKv(dAtA, i, uint64(m.Lease))
 	}
 	return i, nil
 }
 
-func (m *Event) Marshal() (data []byte, err error) {
+func (m *Event) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *Event) MarshalTo(data []byte) (int, error) {
+func (m *Event) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if m.Type != 0 {
-		data[i] = 0x8
+		dAtA[i] = 0x8
 		i++
-		i = encodeVarintKv(data, i, uint64(m.Type))
+		i = encodeVarintKv(dAtA, i, uint64(m.Type))
 	}
 	if m.Kv != nil {
-		data[i] = 0x12
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintKv(data, i, uint64(m.Kv.Size()))
-		n1, err := m.Kv.MarshalTo(data[i:])
+		i = encodeVarintKv(dAtA, i, uint64(m.Kv.Size()))
+		n1, err := m.Kv.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n1
 	}
 	if m.PrevKv != nil {
-		data[i] = 0x1a
+		dAtA[i] = 0x1a
 		i++
-		i = encodeVarintKv(data, i, uint64(m.PrevKv.Size()))
-		n2, err := m.PrevKv.MarshalTo(data[i:])
+		i = encodeVarintKv(dAtA, i, uint64(m.PrevKv.Size()))
+		n2, err := m.PrevKv.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
@@ -196,31 +198,31 @@ func (m *Event) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func encodeFixed64Kv(data []byte, offset int, v uint64) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
-	data[offset+4] = uint8(v >> 32)
-	data[offset+5] = uint8(v >> 40)
-	data[offset+6] = uint8(v >> 48)
-	data[offset+7] = uint8(v >> 56)
+func encodeFixed64Kv(dAtA []byte, offset int, v uint64) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
+	dAtA[offset+4] = uint8(v >> 32)
+	dAtA[offset+5] = uint8(v >> 40)
+	dAtA[offset+6] = uint8(v >> 48)
+	dAtA[offset+7] = uint8(v >> 56)
 	return offset + 8
 }
-func encodeFixed32Kv(data []byte, offset int, v uint32) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
+func encodeFixed32Kv(dAtA []byte, offset int, v uint32) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
 	return offset + 4
 }
-func encodeVarintKv(data []byte, offset int, v uint64) int {
+func encodeVarintKv(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
-		data[offset] = uint8(v&0x7f | 0x80)
+		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
-	data[offset] = uint8(v)
+	dAtA[offset] = uint8(v)
 	return offset + 1
 }
 func (m *KeyValue) Size() (n int) {
@@ -279,8 +281,8 @@ func sovKv(x uint64) (n int) {
 func sozKv(x uint64) (n int) {
 	return sovKv(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (m *KeyValue) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *KeyValue) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -292,7 +294,7 @@ func (m *KeyValue) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -320,7 +322,7 @@ func (m *KeyValue) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				byteLen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -334,7 +336,7 @@ func (m *KeyValue) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Key = append(m.Key[:0], data[iNdEx:postIndex]...)
+			m.Key = append(m.Key[:0], dAtA[iNdEx:postIndex]...)
 			if m.Key == nil {
 				m.Key = []byte{}
 			}
@@ -351,7 +353,7 @@ func (m *KeyValue) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.CreateRevision |= (int64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -370,7 +372,7 @@ func (m *KeyValue) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.ModRevision |= (int64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -389,7 +391,7 @@ func (m *KeyValue) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.Version |= (int64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -408,7 +410,7 @@ func (m *KeyValue) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				byteLen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -422,7 +424,7 @@ func (m *KeyValue) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Value = append(m.Value[:0], data[iNdEx:postIndex]...)
+			m.Value = append(m.Value[:0], dAtA[iNdEx:postIndex]...)
 			if m.Value == nil {
 				m.Value = []byte{}
 			}
@@ -439,7 +441,7 @@ func (m *KeyValue) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.Lease |= (int64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -448,7 +450,7 @@ func (m *KeyValue) Unmarshal(data []byte) error {
 			}
 		default:
 			iNdEx = preIndex
-			skippy, err := skipKv(data[iNdEx:])
+			skippy, err := skipKv(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -467,8 +469,8 @@ func (m *KeyValue) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *Event) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *Event) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -480,7 +482,7 @@ func (m *Event) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -508,7 +510,7 @@ func (m *Event) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.Type |= (Event_EventType(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -527,7 +529,7 @@ func (m *Event) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -544,7 +546,7 @@ func (m *Event) Unmarshal(data []byte) error {
 			if m.Kv == nil {
 				m.Kv = &KeyValue{}
 			}
-			if err := m.Kv.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Kv.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -560,7 +562,7 @@ func (m *Event) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -577,13 +579,13 @@ func (m *Event) Unmarshal(data []byte) error {
 			if m.PrevKv == nil {
 				m.PrevKv = &KeyValue{}
 			}
-			if err := m.PrevKv.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.PrevKv.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipKv(data[iNdEx:])
+			skippy, err := skipKv(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -602,8 +604,8 @@ func (m *Event) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func skipKv(data []byte) (n int, err error) {
-	l := len(data)
+func skipKv(dAtA []byte) (n int, err error) {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		var wire uint64
@@ -614,7 +616,7 @@ func skipKv(data []byte) (n int, err error) {
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -632,7 +634,7 @@ func skipKv(data []byte) (n int, err error) {
 					return 0, io.ErrUnexpectedEOF
 				}
 				iNdEx++
-				if data[iNdEx-1] < 0x80 {
+				if dAtA[iNdEx-1] < 0x80 {
 					break
 				}
 			}
@@ -649,7 +651,7 @@ func skipKv(data []byte) (n int, err error) {
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				length |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -672,7 +674,7 @@ func skipKv(data []byte) (n int, err error) {
 					if iNdEx >= l {
 						return 0, io.ErrUnexpectedEOF
 					}
-					b := data[iNdEx]
+					b := dAtA[iNdEx]
 					iNdEx++
 					innerWire |= (uint64(b) & 0x7F) << shift
 					if b < 0x80 {
@@ -683,7 +685,7 @@ func skipKv(data []byte) (n int, err error) {
 				if innerWireType == 4 {
 					break
 				}
-				next, err := skipKv(data[start:])
+				next, err := skipKv(dAtA[start:])
 				if err != nil {
 					return 0, err
 				}
@@ -706,6 +708,8 @@ var (
 	ErrInvalidLengthKv = fmt.Errorf("proto: negative length found during unmarshaling")
 	ErrIntOverflowKv   = fmt.Errorf("proto: integer overflow")
 )
+
+func init() { proto.RegisterFile("kv.proto", fileDescriptorKv) }
 
 var fileDescriptorKv = []byte{
 	// 303 bytes of a gzipped FileDescriptorProto

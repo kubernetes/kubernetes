@@ -17,6 +17,8 @@ go_library(
         "//federation/apis/federation/install:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/apis/admissionregistration:go_default_library",
+        "//pkg/apis/admissionregistration/install:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
@@ -33,6 +35,8 @@ go_library(
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/imagepolicy:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
+        "//pkg/apis/networking:go_default_library",
+        "//pkg/apis/networking/install:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/apis/policy/install:go_default_library",
         "//pkg/apis/rbac:go_default_library",
@@ -41,10 +45,10 @@ go_library(
         "//pkg/apis/settings/install:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/meta",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/recognizer",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/recognizer:go_default_library",
     ],
 )
 
@@ -54,8 +58,8 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],
 )
 

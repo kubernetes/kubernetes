@@ -85,7 +85,7 @@ func (s *store) detectAuth() bool {
 	if s.server == nil {
 		return false
 	}
-	value, err := s.requestResource("/enabled", false)
+	value, err := s.requestResource("/enabled", false, false)
 	if err != nil {
 		if e, ok := err.(*etcderr.Error); ok {
 			if e.ErrorCode == etcderr.EcodeKeyNotFound {
@@ -105,12 +105,16 @@ func (s *store) detectAuth() bool {
 	return u
 }
 
-func (s *store) requestResource(res string, dir bool) (etcdserver.Response, error) {
+func (s *store) requestResource(res string, dir, quorum bool) (etcdserver.Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
 	p := path.Join(StorePermsPrefix, res)
+	method := "GET"
+	if quorum {
+		method = "QGET"
+	}
 	rr := etcdserverpb.Request{
-		Method: "GET",
+		Method: method,
 		Path:   p,
 		Dir:    dir,
 	}

@@ -30,7 +30,7 @@ import (
 const currentApiCallMetricsVersion = "v1"
 
 // ApiCallToPerfData transforms APIResponsiveness to PerfData.
-func ApiCallToPerfData(apicalls APIResponsiveness) *perftype.PerfData {
+func ApiCallToPerfData(apicalls *APIResponsiveness) *perftype.PerfData {
 	perfData := &perftype.PerfData{Version: currentApiCallMetricsVersion}
 	for _, apicall := range apicalls.APICalls {
 		item := perftype.DataItem{
@@ -43,10 +43,30 @@ func ApiCallToPerfData(apicalls APIResponsiveness) *perftype.PerfData {
 			Labels: map[string]string{
 				"Verb":     apicall.Verb,
 				"Resource": apicall.Resource,
+				"Count":    fmt.Sprintf("%v", apicall.Count),
 			},
 		}
 		perfData.DataItems = append(perfData.DataItems, item)
 	}
+	return perfData
+}
+
+// PodStartupLatencyToPerfData transforms PodStartupLatency to PerfData.
+func PodStartupLatencyToPerfData(latency *PodStartupLatency) *perftype.PerfData {
+	perfData := &perftype.PerfData{Version: currentApiCallMetricsVersion}
+	item := perftype.DataItem{
+		Data: map[string]float64{
+			"Perc50":  float64(latency.Latency.Perc50) / 1000000, // us -> ms
+			"Perc90":  float64(latency.Latency.Perc90) / 1000000,
+			"Perc99":  float64(latency.Latency.Perc99) / 1000000,
+			"Perc100": float64(latency.Latency.Perc100) / 1000000,
+		},
+		Unit: "ms",
+		Labels: map[string]string{
+			"Metric": "pod_startup",
+		},
+	}
+	perfData.DataItems = append(perfData.DataItems, item)
 	return perfData
 }
 

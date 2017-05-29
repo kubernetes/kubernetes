@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -106,7 +107,7 @@ func reserveAllCpu(f *framework.Framework, id string, millicores int) error {
 }
 
 func podRunningOrUnschedulable(pod *v1.Pod) bool {
-	_, cond := v1.GetPodCondition(&pod.Status, v1.PodScheduled)
+	_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
 	if cond != nil && cond.Status == v1.ConditionFalse && cond.Reason == "Unschedulable" {
 		return true
 	}

@@ -31,11 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	apijson "k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/kubernetes/pkg/api/annotations"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type SetLastAppliedOptions struct {
@@ -51,19 +53,24 @@ type SetLastAppliedOptions struct {
 	CreateAnnotation bool
 	Output           string
 	Codec            runtime.Encoder
-	PatchBufferList  [][]byte
+	PatchBufferList  []PatchBuffer
 	Factory          cmdutil.Factory
 	Out              io.Writer
 	ErrOut           io.Writer
 }
 
+type PatchBuffer struct {
+	Patch     []byte
+	PatchType types.PatchType
+}
+
 var (
-	applySetLastAppliedLong = templates.LongDesc(`
+	applySetLastAppliedLong = templates.LongDesc(i18n.T(`
 		Set the latest last-applied-configuration annotations by setting it to match the contents of a file.
 		This results in the last-applied-configuration being updated as though 'kubectl apply -f <file>' was run,
-		without updating any other parts of the object.`)
+		without updating any other parts of the object.`))
 
-	applySetLastAppliedExample = templates.Examples(`
+	applySetLastAppliedExample = templates.Examples(i18n.T(`
 		# Set the last-applied-configuration of a resource to match the contents of a file.
 		kubectl apply set-last-applied -f deploy.yaml
 
@@ -72,14 +79,14 @@ var (
 
 		# Set the last-applied-configuration of a resource to match the contents of a file, will create the annotation if it does not already exist.
 		kubectl apply set-last-applied -f deploy.yaml --create-annotation=true
-		`)
+		`))
 )
 
 func NewCmdApplySetLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	options := &SetLastAppliedOptions{Out: out, ErrOut: err}
 	cmd := &cobra.Command{
 		Use:     "set-last-applied -f FILENAME",
-		Short:   "Set the last-applied-configuration annotation on a live object to match the contents of a file.",
+		Short:   i18n.T("Set the last-applied-configuration annotation on a live object to match the contents of a file."),
 		Long:    applySetLastAppliedLong,
 		Example: applySetLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -120,7 +127,7 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 }
 
 func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) error {
-	r := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		Latest().
@@ -136,8 +143,7 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 			return err
 		}
 
-		var diffBuf, patchBuf []byte
-		patchBuf, diffBuf, err = o.getPatch(info)
+		patchBuf, diffBuf, patchType, err := editor.GetApplyPatch(info.VersionedObject, o.Codec)
 		if err != nil {
 			return err
 		}
@@ -159,8 +165,9 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 		}
 
 		//only add to PatchBufferList when changed
-		if !bytes.Equal(stripComments(oringalBuf), stripComments(diffBuf)) {
-			o.PatchBufferList = append(o.PatchBufferList, patchBuf)
+		if !bytes.Equal(cmdutil.StripComments(oringalBuf), cmdutil.StripComments(diffBuf)) {
+			p := PatchBuffer{Patch: patchBuf, PatchType: patchType}
+			o.PatchBufferList = append(o.PatchBufferList, p)
 			o.InfoList = append(o.InfoList, info)
 		} else {
 			fmt.Fprintf(o.Out, "set-last-applied %s: no changes required.\n", info.Name)
@@ -184,7 +191,7 @@ func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			patchedObj, err := helper.Patch(o.Namespace, info.Name, types.MergePatchType, patch)
+			patchedObj, err := helper.Patch(o.Namespace, info.Name, patch.PatchType, patch.Patch)
 			if err != nil {
 				return err
 			}
@@ -196,7 +203,7 @@ func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.
 			cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
 
 		} else {
-			err := o.formatPrinter(o.Output, patch)
+			err := o.formatPrinter(o.Output, patch.Patch, o.Out)
 			if err != nil {
 				return err
 			}
@@ -206,7 +213,7 @@ func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.
 	return nil
 }
 
-func (o *SetLastAppliedOptions) formatPrinter(output string, buf []byte) error {
+func (o *SetLastAppliedOptions) formatPrinter(output string, buf []byte, w io.Writer) error {
 	yamlOutput, err := yaml.JSONToYAML(buf)
 	if err != nil {
 		return err
@@ -218,9 +225,9 @@ func (o *SetLastAppliedOptions) formatPrinter(output string, buf []byte) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(o.Out, string(jsonBuffer.Bytes()))
+		fmt.Fprintf(w, string(jsonBuffer.Bytes()))
 	case "yaml":
-		fmt.Fprintf(o.Out, string(yamlOutput))
+		fmt.Fprintf(w, string(yamlOutput))
 	}
 	return nil
 }
@@ -233,7 +240,7 @@ func (o *SetLastAppliedOptions) getPatch(info *resource.Info) ([]byte, []byte, e
 	if err != nil {
 		return nil, localFile, err
 	}
-	annotationsMap[annotations.LastAppliedConfigAnnotation] = string(localFile)
+	annotationsMap[api.LastAppliedConfigAnnotation] = string(localFile)
 	metadataMap["annotations"] = annotationsMap
 	objMap["metadata"] = metadataMap
 	jsonString, err := apijson.Marshal(objMap)

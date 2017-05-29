@@ -2,6 +2,27 @@
 
 set -ex
 
-kubectl --kubeconfig=/srv/kubernetes/config cordon $(hostname)
-kubectl --kubeconfig=/srv/kubernetes/config drain $(hostname) --force
+export PATH=$PATH:/snap/bin
+
+DELETE_LOCAL_DATA=$(action-get delete-local-data)
+FORCE=$(action-get force)
+
+# placeholder for additional flags to the command
+export EXTRA_FLAGS=""
+
+# Determine if we have extra flags
+if [[ "${DELETE_LOCAL_DATA}" == "True" || "${DELETE_LOCAL_DATA}" == "true" ]]; then
+  EXTRA_FLAGS="${EXTRA_FLAGS} --delete-local-data=true"
+fi
+
+if [[ "${FORCE}" == "True" || "${FORCE}" == "true" ]]; then
+  EXTRA_FLAGS="${EXTRA_FLAGS} --force"
+fi
+
+
+# Cordon and drain the unit
+kubectl --kubeconfig=/root/cdk/kubeconfig cordon $(hostname)
+kubectl --kubeconfig=/root/cdk/kubeconfig drain $(hostname) ${EXTRA_FLAGS}
+
+# Set status to indicate the unit is paused and under maintenance.
 status-set 'waiting' 'Kubernetes unit paused'

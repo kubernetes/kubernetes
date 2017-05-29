@@ -1,4 +1,4 @@
-# Zookeeper petset e2e tester
+# Zookeeper statefulset e2e tester
 
 The image in this directory is the init container for contrib/pets/zookeeper but for one difference, it bakes a specific version of zookeeper into the base image so we get deterministic test results without having to depend on a zookeeper download server. Discussing the tradeoffs to either approach (download the version at runtime, or maintain an image per version) are outside the scope of this document.
 

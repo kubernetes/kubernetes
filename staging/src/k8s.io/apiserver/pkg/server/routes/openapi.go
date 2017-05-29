@@ -17,6 +17,8 @@ limitations under the License.
 package routes
 
 import (
+	"github.com/emicklei/go-restful"
+
 	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apiserver/pkg/server/mux"
 	apiserveropenapi "k8s.io/apiserver/pkg/server/openapi"
@@ -30,8 +32,8 @@ type OpenAPI struct {
 }
 
 // Install adds the SwaggerUI webservice to the given mux.
-func (oa OpenAPI) Install(c *mux.APIContainer) {
-	err := apiserveropenapi.RegisterOpenAPIService("/swagger.json", c.RegisteredWebServices(), oa.Config, c)
+func (oa OpenAPI) Install(c *restful.Container, mux *mux.PathRecorderMux) {
+	err := apiserveropenapi.RegisterOpenAPIService("/swagger.json", c.RegisteredWebServices(), oa.Config, mux)
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}

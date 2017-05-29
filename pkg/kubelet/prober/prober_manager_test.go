@@ -249,11 +249,11 @@ func TestUpdatePodStatus(t *testing.T) {
 
 	// Setup probe "workers" and cached results.
 	m.workers = map[probeKey]*worker{
-		probeKey{testPodUID, unprobed.Name, liveness}:       {},
-		probeKey{testPodUID, probedReady.Name, readiness}:   {},
-		probeKey{testPodUID, probedPending.Name, readiness}: {},
-		probeKey{testPodUID, probedUnready.Name, readiness}: {},
-		probeKey{testPodUID, terminated.Name, readiness}:    {},
+		{testPodUID, unprobed.Name, liveness}:       {},
+		{testPodUID, probedReady.Name, readiness}:   {},
+		{testPodUID, probedPending.Name, readiness}: {},
+		{testPodUID, probedUnready.Name, readiness}: {},
+		{testPodUID, terminated.Name, readiness}:    {},
 	}
 	m.readinessManager.Set(kubecontainer.ParseContainerID(probedReady.ContainerID), results.Success, &v1.Pod{})
 	m.readinessManager.Set(kubecontainer.ParseContainerID(probedUnready.ContainerID), results.Failure, &v1.Pod{})
@@ -262,11 +262,11 @@ func TestUpdatePodStatus(t *testing.T) {
 	m.UpdatePodStatus(testPodUID, &podStatus)
 
 	expectedReadiness := map[probeKey]bool{
-		probeKey{testPodUID, unprobed.Name, readiness}:      true,
-		probeKey{testPodUID, probedReady.Name, readiness}:   true,
-		probeKey{testPodUID, probedPending.Name, readiness}: false,
-		probeKey{testPodUID, probedUnready.Name, readiness}: false,
-		probeKey{testPodUID, terminated.Name, readiness}:    false,
+		{testPodUID, unprobed.Name, readiness}:      true,
+		{testPodUID, probedReady.Name, readiness}:   true,
+		{testPodUID, probedPending.Name, readiness}: false,
+		{testPodUID, probedUnready.Name, readiness}: false,
+		{testPodUID, terminated.Name, readiness}:    false,
 	}
 	for _, c := range podStatus.ContainerStatuses {
 		expected, ok := expectedReadiness[probeKey{testPodUID, c.Name, readiness}]

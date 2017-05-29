@@ -18,6 +18,7 @@ import (
 	"crypto/sha256"
 	"io"
 
+	"github.com/coreos/etcd/auth"
 	"github.com/coreos/etcd/etcdserver"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/mvcc"
@@ -45,6 +46,10 @@ type RaftStatusGetter interface {
 	Leader() types.ID
 }
 
+type AuthGetter interface {
+	AuthStore() auth.AuthStore
+}
+
 type maintenanceServer struct {
 	rg  RaftStatusGetter
 	kg  KVGetter
@@ -54,7 +59,8 @@ type maintenanceServer struct {
 }
 
 func NewMaintenanceServer(s *etcdserver.EtcdServer) pb.MaintenanceServer {
-	return &maintenanceServer{rg: s, kg: s, bg: s, a: s, hdr: newHeader(s)}
+	srv := &maintenanceServer{rg: s, kg: s, bg: s, a: s, hdr: newHeader(s)}
+	return &authMaintenanceServer{srv, s}
 }
 
 func (ms *maintenanceServer) Defragment(ctx context.Context, sr *pb.DefragmentRequest) (*pb.DefragmentResponse, error) {
@@ -138,4 +144,50 @@ func (ms *maintenanceServer) Status(ctx context.Context, ar *pb.StatusRequest) (
 	}
 	ms.hdr.fill(resp.Header)
 	return resp, nil
+}
+
+type authMaintenanceServer struct {
+	*maintenanceServer
+	ag AuthGetter
+}
+
+func (ams *authMaintenanceServer) isAuthenticated(ctx context.Context) error {
+	authInfo, err := ams.ag.AuthStore().AuthInfoFromCtx(ctx)
+	if err != nil {
+		return err
+	}
+
+	return ams.ag.AuthStore().IsAdminPermitted(authInfo)
+}
+
+func (ams *authMaintenanceServer) Defragment(ctx context.Context, sr *pb.DefragmentRequest) (*pb.DefragmentResponse, error) {
+	if err := ams.isAuthenticated(ctx); err != nil {
+		return nil, err
+	}
+
+	return ams.maintenanceServer.Defragment(ctx, sr)
+}
+
+func (ams *authMaintenanceServer) Snapshot(sr *pb.SnapshotRequest, srv pb.Maintenance_SnapshotServer) error {
+	if err := ams.isAuthenticated(srv.Context()); err != nil {
+		return err
+	}
+
+	return ams.maintenanceServer.Snapshot(sr, srv)
+}
+
+func (ams *authMaintenanceServer) Hash(ctx context.Context, r *pb.HashRequest) (*pb.HashResponse, error) {
+	if err := ams.isAuthenticated(ctx); err != nil {
+		return nil, err
+	}
+
+	return ams.maintenanceServer.Hash(ctx, r)
+}
+
+func (ams *authMaintenanceServer) Status(ctx context.Context, ar *pb.StatusRequest) (*pb.StatusResponse, error) {
+	if err := ams.isAuthenticated(ctx); err != nil {
+		return nil, err
+	}
+
+	return ams.maintenanceServer.Status(ctx, ar)
 }

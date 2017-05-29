@@ -3,6 +3,9 @@ approvers:
 - thockin
 - jsafrane
 - matchstick
+- rootfs
+- gnufied
+- childsb
 reviewers:
 - thockin
 - smarterclayton
@@ -16,5 +19,5 @@ reviewers:
 - jsafrane
 - rootfs
 - jingxu97
-- rkouj
 - msau42
+- gnufied

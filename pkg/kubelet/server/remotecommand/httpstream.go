@@ -28,10 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/wsstream"
+	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/term"
 
 	"github.com/golang/glog"
 )
@@ -78,7 +79,7 @@ type context struct {
 	stderrStream io.WriteCloser
 	writeStatus  func(status *apierrors.StatusError) error
 	resizeStream io.ReadCloser
-	resizeChan   chan term.Size
+	resizeChan   chan remotecommand.TerminalSize
 	tty          bool
 }
 
@@ -114,7 +115,7 @@ func createStreams(req *http.Request, w http.ResponseWriter, opts *Options, supp
 	}
 
 	if ctx.resizeStream != nil {
-		ctx.resizeChan = make(chan term.Size)
+		ctx.resizeChan = make(chan remotecommand.TerminalSize)
 		go handleResizeEvents(ctx.resizeStream, ctx.resizeChan)
 	}
 
@@ -148,16 +149,16 @@ func createHttpStreamStreams(req *http.Request, w http.ResponseWriter, opts *Opt
 
 	var handler protocolHandler
 	switch protocol {
-	case StreamProtocolV4Name:
+	case remotecommandconsts.StreamProtocolV4Name:
 		handler = &v4ProtocolHandler{}
-	case StreamProtocolV3Name:
+	case remotecommandconsts.StreamProtocolV3Name:
 		handler = &v3ProtocolHandler{}
-	case StreamProtocolV2Name:
+	case remotecommandconsts.StreamProtocolV2Name:
 		handler = &v2ProtocolHandler{}
 	case "":
-		glog.V(4).Infof("Client did not request protocol negotiaion. Falling back to %q", StreamProtocolV1Name)
+		glog.V(4).Infof("Client did not request protocol negotiaion. Falling back to %q", remotecommandconsts.StreamProtocolV1Name)
 		fallthrough
-	case StreamProtocolV1Name:
+	case remotecommandconsts.StreamProtocolV1Name:
 		handler = &v1ProtocolHandler{}
 	}
 
@@ -409,12 +410,12 @@ WaitForStreams:
 // supportsTerminalResizing returns false because v1ProtocolHandler doesn't support it.
 func (*v1ProtocolHandler) supportsTerminalResizing() bool { return false }
 
-func handleResizeEvents(stream io.Reader, channel chan<- term.Size) {
+func handleResizeEvents(stream io.Reader, channel chan<- remotecommand.TerminalSize) {
 	defer runtime.HandleCrash()
 
 	decoder := json.NewDecoder(stream)
 	for {
-		size := term.Size{}
+		size := remotecommand.TerminalSize{}
 		if err := decoder.Decode(&size); err != nil {
 			break
 		}

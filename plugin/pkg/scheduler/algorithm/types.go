@@ -41,7 +41,7 @@ type PriorityMapFunction func(pod *v1.Pod, meta interface{}, nodeInfo *scheduler
 // TODO: Change interface{} to a specific type.
 type PriorityReduceFunction func(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error
 
-// MetdataProducer is a function that computes metadata for a given pod.
+// MetadataProducer is a function that computes metadata for a given pod.
 type MetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{}
 
 // DEPRECATED

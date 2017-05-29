@@ -1,7 +1,7 @@
-// Extensions for Protocol Buffers to create more go like structures.
+// Protocol Buffers for Go with Gadgets
 //
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
-// http://github.com/gogo/protobuf/gogoproto
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
+// http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -148,6 +148,7 @@ The enumprefix, getters and stringer extensions can be used to remove some of th
   - goproto_stringer, if false, the message is generated without the default string method, this is useful for rather using stringer, or allowing you to write your own string method.
   - goproto_extensions_map (beta), if false, the extensions field is generated as type []byte instead of type map[int32]proto.Extension
   - goproto_unrecognized (beta), if false, XXX_unrecognized field is not generated. This is useful in conjunction with gogoproto.nullable=false, to generate structures completely devoid of pointers and reduce GC pressure at the cost of losing information about unrecognized fields.
+  - goproto_registration (beta), if true, the generated files will register all messages and types against both gogo/protobuf and golang/protobuf. This is necessary when using third-party packages which read registrations from golang/protobuf (such as the grpc-gateway).
 
 Less Typing and Peace of Mind is explained in their specific plugin folders godoc:
 

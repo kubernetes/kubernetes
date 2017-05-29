@@ -21,7 +21,6 @@ package v1beta1
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	extensions "k8s.io/client-go/pkg/apis/extensions"
 	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -89,7 +88,7 @@ func (s replicaSetNamespaceLister) Get(name string) (*v1beta1.ReplicaSet, error)
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(extensions.Resource("replicaset"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("replicaset"), name)
 	}
 	return obj.(*v1beta1.ReplicaSet), nil
 }

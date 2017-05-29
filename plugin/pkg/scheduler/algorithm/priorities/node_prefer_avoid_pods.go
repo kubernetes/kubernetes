@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -43,17 +44,15 @@ func CalculateNodePreferAvoidPodsPriorityMap(pod *v1.Pod, meta interface{}, node
 		return schedulerapi.HostPriority{Host: node.Name, Score: 10}, nil
 	}
 
-	avoids, err := v1.GetAvoidPodsFromNodeAnnotations(node.Annotations)
+	avoids, err := v1helper.GetAvoidPodsFromNodeAnnotations(node.Annotations)
 	if err != nil {
 		// If we cannot get annotation, assume it's schedulable there.
 		return schedulerapi.HostPriority{Host: node.Name, Score: 10}, nil
 	}
 	for i := range avoids.PreferAvoidPods {
 		avoid := &avoids.PreferAvoidPods[i]
-		if controllerRef != nil {
-			if avoid.PodSignature.PodController.Kind == controllerRef.Kind && avoid.PodSignature.PodController.UID == controllerRef.UID {
-				return schedulerapi.HostPriority{Host: node.Name, Score: 0}, nil
-			}
+		if avoid.PodSignature.PodController.Kind == controllerRef.Kind && avoid.PodSignature.PodController.UID == controllerRef.UID {
+			return schedulerapi.HostPriority{Host: node.Name, Score: 0}, nil
 		}
 	}
 	return schedulerapi.HostPriority{Host: node.Name, Score: 10}, nil

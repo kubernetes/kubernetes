@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -417,8 +415,8 @@ func TestRBAC(t *testing.T) {
 		masterConfig := framework.NewIntegrationTestMasterConfig()
 		masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(masterConfig)
 		masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
-		_, s := framework.RunAMaster(masterConfig)
-		defer s.Close()
+		_, s, closeFn := framework.RunAMaster(masterConfig)
+		defer closeFn()
 
 		clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 
@@ -509,8 +507,8 @@ func TestBootstrapping(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(masterConfig)
 	masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
 

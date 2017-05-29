@@ -16,7 +16,10 @@ limitations under the License.
 
 package qos
 
-import "k8s.io/kubernetes/pkg/api/v1"
+import (
+	"k8s.io/kubernetes/pkg/api/v1"
+	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
+)
 
 const (
 	// PodInfraOOMAdj is very docker specific. For arbitrary runtime, it may not make
@@ -38,7 +41,7 @@ const (
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
 func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) int {
-	switch GetPodQOS(pod) {
+	switch v1qos.GetPodQOS(pod) {
 	case v1.PodQOSGuaranteed:
 		// Guaranteed containers should be the last to get killed.
 		return guaranteedOOMScoreAdj

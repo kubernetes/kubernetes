@@ -41,28 +41,37 @@ KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
 kube::test::find_integration_test_dirs() {
   (
     cd ${KUBE_ROOT}
-    find test/integration/${1-} -name '*_test.go' -print0 \
+    find test/integration/ -name '*_test.go' -print0 \
+      | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
+      | LC_ALL=C sort -u
+    find vendor/k8s.io/kube-apiextensions-server/test/integration/ -name '*_test.go' -print0 \
       | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
       | LC_ALL=C sort -u
   )
 }
 
+CLEANUP_REQUIRED=
 cleanup() {
+  if [[ -z "${CLEANUP_REQUIRED}" ]]; then
+    return
+  fi
   kube::log::status "Cleaning up etcd"
   kube::etcd::cleanup
+  CLEANUP_REQUIRED=
   kube::log::status "Integration test cleanup complete"
 }
 
 runTests() {
   kube::log::status "Starting etcd instance"
+  CLEANUP_REQUIRED=1
   kube::etcd::start
   kube::log::status "Running integration test cases"
 
   # TODO: Re-enable race detection when we switch to a thread-safe etcd client
   # KUBE_RACE="-race"
   make -C "${KUBE_ROOT}" test \
-      WHAT="$(kube::test::find_integration_test_dirs ${2-} | paste -sd' ' -) $(echo ${@:3})" \
-      KUBE_GOFLAGS="${KUBE_GOFLAGS:-} -tags 'integration no-docker'" \
+      WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
+      KUBE_GOFLAGS="${KUBE_GOFLAGS:-}" \
       KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=garbage*collector*=6 --alsologtostderr=true" \
       KUBE_RACE="" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
@@ -87,22 +96,11 @@ trap cleanup EXIT
 # If a test case is specified, just run once with v1 API version and exit
 if [[ -n "${KUBE_TEST_ARGS}" ]]; then
   runTests v1
+  exit 0
 fi
-
-# Pass arguments that begin with "-" and move them to goflags.
-what_flags=()
-for arg in "$@"; do
-  if [[ "${arg}" == -* ]]; then
-    what_flags+=("${arg}")
-  fi
-done
-if [[ "${#what_flags[@]}" -eq 0 ]]; then
-  what_flags=''
-fi
-
 
 # Convert the CSV to an array of API versions to test
 IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 for apiVersion in "${apiVersions[@]}"; do
-  runTests "${apiVersion}" "${1-}" "${what_flags[@]}"
+  runTests "${apiVersion}"
 done

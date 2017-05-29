@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: registry-tls-data
+type: Opaque
+data:
+  tls.crt: {{ tlscert }}
+  tls.key: {{ tlskey }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: registry-auth-data
+type: Opaque
+data:
+  htpasswd: {{ htpasswd }}
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: kube-registry-v0
+  labels:
+    k8s-app: kube-registry
+    version: v0
+    kubernetes.io/cluster-service: "true"
+spec:
+  replicas: 1
+  selector:
+    k8s-app: kube-registry
+    version: v0
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-registry
+        version: v0
+        kubernetes.io/cluster-service: "true"
+    spec:
+      containers:
+      - name: registry
+        image: registry:2
+        resources:
+          # keep request = limit to keep this container in guaranteed class
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        env:
+        - name: REGISTRY_HTTP_ADDR
+          value: :5000
+        - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+          value: /var/lib/registry
+        - name: REGISTRY_AUTH_HTPASSWD_REALM
+          value: basic_realm
+        - name: REGISTRY_AUTH_HTPASSWD_PATH
+          value: /auth/htpasswd
+        volumeMounts:
+        - name: image-store
+          mountPath: /var/lib/registry
+        - name: auth-dir
+          mountPath: /auth
+        ports:
+        - containerPort: 5000
+          name: registry
+          protocol: TCP
+      volumes:
+      - name: image-store
+        hostPath:
+          path: /srv/registry
+      - name: auth-dir
+        secret:
+          secretName: registry-auth-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-registry
+  labels:
+    k8s-app: kube-registry
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "KubeRegistry"
+spec:
+  selector:
+    k8s-app: kube-registry
+  type: LoadBalancer
+  ports:
+  - name: registry
+    port: 5000
+    protocol: TCP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: registry-access
+data:
+  .dockercfg: {{ dockercfg }}
+type: kubernetes.io/dockercfg
+{%- if ingress %}
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: registry-ing
+spec:
+  tls:
+  - hosts:
+    - {{ domain }}
+    secretName: registry-tls-data
+  rules:
+  - host: {{ domain }}
+    http:
+      paths:
+      - backend:
+          serviceName: kube-registry
+          servicePort: 5000
+        path: /
+{% endif %}

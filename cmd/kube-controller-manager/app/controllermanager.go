@@ -32,7 +32,6 @@ import (
 	"strconv"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -177,7 +176,7 @@ func Run(s *options.CMServer) error {
 			clientBuilder = rootClientBuilder
 		}
 
-		err := StartControllers(newControllerInitializers(), s, rootClientBuilder, clientBuilder, stop)
+		err := StartControllers(NewControllerInitializers(), s, rootClientBuilder, clientBuilder, stop)
 		glog.Fatalf("error running controllers: %v", err)
 		panic("unreachable")
 	}
@@ -192,21 +191,20 @@ func Run(s *options.CMServer) error {
 		return err
 	}
 
-	// TODO: enable other lock types
-	rl := resourcelock.EndpointsLock{
-		EndpointsMeta: metav1.ObjectMeta{
-			Namespace: "kube-system",
-			Name:      "kube-controller-manager",
-		},
-		Client: leaderElectionClient,
-		LockConfig: resourcelock.ResourceLockConfig{
+	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
+		"kube-system",
+		"kube-controller-manager",
+		leaderElectionClient,
+		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
-		},
+		})
+	if err != nil {
+		glog.Fatalf("error creating lock: %v", err)
 	}
 
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
-		Lock:          &rl,
+		Lock:          rl,
 		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
 		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
@@ -243,14 +241,14 @@ func (c ControllerContext) IsControllerEnabled(name string) bool {
 
 func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, controllers ...string) bool {
 	hasStar := false
-	for _, controller := range controllers {
-		if controller == name {
+	for _, ctrl := range controllers {
+		if ctrl == name {
 			return true
 		}
-		if controller == "-"+name {
+		if ctrl == "-"+name {
 			return false
 		}
-		if controller == "*" {
+		if ctrl == "*" {
 			hasStar = true
 		}
 	}
@@ -272,7 +270,7 @@ func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, 
 type InitFunc func(ctx ControllerContext) (bool, error)
 
 func KnownControllers() []string {
-	ret := sets.StringKeySet(newControllerInitializers())
+	ret := sets.StringKeySet(NewControllerInitializers())
 
 	ret.Insert(
 		saTokenControllerName,
@@ -280,7 +278,7 @@ func KnownControllers() []string {
 		serviceControllerName,
 		routeControllerName,
 		pvBinderControllerName,
-		attachDetatchControllerName,
+		attachDetachControllerName,
 	)
 
 	// add "special" controllers that aren't initialized normally
@@ -292,7 +290,9 @@ var ControllersDisabledByDefault = sets.NewString(
 	"tokencleaner",
 )
 
-func newControllerInitializers() map[string]InitFunc {
+// NewControllerInitializers is a public map of named controller groups (you can start more than one in an init func)
+// paired to their InitFunc.  This allows for structured downstream composition and subdivision.
+func NewControllerInitializers() map[string]InitFunc {
 	controllers := map[string]InitFunc{}
 	controllers["endpoint"] = startEndpointController
 	controllers["replicationcontroller"] = startReplicationController
@@ -307,9 +307,10 @@ func newControllerInitializers() map[string]InitFunc {
 	controllers["replicaset"] = startReplicaSetController
 	controllers["horizontalpodautoscaling"] = startHPAController
 	controllers["disruption"] = startDisruptionController
-	controllers["statefuleset"] = startStatefulSetController
+	controllers["statefulset"] = startStatefulSetController
 	controllers["cronjob"] = startCronJobController
-	controllers["certificatesigningrequests"] = startCSRController
+	controllers["csrsigning"] = startCSRSigningController
+	controllers["csrapproving"] = startCSRApprovingController
 	controllers["ttl"] = startTTLController
 	controllers["bootstrapsigner"] = startBootstrapSignerController
 	controllers["tokencleaner"] = startTokenCleanerController
@@ -319,7 +320,8 @@ func newControllerInitializers() map[string]InitFunc {
 
 // TODO: In general, any controller checking this needs to be dynamic so
 //  users don't have to restart their controller manager if they change the apiserver.
-func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
+// Until we get there, the structure here needs to be exposed for the construction of a proper ControllerContext.
+func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
 	var discoveryClient discovery.DiscoveryInterface
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
@@ -328,6 +330,13 @@ func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 		client, err := clientBuilder.Client("controller-discovery")
 		if err != nil {
 			glog.Errorf("Failed to get api versions from server: %v", err)
+			return false, nil
+		}
+
+		healthStatus := 0
+		client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		if healthStatus != http.StatusOK {
+			glog.Errorf("Server isn't healthy yet.  Waiting a little while.")
 			return false, nil
 		}
 
@@ -358,12 +367,12 @@ func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 }
 
 const (
-	saTokenControllerName       = "serviceaccount-token"
-	nodeControllerName          = "node"
-	serviceControllerName       = "service"
-	routeControllerName         = "route"
-	pvBinderControllerName      = "persistentvolume-binder"
-	attachDetatchControllerName = "attachdetach"
+	saTokenControllerName      = "serviceaccount-token"
+	nodeControllerName         = "node"
+	serviceControllerName      = "service"
+	routeControllerName        = "route"
+	pvBinderControllerName     = "persistentvolume-binder"
+	attachDetachControllerName = "attachdetach"
 )
 
 func StartControllers(controllers map[string]InitFunc, s *options.CMServer, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) error {
@@ -389,21 +398,27 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 				rootCA = rootClientBuilder.ConfigOrDie("tokens-controller").CAData
 			}
 
-			go serviceaccountcontroller.NewTokensController(
+			controller := serviceaccountcontroller.NewTokensController(
+				sharedInformers.Core().V1().ServiceAccounts(),
+				sharedInformers.Core().V1().Secrets(),
 				rootClientBuilder.ClientOrDie("tokens-controller"),
 				serviceaccountcontroller.TokensControllerOptions{
 					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
 					RootCA:         rootCA,
 				},
-			).Run(int(s.ConcurrentSATokenSyncs), stop)
+			)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+			go controller.Run(int(s.ConcurrentSATokenSyncs), stop)
+
+			// start the first set of informers now so that other controllers can start
+			sharedInformers.Start(stop)
 		}
 
 	} else {
 		glog.Warningf("%q is disabled", saTokenControllerName)
 	}
 
-	availableResources, err := getAvailableResources(clientBuilder)
+	availableResources, err := GetAvailableResources(clientBuilder)
 	if err != nil {
 		return err
 	}
@@ -437,10 +452,15 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		glog.Infof("Started %q", controllerName)
 	}
 
-	// all the remaning plugins want this cloud variable
+	// all the remaining plugins want this cloud variable
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	if err != nil {
 		return fmt.Errorf("cloud provider could not be initialized: %v", err)
+	}
+
+	if cloud != nil {
+		// Initialize the cloud provider with a reference to the clientBuilder
+		cloud.Initialize(clientBuilder)
 	}
 
 	if ctx.IsControllerEnabled(nodeControllerName) {
@@ -470,13 +490,14 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 			serviceCIDR,
 			int(s.NodeCIDRMaskSize),
 			s.AllocateNodeCIDRs,
+			nodecontroller.CIDRAllocatorType(s.CIDRAllocatorType),
 			s.EnableTaintManager,
 			utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to initialize nodecontroller: %v", err)
 		}
-		nodeController.Run()
+		go nodeController.Run(stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	} else {
 		glog.Warningf("%q is disabled", nodeControllerName)
@@ -523,30 +544,28 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	}
 
 	if ctx.IsControllerEnabled(pvBinderControllerName) {
-		alphaProvisioner, err := NewAlphaVolumeProvisioner(cloud, s.VolumeConfiguration)
-		if err != nil {
-			return fmt.Errorf("an backward-compatible provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
-		}
 		params := persistentvolumecontroller.ControllerParameters{
 			KubeClient:                clientBuilder.ClientOrDie("persistent-volume-binder"),
 			SyncPeriod:                s.PVClaimBinderSyncPeriod.Duration,
-			AlphaProvisioner:          alphaProvisioner,
 			VolumePlugins:             ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
 			Cloud:                     cloud,
 			ClusterName:               s.ClusterName,
 			VolumeInformer:            sharedInformers.Core().V1().PersistentVolumes(),
 			ClaimInformer:             sharedInformers.Core().V1().PersistentVolumeClaims(),
-			ClassInformer:             sharedInformers.Storage().V1beta1().StorageClasses(),
+			ClassInformer:             sharedInformers.Storage().V1().StorageClasses(),
 			EnableDynamicProvisioning: s.VolumeConfiguration.EnableDynamicProvisioning,
 		}
-		volumeController := persistentvolumecontroller.NewController(params)
+		volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
+		if volumeControllerErr != nil {
+			return fmt.Errorf("failed to construct persistentvolume controller: %v", volumeControllerErr)
+		}
 		go volumeController.Run(stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	} else {
 		glog.Warningf("%q is disabled", pvBinderControllerName)
 	}
 
-	if ctx.IsControllerEnabled(attachDetatchControllerName) {
+	if ctx.IsControllerEnabled(attachDetachControllerName) {
 		if s.ReconcilerSyncLoopPeriod.Duration < time.Second {
 			return fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
 		}
@@ -560,15 +579,14 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 				cloud,
 				ProbeAttachableVolumePlugins(s.VolumeConfiguration),
 				s.DisableAttachDetachReconcilerSync,
-				s.ReconcilerSyncLoopPeriod.Duration,
-			)
+				s.ReconcilerSyncLoopPeriod.Duration)
 		if attachDetachControllerErr != nil {
 			return fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 		}
 		go attachDetachController.Run(stop)
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	} else {
-		glog.Warningf("%q is disabled", attachDetatchControllerName)
+		glog.Warningf("%q is disabled", attachDetachControllerName)
 	}
 
 	sharedInformers.Start(stop)

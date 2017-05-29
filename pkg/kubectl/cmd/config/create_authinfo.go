@@ -105,11 +105,11 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 		Long:    create_authinfo_long,
 		Example: create_authinfo_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if !options.complete(cmd, out) {
+			err := options.complete(cmd, out)
+			if err != nil {
 				cmd.Help()
-				return
+				cmdutil.CheckErr(err)
 			}
-
 			cmdutil.CheckErr(options.run())
 			fmt.Fprintf(out, "User %q set.\n", options.name)
 		},
@@ -123,7 +123,7 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 	cmd.Flags().Var(&options.username, clientcmd.FlagUsername, clientcmd.FlagUsername+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.password, clientcmd.FlagPassword, clientcmd.FlagPassword+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.authProvider, flagAuthProvider, "auth provider for the user entry in kubeconfig")
-	cmd.Flags().StringSlice(flagAuthProviderArg, nil, "'key=value' arugments for the auth provider")
+	cmd.Flags().StringSlice(flagAuthProviderArg, nil, "'key=value' arguments for the auth provider")
 	f := cmd.Flags().VarPF(&options.embedCertData, clientcmd.FlagEmbedCerts, "", "embed client cert/key for the user entry in kubeconfig")
 	f.NoOptDefVal = "true"
 
@@ -238,30 +238,28 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	return modifiedAuthInfo
 }
 
-func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) bool {
+func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) error {
 	args := cmd.Flags().Args()
 	if len(args) != 1 {
-		return false
+		return fmt.Errorf("Unexpected args: %v", args)
 	}
 
 	authProviderArgs, err := cmd.Flags().GetStringSlice(flagAuthProviderArg)
 	if err != nil {
-		fmt.Fprintf(out, "Error: %s\n", err)
-		return false
+		return fmt.Errorf("Error: %s\n", err)
 	}
 
 	if len(authProviderArgs) > 0 {
 		newPairs, removePairs, err := cmdutil.ParsePairs(authProviderArgs, flagAuthProviderArg, true)
 		if err != nil {
-			fmt.Fprintf(out, "Error: %s\n", err)
-			return false
+			return fmt.Errorf("Error: %s\n", err)
 		}
 		o.authProviderArgs = newPairs
 		o.authProviderArgsToRemove = removePairs
 	}
 
 	o.name = args[0]
-	return true
+	return nil
 }
 
 func (o createAuthInfoOptions) validate() error {

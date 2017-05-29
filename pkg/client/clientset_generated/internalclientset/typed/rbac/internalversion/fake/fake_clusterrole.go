@@ -33,6 +33,8 @@ type FakeClusterRoles struct {
 
 var clusterrolesResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "", Resource: "clusterroles"}
 
+var clusterrolesKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "", Kind: "ClusterRole"}
+
 func (c *FakeClusterRoles) Create(clusterRole *rbac.ClusterRole) (result *rbac.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), &rbac.ClusterRole{})
@@ -75,7 +77,7 @@ func (c *FakeClusterRoles) Get(name string, options v1.GetOptions) (result *rbac
 
 func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *rbac.ClusterRoleList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clusterrolesResource, opts), &rbac.ClusterRoleList{})
+		Invokes(testing.NewRootListAction(clusterrolesResource, clusterrolesKind, opts), &rbac.ClusterRoleList{})
 	if obj == nil {
 		return nil, err
 	}

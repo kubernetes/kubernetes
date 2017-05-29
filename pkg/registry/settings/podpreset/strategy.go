@@ -32,21 +32,21 @@ import (
 	"k8s.io/kubernetes/pkg/apis/settings/validation"
 )
 
-// podPresetStrategy implements verification logic for Pod Injection Policies.
+// podPresetStrategy implements verification logic for Pod Presets.
 type podPresetStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 }
 
-// Strategy is the default logic that applies when creating and updating Pod Injection Policy objects.
+// Strategy is the default logic that applies when creating and updating Pod Preset objects.
 var Strategy = podPresetStrategy{api.Scheme, names.SimpleNameGenerator}
 
-// NamespaceScoped returns true because all Pod Injection Policies need to be within a namespace.
+// NamespaceScoped returns true because all Pod Presets need to be within a namespace.
 func (podPresetStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// PrepareForCreate clears the status of a Pod Injection Policy before creation.
+// PrepareForCreate clears the status of a Pod Preset before creation.
 func (podPresetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	pip := obj.(*settings.PodPreset)
 	pip.Generation = 1
@@ -82,7 +82,7 @@ func (podPresetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old 
 	return append(validationErrorList, updateErrorList...)
 }
 
-// AllowUnconditionalUpdate is the default update policy for Pod Injection Policy objects.
+// AllowUnconditionalUpdate is the default update policy for Pod Preset objects.
 func (podPresetStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }

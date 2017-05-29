@@ -18,18 +18,16 @@ package benchmark
 
 import (
 	"fmt"
-	"math"
-	"testing"
-	"time"
-
+	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/plugin/pkg/scheduler"
+	"math"
+	"testing"
+	"time"
 )
 
 const (
@@ -44,8 +42,8 @@ func TestSchedule100Node3KPods(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping because we want to run short tests")
 	}
-
-	config := defaultSchedulerBenchmarkConfig(100, 3000)
+	config := getBaseConfig(1000, 30000)
+	writePodAndNodeTopologyToConfig(config)
 	min := schedulePods(config)
 	if min < threshold3K {
 		t.Errorf("Failing: Scheduling rate was too low for an interval, we saw rate of %v, which is the allowed minimum of %v ! ", min, threshold3K)
@@ -62,15 +60,11 @@ func TestSchedule100Node3KNodeAffinityPods(t *testing.T) {
 		t.Skip("Skipping because we want to run short tests")
 	}
 
-	config := baseConfig()
-	config.numNodes = 100
-	config.numPods = 3000
-
+	config := getBaseConfig(100, 3000)
 	// number of Node-Pod sets with Pods NodeAffinity matching given Nodes.
 	numGroups := 10
 	nodeAffinityKey := "kubernetes.io/sched-perf-node-affinity"
-
-	nodeStrategies := make([]testutils.CountToStrategy, 0, 10)
+	nodeStrategies := make([]testutils.CountToStrategy, 0, numGroups)
 	for i := 0; i < numGroups; i++ {
 		nodeStrategies = append(nodeStrategies, testutils.CountToStrategy{
 			Count:    config.numNodes / numGroups,
@@ -127,8 +121,8 @@ func TestSchedule1000Node30KPods(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping because we want to run short tests")
 	}
-
-	config := defaultSchedulerBenchmarkConfig(1000, 30000)
+	config := getBaseConfig(1000, 30000)
+	writePodAndNodeTopologyToConfig(config)
 	if min := schedulePods(config); min < threshold30K {
 		t.Errorf("To small pod scheduling throughput for 30k pods. Expected %v got %v", threshold30K, min)
 	} else {
@@ -150,7 +144,9 @@ func TestSchedule1000Node30KPods(t *testing.T) {
 // 	}
 // }
 
+// testConfig contains the some input parameters needed for running test-suite
 type testConfig struct {
+	// Note: We don't need numPods, numNodes anymore in this struct but keeping them for backward compatibility
 	numPods                   int
 	numNodes                  int
 	nodePreparer              testutils.TestNodePreparer
@@ -159,6 +155,7 @@ type testConfig struct {
 	destroyFunc               func()
 }
 
+//  baseConfig returns a minimal testConfig to be customized for different tests.
 func baseConfig() *testConfig {
 	schedulerConfigFactory, destroyFunc := mustSetupScheduler()
 	return &testConfig{
@@ -167,25 +164,14 @@ func baseConfig() *testConfig {
 	}
 }
 
-func defaultSchedulerBenchmarkConfig(numNodes, numPods int) *testConfig {
-	baseConfig := baseConfig()
-
-	nodePreparer := framework.NewIntegrationTestNodePreparer(
-		baseConfig.schedulerSupportFunctions.GetClient(),
-		[]testutils.CountToStrategy{{Count: numNodes, Strategy: &testutils.TrivialNodePrepareStrategy{}}},
-		"scheduler-perf-",
-	)
-
-	config := testutils.NewTestPodCreatorConfig()
-	config.AddStrategy("sched-test", numPods, testutils.NewSimpleWithControllerCreatePodStrategy("rc1"))
-	podCreator := testutils.NewTestPodCreator(baseConfig.schedulerSupportFunctions.GetClient(), config)
-
-	baseConfig.nodePreparer = nodePreparer
-	baseConfig.podCreator = podCreator
-	baseConfig.numPods = numPods
-	baseConfig.numNodes = numNodes
-
-	return baseConfig
+// getBaseConfig returns baseConfig after initializing number of nodes and pods.
+// We have to function for backward compatibility. We can combine this into baseConfig.
+// TODO: Remove this function once the backward compatibility is not needed.
+func getBaseConfig(nodes int, pods int) *testConfig {
+	config := baseConfig()
+	config.numNodes = nodes
+	config.numPods = pods
+	return config
 }
 
 // schedulePods schedules specific number of pods on specific number of nodes.
@@ -252,4 +238,109 @@ func schedulePods(config *testConfig) int32 {
 		prev = len(scheduled)
 		time.Sleep(1 * time.Second)
 	}
+}
+
+// mutateNodeSpec returns the strategy needed for creation of nodes.
+// TODO: It should take the nodespec and return the modified version of it. As of now, returning the strategies for backward compatibilty.
+func (na nodeAffinity) mutateNodeSpec(numNodes int) []testutils.CountToStrategy {
+	numGroups := na.numGroups
+	nodeAffinityKey := na.nodeAffinityKey
+	nodeStrategies := make([]testutils.CountToStrategy, 0, numGroups)
+	for i := 0; i < numGroups; i++ {
+		nodeStrategies = append(nodeStrategies, testutils.CountToStrategy{
+			Count:    numNodes / numGroups,
+			Strategy: testutils.NewLabelNodePrepareStrategy(nodeAffinityKey, fmt.Sprintf("%v", i)),
+		})
+	}
+	return nodeStrategies
+}
+
+// mutatePodSpec returns the list of pods after mutating the pod spec based on predicates and priorities.
+// TODO: It should take the podspec and return the modified version of it. As of now, returning the podlist for backward compatibilty.
+func (na nodeAffinity) mutatePodSpec(numPods int, pod *v1.Pod) []*v1.Pod {
+	numGroups := na.numGroups
+	nodeAffinityKey := na.nodeAffinityKey
+	podList := make([]*v1.Pod, 0, numGroups)
+	for i := 0; i < numGroups; i++ {
+		pod = &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "sched-perf-node-affinity-pod-",
+			},
+			Spec: testutils.MakePodSpec(),
+		}
+		pod.Spec.Affinity = &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      nodeAffinityKey,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{fmt.Sprintf("%v", i)},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		podList = append(podList, pod)
+	}
+	return podList
+}
+
+// generatePodAndNodeTopology is the wrapper function for modifying both pods and node objects.
+func (inputConfig *schedulerPerfConfig) generatePodAndNodeTopology(config *testConfig) {
+	nodeAffinity := inputConfig.NodeAffinity
+	podCreatorConfig := testutils.NewTestPodCreatorConfig()
+	var nodeStrategies []testutils.CountToStrategy
+	var pod *v1.Pod
+	var podList []*v1.Pod
+	if nodeAffinity != nil {
+		// Mutate Node
+		nodeStrategies = nodeAffinity.mutateNodeSpec(config.numNodes)
+		// Mutate Pod TODO: Make this to return to podSpec.
+		podList = nodeAffinity.mutatePodSpec(config.numPods, pod)
+		numGroups := nodeAffinity.numGroups
+		for _, pod := range podList {
+			podCreatorConfig.AddStrategy("sched-perf-node-affinity", config.numPods/numGroups,
+				testutils.NewCustomCreatePodStrategy(pod),
+			)
+		}
+		config.nodePreparer = framework.NewIntegrationTestNodePreparer(
+			config.schedulerSupportFunctions.GetClient(),
+			nodeStrategies, "scheduler-perf-")
+		config.podCreator = testutils.NewTestPodCreator(config.schedulerSupportFunctions.GetClient(), podCreatorConfig)
+		// TODO: other predicates/priorities will be processed in subsequent if statements.
+	} else {
+		// Default configuration.
+		nodePreparer := framework.NewIntegrationTestNodePreparer(
+			config.schedulerSupportFunctions.GetClient(),
+			[]testutils.CountToStrategy{{Count: config.numNodes, Strategy: &testutils.TrivialNodePrepareStrategy{}}},
+			"scheduler-perf-",
+		)
+
+		podConfig := testutils.NewTestPodCreatorConfig()
+		podConfig.AddStrategy("sched-test", config.numPods, testutils.NewSimpleWithControllerCreatePodStrategy("rc1"))
+		podCreator := testutils.NewTestPodCreator(config.schedulerSupportFunctions.GetClient(), podConfig)
+		config.nodePreparer = nodePreparer
+		config.podCreator = podCreator
+	}
+	return
+}
+
+// writePodAndNodeTopologyToConfig reads a configuration and then applies it to a test configuration.
+//TODO: As of now, this function is not doing anything expect for reading input values to priority structs.
+func writePodAndNodeTopologyToConfig(config *testConfig) {
+	// High Level structure that should be filled for every predicate or priority.
+	inputConfig := &schedulerPerfConfig{
+		NodeAffinity: &nodeAffinity{
+			//number of Node-Pod sets with Pods NodeAffinity matching given Nodes.
+			numGroups:       10,
+			nodeAffinityKey: "kubernetes.io/sched-perf-node-affinity",
+		},
+	}
+	inputConfig.generatePodAndNodeTopology(config)
+	return
 }

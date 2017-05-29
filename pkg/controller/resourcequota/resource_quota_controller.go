@@ -236,16 +236,17 @@ func (rq *ResourceQuotaController) worker(queue workqueue.RateLimitingInterface)
 // Run begins quota controller using the specified number of workers
 func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+	defer rq.queue.ShutDown()
 
 	glog.Infof("Starting resource quota controller")
+	defer glog.Infof("Shutting down resource quota controller")
 
 	// the controllers that replenish other resources to respond rapidly to state changes
 	for _, replenishmentController := range rq.replenishmentControllers {
 		go replenishmentController.Run(stopCh)
 	}
 
-	if !cache.WaitForCacheSync(stopCh, rq.informerSyncedFuncs...) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("resource quota", stopCh, rq.informerSyncedFuncs...) {
 		return
 	}
 
@@ -254,9 +255,9 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(rq.worker(rq.queue), time.Second, stopCh)
 		go wait.Until(rq.worker(rq.missingUsageQueue), time.Second, stopCh)
 	}
+	// the timer for how often we do a full recalculation across all quotas
+	go wait.Until(func() { rq.enqueueAll() }, rq.resyncPeriod(), stopCh)
 	<-stopCh
-	glog.Infof("Shutting down ResourceQuotaController")
-	rq.queue.ShutDown()
 }
 
 // syncResourceQuotaFromKey syncs a quota key

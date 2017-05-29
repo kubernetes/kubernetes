@@ -25,8 +25,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-func init() {
-	admission.RegisterPlugin("SecurityContextDeny", func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("SecurityContextDeny", func(config io.Reader) (admission.Interface, error) {
 		return NewSecurityContextDeny(), nil
 	})
 }

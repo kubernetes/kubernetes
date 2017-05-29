@@ -485,7 +485,7 @@ func TestKindToResource(t *testing.T) {
 	for i, testCase := range testCases {
 		version := schema.GroupVersion{}
 
-		plural, singular := KindToResource(version.WithKind(testCase.Kind))
+		plural, singular := UnsafeGuessKindToResource(version.WithKind(testCase.Kind))
 		if singular != version.WithResource(testCase.Singular) || plural != version.WithResource(testCase.Plural) {
 			t.Errorf("%d: unexpected plural and singular: %v %v", i, plural, singular)
 		}

@@ -8,9 +8,7 @@ Kubernetes in a meaningful way. It is educational and informative.
 Examples are not:
 
 * Full app deployments, ready to use, with no explanation. These
-  belong either
-  [here](https://github.com/kubernetes/application-dm-templates) or in
-  something like [Helm](https://github.com/helm/charts).
+  belong to [Helm charts](https://github.com/kubernetes/charts).
 * Simple toys to show how to use a Kubernetes feature. These belong in
   the [user guide](../docs/user-guide/).
 * Demos that follow a script to show a Kubernetes feature in

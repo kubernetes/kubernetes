@@ -17,7 +17,7 @@ package wal
 import (
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/coreos/etcd/pkg/fileutil"
 	"github.com/coreos/etcd/wal/walpb"
@@ -94,6 +94,6 @@ func openLast(dirpath string) (*fileutil.LockedFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	last := path.Join(dirpath, names[len(names)-1])
+	last := filepath.Join(dirpath, names[len(names)-1])
 	return fileutil.LockFile(last, os.O_RDWR, fileutil.PrivateFileMode)
 }

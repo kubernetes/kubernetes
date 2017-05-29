@@ -140,8 +140,9 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 
-	// Test that delete options should be nil when cascade is false.
-	expectedOrphanDependents = nil
+	// Test that delete options should be set to orphan when cascade is false.
+	trueVar := true
+	expectedOrphanDependents = &trueVar
 	buf, errBuf = bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 	cmd = NewCmdDelete(f, buf, errBuf)
 	cmd.Flags().Set("namespace", "test")

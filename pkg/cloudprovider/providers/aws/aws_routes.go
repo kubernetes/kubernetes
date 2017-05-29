@@ -29,17 +29,27 @@ func (c *Cloud) findRouteTable(clusterName string) (*ec2.RouteTable, error) {
 	// This should be unnecessary (we already filter on TagNameKubernetesCluster,
 	// and something is broken if cluster name doesn't match, but anyway...
 	// TODO: All clouds should be cluster-aware by default
-	request := &ec2.DescribeRouteTablesInput{Filters: c.tagging.addFilters(nil)}
-
-	response, err := c.ec2.DescribeRouteTables(request)
-	if err != nil {
-		return nil, err
-	}
-
 	var tables []*ec2.RouteTable
-	for _, table := range response {
-		if c.tagging.hasClusterTag(table.Tags) {
-			tables = append(tables, table)
+
+	if c.cfg.Global.RouteTableID != "" {
+		request := &ec2.DescribeRouteTablesInput{Filters: []*ec2.Filter{newEc2Filter("route-table-id", c.cfg.Global.RouteTableID)}}
+		response, err := c.ec2.DescribeRouteTables(request)
+		if err != nil {
+			return nil, err
+		}
+
+		tables = response
+	} else {
+		request := &ec2.DescribeRouteTablesInput{Filters: c.tagging.addFilters(nil)}
+		response, err := c.ec2.DescribeRouteTables(request)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, table := range response {
+			if c.tagging.hasClusterTag(table.Tags) {
+				tables = append(tables, table)
+			}
 		}
 	}
 

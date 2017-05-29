@@ -7,25 +7,19 @@ import (
 )
 
 type Specs struct {
-	specs                 []*Spec
-	numberOfOriginalSpecs int
-	hasProgrammaticFocus  bool
-	RegexScansFilePath    bool
+	specs                []*Spec
+	hasProgrammaticFocus bool
+	RegexScansFilePath   bool
 }
 
 func NewSpecs(specs []*Spec) *Specs {
 	return &Specs{
 		specs: specs,
-		numberOfOriginalSpecs: len(specs),
 	}
 }
 
 func (e *Specs) Specs() []*Spec {
 	return e.specs
-}
-
-func (e *Specs) NumberOfOriginalSpecs() int {
-	return e.numberOfOriginalSpecs
 }
 
 func (e *Specs) HasProgrammaticFocus() bool {
@@ -111,15 +105,6 @@ func (e *Specs) SkipMeasurements() {
 		if spec.IsMeasurement() {
 			spec.Skip()
 		}
-	}
-}
-
-func (e *Specs) TrimForParallelization(total int, node int) {
-	startIndex, count := ParallelizedIndexRange(len(e.specs), total, node)
-	if count == 0 {
-		e.specs = make([]*Spec, 0)
-	} else {
-		e.specs = e.specs[startIndex : startIndex+count]
 	}
 }
 

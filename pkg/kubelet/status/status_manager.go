@@ -81,7 +81,7 @@ type PodStatusProvider interface {
 // An object which provides guarantees that a pod can be saftely deleted.
 type PodDeletionSafetyProvider interface {
 	// A function which returns true if the pod can safely be deleted
-	OkToDeletePod(pod *v1.Pod) bool
+	PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool
 }
 
 // Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
@@ -288,10 +288,10 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	// Set ReadyCondition.LastTransitionTime.
-	if _, readyCondition := v1.GetPodCondition(&status, v1.PodReady); readyCondition != nil {
+	if _, readyCondition := podutil.GetPodCondition(&status, v1.PodReady); readyCondition != nil {
 		// Need to set LastTransitionTime.
 		lastTransitionTime := metav1.Now()
-		_, oldReadyCondition := v1.GetPodCondition(&oldStatus, v1.PodReady)
+		_, oldReadyCondition := podutil.GetPodCondition(&oldStatus, v1.PodReady)
 		if oldReadyCondition != nil && readyCondition.Status == oldReadyCondition.Status {
 			lastTransitionTime = oldReadyCondition.LastTransitionTime
 		}
@@ -299,10 +299,10 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	// Set InitializedCondition.LastTransitionTime.
-	if _, initCondition := v1.GetPodCondition(&status, v1.PodInitialized); initCondition != nil {
+	if _, initCondition := podutil.GetPodCondition(&status, v1.PodInitialized); initCondition != nil {
 		// Need to set LastTransitionTime.
 		lastTransitionTime := metav1.Now()
-		_, oldInitCondition := v1.GetPodCondition(&oldStatus, v1.PodInitialized)
+		_, oldInitCondition := podutil.GetPodCondition(&oldStatus, v1.PodInitialized)
 		if oldInitCondition != nil && initCondition.Status == oldInitCondition.Status {
 			lastTransitionTime = oldInitCondition.LastTransitionTime
 		}
@@ -427,64 +427,69 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		// RemoveOrphanedStatuses, so we just ignore the update here.
 		return
 	}
-	if err == nil {
-		translatedUID := m.podManager.TranslatePodUID(pod.UID)
-		if len(translatedUID) > 0 && translatedUID != uid {
-			glog.V(2).Infof("Pod %q was deleted and then recreated, skipping status update; old UID %q, new UID %q", format.Pod(pod), uid, translatedUID)
-			m.deletePodStatus(uid)
-			return
-		}
-		pod.Status = status.status
-		if err := podutil.SetInitContainersStatusesAnnotations(pod); err != nil {
-			glog.Error(err)
-		}
-		// TODO: handle conflict as a retry, make that easier too.
-		pod, err = m.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
-		if err == nil {
-			glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
-			m.apiStatusVersions[pod.UID] = status.version
-			if kubepod.IsMirrorPod(pod) {
-				// We don't handle graceful deletion of mirror pods.
-				return
-			}
-			if !m.podDeletionSafety.OkToDeletePod(pod) {
-				return
-			}
-			deleteOptions := metav1.NewDeleteOptions(0)
-			// Use the pod UID as the precondition for deletion to prevent deleting a newly created pod with the same name and namespace.
-			deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod.UID))
-			if err = m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err == nil {
-				glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
-				m.deletePodStatus(uid)
-				return
-			}
-		}
+	if err != nil {
+		glog.Warningf("Failed to get status for pod %q: %v", format.PodDesc(status.podName, status.podNamespace, uid), err)
+		return
 	}
 
-	// We failed to update status, wait for periodic sync to retry.
-	glog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
+	translatedUID := m.podManager.TranslatePodUID(pod.UID)
+	if len(translatedUID) > 0 && translatedUID != uid {
+		glog.V(2).Infof("Pod %q was deleted and then recreated, skipping status update; old UID %q, new UID %q", format.Pod(pod), uid, translatedUID)
+		m.deletePodStatus(uid)
+		return
+	}
+	pod.Status = status.status
+	if err := podutil.SetInitContainersStatusesAnnotations(pod); err != nil {
+		glog.Error(err)
+	}
+	// TODO: handle conflict as a retry, make that easier too.
+	newPod, err := m.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
+	if err != nil {
+		glog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
+		return
+	}
+	pod = newPod
+
+	glog.V(3).Infof("Status for pod %q updated successfully: (%d, %+v)", format.Pod(pod), status.version, status.status)
+	m.apiStatusVersions[pod.UID] = status.version
+
+	// We don't handle graceful deletion of mirror pods.
+	if m.canBeDeleted(pod, status.status) {
+		deleteOptions := metav1.NewDeleteOptions(0)
+		// Use the pod UID as the precondition for deletion to prevent deleting a newly created pod with the same name and namespace.
+		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod.UID))
+		err = m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
+		if err != nil {
+			glog.Warningf("Failed to delete status for pod %q: %v", format.Pod(pod), err)
+			return
+		}
+		glog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
+		m.deletePodStatus(uid)
+	}
 }
 
 // needsUpdate returns whether the status is stale for the given pod UID.
 // This method is not thread safe, and most only be accessed by the sync thread.
 func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 	latest, ok := m.apiStatusVersions[uid]
-	return !ok || latest < status.version || m.couldBeDeleted(uid, status.status)
-}
-
-func (m *manager) couldBeDeleted(uid types.UID, status v1.PodStatus) bool {
-	// The pod could be a static pod, so we should translate first.
+	if !ok || latest < status.version {
+		return true
+	}
 	pod, ok := m.podManager.GetPodByUID(uid)
 	if !ok {
 		return false
 	}
-	return !kubepod.IsMirrorPod(pod) && m.podDeletionSafety.OkToDeletePod(pod)
+	return m.canBeDeleted(pod, status.status)
+}
+
+func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
+	return !kubepod.IsMirrorPod(pod) && m.podDeletionSafety.PodResourcesAreReclaimed(pod, status) && pod.DeletionTimestamp != nil
 }
 
 // needsReconcile compares the given status with the status in the pod manager (which
 // in fact comes from apiserver), returns whether the status needs to be reconciled with
 // the apiserver. Now when pod status is inconsistent between apiserver and kubelet,
-// kubelet should forcibly send an update to reconclie the inconsistence, because kubelet
+// kubelet should forcibly send an update to reconcile the inconsistence, because kubelet
 // should be the source of truth of pod status.
 // NOTE(random-liu): It's simpler to pass in mirror pod uid and get mirror pod by uid, but
 // now the pod manager only supports getting mirror pod by static pod, so we have to pass

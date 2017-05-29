@@ -20,9 +20,9 @@ package replicaset
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -80,7 +80,7 @@ func (rsStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runti
 	// status its own object, and even if we don't, writes may be the result of a
 	// read-update-write loop, so the contents of spec may not actually be the spec that
 	// the ReplicaSet has *seen*.
-	if !reflect.DeepEqual(oldRS.Spec, newRS.Spec) {
+	if !apiequality.Semantic.DeepEqual(oldRS.Spec, newRS.Spec) {
 		newRS.Generation = oldRS.Generation + 1
 	}
 }

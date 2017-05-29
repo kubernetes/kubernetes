@@ -38,6 +38,7 @@ func NewRefManager() *RefManager {
 }
 
 // SetRef stores a reference to a pod's container, associating it with the given container ID.
+// TODO: move this to client-go v1.ObjectReference
 func (c *RefManager) SetRef(id ContainerID, ref *v1.ObjectReference) {
 	c.Lock()
 	defer c.Unlock()
@@ -52,6 +53,7 @@ func (c *RefManager) ClearRef(id ContainerID) {
 }
 
 // GetRef returns the container reference of the given ID, or (nil, false) if none is stored.
+// TODO: move this to client-go v1.ObjectReference
 func (c *RefManager) GetRef(id ContainerID) (ref *v1.ObjectReference, ok bool) {
 	c.RLock()
 	defer c.RUnlock()

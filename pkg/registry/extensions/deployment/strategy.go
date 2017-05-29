@@ -18,8 +18,8 @@ package deployment
 
 import (
 	"fmt"
-	"reflect"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -86,8 +86,8 @@ func (deploymentStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, o
 	// Spec updates bump the generation so that we can distinguish between
 	// scaling events and template changes, annotation updates bump the generation
 	// because annotations are copied from deployments to their replica sets.
-	if !reflect.DeepEqual(newDeployment.Spec, oldDeployment.Spec) ||
-		!reflect.DeepEqual(newDeployment.Annotations, oldDeployment.Annotations) {
+	if !apiequality.Semantic.DeepEqual(newDeployment.Spec, oldDeployment.Spec) ||
+		!apiequality.Semantic.DeepEqual(newDeployment.Annotations, oldDeployment.Annotations) {
 		newDeployment.Generation = oldDeployment.Generation + 1
 	}
 }

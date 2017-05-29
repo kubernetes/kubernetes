@@ -57,7 +57,9 @@ var _ = math.Inf
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
-const _ = proto.GoGoProtoPackageIsVersion1
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
 func (m *ClusterRole) Reset()                    { *m = ClusterRole{} }
 func (*ClusterRole) ProtoMessage()               {}
@@ -128,35 +130,35 @@ func init() {
 	proto.RegisterType((*RoleRef)(nil), "k8s.io.kubernetes.pkg.apis.rbac.v1alpha1.RoleRef")
 	proto.RegisterType((*Subject)(nil), "k8s.io.kubernetes.pkg.apis.rbac.v1alpha1.Subject")
 }
-func (m *ClusterRole) Marshal() (data []byte, err error) {
+func (m *ClusterRole) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ClusterRole) MarshalTo(data []byte) (int, error) {
+func (m *ClusterRole) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n1, err := m.ObjectMeta.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ObjectMeta.Size()))
+	n1, err := m.ObjectMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n1
 	if len(m.Rules) > 0 {
 		for _, msg := range m.Rules {
-			data[i] = 0x12
+			dAtA[i] = 0x12
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -166,45 +168,45 @@ func (m *ClusterRole) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ClusterRoleBinding) Marshal() (data []byte, err error) {
+func (m *ClusterRoleBinding) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ClusterRoleBinding) MarshalTo(data []byte) (int, error) {
+func (m *ClusterRoleBinding) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n2, err := m.ObjectMeta.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ObjectMeta.Size()))
+	n2, err := m.ObjectMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n2
 	if len(m.Subjects) > 0 {
 		for _, msg := range m.Subjects {
-			data[i] = 0x12
+			dAtA[i] = 0x12
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
 			i += n
 		}
 	}
-	data[i] = 0x1a
+	dAtA[i] = 0x1a
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.RoleRef.Size()))
-	n3, err := m.RoleRef.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.RoleRef.Size()))
+	n3, err := m.RoleRef.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
@@ -212,25 +214,25 @@ func (m *ClusterRoleBinding) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ClusterRoleBindingBuilder) Marshal() (data []byte, err error) {
+func (m *ClusterRoleBindingBuilder) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ClusterRoleBindingBuilder) MarshalTo(data []byte) (int, error) {
+func (m *ClusterRoleBindingBuilder) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ClusterRoleBinding.Size()))
-	n4, err := m.ClusterRoleBinding.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ClusterRoleBinding.Size()))
+	n4, err := m.ClusterRoleBinding.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
@@ -238,35 +240,35 @@ func (m *ClusterRoleBindingBuilder) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ClusterRoleBindingList) Marshal() (data []byte, err error) {
+func (m *ClusterRoleBindingList) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ClusterRoleBindingList) MarshalTo(data []byte) (int, error) {
+func (m *ClusterRoleBindingList) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n5, err := m.ListMeta.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ListMeta.Size()))
+	n5, err := m.ListMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n5
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
-			data[i] = 0x12
+			dAtA[i] = 0x12
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -276,35 +278,35 @@ func (m *ClusterRoleBindingList) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ClusterRoleList) Marshal() (data []byte, err error) {
+func (m *ClusterRoleList) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *ClusterRoleList) MarshalTo(data []byte) (int, error) {
+func (m *ClusterRoleList) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n6, err := m.ListMeta.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ListMeta.Size()))
+	n6, err := m.ListMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n6
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
-			data[i] = 0x12
+			dAtA[i] = 0x12
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -314,118 +316,118 @@ func (m *ClusterRoleList) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *PolicyRule) Marshal() (data []byte, err error) {
+func (m *PolicyRule) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *PolicyRule) MarshalTo(data []byte) (int, error) {
+func (m *PolicyRule) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if len(m.Verbs) > 0 {
 		for _, s := range m.Verbs {
-			data[i] = 0xa
+			dAtA[i] = 0xa
 			i++
 			l = len(s)
 			for l >= 1<<7 {
-				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
 				l >>= 7
 				i++
 			}
-			data[i] = uint8(l)
+			dAtA[i] = uint8(l)
 			i++
-			i += copy(data[i:], s)
+			i += copy(dAtA[i:], s)
 		}
 	}
 	if len(m.APIGroups) > 0 {
 		for _, s := range m.APIGroups {
-			data[i] = 0x1a
+			dAtA[i] = 0x1a
 			i++
 			l = len(s)
 			for l >= 1<<7 {
-				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
 				l >>= 7
 				i++
 			}
-			data[i] = uint8(l)
+			dAtA[i] = uint8(l)
 			i++
-			i += copy(data[i:], s)
+			i += copy(dAtA[i:], s)
 		}
 	}
 	if len(m.Resources) > 0 {
 		for _, s := range m.Resources {
-			data[i] = 0x22
+			dAtA[i] = 0x22
 			i++
 			l = len(s)
 			for l >= 1<<7 {
-				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
 				l >>= 7
 				i++
 			}
-			data[i] = uint8(l)
+			dAtA[i] = uint8(l)
 			i++
-			i += copy(data[i:], s)
+			i += copy(dAtA[i:], s)
 		}
 	}
 	if len(m.ResourceNames) > 0 {
 		for _, s := range m.ResourceNames {
-			data[i] = 0x2a
+			dAtA[i] = 0x2a
 			i++
 			l = len(s)
 			for l >= 1<<7 {
-				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
 				l >>= 7
 				i++
 			}
-			data[i] = uint8(l)
+			dAtA[i] = uint8(l)
 			i++
-			i += copy(data[i:], s)
+			i += copy(dAtA[i:], s)
 		}
 	}
 	if len(m.NonResourceURLs) > 0 {
 		for _, s := range m.NonResourceURLs {
-			data[i] = 0x32
+			dAtA[i] = 0x32
 			i++
 			l = len(s)
 			for l >= 1<<7 {
-				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				dAtA[i] = uint8(uint64(l)&0x7f | 0x80)
 				l >>= 7
 				i++
 			}
-			data[i] = uint8(l)
+			dAtA[i] = uint8(l)
 			i++
-			i += copy(data[i:], s)
+			i += copy(dAtA[i:], s)
 		}
 	}
 	return i, nil
 }
 
-func (m *PolicyRuleBuilder) Marshal() (data []byte, err error) {
+func (m *PolicyRuleBuilder) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *PolicyRuleBuilder) MarshalTo(data []byte) (int, error) {
+func (m *PolicyRuleBuilder) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.PolicyRule.Size()))
-	n7, err := m.PolicyRule.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.PolicyRule.Size()))
+	n7, err := m.PolicyRule.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
@@ -433,35 +435,35 @@ func (m *PolicyRuleBuilder) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *Role) Marshal() (data []byte, err error) {
+func (m *Role) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *Role) MarshalTo(data []byte) (int, error) {
+func (m *Role) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n8, err := m.ObjectMeta.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ObjectMeta.Size()))
+	n8, err := m.ObjectMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n8
 	if len(m.Rules) > 0 {
 		for _, msg := range m.Rules {
-			data[i] = 0x12
+			dAtA[i] = 0x12
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -471,45 +473,45 @@ func (m *Role) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RoleBinding) Marshal() (data []byte, err error) {
+func (m *RoleBinding) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *RoleBinding) MarshalTo(data []byte) (int, error) {
+func (m *RoleBinding) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n9, err := m.ObjectMeta.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ObjectMeta.Size()))
+	n9, err := m.ObjectMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n9
 	if len(m.Subjects) > 0 {
 		for _, msg := range m.Subjects {
-			data[i] = 0x12
+			dAtA[i] = 0x12
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
 			i += n
 		}
 	}
-	data[i] = 0x1a
+	dAtA[i] = 0x1a
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.RoleRef.Size()))
-	n10, err := m.RoleRef.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.RoleRef.Size()))
+	n10, err := m.RoleRef.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
@@ -517,35 +519,35 @@ func (m *RoleBinding) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RoleBindingList) Marshal() (data []byte, err error) {
+func (m *RoleBindingList) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *RoleBindingList) MarshalTo(data []byte) (int, error) {
+func (m *RoleBindingList) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n11, err := m.ListMeta.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ListMeta.Size()))
+	n11, err := m.ListMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n11
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
-			data[i] = 0x12
+			dAtA[i] = 0x12
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -555,35 +557,35 @@ func (m *RoleBindingList) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RoleList) Marshal() (data []byte, err error) {
+func (m *RoleList) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *RoleList) MarshalTo(data []byte) (int, error) {
+func (m *RoleList) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n12, err := m.ListMeta.MarshalTo(data[i:])
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ListMeta.Size()))
+	n12, err := m.ListMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n12
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
-			data[i] = 0x12
+			dAtA[i] = 0x12
 			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
 			if err != nil {
 				return 0, err
 			}
@@ -593,95 +595,95 @@ func (m *RoleList) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *RoleRef) Marshal() (data []byte, err error) {
+func (m *RoleRef) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *RoleRef) MarshalTo(data []byte) (int, error) {
+func (m *RoleRef) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.APIGroup)))
-	i += copy(data[i:], m.APIGroup)
-	data[i] = 0x12
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.APIGroup)))
+	i += copy(dAtA[i:], m.APIGroup)
+	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Kind)))
-	i += copy(data[i:], m.Kind)
-	data[i] = 0x1a
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Kind)))
+	i += copy(dAtA[i:], m.Kind)
+	dAtA[i] = 0x1a
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Name)))
-	i += copy(data[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i += copy(dAtA[i:], m.Name)
 	return i, nil
 }
 
-func (m *Subject) Marshal() (data []byte, err error) {
+func (m *Subject) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *Subject) MarshalTo(data []byte) (int, error) {
+func (m *Subject) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	data[i] = 0xa
+	dAtA[i] = 0xa
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Kind)))
-	i += copy(data[i:], m.Kind)
-	data[i] = 0x12
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Kind)))
+	i += copy(dAtA[i:], m.Kind)
+	dAtA[i] = 0x12
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.APIVersion)))
-	i += copy(data[i:], m.APIVersion)
-	data[i] = 0x1a
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.APIVersion)))
+	i += copy(dAtA[i:], m.APIVersion)
+	dAtA[i] = 0x1a
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Name)))
-	i += copy(data[i:], m.Name)
-	data[i] = 0x22
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i += copy(dAtA[i:], m.Name)
+	dAtA[i] = 0x22
 	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Namespace)))
-	i += copy(data[i:], m.Namespace)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Namespace)))
+	i += copy(dAtA[i:], m.Namespace)
 	return i, nil
 }
 
-func encodeFixed64Generated(data []byte, offset int, v uint64) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
-	data[offset+4] = uint8(v >> 32)
-	data[offset+5] = uint8(v >> 40)
-	data[offset+6] = uint8(v >> 48)
-	data[offset+7] = uint8(v >> 56)
+func encodeFixed64Generated(dAtA []byte, offset int, v uint64) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
+	dAtA[offset+4] = uint8(v >> 32)
+	dAtA[offset+5] = uint8(v >> 40)
+	dAtA[offset+6] = uint8(v >> 48)
+	dAtA[offset+7] = uint8(v >> 56)
 	return offset + 8
 }
-func encodeFixed32Generated(data []byte, offset int, v uint32) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
+func encodeFixed32Generated(dAtA []byte, offset int, v uint32) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
 	return offset + 4
 }
-func encodeVarintGenerated(data []byte, offset int, v uint64) int {
+func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
-		data[offset] = uint8(v&0x7f | 0x80)
+		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
-	data[offset] = uint8(v)
+	dAtA[offset] = uint8(v)
 	return offset + 1
 }
 func (m *ClusterRole) Size() (n int) {
@@ -1048,8 +1050,8 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *ClusterRole) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ClusterRole) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1061,7 +1063,7 @@ func (m *ClusterRole) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1089,7 +1091,7 @@ func (m *ClusterRole) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1103,7 +1105,7 @@ func (m *ClusterRole) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ObjectMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1119,7 +1121,7 @@ func (m *ClusterRole) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1134,13 +1136,13 @@ func (m *ClusterRole) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Rules = append(m.Rules, PolicyRule{})
-			if err := m.Rules[len(m.Rules)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Rules[len(m.Rules)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1159,8 +1161,8 @@ func (m *ClusterRole) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ClusterRoleBinding) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ClusterRoleBinding) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1172,7 +1174,7 @@ func (m *ClusterRoleBinding) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1200,7 +1202,7 @@ func (m *ClusterRoleBinding) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1214,7 +1216,7 @@ func (m *ClusterRoleBinding) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ObjectMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1230,7 +1232,7 @@ func (m *ClusterRoleBinding) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1245,7 +1247,7 @@ func (m *ClusterRoleBinding) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Subjects = append(m.Subjects, Subject{})
-			if err := m.Subjects[len(m.Subjects)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Subjects[len(m.Subjects)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1261,7 +1263,7 @@ func (m *ClusterRoleBinding) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1275,13 +1277,13 @@ func (m *ClusterRoleBinding) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.RoleRef.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.RoleRef.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1300,8 +1302,8 @@ func (m *ClusterRoleBinding) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ClusterRoleBindingBuilder) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ClusterRoleBindingBuilder) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1313,7 +1315,7 @@ func (m *ClusterRoleBindingBuilder) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1341,7 +1343,7 @@ func (m *ClusterRoleBindingBuilder) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1355,13 +1357,13 @@ func (m *ClusterRoleBindingBuilder) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ClusterRoleBinding.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ClusterRoleBinding.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1380,8 +1382,8 @@ func (m *ClusterRoleBindingBuilder) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ClusterRoleBindingList) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ClusterRoleBindingList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1393,7 +1395,7 @@ func (m *ClusterRoleBindingList) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1421,7 +1423,7 @@ func (m *ClusterRoleBindingList) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1435,7 +1437,7 @@ func (m *ClusterRoleBindingList) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ListMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1451,7 +1453,7 @@ func (m *ClusterRoleBindingList) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1466,13 +1468,13 @@ func (m *ClusterRoleBindingList) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Items = append(m.Items, ClusterRoleBinding{})
-			if err := m.Items[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1491,8 +1493,8 @@ func (m *ClusterRoleBindingList) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ClusterRoleList) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *ClusterRoleList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1504,7 +1506,7 @@ func (m *ClusterRoleList) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1532,7 +1534,7 @@ func (m *ClusterRoleList) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1546,7 +1548,7 @@ func (m *ClusterRoleList) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ListMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1562,7 +1564,7 @@ func (m *ClusterRoleList) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1577,13 +1579,13 @@ func (m *ClusterRoleList) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Items = append(m.Items, ClusterRole{})
-			if err := m.Items[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1602,8 +1604,8 @@ func (m *ClusterRoleList) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *PolicyRule) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *PolicyRule) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1615,7 +1617,7 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1643,7 +1645,7 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1658,7 +1660,7 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Verbs = append(m.Verbs, string(data[iNdEx:postIndex]))
+			m.Verbs = append(m.Verbs, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -1672,7 +1674,7 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1687,7 +1689,7 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.APIGroups = append(m.APIGroups, string(data[iNdEx:postIndex]))
+			m.APIGroups = append(m.APIGroups, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
@@ -1701,7 +1703,7 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1716,7 +1718,7 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Resources = append(m.Resources, string(data[iNdEx:postIndex]))
+			m.Resources = append(m.Resources, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {
@@ -1730,7 +1732,7 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1745,7 +1747,7 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ResourceNames = append(m.ResourceNames, string(data[iNdEx:postIndex]))
+			m.ResourceNames = append(m.ResourceNames, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		case 6:
 			if wireType != 2 {
@@ -1759,7 +1761,7 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1774,11 +1776,11 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.NonResourceURLs = append(m.NonResourceURLs, string(data[iNdEx:postIndex]))
+			m.NonResourceURLs = append(m.NonResourceURLs, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1797,8 +1799,8 @@ func (m *PolicyRule) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *PolicyRuleBuilder) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *PolicyRuleBuilder) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1810,7 +1812,7 @@ func (m *PolicyRuleBuilder) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1838,7 +1840,7 @@ func (m *PolicyRuleBuilder) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1852,13 +1854,13 @@ func (m *PolicyRuleBuilder) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.PolicyRule.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.PolicyRule.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1877,8 +1879,8 @@ func (m *PolicyRuleBuilder) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *Role) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *Role) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1890,7 +1892,7 @@ func (m *Role) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1918,7 +1920,7 @@ func (m *Role) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1932,7 +1934,7 @@ func (m *Role) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ObjectMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1948,7 +1950,7 @@ func (m *Role) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1963,13 +1965,13 @@ func (m *Role) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Rules = append(m.Rules, PolicyRule{})
-			if err := m.Rules[len(m.Rules)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Rules[len(m.Rules)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1988,8 +1990,8 @@ func (m *Role) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *RoleBinding) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *RoleBinding) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -2001,7 +2003,7 @@ func (m *RoleBinding) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2029,7 +2031,7 @@ func (m *RoleBinding) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2043,7 +2045,7 @@ func (m *RoleBinding) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ObjectMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -2059,7 +2061,7 @@ func (m *RoleBinding) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2074,7 +2076,7 @@ func (m *RoleBinding) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Subjects = append(m.Subjects, Subject{})
-			if err := m.Subjects[len(m.Subjects)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Subjects[len(m.Subjects)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -2090,7 +2092,7 @@ func (m *RoleBinding) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2104,13 +2106,13 @@ func (m *RoleBinding) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.RoleRef.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.RoleRef.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2129,8 +2131,8 @@ func (m *RoleBinding) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *RoleBindingList) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *RoleBindingList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -2142,7 +2144,7 @@ func (m *RoleBindingList) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2170,7 +2172,7 @@ func (m *RoleBindingList) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2184,7 +2186,7 @@ func (m *RoleBindingList) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ListMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -2200,7 +2202,7 @@ func (m *RoleBindingList) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2215,13 +2217,13 @@ func (m *RoleBindingList) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Items = append(m.Items, RoleBinding{})
-			if err := m.Items[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2240,8 +2242,8 @@ func (m *RoleBindingList) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *RoleList) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *RoleList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -2253,7 +2255,7 @@ func (m *RoleList) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2281,7 +2283,7 @@ func (m *RoleList) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2295,7 +2297,7 @@ func (m *RoleList) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ListMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -2311,7 +2313,7 @@ func (m *RoleList) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2326,13 +2328,13 @@ func (m *RoleList) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Items = append(m.Items, Role{})
-			if err := m.Items[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2351,8 +2353,8 @@ func (m *RoleList) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *RoleRef) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *RoleRef) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -2364,7 +2366,7 @@ func (m *RoleRef) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2392,7 +2394,7 @@ func (m *RoleRef) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2407,7 +2409,7 @@ func (m *RoleRef) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.APIGroup = string(data[iNdEx:postIndex])
+			m.APIGroup = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -2421,7 +2423,7 @@ func (m *RoleRef) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2436,7 +2438,7 @@ func (m *RoleRef) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Kind = string(data[iNdEx:postIndex])
+			m.Kind = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -2450,7 +2452,7 @@ func (m *RoleRef) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2465,11 +2467,11 @@ func (m *RoleRef) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Name = string(data[iNdEx:postIndex])
+			m.Name = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2488,8 +2490,8 @@ func (m *RoleRef) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *Subject) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *Subject) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -2501,7 +2503,7 @@ func (m *Subject) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2529,7 +2531,7 @@ func (m *Subject) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2544,7 +2546,7 @@ func (m *Subject) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Kind = string(data[iNdEx:postIndex])
+			m.Kind = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -2558,7 +2560,7 @@ func (m *Subject) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2573,7 +2575,7 @@ func (m *Subject) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.APIVersion = string(data[iNdEx:postIndex])
+			m.APIVersion = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -2587,7 +2589,7 @@ func (m *Subject) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2602,7 +2604,7 @@ func (m *Subject) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Name = string(data[iNdEx:postIndex])
+			m.Name = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
@@ -2616,7 +2618,7 @@ func (m *Subject) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2631,11 +2633,11 @@ func (m *Subject) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Namespace = string(data[iNdEx:postIndex])
+			m.Namespace = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
+			skippy, err := skipGenerated(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -2654,8 +2656,8 @@ func (m *Subject) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func skipGenerated(data []byte) (n int, err error) {
-	l := len(data)
+func skipGenerated(dAtA []byte) (n int, err error) {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		var wire uint64
@@ -2666,7 +2668,7 @@ func skipGenerated(data []byte) (n int, err error) {
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -2684,7 +2686,7 @@ func skipGenerated(data []byte) (n int, err error) {
 					return 0, io.ErrUnexpectedEOF
 				}
 				iNdEx++
-				if data[iNdEx-1] < 0x80 {
+				if dAtA[iNdEx-1] < 0x80 {
 					break
 				}
 			}
@@ -2701,7 +2703,7 @@ func skipGenerated(data []byte) (n int, err error) {
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				length |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -2724,7 +2726,7 @@ func skipGenerated(data []byte) (n int, err error) {
 					if iNdEx >= l {
 						return 0, io.ErrUnexpectedEOF
 					}
-					b := data[iNdEx]
+					b := dAtA[iNdEx]
 					iNdEx++
 					innerWire |= (uint64(b) & 0x7F) << shift
 					if b < 0x80 {
@@ -2735,7 +2737,7 @@ func skipGenerated(data []byte) (n int, err error) {
 				if innerWireType == 4 {
 					break
 				}
-				next, err := skipGenerated(data[start:])
+				next, err := skipGenerated(dAtA[start:])
 				if err != nil {
 					return 0, err
 				}
@@ -2759,59 +2761,62 @@ var (
 	ErrIntOverflowGenerated   = fmt.Errorf("proto: integer overflow")
 )
 
+func init() {
+	proto.RegisterFile("k8s.io/kubernetes/pkg/apis/rbac/v1alpha1/generated.proto", fileDescriptorGenerated)
+}
+
 var fileDescriptorGenerated = []byte{
-	// 847 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xec, 0x54, 0xcf, 0x6f, 0xe3, 0x44,
-	0x14, 0xce, 0xb4, 0x09, 0x4d, 0x5e, 0xa9, 0x4a, 0x07, 0x09, 0x99, 0x1e, 0x9c, 0xca, 0xa7, 0x0a,
-	0x16, 0x9b, 0x96, 0x05, 0xf6, 0x00, 0x87, 0x35, 0x07, 0x54, 0xb1, 0x94, 0x6a, 0x56, 0xac, 0xc4,
-	0x6a, 0x25, 0x98, 0x38, 0xb3, 0xc9, 0x10, 0xff, 0xd2, 0x8c, 0x1d, 0xb1, 0x42, 0x48, 0x1c, 0x39,
-	0xf2, 0x57, 0x70, 0xe4, 0x80, 0xc4, 0x91, 0x13, 0x97, 0x0a, 0x2e, 0x3d, 0xc2, 0x25, 0xa2, 0xe6,
-	0x0f, 0x01, 0x79, 0x3c, 0xfe, 0x51, 0x9c, 0xaa, 0x3f, 0x90, 0x22, 0x21, 0x71, 0x4a, 0xfc, 0xde,
-	0xf7, 0x7d, 0xf3, 0xbe, 0x79, 0xf6, 0x07, 0xf7, 0x66, 0xf7, 0xa4, 0xcd, 0x23, 0x67, 0x96, 0x8e,
-	0x98, 0x08, 0x59, 0xc2, 0xa4, 0x13, 0xcf, 0x26, 0x0e, 0x8d, 0xb9, 0x74, 0xc4, 0x88, 0x7a, 0xce,
-	0xfc, 0x80, 0xfa, 0xf1, 0x94, 0x1e, 0x38, 0x13, 0x16, 0x32, 0x41, 0x13, 0x36, 0xb6, 0x63, 0x11,
-	0x25, 0x11, 0xde, 0x2f, 0x98, 0x76, 0xcd, 0xb4, 0xe3, 0xd9, 0xc4, 0xce, 0x99, 0x76, 0xce, 0xb4,
-	0x4b, 0xe6, 0xee, 0x6b, 0x13, 0x9e, 0x4c, 0xd3, 0x91, 0xed, 0x45, 0x81, 0x33, 0x89, 0x26, 0x91,
-	0xa3, 0x04, 0x46, 0xe9, 0x53, 0xf5, 0xa4, 0x1e, 0xd4, 0xbf, 0x42, 0x78, 0xf7, 0xae, 0x1e, 0x89,
-	0xc6, 0x3c, 0xa0, 0xde, 0x94, 0x87, 0x4c, 0x3c, 0xab, 0x87, 0x0a, 0x58, 0x42, 0x9d, 0x79, 0x6b,
-	0x9c, 0x5d, 0xe7, 0x32, 0x96, 0x48, 0xc3, 0x84, 0x07, 0xac, 0x45, 0x78, 0xeb, 0x2a, 0x82, 0xf4,
-	0xa6, 0x2c, 0xa0, 0x2d, 0xde, 0x1b, 0x97, 0xf1, 0xd2, 0x84, 0xfb, 0x0e, 0x0f, 0x13, 0x99, 0x88,
-	0x16, 0xa9, 0xe1, 0x49, 0x32, 0x31, 0x67, 0xa2, 0x36, 0xc4, 0xbe, 0xa0, 0x41, 0xec, 0xb3, 0x65,
-	0x9e, 0xee, 0x5c, 0xba, 0x9c, 0x25, 0x68, 0xeb, 0x17, 0x04, 0x9b, 0xef, 0xf9, 0xa9, 0x4c, 0x98,
-	0x20, 0x91, 0xcf, 0xf0, 0x67, 0xd0, 0xcf, 0x2f, 0x6b, 0x4c, 0x13, 0x6a, 0xa0, 0x3d, 0xb4, 0xbf,
-	0x79, 0xf8, 0xba, 0xad, 0x77, 0xd6, 0x9c, 0xbd, 0xde, 0x5a, 0x8e, 0xb6, 0xe7, 0x07, 0xf6, 0x47,
-	0xa3, 0xcf, 0x99, 0x97, 0x7c, 0xc8, 0x12, 0xea, 0xe2, 0xd3, 0xc5, 0xb0, 0x93, 0x2d, 0x86, 0x50,
-	0xd7, 0x48, 0xa5, 0x8a, 0x3f, 0x81, 0x9e, 0x48, 0x7d, 0x26, 0x8d, 0xb5, 0xbd, 0xf5, 0xfd, 0xcd,
-	0xc3, 0xbb, 0xf6, 0x75, 0x5f, 0x09, 0xfb, 0x24, 0xf2, 0xb9, 0xf7, 0x8c, 0xa4, 0x3e, 0x73, 0xb7,
-	0xf4, 0x11, 0xbd, 0xfc, 0x49, 0x92, 0x42, 0xd1, 0xfa, 0x71, 0x0d, 0x70, 0xc3, 0x8c, 0xcb, 0xc3,
-	0x31, 0x0f, 0x27, 0x2b, 0xf0, 0xf4, 0x29, 0xf4, 0x65, 0xaa, 0x1a, 0xa5, 0xad, 0x83, 0xeb, 0xdb,
-	0x7a, 0x58, 0x30, 0xdd, 0x17, 0xf4, 0x11, 0x7d, 0x5d, 0x90, 0xa4, 0x12, 0xc5, 0x4f, 0x60, 0x43,
-	0x44, 0x3e, 0x23, 0xec, 0xa9, 0xb1, 0xae, 0x1c, 0xdc, 0x40, 0x9f, 0x14, 0x44, 0x77, 0x5b, 0xeb,
-	0x6f, 0xe8, 0x02, 0x29, 0x25, 0xad, 0xef, 0x10, 0xbc, 0xdc, 0xbe, 0x37, 0x37, 0xe5, 0xfe, 0x98,
-	0x09, 0xfc, 0x0d, 0x02, 0xec, 0xb5, 0xba, 0xfa, 0x26, 0xdf, 0xb9, 0xfe, 0x1c, 0x4b, 0x4e, 0xd8,
-	0xd5, 0x23, 0x2d, 0xd9, 0x1a, 0x59, 0x72, 0xa6, 0xf5, 0x3b, 0x82, 0x97, 0xda, 0xd0, 0x07, 0x5c,
-	0x26, 0xf8, 0x49, 0x6b, 0xc9, 0xf6, 0xf5, 0x96, 0x9c, 0xb3, 0xd5, 0x8a, 0xab, 0xfb, 0x2f, 0x2b,
-	0x8d, 0x05, 0x53, 0xe8, 0xf1, 0x84, 0x05, 0xe5, 0x76, 0xff, 0x9d, 0xeb, 0xea, 0xe5, 0x3d, 0xca,
-	0x25, 0x49, 0xa1, 0x6c, 0xfd, 0x8a, 0x60, 0xbb, 0x01, 0x5e, 0x81, 0xa9, 0xc7, 0x17, 0x4d, 0xbd,
-	0x79, 0x3b, 0x53, 0xcb, 0xdd, 0xfc, 0x85, 0x00, 0xea, 0xef, 0x15, 0x0f, 0xa1, 0x37, 0x67, 0x62,
-	0x24, 0x0d, 0xb4, 0xb7, 0xbe, 0x3f, 0x70, 0x07, 0x39, 0xfe, 0x51, 0x5e, 0x20, 0x45, 0x1d, 0xbf,
-	0x0a, 0x03, 0x1a, 0xf3, 0xf7, 0x45, 0x94, 0xc6, 0xd2, 0x58, 0x57, 0xa0, 0xad, 0x6c, 0x31, 0x1c,
-	0xdc, 0x3f, 0x39, 0x2a, 0x8a, 0xa4, 0xee, 0xe7, 0x60, 0xc1, 0x64, 0x94, 0x0a, 0x8f, 0x49, 0xa3,
-	0x5b, 0x83, 0x49, 0x59, 0x24, 0x75, 0x1f, 0xbf, 0x0d, 0x5b, 0xe5, 0xc3, 0x31, 0x0d, 0x98, 0x34,
-	0x7a, 0x8a, 0xb0, 0x93, 0x2d, 0x86, 0x5b, 0xa4, 0xd9, 0x20, 0x17, 0x71, 0xf8, 0x5d, 0xd8, 0x0e,
-	0xa3, 0xb0, 0x84, 0x7c, 0x4c, 0x1e, 0x48, 0xe3, 0x39, 0x45, 0x7d, 0x31, 0x5b, 0x0c, 0xb7, 0x8f,
-	0x2f, 0xb6, 0xc8, 0x3f, 0xb1, 0xd6, 0x57, 0xb0, 0xd3, 0x08, 0x2c, 0xfd, 0x2d, 0x4d, 0x01, 0xe2,
-	0xaa, 0xa8, 0x57, 0x7a, 0xbb, 0x04, 0xac, 0x02, 0xa9, 0xae, 0x91, 0x86, 0xb6, 0xf5, 0x33, 0x82,
-	0xee, 0x7f, 0x3f, 0xd1, 0xbf, 0x5f, 0x83, 0xcd, 0xff, 0xa3, 0xfc, 0x06, 0x51, 0x9e, 0xa7, 0xc8,
-	0x6a, 0xa3, 0xf1, 0xf6, 0x29, 0x72, 0x75, 0x26, 0xfe, 0x84, 0xa0, 0xbf, 0xa2, 0x30, 0x7c, 0x78,
-	0xd1, 0x86, 0x7d, 0x43, 0x1b, 0xcb, 0xe7, 0xff, 0x12, 0xca, 0x0d, 0xe1, 0x3b, 0xd0, 0x2f, 0x03,
-	0x4c, 0x4d, 0x3f, 0xa8, 0xa7, 0x29, 0x33, 0x8e, 0x54, 0x08, 0xbc, 0x07, 0xdd, 0x19, 0x0f, 0xc7,
-	0xc6, 0x9a, 0x42, 0x3e, 0xaf, 0x91, 0xdd, 0x0f, 0x78, 0x38, 0x26, 0xaa, 0x93, 0x23, 0x42, 0x1a,
-	0x30, 0xf5, 0x0e, 0x35, 0x10, 0x79, 0x74, 0x11, 0xd5, 0xb1, 0x7e, 0x40, 0xb0, 0xa1, 0xdf, 0xbf,
-	0x4a, 0x0f, 0x5d, 0xaa, 0x77, 0x08, 0x40, 0x63, 0xfe, 0x88, 0x09, 0xc9, 0xa3, 0x50, 0x9f, 0x5b,
-	0x7d, 0x29, 0xf7, 0x4f, 0x8e, 0x74, 0x87, 0x34, 0x50, 0x57, 0xcf, 0x80, 0x1d, 0x18, 0xe4, 0xbf,
-	0x32, 0xa6, 0x1e, 0x33, 0xba, 0x0a, 0xb6, 0xa3, 0x61, 0x83, 0xe3, 0xb2, 0x41, 0x6a, 0x8c, 0xfb,
-	0xca, 0xe9, 0xb9, 0xd9, 0x39, 0x3b, 0x37, 0x3b, 0xbf, 0x9d, 0x9b, 0x9d, 0xaf, 0x33, 0x13, 0x9d,
-	0x66, 0x26, 0x3a, 0xcb, 0x4c, 0xf4, 0x47, 0x66, 0xa2, 0x6f, 0xff, 0x34, 0x3b, 0x8f, 0xfb, 0xe5,
-	0xc5, 0xff, 0x1d, 0x00, 0x00, 0xff, 0xff, 0x53, 0x64, 0x1d, 0x0e, 0x87, 0x0c, 0x00, 0x00,
+	// 826 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xec, 0x54, 0xcf, 0x6f, 0xe3, 0x44,
+	0x14, 0xce, 0xb4, 0x09, 0x4d, 0x5e, 0xa9, 0x4a, 0x07, 0x09, 0x99, 0x1e, 0x9c, 0xca, 0xa7, 0x8a,
+	0x1f, 0x36, 0x2d, 0x0b, 0xec, 0x01, 0x0e, 0x6b, 0x0e, 0xa8, 0x62, 0x29, 0xd5, 0xac, 0x58, 0x89,
+	0xd5, 0x4a, 0x30, 0x71, 0x66, 0x93, 0x21, 0xfe, 0xa5, 0x19, 0x3b, 0xd2, 0x0a, 0x21, 0x71, 0xe4,
+	0xc8, 0x5f, 0xc1, 0x91, 0x03, 0x12, 0x47, 0x4e, 0x5c, 0x2a, 0xb8, 0xec, 0x11, 0x2e, 0x11, 0x35,
+	0x7f, 0x08, 0xc8, 0xe3, 0xf1, 0x8f, 0x34, 0xa9, 0x9a, 0x16, 0x29, 0x12, 0xd2, 0x9e, 0x12, 0xbf,
+	0xf7, 0x7d, 0xdf, 0xbc, 0x6f, 0x9e, 0xfd, 0xc1, 0xdd, 0xc9, 0x5d, 0x69, 0xf3, 0xc8, 0x99, 0xa4,
+	0x03, 0x26, 0x42, 0x96, 0x30, 0xe9, 0xc4, 0x93, 0x91, 0x43, 0x63, 0x2e, 0x1d, 0x31, 0xa0, 0x9e,
+	0x33, 0x3d, 0xa2, 0x7e, 0x3c, 0xa6, 0x47, 0xce, 0x88, 0x85, 0x4c, 0xd0, 0x84, 0x0d, 0xed, 0x58,
+	0x44, 0x49, 0x84, 0x0f, 0x0b, 0xa6, 0x5d, 0x33, 0xed, 0x78, 0x32, 0xb2, 0x73, 0xa6, 0x9d, 0x33,
+	0xed, 0x92, 0xb9, 0xff, 0xe6, 0x88, 0x27, 0xe3, 0x74, 0x60, 0x7b, 0x51, 0xe0, 0x8c, 0xa2, 0x51,
+	0xe4, 0x28, 0x81, 0x41, 0xfa, 0x44, 0x3d, 0xa9, 0x07, 0xf5, 0xaf, 0x10, 0xde, 0xbf, 0xa3, 0x47,
+	0xa2, 0x31, 0x0f, 0xa8, 0x37, 0xe6, 0x21, 0x13, 0x4f, 0xeb, 0xa1, 0x02, 0x96, 0x50, 0x67, 0xba,
+	0x30, 0xce, 0xbe, 0x73, 0x15, 0x4b, 0xa4, 0x61, 0xc2, 0x03, 0xb6, 0x40, 0x78, 0xf7, 0x3a, 0x82,
+	0xf4, 0xc6, 0x2c, 0xa0, 0x0b, 0xbc, 0xb7, 0xaf, 0xe2, 0xa5, 0x09, 0xf7, 0x1d, 0x1e, 0x26, 0x32,
+	0x11, 0x97, 0x49, 0xd6, 0x6f, 0x08, 0xb6, 0x3f, 0xf4, 0x53, 0x99, 0x30, 0x41, 0x22, 0x9f, 0xe1,
+	0x2f, 0xa1, 0x9b, 0x1b, 0x19, 0xd2, 0x84, 0x1a, 0xe8, 0x00, 0x1d, 0x6e, 0x1f, 0xbf, 0x65, 0xeb,
+	0xfb, 0x6c, 0xea, 0xd6, 0x37, 0x9a, 0xa3, 0xed, 0xe9, 0x91, 0xfd, 0xe9, 0xe0, 0x2b, 0xe6, 0x25,
+	0x9f, 0xb0, 0x84, 0xba, 0xf8, 0x7c, 0xd6, 0x6f, 0x65, 0xb3, 0x3e, 0xd4, 0x35, 0x52, 0xa9, 0xe2,
+	0xcf, 0xa1, 0x23, 0x52, 0x9f, 0x49, 0x63, 0xe3, 0x60, 0xf3, 0x70, 0xfb, 0xf8, 0x8e, 0xbd, 0xea,
+	0xba, 0xec, 0xb3, 0xc8, 0xe7, 0xde, 0x53, 0x92, 0xfa, 0xcc, 0xdd, 0xd1, 0x47, 0x74, 0xf2, 0x27,
+	0x49, 0x0a, 0x45, 0xeb, 0xe7, 0x0d, 0xc0, 0x0d, 0x33, 0x2e, 0x0f, 0x87, 0x3c, 0x1c, 0xad, 0xc1,
+	0xd3, 0x17, 0xd0, 0x95, 0xa9, 0x6a, 0x94, 0xb6, 0x8e, 0x56, 0xb7, 0xf5, 0xa0, 0x60, 0xba, 0x2f,
+	0xe9, 0x23, 0xba, 0xba, 0x20, 0x49, 0x25, 0x8a, 0x1f, 0xc3, 0x96, 0x88, 0x7c, 0x46, 0xd8, 0x13,
+	0x63, 0x53, 0x39, 0xb8, 0x81, 0x3e, 0x29, 0x88, 0xee, 0xae, 0xd6, 0xdf, 0xd2, 0x05, 0x52, 0x4a,
+	0x5a, 0x3f, 0x20, 0x78, 0x75, 0xf1, 0xde, 0xdc, 0x94, 0xfb, 0x43, 0x26, 0xf0, 0x77, 0x08, 0xb0,
+	0xb7, 0xd0, 0xd5, 0x37, 0xf9, 0xfe, 0xea, 0x73, 0x2c, 0x39, 0x61, 0x5f, 0x8f, 0xb4, 0x64, 0x6b,
+	0x64, 0xc9, 0x99, 0xd6, 0x9f, 0x08, 0x5e, 0x59, 0x84, 0xde, 0xe7, 0x32, 0xc1, 0x8f, 0x17, 0x96,
+	0x6c, 0xaf, 0xb6, 0xe4, 0x9c, 0xad, 0x56, 0x5c, 0xdd, 0x7f, 0x59, 0x69, 0x2c, 0x98, 0x42, 0x87,
+	0x27, 0x2c, 0x28, 0xb7, 0xfb, 0xdf, 0x5c, 0x57, 0x2f, 0xef, 0x49, 0x2e, 0x49, 0x0a, 0x65, 0xeb,
+	0x77, 0x04, 0xbb, 0x0d, 0xf0, 0x1a, 0x4c, 0x3d, 0x9a, 0x37, 0xf5, 0xce, 0xed, 0x4c, 0x2d, 0x77,
+	0xf3, 0x0f, 0x02, 0xa8, 0xbf, 0x57, 0xdc, 0x87, 0xce, 0x94, 0x89, 0x81, 0x34, 0xd0, 0xc1, 0xe6,
+	0x61, 0xcf, 0xed, 0xe5, 0xf8, 0x87, 0x79, 0x81, 0x14, 0x75, 0xfc, 0x3a, 0xf4, 0x68, 0xcc, 0x3f,
+	0x12, 0x51, 0x1a, 0x4b, 0x63, 0x53, 0x81, 0x76, 0xb2, 0x59, 0xbf, 0x77, 0xef, 0xec, 0xa4, 0x28,
+	0x92, 0xba, 0x9f, 0x83, 0x05, 0x93, 0x51, 0x2a, 0x3c, 0x26, 0x8d, 0x76, 0x0d, 0x26, 0x65, 0x91,
+	0xd4, 0x7d, 0xfc, 0x1e, 0xec, 0x94, 0x0f, 0xa7, 0x34, 0x60, 0xd2, 0xe8, 0x28, 0xc2, 0x5e, 0x36,
+	0xeb, 0xef, 0x90, 0x66, 0x83, 0xcc, 0xe3, 0xf0, 0x07, 0xb0, 0x1b, 0x46, 0x61, 0x09, 0xf9, 0x8c,
+	0xdc, 0x97, 0xc6, 0x0b, 0x8a, 0xfa, 0x72, 0x36, 0xeb, 0xef, 0x9e, 0xce, 0xb7, 0xc8, 0x65, 0xac,
+	0xf5, 0x0d, 0xec, 0x35, 0x02, 0x4b, 0x7f, 0x4b, 0x63, 0x80, 0xb8, 0x2a, 0xea, 0x95, 0xde, 0x2e,
+	0x01, 0xab, 0x40, 0xaa, 0x6b, 0xa4, 0xa1, 0x6d, 0xfd, 0x8a, 0xa0, 0xfd, 0xff, 0x4f, 0xf4, 0x1f,
+	0x37, 0x60, 0xfb, 0x79, 0x94, 0xdf, 0x20, 0xca, 0xf3, 0x14, 0x59, 0x6f, 0x34, 0xde, 0x3e, 0x45,
+	0xae, 0xcf, 0xc4, 0x5f, 0x10, 0x74, 0xd7, 0x14, 0x86, 0x0f, 0xe6, 0x6d, 0xd8, 0x37, 0xb4, 0xb1,
+	0x7c, 0xfe, 0xaf, 0xa1, 0xdc, 0x10, 0x7e, 0x03, 0xba, 0x65, 0x80, 0xa9, 0xe9, 0x7b, 0xf5, 0x34,
+	0x65, 0xc6, 0x91, 0x0a, 0x81, 0x0f, 0xa0, 0x3d, 0xe1, 0xe1, 0xd0, 0xd8, 0x50, 0xc8, 0x17, 0x35,
+	0xb2, 0xfd, 0x31, 0x0f, 0x87, 0x44, 0x75, 0x72, 0x44, 0x48, 0x03, 0xa6, 0xde, 0xa1, 0x06, 0x22,
+	0x8f, 0x2e, 0xa2, 0x3a, 0xd6, 0x4f, 0x08, 0xb6, 0xf4, 0xfb, 0x57, 0xe9, 0xa1, 0x2b, 0xf5, 0x8e,
+	0x01, 0x68, 0xcc, 0x1f, 0x32, 0x21, 0x79, 0x14, 0xea, 0x73, 0xab, 0x2f, 0xe5, 0xde, 0xd9, 0x89,
+	0xee, 0x90, 0x06, 0xea, 0xfa, 0x19, 0xb0, 0x03, 0xbd, 0xfc, 0x57, 0xc6, 0xd4, 0x63, 0x46, 0x5b,
+	0xc1, 0xf6, 0x34, 0xac, 0x77, 0x5a, 0x36, 0x48, 0x8d, 0x71, 0x5f, 0x3b, 0xbf, 0x30, 0x5b, 0xcf,
+	0x2e, 0xcc, 0xd6, 0x1f, 0x17, 0x66, 0xeb, 0xdb, 0xcc, 0x44, 0xe7, 0x99, 0x89, 0x9e, 0x65, 0x26,
+	0xfa, 0x2b, 0x33, 0xd1, 0xf7, 0x7f, 0x9b, 0xad, 0x47, 0xdd, 0xf2, 0xe2, 0xff, 0x0d, 0x00, 0x00,
+	0xff, 0xff, 0x2d, 0x29, 0xd0, 0x2d, 0x23, 0x0c, 0x00, 0x00,
 }

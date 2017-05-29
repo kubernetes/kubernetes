@@ -61,8 +61,13 @@ message APIGroupList {
 
 // APIResource specifies the name of a resource and whether it is namespaced.
 message APIResource {
-  // name is the name of the resource.
+  // name is the plural name of the resource.
   optional string name = 1;
+
+  // singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely.
+  // The singularName is more correct for reporting status on a single item and both singular and plural are allowed
+  // from the kubectl CLI interface.
+  optional string singularName = 6;
 
   // namespaced indicates if a resource is namespaced or not.
   optional bool namespaced = 2;
@@ -159,6 +164,10 @@ message GetOptions {
   // - if it's 0, then we simply return what we currently have in cache, no guarantee;
   // - if set to non zero, then the result is at least as fresh as given rv.
   optional string resourceVersion = 1;
+
+  // If true, partially initialized resources are included in the response.
+  // +optional
+  optional bool includeUninitialized = 2;
 }
 
 // GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
@@ -225,6 +234,25 @@ message GroupVersionResource {
   optional string resource = 3;
 }
 
+// Initializer is information about an initializer that has not yet completed.
+message Initializer {
+  // name of the process that is responsible for initializing this object.
+  optional string name = 1;
+}
+
+// Initializers tracks the progress of initialization.
+message Initializers {
+  // Pending is a list of initializers that must execute in order before this object is visible.
+  // When the last pending initializer is removed, and no failing result is set, the initializers
+  // struct will be set to nil and the object is considered as initialized and visible to all
+  // clients.
+  repeated Initializer pending = 1;
+
+  // If result is set with the Failure field, the object will be persisted to storage and then deleted,
+  // ensuring that other clients can observe the deletion.
+  optional Status result = 2;
+}
+
 // A label selector is a label query over a set of resources. The result of matchLabels and
 // matchExpressions are ANDed. An empty label selector matches all objects. A null
 // label selector matches no objects.
@@ -244,6 +272,8 @@ message LabelSelector {
 // relates the key and values.
 message LabelSelectorRequirement {
   // key is the label key that the selector applies to.
+  // +patchMergeKey=key
+  // +patchStrategy=merge
   optional string key = 1;
 
   // operator represents a key's relationship to a set of values.
@@ -288,6 +318,10 @@ message ListOptions {
   // Defaults to everything.
   // +optional
   optional string fieldSelector = 2;
+
+  // If true, partially initialized resources are included in the response.
+  // +optional
+  optional bool includeUninitialized = 6;
 
   // Watch for changes to the described resources and return them as a stream of
   // add, update, and remove notifications. Specify resourceVersion.
@@ -440,13 +474,27 @@ message ObjectMeta {
   // then an entry in this list will point to this controller, with the controller field set to true.
   // There cannot be more than one managing controller.
   // +optional
+  // +patchMergeKey=uid
+  // +patchStrategy=merge
   repeated OwnerReference ownerReferences = 13;
+
+  // An initializer is a controller which enforces some system invariant at object creation time.
+  // This field is a list of initializers that have not yet acted on this object. If nil or empty,
+  // this object has been completely initialized. Otherwise, the object is considered uninitialized
+  // and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to
+  // observe uninitialized objects.
+  // 
+  // When an object is created, the system will populate this list with the current set of initializers.
+  // Only privileged users may set or modify this list. Once it is empty, it may not be modified further
+  // by any user.
+  optional Initializers initializers = 16;
 
   // Must be empty before the object is deleted from the registry. Each entry
   // is an identifier for the responsible component that will remove the entry
   // from the list. If the deletionTimestamp of the object is non-nil, entries
   // in this list can only be removed.
   // +optional
+  // +patchStrategy=merge
   repeated string finalizers = 14;
 
   // The name of the cluster which the object belongs to.
@@ -597,6 +645,12 @@ message StatusDetails {
   // +optional
   optional string kind = 3;
 
+  // UID of the resource.
+  // (when there is a single resource which can be described).
+  // More info: http://kubernetes.io/docs/user-guide/identifiers#uids
+  // +optional
+  optional string uid = 6;
+
   // The Causes array includes more details associated with the StatusReason
   // failure. Not all StatusReasons may provide detailed causes.
   // +optional
@@ -616,7 +670,7 @@ message StatusDetails {
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 message Time {
   // Represents seconds of UTC time since Unix epoch
-  // 1970-01-01T00:00:00Z. Must be from from 0001-01-01T00:00:00Z to
+  // 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
   // 9999-12-31T23:59:59Z inclusive.
   optional int64 seconds = 1;
 
@@ -632,7 +686,7 @@ message Time {
 // that matches Time. Do not use in Go structs.
 message Timestamp {
   // Represents seconds of UTC time since Unix epoch
-  // 1970-01-01T00:00:00Z. Must be from from 0001-01-01T00:00:00Z to
+  // 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
   // 9999-12-31T23:59:59Z inclusive.
   optional int64 seconds = 1;
 

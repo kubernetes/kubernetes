@@ -19,6 +19,8 @@ package apiregistration
 import (
 	"sort"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func SortedByGroup(servers []*APIService) [][]*APIService {
@@ -53,7 +55,48 @@ func (s ByPriority) Len() int      { return len(s) }
 func (s ByPriority) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s ByPriority) Less(i, j int) bool {
 	if s[i].Spec.Priority == s[j].Spec.Priority {
-		return strings.Compare(s[i].Name, s[j].Name) < 0
+		return s[i].Name < s[j].Name
 	}
 	return s[i].Spec.Priority < s[j].Spec.Priority
+}
+
+// APIServiceNameToGroupVersion returns the GroupVersion for a given apiServiceName.  The name
+// must be valid, but any object you get back from an informer will be valid.
+func APIServiceNameToGroupVersion(apiServiceName string) schema.GroupVersion {
+	tokens := strings.SplitN(apiServiceName, ".", 2)
+	return schema.GroupVersion{Group: tokens[1], Version: tokens[0]}
+}
+
+// SetAPIServiceCondition sets the status condition.  It either overwrites the existing one or
+// creates a new one
+func SetAPIServiceCondition(apiService *APIService, newCondition APIServiceCondition) {
+	var existingCondition *APIServiceCondition
+	for i := range apiService.Status.Conditions {
+		if apiService.Status.Conditions[i].Type == newCondition.Type {
+			existingCondition = &apiService.Status.Conditions[i]
+			break
+		}
+	}
+	if existingCondition == nil {
+		apiService.Status.Conditions = append(apiService.Status.Conditions, newCondition)
+		return
+	}
+
+	if existingCondition.Status != newCondition.Status {
+		existingCondition.Status = newCondition.Status
+		existingCondition.LastTransitionTime = newCondition.LastTransitionTime
+	}
+
+	existingCondition.Reason = newCondition.Reason
+	existingCondition.Message = newCondition.Message
+}
+
+// IsAPIServiceConditionTrue indicates if the condition is present and strictly true
+func IsAPIServiceConditionTrue(apiService *APIService, conditionType APIServiceConditionType) bool {
+	for _, condition := range apiService.Status.Conditions {
+		if condition.Type == conditionType && condition.Status == ConditionTrue {
+			return true
+		}
+	}
+	return false
 }

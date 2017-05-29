@@ -30,9 +30,10 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 const (
@@ -50,7 +51,7 @@ var (
 	memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
 )
 
-func NewContainerManager(cgroupsName string, client dockertools.DockerInterface) ContainerManager {
+func NewContainerManager(cgroupsName string, client libdocker.Interface) ContainerManager {
 	return &containerManager{
 		cgroupsName: cgroupsName,
 		client:      client,
@@ -59,7 +60,7 @@ func NewContainerManager(cgroupsName string, client dockertools.DockerInterface)
 
 type containerManager struct {
 	// Docker client.
-	client dockertools.DockerInterface
+	client libdocker.Interface
 	// Name of the cgroups.
 	cgroupsName string
 	// Manager for the cgroups.
@@ -85,9 +86,9 @@ func (m *containerManager) doWork() {
 		glog.Errorf("Unable to get docker version: %v", err)
 		return
 	}
-	version, err := utilversion.ParseSemantic(v.Version)
+	version, err := utilversion.ParseGeneric(v.APIVersion)
 	if err != nil {
-		glog.Errorf("Unable to parse docker version %q: %v", v.Version, err)
+		glog.Errorf("Unable to parse docker version %q: %v", v.APIVersion, err)
 		return
 	}
 	// EnsureDockerInConatiner does two things.

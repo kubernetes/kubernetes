@@ -24,11 +24,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -190,7 +191,7 @@ type admissionRequirementList []*admissionRequirement
 func (a admissionRequirementList) distance(pod *v1.Pod) float64 {
 	dist := float64(0)
 	for _, req := range a {
-		remainingRequest := float64(req.quantity - v1.GetResourceRequest(pod, req.resourceName))
+		remainingRequest := float64(req.quantity - resource.GetResourceRequest(pod, req.resourceName))
 		if remainingRequest < 0 {
 			remainingRequest = 0
 		}
@@ -206,7 +207,7 @@ func (a admissionRequirementList) subtract(pods ...*v1.Pod) admissionRequirement
 	for _, req := range a {
 		newQuantity := req.quantity
 		for _, pod := range pods {
-			newQuantity -= v1.GetResourceRequest(pod, req.resourceName)
+			newQuantity -= resource.GetResourceRequest(pod, req.resourceName)
 		}
 		if newQuantity > 0 {
 			newList = append(newList, &admissionRequirement{
@@ -230,7 +231,7 @@ func (a admissionRequirementList) toString() string {
 func sortPodsByQOS(pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod) {
 	for _, pod := range pods {
 		if !kubetypes.IsCriticalPod(pod) {
-			switch qos.GetPodQOS(pod) {
+			switch v1qos.GetPodQOS(pod) {
 			case v1.PodQOSBestEffort:
 				bestEffort = append(bestEffort, pod)
 			case v1.PodQOSBurstable:
@@ -252,8 +253,8 @@ func smallerResourceRequest(pod1 *v1.Pod, pod2 *v1.Pod) bool {
 		v1.ResourceCPU,
 	}
 	for _, res := range priorityList {
-		req1 := v1.GetResourceRequest(pod1, res)
-		req2 := v1.GetResourceRequest(pod2, res)
+		req1 := resource.GetResourceRequest(pod1, res)
+		req2 := resource.GetResourceRequest(pod2, res)
 		if req1 < req2 {
 			return true
 		} else if req1 > req2 {

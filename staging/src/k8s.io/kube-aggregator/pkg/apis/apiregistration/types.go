@@ -39,7 +39,9 @@ type ServiceReference struct {
 type APIServiceSpec struct {
 	// Service is a reference to the service for this API server.  It must communicate
 	// on port 443
-	Service ServiceReference
+	// If the Service is nil, that means the handling for the API groupversion is handled locally on this server.
+	// The call will simply delegate to the normal handler chain to be fulfilled.
+	Service *ServiceReference
 	// Group is the API group name this server hosts
 	Group string
 	// Version is the API version this server hosts.  For example, "v1"
@@ -61,8 +63,45 @@ type APIServiceSpec struct {
 	Priority int64
 }
 
+type ConditionStatus string
+
+// These are valid condition statuses. "ConditionTrue" means a resource is in the condition;
+// "ConditionFalse" means a resource is not in the condition; "ConditionUnknown" means kubernetes
+// can't decide if a resource is in the condition or not. In the future, we could add other
+// intermediate conditions, e.g. ConditionDegraded.
+const (
+	ConditionTrue    ConditionStatus = "True"
+	ConditionFalse   ConditionStatus = "False"
+	ConditionUnknown ConditionStatus = "Unknown"
+)
+
+// APIConditionConditionType is a valid value for APIServiceCondition.Type
+type APIServiceConditionType string
+
+const (
+	// Available indicates that the service exists and is reachable
+	Available APIServiceConditionType = "Available"
+)
+
+// APIServiceCondition describes conditions for an APIService
+type APIServiceCondition struct {
+	// Type is the type of the condition.
+	Type APIServiceConditionType
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	Status ConditionStatus
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	Reason string
+	// Human-readable message indicating details about last transition.
+	Message string
+}
+
 // APIServiceStatus contains derived information about an API server
 type APIServiceStatus struct {
+	// Current service state of apiService.
+	Conditions []APIServiceCondition
 }
 
 // +genclient=true

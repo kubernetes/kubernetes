@@ -22,7 +22,7 @@ go_library(
         "//cmd/genutils:go_default_library",
         "//federation/cmd/federation-apiserver/app:go_default_library",
         "//federation/cmd/federation-controller-manager/app:go_default_library",
-        "//vendor:github.com/spf13/cobra/doc",
+        "//vendor/github.com/spf13/cobra/doc:go_default_library",
     ],
 )
 

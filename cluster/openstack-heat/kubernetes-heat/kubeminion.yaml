@@ -1,4 +1,4 @@
-heat_template_version: 2014-10-16
+heat_template_version: 2016-10-14
 
 description: >
   This is a nested stack that defines a single Kubernetes minion, This stack is
@@ -100,6 +100,11 @@ parameters:
     description: Comma seperated list of domains/addresses that bypass proxying.
     default: localhost
 
+  assign_floating_ip:
+    type: boolean
+    description: Indicates whether floating IPs will be generated for minions
+    default: true
+
   # The following are all generated in the parent template.
   kube_master_ip:
     type: string
@@ -126,6 +131,9 @@ parameters:
     type: string
   secgroup_node:
     type: string
+
+conditions:
+  assign_floating_ip: {equals : [{get_param: assign_floating_ip}, true]}
 
 resources:
 
@@ -294,10 +302,13 @@ resources:
     properties:
       floating_network: {get_param: external_network}
       port_id: {get_resource: kube_minion_eth0}
+    condition: assign_floating_ip
 
 outputs:
 
   kube_minion_ip:
     value: {get_attr: [kube_minion_eth0, fixed_ips, 0, ip_address]}
+
   kube_minion_external_ip:
     value: {get_attr: [kube_minion_floating, floating_ip_address]}
+    condition: assign_floating_ip

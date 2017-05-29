@@ -72,7 +72,7 @@ func (test currentContextTest) run(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
-	err = RunCurrentContext(buf, []string{}, &options)
+	err = RunCurrentContext(buf, &options)
 	if len(test.expectedError) != 0 {
 		if err == nil {
 			t.Errorf("Did not get %v", test.expectedError)

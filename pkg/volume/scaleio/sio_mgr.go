@@ -148,7 +148,7 @@ func (m *sioMgr) AttachVolume(volName string) (string, error) {
 		glog.Error(log("failed while waiting for device to attach: %v", err))
 		return "", err
 	}
-	glog.V(4).Info(log("volume %s attached succesfully as %s to instance %s", volName, device, iid))
+	glog.V(4).Info(log("volume %s attached successfully as %s to instance %s", volName, device, iid))
 	return device, nil
 }
 

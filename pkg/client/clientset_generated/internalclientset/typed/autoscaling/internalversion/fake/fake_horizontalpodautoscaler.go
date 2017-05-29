@@ -34,6 +34,8 @@ type FakeHorizontalPodAutoscalers struct {
 
 var horizontalpodautoscalersResource = schema.GroupVersionResource{Group: "autoscaling", Version: "", Resource: "horizontalpodautoscalers"}
 
+var horizontalpodautoscalersKind = schema.GroupVersionKind{Group: "autoscaling", Version: "", Kind: "HorizontalPodAutoscaler"}
+
 func (c *FakeHorizontalPodAutoscalers) Create(horizontalPodAutoscaler *autoscaling.HorizontalPodAutoscaler) (result *autoscaling.HorizontalPodAutoscaler, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(horizontalpodautoscalersResource, c.ns, horizontalPodAutoscaler), &autoscaling.HorizontalPodAutoscaler{})
@@ -90,7 +92,7 @@ func (c *FakeHorizontalPodAutoscalers) Get(name string, options v1.GetOptions) (
 
 func (c *FakeHorizontalPodAutoscalers) List(opts v1.ListOptions) (result *autoscaling.HorizontalPodAutoscalerList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(horizontalpodautoscalersResource, c.ns, opts), &autoscaling.HorizontalPodAutoscalerList{})
+		Invokes(testing.NewListAction(horizontalpodautoscalersResource, horizontalpodautoscalersKind, c.ns, opts), &autoscaling.HorizontalPodAutoscalerList{})
 
 	if obj == nil {
 		return nil, err

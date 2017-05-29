@@ -28,7 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
+	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/api/v1/resource"
 )
 
 const (
@@ -142,12 +143,12 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 	burstablePodCPURequest := int64(0)
 	for i := range pods {
 		pod := pods[i]
-		qosClass := qos.GetPodQOS(pod)
+		qosClass := v1qos.GetPodQOS(pod)
 		if qosClass != v1.PodQOSBurstable {
 			// we only care about the burstable qos tier
 			continue
 		}
-		req, _, err := v1.PodRequestsAndLimits(pod)
+		req, _, err := resource.PodRequestsAndLimits(pod)
 		if err != nil {
 			return err
 		}
@@ -182,12 +183,12 @@ func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*C
 	pods := m.activePods()
 	for _, pod := range pods {
 		podMemoryRequest := int64(0)
-		qosClass := qos.GetPodQOS(pod)
+		qosClass := v1qos.GetPodQOS(pod)
 		if qosClass == v1.PodQOSBestEffort {
 			// limits are not set for Best Effort pods
 			continue
 		}
-		req, _, err := v1.PodRequestsAndLimits(pod)
+		req, _, err := resource.PodRequestsAndLimits(pod)
 		if err != nil {
 			glog.V(2).Infof("[Container Manager] Pod resource requests/limits could not be determined.  Not setting QOS memory limts.")
 			return

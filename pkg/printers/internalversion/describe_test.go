@@ -27,6 +27,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/fake"
@@ -65,6 +66,30 @@ func TestDescribePod(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "bar") || !strings.Contains(out, "Status:") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePodNode(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: api.PodSpec{
+			NodeName: "all-in-one",
+		},
+		Status: api.PodStatus{
+			HostIP: "127.0.0.1",
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "all-in-one/127.0.0.1") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -402,7 +427,7 @@ func TestDescribeContainers(t *testing.T) {
 				ContainerStatuses: []api.ContainerStatus{testCase.status},
 			},
 		}
-		writer := &PrefixWriter{out}
+		writer := NewPrefixWriter(out)
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(&pod), writer, "")
 		output := out.String()
 		for _, expected := range testCase.expectedElements {
@@ -749,6 +774,7 @@ func TestDescribeStorageClass(t *testing.T) {
 }
 
 func TestDescribePodDisruptionBudget(t *testing.T) {
+	minAvailable := intstr.FromInt(22)
 	f := fake.NewSimpleClientset(&policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:         "ns1",
@@ -756,7 +782,7 @@ func TestDescribePodDisruptionBudget(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
-			MinAvailable: intstr.FromInt(22),
+			MinAvailable: &minAvailable,
 		},
 		Status: policy.PodDisruptionBudgetStatus{
 			PodDisruptionsAllowed: 5,
@@ -1245,6 +1271,14 @@ func TestDescribeEvents(t *testing.T) {
 				},
 			}, events),
 		},
+		"ConfigMap": &ConfigMapDescriber{
+			fake.NewSimpleClientset(&api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
 	}
 
 	for name, d := range m {
@@ -1297,11 +1331,134 @@ func TestPrintLabelsMultiline(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		out := new(bytes.Buffer)
-		writer := &PrefixWriter{out}
+		writer := NewPrefixWriter(out)
 		printAnnotationsMultiline(writer, "Annotations", testCase.annotations)
 		output := out.String()
 		if output != testCase.expectPrint {
 			t.Errorf("Test case %d: expected to find %q in output: %q", i, testCase.expectPrint, output)
+		}
+	}
+}
+
+func TestDescribeUnstructuredContent(t *testing.T) {
+	testCases := []struct {
+		expected   string
+		unexpected string
+	}{
+		{
+			expected: `API Version:	v1
+Dummy 2:	present
+Items:
+  Item Bool:	true
+  Item Int:	42
+Kind:	Test
+Metadata:
+  Creation Timestamp:	2017-04-01T00:00:00Z
+  Name:	MyName
+  Namespace:	MyNamespace
+  Resource Version:	123
+  UID:	00000000-0000-0000-0000-000000000001
+Status:	ok
+URL:	http://localhost
+`,
+		},
+		{
+			unexpected: "\nDummy 1:\tpresent\n",
+		},
+		{
+			unexpected: "Dummy 1",
+		},
+		{
+			unexpected: "Dummy 3",
+		},
+		{
+			unexpected: "Dummy3",
+		},
+		{
+			unexpected: "dummy3",
+		},
+		{
+			unexpected: "dummy 3",
+		},
+	}
+	out := new(bytes.Buffer)
+	w := NewPrefixWriter(out)
+	obj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Test",
+			"dummy1":     "present",
+			"dummy2":     "present",
+			"metadata": map[string]interface{}{
+				"name":              "MyName",
+				"namespace":         "MyNamespace",
+				"creationTimestamp": "2017-04-01T00:00:00Z",
+				"resourceVersion":   123,
+				"uid":               "00000000-0000-0000-0000-000000000001",
+				"dummy3":            "present",
+			},
+			"items": []interface{}{
+				map[string]interface{}{
+					"itemBool": true,
+					"itemInt":  42,
+				},
+			},
+			"url":    "http://localhost",
+			"status": "ok",
+		},
+	}
+	printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), "", ".dummy1", ".metadata.dummy3")
+	output := out.String()
+
+	for _, test := range testCases {
+		if len(test.expected) > 0 {
+			if !strings.Contains(output, test.expected) {
+				t.Errorf("Expected to find %q in: %q", test.expected, output)
+			}
+		}
+		if len(test.unexpected) > 0 {
+			if strings.Contains(output, test.unexpected) {
+				t.Errorf("Didn't expect to find %q in: %q", test.unexpected, output)
+			}
+		}
+	}
+}
+
+func TestDescribeResourceQuota(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceName(api.ResourceCPU):            resource.MustParse("1"),
+				api.ResourceName(api.ResourceLimitsCPU):      resource.MustParse("2"),
+				api.ResourceName(api.ResourceLimitsMemory):   resource.MustParse("2G"),
+				api.ResourceName(api.ResourceMemory):         resource.MustParse("1G"),
+				api.ResourceName(api.ResourceRequestsCPU):    resource.MustParse("1"),
+				api.ResourceName(api.ResourceRequestsMemory): resource.MustParse("1G"),
+			},
+			Used: api.ResourceList{
+				api.ResourceName(api.ResourceCPU):            resource.MustParse("0"),
+				api.ResourceName(api.ResourceLimitsCPU):      resource.MustParse("0"),
+				api.ResourceName(api.ResourceLimitsMemory):   resource.MustParse("0G"),
+				api.ResourceName(api.ResourceMemory):         resource.MustParse("0G"),
+				api.ResourceName(api.ResourceRequestsCPU):    resource.MustParse("0"),
+				api.ResourceName(api.ResourceRequestsMemory): resource.MustParse("0G"),
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := ResourceQuotaDescriber{c}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedOut := []string{"bar", "foo", "limits.cpu", "2", "limits.memory", "2G", "requests.cpu", "1", "requests.memory", "1G"}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
 		}
 	}
 }

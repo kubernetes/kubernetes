@@ -1,5 +1,7 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
-// http://github.com/gogo/protobuf/gogoproto
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
+// http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -47,6 +49,51 @@ func (p *Properties) setCustomEncAndDec(typ reflect.Type) {
 		p.dec = (*Buffer).dec_custom_ref_bytes
 		p.size = size_custom_ref_bytes
 	}
+}
+
+func (p *Properties) setDurationEncAndDec(typ reflect.Type) {
+	if p.Repeated {
+		if typ.Elem().Kind() == reflect.Ptr {
+			p.enc = (*Buffer).enc_slice_duration
+			p.dec = (*Buffer).dec_slice_duration
+			p.size = size_slice_duration
+		} else {
+			p.enc = (*Buffer).enc_slice_ref_duration
+			p.dec = (*Buffer).dec_slice_ref_duration
+			p.size = size_slice_ref_duration
+		}
+	} else if typ.Kind() == reflect.Ptr {
+		p.enc = (*Buffer).enc_duration
+		p.dec = (*Buffer).dec_duration
+		p.size = size_duration
+	} else {
+		p.enc = (*Buffer).enc_ref_duration
+		p.dec = (*Buffer).dec_ref_duration
+		p.size = size_ref_duration
+	}
+}
+
+func (p *Properties) setTimeEncAndDec(typ reflect.Type) {
+	if p.Repeated {
+		if typ.Elem().Kind() == reflect.Ptr {
+			p.enc = (*Buffer).enc_slice_time
+			p.dec = (*Buffer).dec_slice_time
+			p.size = size_slice_time
+		} else {
+			p.enc = (*Buffer).enc_slice_ref_time
+			p.dec = (*Buffer).dec_slice_ref_time
+			p.size = size_slice_ref_time
+		}
+	} else if typ.Kind() == reflect.Ptr {
+		p.enc = (*Buffer).enc_time
+		p.dec = (*Buffer).dec_time
+		p.size = size_time
+	} else {
+		p.enc = (*Buffer).enc_ref_time
+		p.dec = (*Buffer).dec_ref_time
+		p.size = size_ref_time
+	}
+
 }
 
 func (p *Properties) setSliceOfNonPointerStructs(typ reflect.Type) {

@@ -44,9 +44,10 @@ const (
 	month                      = 30 * 24 * time.Hour
 )
 
+// Register registers a plugin
 // WARNING: this feature is experimental and will definitely change.
-func init() {
-	admission.RegisterPlugin("InitialResources", func(config io.Reader) (admission.Interface, error) {
+func Register(plugins *admission.Plugins) {
+	plugins.Register("InitialResources", func(config io.Reader) (admission.Interface, error) {
 		// TODO: remove the usage of flags in favor of reading versioned configuration
 		s, err := newDataSource(*source)
 		if err != nil {

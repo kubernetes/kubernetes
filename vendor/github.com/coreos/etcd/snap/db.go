@@ -19,7 +19,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/coreos/etcd/pkg/fileutil"
 )
@@ -41,7 +41,7 @@ func (s *Snapshotter) SaveDBFrom(r io.Reader, id uint64) (int64, error) {
 		os.Remove(f.Name())
 		return n, err
 	}
-	fn := path.Join(s.dir, fmt.Sprintf("%016x.snap.db", id))
+	fn := filepath.Join(s.dir, fmt.Sprintf("%016x.snap.db", id))
 	if fileutil.Exist(fn) {
 		os.Remove(f.Name())
 		return n, nil
@@ -67,7 +67,7 @@ func (s *Snapshotter) DBFilePath(id uint64) (string, error) {
 	wfn := fmt.Sprintf("%016x.snap.db", id)
 	for _, fn := range fns {
 		if fn == wfn {
-			return path.Join(s.dir, fn), nil
+			return filepath.Join(s.dir, fn), nil
 		}
 	}
 	return "", fmt.Errorf("snap: snapshot file doesn't exist")

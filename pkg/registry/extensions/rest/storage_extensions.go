@@ -114,7 +114,7 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 func (p RESTStorageProvider) postStartHookFunc(hookContext genericapiserver.PostStartHookContext) error {
 	clientset, err := extensionsclient.NewForConfig(hookContext.LoopbackClientConfig)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to initialize client: %v", err))
 		return nil
 	}
 

@@ -18,17 +18,18 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
+	prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 )
@@ -46,11 +47,12 @@ type Client struct {
 	Auth
 	Maintenance
 
-	conn         *grpc.ClientConn
-	cfg          Config
-	creds        *credentials.TransportCredentials
-	balancer     *simpleBalancer
-	retryWrapper retryRpcFunc
+	conn             *grpc.ClientConn
+	cfg              Config
+	creds            *credentials.TransportCredentials
+	balancer         *simpleBalancer
+	retryWrapper     retryRpcFunc
+	retryAuthWrapper retryRpcFunc
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -59,6 +61,8 @@ type Client struct {
 	Username string
 	// Password is a password for authentication
 	Password string
+	// tokenCred is an instance of WithPerRPCCredentials()'s argument
+	tokenCred *authTokenCredential
 }
 
 // New creates a new etcdv3 client from a given configuration.
@@ -87,6 +91,8 @@ func NewFromConfigFile(path string) (*Client, error) {
 // Close shuts down the client's etcd connections.
 func (c *Client) Close() error {
 	c.cancel()
+	c.Watcher.Close()
+	c.Lease.Close()
 	return toErr(c.ctx, c.conn.Close())
 }
 
@@ -96,10 +102,54 @@ func (c *Client) Close() error {
 func (c *Client) Ctx() context.Context { return c.ctx }
 
 // Endpoints lists the registered endpoints for the client.
-func (c *Client) Endpoints() []string { return c.cfg.Endpoints }
+func (c *Client) Endpoints() (eps []string) {
+	// copy the slice; protect original endpoints from being changed
+	eps = make([]string, len(c.cfg.Endpoints))
+	copy(eps, c.cfg.Endpoints)
+	return
+}
+
+// SetEndpoints updates client's endpoints.
+func (c *Client) SetEndpoints(eps ...string) {
+	c.cfg.Endpoints = eps
+	c.balancer.updateAddrs(eps)
+}
+
+// Sync synchronizes client's endpoints with the known endpoints from the etcd membership.
+func (c *Client) Sync(ctx context.Context) error {
+	mresp, err := c.MemberList(ctx)
+	if err != nil {
+		return err
+	}
+	var eps []string
+	for _, m := range mresp.Members {
+		eps = append(eps, m.ClientURLs...)
+	}
+	c.SetEndpoints(eps...)
+	return nil
+}
+
+func (c *Client) autoSync() {
+	if c.cfg.AutoSyncInterval == time.Duration(0) {
+		return
+	}
+
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		case <-time.After(c.cfg.AutoSyncInterval):
+			ctx, _ := context.WithTimeout(c.ctx, 5*time.Second)
+			if err := c.Sync(ctx); err != nil && err != c.ctx.Err() {
+				logger.Println("Auto sync endpoints failed:", err)
+			}
+		}
+	}
+}
 
 type authTokenCredential struct {
-	token string
+	token   string
+	tokenMu *sync.RWMutex
 }
 
 func (cred authTokenCredential) RequireTransportSecurity() bool {
@@ -107,24 +157,38 @@ func (cred authTokenCredential) RequireTransportSecurity() bool {
 }
 
 func (cred authTokenCredential) GetRequestMetadata(ctx context.Context, s ...string) (map[string]string, error) {
+	cred.tokenMu.RLock()
+	defer cred.tokenMu.RUnlock()
 	return map[string]string{
 		"token": cred.token,
 	}, nil
 }
 
-func (c *Client) dialTarget(endpoint string) (proto string, host string, creds *credentials.TransportCredentials) {
+func parseEndpoint(endpoint string) (proto string, host string, scheme string) {
 	proto = "tcp"
 	host = endpoint
-	creds = c.creds
 	url, uerr := url.Parse(endpoint)
 	if uerr != nil || !strings.Contains(endpoint, "://") {
 		return
 	}
+	scheme = url.Scheme
+
 	// strip scheme:// prefix since grpc dials by host
 	host = url.Host
 	switch url.Scheme {
+	case "http", "https":
 	case "unix":
 		proto = "unix"
+	default:
+		proto, host = "", ""
+	}
+	return
+}
+
+func (c *Client) processCreds(scheme string) (creds *credentials.TransportCredentials) {
+	creds = c.creds
+	switch scheme {
+	case "unix":
 	case "http":
 		creds = nil
 	case "https":
@@ -135,7 +199,7 @@ func (c *Client) dialTarget(endpoint string) (proto string, host string, creds *
 		emptyCreds := credentials.NewTLS(tlsconfig)
 		creds = &emptyCreds
 	default:
-		return "", "", nil
+		creds = nil
 	}
 	return
 }
@@ -147,17 +211,8 @@ func (c *Client) dialSetupOpts(endpoint string, dopts ...grpc.DialOption) (opts 
 	}
 	opts = append(opts, dopts...)
 
-	// grpc issues TLS cert checks using the string passed into dial so
-	// that string must be the host. To recover the full scheme://host URL,
-	// have a map from hosts to the original endpoint.
-	host2ep := make(map[string]string)
-	for i := range c.cfg.Endpoints {
-		_, host, _ := c.dialTarget(c.cfg.Endpoints[i])
-		host2ep[host] = c.cfg.Endpoints[i]
-	}
-
 	f := func(host string, t time.Duration) (net.Conn, error) {
-		proto, host, _ := c.dialTarget(host2ep[host])
+		proto, host, _ := parseEndpoint(c.balancer.getEndpoint(host))
 		if proto == "" {
 			return nil, fmt.Errorf("unknown scheme for %q", host)
 		}
@@ -166,11 +221,15 @@ func (c *Client) dialSetupOpts(endpoint string, dopts ...grpc.DialOption) (opts 
 			return nil, c.ctx.Err()
 		default:
 		}
-		return net.DialTimeout(proto, host, t)
+		dialer := &net.Dialer{Timeout: t}
+		return dialer.DialContext(c.ctx, proto, host)
 	}
 	opts = append(opts, grpc.WithDialer(f))
 
-	_, _, creds := c.dialTarget(endpoint)
+	creds := c.creds
+	if _, _, scheme := parseEndpoint(endpoint); len(scheme) != 0 {
+		creds = c.processCreds(scheme)
+	}
 	if creds != nil {
 		opts = append(opts, grpc.WithTransportCredentials(*creds))
 	} else {
@@ -185,23 +244,55 @@ func (c *Client) Dial(endpoint string) (*grpc.ClientConn, error) {
 	return c.dial(endpoint)
 }
 
+func (c *Client) getToken(ctx context.Context) error {
+	var err error // return last error in a case of fail
+	var auth *authenticator
+
+	for i := 0; i < len(c.cfg.Endpoints); i++ {
+		endpoint := c.cfg.Endpoints[i]
+		host := getHost(endpoint)
+		// use dial options without dopts to avoid reusing the client balancer
+		auth, err = newAuthenticator(host, c.dialSetupOpts(endpoint))
+		if err != nil {
+			continue
+		}
+		defer auth.close()
+
+		var resp *AuthenticateResponse
+		resp, err = auth.authenticate(ctx, c.Username, c.Password)
+		if err != nil {
+			continue
+		}
+
+		c.tokenCred.tokenMu.Lock()
+		c.tokenCred.token = resp.Token
+		c.tokenCred.tokenMu.Unlock()
+
+		return nil
+	}
+
+	return err
+}
+
 func (c *Client) dial(endpoint string, dopts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	opts := c.dialSetupOpts(endpoint, dopts...)
 	host := getHost(endpoint)
 	if c.Username != "" && c.Password != "" {
-		// use dial options without dopts to avoid reusing the client balancer
-		auth, err := newAuthenticator(host, c.dialSetupOpts(endpoint))
-		if err != nil {
-			return nil, err
+		c.tokenCred = &authTokenCredential{
+			tokenMu: &sync.RWMutex{},
 		}
-		defer auth.close()
 
-		resp, err := auth.authenticate(c.ctx, c.Username, c.Password)
+		err := c.getToken(context.TODO())
 		if err != nil {
 			return nil, err
 		}
-		opts = append(opts, grpc.WithPerRPCCredentials(authTokenCredential{token: resp.Token}))
+
+		opts = append(opts, grpc.WithPerRPCCredentials(c.tokenCred))
 	}
+
+	// add metrics options
+	opts = append(opts, grpc.WithUnaryInterceptor(prometheus.UnaryClientInterceptor))
+	opts = append(opts, grpc.WithStreamInterceptor(prometheus.StreamClientInterceptor))
 
 	conn, err := grpc.Dial(host, opts...)
 	if err != nil {
@@ -248,6 +339,7 @@ func newClient(cfg *Config) (*Client, error) {
 	}
 	client.conn = conn
 	client.retryWrapper = client.newRetryWrapper()
+	client.retryAuthWrapper = client.newAuthRetryWrapper()
 
 	// wait for a connection
 	if cfg.DialTimeout > 0 {
@@ -272,13 +364,8 @@ func newClient(cfg *Config) (*Client, error) {
 	client.Watcher = NewWatcher(client)
 	client.Auth = NewAuth(client)
 	client.Maintenance = NewMaintenance(client)
-	if cfg.Logger != nil {
-		logger.Set(cfg.Logger)
-	} else {
-		// disable client side grpc by default
-		logger.Set(log.New(ioutil.Discard, "", 0))
-	}
 
+	go client.autoSync()
 	return client, nil
 }
 
@@ -294,17 +381,14 @@ func isHaltErr(ctx context.Context, err error) bool {
 	if err == nil {
 		return false
 	}
-	eErr := rpctypes.Error(err)
-	if _, ok := eErr.(rpctypes.EtcdError); ok {
-		return eErr != rpctypes.ErrStopped && eErr != rpctypes.ErrNoLeader
-	}
-	// treat etcdserver errors not recognized by the client as halting
-	return isConnClosing(err) || strings.Contains(err.Error(), "etcdserver:")
-}
-
-// isConnClosing returns true if the error matches a grpc client closing error
-func isConnClosing(err error) bool {
-	return strings.Contains(err.Error(), grpc.ErrClientConnClosing.Error())
+	code := grpc.Code(err)
+	// Unavailable codes mean the system will be right back.
+	// (e.g., can't connect, lost leader)
+	// Treat Internal codes as if something failed, leaving the
+	// system in an inconsistent state, but retrying could make progress.
+	// (e.g., failed in middle of send, corrupted frame)
+	// TODO: are permanent Internal errors possible from grpc?
+	return code != codes.Unavailable && code != codes.Internal
 }
 
 func toErr(ctx context.Context, err error) error {
@@ -312,12 +396,20 @@ func toErr(ctx context.Context, err error) error {
 		return nil
 	}
 	err = rpctypes.Error(err)
-	switch {
-	case ctx.Err() != nil && strings.Contains(err.Error(), "context"):
-		err = ctx.Err()
-	case strings.Contains(err.Error(), ErrNoAvailableEndpoints.Error()):
+	if _, ok := err.(rpctypes.EtcdError); ok {
+		return err
+	}
+	code := grpc.Code(err)
+	switch code {
+	case codes.DeadlineExceeded:
+		fallthrough
+	case codes.Canceled:
+		if ctx.Err() != nil {
+			err = ctx.Err()
+		}
+	case codes.Unavailable:
 		err = ErrNoAvailableEndpoints
-	case strings.Contains(err.Error(), grpc.ErrClientConnClosing.Error()):
+	case codes.FailedPrecondition:
 		err = grpc.ErrClientConnClosing
 	}
 	return err

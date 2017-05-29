@@ -17,9 +17,8 @@ limitations under the License.
 package routes
 
 import (
-	"k8s.io/apiserver/pkg/server/mux"
-
-	"github.com/emicklei/go-restful/swagger"
+	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful-swagger12"
 )
 
 // Swagger installs the /swaggerapi/ endpoint to allow schema discovery
@@ -31,7 +30,7 @@ type Swagger struct {
 }
 
 // Install adds the SwaggerUI webservice to the given mux.
-func (s Swagger) Install(c *mux.APIContainer) {
+func (s Swagger) Install(c *restful.Container) {
 	s.Config.WebServices = c.RegisteredWebServices()
-	swagger.RegisterSwaggerService(*s.Config, c.Container)
+	swagger.RegisterSwaggerService(*s.Config, c)
 }

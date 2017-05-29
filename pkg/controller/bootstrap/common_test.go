@@ -22,9 +22,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	core "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/api/helper"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
@@ -59,7 +59,7 @@ func verifyActions(t *testing.T, expected, actual []core.Action) {
 		}
 
 		e := expected[i]
-		if !api.Semantic.DeepEqual(e, a) {
+		if !helper.Semantic.DeepEqual(e, a) {
 			t.Errorf("Expected\n\t%s\ngot\n\t%s", spew.Sdump(e), spew.Sdump(a))
 			continue
 		}

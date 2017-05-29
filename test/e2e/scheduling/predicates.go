@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -38,6 +39,7 @@ import (
 
 const maxNumberOfPods int64 = 10
 const minPodCPURequest int64 = 500
+const imagePrePullingTimeout = 5 * time.Minute
 
 // variable set in BeforeEach, never modified afterwards
 var masterNodes sets.String
@@ -48,6 +50,7 @@ type pausePodConfig struct {
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
 	Tolerations                       []v1.Toleration
+	NodeName                          string
 }
 
 var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
@@ -92,7 +95,10 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, ignoreLabels, true)
+		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, ignoreLabels)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = framework.WaitForPodsSuccess(cs, metav1.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
@@ -757,6 +763,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 				},
 			},
 			Tolerations: conf.Tolerations,
+			NodeName:    conf.NodeName,
 		},
 	}
 	if conf.Resources != nil {
@@ -861,7 +868,7 @@ func getPodsScheduled(pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Po
 	for _, pod := range pods.Items {
 		if !masterNodes.Has(pod.Spec.NodeName) {
 			if pod.Spec.NodeName != "" {
-				_, scheduledCondition := v1.GetPodCondition(&pod.Status, v1.PodScheduled)
+				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
 				// We can't assume that the scheduledCondition is always set if Pod is assigned to Node,
 				// as e.g. DaemonController doesn't set it when assigning Pod to a Node. Currently
 				// Kubelet sets this condition when it gets a Pod without it, but if we were expecting
@@ -871,7 +878,7 @@ func getPodsScheduled(pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Po
 				}
 				scheduledPods = append(scheduledPods, pod)
 			} else {
-				_, scheduledCondition := v1.GetPodCondition(&pod.Status, v1.PodScheduled)
+				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
 				if scheduledCondition != nil {
 					Expect(scheduledCondition.Status).To(Equal(v1.ConditionFalse))
 				}

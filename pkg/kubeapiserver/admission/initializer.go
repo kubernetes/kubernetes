@@ -17,10 +17,12 @@ limitations under the License.
 package admission
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	"k8s.io/kubernetes/pkg/quota"
 )
 
 // TODO add a `WantsToRun` which takes a stopCh.  Might make it generic.
@@ -48,22 +50,42 @@ type WantsCloudConfig interface {
 	SetCloudConfig([]byte)
 }
 
+// WantsRESTMapper defines a function which sets RESTMapper for admission plugins that need it.
+type WantsRESTMapper interface {
+	SetRESTMapper(meta.RESTMapper)
+}
+
+// WantsQuotaRegistry defines a function which sets quota registry for admission plugins that need it.
+type WantsQuotaRegistry interface {
+	SetQuotaRegistry(quota.Registry)
+	admission.Validator
+}
+
 type pluginInitializer struct {
 	internalClient internalclientset.Interface
 	informers      informers.SharedInformerFactory
 	authorizer     authorizer.Authorizer
 	cloudConfig    []byte
+	restMapper     meta.RESTMapper
+	quotaRegistry  quota.Registry
 }
 
 var _ admission.PluginInitializer = pluginInitializer{}
 
 // NewPluginInitializer constructs new instance of PluginInitializer
-func NewPluginInitializer(internalClient internalclientset.Interface, sharedInformers informers.SharedInformerFactory, authz authorizer.Authorizer, cloudConfig []byte) admission.PluginInitializer {
+func NewPluginInitializer(internalClient internalclientset.Interface,
+	sharedInformers informers.SharedInformerFactory,
+	authz authorizer.Authorizer,
+	cloudConfig []byte,
+	restMapper meta.RESTMapper,
+	quotaRegistry quota.Registry) admission.PluginInitializer {
 	return pluginInitializer{
 		internalClient: internalClient,
 		informers:      sharedInformers,
 		authorizer:     authz,
 		cloudConfig:    cloudConfig,
+		restMapper:     restMapper,
+		quotaRegistry:  quotaRegistry,
 	}
 }
 
@@ -84,5 +106,13 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsCloudConfig); ok {
 		wants.SetCloudConfig(i.cloudConfig)
+	}
+
+	if wants, ok := plugin.(WantsRESTMapper); ok {
+		wants.SetRESTMapper(i.restMapper)
+	}
+
+	if wants, ok := plugin.(WantsQuotaRegistry); ok {
+		wants.SetQuotaRegistry(i.quotaRegistry)
 	}
 }

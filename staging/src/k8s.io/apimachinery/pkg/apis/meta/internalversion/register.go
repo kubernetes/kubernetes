@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -49,11 +50,11 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		return err
 	}
 	scheme.AddConversionFuncs(
-		Convert_string_To_labels_Selector,
-		Convert_labels_Selector_To_string,
+		metav1.Convert_string_To_labels_Selector,
+		metav1.Convert_labels_Selector_To_string,
 
-		Convert_string_To_fields_Selector,
-		Convert_fields_Selector_To_string,
+		metav1.Convert_string_To_fields_Selector,
+		metav1.Convert_fields_Selector_To_string,
 
 		Convert_map_to_v1_LabelSelector,
 		Convert_v1_LabelSelector_to_map,
@@ -68,6 +69,12 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&metav1.GetOptions{},
 		&metav1.ExportOptions{},
 		&metav1.DeleteOptions{},
+	)
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&metav1alpha1.Table{},
+	)
+	scheme.AddKnownTypes(metav1alpha1.SchemeGroupVersion,
+		&metav1alpha1.Table{},
 	)
 	// Allow delete options to be decoded across all version in this scheme (we may want to be more clever than this)
 	scheme.AddUnversionedTypes(SchemeGroupVersion, &metav1.DeleteOptions{})

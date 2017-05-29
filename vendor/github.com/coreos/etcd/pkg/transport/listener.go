@@ -23,10 +23,11 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"log"
 	"math/big"
 	"net"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -34,27 +35,30 @@ import (
 	"github.com/coreos/etcd/pkg/tlsutil"
 )
 
-func NewListener(addr string, scheme string, tlscfg *tls.Config) (l net.Listener, err error) {
-	if scheme == "unix" || scheme == "unixs" {
-		// unix sockets via unix://laddr
-		l, err = NewUnixListener(addr)
-	} else {
-		l, err = net.Listen("tcp", addr)
-	}
-
-	if err != nil {
+func NewListener(addr, scheme string, tlscfg *tls.Config) (l net.Listener, err error) {
+	if l, err = newListener(addr, scheme); err != nil {
 		return nil, err
 	}
+	return wrapTLS(addr, scheme, tlscfg, l)
+}
 
-	if scheme == "https" || scheme == "unixs" {
-		if tlscfg == nil {
-			return nil, fmt.Errorf("cannot listen on TLS for %s: KeyFile and CertFile are not presented", scheme+"://"+addr)
-		}
-
-		l = tls.NewListener(l, tlscfg)
+func newListener(addr string, scheme string) (net.Listener, error) {
+	if scheme == "unix" || scheme == "unixs" {
+		// unix sockets via unix://laddr
+		return NewUnixListener(addr)
 	}
+	return net.Listen("tcp", addr)
+}
 
-	return l, nil
+func wrapTLS(addr, scheme string, tlscfg *tls.Config, l net.Listener) (net.Listener, error) {
+	if scheme != "https" && scheme != "unixs" {
+		return l, nil
+	}
+	if tlscfg == nil {
+		l.Close()
+		return nil, fmt.Errorf("cannot listen on TLS for %s: KeyFile and CertFile are not presented", scheme+"://"+addr)
+	}
+	return tls.NewListener(l, tlscfg), nil
 }
 
 type TLSInfo struct {
@@ -87,8 +91,8 @@ func SelfCert(dirpath string, hosts []string) (info TLSInfo, err error) {
 		return
 	}
 
-	certPath := path.Join(dirpath, "cert.pem")
-	keyPath := path.Join(dirpath, "key.pem")
+	certPath := filepath.Join(dirpath, "cert.pem")
+	keyPath := filepath.Join(dirpath, "key.pem")
 	_, errcert := os.Stat(certPath)
 	_, errkey := os.Stat(keyPath)
 	if errcert == nil && errkey == nil {
@@ -205,6 +209,9 @@ func (info TLSInfo) ServerConfig() (*tls.Config, error) {
 		cfg.ClientCAs = cp
 	}
 
+	// "h2" NextProtos is necessary for enabling HTTP2 for go's HTTP server
+	cfg.NextProtos = []string{"h2"}
+
 	return cfg, nil
 }
 
@@ -229,6 +236,7 @@ func (info TLSInfo) ClientConfig() (*tls.Config, error) {
 			return nil, err
 		}
 		// if given a CA, trust any host with a cert signed by the CA
+		log.Println("warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated")
 		cfg.ServerName = ""
 	}
 

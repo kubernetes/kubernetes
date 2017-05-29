@@ -34,7 +34,7 @@ import (
 )
 
 var (
-	cp_example = templates.Examples(`
+	cp_example = templates.Examples(i18n.T(`
 	    # !!!Important Note!!!
 	    # Requires that the 'tar' binary is present in your container
 	    # image.  If 'tar' is not present, 'kubectl cp' will fail.
@@ -49,7 +49,7 @@ var (
 		kubectl cp /tmp/foo <some-namespace>/<some-pod>:/tmp/bar
 
 		# Copy /tmp/foo from a remote pod to /tmp/bar locally
-		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`)
+		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`))
 
 	cpUsageStr = dedent.Dedent(`
 	    expected 'cp <file-spec-src> <file-spec-dest> [-c container]'.
@@ -59,7 +59,7 @@ var (
 )
 
 // NewCmdCp creates a new Copy command.
-func NewCmdCp(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdCp(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "cp <file-spec-src> <file-spec-dest>",
 		Short:   i18n.T("Copy files and directories to and from containers."),
@@ -121,7 +121,7 @@ func runCopy(f cmdutil.Factory, cmd *cobra.Command, out, cmderr io.Writer, args 
 		return err
 	}
 	if len(srcSpec.PodName) != 0 {
-		return copyFromPod(f, cmd, out, cmderr, srcSpec, destSpec)
+		return copyFromPod(f, cmd, cmderr, srcSpec, destSpec)
 	}
 	if len(destSpec.PodName) != 0 {
 		return copyToPod(f, cmd, out, cmderr, srcSpec, destSpec)
@@ -161,7 +161,7 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 	return execute(f, cmd, options)
 }
 
-func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, out, cmderr io.Writer, src, dest fileSpec) error {
+func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, dest fileSpec) error {
 	reader, outStream := io.Pipe()
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{

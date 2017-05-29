@@ -510,41 +510,63 @@ func (m *Marshaler) marshalValue(out *errWriter, prop *proto.Properties, v refle
 	return out.err
 }
 
+// Unmarshaler is a configurable object for converting from a JSON
+// representation to a protocol buffer object.
+type Unmarshaler struct {
+	// Whether to allow messages to contain unknown fields, as opposed to
+	// failing to unmarshal.
+	AllowUnknownFields bool
+}
+
 // UnmarshalNext unmarshals the next protocol buffer from a JSON object stream.
 // This function is lenient and will decode any options permutations of the
 // related Marshaler.
-func UnmarshalNext(dec *json.Decoder, pb proto.Message) error {
+func (u *Unmarshaler) UnmarshalNext(dec *json.Decoder, pb proto.Message) error {
 	inputValue := json.RawMessage{}
 	if err := dec.Decode(&inputValue); err != nil {
 		return err
 	}
-	return unmarshalValue(reflect.ValueOf(pb).Elem(), inputValue, nil)
+	return u.unmarshalValue(reflect.ValueOf(pb).Elem(), inputValue, nil)
+}
+
+// Unmarshal unmarshals a JSON object stream into a protocol
+// buffer. This function is lenient and will decode any options
+// permutations of the related Marshaler.
+func (u *Unmarshaler) Unmarshal(r io.Reader, pb proto.Message) error {
+	dec := json.NewDecoder(r)
+	return u.UnmarshalNext(dec, pb)
+}
+
+// UnmarshalNext unmarshals the next protocol buffer from a JSON object stream.
+// This function is lenient and will decode any options permutations of the
+// related Marshaler.
+func UnmarshalNext(dec *json.Decoder, pb proto.Message) error {
+	return new(Unmarshaler).UnmarshalNext(dec, pb)
 }
 
 // Unmarshal unmarshals a JSON object stream into a protocol
 // buffer. This function is lenient and will decode any options
 // permutations of the related Marshaler.
 func Unmarshal(r io.Reader, pb proto.Message) error {
-	dec := json.NewDecoder(r)
-	return UnmarshalNext(dec, pb)
+	return new(Unmarshaler).Unmarshal(r, pb)
 }
 
 // UnmarshalString will populate the fields of a protocol buffer based
 // on a JSON string. This function is lenient and will decode any options
 // permutations of the related Marshaler.
 func UnmarshalString(str string, pb proto.Message) error {
-	return Unmarshal(strings.NewReader(str), pb)
+	return new(Unmarshaler).Unmarshal(strings.NewReader(str), pb)
 }
 
 // unmarshalValue converts/copies a value into the target.
 // prop may be nil.
-func unmarshalValue(target reflect.Value, inputValue json.RawMessage, prop *proto.Properties) error {
+func (u *Unmarshaler) unmarshalValue(target reflect.Value, inputValue json.RawMessage, prop *proto.Properties) error {
 	targetType := target.Type()
 
 	// Allocate memory for pointer fields.
 	if targetType.Kind() == reflect.Ptr {
 		target.Set(reflect.New(targetType.Elem()))
-		return unmarshalValue(target.Elem(), inputValue, prop)
+		return u.unmarshalValue(target.Elem(), inputValue, prop)
 	}
 
 	// Handle well-known types.
@@ -559,7 +581,7 @@ func unmarshalValue(target reflect.Value, inputValue json.RawMessage, prop *prot
 			//  as the wrapped primitive type, except that null is allowed."
 			// encoding/json will turn JSON `null` into Go `nil`,
 			// so we don't have to do any extra work.
-			return unmarshalValue(target.Field(0), inputValue, prop)
+			return u.unmarshalValue(target.Field(0), inputValue, prop)
 		case "Any":
 			return fmt.Errorf("unmarshaling Any not supported yet")
 		case "Duration":
@@ -586,11 +608,8 @@ func unmarshalValue(target reflect.Value, inputValue json.RawMessage, prop *prot
 			if err != nil {
 				return fmt.Errorf("bad Timestamp: %v", err)
 			}
-			ns := t.UnixNano()
-			s := ns / 1e9
-			ns %= 1e9
-			target.Field(0).SetInt(s)
-			target.Field(1).SetInt(ns)
+			target.Field(0).SetInt(int64(t.Unix()))
+			target.Field(1).SetInt(int64(t.Nanosecond()))
 			return nil
 		}
 	}
@@ -657,7 +676,7 @@ func unmarshalValue(target reflect.Value, inputValue json.RawMessage, prop *prot
 				continue
 			}
 
-			if err := unmarshalValue(target.Field(i), valueForField, sprops.Prop[i]); err != nil {
+			if err := u.unmarshalValue(target.Field(i), valueForField, sprops.Prop[i]); err != nil {
 				return err
 			}
 		}
@@ -670,12 +689,12 @@ func unmarshalValue(target reflect.Value, inputValue json.RawMessage, prop *prot
 				}
 				nv := reflect.New(oop.Type.Elem())
 				target.Field(oop.Field).Set(nv)
-				if err := unmarshalValue(nv.Elem().Field(0), raw, oop.Prop); err != nil {
+				if err := u.unmarshalValue(nv.Elem().Field(0), raw, oop.Prop); err != nil {
 					return err
 				}
 			}
 		}
-		if len(jsonFields) > 0 {
+		if !u.AllowUnknownFields && len(jsonFields) > 0 {
 			// Pick any field to be the scapegoat.
 			var f string
 			for fname := range jsonFields {
@@ -696,7 +715,7 @@ func unmarshalValue(target reflect.Value, inputValue json.RawMessage, prop *prot
 		len := len(slc)
 		target.Set(reflect.MakeSlice(targetType, len, len))
 		for i := 0; i < len; i++ {
-			if err := unmarshalValue(target.Index(i), slc[i], prop); err != nil {
+			if err := u.unmarshalValue(target.Index(i), slc[i], prop); err != nil {
 				return err
 			}
 		}
@@ -725,14 +744,14 @@ func unmarshalValue(target reflect.Value, inputValue json.RawMessage, prop *prot
 				k = reflect.ValueOf(ks)
 			} else {
 				k = reflect.New(targetType.Key()).Elem()
-				if err := unmarshalValue(k, json.RawMessage(ks), keyprop); err != nil {
+				if err := u.unmarshalValue(k, json.RawMessage(ks), keyprop); err != nil {
 					return err
 				}
 			}
 
 			// Unmarshal map value.
 			v := reflect.New(targetType.Elem()).Elem()
-			if err := unmarshalValue(v, raw, valprop); err != nil {
+			if err := u.unmarshalValue(v, raw, valprop); err != nil {
 				return err
 			}
 			target.SetMapIndex(k, v)
@@ -790,10 +809,21 @@ func (w *errWriter) write(str string) {
 // The easiest way to sort them in some deterministic order is to use fmt.
 // If this turns out to be inefficient we can always consider other options,
 // such as doing a Schwartzian transform.
+//
+// Numeric keys are sorted in numeric order per
+// https://developers.google.com/protocol-buffers/docs/proto#maps.
 type mapKeys []reflect.Value
 
 func (s mapKeys) Len() int      { return len(s) }
 func (s mapKeys) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s mapKeys) Less(i, j int) bool {
+	if k := s[i].Kind(); k == s[j].Kind() {
+		switch k {
+		case reflect.Int32, reflect.Int64:
+			return s[i].Int() < s[j].Int()
+		case reflect.Uint32, reflect.Uint64:
+			return s[i].Uint() < s[j].Uint()
+		}
+	}
 	return fmt.Sprint(s[i].Interface()) < fmt.Sprint(s[j].Interface())
 }

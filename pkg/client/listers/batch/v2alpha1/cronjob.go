@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	batch "k8s.io/kubernetes/pkg/apis/batch"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
@@ -89,7 +88,7 @@ func (s cronJobNamespaceLister) Get(name string) (*v2alpha1.CronJob, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(batch.Resource("cronjob"), name)
+		return nil, errors.NewNotFound(v2alpha1.Resource("cronjob"), name)
 	}
 	return obj.(*v2alpha1.CronJob), nil
 }

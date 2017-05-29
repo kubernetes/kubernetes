@@ -105,16 +105,16 @@ func (r *Reset) Run(out io.Writer) error {
 	}
 
 	dockerCheck := preflight.ServiceCheck{Service: "docker", CheckIfActive: true}
-	if warnings, errors := dockerCheck.Check(); len(warnings) == 0 && len(errors) == 0 {
+	if _, errors := dockerCheck.Check(); len(errors) == 0 {
 		fmt.Println("[reset] Removing kubernetes-managed containers")
-		if err := exec.Command("sh", "-c", "docker ps | grep 'k8s_' | awk '{print $1}' | xargs -r docker rm --force --volumes").Run(); err != nil {
+		if err := exec.Command("sh", "-c", "docker ps -a --filter name=k8s_ -q | xargs -r docker rm --force --volumes").Run(); err != nil {
 			fmt.Println("[reset] Failed to stop the running containers")
 		}
 	} else {
 		fmt.Println("[reset] docker doesn't seem to be running, skipping the removal of running kubernetes containers")
 	}
 
-	dirsToClean := []string{"/var/lib/kubelet", "/etc/cni/net.d"}
+	dirsToClean := []string{"/var/lib/kubelet", "/etc/cni/net.d", "/var/lib/dockershim"}
 
 	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
 	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd

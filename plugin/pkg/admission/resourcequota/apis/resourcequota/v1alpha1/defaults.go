@@ -19,10 +19,7 @@ package v1alpha1
 import kruntime "k8s.io/apimachinery/pkg/runtime"
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
-	RegisterDefaults(scheme)
-	return scheme.AddDefaultingFuncs(
-		SetDefaults_Configuration,
-	)
+	return RegisterDefaults(scheme)
 }
 
 func SetDefaults_Configuration(obj *Configuration) {}

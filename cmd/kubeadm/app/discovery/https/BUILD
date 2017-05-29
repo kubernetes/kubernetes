@@ -13,8 +13,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/discovery/file:go_default_library",
-        "//vendor:k8s.io/client-go/tools/clientcmd",
-        "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
     ],
 )
 

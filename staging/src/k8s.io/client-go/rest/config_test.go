@@ -19,6 +19,7 @@ package rest
 import (
 	"io"
 	"net/http"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -28,11 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/pkg/api/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/flowcontrol"
 
-	_ "k8s.io/client-go/pkg/api/install"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsConfigTransportTLS(t *testing.T) {
@@ -100,14 +102,50 @@ func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
 	}
 }
 
+func TestAdjustVersion(t *testing.T) {
+	assert := assert.New(t)
+	assert.Equal("1.2.3", adjustVersion("1.2.3-alpha4"))
+	assert.Equal("1.2.3", adjustVersion("1.2.3-alpha"))
+	assert.Equal("1.2.3", adjustVersion("1.2.3"))
+	assert.Equal("unknown", adjustVersion(""))
+}
+
+func TestAdjustCommit(t *testing.T) {
+	assert := assert.New(t)
+	assert.Equal("1234567", adjustCommit("1234567890"))
+	assert.Equal("123456", adjustCommit("123456"))
+	assert.Equal("unknown", adjustCommit(""))
+}
+
+func TestAdjustCommand(t *testing.T) {
+	assert := assert.New(t)
+	assert.Equal("beans", adjustCommand(filepath.Join("home", "bob", "Downloads", "beans")))
+	assert.Equal("beans", adjustCommand(filepath.Join(".", "beans")))
+	assert.Equal("beans", adjustCommand("beans"))
+	assert.Equal("unknown", adjustCommand(""))
+}
+
+func TestBuildUserAgent(t *testing.T) {
+	assert.New(t).Equal(
+		"lynx/nicest (beos/itanium) kubernetes/baaaaaaaaad",
+		buildUserAgent(
+			"lynx", "nicest",
+			"beos", "itanium", "baaaaaaaaad"))
+}
+
+// This function untestable since it doesn't accept arguments.
+func TestDefaultKubernetesUserAgent(t *testing.T) {
+	assert.New(t).Contains(DefaultKubernetesUserAgent(), "kubernetes")
+}
+
 func TestRESTClientRequires(t *testing.T) {
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{NegotiatedSerializer: api.Codecs}}); err == nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{NegotiatedSerializer: scheme.Codecs}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}); err == nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &v1.SchemeGroupVersion}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion, NegotiatedSerializer: api.Codecs}}); err != nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &v1.SchemeGroupVersion, NegotiatedSerializer: scheme.Codecs}}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

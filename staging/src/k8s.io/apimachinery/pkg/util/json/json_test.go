@@ -1,3 +1,5 @@
+// +build go1.8
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -101,12 +103,12 @@ func TestEvaluateTypes(t *testing.T) {
 		{
 			In:   `9223372036854775808`, // MaxInt64 + 1
 			Data: float64(9223372036854775808),
-			Out:  strconv.FormatFloat(9223372036854775808, 'g', -1, 64),
+			Out:  `9223372036854776000`,
 		},
 		{
 			In:   `-9223372036854775809`, // MinInt64 - 1
 			Data: float64(math.MinInt64),
-			Out:  strconv.FormatFloat(-9223372036854775809, 'g', -1, 64),
+			Out:  `-9223372036854776000`,
 		},
 
 		// Floats

@@ -20,12 +20,12 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//test/e2e_node/remote:go_default_library",
-        "//vendor:github.com/ghodss/yaml",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/pborman/uuid",
-        "//vendor:golang.org/x/oauth2",
-        "//vendor:golang.org/x/oauth2/google",
-        "//vendor:google.golang.org/api/compute/v1",
+        "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/pborman/uuid:go_default_library",
+        "//vendor/golang.org/x/oauth2:go_default_library",
+        "//vendor/golang.org/x/oauth2/google:go_default_library",
+        "//vendor/google.golang.org/api/compute/v0.beta:go_default_library",
     ],
 )
 

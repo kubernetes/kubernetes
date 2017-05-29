@@ -19,9 +19,9 @@ go_library(
     srcs = ["main.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/codegangsta/negroni",
-        "//vendor:github.com/gorilla/mux",
-        "//vendor:github.com/xyproto/simpleredis",
+        "//vendor/github.com/codegangsta/negroni:go_default_library",
+        "//vendor/github.com/gorilla/mux:go_default_library",
+        "//vendor/github.com/xyproto/simpleredis:go_default_library",
     ],
 )
 

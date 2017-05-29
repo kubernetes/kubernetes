@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/util/removeall"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -78,7 +78,7 @@ func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *v1.Pod, o
 }
 
 // cleanupOrphanedPodDirs removes the volumes of pods that should not be
-// running and that have no containers running.
+// running and that have no containers running.  Note that we roll up logs here since it runs in the main loop.
 func (kl *Kubelet) cleanupOrphanedPodDirs(
 	pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
 	allPods := sets.NewString()
@@ -93,7 +93,10 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(
 	if err != nil {
 		return err
 	}
-	errlist := []error{}
+
+	orphanRemovalErrors := []error{}
+	orphanVolumeErrors := []error{}
+
 	for _, uid := range found {
 		if allPods.Has(string(uid)) {
 			continue
@@ -107,18 +110,29 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(
 		// If there are still volume directories, do not delete directory
 		volumePaths, err := kl.getPodVolumePathListFromDisk(uid)
 		if err != nil {
-			glog.Errorf("Orphaned pod %q found, but error %v occurred during reading volume dir from disk", uid, err)
+			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("Orphaned pod %q found, but error %v occurred during reading volume dir from disk", uid, err))
 			continue
 		}
 		if len(volumePaths) > 0 {
-			glog.Errorf("Orphaned pod %q found, but volume paths are still present on disk.", uid)
+			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("Orphaned pod %q found, but volume paths are still present on disk.", uid))
 			continue
 		}
 		glog.V(3).Infof("Orphaned pod %q found, removing", uid)
-		if err := os.RemoveAll(kl.getPodDir(uid)); err != nil {
+		if err := removeall.RemoveAllOneFilesystem(kl.mounter, kl.getPodDir(uid)); err != nil {
 			glog.Errorf("Failed to remove orphaned pod %q dir; err: %v", uid, err)
-			errlist = append(errlist, err)
+			orphanRemovalErrors = append(orphanRemovalErrors, err)
 		}
 	}
-	return utilerrors.NewAggregate(errlist)
+
+	logSpew := func(errs []error) {
+		if len(errs) > 0 {
+			glog.Errorf("%v : There were a total of %v errors similar to this.  Turn up verbosity to see them.", errs[0], len(errs))
+			for _, err := range errs {
+				glog.V(5).Infof("Orphan pod: %v", err)
+			}
+		}
+	}
+	logSpew(orphanVolumeErrors)
+	logSpew(orphanRemovalErrors)
+	return utilerrors.NewAggregate(orphanRemovalErrors)
 }

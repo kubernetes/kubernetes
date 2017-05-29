@@ -21,6 +21,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	admissionregistrationv1alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/admissionregistration/v1alpha1"
 	appsv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	authenticationv1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1"
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
@@ -33,6 +34,7 @@ import (
 	certificatesv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 	corev1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
+	networkingv1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/networking/v1"
 	policyv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
 	rbacv1alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1beta1"
@@ -43,6 +45,9 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
+	AdmissionregistrationV1alpha1() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Admissionregistration() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface
 	CoreV1() corev1.CoreV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Core() corev1.CoreV1Interface
@@ -71,6 +76,9 @@ type Interface interface {
 	ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Extensions() extensionsv1beta1.ExtensionsV1beta1Interface
+	NetworkingV1() networkingv1.NetworkingV1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Networking() networkingv1.NetworkingV1Interface
 	PolicyV1beta1() policyv1beta1.PolicyV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Policy() policyv1beta1.PolicyV1beta1Interface
@@ -91,6 +99,7 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
+	*admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Client
 	*corev1.CoreV1Client
 	*appsv1beta1.AppsV1beta1Client
 	*authenticationv1.AuthenticationV1Client
@@ -103,12 +112,30 @@ type Clientset struct {
 	*batchv2alpha1.BatchV2alpha1Client
 	*certificatesv1beta1.CertificatesV1beta1Client
 	*extensionsv1beta1.ExtensionsV1beta1Client
+	*networkingv1.NetworkingV1Client
 	*policyv1beta1.PolicyV1beta1Client
 	*rbacv1beta1.RbacV1beta1Client
 	*rbacv1alpha1.RbacV1alpha1Client
 	*settingsv1alpha1.SettingsV1alpha1Client
 	*storagev1beta1.StorageV1beta1Client
 	*storagev1.StorageV1Client
+}
+
+// AdmissionregistrationV1alpha1 retrieves the AdmissionregistrationV1alpha1Client
+func (c *Clientset) AdmissionregistrationV1alpha1() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.AdmissionregistrationV1alpha1Client
+}
+
+// Deprecated: Admissionregistration retrieves the default version of AdmissionregistrationClient.
+// Please explicitly pick a version.
+func (c *Clientset) Admissionregistration() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.AdmissionregistrationV1alpha1Client
 }
 
 // CoreV1 retrieves the CoreV1Client
@@ -279,6 +306,23 @@ func (c *Clientset) Extensions() extensionsv1beta1.ExtensionsV1beta1Interface {
 	return c.ExtensionsV1beta1Client
 }
 
+// NetworkingV1 retrieves the NetworkingV1Client
+func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.NetworkingV1Client
+}
+
+// Deprecated: Networking retrieves the default version of NetworkingClient.
+// Please explicitly pick a version.
+func (c *Clientset) Networking() networkingv1.NetworkingV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.NetworkingV1Client
+}
+
 // PolicyV1beta1 retrieves the PolicyV1beta1Client
 func (c *Clientset) PolicyV1beta1() policyv1beta1.PolicyV1beta1Interface {
 	if c == nil {
@@ -379,6 +423,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
+	cs.AdmissionregistrationV1alpha1Client, err = admissionregistrationv1alpha1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.CoreV1Client, err = corev1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -427,6 +475,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.NetworkingV1Client, err = networkingv1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.PolicyV1beta1Client, err = policyv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -464,6 +516,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
+	cs.AdmissionregistrationV1alpha1Client = admissionregistrationv1alpha1.NewForConfigOrDie(c)
 	cs.CoreV1Client = corev1.NewForConfigOrDie(c)
 	cs.AppsV1beta1Client = appsv1beta1.NewForConfigOrDie(c)
 	cs.AuthenticationV1Client = authenticationv1.NewForConfigOrDie(c)
@@ -476,6 +529,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.BatchV2alpha1Client = batchv2alpha1.NewForConfigOrDie(c)
 	cs.CertificatesV1beta1Client = certificatesv1beta1.NewForConfigOrDie(c)
 	cs.ExtensionsV1beta1Client = extensionsv1beta1.NewForConfigOrDie(c)
+	cs.NetworkingV1Client = networkingv1.NewForConfigOrDie(c)
 	cs.PolicyV1beta1Client = policyv1beta1.NewForConfigOrDie(c)
 	cs.RbacV1beta1Client = rbacv1beta1.NewForConfigOrDie(c)
 	cs.RbacV1alpha1Client = rbacv1alpha1.NewForConfigOrDie(c)
@@ -490,6 +544,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
+	cs.AdmissionregistrationV1alpha1Client = admissionregistrationv1alpha1.New(c)
 	cs.CoreV1Client = corev1.New(c)
 	cs.AppsV1beta1Client = appsv1beta1.New(c)
 	cs.AuthenticationV1Client = authenticationv1.New(c)
@@ -502,6 +557,7 @@ func New(c rest.Interface) *Clientset {
 	cs.BatchV2alpha1Client = batchv2alpha1.New(c)
 	cs.CertificatesV1beta1Client = certificatesv1beta1.New(c)
 	cs.ExtensionsV1beta1Client = extensionsv1beta1.New(c)
+	cs.NetworkingV1Client = networkingv1.New(c)
 	cs.PolicyV1beta1Client = policyv1beta1.New(c)
 	cs.RbacV1beta1Client = rbacv1beta1.New(c)
 	cs.RbacV1alpha1Client = rbacv1alpha1.New(c)

@@ -1,7 +1,6 @@
 package models
 
 import (
-	"hash/fnv"
 	"sort"
 )
 
@@ -11,7 +10,6 @@ type Row struct {
 	Tags    map[string]string `json:"tags,omitempty"`
 	Columns []string          `json:"columns,omitempty"`
 	Values  [][]interface{}   `json:"values,omitempty"`
-	Err     error             `json:"err,omitempty"`
 }
 
 // SameSeries returns true if r contains values for the same series as o.
@@ -21,7 +19,7 @@ func (r *Row) SameSeries(o *Row) bool {
 
 // tagsHash returns a hash of tag key/value pairs.
 func (r *Row) tagsHash() uint64 {
-	h := fnv.New64a()
+	h := NewInlineFNV64a()
 	keys := r.tagsKeys()
 	for _, k := range keys {
 		h.Write([]byte(k))

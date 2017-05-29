@@ -78,7 +78,7 @@ func (c *cluster) MemberUpdate(ctx context.Context, id uint64, peerAddrs []strin
 	// it is safe to retry on update.
 	for {
 		r := &pb.MemberUpdateRequest{ID: id, PeerURLs: peerAddrs}
-		resp, err := c.remote.MemberUpdate(ctx, r)
+		resp, err := c.remote.MemberUpdate(ctx, r, grpc.FailFast(false))
 		if err == nil {
 			return (*MemberUpdateResponse)(resp), nil
 		}

@@ -39,7 +39,9 @@ import (
 	"gopkg.in/gcfg.v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -291,6 +293,9 @@ func newPCCloud(cfg PCConfig) (*PCCloud, error) {
 	return &pc, nil
 }
 
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (pc *PCCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+
 // Instances returns an implementation of Instances for Photon Controller.
 func (pc *PCCloud) Instances() (cloudprovider.Instances, bool) {
 	return pc, true
@@ -324,14 +329,14 @@ func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 							// Filter external IP by MAC address OUIs from vCenter and from ESX
 							if strings.HasPrefix(i.HardwareAddr.String(), MAC_OUI_VC) ||
 								strings.HasPrefix(i.HardwareAddr.String(), MAC_OUI_ESX) {
-								v1.AddToNodeAddresses(&nodeAddrs,
+								v1helper.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
 										Type:    v1.NodeExternalIP,
 										Address: ipnet.IP.String(),
 									},
 								)
 							} else {
-								v1.AddToNodeAddresses(&nodeAddrs,
+								v1helper.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
 										Type:    v1.NodeInternalIP,
 										Address: ipnet.IP.String(),
@@ -394,14 +399,14 @@ func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 						if ipAddr != "-" {
 							if strings.HasPrefix(macAddr, MAC_OUI_VC) ||
 								strings.HasPrefix(macAddr, MAC_OUI_ESX) {
-								v1.AddToNodeAddresses(&nodeAddrs,
+								v1helper.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
 										Type:    v1.NodeExternalIP,
 										Address: ipAddr,
 									},
 								)
 							} else {
-								v1.AddToNodeAddresses(&nodeAddrs,
+								v1helper.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
 										Type:    v1.NodeInternalIP,
 										Address: ipAddr,
@@ -418,6 +423,13 @@ func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 
 	glog.Errorf("Failed to find the node %s from Photon Controller endpoint", name)
 	return nodeAddrs, fmt.Errorf("Failed to find the node %s from Photon Controller endpoint", name)
+}
+
+// NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (pc *PCCloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+	return []v1.NodeAddress{}, errors.New("unimplemented")
 }
 
 func (pc *PCCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
@@ -481,6 +493,13 @@ func (pc *PCCloud) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 			return ID, nil
 		}
 	}
+}
+
+// InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (pc *PCCloud) InstanceTypeByProviderID(providerID string) (string, error) {
+	return "", errors.New("unimplemented")
 }
 
 func (pc *PCCloud) InstanceType(nodeName k8stypes.NodeName) (string, error) {
@@ -607,7 +626,7 @@ func (pc *PCCloud) DiskIsAttached(pdID string, nodeName k8stypes.NodeName) (bool
 	}
 
 	for _, vm := range disk.VMs {
-		if strings.Compare(vm, vmID) == 0 {
+		if vm == vmID {
 			return true, nil
 		}
 	}

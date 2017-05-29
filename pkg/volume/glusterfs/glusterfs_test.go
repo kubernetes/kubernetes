@@ -126,10 +126,9 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if mounter == nil {
 		t.Error("Got a nil Mounter")
 	}
-	path := mounter.GetPath()
 	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~glusterfs/vol1", tmpDir)
-	if path != expectedPath {
-		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
+	if volumePath != expectedPath {
+		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, volumePath)
 	}
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)

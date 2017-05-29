@@ -1,4 +1,5 @@
 reviewers:
+  - cblecker
   - eparis
   - fejta
   - ixdy
@@ -9,9 +10,13 @@ reviewers:
 approvers:
   - deads2k
   - eparis
+  - fabianofranz
   - fejta
   - ixdy
   - jbeda
   - lavalamp
+  - madhusudancs
+  - pwittrock
+  - shashidharatd
   - spxtr
   - zmerlynn

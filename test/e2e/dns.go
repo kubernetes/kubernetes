@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -106,15 +105,9 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotatio
 		},
 	}
 
-	if useAnnotation {
-		dnsPod.ObjectMeta.Annotations = map[string]string{
-			pod.PodHostnameAnnotation:  dnsTestPodHostName,
-			pod.PodSubdomainAnnotation: dnsTestServiceName,
-		}
-	} else {
-		dnsPod.Spec.Hostname = dnsTestPodHostName
-		dnsPod.Spec.Subdomain = dnsTestServiceName
-	}
+	dnsPod.Spec.Hostname = dnsTestPodHostName
+	dnsPod.Spec.Subdomain = dnsTestServiceName
+
 	return dnsPod
 }
 
@@ -179,7 +172,7 @@ func assertFilesExist(fileNames []string, fileDir string, pod *v1.Pod, client cl
 func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client clientset.Interface, check bool, expected string) {
 	var failed []string
 
-	framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+	framework.ExpectNoError(wait.Poll(time.Second*10, time.Second*600, func() (bool, error) {
 		failed = []string{}
 		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, client.Discovery())
 		if err != nil {
@@ -287,21 +280,6 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 	framework.Logf("DNS probes using %s succeeded\n", pod.Name)
 }
 
-func verifyDNSPodIsRunning(f *framework.Framework) {
-	systemClient := f.ClientSet.Core().Pods(metav1.NamespaceSystem)
-	By("Waiting for DNS Service to be Running")
-	options := metav1.ListOptions{LabelSelector: dnsServiceLabelSelector.String()}
-	dnsPods, err := systemClient.List(options)
-	if err != nil {
-		framework.Failf("Failed to list all dns service pods")
-	}
-	if len(dnsPods.Items) < 1 {
-		framework.Failf("No pods match the label selector %v", dnsServiceLabelSelector.String())
-	}
-	pod := dnsPods.Items[0]
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, &pod))
-}
-
 func createServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *v1.Service {
 	headlessService := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -343,10 +321,10 @@ var _ = framework.KubeDescribe("DNS", func() {
 			"kubernetes.default",
 			"kubernetes.default.svc",
 			"kubernetes.default.svc.cluster.local",
-			"google.com",
 		}
 		// Added due to #8512. This is critical for GCE and GKE deployments.
 		if framework.ProviderIs("gce", "gke") {
+			namesToResolve = append(namesToResolve, "google.com")
 			namesToResolve = append(namesToResolve, "metadata")
 		}
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name)
@@ -439,10 +417,8 @@ var _ = framework.KubeDescribe("DNS", func() {
 		By("creating a pod to probe DNS")
 		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
 		pod1.ObjectMeta.Labels = testServiceSelector
-		pod1.ObjectMeta.Annotations = map[string]string{
-			pod.PodHostnameAnnotation:  podHostname,
-			pod.PodSubdomainAnnotation: serviceName,
-		}
+		pod1.Spec.Hostname = podHostname
+		pod1.Spec.Subdomain = serviceName
 
 		validateDNSResults(f, pod1, append(wheezyFileNames, jessieFileNames...))
 	})

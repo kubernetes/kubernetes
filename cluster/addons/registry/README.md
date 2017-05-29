@@ -105,18 +105,18 @@ metadata:
   name: kube-registry-v0
   namespace: kube-system
   labels:
-    k8s-app: kube-registry
+    k8s-app: kube-registry-upstream
     version: v0
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: 1
   selector:
-    k8s-app: kube-registry
+    k8s-app: kube-registry-upstream
     version: v0
   template:
     metadata:
       labels:
-        k8s-app: kube-registry
+        k8s-app: kube-registry-upstream
         version: v0
         kubernetes.io/cluster-service: "true"
     spec:
@@ -158,12 +158,12 @@ metadata:
   name: kube-registry
   namespace: kube-system
   labels:
-    k8s-app: kube-registry
+    k8s-app: kube-registry-upstream
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "KubeRegistry"
 spec:
   selector:
-    k8s-app: kube-registry
+    k8s-app: kube-registry-upstream
   ports:
   - name: registry
     port: 5000
@@ -185,14 +185,14 @@ metadata:
   name: kube-registry-proxy
   namespace: kube-system
   labels:
-    k8s-app: kube-registry
+    k8s-app: kube-registry-proxy
     kubernetes.io/cluster-service: "true"
     version: v0.4
 spec:
   template:
     metadata:
       labels:
-        k8s-app: kube-registry
+        k8s-app: kube-registry-proxy
         kubernetes.io/name: "kube-registry-proxy"
         kubernetes.io/cluster-service: "true"
         version: v0.4
@@ -215,6 +215,12 @@ spec:
           hostPort: 5000
 ```
 <!-- END MUNGE: EXAMPLE ../../saltbase/salt/kube-registry-proxy/kube-registry-proxy.yaml -->
+
+When modifying replication-controller, service and daemon-set defintions, take
+care to ensure _unique_ identifiers for the rc-svc couple and the daemon-set.
+Failing to do so will have register the localhost proxy daemon-sets to the
+upstream service. As a result they will then try to proxy themselves, which
+will, for obvious reasons, not work.
 
 This ensures that port 5000 on each node is directed to the registry `Service`.
 You should be able to verify that it is running by hitting port 5000 with a web

@@ -31,7 +31,7 @@ type ClusterRoleBindingListerExpansion interface{}
 type RoleListerExpansion interface{}
 
 // RoleNamespaceListerExpansion allows custom methods to be added to
-// RoleNamespaeLister.
+// RoleNamespaceLister.
 type RoleNamespaceListerExpansion interface{}
 
 // RoleBindingListerExpansion allows custom methods to be added to
@@ -39,5 +39,5 @@ type RoleNamespaceListerExpansion interface{}
 type RoleBindingListerExpansion interface{}
 
 // RoleBindingNamespaceListerExpansion allows custom methods to be added to
-// RoleBindingNamespaeLister.
+// RoleBindingNamespaceLister.
 type RoleBindingNamespaceListerExpansion interface{}

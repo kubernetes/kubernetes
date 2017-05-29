@@ -19,10 +19,10 @@ go_library(
     srcs = ["main.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/gogo/protobuf/gogoproto",
-        "//vendor:github.com/gogo/protobuf/proto",
-        "//vendor:github.com/gogo/protobuf/sortkeys",
-        "//vendor:github.com/gogo/protobuf/vanity/command",
+        "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
+        "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
+        "//vendor/github.com/gogo/protobuf/vanity/command:go_default_library",
     ],
 )
 

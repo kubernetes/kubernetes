@@ -9,53 +9,37 @@ spec:
     metadata:
       labels:
         app: redis
-      annotations:
-        pod.alpha.kubernetes.io/init-containers: '[
-            {
-                "name": "install",
-                "image": "gcr.io/google_containers/redis-install-3.2.0:e2e",
-                "imagePullPolicy": "Always",
-                "args": ["--install-into=/opt", "--work-dir=/work-dir"],
-                "volumeMounts": [
-                    {
-                        "name": "opt",
-                        "mountPath": "/opt"
-                    },
-                    {
-                        "name": "workdir",
-                        "mountPath": "/work-dir"
-                    }
-                ]
-            },
-            {
-                "name": "bootstrap",
-                "image": "debian:jessie",
-                "command": ["/work-dir/peer-finder"],
-                "args": ["-on-start=\"/work-dir/on-start.sh\"", "-service=redis"],
-                "env": [
-                  {
-                      "name": "POD_NAMESPACE",
-                      "valueFrom": {
-                          "fieldRef": {
-                              "apiVersion": "v1",
-                              "fieldPath": "metadata.namespace"
-                          }
-                      }
-                   }
-                ],
-                "volumeMounts": [
-                    {
-                        "name": "opt",
-                        "mountPath": "/opt"
-                    },
-                    {
-                        "name": "workdir",
-                        "mountPath": "/work-dir"
-                    }
-                ]
-            }
-        ]'
     spec:
+      initContainers:
+      - name: install
+        image: gcr.io/google_containers/redis-install-3.2.0:e2e
+        imagePullPolicy: Always
+        args:
+        - "--install-into=/opt"
+        - "--work-dir=/work-dir"
+        volumeMounts:
+        - name: opt
+          mountPath: "/opt"
+        - name: workdir
+          mountPath: "/work-dir"
+      - name: bootstrap
+        image: debian:jessie
+        command:
+        - "/work-dir/peer-finder"
+        args:
+        - -on-start="/work-dir/on-start.sh"
+        - "-service=redis"
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: opt
+          mountPath: "/opt"
+        - name: workdir
+          mountPath: "/work-dir"
       containers:
       - name: redis
         image: debian:jessie

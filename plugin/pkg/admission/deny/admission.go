@@ -23,8 +23,9 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 )
 
-func init() {
-	admission.RegisterPlugin("AlwaysDeny", func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("AlwaysDeny", func(config io.Reader) (admission.Interface, error) {
 		return NewAlwaysDeny(), nil
 	})
 }

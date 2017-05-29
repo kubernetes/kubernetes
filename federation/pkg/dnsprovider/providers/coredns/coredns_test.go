@@ -124,16 +124,16 @@ func listRrsOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets) []dnspro
 	return rrset
 }
 
-func getRrOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, name string) dnsprovider.ResourceRecordSet {
-	rrset, err := rrsets.Get(name)
+func getRrOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, name string) []dnsprovider.ResourceRecordSet {
+	rrsetList, err := rrsets.Get(name)
 	if err != nil {
 		t.Fatalf("Failed to get recordset: %v", err)
-	} else if rrset == nil {
+	} else if len(rrsetList) == 0 {
 		t.Logf("Did not Get recordset: %v", name)
 	} else {
-		t.Logf("Got recordset: %v", rrset.Name())
+		t.Logf("Got recordsets: %v", rrsetList)
 	}
-	return rrset
+	return rrsetList
 }
 
 func getExampleRrs(zone dnsprovider.Zone) dnsprovider.ResourceRecordSet {
@@ -176,6 +176,9 @@ func TestResourceRecordSetsAddSuccess(t *testing.T) {
 	addRrsetOrFail(t, sets, set)
 	defer sets.StartChangeset().Remove(set).Apply()
 	t.Logf("Successfully added resource record set: %v", set)
+	if sets.Zone().ID() != zone.ID() {
+		t.Errorf("Zone for rrset does not match expected")
+	}
 }
 
 /* TestResourceRecordSetsAdditionVisible verifies that added RRS is visible after addition */
@@ -254,8 +257,14 @@ func TestResourceRecordSetsReplace(t *testing.T) {
 	tests.CommonTestResourceRecordSetsReplace(t, zone)
 }
 
-/* TestResourceRecordSetsReplaceAll verifies that we can remove an RRS and create one with a different name*/
+/* TestResourceRecordSetsReplaceAll verifies that we can remove an RRS and create one with a different name */
 func TestResourceRecordSetsReplaceAll(t *testing.T) {
 	zone := firstZone(t)
 	tests.CommonTestResourceRecordSetsReplaceAll(t, zone)
+}
+
+/* TestResourceRecordSetsDifferentTypes verifies that we can add records with same name, but different types */
+func TestResourceRecordSetsDifferentTypes(t *testing.T) {
+	zone := firstZone(t)
+	tests.CommonTestResourceRecordSetsDifferentTypes(t, zone)
 }

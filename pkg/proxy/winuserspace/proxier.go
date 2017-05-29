@@ -30,6 +30,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/util/netsh"
 )
@@ -261,7 +262,7 @@ func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPo
 		socket:              sock,
 		timeout:             timeout,
 		activeClients:       newClientCache(),
-		dnsClients:          newDnsClientCache(),
+		dnsClients:          newDNSClientCache(),
 		sessionAffinityType: api.ServiceAffinityNone, // default
 	}
 	proxier.setServiceInfo(servicePortPortalName, si)
@@ -314,88 +315,78 @@ func getListenIPPortMap(service *api.Service, listenPort int, nodePort int) map[
 	return listenIPPortMap
 }
 
-// OnServiceUpdate manages the active set of service proxies.
-// Active service proxies are reinitialized if found in the update set or
-// shutdown if missing from the update set.
-func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
-	glog.V(4).Infof("Received update notice: %+v", services)
-	activeServicePortPortals := make(map[ServicePortPortalName]bool) // use a map as a set
-	for i := range services {
-		service := &services[i]
+func (proxier *Proxier) mergeService(service *api.Service) map[ServicePortPortalName]bool {
+	if service == nil {
+		return nil
+	}
+	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+	if !helper.IsServiceIPSet(service) {
+		glog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
+		return nil
+	}
+	existingPortPortals := make(map[ServicePortPortalName]bool)
 
-		// if ClusterIP is "None" or empty, skip proxying
-		if !api.IsServiceIPSet(service) {
-			glog.V(3).Infof("Skipping service %s due to clusterIP = %q", types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, service.Spec.ClusterIP)
-			continue
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		// create a slice of all the source IPs to use for service port portals
+		listenIPPortMap := getListenIPPortMap(service, int(servicePort.Port), int(servicePort.NodePort))
+		protocol := servicePort.Protocol
+
+		for listenIP, listenPort := range listenIPPortMap {
+			servicePortPortalName := ServicePortPortalName{
+				NamespacedName: svcName,
+				Port:           servicePort.Name,
+				PortalIPName:   listenIP,
+			}
+			existingPortPortals[servicePortPortalName] = true
+			info, exists := proxier.getServiceInfo(servicePortPortalName)
+			if exists && sameConfig(info, service, protocol, listenPort) {
+				// Nothing changed.
+				continue
+			}
+			if exists {
+				glog.V(4).Infof("Something changed for service %q: stopping it", servicePortPortalName)
+				if err := proxier.closeServicePortPortal(servicePortPortalName, info); err != nil {
+					glog.Errorf("Failed to close service port portal %q: %v", servicePortPortalName, err)
+				}
+			}
+			glog.V(1).Infof("Adding new service %q at %s:%d/%s", servicePortPortalName, listenIP, listenPort, protocol)
+			info, err := proxier.addServicePortPortal(servicePortPortalName, protocol, listenIP, listenPort, proxier.udpIdleTimeout)
+			if err != nil {
+				glog.Errorf("Failed to start proxy for %q: %v", servicePortPortalName, err)
+				continue
+			}
+			info.sessionAffinityType = service.Spec.SessionAffinity
+			glog.V(10).Infof("info: %#v", info)
 		}
-
-		for i := range service.Spec.Ports {
-			servicePort := &service.Spec.Ports[i]
-			// create a slice of all the source IPs to use for service port portals
-			listenIPPortMap := getListenIPPortMap(service, int(servicePort.Port), int(servicePort.NodePort))
-			protocol := servicePort.Protocol
-
-			for listenIP, listenPort := range listenIPPortMap {
-				servicePortPortalName := ServicePortPortalName{
-					NamespacedName: types.NamespacedName{
-						Namespace: service.Namespace,
-						Name:      service.Name,
-					},
-					Port:         servicePort.Name,
-					PortalIPName: listenIP,
-				}
-				activeServicePortPortals[servicePortPortalName] = true
-				info, exists := proxier.getServiceInfo(servicePortPortalName)
-				if exists && sameConfig(info, service, protocol, listenPort) {
-					// Nothing changed.
-					continue
-				}
-				if exists {
-					glog.V(4).Infof("Something changed for service %q: stopping it", servicePortPortalName)
-					if err := proxier.closeServicePortPortal(servicePortPortalName, info); err != nil {
-						glog.Errorf("Failed to close service port portal %q: %v", servicePortPortalName, err)
-					}
-				}
-				glog.V(1).Infof("Adding new service %q at %s:%d/%s", servicePortPortalName, listenIP, listenPort, protocol)
-				info, err := proxier.addServicePortPortal(servicePortPortalName, protocol, listenIP, listenPort, proxier.udpIdleTimeout)
-				if err != nil {
-					glog.Errorf("Failed to start proxy for %q: %v", servicePortPortalName, err)
-					continue
-				}
-				info.sessionAffinityType = service.Spec.SessionAffinity
-				glog.V(10).Infof("info: %#v", info)
+		if len(listenIPPortMap) > 0 {
+			// only one loadbalancer per service port portal
+			servicePortName := proxy.ServicePortName{
+				NamespacedName: types.NamespacedName{
+					Namespace: service.Namespace,
+					Name:      service.Name,
+				},
+				Port: servicePort.Name,
 			}
-			if len(listenIPPortMap) > 0 {
-				// only one loadbalancer per service port portal
-				servicePortName := proxy.ServicePortName{
-					NamespacedName: types.NamespacedName{
-						Namespace: service.Namespace,
-						Name:      service.Name,
-					},
-					Port: servicePort.Name,
-				}
-				proxier.loadBalancer.NewService(servicePortName, service.Spec.SessionAffinity, stickyMaxAgeMinutes)
-			}
+			proxier.loadBalancer.NewService(servicePortName, service.Spec.SessionAffinity, stickyMaxAgeMinutes)
 		}
 	}
 
-	for name, info := range proxier.serviceMap {
-		if !activeServicePortPortals[name] {
-			glog.V(1).Infof("Stopping service %q", name)
+	return existingPortPortals
+}
 
-			if err := proxier.closeServicePortPortal(name, info); err != nil {
-				glog.Errorf("Failed to close service port portal %q: %v", name, err)
-			}
-		}
+func (proxier *Proxier) unmergeService(service *api.Service, existingPortPortals map[ServicePortPortalName]bool) {
+	if service == nil {
+		return
+	}
+	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+	if !helper.IsServiceIPSet(service) {
+		glog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
+		return
 	}
 
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-
-	// servicePortNameMap tracks all service port portals with the same name/port.
-	// A value of true means there is one or more service port portals with name/port pair.
 	servicePortNameMap := make(map[proxy.ServicePortName]bool)
-	for name := range proxier.serviceMap {
+	for name := range existingPortPortals {
 		servicePortName := proxy.ServicePortName{
 			NamespacedName: types.NamespacedName{
 				Namespace: name.Namespace,
@@ -403,15 +394,58 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 			},
 			Port: name.Port,
 		}
-		servicePortNameMap[servicePortName] = servicePortNameMap[servicePortName] || activeServicePortPortals[name]
+		servicePortNameMap[servicePortName] = true
 	}
 
-	// Only delete load balancer if all listen ips per name/port show inactive.
-	for name := range servicePortNameMap {
-		if !servicePortNameMap[name] {
-			proxier.loadBalancer.DeleteService(name)
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		serviceName := proxy.ServicePortName{NamespacedName: svcName, Port: servicePort.Name}
+		// create a slice of all the source IPs to use for service port portals
+		listenIPPortMap := getListenIPPortMap(service, int(servicePort.Port), int(servicePort.NodePort))
+
+		for listenIP := range listenIPPortMap {
+			servicePortPortalName := ServicePortPortalName{
+				NamespacedName: svcName,
+				Port:           servicePort.Name,
+				PortalIPName:   listenIP,
+			}
+			if existingPortPortals[servicePortPortalName] {
+				continue
+			}
+
+			glog.V(1).Infof("Stopping service %q", servicePortPortalName)
+			info, exists := proxier.getServiceInfo(servicePortPortalName)
+			if !exists {
+				glog.Errorf("Service %q is being removed but doesn't exist", servicePortPortalName)
+				continue
+			}
+
+			if err := proxier.closeServicePortPortal(servicePortPortalName, info); err != nil {
+				glog.Errorf("Failed to close service port portal %q: %v", servicePortPortalName, err)
+			}
+		}
+
+		// Only delete load balancer if all listen ips per name/port show inactive.
+		if !servicePortNameMap[serviceName] {
+			proxier.loadBalancer.DeleteService(serviceName)
 		}
 	}
+}
+
+func (proxier *Proxier) OnServiceAdd(service *api.Service) {
+	_ = proxier.mergeService(service)
+}
+
+func (proxier *Proxier) OnServiceUpdate(oldService, service *api.Service) {
+	existingPortPortals := proxier.mergeService(service)
+	proxier.unmergeService(oldService, existingPortPortals)
+}
+
+func (proxier *Proxier) OnServiceDelete(service *api.Service) {
+	proxier.unmergeService(service, map[ServicePortPortalName]bool{})
+}
+
+func (proxier *Proxier) OnServiceSynced() {
 }
 
 func sameConfig(info *serviceInfo, service *api.Service, protocol api.Protocol, listenPort int) bool {

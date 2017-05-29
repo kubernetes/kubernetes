@@ -15,8 +15,8 @@ go_library(
     deps = [
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/rbac:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/validation/path",
-        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor/k8s.io/apimachinery/pkg/api/validation/path:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 
@@ -27,8 +27,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/rbac:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 

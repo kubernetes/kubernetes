@@ -80,7 +80,7 @@ container: .container-$(ARCH)
 .container-$(ARCH): bin/$(BIN)-$(ARCH)
 	docker build --pull -t $(IMAGE):$(TAG) --build-arg ARCH=$(ARCH) .
 ifeq ($(ARCH),amd64)
-	docker rmi $(LEGACY_AMD64_IMAGE):$(TAG) || true
+	docker rmi $(LEGACY_AMD64_IMAGE):$(TAG) 2>/dev/null || true
 	docker tag $(IMAGE):$(TAG) $(LEGACY_AMD64_IMAGE):$(TAG)
 endif
 	touch $@

@@ -28,7 +28,7 @@ cd ${KUBE_ROOT}
 
 echo "Checking whether godeps are restored"
 if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
-  echo -e '\nRun 'godep restore' to download dependencies.' 1>&2
+  echo -e '\nExecute script 'hack/godep-restore.sh' to download dependencies.' 1>&2
   exit 1
 fi
 

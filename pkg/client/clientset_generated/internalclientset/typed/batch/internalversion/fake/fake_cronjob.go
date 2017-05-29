@@ -34,6 +34,8 @@ type FakeCronJobs struct {
 
 var cronjobsResource = schema.GroupVersionResource{Group: "batch", Version: "", Resource: "cronjobs"}
 
+var cronjobsKind = schema.GroupVersionKind{Group: "batch", Version: "", Kind: "CronJob"}
+
 func (c *FakeCronJobs) Create(cronJob *batch.CronJob) (result *batch.CronJob, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(cronjobsResource, c.ns, cronJob), &batch.CronJob{})
@@ -90,7 +92,7 @@ func (c *FakeCronJobs) Get(name string, options v1.GetOptions) (result *batch.Cr
 
 func (c *FakeCronJobs) List(opts v1.ListOptions) (result *batch.CronJobList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(cronjobsResource, c.ns, opts), &batch.CronJobList{})
+		Invokes(testing.NewListAction(cronjobsResource, cronjobsKind, c.ns, opts), &batch.CronJobList{})
 
 	if obj == nil {
 		return nil, err

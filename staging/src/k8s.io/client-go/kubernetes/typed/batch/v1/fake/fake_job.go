@@ -34,6 +34,8 @@ type FakeJobs struct {
 
 var jobsResource = schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}
 
+var jobsKind = schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}
+
 func (c *FakeJobs) Create(job *v1.Job) (result *v1.Job, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(jobsResource, c.ns, job), &v1.Job{})
@@ -90,7 +92,7 @@ func (c *FakeJobs) Get(name string, options meta_v1.GetOptions) (result *v1.Job,
 
 func (c *FakeJobs) List(opts meta_v1.ListOptions) (result *v1.JobList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(jobsResource, c.ns, opts), &v1.JobList{})
+		Invokes(testing.NewListAction(jobsResource, jobsKind, c.ns, opts), &v1.JobList{})
 
 	if obj == nil {
 		return nil, err

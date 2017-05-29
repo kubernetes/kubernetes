@@ -1,5 +1,6 @@
 repo: https://github.com/kubernetes/kubernetes.git
 includes:
+  - 'layer:metrics'
   - 'layer:nagios'
   - 'layer:nginx'
   - 'layer:tls-client'

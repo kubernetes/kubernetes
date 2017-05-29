@@ -75,7 +75,6 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 // GetNodeHostIP returns the provided node's IP, based on the priority:
 // 1. NodeInternalIP
 // 2. NodeExternalIP
-// 3. NodeLegacyHostIP
 func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 	addresses := node.Status.Addresses
 	addressMap := make(map[v1.NodeAddressType][]v1.NodeAddress)
@@ -88,16 +87,12 @@ func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 	if addresses, ok := addressMap[v1.NodeExternalIP]; ok {
 		return net.ParseIP(addresses[0].Address), nil
 	}
-	if addresses, ok := addressMap[v1.NodeLegacyHostIP]; ok {
-		return net.ParseIP(addresses[0].Address), nil
-	}
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
 }
 
 // InternalGetNodeHostIP returns the provided node's IP, based on the priority:
 // 1. NodeInternalIP
 // 2. NodeExternalIP
-// 3. NodeLegacyHostIP
 func InternalGetNodeHostIP(node *api.Node) (net.IP, error) {
 	addresses := node.Status.Addresses
 	addressMap := make(map[api.NodeAddressType][]api.NodeAddress)
@@ -108,9 +103,6 @@ func InternalGetNodeHostIP(node *api.Node) (net.IP, error) {
 		return net.ParseIP(addresses[0].Address), nil
 	}
 	if addresses, ok := addressMap[api.NodeExternalIP]; ok {
-		return net.ParseIP(addresses[0].Address), nil
-	}
-	if addresses, ok := addressMap[api.NodeLegacyHostIP]; ok {
 		return net.ParseIP(addresses[0].Address), nil
 	}
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)

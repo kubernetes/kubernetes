@@ -47,6 +47,18 @@ addon-dir-create:
     - file_mode: 644
 {% endif %}
 
+{% if pillar.get('enable_cluster_monitoring', '').lower() == 'stackdriver' %}
+/etc/kubernetes/addons/cluster-monitoring/stackdriver:
+  file.recurse:
+    - source: salt://kube-addons/cluster-monitoring/stackdriver
+    - include_pat: E@(^.+\.yaml$|^.+\.json$)
+    - template: jinja
+    - user: root
+    - group: root
+    - dir_mode: 755
+    - file_mode: 644
+{% endif %}
+
 {% if pillar.get('enable_cluster_monitoring', '').lower() == 'standalone' %}
 /etc/kubernetes/addons/cluster-monitoring/standalone:
   file.recurse:

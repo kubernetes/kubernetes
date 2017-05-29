@@ -28,7 +28,6 @@ aliases:
     - ericchiang
     - fabianofranz
     - ghodss
-    - kargakis
     - pwittrock
     - rootfs
     - smarterclayton
@@ -66,3 +65,17 @@ aliases:
     - dcbw
     - danwinship
     - caseydavenport
+  sig-apps-reviewers:
+    - enisoc
+    - erictune
+    - foxish
+    - janetkuo
+    - kargakis
+    - kow3ns
+    - lukaszo
+    - mfojtik
+    - smarterclayton
+    - soltysh
+  sig-apps-api-approvers:
+    - erictune
+    - smarterclayton

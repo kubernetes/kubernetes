@@ -56,8 +56,9 @@ type Test interface {
 	// begin.
 	Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType)
 
-	// TearDown should clean up any objects that are created that
-	// aren't already cleaned up by the framework.
+	// Teardown should clean up any objects that are created that
+	// aren't already cleaned up by the framework. This will
+	// always be called, even if Setup failed.
 	Teardown(f *framework.Framework)
 }
 

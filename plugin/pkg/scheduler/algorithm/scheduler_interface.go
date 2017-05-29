@@ -41,4 +41,10 @@ type SchedulerExtender interface {
 // onto machines.
 type ScheduleAlgorithm interface {
 	Schedule(*v1.Pod, NodeLister) (selectedMachine string, err error)
+	// Predicates() returns a pointer to a map of predicate functions. This is
+	// exposed for testing.
+	Predicates() map[string]FitPredicate
+	// Prioritizers returns a slice of priority config. This is exposed for
+	// testing.
+	Prioritizers() []PriorityConfig
 }

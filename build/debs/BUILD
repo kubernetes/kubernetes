@@ -1,16 +1,18 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load("@io_kubernetes_build//defs:deb.bzl", "k8s_deb", "deb_data")
+load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 
 # We do not include kube-scheduler, kube-controller-manager,
 # kube-apiserver, and kube-proxy in this list even though we
 # produce debs for them. We recommend that they be run in docker
 # images. We use the debs that we produce here to build those
 # images.
-filegroup(
+release_filegroup(
     name = "debs",
     srcs = [
+        ":cloud-controller-manager.deb",
         ":kubeadm.deb",
         ":kubectl.deb",
         ":kubelet.deb",
@@ -28,11 +30,11 @@ filegroup(
         },
     ],
 ) for binary in [
+    "cloud-controller-manager",
     "kubectl",
     "kube-apiserver",
     "kube-controller-manager",
     "kube-proxy",
-    "kube-aggregator",
 ]]
 
 deb_data(
@@ -85,6 +87,11 @@ pkg_tar(
 )
 
 k8s_deb(
+    name = "cloud-controller-manager",
+    description = "Kubernetes Cloud Controller Manager",
+)
+
+k8s_deb(
     name = "kubectl",
     description = """Kubernetes Command Line Tool
 The Kubernetes command line tool for interacting with the Kubernetes API.
@@ -113,11 +120,6 @@ k8s_deb(
         "iproute2",
     ],
     description = "Kubernetes Service Proxy",
-)
-
-k8s_deb(
-    name = "kube-aggregator",
-    description = "Kubernetes Federated API Server",
 )
 
 k8s_deb(

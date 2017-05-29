@@ -20,28 +20,27 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/pborman/uuid"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	restclient "k8s.io/client-go/rest"
+	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-const (
-	apiNoun      = "federation apiserver"
-	waitInterval = 50 * time.Millisecond
-)
+const apiNoun = "federation apiserver"
 
-func getRunOptions() *options.ServerRunOptions {
+// GetRunOptions returns the default run options that can be used to run a test federation apiserver.
+func GetRunOptions() *options.ServerRunOptions {
 	r := options.NewServerRunOptions()
 	r.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURLFromEnv()}
 	// Use a unique prefix to ensure isolation from other tests using the same etcd instance
 	r.Etcd.StorageConfig.Prefix = uuid.New()
 	// Disable secure serving
-	r.SecureServing.ServingOptions.BindPort = 0
+	r.SecureServing.BindPort = 0
 	return r
 }
 
@@ -51,15 +50,20 @@ type FederationAPIFixture struct {
 	stopChan chan struct{}
 }
 
-func (f *FederationAPIFixture) Setup(t *testing.T) {
+// SetUp runs federation apiserver with default run options.
+func (f *FederationAPIFixture) SetUp(t *testing.T) {
+	f.SetUpWithRunOptions(t, GetRunOptions())
+}
+
+// SetUpWithRunOptions runs federation apiserver with the given run options.
+// Uses default run options if runOptions is nil.
+func (f *FederationAPIFixture) SetUpWithRunOptions(t *testing.T, runOptions *options.ServerRunOptions) {
 	if f.stopChan != nil {
-		t.Fatal("Setup() already called")
+		t.Fatal("SetUp() already called")
 	}
-	defer TeardownOnPanic(t, f)
+	defer TearDownOnPanic(t, f)
 
 	f.stopChan = make(chan struct{})
-
-	runOptions := getRunOptions()
 
 	err := startServer(t, runOptions, f.stopChan)
 	if err != nil {
@@ -74,15 +78,25 @@ func (f *FederationAPIFixture) Setup(t *testing.T) {
 	}
 }
 
-func (f *FederationAPIFixture) Teardown(t *testing.T) {
+func (f *FederationAPIFixture) TearDown(t *testing.T) {
 	if f.stopChan != nil {
 		close(f.stopChan)
 		f.stopChan = nil
 	}
 }
 
+func (f *FederationAPIFixture) NewConfig() *restclient.Config {
+	return &restclient.Config{Host: f.Host}
+}
+
+func (f *FederationAPIFixture) NewClient(userAgent string) federationclientset.Interface {
+	config := f.NewConfig()
+	restclient.AddUserAgent(config, userAgent)
+	return federationclientset.NewForConfigOrDie(config)
+}
+
 func startServer(t *testing.T, runOptions *options.ServerRunOptions, stopChan <-chan struct{}) error {
-	err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
+	err := wait.PollImmediate(DefaultWaitInterval, wait.ForeverTestTimeout, func() (bool, error) {
 		port, err := framework.FindFreeLocalPort()
 		if err != nil {
 			t.Logf("Error allocating an ephemeral port: %v", err)
@@ -90,7 +104,6 @@ func startServer(t *testing.T, runOptions *options.ServerRunOptions, stopChan <-
 		}
 
 		runOptions.InsecureServing.BindPort = port
-
 		err = app.NonBlockingRun(runOptions, stopChan)
 		if err != nil {
 			t.Logf("Error starting the %s: %v", apiNoun, err)
@@ -105,7 +118,7 @@ func startServer(t *testing.T, runOptions *options.ServerRunOptions, stopChan <-
 }
 
 func waitForServer(t *testing.T, host string) error {
-	err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
+	err := wait.PollImmediate(DefaultWaitInterval, wait.ForeverTestTimeout, func() (bool, error) {
 		_, err := http.Get(host)
 		if err != nil {
 			t.Logf("Error when trying to contact the API: %v", err)

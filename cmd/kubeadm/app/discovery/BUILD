@@ -18,7 +18,7 @@ go_library(
         "//cmd/kubeadm/app/discovery/https:go_default_library",
         "//cmd/kubeadm/app/discovery/token:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
-        "//vendor:k8s.io/client-go/tools/clientcmd/api",
+        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
     ],
 )
 

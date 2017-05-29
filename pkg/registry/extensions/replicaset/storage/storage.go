@@ -60,12 +60,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against ReplicaSet.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
-		NewFunc:     func() runtime.Object { return &extensions.ReplicaSet{} },
-		NewListFunc: func() runtime.Object { return &extensions.ReplicaSetList{} },
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*extensions.ReplicaSet).Name, nil
-		},
+		Copier:            api.Scheme,
+		NewFunc:           func() runtime.Object { return &extensions.ReplicaSet{} },
+		NewListFunc:       func() runtime.Object { return &extensions.ReplicaSetList{} },
 		PredicateFunc:     replicaset.MatchReplicaSet,
 		QualifiedResource: extensions.Resource("replicasets"),
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("replicasets"),

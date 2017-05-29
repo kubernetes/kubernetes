@@ -11,10 +11,11 @@ package reporters
 import (
 	"encoding/xml"
 	"fmt"
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/types"
 	"os"
 	"strings"
+
+	"github.com/onsi/ginkgo/config"
+	"github.com/onsi/ginkgo/types"
 )
 
 type JUnitTestSuite struct {
@@ -58,7 +59,6 @@ func NewJUnitReporter(filename string) *JUnitReporter {
 
 func (reporter *JUnitReporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
 	reporter.suite = JUnitTestSuite{
-		Tests:     summary.NumberOfSpecsThatWillBeRun,
 		TestCases: []JUnitTestCase{},
 	}
 	reporter.testSuiteName = summary.SuiteDescription
@@ -116,6 +116,7 @@ func (reporter *JUnitReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 }
 
 func (reporter *JUnitReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
+	reporter.suite.Tests = summary.NumberOfSpecsThatWillBeRun
 	reporter.suite.Time = summary.RunTime.Seconds()
 	reporter.suite.Failures = summary.NumberOfFailedSpecs
 	file, err := os.Create(reporter.filename)

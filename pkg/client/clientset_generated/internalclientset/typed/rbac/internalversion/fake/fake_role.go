@@ -34,6 +34,8 @@ type FakeRoles struct {
 
 var rolesResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "", Resource: "roles"}
 
+var rolesKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "", Kind: "Role"}
+
 func (c *FakeRoles) Create(role *rbac.Role) (result *rbac.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(rolesResource, c.ns, role), &rbac.Role{})
@@ -80,7 +82,7 @@ func (c *FakeRoles) Get(name string, options v1.GetOptions) (result *rbac.Role, 
 
 func (c *FakeRoles) List(opts v1.ListOptions) (result *rbac.RoleList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(rolesResource, c.ns, opts), &rbac.RoleList{})
+		Invokes(testing.NewListAction(rolesResource, rolesKind, c.ns, opts), &rbac.RoleList{})
 
 	if obj == nil {
 		return nil, err

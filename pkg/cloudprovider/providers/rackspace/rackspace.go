@@ -25,7 +25,6 @@ import (
 	"net"
 	"os"
 	"regexp"
-	"strings"
 	"time"
 
 	"gopkg.in/gcfg.v1"
@@ -43,10 +42,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
-const ProviderName = "rackspace"
-const metaDataPath = "/media/configdrive/openstack/latest/meta_data.json"
+const (
+	ProviderName          = "rackspace"
+	MetaDataPath          = "/media/configdrive/openstack/latest/meta_data.json"
+	VolumeAvailableStatus = "available"
+	VolumeInUseStatus     = "in-use"
+	VolumeErrorStatus     = "error"
+)
 
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
@@ -146,16 +151,16 @@ func parseMetaData(file io.Reader) (string, error) {
 	metaData := MetaData{}
 	err = json.Unmarshal(metaDataBytes, &metaData)
 	if err != nil {
-		return "", fmt.Errorf("Cannot parse %s: %v", metaDataPath, err)
+		return "", fmt.Errorf("Cannot parse %s: %v", MetaDataPath, err)
 	}
 
 	return metaData.UUID, nil
 }
 
 func readInstanceID() (string, error) {
-	file, err := os.Open(metaDataPath)
+	file, err := os.Open(MetaDataPath)
 	if err != nil {
-		return "", fmt.Errorf("Cannot open %s: %v", metaDataPath, err)
+		return "", fmt.Errorf("Cannot open %s: %v", MetaDataPath, err)
 	}
 	defer file.Close()
 
@@ -212,6 +217,9 @@ func newRackspace(cfg Config) (*Rackspace, error) {
 
 	return &os, nil
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (os *Rackspace) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 type Instances struct {
 	compute *gophercloud.ServiceClient
@@ -381,10 +389,16 @@ func (i *Instances) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, er
 	// net.ParseIP().String() is to maintain compatibility with the old code
 	parsedIP := net.ParseIP(ip).String()
 	return []v1.NodeAddress{
-		{Type: v1.NodeLegacyHostIP, Address: parsedIP},
 		{Type: v1.NodeInternalIP, Address: parsedIP},
 		{Type: v1.NodeExternalIP, Address: parsedIP},
 	}, nil
+}
+
+// NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (i *Instances) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+	return []v1.NodeAddress{}, errors.New("unimplemented")
 }
 
 // mapNodeNameToServerName maps from a k8s NodeName to a rackspace Server Name
@@ -418,6 +432,13 @@ func (i *Instances) InstanceID(nodeName types.NodeName) (string, error) {
 // InstanceType returns the type of the specified instance.
 func (i *Instances) InstanceType(name types.NodeName) (string, error) {
 	return "", nil
+}
+
+// InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
+// This method will not be called from the node that is requesting this ID. i.e. metadata service
+// and other local methods cannot be used here
+func (i *Instances) InstanceTypeByProviderID(providerID string) (string, error) {
+	return "", errors.New("unimplemented")
 }
 
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
@@ -466,19 +487,41 @@ func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
 }
 
 // Create a volume of given size (in GiB)
-func (rs *Rackspace) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, err error) {
-	return "", errors.New("unimplemented")
+func (rs *Rackspace) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, error) {
+	return "", "", errors.New("unimplemented")
 }
 
-func (rs *Rackspace) DeleteVolume(volumeName string) error {
+func (rs *Rackspace) DeleteVolume(volumeID string) error {
 	return errors.New("unimplemented")
 }
 
-// Attaches given cinder volume to the compute running kubelet
-func (rs *Rackspace) AttachDisk(instanceID string, diskName string) (string, error) {
+func (rs *Rackspace) OperationPending(diskName string) (bool, string, error) {
 	disk, err := rs.getVolume(diskName)
 	if err != nil {
+		return false, "", err
+	}
+	volumeStatus := disk.Status
+	if volumeStatus == VolumeErrorStatus {
+		glog.Errorf("status of volume %s is %s", diskName, volumeStatus)
+		return false, volumeStatus, nil
+	}
+	if volumeStatus == VolumeAvailableStatus || volumeStatus == VolumeInUseStatus {
+		return false, disk.Status, nil
+	}
+	return true, volumeStatus, nil
+}
+
+// Attaches given cinder volume to the compute running kubelet
+func (rs *Rackspace) AttachDisk(instanceID, volumeID string) (string, error) {
+	volume, err := rs.getVolume(volumeID)
+	if err != nil {
 		return "", err
+	}
+
+	if volume.Status != VolumeAvailableStatus {
+		errmsg := fmt.Sprintf("volume %s status is %s, not %s, can not be attached to instance %s.", volume.Name, volume.Status, VolumeAvailableStatus, instanceID)
+		glog.Errorf(errmsg)
+		return "", errors.New(errmsg)
 	}
 
 	compute, err := rs.getComputeClient()
@@ -486,77 +529,54 @@ func (rs *Rackspace) AttachDisk(instanceID string, diskName string) (string, err
 		return "", err
 	}
 
-	if len(disk.Attachments) > 0 {
-		if instanceID == disk.Attachments[0]["server_id"] {
-			glog.V(4).Infof("Disk: %q is already attached to compute: %q", diskName, instanceID)
-			return disk.ID, nil
+	if len(volume.Attachments) > 0 {
+		if instanceID == volume.Attachments[0]["server_id"] {
+			glog.V(4).Infof("Volume: %q is already attached to compute: %q", volumeID, instanceID)
+			return volume.ID, nil
 		}
 
-		errMsg := fmt.Sprintf("Disk %q is attached to a different compute: %q, should be detached before proceeding", diskName, disk.Attachments[0]["server_id"])
+		errMsg := fmt.Sprintf("Volume %q is attached to a different compute: %q, should be detached before proceeding", volumeID, volume.Attachments[0]["server_id"])
 		glog.Errorf(errMsg)
 		return "", errors.New(errMsg)
 	}
 
 	_, err = volumeattach.Create(compute, instanceID, &osvolumeattach.CreateOpts{
-		VolumeID: disk.ID,
+		VolumeID: volume.ID,
 	}).Extract()
 	if err != nil {
-		glog.Errorf("Failed to attach %s volume to %s compute", diskName, instanceID)
+		glog.Errorf("Failed to attach %s volume to %s compute", volumeID, instanceID)
 		return "", err
 	}
-	glog.V(2).Infof("Successfully attached %s volume to %s compute", diskName, instanceID)
-	return disk.ID, nil
+	glog.V(2).Infof("Successfully attached %s volume to %s compute", volumeID, instanceID)
+	return volume.ID, nil
 }
 
 // GetDevicePath returns the path of an attached block storage volume, specified by its id.
-func (rs *Rackspace) GetDevicePath(diskId string) string {
-	volume, err := rs.getVolume(diskId)
+func (rs *Rackspace) GetDevicePath(volumeID string) string {
+	volume, err := rs.getVolume(volumeID)
 	if err != nil {
 		return ""
 	}
 	attachments := volume.Attachments
 	if len(attachments) != 1 {
-		glog.Warningf("Unexpected number of volume attachments on %s: %d", diskId, len(attachments))
+		glog.Warningf("Unexpected number of volume attachments on %s: %d", volumeID, len(attachments))
 		return ""
 	}
 	return attachments[0]["device"].(string)
 }
 
-// Takes a partial/full disk id or diskname
-func (rs *Rackspace) getVolume(diskName string) (volumes.Volume, error) {
-	sClient, err := rackspace.NewBlockStorageV1(rs.provider, gophercloud.EndpointOpts{
+// Takes a partial/full disk id or volumeName
+func (rs *Rackspace) getVolume(volumeID string) (*volumes.Volume, error) {
+	client, err := rackspace.NewBlockStorageV1(rs.provider, gophercloud.EndpointOpts{
 		Region: rs.region,
 	})
 
-	var volume volumes.Volume
-	if err != nil || sClient == nil {
-		glog.Errorf("Unable to initialize cinder client for region: %s", rs.region)
-		return volume, err
-	}
-
-	err = volumes.List(sClient).EachPage(func(page pagination.Page) (bool, error) {
-		vols, err := volumes.ExtractVolumes(page)
-		if err != nil {
-			glog.Errorf("Failed to extract volumes: %v", err)
-			return false, err
-		}
-
-		for _, v := range vols {
-			glog.V(4).Infof("%s %s %v", v.ID, v.Name, v.Attachments)
-			if v.Name == diskName || strings.Contains(v.ID, diskName) {
-				volume = v
-				return true, nil
-			}
-		}
-
-		// if it reached here then no disk with the given name was found.
-		errmsg := fmt.Sprintf("Unable to find disk: %s in region %s", diskName, rs.region)
-		return false, errors.New(errmsg)
-	})
+	volume, err := volumes.Get(client, volumeID).Extract()
 	if err != nil {
-		glog.Errorf("Error occurred getting volume: %s", diskName)
+		glog.Errorf("Error occurred getting volume by ID: %s", volumeID)
+		return &volumes.Volume{}, err
 	}
-	return volume, err
+	return volume, nil
 }
 
 func (rs *Rackspace) getComputeClient() (*gophercloud.ServiceClient, error) {
@@ -570,10 +590,16 @@ func (rs *Rackspace) getComputeClient() (*gophercloud.ServiceClient, error) {
 }
 
 // Detaches given cinder volume from the compute running kubelet
-func (rs *Rackspace) DetachDisk(instanceID string, partialDiskId string) error {
-	disk, err := rs.getVolume(partialDiskId)
+func (rs *Rackspace) DetachDisk(instanceID, volumeID string) error {
+	volume, err := rs.getVolume(volumeID)
 	if err != nil {
 		return err
+	}
+
+	if volume.Status != VolumeInUseStatus {
+		errmsg := fmt.Sprintf("can not detach volume %s, its status is %s.", volume.Name, volume.Status)
+		glog.Errorf(errmsg)
+		return errors.New(errmsg)
 	}
 
 	compute, err := rs.getComputeClient()
@@ -581,23 +607,23 @@ func (rs *Rackspace) DetachDisk(instanceID string, partialDiskId string) error {
 		return err
 	}
 
-	if len(disk.Attachments) > 1 {
+	if len(volume.Attachments) > 1 {
 		// Rackspace does not support "multiattach", this is a sanity check.
-		errmsg := fmt.Sprintf("Volume %s is attached to multiple instances, which is not supported by this provider.", disk.ID)
+		errmsg := fmt.Sprintf("Volume %s is attached to multiple instances, which is not supported by this provider.", volume.ID)
 		return errors.New(errmsg)
 	}
 
-	if len(disk.Attachments) > 0 && instanceID == disk.Attachments[0]["server_id"] {
+	if len(volume.Attachments) > 0 && instanceID == volume.Attachments[0]["server_id"] {
 		// This is a blocking call and effects kubelet's performance directly.
 		// We should consider kicking it out into a separate routine, if it is bad.
-		err = volumeattach.Delete(compute, instanceID, disk.ID).ExtractErr()
+		err = volumeattach.Delete(compute, instanceID, volume.ID).ExtractErr()
 		if err != nil {
-			glog.Errorf("Failed to delete volume %s from compute %s attached %v", disk.ID, instanceID, err)
+			glog.Errorf("Failed to delete volume %s from compute %s attached %v", volume.ID, instanceID, err)
 			return err
 		}
-		glog.V(2).Infof("Successfully detached volume: %s from compute: %s", disk.ID, instanceID)
+		glog.V(2).Infof("Successfully detached volume: %s from compute: %s", volume.ID, instanceID)
 	} else {
-		errMsg := fmt.Sprintf("Disk: %s has no attachments or is not attached to compute: %s", disk.Name, instanceID)
+		errMsg := fmt.Sprintf("Disk: %s has no attachments or is not attached to compute: %s", volume.Name, instanceID)
 		glog.Errorf(errMsg)
 		return errors.New(errMsg)
 	}
@@ -606,54 +632,60 @@ func (rs *Rackspace) DetachDisk(instanceID string, partialDiskId string) error {
 }
 
 // Get device path of attached volume to the compute running kubelet, as known by cinder
-func (rs *Rackspace) GetAttachmentDiskPath(instanceID string, diskName string) (string, error) {
+func (rs *Rackspace) GetAttachmentDiskPath(instanceID, volumeID string) (string, error) {
 	// See issue #33128 - Cinder does not always tell you the right device path, as such
 	// we must only use this value as a last resort.
-	disk, err := rs.getVolume(diskName)
+	volume, err := rs.getVolume(volumeID)
 	if err != nil {
 		return "", err
 	}
-	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil {
-		if instanceID == disk.Attachments[0]["server_id"] {
+
+	if volume.Status != VolumeInUseStatus {
+		errmsg := fmt.Sprintf("can not get device path of volume %s, its status is %s.", volume.Name, volume.Status)
+		glog.Errorf(errmsg)
+		return "", errors.New(errmsg)
+	}
+	if len(volume.Attachments) > 0 && volume.Attachments[0]["server_id"] != nil {
+		if instanceID == volume.Attachments[0]["server_id"] {
 			// Attachment[0]["device"] points to the device path
 			// see http://developer.openstack.org/api-ref-blockstorage-v1.html
-			return disk.Attachments[0]["device"].(string), nil
+			return volume.Attachments[0]["device"].(string), nil
 		} else {
-			errMsg := fmt.Sprintf("Disk %q is attached to a different compute: %q, should be detached before proceeding", diskName, disk.Attachments[0]["server_id"])
+			errMsg := fmt.Sprintf("Disk %q is attached to a different compute: %q, should be detached before proceeding", volumeID, volume.Attachments[0]["server_id"])
 			glog.Errorf(errMsg)
 			return "", errors.New(errMsg)
 		}
 	}
-	return "", fmt.Errorf("volume %s is not attached to %s", diskName, instanceID)
+	return "", fmt.Errorf("volume %s is not attached to %s", volumeID, instanceID)
 }
 
 // query if a volume is attached to a compute instance
-func (rs *Rackspace) DiskIsAttached(diskName, instanceID string) (bool, error) {
-	disk, err := rs.getVolume(diskName)
+func (rs *Rackspace) DiskIsAttached(instanceID, volumeID string) (bool, error) {
+	volume, err := rs.getVolume(volumeID)
 	if err != nil {
 		return false, err
 	}
-	if len(disk.Attachments) > 0 && disk.Attachments[0]["server_id"] != nil && instanceID == disk.Attachments[0]["server_id"] {
+	if len(volume.Attachments) > 0 && volume.Attachments[0]["server_id"] != nil && instanceID == volume.Attachments[0]["server_id"] {
 		return true, nil
 	}
 	return false, nil
 }
 
 // query if a list volumes are attached to a compute instance
-func (rs *Rackspace) DisksAreAttached(diskNames []string, instanceID string) (map[string]bool, error) {
+func (rs *Rackspace) DisksAreAttached(instanceID string, volumeIDs []string) (map[string]bool, error) {
 	attached := make(map[string]bool)
-	for _, diskName := range diskNames {
-		attached[diskName] = false
+	for _, volumeID := range volumeIDs {
+		attached[volumeID] = false
 	}
 	var returnedErr error
-	for _, diskName := range diskNames {
-		result, err := rs.DiskIsAttached(diskName, instanceID)
+	for _, volumeID := range volumeIDs {
+		result, err := rs.DiskIsAttached(instanceID, volumeID)
 		if err != nil {
-			returnedErr = fmt.Errorf("Error in checking disk %q attached: %v \n %v", diskName, err, returnedErr)
+			returnedErr = fmt.Errorf("Error in checking disk %q attached: %v \n %v", volumeID, err, returnedErr)
 			continue
 		}
 		if result {
-			attached[diskName] = true
+			attached[volumeID] = true
 		}
 
 	}

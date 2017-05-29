@@ -22,16 +22,19 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
@@ -41,6 +44,7 @@ import (
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	autoscalinginformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/autoscaling/v1"
 	autoscalinglisters "k8s.io/kubernetes/pkg/client/listers/autoscaling/v1"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -81,14 +85,17 @@ type HorizontalController struct {
 	replicaCalc   *ReplicaCalculator
 	eventRecorder record.EventRecorder
 
+	upscaleForbiddenWindow   time.Duration
+	downscaleForbiddenWindow time.Duration
+
 	// hpaLister is able to list/get HPAs from the shared cache from the informer passed in to
 	// NewHorizontalController.
 	hpaLister       autoscalinglisters.HorizontalPodAutoscalerLister
 	hpaListerSynced cache.InformerSynced
-}
 
-var downscaleForbiddenWindow = 5 * time.Minute
-var upscaleForbiddenWindow = 3 * time.Minute
+	// Controllers that need to be synced
+	queue workqueue.RateLimitingInterface
+}
 
 func NewHorizontalController(
 	evtNamespacer v1core.EventsGetter,
@@ -97,57 +104,106 @@ func NewHorizontalController(
 	replicaCalc *ReplicaCalculator,
 	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
 	resyncPeriod time.Duration,
+	upscaleForbiddenWindow time.Duration,
+	downscaleForbiddenWindow time.Duration,
+
 ) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "horizontal-pod-autoscaler"})
 
-	controller := &HorizontalController{
-		replicaCalc:     replicaCalc,
-		eventRecorder:   recorder,
-		scaleNamespacer: scaleNamespacer,
-		hpaNamespacer:   hpaNamespacer,
+	hpaController := &HorizontalController{
+		replicaCalc:              replicaCalc,
+		eventRecorder:            recorder,
+		scaleNamespacer:          scaleNamespacer,
+		hpaNamespacer:            hpaNamespacer,
+		upscaleForbiddenWindow:   upscaleForbiddenWindow,
+		downscaleForbiddenWindow: downscaleForbiddenWindow,
+		queue: workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				hpa := obj.(*autoscalingv1.HorizontalPodAutoscaler)
-				err := controller.reconcileAutoscaler(hpa)
-				if err != nil {
-					glog.Warningf("Failed to reconcile %s: %v", hpa.Name, err)
-				}
-			},
-			UpdateFunc: func(old, cur interface{}) {
-				hpa := cur.(*autoscalingv1.HorizontalPodAutoscaler)
-				err := controller.reconcileAutoscaler(hpa)
-				if err != nil {
-					glog.Warningf("Failed to reconcile %s: %v", hpa.Name, err)
-				}
-			},
-			// We are not interested in deletions.
+			AddFunc:    hpaController.enqueueHPA,
+			UpdateFunc: hpaController.updateHPA,
+			DeleteFunc: hpaController.deleteHPA,
 		},
 		resyncPeriod,
 	)
-	controller.hpaLister = hpaInformer.Lister()
-	controller.hpaListerSynced = hpaInformer.Informer().HasSynced
+	hpaController.hpaLister = hpaInformer.Lister()
+	hpaController.hpaListerSynced = hpaInformer.Informer().HasSynced
 
-	return controller
+	return hpaController
 }
 
 func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+	defer a.queue.ShutDown()
 
-	glog.Infof("Starting HPA Controller")
+	glog.Infof("Starting HPA controller")
+	defer glog.Infof("Shutting down HPA controller")
 
-	if !cache.WaitForCacheSync(stopCh, a.hpaListerSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !controller.WaitForCacheSync("HPA", stopCh, a.hpaListerSynced) {
 		return
 	}
 
+	// start a single worker (we may wish to start more in the future)
+	go wait.Until(a.worker, time.Second, stopCh)
+
 	<-stopCh
-	glog.Infof("Shutting down HPA Controller")
+}
+
+// obj could be an *v1.HorizontalPodAutoscaler, or a DeletionFinalStateUnknown marker item.
+func (a *HorizontalController) updateHPA(old, cur interface{}) {
+	a.enqueueHPA(cur)
+}
+
+// obj could be an *v1.HorizontalPodAutoscaler, or a DeletionFinalStateUnknown marker item.
+func (a *HorizontalController) enqueueHPA(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+
+	// always add rate-limitted so we don't fetch metrics more that once per resync interval
+	a.queue.AddRateLimited(key)
+}
+
+func (a *HorizontalController) deleteHPA(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+
+	// TODO: could we leak if we fail to get the key?
+	a.queue.Forget(key)
+}
+
+func (a *HorizontalController) worker() {
+	for a.processNextWorkItem() {
+	}
+	glog.Infof("horizontal pod autoscaler controller worker shutting down")
+}
+
+func (a *HorizontalController) processNextWorkItem() bool {
+	key, quit := a.queue.Get()
+	if quit {
+		return false
+	}
+	defer a.queue.Done(key)
+
+	err := a.reconcileKey(key.(string))
+	if err == nil {
+		// don't "forget" here because we want to only process a given HPA once per resync interval
+		return true
+	}
+
+	a.queue.AddRateLimited(key)
+	utilruntime.HandleError(err)
+	return true
 }
 
 // Computes the desired number of replicas for the metric specifications listed in the HPA, returning the maximum
@@ -275,6 +331,21 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 	return replicas, metric, statuses, timestamp, nil
 }
 
+func (a *HorizontalController) reconcileKey(key string) error {
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+
+	hpa, err := a.hpaLister.HorizontalPodAutoscalers(namespace).Get(name)
+	if errors.IsNotFound(err) {
+		glog.Infof("Horizontal Pod Autoscaler has been deleted %v", key)
+		return nil
+	}
+
+	return a.reconcileAutoscaler(hpa)
+}
+
 func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.HorizontalPodAutoscaler) error {
 	// make a copy so that we never mutate the shared informer cache (conversion can mutate the object)
 	hpav1Raw, err := api.Scheme.DeepCopy(hpav1Shared)
@@ -363,11 +434,11 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 
 		// Do not upscale too much to prevent incorrect rapid increase of the number of master replicas caused by
 		// bogus CPU usage report from heapster/kubelet (like in issue #32304).
-		if desiredReplicas > calculateScaleUpLimit(currentReplicas) {
-			desiredReplicas = calculateScaleUpLimit(currentReplicas)
+		if scaleUpLimit := calculateScaleUpLimit(currentReplicas); desiredReplicas > scaleUpLimit {
+			desiredReplicas = scaleUpLimit
 		}
 
-		rescale = shouldScale(hpa, currentReplicas, desiredReplicas, timestamp)
+		rescale = a.shouldScale(hpa, currentReplicas, desiredReplicas, timestamp)
 	}
 
 	if rescale {
@@ -378,7 +449,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
 		}
 		a.eventRecorder.Eventf(hpa, v1.EventTypeNormal, "SuccessfulRescale", "New size: %d; reason: %s", desiredReplicas, rescaleReason)
-		glog.Infof("Successfull rescale of %s, old size: %d, new size: %d, reason: %s",
+		glog.Infof("Successful rescale of %s, old size: %d, new size: %d, reason: %s",
 			hpa.Name, currentReplicas, desiredReplicas, rescaleReason)
 	} else {
 		glog.V(4).Infof("decided not to scale %s to %v (last scale time was %s)", reference, desiredReplicas, hpa.Status.LastScaleTime)
@@ -388,7 +459,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	return a.updateStatus(hpa, currentReplicas, desiredReplicas, metricStatuses, rescale)
 }
 
-func shouldScale(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, timestamp time.Time) bool {
+func (a *HorizontalController) shouldScale(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, timestamp time.Time) bool {
 	if desiredReplicas == currentReplicas {
 		return false
 	}
@@ -399,13 +470,13 @@ func shouldScale(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, de
 
 	// Going down only if the usageRatio dropped significantly below the target
 	// and there was no rescaling in the last downscaleForbiddenWindow.
-	if desiredReplicas < currentReplicas && hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(timestamp) {
+	if desiredReplicas < currentReplicas && hpa.Status.LastScaleTime.Add(a.downscaleForbiddenWindow).Before(timestamp) {
 		return true
 	}
 
 	// Going up only if the usage ratio increased significantly above the target
 	// and there was no rescaling in the last upscaleForbiddenWindow.
-	if desiredReplicas > currentReplicas && hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(timestamp) {
+	if desiredReplicas > currentReplicas && hpa.Status.LastScaleTime.Add(a.upscaleForbiddenWindow).Before(timestamp) {
 		return true
 	}
 

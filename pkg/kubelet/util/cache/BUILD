@@ -12,7 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["object_cache.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/client-go/tools/cache"],
+    deps = ["//vendor/k8s.io/client-go/tools/cache:go_default_library"],
 )
 
 go_test(
@@ -21,8 +21,8 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//vendor:k8s.io/client-go/tools/cache",
-        "//vendor:k8s.io/client-go/util/clock",
+        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 

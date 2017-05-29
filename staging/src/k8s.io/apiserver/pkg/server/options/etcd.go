@@ -39,7 +39,11 @@ type EtcdOptions struct {
 	DefaultStorageMediaType string
 	DeleteCollectionWorkers int
 	EnableGarbageCollection bool
-	EnableWatchCache        bool
+
+	// Set EnableWatchCache to false to disable all watch caches
+	EnableWatchCache bool
+	// Set DefaultWatchCacheSize to zero to disable watch caches for those resources that have no explicit cache size set
+	DefaultWatchCacheSize int
 }
 
 func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
@@ -49,6 +53,7 @@ func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 		DeleteCollectionWorkers: 1,
 		EnableGarbageCollection: true,
 		EnableWatchCache:        true,
+		DefaultWatchCacheSize:   100,
 	}
 }
 
@@ -107,7 +112,7 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *EtcdOptions) ApplyTo(c *server.Config) error {
-	c.RESTOptionsGetter = &simpleRestOptionsFactory{Options: *s}
+	c.RESTOptionsGetter = &SimpleRestOptionsFactory{Options: *s}
 	return nil
 }
 
@@ -116,11 +121,11 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 	return nil
 }
 
-type simpleRestOptionsFactory struct {
+type SimpleRestOptionsFactory struct {
 	Options EtcdOptions
 }
 
-func (f *simpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret := generic.RESTOptions{
 		StorageConfig:           &f.Options.StorageConfig,
 		Decorator:               generic.UndecoratedStorage,
@@ -129,7 +134,7 @@ func (f *simpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 		ResourcePrefix:          f.Options.StorageConfig.Prefix + "/" + resource.Group + "/" + resource.Resource,
 	}
 	if f.Options.EnableWatchCache {
-		ret.Decorator = genericregistry.StorageWithCacher
+		ret.Decorator = genericregistry.StorageWithCacher(f.Options.DefaultWatchCacheSize)
 	}
 	return ret, nil
 }
@@ -153,7 +158,7 @@ func (f *storageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		ResourcePrefix:          f.StorageFactory.ResourcePrefix(resource),
 	}
 	if f.Options.EnableWatchCache {
-		ret.Decorator = genericregistry.StorageWithCacher
+		ret.Decorator = genericregistry.StorageWithCacher(f.Options.DefaultWatchCacheSize)
 	}
 
 	return ret, nil

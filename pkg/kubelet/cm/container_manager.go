@@ -51,7 +51,7 @@ type ContainerManager interface {
 	// Returns a noop implementation if qos cgroup hierarchy is not enabled
 	NewPodContainerManager() PodContainerManager
 
-	// GetMountedSubsystems returns the mounted cgroup subsytems on the node
+	// GetMountedSubsystems returns the mounted cgroup subsystems on the node
 	GetMountedSubsystems() *CgroupSubsystems
 
 	// GetQOSContainersInfo returns the names of top level QoS containers
@@ -74,7 +74,6 @@ type NodeConfig struct {
 	CgroupRoot            string
 	CgroupDriver          string
 	ProtectKernelDefaults bool
-	EnableCRI             bool
 	NodeAllocatableConfig
 	ExperimentalQOSReserved map[v1.ResourceName]int64
 }

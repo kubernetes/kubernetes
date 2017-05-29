@@ -18,10 +18,14 @@ package config
 
 import (
 	"bytes"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
 	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 func stringFlagFor(s string) flag.StringFlag {
@@ -160,7 +164,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			continue
 		}
 
-		if !opts.complete(cmd, buff) {
+		if err := opts.complete(cmd, buff); err != nil {
 			if !test.wantCompleteErr {
 				t.Errorf("case %d: complete() error for flags %q: %s", i, test.flags, buff)
 			}
@@ -185,6 +189,72 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 
 		if !reflect.DeepEqual(opts, test.wantOptions) {
 			t.Errorf("case %d: flags %q: mis-matched options,\nwanted=%#v\ngot=   %#v", i, test.flags, test.wantOptions, opts)
+		}
+	}
+}
+
+type createAuthInfoTest struct {
+	description    string
+	config         clientcmdapi.Config
+	args           []string
+	flags          []string
+	expected       string
+	expectedConfig clientcmdapi.Config
+}
+
+func TestCreateAuthInfo(t *testing.T) {
+	conf := clientcmdapi.Config{}
+	test := createAuthInfoTest{
+		description: "Testing for create aythinfo",
+		config:      conf,
+		args:        []string{"cluster-admin"},
+		flags: []string{
+			"--username=admin",
+			"--password=uXFGweU9l35qcif",
+		},
+		expected: `User "cluster-admin" set.` + "\n",
+		expectedConfig: clientcmdapi.Config{
+			AuthInfos: map[string]*clientcmdapi.AuthInfo{
+				"cluster-admin": {Username: "admin", Password: "uXFGweU9l35qcif"}},
+		},
+	}
+	test.run(t)
+}
+func (test createAuthInfoTest) run(t *testing.T) {
+	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer os.Remove(fakeKubeFile.Name())
+	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	pathOptions := clientcmd.NewDefaultPathOptions()
+	pathOptions.GlobalFile = fakeKubeFile.Name()
+	pathOptions.EnvVar = ""
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdConfigSetAuthInfo(buf, pathOptions)
+	cmd.SetArgs(test.args)
+	cmd.Flags().Parse(test.flags)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error executing command: %v,kubectl config set-credentials  args: %v,flags: %v", err, test.args, test.flags)
+	}
+	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
+	if err != nil {
+		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
+	}
+	if len(test.expected) != 0 {
+		if buf.String() != test.expected {
+			t.Errorf("Fail in %q:\n expected %v\n but got %v\n", test.description, test.expected, buf.String())
+		}
+	}
+	if test.expectedConfig.AuthInfos != nil {
+		expectAuthInfo := test.expectedConfig.AuthInfos[test.args[0]]
+		actualAuthInfo := config.AuthInfos[test.args[0]]
+		if expectAuthInfo.Username != actualAuthInfo.Username || expectAuthInfo.Password != actualAuthInfo.Password {
+			t.Errorf("Fail in %q:\n expected AuthInfo%v\n but found %v in kubeconfig\n", test.description, expectAuthInfo, actualAuthInfo)
 		}
 	}
 }

@@ -1542,3 +1542,29 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		Storage: s,
 	}
 }
+
+func TestFinalizeDelete(t *testing.T) {
+	// Verify that it returns the expected Status.
+	_, s := NewTestGenericStoreRegistry(t)
+	obj := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "random-uid"},
+	}
+	result, err := s.finalizeDelete(obj, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %s", err)
+	}
+	returnedObj := result.(*metav1.Status)
+
+	expectedObj := &metav1.Status{
+		Status: metav1.StatusSuccess,
+		Details: &metav1.StatusDetails{
+			Name:  "foo",
+			Group: s.QualifiedResource.Group,
+			Kind:  s.QualifiedResource.Resource,
+			UID:   "random-uid",
+		},
+	}
+	if !apiequality.Semantic.DeepEqual(expectedObj, returnedObj) {
+		t.Errorf("unexpected obj. expected %#v, got %#v", expectedObj, returnedObj)
+	}
+}

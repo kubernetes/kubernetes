@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
@@ -153,7 +153,7 @@ func (f *FakeControllerSource) getListItemsLocked() ([]runtime.Object, error) {
 		// Otherwise, if they make a change and write it back, they
 		// will inadvertently change our canonical copy (in
 		// addition to racing with other clients).
-		objCopy, err := api.Scheme.DeepCopy(obj)
+		objCopy, err := scheme.Scheme.DeepCopy(obj)
 		if err != nil {
 			return nil, err
 		}
@@ -170,16 +170,16 @@ func (f *FakeControllerSource) List(options metav1.ListOptions) (runtime.Object,
 	if err != nil {
 		return nil, err
 	}
-	listObj := &api.List{}
+	listObj := &v1.List{}
 	if err := meta.SetList(listObj, list); err != nil {
 		return nil, err
 	}
-	objMeta, err := metav1.ListMetaFor(listObj)
+	listAccessor, err := meta.ListAccessor(listObj)
 	if err != nil {
 		return nil, err
 	}
 	resourceVersion := len(f.changes)
-	objMeta.ResourceVersion = strconv.Itoa(resourceVersion)
+	listAccessor.SetResourceVersion(strconv.Itoa(resourceVersion))
 	return listObj, nil
 }
 
@@ -195,12 +195,12 @@ func (f *FakePVControllerSource) List(options metav1.ListOptions) (runtime.Objec
 	if err := meta.SetList(listObj, list); err != nil {
 		return nil, err
 	}
-	objMeta, err := metav1.ListMetaFor(listObj)
+	listAccessor, err := meta.ListAccessor(listObj)
 	if err != nil {
 		return nil, err
 	}
 	resourceVersion := len(f.changes)
-	objMeta.ResourceVersion = strconv.Itoa(resourceVersion)
+	listAccessor.SetResourceVersion(strconv.Itoa(resourceVersion))
 	return listObj, nil
 }
 
@@ -216,12 +216,12 @@ func (f *FakePVCControllerSource) List(options metav1.ListOptions) (runtime.Obje
 	if err := meta.SetList(listObj, list); err != nil {
 		return nil, err
 	}
-	objMeta, err := metav1.ListMetaFor(listObj)
+	listAccessor, err := meta.ListAccessor(listObj)
 	if err != nil {
 		return nil, err
 	}
 	resourceVersion := len(f.changes)
-	objMeta.ResourceVersion = strconv.Itoa(resourceVersion)
+	listAccessor.SetResourceVersion(strconv.Itoa(resourceVersion))
 	return listObj, nil
 }
 
@@ -242,7 +242,7 @@ func (f *FakeControllerSource) Watch(options metav1.ListOptions) (watch.Interfac
 			// it back, they will inadvertently change the our
 			// canonical copy (in addition to racing with other
 			// clients).
-			objCopy, err := api.Scheme.DeepCopy(c.Object)
+			objCopy, err := scheme.Scheme.DeepCopy(c.Object)
 			if err != nil {
 				return nil, err
 			}

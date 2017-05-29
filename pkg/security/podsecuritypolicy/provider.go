@@ -19,6 +19,7 @@ package podsecuritypolicy
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -194,7 +195,7 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 		return allErrs
 	}
 
-	fsGroups := []int64{}
+	fsGroups := []types.UnixGroupID{}
 	if pod.Spec.SecurityContext.FSGroup != nil {
 		fsGroups = append(fsGroups, *pod.Spec.SecurityContext.FSGroup)
 	}

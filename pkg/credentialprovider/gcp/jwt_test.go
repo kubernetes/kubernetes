@@ -60,7 +60,7 @@ mJAYH8WU+UAy9pecUnDZj14LAGNVmYcse8HFX71MoshnvCTFEPVo4rZxIAGwMpeJ
 5jgQ3slYLpqrGlcbLgUXBUgzEO684Wk/UV9DFPlHALVqCfXQ9dpJPg==
 -----END RSA PRIVATE KEY-----`
 
-	jsonKey = fmt.Sprintf(`{"private_key":"%[1]s", "client_email":"%[2]s"}`,
+	jsonKey = fmt.Sprintf(`{"private_key":"%[1]s", "client_email":"%[2]s", "type": "service_account"}`,
 		strings.Replace(dummyPrivateKey, "\n", "\\n", -1), email)
 )
 

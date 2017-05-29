@@ -30,12 +30,12 @@ import (
 )
 
 var (
-	deploymentLong = templates.LongDesc(`
-    Create a deployment with the specified name.`)
+	deploymentLong = templates.LongDesc(i18n.T(`
+    Create a deployment with the specified name.`))
 
-	deploymentExample = templates.Examples(`
+	deploymentExample = templates.Examples(i18n.T(`
     # Create a new deployment named my-dep that runs the busybox image.
-    kubectl create deployment my-dep --image=busybox`)
+    kubectl create deployment my-dep --image=busybox`))
 )
 
 // NewCmdCreateDeployment is a macro command to create a new deployment

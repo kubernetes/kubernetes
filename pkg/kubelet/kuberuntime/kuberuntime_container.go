@@ -35,7 +35,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -357,10 +357,10 @@ func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessag
 
 // readLastStringFromContainerLogs attempts to read up to the max log length from the end of the CRI log represented
 // by path. It reads up to max log lines.
-func readLastStringFromContainerLogs(path string) string {
+func (m *kubeGenericRuntimeManager) readLastStringFromContainerLogs(path string) string {
 	value := int64(kubecontainer.MaxContainerTerminationMessageLogLines)
 	buf, _ := circbuf.NewBuffer(kubecontainer.MaxContainerTerminationMessageLogLength)
-	if err := ReadLogs(path, &v1.PodLogOptions{TailLines: &value}, buf, buf); err != nil {
+	if err := m.ReadLogs(path, "", &v1.PodLogOptions{TailLines: &value}, buf, buf); err != nil {
 		return fmt.Sprintf("Error on reading termination message from logs: %v", err)
 	}
 	return buf.String()
@@ -385,48 +385,58 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			glog.Errorf("ContainerStatus for %s error: %v", c.Id, err)
 			return nil, err
 		}
-
-		annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
-		labeledInfo := getContainerInfoFromLabels(c.Labels)
-		cStatus := &kubecontainer.ContainerStatus{
-			ID: kubecontainer.ContainerID{
-				Type: m.runtimeName,
-				ID:   c.Id,
-			},
-			Name:         labeledInfo.ContainerName,
-			Image:        status.Image.Image,
-			ImageID:      status.ImageRef,
-			Hash:         annotatedInfo.Hash,
-			RestartCount: annotatedInfo.RestartCount,
-			State:        toKubeContainerState(c.State),
-			CreatedAt:    time.Unix(0, status.CreatedAt),
-		}
-
-		if c.State == runtimeapi.ContainerState_CONTAINER_RUNNING {
-			cStatus.StartedAt = time.Unix(0, status.StartedAt)
-		} else {
-			cStatus.Reason = status.Reason
-			cStatus.Message = status.Message
-			cStatus.ExitCode = int(status.ExitCode)
-			cStatus.FinishedAt = time.Unix(0, status.FinishedAt)
-
+		cStatus := toKubeContainerStatus(status, m.runtimeName)
+		if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
+			// Populate the termination message if needed.
+			annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
+			labeledInfo := getContainerInfoFromLabels(status.Labels)
 			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError && (cStatus.ExitCode != 0 || cStatus.Reason == "OOMKilled")
 			tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
 			if checkLogs {
 				path := buildFullContainerLogsPath(uid, labeledInfo.ContainerName, annotatedInfo.RestartCount)
-				tMessage = readLastStringFromContainerLogs(path)
+				tMessage = m.readLastStringFromContainerLogs(path)
 			}
 			// Use the termination message written by the application is not empty
 			if len(tMessage) != 0 {
 				cStatus.Message = tMessage
 			}
 		}
-
 		statuses[i] = cStatus
 	}
 
 	sort.Sort(containerStatusByCreated(statuses))
 	return statuses, nil
+}
+
+func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.ContainerStatus {
+	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
+	labeledInfo := getContainerInfoFromLabels(status.Labels)
+	cStatus := &kubecontainer.ContainerStatus{
+		ID: kubecontainer.ContainerID{
+			Type: runtimeName,
+			ID:   status.Id,
+		},
+		Name:         labeledInfo.ContainerName,
+		Image:        status.Image.Image,
+		ImageID:      status.ImageRef,
+		Hash:         annotatedInfo.Hash,
+		RestartCount: annotatedInfo.RestartCount,
+		State:        toKubeContainerState(status.State),
+		CreatedAt:    time.Unix(0, status.CreatedAt),
+	}
+
+	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {
+		// If container is not in the created state, we have tried and
+		// started the container. Set the StartedAt time.
+		cStatus.StartedAt = time.Unix(0, status.StartedAt)
+	}
+	if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
+		cStatus.Reason = status.Reason
+		cStatus.Message = status.Message
+		cStatus.ExitCode = int(status.ExitCode)
+		cStatus.FinishedAt = time.Unix(0, status.FinishedAt)
+	}
+	return cStatus
 }
 
 // generateContainerEvent generates an event for the container.
@@ -436,7 +446,7 @@ func (m *kubeGenericRuntimeManager) generateContainerEvent(containerID kubeconta
 		glog.Warningf("No ref for container %q", containerID)
 		return
 	}
-	m.recorder.Event(ref, eventType, reason, message)
+	m.recorder.Event(events.ToObjectReference(ref), eventType, reason, message)
 }
 
 // executePreStopHook runs the pre-stop lifecycle hooks if applicable and returns the duration it takes.
@@ -688,7 +698,7 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *v1.Pod, containerID ku
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 	path := buildFullContainerLogsPath(pod.UID, labeledInfo.ContainerName, annotatedInfo.RestartCount)
-	return ReadLogs(path, logOptions, stdout, stderr)
+	return m.ReadLogs(path, containerID.ID, logOptions, stdout, stderr)
 }
 
 // GetExec gets the endpoint the runtime will serve the exec request from.

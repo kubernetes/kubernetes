@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -48,13 +49,21 @@ import (
 // if it has volumes. It also verifies that the pods in the desired state of the
 // world cache still exist, if not, it removes them.
 type DesiredStateOfWorldPopulator interface {
-	Run(stopCh <-chan struct{})
+	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
 
 	// ReprocessPod removes the specified pod from the list of processedPods
 	// (if it exists) forcing it to be reprocessed. This is required to enable
 	// remounting volumes on pod updates (volumes like Downward API volumes
 	// depend on this behavior to ensure volume content is updated).
 	ReprocessPod(podName volumetypes.UniquePodName)
+
+	// HasAddedPods returns whether the populator has looped through the list
+	// of active pods and added them to the desired state of the world cache,
+	// at a time after sources are all ready, at least once. It does not
+	// return true before sources are all ready because before then, there is
+	// a chance many or all pods are missing from the list of active pods and
+	// so few to none will have been added.
+	HasAddedPods() bool
 }
 
 // NewDesiredStateOfWorldPopulator returns a new instance of
@@ -86,6 +95,8 @@ func NewDesiredStateOfWorldPopulator(
 			processedPods: make(map[volumetypes.UniquePodName]bool)},
 		kubeContainerRuntime:     kubeContainerRuntime,
 		keepTerminatedPodVolumes: keepTerminatedPodVolumes,
+		hasAddedPods:             false,
+		hasAddedPodsLock:         sync.RWMutex{},
 	}
 }
 
@@ -100,6 +111,8 @@ type desiredStateOfWorldPopulator struct {
 	kubeContainerRuntime      kubecontainer.Runtime
 	timeOfLastGetPodStatus    time.Time
 	keepTerminatedPodVolumes  bool
+	hasAddedPods              bool
+	hasAddedPodsLock          sync.RWMutex
 }
 
 type processedPods struct {
@@ -107,13 +120,28 @@ type processedPods struct {
 	sync.RWMutex
 }
 
-func (dswp *desiredStateOfWorldPopulator) Run(stopCh <-chan struct{}) {
+func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+	// Wait for the completion of a loop that started after sources are all ready, then set hasAddedPods accordingly
+	wait.PollUntil(dswp.loopSleepDuration, func() (bool, error) {
+		done := sourcesReady.AllReady()
+		dswp.populatorLoopFunc()()
+		return done, nil
+	}, stopCh)
+	dswp.hasAddedPodsLock.Lock()
+	dswp.hasAddedPods = true
+	dswp.hasAddedPodsLock.Unlock()
 	wait.Until(dswp.populatorLoopFunc(), dswp.loopSleepDuration, stopCh)
 }
 
 func (dswp *desiredStateOfWorldPopulator) ReprocessPod(
 	podName volumetypes.UniquePodName) {
 	dswp.deleteProcessedPod(podName)
+}
+
+func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
+	dswp.hasAddedPodsLock.RLock()
+	defer dswp.hasAddedPodsLock.RUnlock()
+	return dswp.hasAddedPods
 }
 
 func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
@@ -143,18 +171,7 @@ func (dswp *desiredStateOfWorldPopulator) isPodTerminated(pod *v1.Pod) bool {
 	if !found {
 		podStatus = pod.Status
 	}
-	return podStatus.Phase == v1.PodFailed || podStatus.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(podStatus.ContainerStatuses))
-}
-
-// notRunning returns true if every status is terminated or waiting, or the status list
-// is empty.
-func notRunning(statuses []v1.ContainerStatus) bool {
-	for _, status := range statuses {
-		if status.State.Terminated == nil && status.State.Waiting == nil {
-			return false
-		}
-	}
-	return true
+	return volumehelper.IsPodTerminated(pod, podStatus)
 }
 
 // Iterate through all pods and add to desired state of world if they don't
@@ -223,11 +240,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			continue
 		}
 
-		glog.V(5).Infof(
-			"Removing volume %q (volSpec=%q) for pod %q from desired state.",
-			volumeToMount.VolumeName,
-			volumeToMount.VolumeSpec.Name(),
-			format.Pod(volumeToMount.Pod))
+		glog.V(5).Infof(volumeToMount.GenerateMsgDetailed("Removing volume from desired state", ""))
 
 		dswp.desiredStateOfWorld.DeletePodFromVolume(
 			volumeToMount.PodName, volumeToMount.VolumeName)

@@ -182,14 +182,14 @@ func TestCanSupport(t *testing.T) {
 	assert.NoError(err)
 
 	specs := map[*volume.Spec]bool{
-		&volume.Spec{
+		{
 			Volume: &v1.Volume{
 				VolumeSource: v1.VolumeSource{
 					Flocker: &v1.FlockerVolumeSource{},
 				},
 			},
 		}: true,
-		&volume.Spec{
+		{
 			PersistentVolume: &v1.PersistentVolume{
 				Spec: v1.PersistentVolumeSpec{
 					PersistentVolumeSource: v1.PersistentVolumeSource{
@@ -198,7 +198,7 @@ func TestCanSupport(t *testing.T) {
 				},
 			},
 		}: true,
-		&volume.Spec{
+		{
 			Volume: &v1.Volume{
 				VolumeSource: v1.VolumeSource{},
 			},

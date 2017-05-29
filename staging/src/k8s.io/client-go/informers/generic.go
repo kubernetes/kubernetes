@@ -22,6 +22,7 @@ import (
 	"fmt"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
+	v1alpha1 "k8s.io/client-go/pkg/apis/admissionregistration/v1alpha1"
 	v1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 	v1 "k8s.io/client-go/pkg/apis/autoscaling/v1"
 	v2alpha1 "k8s.io/client-go/pkg/apis/autoscaling/v2alpha1"
@@ -29,8 +30,9 @@ import (
 	batch_v2alpha1 "k8s.io/client-go/pkg/apis/batch/v2alpha1"
 	certificates_v1beta1 "k8s.io/client-go/pkg/apis/certificates/v1beta1"
 	extensions_v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	networking_v1 "k8s.io/client-go/pkg/apis/networking/v1"
 	policy_v1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
-	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
+	rbac_v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	rbac_v1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	settings_v1alpha1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 	storage_v1 "k8s.io/client-go/pkg/apis/storage/v1"
@@ -64,7 +66,15 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=Apps, Version=V1beta1
+	// Group=Admissionregistration, Version=V1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("externaladmissionhookconfigurations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1alpha1().ExternalAdmissionHookConfigurations().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("initializerconfigurations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1alpha1().InitializerConfigurations().Informer()}, nil
+
+		// Group=Apps, Version=V1beta1
+	case v1beta1.SchemeGroupVersion.WithResource("controllerrevisions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().ControllerRevisions().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("deployments"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().Deployments().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("statefulsets"):
@@ -138,18 +148,22 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case extensions_v1beta1.SchemeGroupVersion.WithResource("thirdpartyresources"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1beta1().ThirdPartyResources().Informer()}, nil
 
+		// Group=Networking, Version=V1
+	case networking_v1.SchemeGroupVersion.WithResource("networkpolicies"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1().NetworkPolicies().Informer()}, nil
+
 		// Group=Policy, Version=V1beta1
 	case policy_v1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Policy().V1beta1().PodDisruptionBudgets().Informer()}, nil
 
 		// Group=Rbac, Version=V1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("clusterroles"):
+	case rbac_v1alpha1.SchemeGroupVersion.WithResource("clusterroles"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1alpha1().ClusterRoles().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("clusterrolebindings"):
+	case rbac_v1alpha1.SchemeGroupVersion.WithResource("clusterrolebindings"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1alpha1().ClusterRoleBindings().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("roles"):
+	case rbac_v1alpha1.SchemeGroupVersion.WithResource("roles"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1alpha1().Roles().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("rolebindings"):
+	case rbac_v1alpha1.SchemeGroupVersion.WithResource("rolebindings"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1alpha1().RoleBindings().Informer()}, nil
 
 		// Group=Rbac, Version=V1beta1

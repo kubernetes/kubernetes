@@ -34,6 +34,8 @@ type FakeNetworkPolicies struct {
 
 var networkpoliciesResource = schema.GroupVersionResource{Group: "extensions", Version: "", Resource: "networkpolicies"}
 
+var networkpoliciesKind = schema.GroupVersionKind{Group: "extensions", Version: "", Kind: "NetworkPolicy"}
+
 func (c *FakeNetworkPolicies) Create(networkPolicy *extensions.NetworkPolicy) (result *extensions.NetworkPolicy, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(networkpoliciesResource, c.ns, networkPolicy), &extensions.NetworkPolicy{})
@@ -80,7 +82,7 @@ func (c *FakeNetworkPolicies) Get(name string, options v1.GetOptions) (result *e
 
 func (c *FakeNetworkPolicies) List(opts v1.ListOptions) (result *extensions.NetworkPolicyList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(networkpoliciesResource, c.ns, opts), &extensions.NetworkPolicyList{})
+		Invokes(testing.NewListAction(networkpoliciesResource, networkpoliciesKind, c.ns, opts), &extensions.NetworkPolicyList{})
 
 	if obj == nil {
 		return nil, err

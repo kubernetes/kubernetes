@@ -33,6 +33,8 @@ type FakeThirdPartyResources struct {
 
 var thirdpartyresourcesResource = schema.GroupVersionResource{Group: "extensions", Version: "", Resource: "thirdpartyresources"}
 
+var thirdpartyresourcesKind = schema.GroupVersionKind{Group: "extensions", Version: "", Kind: "ThirdPartyResource"}
+
 func (c *FakeThirdPartyResources) Create(thirdPartyResource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(thirdpartyresourcesResource, thirdPartyResource), &extensions.ThirdPartyResource{})
@@ -75,7 +77,7 @@ func (c *FakeThirdPartyResources) Get(name string, options v1.GetOptions) (resul
 
 func (c *FakeThirdPartyResources) List(opts v1.ListOptions) (result *extensions.ThirdPartyResourceList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(thirdpartyresourcesResource, opts), &extensions.ThirdPartyResourceList{})
+		Invokes(testing.NewRootListAction(thirdpartyresourcesResource, thirdpartyresourcesKind, opts), &extensions.ThirdPartyResourceList{})
 	if obj == nil {
 		return nil, err
 	}

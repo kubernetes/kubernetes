@@ -30,11 +30,11 @@ go_library(
         "//pkg/client/listers/rbac/internalversion:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
-        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
-        "//vendor:k8s.io/apiserver/pkg/authorization/authorizerfactory",
-        "//vendor:k8s.io/apiserver/pkg/authorization/union",
-        "//vendor:k8s.io/apiserver/plugin/pkg/authorizer/webhook",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/authorization/union:go_default_library",
+        "//vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook:go_default_library",
     ],
 )
 

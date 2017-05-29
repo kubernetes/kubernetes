@@ -40,6 +40,7 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 	cfg.Global.Datastore = os.Getenv("VSPHERE_DATASTORE")
 	cfg.Disk.SCSIControllerType = os.Getenv("VSPHERE_SCSICONTROLLER_TYPE")
 	cfg.Global.WorkingDir = os.Getenv("VSPHERE_WORKING_DIR")
+	cfg.Global.VMName = os.Getenv("VSPHERE_VM_NAME")
 	if os.Getenv("VSPHERE_INSECURE") != "" {
 		InsecureFlag, err = strconv.ParseBool(os.Getenv("VSPHERE_INSECURE"))
 	} else {
@@ -71,6 +72,7 @@ password = password
 insecure-flag = true
 datacenter = us-west
 vm-uuid = 1234
+vm-name = vmname
 `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
@@ -86,6 +88,10 @@ vm-uuid = 1234
 
 	if cfg.Global.VMUUID != "1234" {
 		t.Errorf("incorrect vm-uuid: %s", cfg.Global.VMUUID)
+	}
+
+	if cfg.Global.VMName != "vmname" {
+		t.Errorf("incorrect vm-name: %s", cfg.Global.VMName)
 	}
 }
 
@@ -156,21 +162,16 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances() returned false")
 	}
 
-	srvs, err := vs.list("*")
+	nodeName, err := vs.CurrentNodeName("")
 	if err != nil {
-		t.Fatalf("list() failed: %s", err)
+		t.Fatalf("CurrentNodeName() failed: %s", err)
 	}
 
-	if len(srvs) == 0 {
-		t.Fatalf("list() returned zero servers")
-	}
-	t.Logf("Found servers (%d): %s\n", len(srvs), srvs)
-
-	externalId, err := i.ExternalID(srvs[0])
+	externalId, err := i.ExternalID(nodeName)
 	if err != nil {
-		t.Fatalf("Instances.ExternalID(%s) failed: %s", srvs[0], err)
+		t.Fatalf("Instances.ExternalID(%s) failed: %s", nodeName, err)
 	}
-	t.Logf("Found ExternalID(%s) = %s\n", srvs[0], externalId)
+	t.Logf("Found ExternalID(%s) = %s\n", nodeName, externalId)
 
 	nonExistingVM := types.NodeName(rand.String(15))
 	externalId, err = i.ExternalID(nonExistingVM)
@@ -182,11 +183,11 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances.ExternalID did not fail as expected, err: %v", err)
 	}
 
-	instanceId, err := i.InstanceID(srvs[0])
+	instanceId, err := i.InstanceID(nodeName)
 	if err != nil {
-		t.Fatalf("Instances.InstanceID(%s) failed: %s", srvs[0], err)
+		t.Fatalf("Instances.InstanceID(%s) failed: %s", nodeName, err)
 	}
-	t.Logf("Found InstanceID(%s) = %s\n", srvs[0], instanceId)
+	t.Logf("Found InstanceID(%s) = %s\n", nodeName, instanceId)
 
 	instanceId, err = i.InstanceID(nonExistingVM)
 	if err == cloudprovider.InstanceNotFound {
@@ -197,11 +198,11 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances.InstanceID did not fail as expected, err: %v", err)
 	}
 
-	addrs, err := i.NodeAddresses(srvs[0])
+	addrs, err := i.NodeAddresses(nodeName)
 	if err != nil {
-		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", srvs[0], err)
+		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", nodeName, err)
 	}
-	t.Logf("Found NodeAddresses(%s) = %s\n", srvs[0], addrs)
+	t.Logf("Found NodeAddresses(%s) = %s\n", nodeName, addrs)
 }
 
 func TestVolumes(t *testing.T) {
@@ -215,12 +216,9 @@ func TestVolumes(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
 
-	srvs, err := vs.list("*")
+	nodeName, err := vs.CurrentNodeName("")
 	if err != nil {
-		t.Fatalf("list() failed: %s", err)
-	}
-	if len(srvs) == 0 {
-		t.Fatalf("list() returned zero servers")
+		t.Fatalf("CurrentNodeName() failed: %s", err)
 	}
 
 	volumeOptions := &VolumeOptions{
@@ -234,14 +232,14 @@ func TestVolumes(t *testing.T) {
 		t.Fatalf("Cannot create a new VMDK volume: %v", err)
 	}
 
-	_, _, err = vs.AttachDisk(volPath, "")
+	_, _, err = vs.AttachDisk(volPath, "", "")
 	if err != nil {
-		t.Fatalf("Cannot attach volume(%s) to VM(%s): %v", volPath, srvs[0], err)
+		t.Fatalf("Cannot attach volume(%s) to VM(%s): %v", volPath, nodeName, err)
 	}
 
 	err = vs.DetachDisk(volPath, "")
 	if err != nil {
-		t.Fatalf("Cannot detach disk(%s) from VM(%s): %v", volPath, srvs[0], err)
+		t.Fatalf("Cannot detach disk(%s) from VM(%s): %v", volPath, nodeName, err)
 	}
 
 	// todo: Deleting a volume after detach currently not working through API or UI (vSphere)
@@ -249,4 +247,37 @@ func TestVolumes(t *testing.T) {
 	// if err != nil {
 	// 	t.Fatalf("Cannot delete VMDK volume %s: %v", volPath, err)
 	// }
+}
+
+func TestGetVMName(t *testing.T) {
+	cfg, ok := configFromEnv()
+	if !ok {
+		t.Skipf("No config found in environment")
+	}
+
+	// Create vSphere configuration object
+	vs, err := newVSphere(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
+	}
+
+	// Create context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create vSphere client
+	err = vSphereLogin(ctx, vs)
+	if err != nil {
+		t.Errorf("Failed to create vSpere client: %s", err)
+	}
+	defer vs.client.Logout(ctx)
+
+	// Get VM name
+	vmName, err := getVMName(vs.client, &cfg)
+	if err != nil {
+		t.Fatalf("Failed to get VM name: %s", err)
+	}
+	if vmName != "vmname" {
+		t.Errorf("Expect VM name 'vmname', got: %s", vmName)
+	}
 }

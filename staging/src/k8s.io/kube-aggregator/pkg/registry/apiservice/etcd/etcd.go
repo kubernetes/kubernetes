@@ -18,9 +18,10 @@ package etcd
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/registry/apiservice"
 )
@@ -31,25 +32,47 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against API services.
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST {
+	strategy := apiservice.NewStrategy(scheme)
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
-		NewFunc:     func() runtime.Object { return &apiregistration.APIService{} },
-		NewListFunc: func() runtime.Object { return &apiregistration.APIServiceList{} },
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*apiregistration.APIService).Name, nil
-		},
+		Copier:            scheme,
+		NewFunc:           func() runtime.Object { return &apiregistration.APIService{} },
+		NewListFunc:       func() runtime.Object { return &apiregistration.APIServiceList{} },
 		PredicateFunc:     apiservice.MatchAPIService,
 		QualifiedResource: apiregistration.Resource("apiservices"),
-		WatchCacheSize:    100,
 
-		CreateStrategy: apiservice.Strategy,
-		UpdateStrategy: apiservice.Strategy,
-		DeleteStrategy: apiservice.Strategy,
+		CreateStrategy: strategy,
+		UpdateStrategy: strategy,
+		DeleteStrategy: strategy,
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: apiservice.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
 	return &REST{store}
+}
+
+// NewStatusREST makes a RESTStorage for status that has more limited options.
+// It is based on the original REST so that we can share the same underlying store
+func NewStatusREST(scheme *runtime.Scheme, rest *REST) *StatusREST {
+	statusStore := *rest.Store
+	statusStore.CreateStrategy = nil
+	statusStore.DeleteStrategy = nil
+	statusStore.UpdateStrategy = apiservice.NewStatusStrategy(scheme)
+	return &StatusREST{store: &statusStore}
+}
+
+type StatusREST struct {
+	store *genericregistry.Store
+}
+
+var _ = rest.Updater(&StatusREST{})
+
+func (r *StatusREST) New() runtime.Object {
+	return &apiregistration.APIService{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo)
 }

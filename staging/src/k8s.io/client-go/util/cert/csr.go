@@ -51,7 +51,7 @@ func MakeCSRFromTemplate(privateKey interface{}, template *x509.CertificateReque
 	}
 
 	csrPemBlock := &pem.Block{
-		Type:  "CERTIFICATE REQUEST",
+		Type:  CertificateRequestBlockType,
 		Bytes: csrDER,
 	}
 

@@ -130,17 +130,10 @@ kube::swagger::gen_api_ref_docs() {
   while read file; do
     if [[ -e "${output_dir}/${file}" && -e "${output_tmp}/${file}" ]]; then
       echo "comparing ${output_dir}/${file} with ${output_tmp}/${file}"
-      # Filter all munges from original content.
-      original=$(cat "${output_dir}/${file}")
-      generated=$(cat "${output_tmp}/${file}")
-
-      # Filter out meaningless lines with timestamps
-      original=$(echo "${original}" | grep -v "Last updated" || :)
-      generated=$(echo "${generated}" | grep -v "Last updated" || :)
 
       # By now, the contents should be normalized and stripped of any
       # auto-managed content.
-      if diff -B >/dev/null <(echo "${original}") <(echo "${generated}"); then
+      if diff -NauprB -I 'Last update' "${output_dir}/${file}" "${output_tmp}/${file}" >/dev/null; then
         # actual contents same, overwrite generated with original.
         cp "${output_dir}/${file}" "${output_tmp}/${file}"
       fi

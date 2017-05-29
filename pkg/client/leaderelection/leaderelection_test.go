@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package leaderelection implements leader election of a set of endpoints.
-// It uses an annotation in the endpoints object to store the record of the
-// election state.
-
 package leaderelection
 
 import (
@@ -32,11 +28,28 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
-	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	fakecorev1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1/fake"
 	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 )
 
-func TestTryAcquireOrRenew(t *testing.T) {
+func createLockObject(objectType string, objectMeta metav1.ObjectMeta) (obj runtime.Object) {
+	switch objectType {
+	case "endpoints":
+		obj = &v1.Endpoints{ObjectMeta: objectMeta}
+	case "configmaps":
+		obj = &v1.ConfigMap{ObjectMeta: objectMeta}
+	default:
+		panic("unexpected objType:" + objectType)
+	}
+	return
+}
+
+// Will test leader election using endpoints as the resource
+func TestTryAcquireOrRenewEndpoints(t *testing.T) {
+	testTryAcquireOrRenew(t, "endpoints")
+}
+
+func testTryAcquireOrRenew(t *testing.T, objectType string) {
 	future := time.Now().Add(1000 * time.Hour)
 	past := time.Now().Add(-1000 * time.Hour)
 
@@ -52,7 +65,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		transitionLeader bool
 		outHolder        string
 	}{
-		// acquire from no endpoints
+		// acquire from no object
 		{
 			reactors: []struct {
 				verb     string
@@ -67,14 +80,14 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "create",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(core.CreateAction).GetObject().(*v1.Endpoints), nil
+						return true, action.(core.CreateAction).GetObject(), nil
 					},
 				},
 			},
 			expectSuccess: true,
 			outHolder:     "baz",
 		},
-		// acquire from unled endpoints
+		// acquire from unled object
 		{
 			reactors: []struct {
 				verb     string
@@ -83,18 +96,17 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, &v1.Endpoints{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: action.GetNamespace(),
-								Name:      action.(core.GetAction).GetName(),
-							},
-						}, nil
+						objectMeta := metav1.ObjectMeta{
+							Namespace: action.GetNamespace(),
+							Name:      action.(core.GetAction).GetName(),
+						}
+						return true, createLockObject(objectType, objectMeta), nil
 					},
 				},
 				{
 					verb: "update",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(core.CreateAction).GetObject().(*v1.Endpoints), nil
+						return true, action.(core.CreateAction).GetObject(), nil
 					},
 				},
 			},
@@ -103,7 +115,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 			transitionLeader: true,
 			outHolder:        "baz",
 		},
-		// acquire from led, unacked endpoints
+		// acquire from led, unacked object
 		{
 			reactors: []struct {
 				verb     string
@@ -112,21 +124,20 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, &v1.Endpoints{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: action.GetNamespace(),
-								Name:      action.(core.GetAction).GetName(),
-								Annotations: map[string]string{
-									rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
-								},
+						objectMeta := metav1.ObjectMeta{
+							Namespace: action.GetNamespace(),
+							Name:      action.(core.GetAction).GetName(),
+							Annotations: map[string]string{
+								rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
 							},
-						}, nil
+						}
+						return true, createLockObject(objectType, objectMeta), nil
 					},
 				},
 				{
 					verb: "update",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(core.CreateAction).GetObject().(*v1.Endpoints), nil
+						return true, action.(core.CreateAction).GetObject(), nil
 					},
 				},
 			},
@@ -137,7 +148,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 			transitionLeader: true,
 			outHolder:        "baz",
 		},
-		// don't acquire from led, acked endpoints
+		// don't acquire from led, acked object
 		{
 			reactors: []struct {
 				verb     string
@@ -146,15 +157,14 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, &v1.Endpoints{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: action.GetNamespace(),
-								Name:      action.(core.GetAction).GetName(),
-								Annotations: map[string]string{
-									rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
-								},
+						objectMeta := metav1.ObjectMeta{
+							Namespace: action.GetNamespace(),
+							Name:      action.(core.GetAction).GetName(),
+							Annotations: map[string]string{
+								rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
 							},
-						}, nil
+						}
+						return true, createLockObject(objectType, objectMeta), nil
 					},
 				},
 			},
@@ -163,7 +173,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 			expectSuccess: false,
 			outHolder:     "bing",
 		},
-		// renew already acquired endpoints
+		// renew already acquired object
 		{
 			reactors: []struct {
 				verb     string
@@ -172,21 +182,20 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				{
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, &v1.Endpoints{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: action.GetNamespace(),
-								Name:      action.(core.GetAction).GetName(),
-								Annotations: map[string]string{
-									rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"baz"}`,
-								},
+						objectMeta := metav1.ObjectMeta{
+							Namespace: action.GetNamespace(),
+							Name:      action.(core.GetAction).GetName(),
+							Annotations: map[string]string{
+								rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"baz"}`,
 							},
-						}, nil
+						}
+						return true, createLockObject(objectType, objectMeta), nil
 					},
 				},
 				{
 					verb: "update",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(core.CreateAction).GetObject().(*v1.Endpoints), nil
+						return true, action.(core.CreateAction).GetObject(), nil
 					},
 				},
 			},
@@ -203,17 +212,39 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(1)
 		var reportedLeader string
+		var lock rl.Interface
 
-		lock := rl.EndpointsLock{
-			EndpointsMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
-			LockConfig: rl.ResourceLockConfig{
-				Identity:      "baz",
-				EventRecorder: &record.FakeRecorder{},
-			},
+		objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+		resourceLockConfig := rl.ResourceLockConfig{
+			Identity:      "baz",
+			EventRecorder: &record.FakeRecorder{},
+		}
+		c := &fakecorev1.FakeCoreV1{Fake: &core.Fake{}}
+		for _, reactor := range test.reactors {
+			c.AddReactor(reactor.verb, objectType, reactor.reaction)
+		}
+		c.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
+			t.Errorf("[%v] unreachable action. testclient called too many times: %+v", i, action)
+			return true, nil, fmt.Errorf("unreachable action")
+		})
+
+		switch objectType {
+		case "endpoints":
+			lock = &rl.EndpointsLock{
+				EndpointsMeta: objectMeta,
+				LockConfig:    resourceLockConfig,
+				Client:        c,
+			}
+		case "configmaps":
+			lock = &rl.ConfigMapLock{
+				ConfigMapMeta: objectMeta,
+				LockConfig:    resourceLockConfig,
+				Client:        c,
+			}
 		}
 
 		lec := LeaderElectionConfig{
-			Lock:          &lock,
+			Lock:          lock,
 			LeaseDuration: 10 * time.Second,
 			Callbacks: LeaderCallbacks{
 				OnNewLeader: func(l string) {
@@ -222,21 +253,11 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				},
 			},
 		}
-		c := &fakeclientset.Clientset{Fake: core.Fake{}}
-		for _, reactor := range test.reactors {
-			c.AddReactor(reactor.verb, "endpoints", reactor.reaction)
-		}
-		c.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
-			t.Errorf("[%v] unreachable action. testclient called too many times: %+v", i, action)
-			return true, nil, fmt.Errorf("uncreachable action")
-		})
-
 		le := &LeaderElector{
 			config:         lec,
 			observedRecord: test.observedRecord,
 			observedTime:   test.observedTime,
 		}
-		lock.Client = c
 
 		if test.expectSuccess != le.tryAcquireOrRenew() {
 			t.Errorf("[%v]unexpected result of tryAcquireOrRenew: [succeded=%v]", i, !test.expectSuccess)
@@ -263,4 +284,9 @@ func TestTryAcquireOrRenew(t *testing.T) {
 			t.Errorf("[%v]reported leader was not the new leader. expected %q, got %q", i, test.outHolder, reportedLeader)
 		}
 	}
+}
+
+// Will test leader election using configmap as the resource
+func TestTryAcquireOrRenewConfigMaps(t *testing.T) {
+	testTryAcquireOrRenew(t, "configmaps")
 }

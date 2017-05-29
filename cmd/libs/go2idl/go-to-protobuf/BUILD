@@ -20,7 +20,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/libs/go2idl/go-to-protobuf/protobuf:go_default_library",
-        "//vendor:github.com/spf13/pflag",
+        "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
 

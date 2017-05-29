@@ -42,7 +42,6 @@ import (
 	"k8s.io/client-go/util/homedir"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -456,6 +455,9 @@ func (f *ring0Factory) DefaultNamespace() (string, bool, error) {
 }
 
 const (
+	// TODO(sig-cli): Enforce consistent naming for generators here.
+	// See discussion in https://github.com/kubernetes/kubernetes/issues/46237
+	// before you add any more.
 	RunV1GeneratorName                      = "run/v1"
 	RunPodV1GeneratorName                   = "run-pod/v1"
 	ServiceV1GeneratorName                  = "service/v1"
@@ -483,6 +485,7 @@ const (
 	RoleBindingV1GeneratorName              = "rolebinding.rbac.authorization.k8s.io/v1alpha1"
 	ClusterV1Beta1GeneratorName             = "cluster/v1beta1"
 	PodDisruptionBudgetV1GeneratorName      = "poddisruptionbudget/v1beta1"
+	PodDisruptionBudgetV2GeneratorName      = "poddisruptionbudget/v1beta1/v2"
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
@@ -595,7 +598,7 @@ See http://kubernetes.io/docs/user-guide/services-firewalls for more details.
 			out.Write([]byte(msg))
 		}
 
-		if _, ok := obj.Annotations[service.AnnotationLoadBalancerSourceRangesKey]; ok {
+		if _, ok := obj.Annotations[api.AnnotationLoadBalancerSourceRangesKey]; ok {
 			msg := fmt.Sprintf(
 				`You are using service annotation [service.beta.kubernetes.io/load-balancer-source-ranges].
 It has been promoted to field [loadBalancerSourceRanges] in service spec. This annotation will be deprecated in the future.

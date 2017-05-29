@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: server
+spec:
+  replicas: 1
+  selector:
+    role: server
+  template:
+    metadata:
+      labels:
+        role: server
+    spec:
+      containers:
+      - name: server
+        image: nginx
+        volumeMounts:
+          - mountPath: /var/lib/www/html
+            name: cinderpvc
+      volumes:
+        - name: cinderpvc
+          persistentVolumeClaim:
+            claimName: claim1

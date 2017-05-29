@@ -18,7 +18,7 @@ import "github.com/coreos/etcd/raft/raftpb"
 
 type encoder interface {
 	// encode encodes the given message to an output stream.
-	encode(m raftpb.Message) error
+	encode(m *raftpb.Message) error
 }
 
 type decoder interface {

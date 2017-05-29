@@ -19,6 +19,7 @@ package user
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -49,8 +50,8 @@ func TestNonRootGenerate(t *testing.T) {
 }
 
 func TestNonRootValidate(t *testing.T) {
-	var uid int64 = 1
-	var badUID int64 = 0
+	goodUID := types.UnixUserID(1)
+	badUID := types.UnixUserID(0)
 	s, err := NewRunAsNonRoot(&extensions.RunAsUserStrategyOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error initializing NewMustRunAs %v", err)
@@ -66,7 +67,7 @@ func TestNonRootValidate(t *testing.T) {
 		t.Errorf("expected errors from root uid but got none")
 	}
 
-	container.SecurityContext.RunAsUser = &uid
+	container.SecurityContext.RunAsUser = &goodUID
 	errs = s.Validate(nil, container)
 	if len(errs) != 0 {
 		t.Errorf("expected no errors from non-root uid but got %v", errs)

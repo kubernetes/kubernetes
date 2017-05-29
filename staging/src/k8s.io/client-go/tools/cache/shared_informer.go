@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/clock"
 
 	"github.com/golang/glog"
 )
@@ -96,7 +96,7 @@ type InformerSynced func() bool
 const syncedPollPeriod = 100 * time.Millisecond
 
 // WaitForCacheSync waits for caches to populate.  It returns true if it was successful, false
-// if the contoller should shutdown
+// if the controller should shutdown
 func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool {
 	err := wait.PollUntil(syncedPollPeriod,
 		func() (bool, error) {
@@ -150,7 +150,7 @@ type sharedIndexInformer struct {
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
-// where a caller can `Run`.  The run method is disonnected in this case, because higher
+// where a caller can `Run`.  The run method is disconnected in this case, because higher
 // level logic will decide when to start the SharedInformer and related controller.
 // Because returning information back is always asynchronous, the legacy callers shouldn't
 // notice any change in behavior.

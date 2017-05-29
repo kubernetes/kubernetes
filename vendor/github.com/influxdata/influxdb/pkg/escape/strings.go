@@ -20,6 +20,10 @@ func init() {
 }
 
 func UnescapeString(in string) string {
+	if strings.IndexByte(in, '\\') == -1 {
+		return in
+	}
+
 	for b, esc := range codesStr {
 		in = strings.Replace(in, esc, b, -1)
 	}

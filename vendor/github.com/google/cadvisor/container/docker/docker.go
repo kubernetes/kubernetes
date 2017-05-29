@@ -17,6 +17,7 @@ package docker
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -39,6 +40,7 @@ func Status() (v1.DockerStatus, error) {
 
 	out := v1.DockerStatus{}
 	out.Version = VersionString()
+	out.APIVersion = APIVersionString()
 	out.KernelVersion = machine.KernelVersion()
 	out.OS = dockerInfo.OperatingSystem
 	out.Hostname = dockerInfo.Name
@@ -105,7 +107,7 @@ func ValidateInfo() (*dockertypes.Info, error) {
 		}
 		dockerInfo.ServerVersion = version.Version
 	}
-	version, err := parseDockerVersion(dockerInfo.ServerVersion)
+	version, err := parseVersion(dockerInfo.ServerVersion, version_re, 3)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +131,11 @@ func ValidateInfo() (*dockertypes.Info, error) {
 }
 
 func Version() ([]int, error) {
-	return parseDockerVersion(VersionString())
+	return parseVersion(VersionString(), version_re, 3)
+}
+
+func APIVersion() ([]int, error) {
+	return parseVersion(APIVersionString(), apiversion_re, 2)
 }
 
 func VersionString() string {
@@ -144,18 +150,29 @@ func VersionString() string {
 	return docker_version
 }
 
-// TODO: switch to a semantic versioning library.
-func parseDockerVersion(full_version_string string) ([]int, error) {
-	matches := version_re.FindAllStringSubmatch(full_version_string, -1)
+func APIVersionString() string {
+	docker_api_version := "Unknown"
+	client, err := Client()
+	if err == nil {
+		version, err := client.ServerVersion(context.Background())
+		if err == nil {
+			docker_api_version = version.APIVersion
+		}
+	}
+	return docker_api_version
+}
+
+func parseVersion(version_string string, regex *regexp.Regexp, length int) ([]int, error) {
+	matches := regex.FindAllStringSubmatch(version_string, -1)
 	if len(matches) != 1 {
-		return nil, fmt.Errorf("version string \"%v\" doesn't match expected regular expression: \"%v\"", full_version_string, version_regexp_string)
+		return nil, fmt.Errorf("version string \"%v\" doesn't match expected regular expression: \"%v\"", version_string, regex.String())
 	}
 	version_string_array := matches[0][1:]
-	version_array := make([]int, 3)
-	for index, version_string := range version_string_array {
-		version, err := strconv.Atoi(version_string)
+	version_array := make([]int, length)
+	for index, version_str := range version_string_array {
+		version, err := strconv.Atoi(version_str)
 		if err != nil {
-			return nil, fmt.Errorf("error while parsing \"%v\" in \"%v\"", version_string, full_version_string)
+			return nil, fmt.Errorf("error while parsing \"%v\" in \"%v\"", version_str, version_string)
 		}
 		version_array[index] = version
 	}

@@ -28,12 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/client-go/pkg/api"
-	_ "k8s.io/client-go/pkg/api/install" // To register api.Pod used in tests below
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/v1/ref"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/util/clock"
 )
 
 type testEventSink struct {
@@ -119,8 +119,8 @@ func TestEventf(t *testing.T) {
 			UID:       "differentUid",
 		},
 	}
-	testRef, err := v1.GetPartialReference(api.Scheme, testPod, "spec.containers[2]")
-	testRef2, err := v1.GetPartialReference(api.Scheme, testPod2, "spec.containers[3]")
+	testRef, err := ref.GetPartialReference(scheme.Scheme, testPod, "spec.containers[2]")
+	testRef2, err := ref.GetPartialReference(scheme.Scheme, testPod2, "spec.containers[3]")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,7 +375,7 @@ func TestEventf(t *testing.T) {
 }
 
 func recorderWithFakeClock(eventSource v1.EventSource, eventBroadcaster EventBroadcaster, clock clock.Clock) EventRecorder {
-	return &recorderImpl{api.Scheme, eventSource, eventBroadcaster.(*eventBroadcasterImpl).Broadcaster, clock}
+	return &recorderImpl{scheme.Scheme, eventSource, eventBroadcaster.(*eventBroadcasterImpl).Broadcaster, clock}
 }
 
 func TestWriteEventError(t *testing.T) {
@@ -496,7 +496,7 @@ func TestLotsOfEvents(t *testing.T) {
 	logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 		loggerCalled <- struct{}{}
 	})
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "eventTest"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "eventTest"})
 	ref := &v1.ObjectReference{
 		Kind:       "Pod",
 		Name:       "foo",
@@ -531,7 +531,7 @@ func TestEventfNoNamespace(t *testing.T) {
 			UID:      "bar",
 		},
 	}
-	testRef, err := v1.GetPartialReference(api.Scheme, testPod, "spec.containers[2]")
+	testRef, err := ref.GetPartialReference(scheme.Scheme, testPod, "spec.containers[2]")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -637,8 +637,8 @@ func TestMultiSinkCache(t *testing.T) {
 			UID:       "differentUid",
 		},
 	}
-	testRef, err := v1.GetPartialReference(api.Scheme, testPod, "spec.containers[2]")
-	testRef2, err := v1.GetPartialReference(api.Scheme, testPod2, "spec.containers[3]")
+	testRef, err := ref.GetPartialReference(scheme.Scheme, testPod, "spec.containers[2]")
+	testRef2, err := ref.GetPartialReference(scheme.Scheme, testPod2, "spec.containers[3]")
 	if err != nil {
 		t.Fatal(err)
 	}

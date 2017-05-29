@@ -17,21 +17,30 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
+	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/version"
 )
 
+type Version struct {
+	ClientVersion *apimachineryversion.Info `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
+	ServerVersion *apimachineryversion.Info `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
+}
+
 var (
-	version_example = templates.Examples(`
+	versionExample = templates.Examples(i18n.T(`
 		# Print the client and server versions for the current context
-		kubectl version`)
+		kubectl version`))
 )
 
 func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -39,7 +48,7 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use:     "version",
 		Short:   i18n.T("Print the client and server version information"),
 		Long:    "Print the client and server version information for the current context",
-		Example: version_example,
+		Example: versionExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunVersion(f, out, cmd)
 			cmdutil.CheckErr(err)
@@ -47,36 +56,75 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
 	cmd.Flags().BoolP("short", "", false, "Print just the version number.")
+	cmd.Flags().String("output", "", "output format, options available are yaml and json")
 	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
 }
 
 func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	v := fmt.Sprintf("%#v", version.Get())
-	if cmdutil.GetFlagBool(cmd, "short") {
-		v = version.Get().GitVersion
+	var serverVersion *apimachineryversion.Info = nil
+	var serverErr error = nil
+	vo := Version{nil, nil}
+
+	clientVersion := version.Get()
+	vo.ClientVersion = &clientVersion
+
+	if !cmdutil.GetFlagBool(cmd, "client") {
+		serverVersion, serverErr = retrieveServerVersion(f)
+		vo.ServerVersion = serverVersion
 	}
 
-	fmt.Fprintf(out, "Client Version: %s\n", v)
-	if cmdutil.GetFlagBool(cmd, "client") {
-		return nil
+	switch of := cmdutil.GetFlagString(cmd, "output"); of {
+	case "":
+		if cmdutil.GetFlagBool(cmd, "short") {
+			fmt.Fprintf(out, "Client Version: %s\n", clientVersion.GitVersion)
+
+			if serverVersion != nil {
+				fmt.Fprintf(out, "Server Version: %s\n", serverVersion.GitVersion)
+			}
+		} else {
+			fmt.Fprintf(out, "Client Version: %s\n", fmt.Sprintf("%#v", clientVersion))
+
+			if serverVersion != nil {
+				fmt.Fprintf(out, "Server Version: %s\n", fmt.Sprintf("%#v", *serverVersion))
+			}
+		}
+	case "yaml":
+		y, err := yaml.Marshal(&vo)
+		if err != nil {
+			return err
+		}
+
+		fmt.Fprintln(out, string(y))
+	case "json":
+		y, err := json.Marshal(&vo)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, string(y))
+	default:
+		return errors.New("invalid output format: " + of)
+
 	}
 
-	discoveryclient, err := f.DiscoveryClient()
-	if err != nil {
-		return err
+	if serverErr != nil {
+		return serverErr
 	}
 
-	serverVersion, err := discoveryclient.ServerVersion()
-	if err != nil {
-		return err
-	}
-
-	v = fmt.Sprintf("%#v", *serverVersion)
-	if cmdutil.GetFlagBool(cmd, "short") {
-		v = serverVersion.GitVersion
-	}
-
-	fmt.Fprintf(out, "Server Version: %s\n", v)
 	return nil
+}
+
+func retrieveServerVersion(f cmdutil.Factory) (*apimachineryversion.Info, error) {
+	discoveryClient, err := f.DiscoveryClient()
+
+	if err != nil {
+		return nil, err
+	}
+
+	serverVersion, err := discoveryClient.ServerVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	return serverVersion, nil
 }

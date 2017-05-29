@@ -14,5 +14,4 @@
 
 FROM alpine
 
-RUN apk update --no-cache
-RUN apk add bind-tools
+RUN apk add --no-cache bind-tools

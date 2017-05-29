@@ -25,7 +25,6 @@ import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
-import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -71,6 +70,12 @@ message PodDisruptionBudgetSpec {
   // Label query over pods whose evictions are managed by the disruption
   // budget.
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
+
+  // An eviction is allowed if at most "maxUnavailable" pods selected by
+  // "selector" are unavailable after the eviction, i.e. even in absence of
+  // the evicted pod. For example, one can prevent all voluntary evictions
+  // by specifying 0. This is a mutually exclusive setting with "minAvailable".
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 3;
 }
 
 // PodDisruptionBudgetStatus represents information about the status of a

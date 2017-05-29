@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	clustercache "k8s.io/kubernetes/federation/client/cache"
@@ -53,8 +54,17 @@ type ClusterController struct {
 	clusterStore      clustercache.StoreToClusterLister
 }
 
-// NewclusterController returns a new cluster controller
-func NewclusterController(federationClient federationclientset.Interface, clusterMonitorPeriod time.Duration) *ClusterController {
+// StartClusterController starts a new cluster controller
+func StartClusterController(config *restclient.Config, stopChan <-chan struct{}, clusterMonitorPeriod time.Duration) {
+	restclient.AddUserAgent(config, "cluster-controller")
+	client := federationclientset.NewForConfigOrDie(config)
+	controller := newClusterController(client, clusterMonitorPeriod)
+	glog.Infof("Starting cluster controller")
+	controller.Run(stopChan)
+}
+
+// newClusterController returns a new cluster controller
+func newClusterController(federationClient federationclientset.Interface, clusterMonitorPeriod time.Duration) *ClusterController {
 	cc := &ClusterController{
 		knownClusterSet:         make(sets.String),
 		federationClient:        federationClient,
@@ -85,14 +95,22 @@ func NewclusterController(federationClient federationclientset.Interface, cluste
 // delete the corresponding restclient from the map clusterKubeClientMap
 func (cc *ClusterController) delFromClusterSet(obj interface{}) {
 	cluster := obj.(*federationv1beta1.Cluster)
-	cc.knownClusterSet.Delete(cluster.Name)
-	delete(cc.clusterKubeClientMap, cluster.Name)
+	cc.delFromClusterSetByName(cluster.Name)
+}
+
+// delFromClusterSetByName delete a cluster from clusterSet by name and
+// delete the corresponding restclient from the map clusterKubeClientMap
+func (cc *ClusterController) delFromClusterSetByName(clusterName string) {
+	glog.V(1).Infof("ClusterController observed a cluster deletion: %v", clusterName)
+	cc.knownClusterSet.Delete(clusterName)
+	delete(cc.clusterKubeClientMap, clusterName)
 }
 
 // addToClusterSet insert the new cluster to clusterSet and create a corresponding
 // restclient to map clusterKubeClientMap
 func (cc *ClusterController) addToClusterSet(obj interface{}) {
 	cluster := obj.(*federationv1beta1.Cluster)
+	glog.V(1).Infof("ClusterController observed a new cluster: %v", cluster.Name)
 	cc.knownClusterSet.Insert(cluster.Name)
 	// create the restclient of cluster
 	restClient, err := NewClusterClientSet(cluster)
@@ -104,20 +122,20 @@ func (cc *ClusterController) addToClusterSet(obj interface{}) {
 }
 
 // Run begins watching and syncing.
-func (cc *ClusterController) Run() {
+func (cc *ClusterController) Run(stopChan <-chan struct{}) {
 	defer utilruntime.HandleCrash()
-	go cc.clusterController.Run(wait.NeverStop)
+	go cc.clusterController.Run(stopChan)
 	// monitor cluster status periodically, in phase 1 we just get the health state from "/healthz"
 	go wait.Until(func() {
 		if err := cc.UpdateClusterStatus(); err != nil {
 			glog.Errorf("Error monitoring cluster status: %v", err)
 		}
-	}, cc.clusterMonitorPeriod, wait.NeverStop)
+	}, cc.clusterMonitorPeriod, stopChan)
 }
 
-func (cc *ClusterController) GetClusterStatus(cluster *federationv1beta1.Cluster) (*federationv1beta1.ClusterStatus, error) {
-	// just get the status of cluster, by requesting the restapi "/healthz"
+func (cc *ClusterController) GetClusterClient(cluster *federationv1beta1.Cluster) (*ClusterClient, error) {
 	clusterClient, found := cc.clusterKubeClientMap[cluster.Name]
+	client := &clusterClient
 	if !found {
 		glog.Infof("It's a new cluster, a cluster client will be created")
 		client, err := NewClusterClientSet(cluster)
@@ -125,8 +143,15 @@ func (cc *ClusterController) GetClusterStatus(cluster *federationv1beta1.Cluster
 			glog.Errorf("Failed to create cluster client, err: %v", err)
 			return nil, err
 		}
-		clusterClient = *client
-		cc.clusterKubeClientMap[cluster.Name] = clusterClient
+	}
+	return client, nil
+}
+
+func (cc *ClusterController) GetClusterStatus(cluster *federationv1beta1.Cluster) (*federationv1beta1.ClusterStatus, error) {
+	// just get the status of cluster, by requesting the restapi "/healthz"
+	clusterClient, err := cc.GetClusterClient(cluster)
+	if err != nil {
+		return nil, err
 	}
 	clusterStatus := clusterClient.GetClusterHealthStatus()
 	return clusterStatus, nil
@@ -140,8 +165,7 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 	}
 	for _, cluster := range clusters.Items {
 		if !cc.knownClusterSet.Has(cluster.Name) {
-			glog.V(1).Infof("ClusterController observed a new cluster: %#v", cluster)
-			cc.knownClusterSet.Insert(cluster.Name)
+			cc.addToClusterSet(&cluster)
 		}
 	}
 
@@ -153,8 +177,7 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 		}
 		deleted := cc.knownClusterSet.Difference(observedSet)
 		for clusterName := range deleted {
-			glog.V(1).Infof("ClusterController observed a Cluster deletion: %v", clusterName)
-			cc.knownClusterSet.Delete(clusterName)
+			cc.delFromClusterSetByName(clusterName)
 		}
 	}
 	for _, cluster := range clusters.Items {
@@ -169,13 +192,18 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 
 		} else {
 			hasTransition := false
-			for i := 0; i < len(clusterStatusNew.Conditions); i++ {
-				if !(strings.EqualFold(string(clusterStatusNew.Conditions[i].Type), string(clusterStatusOld.Conditions[i].Type)) &&
-					strings.EqualFold(string(clusterStatusNew.Conditions[i].Status), string(clusterStatusOld.Conditions[i].Status))) {
-					hasTransition = true
-					break
+			if len(clusterStatusNew.Conditions) != len(clusterStatusOld.Conditions) {
+				hasTransition = true
+			} else {
+				for i := 0; i < len(clusterStatusNew.Conditions); i++ {
+					if !(strings.EqualFold(string(clusterStatusNew.Conditions[i].Type), string(clusterStatusOld.Conditions[i].Type)) &&
+						strings.EqualFold(string(clusterStatusNew.Conditions[i].Status), string(clusterStatusOld.Conditions[i].Status))) {
+						hasTransition = true
+						break
+					}
 				}
 			}
+
 			if !hasTransition {
 				for j := 0; j < len(clusterStatusNew.Conditions); j++ {
 					clusterStatusNew.Conditions[j].LastTransitionTime = clusterStatusOld.Conditions[j].LastTransitionTime
@@ -184,7 +212,7 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 		}
 		clusterClient, found := cc.clusterKubeClientMap[cluster.Name]
 		if !found {
-			glog.Warningf("Failed to client for cluster %s", cluster.Name)
+			glog.Warningf("Failed to get client for cluster %s", cluster.Name)
 			continue
 		}
 

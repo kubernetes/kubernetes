@@ -28,16 +28,16 @@ import (
 )
 
 var (
-	stop_long = templates.LongDesc(`
+	stopLong = templates.LongDesc(i18n.T(`
 		Deprecated: Gracefully shut down a resource by name or filename.
 
 		The stop command is deprecated, all its functionalities are covered by delete command.
 		See 'kubectl delete --help' for more details.
 
 		Attempts to shut down and delete a resource that supports graceful termination.
-		If the resource is scalable it will be scaled to 0 before deletion.`)
+		If the resource is scalable it will be scaled to 0 before deletion.`))
 
-	stop_example = templates.Examples(`
+	stopExample = templates.Examples(i18n.T(`
 		# Shut down foo.
 		kubectl stop replicationcontroller foo
 
@@ -48,7 +48,7 @@ var (
 		kubectl stop -f service.json
 
 		# Shut down all resources in the path/to/resources directory
-		kubectl stop -f path/to/resources`)
+		kubectl stop -f path/to/resources`))
 )
 
 func NewCmdStop(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -57,8 +57,8 @@ func NewCmdStop(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:        "stop (-f FILENAME | TYPE (NAME | -l label | --all))",
 		Short:      i18n.T("Deprecated: Gracefully shut down a resource by name or filename"),
-		Long:       stop_long,
-		Example:    stop_example,
+		Long:       stopLong,
+		Example:    stopExample,
 		Deprecated: fmt.Sprintf("use %q instead.", "delete"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
@@ -68,7 +68,7 @@ func NewCmdStop(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "of resource(s) to be stopped."
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
-	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
+	cmd.Flags().Bool("all", false, "select all resources in the namespace of the specified resource types.")
 	cmd.Flags().Bool("ignore-not-found", false, "Treat \"resource not found\" as a successful stop.")
 	cmd.Flags().Int("grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
 	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
@@ -84,7 +84,7 @@ func RunStop(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer
 	}
 
 	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(false, args...).

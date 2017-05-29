@@ -21,6 +21,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	admissionregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion"
 	appsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	authenticationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion"
 	authorizationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
@@ -29,6 +30,7 @@ import (
 	certificatesinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
 	coreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	networkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion"
 	policyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	settingsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/settings/internalversion"
@@ -37,6 +39,7 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
+	Admissionregistration() admissionregistrationinternalversion.AdmissionregistrationInterface
 	Core() coreinternalversion.CoreInterface
 	Apps() appsinternalversion.AppsInterface
 	Authentication() authenticationinternalversion.AuthenticationInterface
@@ -45,6 +48,7 @@ type Interface interface {
 	Batch() batchinternalversion.BatchInterface
 	Certificates() certificatesinternalversion.CertificatesInterface
 	Extensions() extensionsinternalversion.ExtensionsInterface
+	Networking() networkinginternalversion.NetworkingInterface
 	Policy() policyinternalversion.PolicyInterface
 	Rbac() rbacinternalversion.RbacInterface
 	Settings() settingsinternalversion.SettingsInterface
@@ -55,6 +59,7 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
+	*admissionregistrationinternalversion.AdmissionregistrationClient
 	*coreinternalversion.CoreClient
 	*appsinternalversion.AppsClient
 	*authenticationinternalversion.AuthenticationClient
@@ -63,10 +68,19 @@ type Clientset struct {
 	*batchinternalversion.BatchClient
 	*certificatesinternalversion.CertificatesClient
 	*extensionsinternalversion.ExtensionsClient
+	*networkinginternalversion.NetworkingClient
 	*policyinternalversion.PolicyClient
 	*rbacinternalversion.RbacClient
 	*settingsinternalversion.SettingsClient
 	*storageinternalversion.StorageClient
+}
+
+// Admissionregistration retrieves the AdmissionregistrationClient
+func (c *Clientset) Admissionregistration() admissionregistrationinternalversion.AdmissionregistrationInterface {
+	if c == nil {
+		return nil
+	}
+	return c.AdmissionregistrationClient
 }
 
 // Core retrieves the CoreClient
@@ -133,6 +147,14 @@ func (c *Clientset) Extensions() extensionsinternalversion.ExtensionsInterface {
 	return c.ExtensionsClient
 }
 
+// Networking retrieves the NetworkingClient
+func (c *Clientset) Networking() networkinginternalversion.NetworkingInterface {
+	if c == nil {
+		return nil
+	}
+	return c.NetworkingClient
+}
+
 // Policy retrieves the PolicyClient
 func (c *Clientset) Policy() policyinternalversion.PolicyInterface {
 	if c == nil {
@@ -181,6 +203,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
+	cs.AdmissionregistrationClient, err = admissionregistrationinternalversion.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.CoreClient, err = coreinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -213,6 +239,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.NetworkingClient, err = networkinginternalversion.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.PolicyClient, err = policyinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -242,6 +272,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
+	cs.AdmissionregistrationClient = admissionregistrationinternalversion.NewForConfigOrDie(c)
 	cs.CoreClient = coreinternalversion.NewForConfigOrDie(c)
 	cs.AppsClient = appsinternalversion.NewForConfigOrDie(c)
 	cs.AuthenticationClient = authenticationinternalversion.NewForConfigOrDie(c)
@@ -250,6 +281,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.BatchClient = batchinternalversion.NewForConfigOrDie(c)
 	cs.CertificatesClient = certificatesinternalversion.NewForConfigOrDie(c)
 	cs.ExtensionsClient = extensionsinternalversion.NewForConfigOrDie(c)
+	cs.NetworkingClient = networkinginternalversion.NewForConfigOrDie(c)
 	cs.PolicyClient = policyinternalversion.NewForConfigOrDie(c)
 	cs.RbacClient = rbacinternalversion.NewForConfigOrDie(c)
 	cs.SettingsClient = settingsinternalversion.NewForConfigOrDie(c)
@@ -262,6 +294,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
+	cs.AdmissionregistrationClient = admissionregistrationinternalversion.New(c)
 	cs.CoreClient = coreinternalversion.New(c)
 	cs.AppsClient = appsinternalversion.New(c)
 	cs.AuthenticationClient = authenticationinternalversion.New(c)
@@ -270,6 +303,7 @@ func New(c rest.Interface) *Clientset {
 	cs.BatchClient = batchinternalversion.New(c)
 	cs.CertificatesClient = certificatesinternalversion.New(c)
 	cs.ExtensionsClient = extensionsinternalversion.New(c)
+	cs.NetworkingClient = networkinginternalversion.New(c)
 	cs.PolicyClient = policyinternalversion.New(c)
 	cs.RbacClient = rbacinternalversion.New(c)
 	cs.SettingsClient = settingsinternalversion.New(c)

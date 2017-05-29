@@ -209,10 +209,6 @@ func (m PriorityRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string
 	return m.Delegate.RESTMappings(gk, versions...)
 }
 
-func (m PriorityRESTMapper) AliasesForResource(alias string) (aliases []string, ok bool) {
-	return m.Delegate.AliasesForResource(alias)
-}
-
 func (m PriorityRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
 	return m.Delegate.ResourceSingularizer(resource)
 }

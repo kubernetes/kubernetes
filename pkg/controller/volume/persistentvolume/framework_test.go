@@ -42,11 +42,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
-	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/v1beta1"
+	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
@@ -166,7 +166,7 @@ func (r *volumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		return true, nil, err
 	}
 
-	// Test did not requst to inject an error, continue simulating API server.
+	// Test did not request to inject an error, continue simulating API server.
 	switch {
 	case action.Matches("create", "persistentvolumes"):
 		obj := action.(core.UpdateAction).GetObject()
@@ -596,7 +596,7 @@ func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, 
 }
 func alwaysReady() bool { return true }
 
-func newTestController(kubeClient clientset.Interface, informerFactory informers.SharedInformerFactory, enableDynamicProvisioning bool) *PersistentVolumeController {
+func newTestController(kubeClient clientset.Interface, informerFactory informers.SharedInformerFactory, enableDynamicProvisioning bool) (*PersistentVolumeController, error) {
 	if informerFactory == nil {
 		informerFactory = informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	}
@@ -606,17 +606,20 @@ func newTestController(kubeClient clientset.Interface, informerFactory informers
 		VolumePlugins:             []vol.VolumePlugin{},
 		VolumeInformer:            informerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             informerFactory.Core().V1().PersistentVolumeClaims(),
-		ClassInformer:             informerFactory.Storage().V1beta1().StorageClasses(),
+		ClassInformer:             informerFactory.Storage().V1().StorageClasses(),
 		EventRecorder:             record.NewFakeRecorder(1000),
 		EnableDynamicProvisioning: enableDynamicProvisioning,
 	}
-	ctrl := NewController(params)
+	ctrl, err := NewController(params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct persistentvolume controller: %v", err)
+	}
 	ctrl.volumeListerSynced = alwaysReady
 	ctrl.claimListerSynced = alwaysReady
 	ctrl.classListerSynced = alwaysReady
 	// Speed up the test
 	ctrl.createProvisionedPVInterval = 5 * time.Millisecond
-	return ctrl
+	return ctrl, nil
 }
 
 // newVolume returns a new volume with given attributes
@@ -736,7 +739,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 			Phase: phase,
 		},
 	}
-	// Make sure v1.GetReference(claim) works
+	// Make sure ref.GetReference(claim) works
 	claim.ObjectMeta.SelfLink = testapi.Default.SelfLink("pvc", name)
 
 	if len(annotations) > 0 {
@@ -825,9 +828,6 @@ func wrapTestWithPluginCalls(expectedRecycleCalls, expectedDeleteCalls []error, 
 			provisionCalls: expectedProvisionCalls,
 		}
 		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, ctrl)
-		if expectedProvisionCalls != nil {
-			ctrl.alphaProvisioner = plugin
-		}
 		return toWrap(ctrl, reactor, test)
 	}
 }
@@ -915,7 +915,10 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newTestController(client, nil, true)
+		ctrl, err := newTestController(client, nil, true)
+		if err != nil {
+			t.Fatalf("Test %q construct persistent volume failed: %v", test.name, err)
+		}
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
@@ -934,7 +937,7 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 		ctrl.classLister = storagelisters.NewStorageClassLister(indexer)
 
 		// Run the tested functions
-		err := test.test(ctrl, reactor, test)
+		err = test.test(ctrl, reactor, test)
 		if err != nil {
 			t.Errorf("Test %q failed: %v", test.name, err)
 		}
@@ -969,7 +972,10 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newTestController(client, nil, true)
+		ctrl, err := newTestController(client, nil, true)
+		if err != nil {
+			t.Fatalf("Test %q construct persistent volume failed: %v", test.name, err)
+		}
 
 		// Inject classes into controller via a custom lister.
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
@@ -989,7 +995,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 		}
 
 		// Run the tested function
-		err := test.test(ctrl, reactor, test)
+		err = test.test(ctrl, reactor, test)
 		if err != nil {
 			t.Errorf("Test %q failed: %v", test.name, err)
 		}

@@ -19,7 +19,10 @@ package credentialprovider
 import (
 	"encoding/base64"
 	"fmt"
+	"reflect"
 	"testing"
+
+	dockertypes "github.com/docker/engine-api/types"
 )
 
 func TestUrlsMatch(t *testing.T) {
@@ -497,5 +500,119 @@ func TestLazyKeyring(t *testing.T) {
 	lazy.Lookup("foo")
 	if provider.Count != 3 {
 		t.Errorf("Unexpected number of Provide calls: %v", provider.Count)
+	}
+}
+
+func TestDockerKeyringLookup(t *testing.T) {
+	ada := LazyAuthConfiguration{
+		AuthConfig: dockertypes.AuthConfig{
+			Username: "ada",
+			Password: "smash",
+			Email:    "ada@example.com",
+		},
+	}
+
+	grace := LazyAuthConfiguration{
+		AuthConfig: dockertypes.AuthConfig{
+			Username: "grace",
+			Password: "squash",
+			Email:    "grace@example.com",
+		},
+	}
+
+	dk := &BasicDockerKeyring{}
+	dk.Add(DockerConfig{
+		"bar.example.com/pong": DockerConfigEntry{
+			Username: grace.Username,
+			Password: grace.Password,
+			Email:    grace.Email,
+		},
+		"bar.example.com": DockerConfigEntry{
+			Username: ada.Username,
+			Password: ada.Password,
+			Email:    ada.Email,
+		},
+	})
+
+	tests := []struct {
+		image string
+		match []LazyAuthConfiguration
+		ok    bool
+	}{
+		// direct match
+		{"bar.example.com", []LazyAuthConfiguration{ada}, true},
+
+		// direct match deeper than other possible matches
+		{"bar.example.com/pong", []LazyAuthConfiguration{grace, ada}, true},
+
+		// no direct match, deeper path ignored
+		{"bar.example.com/ping", []LazyAuthConfiguration{ada}, true},
+
+		// match first part of path token
+		{"bar.example.com/pongz", []LazyAuthConfiguration{grace, ada}, true},
+
+		// match regardless of sub-path
+		{"bar.example.com/pong/pang", []LazyAuthConfiguration{grace, ada}, true},
+
+		// no host match
+		{"example.com", []LazyAuthConfiguration{}, false},
+		{"foo.example.com", []LazyAuthConfiguration{}, false},
+	}
+
+	for i, tt := range tests {
+		match, ok := dk.Lookup(tt.image)
+		if tt.ok != ok {
+			t.Errorf("case %d: expected ok=%t, got %t", i, tt.ok, ok)
+		}
+
+		if !reflect.DeepEqual(tt.match, match) {
+			t.Errorf("case %d: expected match=%#v, got %#v", i, tt.match, match)
+		}
+	}
+}
+
+// This validates that dockercfg entries with a scheme and url path are properly matched
+// by images that only match the hostname.
+// NOTE: the above covers the case of a more specific match trumping just hostname.
+func TestIssue3797(t *testing.T) {
+	rex := LazyAuthConfiguration{
+		AuthConfig: dockertypes.AuthConfig{
+			Username: "rex",
+			Password: "tiny arms",
+			Email:    "rex@example.com",
+		},
+	}
+
+	dk := &BasicDockerKeyring{}
+	dk.Add(DockerConfig{
+		"https://quay.io/v1/": DockerConfigEntry{
+			Username: rex.Username,
+			Password: rex.Password,
+			Email:    rex.Email,
+		},
+	})
+
+	tests := []struct {
+		image string
+		match []LazyAuthConfiguration
+		ok    bool
+	}{
+		// direct match
+		{"quay.io", []LazyAuthConfiguration{rex}, true},
+
+		// partial matches
+		{"quay.io/foo", []LazyAuthConfiguration{rex}, true},
+		{"quay.io/foo/bar", []LazyAuthConfiguration{rex}, true},
+	}
+
+	for i, tt := range tests {
+		match, ok := dk.Lookup(tt.image)
+		if tt.ok != ok {
+			t.Errorf("case %d: expected ok=%t, got %t", i, tt.ok, ok)
+		}
+
+		if !reflect.DeepEqual(tt.match, match) {
+			t.Errorf("case %d: expected match=%#v, got %#v", i, tt.match, match)
+		}
 	}
 }

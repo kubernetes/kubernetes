@@ -16,7 +16,7 @@ package fileutil
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -45,7 +45,7 @@ func purgeFile(dirname string, suffix string, max uint, interval time.Duration, 
 			sort.Strings(newfnames)
 			fnames = newfnames
 			for len(newfnames) > int(max) {
-				f := path.Join(dirname, newfnames[0])
+				f := filepath.Join(dirname, newfnames[0])
 				l, err := TryLockFile(f, os.O_WRONLY, PrivateFileMode)
 				if err != nil {
 					break

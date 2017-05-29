@@ -9,6 +9,7 @@ import (
 	"compress/zlib"
 )
 
+// CompressorProvider describes a component that can provider compressors for the std methods.
 type CompressorProvider interface {
 	// Returns a *gzip.Writer which needs to be released later.
 	// Before using it, call Reset().

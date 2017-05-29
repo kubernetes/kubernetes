@@ -19,19 +19,19 @@ package webhook
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/util/cache"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/kubernetes/scheme"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
-	"k8s.io/client-go/pkg/api"
 	authorization "k8s.io/client-go/pkg/apis/authorization/v1beta1"
-
-	_ "k8s.io/client-go/pkg/apis/authorization/install"
 )
 
 var (
@@ -75,7 +75,7 @@ func NewFromInterface(subjectAccessReview authorizationclient.SubjectAccessRevie
 //         client-key: /path/to/key.pem          # key matching the cert
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
-// http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html.
+// https://kubernetes.io/docs/user-guide/kubeconfig-file/.
 func New(kubeConfigFile string, authorizedTTL, unauthorizedTTL time.Duration) (*WebhookAuthorizer, error) {
 	subjectAccessReview, err := subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile)
 	if err != nil {
@@ -207,11 +207,24 @@ func convertToSARExtra(extra map[string][]string) map[string]authorization.Extra
 	return ret
 }
 
+// NOTE: client-go doesn't provide a registry. client-go does registers the
+// authorization/v1beta1. We construct a registry that acknowledges
+// authorization/v1beta1 as an enabled version to pass a check enforced in
+// NewGenericWebhook.
+var registry = registered.NewOrDie("")
+
+func init() {
+	registry.RegisterVersions(groupVersions)
+	if err := registry.EnableVersions(groupVersions...); err != nil {
+		panic(fmt.Sprintf("failed to enable version %v", groupVersions))
+	}
+}
+
 // subjectAccessReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
 // and returns a SubjectAccessReviewInterface that uses that client. Note that the client submits SubjectAccessReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
 func subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile string) (authorizationclient.SubjectAccessReviewInterface, error) {
-	gw, err := webhook.NewGenericWebhook(api.Registry, api.Codecs, kubeConfigFile, groupVersions, 0)
+	gw, err := webhook.NewGenericWebhook(registry, scheme.Codecs, kubeConfigFile, groupVersions, 0)
 	if err != nil {
 		return nil, err
 	}

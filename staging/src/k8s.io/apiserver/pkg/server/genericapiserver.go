@@ -20,14 +20,12 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	systemd "github.com/coreos/go-systemd/daemon"
-	"github.com/emicklei/go-restful"
-	"github.com/emicklei/go-restful/swagger"
+	"github.com/emicklei/go-restful-swagger12"
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/apimachinery"
@@ -37,14 +35,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/audit"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
-	genericmux "k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	restclient "k8s.io/client-go/rest"
 )
@@ -84,7 +82,7 @@ type APIGroupInfo struct {
 // GenericAPIServer contains state for a Kubernetes cluster api server.
 type GenericAPIServer struct {
 	// discoveryAddresses is used to build cluster IPs for discovery.
-	discoveryAddresses DiscoveryAddresses
+	discoveryAddresses discovery.Addresses
 
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
@@ -102,14 +100,10 @@ type GenericAPIServer struct {
 	// requestContextMapper provides a way to get the context for a request.  It may be nil.
 	requestContextMapper apirequest.RequestContextMapper
 
-	// The registered APIs
-	HandlerContainer *genericmux.APIContainer
-
-	SecureServingInfo   *SecureServingInfo
-	InsecureServingInfo *ServingInfo
+	SecureServingInfo *SecureServingInfo
 
 	// numerical ports, set after listening
-	effectiveSecurePort, effectiveInsecurePort int
+	effectiveSecurePort int
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
@@ -123,13 +117,14 @@ type GenericAPIServer struct {
 	Serializer runtime.NegotiatedSerializer
 
 	// "Outputs"
-	Handler         http.Handler
-	InsecureHandler http.Handler
+	// Handler holdes the handlers being used by this API server
+	Handler *APIServerHandler
 
-	// Map storing information about all groups to be exposed in discovery response.
-	// The map is from name to the group.
-	apiGroupsForDiscoveryLock sync.RWMutex
-	apiGroupsForDiscovery     map[string]metav1.APIGroup
+	// listedPathProvider is a lister which provides the set of paths to show at /
+	listedPathProvider routes.ListedPathProvider
+
+	// DiscoveryGroupManager serves /apis
+	DiscoveryGroupManager discovery.GroupManager
 
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	swaggerConfig *swagger.Config
@@ -137,15 +132,77 @@ type GenericAPIServer struct {
 
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guarantee of ordering between them.  The map key is a name used for error reporting.
-	// It may kill the process with a panic if it wishes to by returning an error
-	postStartHookLock    sync.Mutex
-	postStartHooks       map[string]postStartHookEntry
-	postStartHooksCalled bool
+	// It may kill the process with a panic if it wishes to by returning an error.
+	postStartHookLock      sync.Mutex
+	postStartHooks         map[string]postStartHookEntry
+	postStartHooksCalled   bool
+	disabledPostStartHooks sets.String
 
 	// healthz checks
 	healthzLock    sync.Mutex
 	healthzChecks  []healthz.HealthzChecker
 	healthzCreated bool
+
+	// auditing. The backend is started after the server starts listening.
+	AuditBackend audit.Backend
+}
+
+// DelegationTarget is an interface which allows for composition of API servers with top level handling that works
+// as expected.
+type DelegationTarget interface {
+	// UnprotectedHandler returns a handler that is NOT protected by a normal chain
+	UnprotectedHandler() http.Handler
+
+	// RequestContextMapper returns the existing RequestContextMapper.  Because we cannot rewire all existing
+	// uses of this function, this will be used in any delegating API server
+	RequestContextMapper() apirequest.RequestContextMapper
+
+	// PostStartHooks returns the post-start hooks that need to be combined
+	PostStartHooks() map[string]postStartHookEntry
+
+	// HealthzChecks returns the healthz checks that need to be combined
+	HealthzChecks() []healthz.HealthzChecker
+
+	// ListedPaths returns the paths for supporting an index
+	ListedPaths() []string
+}
+
+func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
+	// when we delegate, we need the server we're delegating to choose whether or not to use gorestful
+	return s.Handler.Director
+}
+func (s *GenericAPIServer) PostStartHooks() map[string]postStartHookEntry {
+	return s.postStartHooks
+}
+func (s *GenericAPIServer) HealthzChecks() []healthz.HealthzChecker {
+	return s.healthzChecks
+}
+func (s *GenericAPIServer) ListedPaths() []string {
+	return s.listedPathProvider.ListedPaths()
+}
+
+var EmptyDelegate = emptyDelegate{
+	requestContextMapper: apirequest.NewRequestContextMapper(),
+}
+
+type emptyDelegate struct {
+	requestContextMapper apirequest.RequestContextMapper
+}
+
+func (s emptyDelegate) UnprotectedHandler() http.Handler {
+	return nil
+}
+func (s emptyDelegate) PostStartHooks() map[string]postStartHookEntry {
+	return map[string]postStartHookEntry{}
+}
+func (s emptyDelegate) HealthzChecks() []healthz.HealthzChecker {
+	return []healthz.HealthzChecker{}
+}
+func (s emptyDelegate) ListedPaths() []string {
+	return []string{}
+}
+func (s emptyDelegate) RequestContextMapper() apirequest.RequestContextMapper {
+	return s.requestContextMapper
 }
 
 func init() {
@@ -174,12 +231,12 @@ type preparedGenericAPIServer struct {
 // PrepareRun does post API installation setup steps.
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	if s.swaggerConfig != nil {
-		routes.Swagger{Config: s.swaggerConfig}.Install(s.HandlerContainer)
+		routes.Swagger{Config: s.swaggerConfig}.Install(s.Handler.GoRestfulContainer)
 	}
 	if s.openAPIConfig != nil {
 		routes.OpenAPI{
 			Config: s.openAPIConfig,
-		}.Install(s.HandlerContainer)
+		}.Install(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
 	}
 
 	s.installHealthz()
@@ -187,8 +244,8 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	return preparedGenericAPIServer{s}
 }
 
-// Run spawns the http servers (secure and insecure). It only returns if stopCh is closed
-// or one of the ports cannot be listened on initially.
+// Run spawns the secure http server. It only returns if stopCh is closed
+// or the secure port cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	err := s.NonBlockingRun(stopCh)
 	if err != nil {
@@ -199,8 +256,8 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-// NonBlockingRun spawns the http servers (secure and insecure). An error is
-// returned if either of the ports cannot be listened on.
+// NonBlockingRun spawns the secure http server. An error is
+// returned if the secure port cannot be listened on.
 func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	// Use an internal stop channel to allow cleanup of the listeners on error.
 	internalStopCh := make(chan struct{})
@@ -212,14 +269,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 		}
 	}
 
-	if s.InsecureServingInfo != nil && s.InsecureHandler != nil {
-		if err := s.serveInsecurely(internalStopCh); err != nil {
-			close(internalStopCh)
-			return err
-		}
-	}
-
-	// Now that both listeners have bound successfully, it is the
+	// Now that listener have bound successfully, it is the
 	// responsibility of the caller to close the provided channel to
 	// ensure cleanup.
 	go func() {
@@ -227,10 +277,17 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 		close(internalStopCh)
 	}()
 
-	s.RunPostStartHooks()
+	// Start the audit backend before any request comes in. This means we cannot turn it into a
+	// post start hook because without calling Backend.Run the Backend.ProcessEvents call might block.
+	if s.AuditBackend != nil {
+		if err := s.AuditBackend.Run(stopCh); err != nil {
+			return fmt.Errorf("failed to run the audit backend: %v", err)
+		}
+	}
 
-	// err == systemd.SdNotifyNoSocket when not running on a systemd system
-	if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
+	s.RunPostStartHooks(stopCh)
+
+	if _, err := systemd.SdNotify(true, "READY=1\n"); err != nil {
 		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}
 
@@ -245,12 +302,17 @@ func (s *GenericAPIServer) EffectiveSecurePort() int {
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
 func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
 	for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
+		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
+			glog.Warningf("Skipping API %v because it has no resources.", groupVersion)
+			continue
+		}
+
 		apiGroupVersion := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
 		if apiGroupInfo.OptionsExternalVersion != nil {
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
 		}
 
-		if err := apiGroupVersion.InstallREST(s.HandlerContainer.Container); err != nil {
+		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer); err != nil {
 			return fmt.Errorf("Unable to setup API %v: %v", apiGroupInfo, err)
 		}
 	}
@@ -273,15 +335,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	}
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
-	genericapi.AddApiWebService(s.Serializer, s.HandlerContainer.Container, apiPrefix, func(req *restful.Request) *metav1.APIVersions {
-		clientIP := utilnet.GetClientIP(req.Request)
-
-		apiVersionsForDiscovery := metav1.APIVersions{
-			ServerAddressByClientCIDRs: s.discoveryAddresses.ServerAddressByClientCIDRs(clientIP),
-			Versions:                   apiVersions,
-		}
-		return &apiVersionsForDiscovery
-	})
+	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions, s.requestContextMapper).WebService())
 	return nil
 }
 
@@ -324,24 +378,10 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		PreferredVersion: preferedVersionForDiscovery,
 	}
 
-	s.AddAPIGroupForDiscovery(apiGroup)
-	s.HandlerContainer.Add(genericapi.NewGroupWebService(s.Serializer, APIGroupPrefix+"/"+apiGroup.Name, apiGroup))
+	s.DiscoveryGroupManager.AddGroup(apiGroup)
+	s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup, s.requestContextMapper).WebService())
 
 	return nil
-}
-
-func (s *GenericAPIServer) AddAPIGroupForDiscovery(apiGroup metav1.APIGroup) {
-	s.apiGroupsForDiscoveryLock.Lock()
-	defer s.apiGroupsForDiscoveryLock.Unlock()
-
-	s.apiGroupsForDiscovery[apiGroup.Name] = apiGroup
-}
-
-func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
-	s.apiGroupsForDiscoveryLock.Lock()
-	defer s.apiGroupsForDiscoveryLock.Unlock()
-
-	delete(s.apiGroupsForDiscovery, groupName)
 }
 
 func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion, apiPrefix string) *genericapi.APIGroupVersion {
@@ -376,35 +416,6 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Context:           s.RequestContextMapper(),
 		MinRequestTimeout: s.minRequestTimeout,
 	}
-}
-
-// DynamicApisDiscovery returns a webservice serving api group discovery.
-// Note: during the server runtime apiGroupsForDiscovery might change.
-func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
-	return genericapi.NewApisWebService(s.Serializer, APIGroupPrefix, func(req *restful.Request) []metav1.APIGroup {
-		s.apiGroupsForDiscoveryLock.RLock()
-		defer s.apiGroupsForDiscoveryLock.RUnlock()
-
-		// sort to have a deterministic order
-		sortedGroups := []metav1.APIGroup{}
-		groupNames := make([]string, 0, len(s.apiGroupsForDiscovery))
-		for groupName := range s.apiGroupsForDiscovery {
-			groupNames = append(groupNames, groupName)
-		}
-		sort.Strings(groupNames)
-		for _, groupName := range groupNames {
-			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[groupName])
-		}
-
-		clientIP := utilnet.GetClientIP(req.Request)
-		serverCIDR := s.discoveryAddresses.ServerAddressByClientCIDRs(clientIP)
-		groups := make([]metav1.APIGroup, len(sortedGroups))
-		for i := range sortedGroups {
-			groups[i] = sortedGroups[i]
-			groups[i].ServerAddressByClientCIDRs = serverCIDR
-		}
-		return groups
-	})
 }
 
 // NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values

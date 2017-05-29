@@ -18,16 +18,19 @@ package app
 
 import (
 	"fmt"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -122,88 +125,80 @@ func Test_getProxyMode(t *testing.T) {
 		},
 	}
 	for i, c := range cases {
-		getter := &fakeNodeInterface{}
-		getter.node.Annotations = map[string]string{c.annotationKey: c.annotationVal}
 		versioner := &fakeIPTablesVersioner{c.iptablesVersion, c.iptablesError}
 		kcompater := &fakeKernelCompatTester{c.kernelCompat}
-		r := getProxyMode(c.flag, getter, "host", versioner, kcompater)
+		r := getProxyMode(c.flag, versioner, kcompater)
 		if r != c.expected {
 			t.Errorf("Case[%d] Expected %q, got %q", i, c.expected, r)
 		}
 	}
 }
 
-// This test verifies that Proxy Server does not crash that means
-// Config and iptinterface are not nil when CleanupAndExit is true.
-// To avoid proxy crash: https://github.com/kubernetes/kubernetes/pull/14736
+// This test verifies that Proxy Server does not crash when CleanupAndExit is true.
 func TestProxyServerWithCleanupAndExit(t *testing.T) {
-	// creates default config
-	config := options.NewProxyConfig()
+	options, err := NewOptions()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// sets CleanupAndExit manually
-	config.CleanupAndExit = true
+	options.config = &componentconfig.KubeProxyConfiguration{
+		BindAddress: "0.0.0.0",
+	}
+	options.CleanupAndExit = true
 
-	// creates new proxy server
-	proxyserver, err := NewProxyServerDefault(config)
+	proxyserver, err := NewProxyServer(options.config, options.CleanupAndExit, options.scheme, options.master)
 
-	// verifies that nothing is nill except error
 	assert.Nil(t, err)
 	assert.NotNil(t, proxyserver)
-	assert.NotNil(t, proxyserver.Config)
 	assert.NotNil(t, proxyserver.IptInterface)
 }
 
 func TestGetConntrackMax(t *testing.T) {
 	ncores := runtime.NumCPU()
 	testCases := []struct {
-		config   componentconfig.KubeProxyConfiguration
-		expected int
-		err      string
+		min        int32
+		max        int32
+		maxPerCore int32
+		expected   int
+		err        string
 	}{
 		{
-			config:   componentconfig.KubeProxyConfiguration{},
 			expected: 0,
 		},
 		{
-			config: componentconfig.KubeProxyConfiguration{
-				ConntrackMax: 12345,
-			},
+			max:      12345,
 			expected: 12345,
 		},
 		{
-			config: componentconfig.KubeProxyConfiguration{
-				ConntrackMax:        12345,
-				ConntrackMaxPerCore: 67890,
-			},
-			expected: -1,
-			err:      "mutually exclusive",
+			max:        12345,
+			maxPerCore: 67890,
+			expected:   -1,
+			err:        "mutually exclusive",
 		},
 		{
-			config: componentconfig.KubeProxyConfiguration{
-				ConntrackMaxPerCore: 67890, // use this if Max is 0
-				ConntrackMin:        1,     // avoid 0 default
-			},
-			expected: 67890 * ncores,
+			maxPerCore: 67890, // use this if Max is 0
+			min:        1,     // avoid 0 default
+			expected:   67890 * ncores,
 		},
 		{
-			config: componentconfig.KubeProxyConfiguration{
-				ConntrackMaxPerCore: 1, // ensure that Min is considered
-				ConntrackMin:        123456,
-			},
-			expected: 123456,
+			maxPerCore: 1, // ensure that Min is considered
+			min:        123456,
+			expected:   123456,
 		},
 		{
-			config: componentconfig.KubeProxyConfiguration{
-				ConntrackMaxPerCore: 0, // leave system setting
-				ConntrackMin:        123456,
-			},
-			expected: 0,
+			maxPerCore: 0, // leave system setting
+			min:        123456,
+			expected:   0,
 		},
 	}
 
 	for i, tc := range testCases {
-		cfg := options.ProxyServerConfig{KubeProxyConfiguration: tc.config}
-		x, e := getConntrackMax(&cfg)
+		cfg := componentconfig.KubeProxyConntrackConfiguration{
+			Min:        tc.min,
+			Max:        tc.max,
+			MaxPerCore: tc.maxPerCore,
+		}
+		x, e := getConntrackMax(cfg)
 		if e != nil {
 			if tc.err == "" {
 				t.Errorf("[%d] unexpected error: %v", i, e)
@@ -213,5 +208,84 @@ func TestGetConntrackMax(t *testing.T) {
 		} else if x != tc.expected {
 			t.Errorf("[%d] expected %d, got %d", i, tc.expected, x)
 		}
+	}
+}
+
+func TestLoadConfig(t *testing.T) {
+	yaml := `apiVersion: componentconfig/v1alpha1
+bindAddress: 9.8.7.6
+clientConnection:
+  acceptContentTypes: "abc"
+  burst: 100
+  contentType: content-type
+  kubeconfig: "/path/to/kubeconfig"
+  qps: 7
+clusterCIDR: "1.2.3.0/24"
+configSyncPeriod: 15s
+conntrack:
+  max: 4
+  maxPerCore: 2
+  min: 1
+  tcpCloseWaitTimeout: 10s
+  tcpEstablishedTimeout: 20s
+featureGates: "all"
+healthzBindAddress: 1.2.3.4:12345
+hostnameOverride: "foo"
+iptables:
+  masqueradeAll: true
+  masqueradeBit: 17
+  minSyncPeriod: 10s
+  syncPeriod: 60s
+kind: KubeProxyConfiguration
+metricsBindAddress: 2.3.4.5:23456
+mode: "iptables"
+oomScoreAdj: 17
+portRange: "2-7"
+resourceContainer: /foo
+udpTimeoutMilliseconds: 123ms
+`
+
+	expected := &componentconfig.KubeProxyConfiguration{
+		BindAddress: "9.8.7.6",
+		ClientConnection: componentconfig.ClientConnectionConfiguration{
+			AcceptContentTypes: "abc",
+			Burst:              100,
+			ContentType:        "content-type",
+			KubeConfigFile:     "/path/to/kubeconfig",
+			QPS:                7,
+		},
+		ClusterCIDR:      "1.2.3.0/24",
+		ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
+		Conntrack: componentconfig.KubeProxyConntrackConfiguration{
+			Max:                   4,
+			MaxPerCore:            2,
+			Min:                   1,
+			TCPCloseWaitTimeout:   metav1.Duration{Duration: 10 * time.Second},
+			TCPEstablishedTimeout: metav1.Duration{Duration: 20 * time.Second},
+		},
+		FeatureGates:       "all",
+		HealthzBindAddress: "1.2.3.4:12345",
+		HostnameOverride:   "foo",
+		IPTables: componentconfig.KubeProxyIPTablesConfiguration{
+			MasqueradeAll: true,
+			MasqueradeBit: util.Int32Ptr(17),
+			MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
+			SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
+		},
+		MetricsBindAddress: "2.3.4.5:23456",
+		Mode:               "iptables",
+		OOMScoreAdj:        util.Int32Ptr(17),
+		PortRange:          "2-7",
+		ResourceContainer:  "/foo",
+		UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
+	}
+
+	options, err := NewOptions()
+	assert.NoError(t, err)
+
+	config, err := options.loadConfig([]byte(yaml))
+	assert.NoError(t, err)
+	if !reflect.DeepEqual(expected, config) {
+		t.Fatalf("unexpected config, diff = %s", diff.ObjectDiff(config, expected))
 	}
 }

@@ -167,6 +167,7 @@ func TestUtilSaveConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal("failed to open conf file: ", file)
 	}
+	defer file.Close()
 	dataRcvd := map[string]string{}
 	if err := gob.NewDecoder(file).Decode(&dataRcvd); err != nil {
 		t.Fatal(err)

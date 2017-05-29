@@ -71,7 +71,9 @@ const (
 	// will retry in the next sync iteration. This frees the associated
 	// goroutine of the pod to process newer updates if needed (e.g., a delete
 	// request to the pod).
-	podAttachAndMountTimeout time.Duration = 2 * time.Minute
+	// Value is slightly offset from 2 minutes to make timeouts due to this
+	// constant recognizable.
+	podAttachAndMountTimeout time.Duration = 2*time.Minute + 3*time.Second
 
 	// podAttachAndMountRetryInterval is the amount of time the GetVolumesForPod
 	// call waits before retrying
@@ -84,10 +86,6 @@ const (
 	// operation is waiting it only blocks other operations on the same device,
 	// other devices are not affected.
 	waitForAttachTimeout time.Duration = 10 * time.Minute
-
-	// reconcilerStartGracePeriod is the maximum amount of time volume manager
-	// can wait to start reconciler
-	reconcilerStartGracePeriod time.Duration = 60 * time.Second
 )
 
 // VolumeManager runs a set of asynchronous loops that figure out which volumes
@@ -123,8 +121,6 @@ type VolumeManager interface {
 	// attached to this node and remains "in use" until it is removed from both
 	// the desired state of the world and the actual state of the world, or it
 	// has been unmounted (as indicated in actual state of world).
-	// TODO(#27653): VolumesInUse should be handled gracefully on kubelet'
-	// restarts.
 	GetVolumesInUse() []v1.UniqueVolumeName
 
 	// ReconcilerStatesHasBeenSynced returns true only after the actual states in reconciler
@@ -175,19 +171,6 @@ func NewVolumeManager(
 		),
 	}
 
-	vm.reconciler = reconciler.NewReconciler(
-		kubeClient,
-		controllerAttachDetachEnabled,
-		reconcilerLoopSleepPeriod,
-		reconcilerSyncStatesSleepPeriod,
-		waitForAttachTimeout,
-		nodeName,
-		vm.desiredStateOfWorld,
-		vm.actualStateOfWorld,
-		vm.operationExecutor,
-		mounter,
-		volumePluginMgr,
-		kubeletPodsDir)
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		kubeClient,
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
@@ -197,6 +180,20 @@ func NewVolumeManager(
 		vm.desiredStateOfWorld,
 		kubeContainerRuntime,
 		keepTerminatedPodVolumes)
+	vm.reconciler = reconciler.NewReconciler(
+		kubeClient,
+		controllerAttachDetachEnabled,
+		reconcilerLoopSleepPeriod,
+		reconcilerSyncStatesSleepPeriod,
+		waitForAttachTimeout,
+		nodeName,
+		vm.desiredStateOfWorld,
+		vm.actualStateOfWorld,
+		vm.desiredStateOfWorldPopulator.HasAddedPods,
+		vm.operationExecutor,
+		mounter,
+		volumePluginMgr,
+		kubeletPodsDir)
 
 	return vm, nil
 }
@@ -242,11 +239,11 @@ type volumeManager struct {
 func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
-	go vm.desiredStateOfWorldPopulator.Run(stopCh)
+	go vm.desiredStateOfWorldPopulator.Run(sourcesReady, stopCh)
 	glog.V(2).Infof("The desired_state_of_world populator starts")
 
 	glog.Infof("Starting Kubelet Volume Manager")
-	go vm.reconciler.Run(sourcesReady, stopCh)
+	go vm.reconciler.Run(stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down Kubelet Volume Manager")
@@ -438,7 +435,7 @@ func getExtraSupplementalGid(volumeGidValue string, pod *v1.Pod) (int64, bool) {
 
 	if pod.Spec.SecurityContext != nil {
 		for _, existingGid := range pod.Spec.SecurityContext.SupplementalGroups {
-			if gid == existingGid {
+			if gid == int64(existingGid) {
 				return 0, false
 			}
 		}

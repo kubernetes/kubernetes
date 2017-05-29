@@ -18,67 +18,32 @@ package version
 
 import (
 	"fmt"
-	"os"
-	"path"
 	"strings"
 
-	"github.com/coreos/etcd/pkg/fileutil"
-	"github.com/coreos/etcd/pkg/types"
+	"github.com/coreos/go-semver/semver"
 )
 
 var (
 	// MinClusterVersion is the min cluster version this etcd binary is compatible with.
-	MinClusterVersion = "2.3.0"
-	Version           = "3.0.17"
+	MinClusterVersion = "3.0.0"
+	Version           = "3.1.5"
+	APIVersion        = "unknown"
 
 	// Git SHA Value will be set during build
 	GitSHA = "Not provided (use ./build instead of go build)"
 )
 
-// DataDirVersion is an enum for versions of etcd logs.
-type DataDirVersion string
-
-const (
-	DataDirUnknown  DataDirVersion = "Unknown WAL"
-	DataDir2_0      DataDirVersion = "2.0.0"
-	DataDir2_0Proxy DataDirVersion = "2.0 proxy"
-	DataDir2_0_1    DataDirVersion = "2.0.1"
-)
+func init() {
+	ver, err := semver.NewVersion(Version)
+	if err == nil {
+		APIVersion = fmt.Sprintf("%d.%d", ver.Major, ver.Minor)
+	}
+}
 
 type Versions struct {
 	Server  string `json:"etcdserver"`
 	Cluster string `json:"etcdcluster"`
 	// TODO: raft state machine version
-}
-
-func DetectDataDir(dirpath string) (DataDirVersion, error) {
-	names, err := fileutil.ReadDir(dirpath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = nil
-		}
-		// Error reading the directory
-		return DataDirUnknown, err
-	}
-	nameSet := types.NewUnsafeSet(names...)
-	if nameSet.Contains("member") {
-		ver, err := DetectDataDir(path.Join(dirpath, "member"))
-		if ver == DataDir2_0 {
-			return DataDir2_0_1, nil
-		}
-		return ver, err
-	}
-	if nameSet.ContainsAll([]string{"snap", "wal"}) {
-		// .../wal cannot be empty to exist.
-		walnames, err := fileutil.ReadDir(path.Join(dirpath, "wal"))
-		if err == nil && len(walnames) > 0 {
-			return DataDir2_0, nil
-		}
-	}
-	if nameSet.ContainsAll([]string{"proxy"}) {
-		return DataDir2_0Proxy, nil
-	}
-	return DataDirUnknown, nil
 }
 
 // Cluster only keeps the major.minor.

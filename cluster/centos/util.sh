@@ -208,6 +208,7 @@ echo "[INFO] tear-down-master on $1"
         fi"
   done
   kube-ssh "${1}" "sudo rm -rf /opt/kubernetes"
+  kube-ssh "${1}" "sudo rm -rf /srv/kubernetes"
   kube-ssh "${1}" "sudo rm -rf ${KUBE_TEMP}"
   kube-ssh "${1}" "sudo rm -rf /var/lib/etcd"
 }
@@ -226,6 +227,7 @@ echo "[INFO] tear-down-node on $1"
   done
   kube-ssh "$1" "sudo rm -rf /run/flannel"
   kube-ssh "$1" "sudo rm -rf /opt/kubernetes"
+  kube-ssh "$1" "sudo rm -rf /srv/kubernetes"
   kube-ssh "$1" "sudo rm -rf ${KUBE_TEMP}"
 }
 
@@ -239,6 +241,7 @@ function make-ca-cert() {
 #
 # Assumed vars:
 #   $1 (master)
+#   $2 (etcd_name)
 #   KUBE_TEMP
 #   ETCD_SERVERS
 #   ETCD_INITIAL_CLUSTER
@@ -250,12 +253,21 @@ function provision-master() {
   local master_ip="${master#*@}"
   local etcd_name="$2"
   ensure-setup-dir "${master}"
+  ensure-etcd-cert "${etcd_name}" "${master_ip}"
 
   kube-scp "${master}" "${ROOT}/ca-cert ${ROOT}/binaries/master ${ROOT}/master ${ROOT}/config-default.sh ${ROOT}/util.sh" "${KUBE_TEMP}"
+  kube-scp "${master}" "${ROOT}/etcd-cert/ca.pem \
+    ${ROOT}/etcd-cert/client.pem \
+    ${ROOT}/etcd-cert/client-key.pem \
+    ${ROOT}/etcd-cert/server-${etcd_name}.pem \
+    ${ROOT}/etcd-cert/server-${etcd_name}-key.pem \
+    ${ROOT}/etcd-cert/peer-${etcd_name}.pem \
+    ${ROOT}/etcd-cert/peer-${etcd_name}-key.pem" "${KUBE_TEMP}/etcd-cert"
   kube-ssh "${master}" " \
     sudo rm -rf /opt/kubernetes/bin; \
     sudo cp -r ${KUBE_TEMP}/master/bin /opt/kubernetes; \
-    sudo mkdir -p /srv/kubernetes; sudo cp -f ${KUBE_TEMP}/ca-cert/* /srv/kubernetes; \
+    sudo mkdir -p /srv/kubernetes/; sudo cp -f ${KUBE_TEMP}/ca-cert/* /srv/kubernetes/; \
+    sudo mkdir -p /srv/kubernetes/etcd; sudo cp -f ${KUBE_TEMP}/etcd-cert/* /srv/kubernetes/etcd/; \
     sudo chmod -R +x /opt/kubernetes/bin; \
     sudo ln -sf /opt/kubernetes/bin/* /usr/local/bin/; \
     sudo bash ${KUBE_TEMP}/master/scripts/etcd.sh ${etcd_name} ${master_ip} ${ETCD_INITIAL_CLUSTER}; \
@@ -298,12 +310,17 @@ function provision-node() {
   local dns_domain=${DNS_DOMAIN#*@}
   ensure-setup-dir ${node}
 
-  kube-scp ${node} "${ROOT}/binaries/node ${ROOT}/node ${ROOT}/config-default.sh ${ROOT}/util.sh" ${KUBE_TEMP}
+  kube-scp "${node}" "${ROOT}/binaries/node ${ROOT}/node ${ROOT}/config-default.sh ${ROOT}/util.sh" "${KUBE_TEMP}"
+  kube-scp "${node}" "${ROOT}/etcd-cert/ca.pem \
+    ${ROOT}/etcd-cert/client.pem \
+    ${ROOT}/etcd-cert/client-key.pem" "${KUBE_TEMP}/etcd-cert"
   kube-ssh "${node}" " \
     rm -rf /opt/kubernetes/bin; \
     sudo cp -r ${KUBE_TEMP}/node/bin /opt/kubernetes; \
     sudo chmod -R +x /opt/kubernetes/bin; \
+    sudo mkdir -p /srv/kubernetes/etcd; sudo cp -f ${KUBE_TEMP}/etcd-cert/* /srv/kubernetes/etcd/; \
     sudo ln -s /opt/kubernetes/bin/* /usr/local/bin/; \
+    sudo mkdir -p /srv/kubernetes/etcd; sudo cp -f ${KUBE_TEMP}/etcd-cert/* /srv/kubernetes/etcd/; \
     sudo bash ${KUBE_TEMP}/node/scripts/flannel.sh ${ETCD_SERVERS} ${FLANNEL_NET}; \
     sudo bash ${KUBE_TEMP}/node/scripts/docker.sh \"${DOCKER_OPTS}\"; \
     sudo bash ${KUBE_TEMP}/node/scripts/kubelet.sh ${MASTER_ADVERTISE_ADDRESS} ${node_ip} ${dns_ip} ${dns_domain}; \
@@ -316,8 +333,27 @@ function provision-node() {
 #   KUBE_TEMP
 function ensure-setup-dir() {
   kube-ssh "${1}" "mkdir -p ${KUBE_TEMP}; \
+                   mkdir -p ${KUBE_TEMP}/etcd-cert; \
                    sudo mkdir -p /opt/kubernetes/bin; \
                    sudo mkdir -p /opt/kubernetes/cfg"
+}
+
+# Generate certificates for etcd cluster
+#
+# Assumed vars:
+#   $1 (etcd member name)
+#   $2 (master ip)
+function ensure-etcd-cert() {
+  local etcd_name="$1"
+  local master_ip="$2"
+  local cert_dir="${ROOT}/etcd-cert"
+
+  if [[ ! -r "${cert_dir}/client.pem" || ! -r "${cert_dir}/client-key.pem" ]]; then
+    generate-etcd-cert "${cert_dir}" "${master_ip}" "client" "client"
+  fi
+
+  generate-etcd-cert "${cert_dir}" "${master_ip}" "server" "server-${etcd_name}"
+  generate-etcd-cert "${cert_dir}" "${master_ip}" "peer" "peer-${etcd_name}"
 }
 
 # Run command over ssh

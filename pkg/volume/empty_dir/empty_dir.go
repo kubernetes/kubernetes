@@ -191,12 +191,12 @@ func (b *emptyDir) CanMount() error {
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp(fsGroup *int64) error {
+func (ed *emptyDir) SetUp(fsGroup *types.UnixGroupID) error {
 	return ed.SetUpAt(ed.GetPath(), fsGroup)
 }
 
 // SetUpAt creates new directory.
-func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
+func (ed *emptyDir) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
@@ -329,11 +329,9 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
-	tmpDir, err := volume.RenameDirectory(dir, ed.volName+".deleting~")
-	if err != nil {
-		return err
-	}
-	err = os.RemoveAll(tmpDir)
+	// Renaming the directory is not required anymore because the operation executor
+	// now handles duplicate operations on the same volume
+	err := os.RemoveAll(dir)
 	if err != nil {
 		return err
 	}

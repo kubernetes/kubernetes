@@ -31,12 +31,12 @@ source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
 #   detect-project
 #   get-bearer-token
 function create-master-instance {
-  local address_opt=""
-  [[ -n ${1:-} ]] && address_opt="--address ${1}"
+  local address=""
+  [[ -n ${1:-} ]] && address="${1}"
 
   write-master-env
   ensure-gci-metadata-files
-  create-master-instance-internal "${MASTER_NAME}" "${address_opt}"
+  create-master-instance-internal "${MASTER_NAME}" "${address}"
 }
 
 function replicate-master-instance() {
@@ -74,30 +74,51 @@ function replicate-master-instance() {
 
 
 function create-master-instance-internal() {
+  local gcloud="gcloud"
+  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
+    gcloud="gcloud alpha"
+  fi
+
   local -r master_name="${1}"
-  local -r address_option="${2:-}"
+  local -r address="${2:-}"
 
   local preemptible_master=""
   if [[ "${PREEMPTIBLE_MASTER:-}" == "true" ]]; then
     preemptible_master="--preemptible --maintenance-policy TERMINATE"
   fi
 
-  gcloud compute instances create "${master_name}" \
-    ${address_option} \
+  local network=$(make-gcloud-network-argument \
+    "${NETWORK}" "${address:-}" \
+    "${ENABLE_IP_ALIASES:-}" "${IP_ALIAS_SUBNETWORK:-}" "${IP_ALIAS_SIZE:-}")
+
+  local metadata="kube-env=${KUBE_TEMP}/master-kube-env.yaml"
+  metadata="${metadata},user-data=${KUBE_ROOT}/cluster/gce/gci/master.yaml"
+  metadata="${metadata},configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh"
+  metadata="${metadata},cluster-name=${KUBE_TEMP}/cluster-name.txt"
+  metadata="${metadata},gci-update-strategy=${KUBE_TEMP}/gci-update.txt"
+  metadata="${metadata},gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt"
+  metadata="${metadata},gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt"
+  metadata="${metadata},kube-master-certs=${KUBE_TEMP}/kube-master-certs.yaml"
+
+  local disk="name=${master_name}-pd"
+  disk="${disk},device-name=master-pd"
+  disk="${disk},mode=rw"
+  disk="${disk},boot=no"
+  disk="${disk},auto-delete=no"
+
+  ${gcloud} compute instances create "${master_name}" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
     --machine-type "${MASTER_SIZE}" \
     --image-project="${MASTER_IMAGE_PROJECT}" \
     --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
-    --network "${NETWORK}" \
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
-    --can-ip-forward \
-    --metadata-from-file \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/gci/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt,gci-update-strategy=${KUBE_TEMP}/gci-update.txt,gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt,gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt,kube-master-certs=${KUBE_TEMP}/kube-master-certs.yaml" \
-    --disk "name=${master_name}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
+    --metadata-from-file "${metadata}" \
+    --disk "${disk}" \
     --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}" \
-    ${preemptible_master}
+    ${preemptible_master} \
+    ${network}
 }
 
 function get-metadata() {

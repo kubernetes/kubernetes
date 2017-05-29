@@ -17,52 +17,75 @@ limitations under the License.
 package fake
 
 import (
-	announced "k8s.io/apimachinery/pkg/apimachinery/announced"
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	core "k8s.io/client-go/pkg/api/install"
-	apps "k8s.io/client-go/pkg/apis/apps/install"
-	authentication "k8s.io/client-go/pkg/apis/authentication/install"
-	authorization "k8s.io/client-go/pkg/apis/authorization/install"
-	autoscaling "k8s.io/client-go/pkg/apis/autoscaling/install"
-	batch "k8s.io/client-go/pkg/apis/batch/install"
-	certificates "k8s.io/client-go/pkg/apis/certificates/install"
-	extensions "k8s.io/client-go/pkg/apis/extensions/install"
-	policy "k8s.io/client-go/pkg/apis/policy/install"
-	rbac "k8s.io/client-go/pkg/apis/rbac/install"
-	settings "k8s.io/client-go/pkg/apis/settings/install"
-	storage "k8s.io/client-go/pkg/apis/storage/install"
-	os "os"
+	corev1 "k8s.io/client-go/pkg/api/v1"
+	admissionregistrationv1alpha1 "k8s.io/client-go/pkg/apis/admissionregistration/v1alpha1"
+	appsv1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
+	authenticationv1 "k8s.io/client-go/pkg/apis/authentication/v1"
+	authenticationv1beta1 "k8s.io/client-go/pkg/apis/authentication/v1beta1"
+	authorizationv1 "k8s.io/client-go/pkg/apis/authorization/v1"
+	authorizationv1beta1 "k8s.io/client-go/pkg/apis/authorization/v1beta1"
+	autoscalingv1 "k8s.io/client-go/pkg/apis/autoscaling/v1"
+	autoscalingv2alpha1 "k8s.io/client-go/pkg/apis/autoscaling/v2alpha1"
+	batchv1 "k8s.io/client-go/pkg/apis/batch/v1"
+	batchv2alpha1 "k8s.io/client-go/pkg/apis/batch/v2alpha1"
+	certificatesv1beta1 "k8s.io/client-go/pkg/apis/certificates/v1beta1"
+	extensionsv1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	networkingv1 "k8s.io/client-go/pkg/apis/networking/v1"
+	policyv1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
+	rbacv1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
+	rbacv1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
+	settingsv1alpha1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
+	storagev1 "k8s.io/client-go/pkg/apis/storage/v1"
+	storagev1beta1 "k8s.io/client-go/pkg/apis/storage/v1beta1"
 )
 
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 var parameterCodec = runtime.NewParameterCodec(scheme)
 
-var registry = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
-var groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
-
 func init() {
 	v1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
-	Install(groupFactoryRegistry, registry, scheme)
+	AddToScheme(scheme)
 }
 
-// Install registers the API group and adds types to a scheme
-func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
-	core.Install(groupFactoryRegistry, registry, scheme)
-	apps.Install(groupFactoryRegistry, registry, scheme)
-	authentication.Install(groupFactoryRegistry, registry, scheme)
-	authorization.Install(groupFactoryRegistry, registry, scheme)
-	autoscaling.Install(groupFactoryRegistry, registry, scheme)
-	batch.Install(groupFactoryRegistry, registry, scheme)
-	certificates.Install(groupFactoryRegistry, registry, scheme)
-	extensions.Install(groupFactoryRegistry, registry, scheme)
-	policy.Install(groupFactoryRegistry, registry, scheme)
-	rbac.Install(groupFactoryRegistry, registry, scheme)
-	settings.Install(groupFactoryRegistry, registry, scheme)
-	storage.Install(groupFactoryRegistry, registry, scheme)
+// AddToScheme adds all types of this clientset into the given scheme. This allows composition
+// of clientsets, like in:
+//
+//   import (
+//     "k8s.io/client-go/kubernetes"
+//     clientsetscheme "k8s.io/client-go/kuberentes/scheme"
+//     aggregatorclientsetscheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
+//   )
+//
+//   kclientset, _ := kubernetes.NewForConfig(c)
+//   aggregatorclientsetscheme.AddToScheme(clientsetscheme.Scheme)
+//
+// After this, RawExtensions in Kubernetes types will serialize kube-aggregator types
+// correctly.
+func AddToScheme(scheme *runtime.Scheme) {
+	admissionregistrationv1alpha1.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
+	appsv1beta1.AddToScheme(scheme)
+	authenticationv1.AddToScheme(scheme)
+	authenticationv1beta1.AddToScheme(scheme)
+	authorizationv1.AddToScheme(scheme)
+	authorizationv1beta1.AddToScheme(scheme)
+	autoscalingv1.AddToScheme(scheme)
+	autoscalingv2alpha1.AddToScheme(scheme)
+	batchv1.AddToScheme(scheme)
+	batchv2alpha1.AddToScheme(scheme)
+	certificatesv1beta1.AddToScheme(scheme)
+	extensionsv1beta1.AddToScheme(scheme)
+	networkingv1.AddToScheme(scheme)
+	policyv1beta1.AddToScheme(scheme)
+	rbacv1beta1.AddToScheme(scheme)
+	rbacv1alpha1.AddToScheme(scheme)
+	settingsv1alpha1.AddToScheme(scheme)
+	storagev1beta1.AddToScheme(scheme)
+	storagev1.AddToScheme(scheme)
 
 }

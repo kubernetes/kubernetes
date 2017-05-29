@@ -27,7 +27,7 @@ type ComponentStatusListerExpansion interface{}
 type ConfigMapListerExpansion interface{}
 
 // ConfigMapNamespaceListerExpansion allows custom methods to be added to
-// ConfigMapNamespaeLister.
+// ConfigMapNamespaceLister.
 type ConfigMapNamespaceListerExpansion interface{}
 
 // EndpointsListerExpansion allows custom methods to be added to
@@ -35,7 +35,7 @@ type ConfigMapNamespaceListerExpansion interface{}
 type EndpointsListerExpansion interface{}
 
 // EndpointsNamespaceListerExpansion allows custom methods to be added to
-// EndpointsNamespaeLister.
+// EndpointsNamespaceLister.
 type EndpointsNamespaceListerExpansion interface{}
 
 // EventListerExpansion allows custom methods to be added to
@@ -43,7 +43,7 @@ type EndpointsNamespaceListerExpansion interface{}
 type EventListerExpansion interface{}
 
 // EventNamespaceListerExpansion allows custom methods to be added to
-// EventNamespaeLister.
+// EventNamespaceLister.
 type EventNamespaceListerExpansion interface{}
 
 // LimitRangeListerExpansion allows custom methods to be added to
@@ -51,7 +51,7 @@ type EventNamespaceListerExpansion interface{}
 type LimitRangeListerExpansion interface{}
 
 // LimitRangeNamespaceListerExpansion allows custom methods to be added to
-// LimitRangeNamespaeLister.
+// LimitRangeNamespaceLister.
 type LimitRangeNamespaceListerExpansion interface{}
 
 // NamespaceListerExpansion allows custom methods to be added to
@@ -67,7 +67,7 @@ type PersistentVolumeListerExpansion interface{}
 type PersistentVolumeClaimListerExpansion interface{}
 
 // PersistentVolumeClaimNamespaceListerExpansion allows custom methods to be added to
-// PersistentVolumeClaimNamespaeLister.
+// PersistentVolumeClaimNamespaceLister.
 type PersistentVolumeClaimNamespaceListerExpansion interface{}
 
 // PodListerExpansion allows custom methods to be added to
@@ -75,7 +75,7 @@ type PersistentVolumeClaimNamespaceListerExpansion interface{}
 type PodListerExpansion interface{}
 
 // PodNamespaceListerExpansion allows custom methods to be added to
-// PodNamespaeLister.
+// PodNamespaceLister.
 type PodNamespaceListerExpansion interface{}
 
 // PodTemplateListerExpansion allows custom methods to be added to
@@ -83,7 +83,7 @@ type PodNamespaceListerExpansion interface{}
 type PodTemplateListerExpansion interface{}
 
 // PodTemplateNamespaceListerExpansion allows custom methods to be added to
-// PodTemplateNamespaeLister.
+// PodTemplateNamespaceLister.
 type PodTemplateNamespaceListerExpansion interface{}
 
 // ResourceQuotaListerExpansion allows custom methods to be added to
@@ -91,7 +91,7 @@ type PodTemplateNamespaceListerExpansion interface{}
 type ResourceQuotaListerExpansion interface{}
 
 // ResourceQuotaNamespaceListerExpansion allows custom methods to be added to
-// ResourceQuotaNamespaeLister.
+// ResourceQuotaNamespaceLister.
 type ResourceQuotaNamespaceListerExpansion interface{}
 
 // SecretListerExpansion allows custom methods to be added to
@@ -99,7 +99,7 @@ type ResourceQuotaNamespaceListerExpansion interface{}
 type SecretListerExpansion interface{}
 
 // SecretNamespaceListerExpansion allows custom methods to be added to
-// SecretNamespaeLister.
+// SecretNamespaceLister.
 type SecretNamespaceListerExpansion interface{}
 
 // ServiceAccountListerExpansion allows custom methods to be added to
@@ -107,5 +107,5 @@ type SecretNamespaceListerExpansion interface{}
 type ServiceAccountListerExpansion interface{}
 
 // ServiceAccountNamespaceListerExpansion allows custom methods to be added to
-// ServiceAccountNamespaeLister.
+// ServiceAccountNamespaceLister.
 type ServiceAccountNamespaceListerExpansion interface{}

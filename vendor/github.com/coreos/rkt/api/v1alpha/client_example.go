@@ -44,7 +44,7 @@ func getLogsWithoutFollow(c v1alpha.PublicAPIClient, p *v1alpha.Pod) {
 
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		os.Exit(254)
 	}
 
 	logsRecvResp, err := logsResp.Recv()
@@ -76,7 +76,7 @@ func getLogsWithFollow(c v1alpha.PublicAPIClient, p *v1alpha.Pod) {
 	})
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		os.Exit(254)
 	}
 
 	for {
@@ -103,7 +103,7 @@ func main() {
 	conn, err := grpc.Dial("localhost:15441", grpc.WithInsecure())
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		os.Exit(254)
 	}
 	c := v1alpha.NewPublicAPIClient(conn)
 	defer conn.Close()
@@ -120,7 +120,7 @@ func main() {
 	})
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		os.Exit(254)
 	}
 
 	for _, p := range podResp.Pods {
@@ -145,7 +145,7 @@ func main() {
 	})
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		os.Exit(254)
 	}
 
 	for _, im := range imgResp.Images {

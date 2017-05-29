@@ -26,15 +26,16 @@ import (
 	goruntime "runtime"
 	"strconv"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/server/healthz"
 
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -72,11 +73,14 @@ func Run(s *options.SchedulerServer) error {
 	recorder := createRecorder(kubecli, s)
 
 	informerFactory := informers.NewSharedInformerFactory(kubecli, 0)
+	// cache only non-terminal pods
+	podInformer := factory.NewPodInformer(kubecli, 0)
 
-	sched, err := createScheduler(
+	sched, err := CreateScheduler(
 		s,
 		kubecli,
 		informerFactory.Core().V1().Nodes(),
+		podInformer,
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -93,7 +97,11 @@ func Run(s *options.SchedulerServer) error {
 
 	stop := make(chan struct{})
 	defer close(stop)
+	go podInformer.Informer().Run(stop)
 	informerFactory.Start(stop)
+	// Waiting for all cache to sync before scheduling.
+	informerFactory.WaitForCacheSync(stop)
+	controller.WaitForCacheSync("scheduler", stop, podInformer.Informer().HasSynced)
 
 	run := func(_ <-chan struct{}) {
 		sched.Run()
@@ -110,17 +118,16 @@ func Run(s *options.SchedulerServer) error {
 		return fmt.Errorf("unable to get hostname: %v", err)
 	}
 
-	// TODO: enable other lock types
-	rl := &resourcelock.EndpointsLock{
-		EndpointsMeta: metav1.ObjectMeta{
-			Namespace: "kube-system",
-			Name:      "kube-scheduler",
-		},
-		Client: kubecli,
-		LockConfig: resourcelock.ResourceLockConfig{
+	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
+		s.LockObjectNamespace,
+		s.LockObjectName,
+		kubecli,
+		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
-		},
+		})
+	if err != nil {
+		glog.Fatalf("error creating lock: %v", err)
 	}
 
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{

@@ -20,9 +20,11 @@ var _ = fmt.Errorf
 var _ = math.Inf
 
 type RequestHeader struct {
-	ID uint64 `protobuf:"varint,1,opt,name=ID,json=iD,proto3" json:"ID,omitempty"`
+	ID uint64 `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
 	// username is a username that is associated with an auth token of gRPC connection
 	Username string `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	// auth_revision is a revision number of auth.authStore. It is not related to mvcc
+	AuthRevision uint64 `protobuf:"varint,3,opt,name=auth_revision,json=authRevision,proto3" json:"auth_revision,omitempty"`
 }
 
 func (m *RequestHeader) Reset()                    { *m = RequestHeader{} }
@@ -34,7 +36,7 @@ func (*RequestHeader) Descriptor() ([]byte, []int) { return fileDescriptorRaftIn
 // sent via raft.
 type InternalRaftRequest struct {
 	Header                   *RequestHeader                   `protobuf:"bytes,100,opt,name=header" json:"header,omitempty"`
-	ID                       uint64                           `protobuf:"varint,1,opt,name=ID,json=iD,proto3" json:"ID,omitempty"`
+	ID                       uint64                           `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
 	V2                       *Request                         `protobuf:"bytes,2,opt,name=v2" json:"v2,omitempty"`
 	Range                    *RangeRequest                    `protobuf:"bytes,3,opt,name=range" json:"range,omitempty"`
 	Put                      *PutRequest                      `protobuf:"bytes,4,opt,name=put" json:"put,omitempty"`
@@ -98,344 +100,349 @@ func init() {
 	proto.RegisterType((*EmptyResponse)(nil), "etcdserverpb.EmptyResponse")
 	proto.RegisterType((*InternalAuthenticateRequest)(nil), "etcdserverpb.InternalAuthenticateRequest")
 }
-func (m *RequestHeader) Marshal() (data []byte, err error) {
+func (m *RequestHeader) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *RequestHeader) MarshalTo(data []byte) (int, error) {
+func (m *RequestHeader) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if m.ID != 0 {
-		data[i] = 0x8
+		dAtA[i] = 0x8
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.ID))
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.ID))
 	}
 	if len(m.Username) > 0 {
-		data[i] = 0x12
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(len(m.Username)))
-		i += copy(data[i:], m.Username)
+		i = encodeVarintRaftInternal(dAtA, i, uint64(len(m.Username)))
+		i += copy(dAtA[i:], m.Username)
+	}
+	if m.AuthRevision != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthRevision))
 	}
 	return i, nil
 }
 
-func (m *InternalRaftRequest) Marshal() (data []byte, err error) {
+func (m *InternalRaftRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *InternalRaftRequest) MarshalTo(data []byte) (int, error) {
+func (m *InternalRaftRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if m.ID != 0 {
-		data[i] = 0x8
+		dAtA[i] = 0x8
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.ID))
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.ID))
 	}
 	if m.V2 != nil {
-		data[i] = 0x12
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.V2.Size()))
-		n1, err := m.V2.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.V2.Size()))
+		n1, err := m.V2.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n1
 	}
 	if m.Range != nil {
-		data[i] = 0x1a
+		dAtA[i] = 0x1a
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.Range.Size()))
-		n2, err := m.Range.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.Range.Size()))
+		n2, err := m.Range.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n2
 	}
 	if m.Put != nil {
-		data[i] = 0x22
+		dAtA[i] = 0x22
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.Put.Size()))
-		n3, err := m.Put.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.Put.Size()))
+		n3, err := m.Put.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n3
 	}
 	if m.DeleteRange != nil {
-		data[i] = 0x2a
+		dAtA[i] = 0x2a
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.DeleteRange.Size()))
-		n4, err := m.DeleteRange.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.DeleteRange.Size()))
+		n4, err := m.DeleteRange.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n4
 	}
 	if m.Txn != nil {
-		data[i] = 0x32
+		dAtA[i] = 0x32
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.Txn.Size()))
-		n5, err := m.Txn.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.Txn.Size()))
+		n5, err := m.Txn.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n5
 	}
 	if m.Compaction != nil {
-		data[i] = 0x3a
+		dAtA[i] = 0x3a
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.Compaction.Size()))
-		n6, err := m.Compaction.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.Compaction.Size()))
+		n6, err := m.Compaction.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n6
 	}
 	if m.LeaseGrant != nil {
-		data[i] = 0x42
+		dAtA[i] = 0x42
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.LeaseGrant.Size()))
-		n7, err := m.LeaseGrant.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.LeaseGrant.Size()))
+		n7, err := m.LeaseGrant.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n7
 	}
 	if m.LeaseRevoke != nil {
-		data[i] = 0x4a
+		dAtA[i] = 0x4a
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.LeaseRevoke.Size()))
-		n8, err := m.LeaseRevoke.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.LeaseRevoke.Size()))
+		n8, err := m.LeaseRevoke.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n8
 	}
 	if m.Alarm != nil {
-		data[i] = 0x52
+		dAtA[i] = 0x52
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.Alarm.Size()))
-		n9, err := m.Alarm.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.Alarm.Size()))
+		n9, err := m.Alarm.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n9
 	}
 	if m.Header != nil {
-		data[i] = 0xa2
+		dAtA[i] = 0xa2
 		i++
-		data[i] = 0x6
+		dAtA[i] = 0x6
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.Header.Size()))
-		n10, err := m.Header.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.Header.Size()))
+		n10, err := m.Header.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n10
 	}
 	if m.AuthEnable != nil {
-		data[i] = 0xc2
+		dAtA[i] = 0xc2
 		i++
-		data[i] = 0x3e
+		dAtA[i] = 0x3e
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthEnable.Size()))
-		n11, err := m.AuthEnable.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthEnable.Size()))
+		n11, err := m.AuthEnable.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n11
 	}
 	if m.AuthDisable != nil {
-		data[i] = 0x9a
+		dAtA[i] = 0x9a
 		i++
-		data[i] = 0x3f
+		dAtA[i] = 0x3f
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthDisable.Size()))
-		n12, err := m.AuthDisable.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthDisable.Size()))
+		n12, err := m.AuthDisable.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n12
 	}
 	if m.Authenticate != nil {
-		data[i] = 0xa2
+		dAtA[i] = 0xa2
 		i++
-		data[i] = 0x3f
+		dAtA[i] = 0x3f
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.Authenticate.Size()))
-		n13, err := m.Authenticate.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.Authenticate.Size()))
+		n13, err := m.Authenticate.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n13
 	}
 	if m.AuthUserAdd != nil {
-		data[i] = 0xe2
+		dAtA[i] = 0xe2
 		i++
-		data[i] = 0x44
+		dAtA[i] = 0x44
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserAdd.Size()))
-		n14, err := m.AuthUserAdd.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthUserAdd.Size()))
+		n14, err := m.AuthUserAdd.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n14
 	}
 	if m.AuthUserDelete != nil {
-		data[i] = 0xea
+		dAtA[i] = 0xea
 		i++
-		data[i] = 0x44
+		dAtA[i] = 0x44
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserDelete.Size()))
-		n15, err := m.AuthUserDelete.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthUserDelete.Size()))
+		n15, err := m.AuthUserDelete.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n15
 	}
 	if m.AuthUserGet != nil {
-		data[i] = 0xf2
+		dAtA[i] = 0xf2
 		i++
-		data[i] = 0x44
+		dAtA[i] = 0x44
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserGet.Size()))
-		n16, err := m.AuthUserGet.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthUserGet.Size()))
+		n16, err := m.AuthUserGet.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n16
 	}
 	if m.AuthUserChangePassword != nil {
-		data[i] = 0xfa
+		dAtA[i] = 0xfa
 		i++
-		data[i] = 0x44
+		dAtA[i] = 0x44
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserChangePassword.Size()))
-		n17, err := m.AuthUserChangePassword.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthUserChangePassword.Size()))
+		n17, err := m.AuthUserChangePassword.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n17
 	}
 	if m.AuthUserGrantRole != nil {
-		data[i] = 0x82
+		dAtA[i] = 0x82
 		i++
-		data[i] = 0x45
+		dAtA[i] = 0x45
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserGrantRole.Size()))
-		n18, err := m.AuthUserGrantRole.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthUserGrantRole.Size()))
+		n18, err := m.AuthUserGrantRole.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n18
 	}
 	if m.AuthUserRevokeRole != nil {
-		data[i] = 0x8a
+		dAtA[i] = 0x8a
 		i++
-		data[i] = 0x45
+		dAtA[i] = 0x45
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserRevokeRole.Size()))
-		n19, err := m.AuthUserRevokeRole.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthUserRevokeRole.Size()))
+		n19, err := m.AuthUserRevokeRole.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n19
 	}
 	if m.AuthUserList != nil {
-		data[i] = 0x92
+		dAtA[i] = 0x92
 		i++
-		data[i] = 0x45
+		dAtA[i] = 0x45
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthUserList.Size()))
-		n20, err := m.AuthUserList.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthUserList.Size()))
+		n20, err := m.AuthUserList.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n20
 	}
 	if m.AuthRoleList != nil {
-		data[i] = 0x9a
+		dAtA[i] = 0x9a
 		i++
-		data[i] = 0x45
+		dAtA[i] = 0x45
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleList.Size()))
-		n21, err := m.AuthRoleList.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthRoleList.Size()))
+		n21, err := m.AuthRoleList.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n21
 	}
 	if m.AuthRoleAdd != nil {
-		data[i] = 0x82
+		dAtA[i] = 0x82
 		i++
-		data[i] = 0x4b
+		dAtA[i] = 0x4b
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleAdd.Size()))
-		n22, err := m.AuthRoleAdd.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthRoleAdd.Size()))
+		n22, err := m.AuthRoleAdd.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n22
 	}
 	if m.AuthRoleDelete != nil {
-		data[i] = 0x8a
+		dAtA[i] = 0x8a
 		i++
-		data[i] = 0x4b
+		dAtA[i] = 0x4b
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleDelete.Size()))
-		n23, err := m.AuthRoleDelete.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthRoleDelete.Size()))
+		n23, err := m.AuthRoleDelete.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n23
 	}
 	if m.AuthRoleGet != nil {
-		data[i] = 0x92
+		dAtA[i] = 0x92
 		i++
-		data[i] = 0x4b
+		dAtA[i] = 0x4b
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleGet.Size()))
-		n24, err := m.AuthRoleGet.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthRoleGet.Size()))
+		n24, err := m.AuthRoleGet.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n24
 	}
 	if m.AuthRoleGrantPermission != nil {
-		data[i] = 0x9a
+		dAtA[i] = 0x9a
 		i++
-		data[i] = 0x4b
+		dAtA[i] = 0x4b
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleGrantPermission.Size()))
-		n25, err := m.AuthRoleGrantPermission.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthRoleGrantPermission.Size()))
+		n25, err := m.AuthRoleGrantPermission.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n25
 	}
 	if m.AuthRoleRevokePermission != nil {
-		data[i] = 0xa2
+		dAtA[i] = 0xa2
 		i++
-		data[i] = 0x4b
+		dAtA[i] = 0x4b
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(m.AuthRoleRevokePermission.Size()))
-		n26, err := m.AuthRoleRevokePermission.MarshalTo(data[i:])
+		i = encodeVarintRaftInternal(dAtA, i, uint64(m.AuthRoleRevokePermission.Size()))
+		n26, err := m.AuthRoleRevokePermission.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
@@ -444,17 +451,17 @@ func (m *InternalRaftRequest) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *EmptyResponse) Marshal() (data []byte, err error) {
+func (m *EmptyResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *EmptyResponse) MarshalTo(data []byte) (int, error) {
+func (m *EmptyResponse) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -462,67 +469,67 @@ func (m *EmptyResponse) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *InternalAuthenticateRequest) Marshal() (data []byte, err error) {
+func (m *InternalAuthenticateRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
 	if err != nil {
 		return nil, err
 	}
-	return data[:n], nil
+	return dAtA[:n], nil
 }
 
-func (m *InternalAuthenticateRequest) MarshalTo(data []byte) (int, error) {
+func (m *InternalAuthenticateRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
 	if len(m.Name) > 0 {
-		data[i] = 0xa
+		dAtA[i] = 0xa
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(len(m.Name)))
-		i += copy(data[i:], m.Name)
+		i = encodeVarintRaftInternal(dAtA, i, uint64(len(m.Name)))
+		i += copy(dAtA[i:], m.Name)
 	}
 	if len(m.Password) > 0 {
-		data[i] = 0x12
+		dAtA[i] = 0x12
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(len(m.Password)))
-		i += copy(data[i:], m.Password)
+		i = encodeVarintRaftInternal(dAtA, i, uint64(len(m.Password)))
+		i += copy(dAtA[i:], m.Password)
 	}
 	if len(m.SimpleToken) > 0 {
-		data[i] = 0x1a
+		dAtA[i] = 0x1a
 		i++
-		i = encodeVarintRaftInternal(data, i, uint64(len(m.SimpleToken)))
-		i += copy(data[i:], m.SimpleToken)
+		i = encodeVarintRaftInternal(dAtA, i, uint64(len(m.SimpleToken)))
+		i += copy(dAtA[i:], m.SimpleToken)
 	}
 	return i, nil
 }
 
-func encodeFixed64RaftInternal(data []byte, offset int, v uint64) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
-	data[offset+4] = uint8(v >> 32)
-	data[offset+5] = uint8(v >> 40)
-	data[offset+6] = uint8(v >> 48)
-	data[offset+7] = uint8(v >> 56)
+func encodeFixed64RaftInternal(dAtA []byte, offset int, v uint64) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
+	dAtA[offset+4] = uint8(v >> 32)
+	dAtA[offset+5] = uint8(v >> 40)
+	dAtA[offset+6] = uint8(v >> 48)
+	dAtA[offset+7] = uint8(v >> 56)
 	return offset + 8
 }
-func encodeFixed32RaftInternal(data []byte, offset int, v uint32) int {
-	data[offset] = uint8(v)
-	data[offset+1] = uint8(v >> 8)
-	data[offset+2] = uint8(v >> 16)
-	data[offset+3] = uint8(v >> 24)
+func encodeFixed32RaftInternal(dAtA []byte, offset int, v uint32) int {
+	dAtA[offset] = uint8(v)
+	dAtA[offset+1] = uint8(v >> 8)
+	dAtA[offset+2] = uint8(v >> 16)
+	dAtA[offset+3] = uint8(v >> 24)
 	return offset + 4
 }
-func encodeVarintRaftInternal(data []byte, offset int, v uint64) int {
+func encodeVarintRaftInternal(dAtA []byte, offset int, v uint64) int {
 	for v >= 1<<7 {
-		data[offset] = uint8(v&0x7f | 0x80)
+		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
-	data[offset] = uint8(v)
+	dAtA[offset] = uint8(v)
 	return offset + 1
 }
 func (m *RequestHeader) Size() (n int) {
@@ -534,6 +541,9 @@ func (m *RequestHeader) Size() (n int) {
 	l = len(m.Username)
 	if l > 0 {
 		n += 1 + l + sovRaftInternal(uint64(l))
+	}
+	if m.AuthRevision != 0 {
+		n += 1 + sovRaftInternal(uint64(m.AuthRevision))
 	}
 	return n
 }
@@ -688,8 +698,8 @@ func sovRaftInternal(x uint64) (n int) {
 func sozRaftInternal(x uint64) (n int) {
 	return sovRaftInternal(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (m *RequestHeader) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *RequestHeader) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -701,7 +711,7 @@ func (m *RequestHeader) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -729,7 +739,7 @@ func (m *RequestHeader) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.ID |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -748,7 +758,7 @@ func (m *RequestHeader) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -763,11 +773,30 @@ func (m *RequestHeader) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Username = string(data[iNdEx:postIndex])
+			m.Username = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthRevision", wireType)
+			}
+			m.AuthRevision = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRaftInternal
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.AuthRevision |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRaftInternal(data[iNdEx:])
+			skippy, err := skipRaftInternal(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -786,8 +815,8 @@ func (m *RequestHeader) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *InternalRaftRequest) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *InternalRaftRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -799,7 +828,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -827,7 +856,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				m.ID |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -846,7 +875,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -863,7 +892,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.V2 == nil {
 				m.V2 = &Request{}
 			}
-			if err := m.V2.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.V2.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -879,7 +908,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -896,7 +925,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.Range == nil {
 				m.Range = &RangeRequest{}
 			}
-			if err := m.Range.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Range.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -912,7 +941,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -929,7 +958,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.Put == nil {
 				m.Put = &PutRequest{}
 			}
-			if err := m.Put.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Put.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -945,7 +974,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -962,7 +991,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.DeleteRange == nil {
 				m.DeleteRange = &DeleteRangeRequest{}
 			}
-			if err := m.DeleteRange.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.DeleteRange.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -978,7 +1007,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -995,7 +1024,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.Txn == nil {
 				m.Txn = &TxnRequest{}
 			}
-			if err := m.Txn.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Txn.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1011,7 +1040,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1028,7 +1057,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.Compaction == nil {
 				m.Compaction = &CompactionRequest{}
 			}
-			if err := m.Compaction.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Compaction.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1044,7 +1073,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1061,7 +1090,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.LeaseGrant == nil {
 				m.LeaseGrant = &LeaseGrantRequest{}
 			}
-			if err := m.LeaseGrant.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.LeaseGrant.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1077,7 +1106,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1094,7 +1123,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.LeaseRevoke == nil {
 				m.LeaseRevoke = &LeaseRevokeRequest{}
 			}
-			if err := m.LeaseRevoke.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.LeaseRevoke.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1110,7 +1139,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1127,7 +1156,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.Alarm == nil {
 				m.Alarm = &AlarmRequest{}
 			}
-			if err := m.Alarm.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Alarm.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1143,7 +1172,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1160,7 +1189,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.Header == nil {
 				m.Header = &RequestHeader{}
 			}
-			if err := m.Header.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Header.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1176,7 +1205,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1193,7 +1222,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthEnable == nil {
 				m.AuthEnable = &AuthEnableRequest{}
 			}
-			if err := m.AuthEnable.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthEnable.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1209,7 +1238,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1226,7 +1255,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthDisable == nil {
 				m.AuthDisable = &AuthDisableRequest{}
 			}
-			if err := m.AuthDisable.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthDisable.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1242,7 +1271,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1259,7 +1288,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.Authenticate == nil {
 				m.Authenticate = &InternalAuthenticateRequest{}
 			}
-			if err := m.Authenticate.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.Authenticate.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1275,7 +1304,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1292,7 +1321,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthUserAdd == nil {
 				m.AuthUserAdd = &AuthUserAddRequest{}
 			}
-			if err := m.AuthUserAdd.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthUserAdd.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1308,7 +1337,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1325,7 +1354,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthUserDelete == nil {
 				m.AuthUserDelete = &AuthUserDeleteRequest{}
 			}
-			if err := m.AuthUserDelete.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthUserDelete.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1341,7 +1370,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1358,7 +1387,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthUserGet == nil {
 				m.AuthUserGet = &AuthUserGetRequest{}
 			}
-			if err := m.AuthUserGet.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthUserGet.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1374,7 +1403,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1391,7 +1420,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthUserChangePassword == nil {
 				m.AuthUserChangePassword = &AuthUserChangePasswordRequest{}
 			}
-			if err := m.AuthUserChangePassword.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthUserChangePassword.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1407,7 +1436,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1424,7 +1453,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthUserGrantRole == nil {
 				m.AuthUserGrantRole = &AuthUserGrantRoleRequest{}
 			}
-			if err := m.AuthUserGrantRole.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthUserGrantRole.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1440,7 +1469,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1457,7 +1486,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthUserRevokeRole == nil {
 				m.AuthUserRevokeRole = &AuthUserRevokeRoleRequest{}
 			}
-			if err := m.AuthUserRevokeRole.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthUserRevokeRole.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1473,7 +1502,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1490,7 +1519,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthUserList == nil {
 				m.AuthUserList = &AuthUserListRequest{}
 			}
-			if err := m.AuthUserList.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthUserList.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1506,7 +1535,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1523,7 +1552,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthRoleList == nil {
 				m.AuthRoleList = &AuthRoleListRequest{}
 			}
-			if err := m.AuthRoleList.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthRoleList.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1539,7 +1568,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1556,7 +1585,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthRoleAdd == nil {
 				m.AuthRoleAdd = &AuthRoleAddRequest{}
 			}
-			if err := m.AuthRoleAdd.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthRoleAdd.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1572,7 +1601,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1589,7 +1618,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthRoleDelete == nil {
 				m.AuthRoleDelete = &AuthRoleDeleteRequest{}
 			}
-			if err := m.AuthRoleDelete.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthRoleDelete.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1605,7 +1634,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1622,7 +1651,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthRoleGet == nil {
 				m.AuthRoleGet = &AuthRoleGetRequest{}
 			}
-			if err := m.AuthRoleGet.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthRoleGet.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1638,7 +1667,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1655,7 +1684,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthRoleGrantPermission == nil {
 				m.AuthRoleGrantPermission = &AuthRoleGrantPermissionRequest{}
 			}
-			if err := m.AuthRoleGrantPermission.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthRoleGrantPermission.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1671,7 +1700,7 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				msglen |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1688,13 +1717,13 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 			if m.AuthRoleRevokePermission == nil {
 				m.AuthRoleRevokePermission = &AuthRoleRevokePermissionRequest{}
 			}
-			if err := m.AuthRoleRevokePermission.Unmarshal(data[iNdEx:postIndex]); err != nil {
+			if err := m.AuthRoleRevokePermission.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRaftInternal(data[iNdEx:])
+			skippy, err := skipRaftInternal(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1713,8 +1742,8 @@ func (m *InternalRaftRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *EmptyResponse) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *EmptyResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1726,7 +1755,7 @@ func (m *EmptyResponse) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1744,7 +1773,7 @@ func (m *EmptyResponse) Unmarshal(data []byte) error {
 		switch fieldNum {
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRaftInternal(data[iNdEx:])
+			skippy, err := skipRaftInternal(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1763,8 +1792,8 @@ func (m *EmptyResponse) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *InternalAuthenticateRequest) Unmarshal(data []byte) error {
-	l := len(data)
+func (m *InternalAuthenticateRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		preIndex := iNdEx
@@ -1776,7 +1805,7 @@ func (m *InternalAuthenticateRequest) Unmarshal(data []byte) error {
 			if iNdEx >= l {
 				return io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1804,7 +1833,7 @@ func (m *InternalAuthenticateRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1819,7 +1848,7 @@ func (m *InternalAuthenticateRequest) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Name = string(data[iNdEx:postIndex])
+			m.Name = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -1833,7 +1862,7 @@ func (m *InternalAuthenticateRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1848,7 +1877,7 @@ func (m *InternalAuthenticateRequest) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Password = string(data[iNdEx:postIndex])
+			m.Password = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -1862,7 +1891,7 @@ func (m *InternalAuthenticateRequest) Unmarshal(data []byte) error {
 				if iNdEx >= l {
 					return io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1877,11 +1906,11 @@ func (m *InternalAuthenticateRequest) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.SimpleToken = string(data[iNdEx:postIndex])
+			m.SimpleToken = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
-			skippy, err := skipRaftInternal(data[iNdEx:])
+			skippy, err := skipRaftInternal(dAtA[iNdEx:])
 			if err != nil {
 				return err
 			}
@@ -1900,8 +1929,8 @@ func (m *InternalAuthenticateRequest) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func skipRaftInternal(data []byte) (n int, err error) {
-	l := len(data)
+func skipRaftInternal(dAtA []byte) (n int, err error) {
+	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
 		var wire uint64
@@ -1912,7 +1941,7 @@ func skipRaftInternal(data []byte) (n int, err error) {
 			if iNdEx >= l {
 				return 0, io.ErrUnexpectedEOF
 			}
-			b := data[iNdEx]
+			b := dAtA[iNdEx]
 			iNdEx++
 			wire |= (uint64(b) & 0x7F) << shift
 			if b < 0x80 {
@@ -1930,7 +1959,7 @@ func skipRaftInternal(data []byte) (n int, err error) {
 					return 0, io.ErrUnexpectedEOF
 				}
 				iNdEx++
-				if data[iNdEx-1] < 0x80 {
+				if dAtA[iNdEx-1] < 0x80 {
 					break
 				}
 			}
@@ -1947,7 +1976,7 @@ func skipRaftInternal(data []byte) (n int, err error) {
 				if iNdEx >= l {
 					return 0, io.ErrUnexpectedEOF
 				}
-				b := data[iNdEx]
+				b := dAtA[iNdEx]
 				iNdEx++
 				length |= (int(b) & 0x7F) << shift
 				if b < 0x80 {
@@ -1970,7 +1999,7 @@ func skipRaftInternal(data []byte) (n int, err error) {
 					if iNdEx >= l {
 						return 0, io.ErrUnexpectedEOF
 					}
-					b := data[iNdEx]
+					b := dAtA[iNdEx]
 					iNdEx++
 					innerWire |= (uint64(b) & 0x7F) << shift
 					if b < 0x80 {
@@ -1981,7 +2010,7 @@ func skipRaftInternal(data []byte) (n int, err error) {
 				if innerWireType == 4 {
 					break
 				}
-				next, err := skipRaftInternal(data[start:])
+				next, err := skipRaftInternal(dAtA[start:])
 				if err != nil {
 					return 0, err
 				}
@@ -2005,58 +2034,61 @@ var (
 	ErrIntOverflowRaftInternal   = fmt.Errorf("proto: integer overflow")
 )
 
+func init() { proto.RegisterFile("raft_internal.proto", fileDescriptorRaftInternal) }
+
 var fileDescriptorRaftInternal = []byte{
-	// 824 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x7c, 0x96, 0xdd, 0x4e, 0xdb, 0x48,
-	0x14, 0xc7, 0x49, 0xf8, 0xcc, 0x24, 0x64, 0xd9, 0x01, 0x76, 0x67, 0x83, 0x94, 0x85, 0xac, 0x76,
-	0x97, 0x7e, 0xd1, 0x0a, 0x2e, 0x7b, 0xd1, 0xa6, 0x04, 0x01, 0x12, 0x42, 0xc8, 0xa2, 0x52, 0xa5,
-	0x5e, 0x58, 0x43, 0x7c, 0x48, 0x5c, 0x1c, 0xdb, 0xb5, 0x27, 0x29, 0x7d, 0x93, 0x3e, 0x46, 0xbf,
-	0x1e, 0x82, 0x8b, 0x7e, 0xd0, 0xf6, 0x05, 0x5a, 0x7a, 0xd3, 0xab, 0xde, 0xb4, 0x0f, 0x50, 0xcd,
-	0x87, 0xc7, 0x71, 0x32, 0xe1, 0xce, 0x3e, 0xe7, 0x7f, 0x7e, 0xe7, 0x4c, 0xe6, 0x3f, 0x9e, 0xa0,
-	0xf9, 0x88, 0x1e, 0x33, 0xdb, 0xf5, 0x19, 0x44, 0x3e, 0xf5, 0xd6, 0xc2, 0x28, 0x60, 0x01, 0x2e,
-	0x01, 0x6b, 0x3a, 0x31, 0x44, 0x3d, 0x88, 0xc2, 0xa3, 0xca, 0x42, 0x2b, 0x68, 0x05, 0x22, 0x71,
-	0x93, 0x3f, 0x49, 0x4d, 0x65, 0x2e, 0xd5, 0xa8, 0x48, 0x21, 0x0a, 0x9b, 0xf2, 0xb1, 0x76, 0x1b,
-	0xcd, 0x5a, 0xf0, 0xb8, 0x0b, 0x31, 0xdb, 0x01, 0xea, 0x40, 0x84, 0xcb, 0x28, 0xbf, 0xdb, 0x20,
-	0xb9, 0xe5, 0xdc, 0xea, 0x84, 0x95, 0x77, 0x1b, 0xb8, 0x82, 0x66, 0xba, 0x31, 0x6f, 0xd9, 0x01,
-	0x92, 0x5f, 0xce, 0xad, 0x16, 0x2c, 0xfd, 0x5e, 0xfb, 0x5e, 0x46, 0xf3, 0xbb, 0x6a, 0x20, 0x8b,
-	0x1e, 0x33, 0x45, 0x1a, 0x62, 0xfc, 0x8b, 0xf2, 0xbd, 0x75, 0x51, 0x5d, 0x5c, 0x5f, 0x5c, 0xeb,
-	0x1f, 0x79, 0x4d, 0x95, 0x58, 0xf9, 0xde, 0x3a, 0xbe, 0x85, 0x26, 0x23, 0xea, 0xb7, 0x80, 0x8c,
-	0x0b, 0x65, 0x65, 0x40, 0xc9, 0x53, 0x89, 0x5c, 0x0a, 0xf1, 0x55, 0x34, 0x1e, 0x76, 0x19, 0x99,
-	0x10, 0x7a, 0x92, 0xd5, 0x1f, 0x74, 0x93, 0x79, 0x2c, 0x2e, 0xc2, 0x9b, 0xa8, 0xe4, 0x80, 0x07,
-	0x0c, 0x6c, 0xd9, 0x64, 0x52, 0x14, 0x2d, 0x67, 0x8b, 0x1a, 0x42, 0x91, 0x69, 0x55, 0x74, 0xd2,
-	0x18, 0x6f, 0xc8, 0x4e, 0x7d, 0x32, 0x65, 0x6a, 0x78, 0x78, 0xea, 0xeb, 0x86, 0xec, 0xd4, 0xc7,
-	0x77, 0x10, 0x6a, 0x06, 0x9d, 0x90, 0x36, 0x99, 0x1b, 0xf8, 0x64, 0x5a, 0x94, 0xfc, 0x9d, 0x2d,
-	0xd9, 0xd4, 0xf9, 0xa4, 0xb2, 0xaf, 0x04, 0xdf, 0x45, 0x45, 0x0f, 0x68, 0x0c, 0x76, 0x2b, 0xa2,
-	0x3e, 0x23, 0x33, 0x26, 0xc2, 0x1e, 0x17, 0x6c, 0xf3, 0xbc, 0x26, 0x78, 0x3a, 0xc4, 0xd7, 0x2c,
-	0x09, 0x11, 0xf4, 0x82, 0x13, 0x20, 0x05, 0xd3, 0x9a, 0x05, 0xc2, 0x12, 0x02, 0xbd, 0x66, 0x2f,
-	0x8d, 0xf1, 0x6d, 0xa1, 0x1e, 0x8d, 0x3a, 0x04, 0x99, 0xb6, 0xa5, 0xce, 0x53, 0x7a, 0x5b, 0x84,
-	0x10, 0x6f, 0xa0, 0xa9, 0xb6, 0x70, 0x13, 0x71, 0x44, 0xc9, 0x92, 0x71, 0xcf, 0xa5, 0xe1, 0x2c,
-	0x25, 0xc5, 0x75, 0x54, 0xa4, 0x5d, 0xd6, 0xb6, 0xc1, 0xa7, 0x47, 0x1e, 0x90, 0x6f, 0xc6, 0x1f,
-	0xac, 0xde, 0x65, 0xed, 0x2d, 0x21, 0xd0, 0xcb, 0xa5, 0x3a, 0x84, 0x1b, 0xa8, 0x24, 0x10, 0x8e,
-	0x1b, 0x0b, 0xc6, 0x8f, 0x69, 0xd3, 0x7a, 0x39, 0xa3, 0x21, 0x15, 0x7a, 0xbd, 0x34, 0x8d, 0xe1,
-	0x7d, 0x49, 0x01, 0x9f, 0xb9, 0x4d, 0xca, 0x80, 0xfc, 0x94, 0x94, 0x2b, 0x59, 0x4a, 0xe2, 0xfb,
-	0x7a, 0x9f, 0x34, 0xc1, 0x65, 0xea, 0xf1, 0x16, 0x9a, 0x15, 0x53, 0xf1, 0x63, 0x63, 0x53, 0xc7,
-	0x21, 0x6f, 0x66, 0x46, 0x8d, 0x75, 0x3f, 0x86, 0xa8, 0xee, 0x38, 0x99, 0xb1, 0x54, 0x0c, 0xef,
-	0xa3, 0xb9, 0x14, 0x23, 0x3d, 0x49, 0xde, 0x4a, 0xd2, 0x3f, 0x66, 0x92, 0x32, 0xb3, 0x82, 0x95,
-	0x69, 0x26, 0x9c, 0x1d, 0xab, 0x05, 0x8c, 0xbc, 0xbb, 0x74, 0xac, 0x6d, 0x60, 0x43, 0x63, 0x6d,
-	0x03, 0xc3, 0x2d, 0xf4, 0x57, 0x8a, 0x69, 0xb6, 0xf9, 0x29, 0xb1, 0x43, 0x1a, 0xc7, 0x4f, 0x82,
-	0xc8, 0x21, 0xef, 0x25, 0xf2, 0x9a, 0x19, 0xb9, 0x29, 0xd4, 0x07, 0x4a, 0x9c, 0xd0, 0xff, 0xa0,
-	0xc6, 0x34, 0x7e, 0x80, 0x16, 0xfa, 0xe6, 0xe5, 0xf6, 0xb6, 0xa3, 0xc0, 0x03, 0x72, 0x2e, 0x7b,
-	0xfc, 0x37, 0x62, 0x6c, 0x71, 0x34, 0x82, 0x74, 0xab, 0x7f, 0xa7, 0x83, 0x19, 0xfc, 0x10, 0x2d,
-	0xa6, 0x64, 0x79, 0x52, 0x24, 0xfa, 0x83, 0x44, 0xff, 0x6f, 0x46, 0xab, 0x23, 0xd3, 0xc7, 0xc6,
-	0x74, 0x28, 0x85, 0x77, 0x50, 0x39, 0x85, 0x7b, 0x6e, 0xcc, 0xc8, 0x47, 0x49, 0x5d, 0x31, 0x53,
-	0xf7, 0xdc, 0x98, 0x65, 0x7c, 0x94, 0x04, 0x35, 0x89, 0x8f, 0x26, 0x49, 0x9f, 0x46, 0x92, 0x78,
-	0xeb, 0x21, 0x52, 0x12, 0xd4, 0x5b, 0x2f, 0x48, 0xdc, 0x91, 0xcf, 0x0b, 0xa3, 0xb6, 0x9e, 0xd7,
-	0x0c, 0x3a, 0x52, 0xc5, 0xb4, 0x23, 0x05, 0x46, 0x39, 0xf2, 0x45, 0x61, 0x94, 0x23, 0x79, 0x95,
-	0xc1, 0x91, 0x69, 0x38, 0x3b, 0x16, 0x77, 0xe4, 0xcb, 0x4b, 0xc7, 0x1a, 0x74, 0xa4, 0x8a, 0xe1,
-	0x47, 0xa8, 0xd2, 0x87, 0x11, 0x46, 0x09, 0x21, 0xea, 0xb8, 0x71, 0xcc, 0xbf, 0xc3, 0xaf, 0x24,
-	0xf3, 0xfa, 0x08, 0x26, 0x97, 0x1f, 0x68, 0x75, 0xc2, 0xff, 0x93, 0x9a, 0xf3, 0xb8, 0x83, 0x96,
-	0xd2, 0x5e, 0xca, 0x3a, 0x7d, 0xcd, 0x5e, 0xcb, 0x66, 0x37, 0xcc, 0xcd, 0xa4, 0x4b, 0x86, 0xbb,
-	0x11, 0x3a, 0x42, 0x50, 0xfb, 0x0d, 0xcd, 0x6e, 0x75, 0x42, 0xf6, 0xd4, 0x82, 0x38, 0x0c, 0xfc,
-	0x18, 0x6a, 0x21, 0x5a, 0xba, 0xe4, 0x43, 0x84, 0x31, 0x9a, 0x10, 0x17, 0x77, 0x4e, 0x5c, 0xdc,
-	0xe2, 0x99, 0x5f, 0xe8, 0xfa, 0x7c, 0xaa, 0x0b, 0x3d, 0x79, 0xc7, 0x2b, 0xa8, 0x14, 0xbb, 0x9d,
-	0xd0, 0x03, 0x9b, 0x05, 0x27, 0xe0, 0x8b, 0x8b, 0xb8, 0x60, 0x15, 0x65, 0xec, 0x90, 0x87, 0xee,
-	0x2d, 0x9c, 0x7d, 0xa9, 0x8e, 0x9d, 0x5d, 0x54, 0x73, 0xe7, 0x17, 0xd5, 0xdc, 0xe7, 0x8b, 0x6a,
-	0xee, 0xd9, 0xd7, 0xea, 0xd8, 0xd1, 0x94, 0xf8, 0x37, 0xb1, 0xf1, 0x2b, 0x00, 0x00, 0xff, 0xff,
-	0x54, 0x8c, 0x4a, 0x7f, 0xa5, 0x08, 0x00, 0x00,
+	// 837 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x7c, 0x96, 0xdd, 0x52, 0xd3, 0x40,
+	0x14, 0xc7, 0x69, 0xf9, 0xec, 0xb6, 0x54, 0x5c, 0x40, 0xd7, 0x32, 0x53, 0xa1, 0x8c, 0x8a, 0x5f,
+	0xe8, 0x94, 0x07, 0xd0, 0x4a, 0x19, 0x60, 0x86, 0x61, 0x98, 0x0c, 0xce, 0x38, 0xe3, 0x45, 0x5c,
+	0x9a, 0x43, 0x1b, 0x49, 0x93, 0xb8, 0xd9, 0x56, 0x7c, 0x13, 0x1f, 0xc3, 0xaf, 0x87, 0xe0, 0xc2,
+	0x0f, 0xd4, 0x17, 0x50, 0xbc, 0xf1, 0xca, 0x1b, 0x7d, 0x00, 0x67, 0x3f, 0x92, 0x34, 0x6d, 0xca,
+	0x5d, 0x72, 0xce, 0xff, 0xfc, 0xce, 0xd9, 0xec, 0x7f, 0xbb, 0x45, 0xb3, 0x8c, 0x1e, 0x72, 0xd3,
+	0x76, 0x39, 0x30, 0x97, 0x3a, 0xab, 0x3e, 0xf3, 0xb8, 0x87, 0x0b, 0xc0, 0x1b, 0x56, 0x00, 0xac,
+	0x0b, 0xcc, 0x3f, 0x28, 0xcd, 0x35, 0xbd, 0xa6, 0x27, 0x13, 0xf7, 0xc4, 0x93, 0xd2, 0x94, 0x66,
+	0x62, 0x8d, 0x8e, 0xe4, 0x98, 0xdf, 0x50, 0x8f, 0x95, 0x67, 0x68, 0xda, 0x80, 0x17, 0x1d, 0x08,
+	0xf8, 0x16, 0x50, 0x0b, 0x18, 0x2e, 0xa2, 0xec, 0x76, 0x9d, 0x64, 0x16, 0x33, 0x2b, 0x63, 0x46,
+	0x76, 0xbb, 0x8e, 0x4b, 0x68, 0xaa, 0x13, 0x88, 0x96, 0x6d, 0x20, 0xd9, 0xc5, 0xcc, 0x4a, 0xce,
+	0x88, 0xde, 0xf1, 0x32, 0x9a, 0xa6, 0x1d, 0xde, 0x32, 0x19, 0x74, 0xed, 0xc0, 0xf6, 0x5c, 0x32,
+	0x2a, 0xcb, 0x0a, 0x22, 0x68, 0xe8, 0x58, 0xe5, 0x4f, 0x11, 0xcd, 0x6e, 0xeb, 0xa9, 0x0d, 0x7a,
+	0xc8, 0x75, 0xbb, 0x81, 0x46, 0xd7, 0x50, 0xb6, 0x5b, 0x95, 0x2d, 0xf2, 0xd5, 0xf9, 0xd5, 0xde,
+	0x75, 0xad, 0xea, 0x12, 0x23, 0xdb, 0xad, 0xe2, 0xfb, 0x68, 0x9c, 0x51, 0xb7, 0x09, 0xb2, 0x57,
+	0xbe, 0x5a, 0xea, 0x53, 0x8a, 0x54, 0x28, 0x57, 0x42, 0x7c, 0x0b, 0x8d, 0xfa, 0x1d, 0x4e, 0xc6,
+	0xa4, 0x9e, 0x24, 0xf5, 0x7b, 0x9d, 0x70, 0x1e, 0x43, 0x88, 0xf0, 0x3a, 0x2a, 0x58, 0xe0, 0x00,
+	0x07, 0x53, 0x35, 0x19, 0x97, 0x45, 0x8b, 0xc9, 0xa2, 0xba, 0x54, 0x24, 0x5a, 0xe5, 0xad, 0x38,
+	0x26, 0x1a, 0xf2, 0x63, 0x97, 0x4c, 0xa4, 0x35, 0xdc, 0x3f, 0x76, 0xa3, 0x86, 0xfc, 0xd8, 0xc5,
+	0x0f, 0x10, 0x6a, 0x78, 0x6d, 0x9f, 0x36, 0xb8, 0xf8, 0x7e, 0x93, 0xb2, 0xe4, 0x6a, 0xb2, 0x64,
+	0x3d, 0xca, 0x87, 0x95, 0x3d, 0x25, 0xf8, 0x21, 0xca, 0x3b, 0x40, 0x03, 0x30, 0x9b, 0x8c, 0xba,
+	0x9c, 0x4c, 0xa5, 0x11, 0x76, 0x84, 0x60, 0x53, 0xe4, 0x23, 0x82, 0x13, 0x85, 0xc4, 0x9a, 0x15,
+	0x81, 0x41, 0xd7, 0x3b, 0x02, 0x92, 0x4b, 0x5b, 0xb3, 0x44, 0x18, 0x52, 0x10, 0xad, 0xd9, 0x89,
+	0x63, 0x62, 0x5b, 0xa8, 0x43, 0x59, 0x9b, 0xa0, 0xb4, 0x6d, 0xa9, 0x89, 0x54, 0xb4, 0x2d, 0x52,
+	0x88, 0xd7, 0xd0, 0x44, 0x4b, 0x5a, 0x8e, 0x58, 0xb2, 0x64, 0x21, 0x75, 0xcf, 0x95, 0x2b, 0x0d,
+	0x2d, 0xc5, 0x35, 0x94, 0x97, 0x8e, 0x03, 0x97, 0x1e, 0x38, 0x40, 0x7e, 0xa7, 0x7e, 0xb0, 0x5a,
+	0x87, 0xb7, 0x36, 0xa4, 0x20, 0x5a, 0x2e, 0x8d, 0x42, 0xb8, 0x8e, 0xa4, 0x3f, 0x4d, 0xcb, 0x0e,
+	0x24, 0xe3, 0xef, 0x64, 0xda, 0x7a, 0x05, 0xa3, 0xae, 0x14, 0xd1, 0x7a, 0x69, 0x1c, 0xc3, 0xbb,
+	0x8a, 0x02, 0x2e, 0xb7, 0x1b, 0x94, 0x03, 0xf9, 0xa7, 0x28, 0x37, 0x93, 0x94, 0xd0, 0xf7, 0xb5,
+	0x1e, 0x69, 0x88, 0x4b, 0xd4, 0xe3, 0x0d, 0x7d, 0x94, 0xc4, 0xd9, 0x32, 0xa9, 0x65, 0x91, 0x8f,
+	0x53, 0xc3, 0xc6, 0x7a, 0x1c, 0x00, 0xab, 0x59, 0x56, 0x62, 0x2c, 0x1d, 0xc3, 0xbb, 0x68, 0x26,
+	0xc6, 0x28, 0x4f, 0x92, 0x4f, 0x8a, 0xb4, 0x9c, 0x4e, 0xd2, 0x66, 0xd6, 0xb0, 0x22, 0x4d, 0x84,
+	0x93, 0x63, 0x35, 0x81, 0x93, 0xcf, 0xe7, 0x8e, 0xb5, 0x09, 0x7c, 0x60, 0xac, 0x4d, 0xe0, 0xb8,
+	0x89, 0xae, 0xc4, 0x98, 0x46, 0x4b, 0x9c, 0x12, 0xd3, 0xa7, 0x41, 0xf0, 0xd2, 0x63, 0x16, 0xf9,
+	0xa2, 0x90, 0xb7, 0xd3, 0x91, 0xeb, 0x52, 0xbd, 0xa7, 0xc5, 0x21, 0xfd, 0x12, 0x4d, 0x4d, 0xe3,
+	0x27, 0x68, 0xae, 0x67, 0x5e, 0x61, 0x6f, 0x93, 0x79, 0x0e, 0x90, 0x53, 0xd5, 0xe3, 0xfa, 0x90,
+	0xb1, 0xe5, 0xd1, 0xf0, 0xe2, 0xad, 0xbe, 0x48, 0xfb, 0x33, 0xf8, 0x29, 0x9a, 0x8f, 0xc9, 0xea,
+	0xa4, 0x28, 0xf4, 0x57, 0x85, 0xbe, 0x91, 0x8e, 0xd6, 0x47, 0xa6, 0x87, 0x8d, 0xe9, 0x40, 0x0a,
+	0x6f, 0xa1, 0x62, 0x0c, 0x77, 0xec, 0x80, 0x93, 0x6f, 0x8a, 0xba, 0x94, 0x4e, 0xdd, 0xb1, 0x03,
+	0x9e, 0xf0, 0x51, 0x18, 0x8c, 0x48, 0x62, 0x34, 0x45, 0xfa, 0x3e, 0x94, 0x24, 0x5a, 0x0f, 0x90,
+	0xc2, 0x60, 0xb4, 0xf5, 0x92, 0x24, 0x1c, 0xf9, 0x26, 0x37, 0x6c, 0xeb, 0x45, 0x4d, 0xbf, 0x23,
+	0x75, 0x2c, 0x72, 0xa4, 0xc4, 0x68, 0x47, 0xbe, 0xcd, 0x0d, 0x73, 0xa4, 0xa8, 0x4a, 0x71, 0x64,
+	0x1c, 0x4e, 0x8e, 0x25, 0x1c, 0xf9, 0xee, 0xdc, 0xb1, 0xfa, 0x1d, 0xa9, 0x63, 0xf8, 0x39, 0x2a,
+	0xf5, 0x60, 0xa4, 0x51, 0x7c, 0x60, 0x6d, 0x3b, 0x90, 0xf7, 0xd8, 0x7b, 0xc5, 0xbc, 0x33, 0x84,
+	0x29, 0xe4, 0x7b, 0x91, 0x3a, 0xe4, 0x5f, 0xa6, 0xe9, 0x79, 0xdc, 0x46, 0x0b, 0x71, 0x2f, 0x6d,
+	0x9d, 0x9e, 0x66, 0x1f, 0x54, 0xb3, 0xbb, 0xe9, 0xcd, 0x94, 0x4b, 0x06, 0xbb, 0x11, 0x3a, 0x44,
+	0x50, 0xb9, 0x80, 0xa6, 0x37, 0xda, 0x3e, 0x7f, 0x65, 0x40, 0xe0, 0x7b, 0x6e, 0x00, 0x15, 0x1f,
+	0x2d, 0x9c, 0xf3, 0x43, 0x84, 0x31, 0x1a, 0x93, 0xb7, 0x7b, 0x46, 0xde, 0xee, 0xf2, 0x59, 0xdc,
+	0xfa, 0xd1, 0xf9, 0xd4, 0xb7, 0x7e, 0xf8, 0x8e, 0x97, 0x50, 0x21, 0xb0, 0xdb, 0xbe, 0x03, 0x26,
+	0xf7, 0x8e, 0x40, 0x5d, 0xfa, 0x39, 0x23, 0xaf, 0x62, 0xfb, 0x22, 0xf4, 0x68, 0xee, 0xe4, 0x67,
+	0x79, 0xe4, 0xe4, 0xac, 0x9c, 0x39, 0x3d, 0x2b, 0x67, 0x7e, 0x9c, 0x95, 0x33, 0xaf, 0x7f, 0x95,
+	0x47, 0x0e, 0x26, 0xe4, 0x5f, 0x8e, 0xb5, 0xff, 0x01, 0x00, 0x00, 0xff, 0xff, 0xff, 0xc9, 0xfc,
+	0x0e, 0xca, 0x08, 0x00, 0x00,
 }

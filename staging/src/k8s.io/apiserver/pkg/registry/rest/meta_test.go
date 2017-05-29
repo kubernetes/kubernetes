@@ -19,6 +19,7 @@ package rest
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/apis/example"
@@ -49,11 +50,15 @@ func TestFillObjectMetaSystemFields(t *testing.T) {
 func TestHasObjectMetaSystemFieldValues(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	resource := metav1.ObjectMeta{}
-	if metav1.HasObjectMetaSystemFieldValues(&resource) {
+	objMeta, err := meta.Accessor(&resource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if metav1.HasObjectMetaSystemFieldValues(objMeta) {
 		t.Errorf("the resource does not have all fields yet populated, but incorrectly reports it does")
 	}
 	FillObjectMetaSystemFields(ctx, &resource)
-	if !metav1.HasObjectMetaSystemFieldValues(&resource) {
+	if !metav1.HasObjectMetaSystemFieldValues(objMeta) {
 		t.Errorf("the resource does have all fields populated, but incorrectly reports it does not")
 	}
 }

@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/pkg/api"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 var (
@@ -73,7 +73,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		provide a file (a subset of the standard kubeconfig file). This file 
 		can be a local file or downloaded via an HTTPS URL. The forms are 
 		kubeadm join --discovery-token abcdef.1234567890abcdef 1.2.3.4:6443, 
-		kubeadm join --discovery-file path/to/file.conf or kubeadm join 
+		kubeadm join --discovery-file path/to/file.conf, or kubeadm join
 		--discovery-file https://url/file.conf. Only one form can be used. If 
 		the discovery information is loaded from a URL, HTTPS must be used and 
 		the host installed CA bundle is used to verify the connection.
@@ -85,9 +85,8 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		approve these signing requests. This token is passed in with the 
 		--tls-bootstrap-token abcdef.1234567890abcdef flag.
 
-		Often times the same token is use for both parts. In this case, the 
-		--token flag can be used instead of specifying the each token 
-		individually.
+		Often times the same token is used for both parts. In this case, the
+		--token flag can be used instead of specifying each token individually.
 		`),
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg.DiscoveryTokenAPIServers = args
@@ -122,7 +121,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
-		"skip preflight checks normally run before modifying the system",
+		"Skip preflight checks normally run before modifying the system",
 	)
 
 	return cmd
@@ -157,12 +156,12 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		if err := preflight.RunJoinNodeChecks(cfg); err != nil {
 			return nil, err
 		}
+
+		// Try to start the kubelet service in case it's inactive
+		preflight.TryStartKubelet()
 	} else {
 		fmt.Println("[preflight] Skipping pre-flight checks")
 	}
-
-	// Try to start the kubelet service in case it's inactive
-	preflight.TryStartKubelet()
 
 	return &Join{cfg: cfg}, nil
 }

@@ -30,7 +30,7 @@ This example also uses some of the core components of Kubernetes:
 - [_Pods_](../../../docs/user-guide/pods.md)
 - [ _Services_](../../../docs/user-guide/services.md)
 - [_Replication Controllers_](../../../docs/user-guide/replication-controller.md)
-- [_Stateful Sets_](http://kubernetes.io/docs/user-guide/petset/)
+- [_Stateful Sets_](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
 - [_Daemon Sets_](../../../docs/admin/daemons.md)
 
 ## Prerequisites
@@ -171,7 +171,7 @@ StatefulSets (previously PetSets) are a feature that was upgraded to a <i>Beta</
 Kubernetes 1.5.  Deploying stateful distributed applications, like Cassandra, within a clustered
 environment can be challenging.  We implemented StatefulSet to greatly simplify this
 process.  Multiple StatefulSet features are used within this example, but is out of
-scope of this documentation.  [Please refer to the Stateful Set documentation.](https://kubernetes.io/docs/concepts/abstractions/controllers/statefulsets/)
+scope of this documentation.  [Please refer to the Stateful Set documentation.](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
 
 The StatefulSet manifest that is included below, creates a Cassandra ring that consists
 of three pods.

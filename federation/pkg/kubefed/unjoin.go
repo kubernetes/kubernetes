@@ -29,11 +29,13 @@ import (
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var (
@@ -47,11 +49,20 @@ var (
 		# Federation control plane's host cluster context name
 		# must be specified via the --host-cluster-context flag
 		# to properly cleanup the credentials.
-		kubectl unjoin foo --host-cluster-context=bar`)
+		kubectl unjoin foo --host-cluster-context=bar --cluster-context=baz`)
 )
 
 type unjoinFederation struct {
 	commonOptions util.SubcommandOptions
+	options       unjoinFederationOptions
+}
+
+type unjoinFederationOptions struct {
+	clusterContext string
+}
+
+func (o *unjoinFederationOptions) Bind(flags *pflag.FlagSet) {
+	flags.StringVar(&o.clusterContext, "cluster-context", "", "Name of the cluster's context in the local kubeconfig. Defaults to cluster name if unspecified.")
 }
 
 // NewCmdUnjoin defines the `unjoin` command that removes a cluster
@@ -72,12 +83,17 @@ func NewCmdUnjoin(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config util.Admin
 
 	flags := cmd.Flags()
 	opts.commonOptions.Bind(flags)
+	opts.options.Bind(flags)
 
 	return cmd
 }
 
 // unjoinFederation is the implementation of the `unjoin` command.
 func (u *unjoinFederation) Run(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config util.AdminConfig) error {
+	if u.options.clusterContext == "" {
+		u.options.clusterContext = u.commonOptions.Name
+	}
+
 	cluster, err := popCluster(f, u.commonOptions.Name)
 	if err != nil {
 		return err
@@ -101,24 +117,51 @@ func (u *unjoinFederation) Run(f cmdutil.Factory, cmdOut, cmdErr io.Writer, conf
 		// If this is the case, we cannot get the cluster clientset to delete the
 		// config map from that cluster and obviously cannot delete the not existing secret.
 		// We just publish the warning as cluster has already been removed from federation.
-		fmt.Fprintf(cmdErr, "WARNING: secret %q not found in the host cluster, so it couldn't be deleted", secretName)
+		fmt.Fprintf(cmdErr, "WARNING: secret %q not found in the host cluster, so it couldn't be deleted. Cluster has already been removed from the federation.", secretName)
+		return nil
 	} else if err != nil {
 		fmt.Fprintf(cmdErr, "WARNING: Error retrieving secret from the base cluster")
-	} else {
-		err := deleteSecret(hostClientset, cluster.Spec.SecretRef.Name, u.commonOptions.FederationSystemNamespace)
-		if err != nil {
-			fmt.Fprintf(cmdErr, "WARNING: secret %q could not be deleted: %v", secretName, err)
-			// We anyways continue to try and delete the config map but with above warning
-		}
+		return err
+	}
 
-		// We need to ensure deleting the config map created in the deregistered cluster
-		// This configmap was created when the cluster joined this federation to aid
-		// the kube-dns of that cluster to aid service discovery.
-		err = deleteConfigMapFromCluster(hostClientset, secret, cluster, u.commonOptions.FederationSystemNamespace)
+	unjoiningClusterFactory := config.ClusterFactory(u.options.clusterContext, u.commonOptions.Kubeconfig)
+	unjoiningClusterClientset, err := unjoiningClusterFactory.ClientSet()
+	outerErr := err
+	if err != nil {
+		// Attempt to get a clientset using information from the cluster.
+		unjoiningClusterClientset, err = getClientsetFromCluster(secret, cluster)
 		if err != nil {
-			fmt.Fprintf(cmdErr, "WARNING: Encountered error in deleting kube-dns configmap, %v", err)
-			// We anyways continue to print success message but with above warning
+			return fmt.Errorf("unable to get clientset from kubeconfig or cluster: %v, %v", outerErr, err)
 		}
+	}
+
+	err = deleteSecret(hostClientset, cluster.Spec.SecretRef.Name, u.commonOptions.FederationSystemNamespace)
+	if err != nil {
+		fmt.Fprintf(cmdErr, "WARNING: secret %q could not be deleted: %v", secretName, err)
+		// We anyways continue to try and delete the config map but with above warning
+	}
+
+	// We need to ensure updating the config map created in the deregistered cluster
+	// This configmap was created/updated when the cluster joined this federation to aid
+	// the kube-dns of that cluster to aid service discovery.
+	err = updateConfigMapFromCluster(hostClientset, unjoiningClusterClientset, u.commonOptions.FederationSystemNamespace)
+	if err != nil {
+		fmt.Fprintf(cmdErr, "WARNING: Encountered error in deleting kube-dns configmap: %v", err)
+		// We anyways continue to print success message but with above warning
+	}
+
+	// Delete the service account in the unjoining cluster.
+	err = deleteServiceAccountFromCluster(unjoiningClusterClientset, cluster, u.commonOptions.FederationSystemNamespace)
+	if err != nil {
+		fmt.Fprintf(cmdErr, "WARNING: Encountered error in deleting service account: %v", err)
+		return err
+	}
+
+	// Delete the cluster role and role binding in the unjoining cluster.
+	err = deleteClusterRoleBindingFromCluster(unjoiningClusterClientset, cluster)
+	if err != nil {
+		fmt.Fprintf(cmdErr, "WARNING: Encountered error in deleting cluster role bindings: %v", err)
+		return err
 	}
 
 	_, err = fmt.Fprintf(cmdOut, "Successfully removed cluster %q from federation\n", u.commonOptions.Name)
@@ -162,12 +205,7 @@ func popCluster(f cmdutil.Factory, name string) (*federationapi.Cluster, error) 
 	return cluster, rh.Delete("", name)
 }
 
-func deleteConfigMapFromCluster(hostClientset internalclientset.Interface, secret *api.Secret, cluster *federationapi.Cluster, fedSystemNamespace string) error {
-	clientset, err := getClientsetFromCluster(secret, cluster)
-	if err != nil {
-		return err
-	}
-
+func updateConfigMapFromCluster(hostClientset, unjoiningClusterClientset internalclientset.Interface, fedSystemNamespace string) error {
 	cmDep, err := getCMDeployment(hostClientset, fedSystemNamespace)
 	if err != nil {
 		return err
@@ -177,24 +215,33 @@ func deleteConfigMapFromCluster(hostClientset internalclientset.Interface, secre
 		return fmt.Errorf("kube-dns config map data missing from controller manager annotations")
 	}
 
-	configMap, err := clientset.Core().ConfigMaps(metav1.NamespaceSystem).Get(util.KubeDnsConfigmapName, metav1.GetOptions{})
+	configMap, err := unjoiningClusterClientset.Core().ConfigMaps(metav1.NamespaceSystem).Get(util.KubeDnsConfigmapName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
-	if _, ok := configMap.Data[util.FedDomainMapKey]; !ok {
-		return nil
+	needUpdate := false
+	if _, ok := configMap.Data[util.FedDomainMapKey]; ok {
+		configMap.Data[util.FedDomainMapKey] = removeConfigMapString(configMap.Data[util.FedDomainMapKey], domainMap)
+		needUpdate = true
 	}
-	configMap.Data[util.FedDomainMapKey] = removeConfigMapString(configMap.Data[util.FedDomainMapKey], domainMap)
 
-	_, err = clientset.Core().ConfigMaps(metav1.NamespaceSystem).Update(configMap)
+	if _, ok := configMap.Data[util.KubeDnsStubDomains]; ok {
+		delete(configMap.Data, util.KubeDnsStubDomains)
+		needUpdate = true
+	}
+
+	if needUpdate {
+		_, err = unjoiningClusterClientset.Core().ConfigMaps(metav1.NamespaceSystem).Update(configMap)
+	}
 	return err
 }
 
 // deleteSecret deletes the secret with the given name from the host
 // cluster.
 func deleteSecret(clientset internalclientset.Interface, name, namespace string) error {
-	return clientset.Core().Secrets(namespace).Delete(name, &metav1.DeleteOptions{})
+	orphanDependents := false
+	return clientset.Core().Secrets(namespace).Delete(name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
 }
 
 // isNotFound checks if the given error is a NotFound status error.
@@ -252,4 +299,35 @@ func removeConfigMapString(str string, toRemove string) string {
 		}
 	}
 	return strings.Join(values, ",")
+}
+
+// deleteServiceAccountFromCluster removes the service account that the federation control plane uses
+// to access the cluster from the cluster that is leaving the federation.
+func deleteServiceAccountFromCluster(unjoiningClusterClientset internalclientset.Interface, cluster *federationapi.Cluster, fedSystemNamespace string) error {
+	serviceAccountName, ok := cluster.ObjectMeta.Annotations[kubectl.ServiceAccountNameAnnotation]
+	if !ok {
+		// If there is no service account name annotation, assume that this cluster does not have a federation control plane service account.
+		return nil
+	}
+	return unjoiningClusterClientset.Core().ServiceAccounts(fedSystemNamespace).Delete(serviceAccountName, &metav1.DeleteOptions{})
+}
+
+// deleteClusterRoleBindingFromCluster deletes the ClusterRole and ClusterRoleBinding from the
+// cluster that is leaving the federation.
+func deleteClusterRoleBindingFromCluster(unjoiningClusterClientset internalclientset.Interface, cluster *federationapi.Cluster) error {
+	clusterRoleName, ok := cluster.ObjectMeta.Annotations[kubectl.ClusterRoleNameAnnotation]
+	if !ok {
+		// If there is no cluster role name annotation, assume that this cluster does not have cluster role bindings.
+		return nil
+	}
+
+	err := unjoiningClusterClientset.Rbac().ClusterRoleBindings().Delete(clusterRoleName, &metav1.DeleteOptions{})
+	if err != nil && !errors.IsMethodNotSupported(err) && !errors.IsNotFound(err) {
+		return err
+	}
+	err = unjoiningClusterClientset.Rbac().ClusterRoles().Delete(clusterRoleName, &metav1.DeleteOptions{})
+	if err != nil && !errors.IsMethodNotSupported(err) && !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
 }

@@ -115,6 +115,9 @@ find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT
 # need to copy clientsets, though later we should copy APIs and later generate clientsets
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "pkg/client/informers/informers_generated/externalversions" "pkg/client/informers/informers_generated"
+mkcp "pkg/api/helper" "pkg/api"
+mkcp "pkg/api/v1/resource" "pkg/api/v1"
+mkcp "pkg/api/v1/node" "pkg/api/v1"
 
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
   echo "generating vendor/"
@@ -147,7 +150,7 @@ echo "rewriting Godeps.json"
 # The entries for k8s.io/apimahcinery are not removed from Godeps.json, though
 # they contain the invalid commit revision. The publish robot will set the
 # correct commit revision.
-go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}" --ignored-prefixes="k8s.io/client-go,k8s.io/kubernetes" --rewritten-prefixes="k8s.io/apimachinery"
+go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --override-import-path="${CLIENT_REPO_FROM_SRC}" --ignored-prefixes="k8s.io/client-go,k8s.io/kubernetes" --rewritten-prefixes="k8s.io/apimachinery"
 
 echo "rewriting imports"
 grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \
@@ -157,6 +160,9 @@ grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \
 
 echo "rewrite proto names in proto.RegisterType"
 find "${CLIENT_REPO_TEMP}" -type f -name "generated.pb.go" -print0 | xargs -0 ${SED} -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
+
+echo "rewrite proto IDL package names"
+find "${CLIENT_REPO_TEMP}" -type f -name "generated.proto" -print0 | xargs -0 ${SED} -i "s/k8s\.io\.kubernetes/k8s.io.client_go/g"
 
 # strip all generator tags from client-go
 find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 ${SED} -i '/^\/\/ +k8s:openapi-gen=true/d'
@@ -192,6 +198,7 @@ function mvfolder {
 }
 
 mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
+rm -f "${CLIENT_REPO_TEMP}/kubernetes/import_known_versions.go"
 mvfolder "pkg/client/informers/informers_generated/externalversions" informers
 mvfolder "pkg/client/listers" listers
 if [ "$(find "${CLIENT_REPO_TEMP}"/pkg/client -type f -name "*.go")" ]; then
@@ -206,7 +213,6 @@ find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 gofmt -w
 
 echo "remove black listed files"
 find "${CLIENT_REPO_TEMP}" -type f \( \
-  -name "*BUILD" -o \
   -name "*.json" -not -name "Godeps.json" -o \
   -name "*.yaml" -o \
   -name "*.yml" -o \
@@ -217,7 +223,8 @@ if [ "${FAIL_ON_CHANGES}" = true ]; then
   echo "running FAIL_ON_CHANGES"
   # ignore base.go in diff
   cp "${CLIENT_REPO}/pkg/version/base.go" "${CLIENT_REPO_TEMP}/pkg/version/"
-  if diff -NauprB  -I '^\s*\"Comment\"' -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
+  # TODO(mikedanese): figure out what to do with BUILD files here
+  if diff -NauprB -x '*BUILD' -I '^\s*\"Comment\"' -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
     echo "${CLIENT_REPO} up to date."
     exit 0
   else
@@ -231,4 +238,5 @@ echo "move to the client repo"
 if [ "${DRY_RUN}" = false ]; then
   ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
   mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
+  git checkout HEAD -- $(find "${CLIENT_REPO}" -name BUILD)
 fi

@@ -63,8 +63,15 @@ func getFakeDeviceName(host volume.VolumeHost, volPath string) string {
 	return path.Join(host.GetPluginDir(vsphereVolumePluginName), "device", volPath)
 }
 
-func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeKB int, err error) {
-	return "[local] test-volume-name.vmdk", 100, nil
+func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner) (volSpec *VolumeSpec, err error) {
+	volSpec = &VolumeSpec{
+		Path:              "[local] test-volume-name.vmdk",
+		Size:              100,
+		Fstype:            "ext4",
+		StoragePolicyName: "gold",
+		StoragePolicyID:   "1234",
+	}
+	return volSpec, nil
 }
 
 func (fake *fakePDManager) DeleteVolume(vd *vsphereVolumeDeleter) error {
@@ -153,6 +160,10 @@ func TestPlugin(t *testing.T) {
 
 	if persistentSpec.Spec.PersistentVolumeSource.VsphereVolume.VolumePath != "[local] test-volume-name.vmdk" {
 		t.Errorf("Provision() returned unexpected path %s", persistentSpec.Spec.PersistentVolumeSource.VsphereVolume.VolumePath)
+	}
+
+	if persistentSpec.Spec.PersistentVolumeSource.VsphereVolume.StoragePolicyName != "gold" {
+		t.Errorf("Provision() returned unexpected storagepolicy name %s", persistentSpec.Spec.PersistentVolumeSource.VsphereVolume.StoragePolicyName)
 	}
 
 	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]

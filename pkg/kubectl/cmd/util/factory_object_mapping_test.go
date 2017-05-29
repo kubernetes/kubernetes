@@ -19,6 +19,7 @@ package util
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,6 +52,7 @@ func newFakeClientAccessFactory(objs []runtime.Object) *fakeClientAccessFactory 
 
 var (
 	podsResource = schema.GroupVersionResource{Resource: "pods"}
+	podsKind     = schema.GroupVersionKind{Kind: "Pod"}
 )
 
 func TestLogsForObject(t *testing.T) {
@@ -81,7 +83,7 @@ func TestLogsForObject(t *testing.T) {
 			},
 			pods: []runtime.Object{testPod()},
 			actions: []testclient.Action{
-				testclient.NewListAction(podsResource, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
+				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
 				getLogsAction("test", nil),
 			},
 		},
@@ -95,7 +97,7 @@ func TestLogsForObject(t *testing.T) {
 			},
 			pods: []runtime.Object{testPod()},
 			actions: []testclient.Action{
-				testclient.NewListAction(podsResource, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
+				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
 				getLogsAction("test", nil),
 			},
 		},
@@ -109,7 +111,7 @@ func TestLogsForObject(t *testing.T) {
 			},
 			pods: []runtime.Object{testPod()},
 			actions: []testclient.Action{
-				testclient.NewListAction(podsResource, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
+				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
 				getLogsAction("test", nil),
 			},
 		},
@@ -123,7 +125,7 @@ func TestLogsForObject(t *testing.T) {
 			},
 			pods: []runtime.Object{testPod()},
 			actions: []testclient.Action{
-				testclient.NewListAction(podsResource, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
+				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
 				getLogsAction("test", nil),
 			},
 		},
@@ -137,7 +139,7 @@ func TestLogsForObject(t *testing.T) {
 			},
 			pods: []runtime.Object{testPod()},
 			actions: []testclient.Action{
-				testclient.NewListAction(podsResource, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
+				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
 				getLogsAction("test", nil),
 			},
 		},
@@ -146,7 +148,7 @@ func TestLogsForObject(t *testing.T) {
 	for _, test := range tests {
 		caf := newFakeClientAccessFactory(test.pods)
 		omf := NewObjectMappingFactory(caf)
-		_, err := omf.LogsForObject(test.obj, test.opts)
+		_, err := omf.LogsForObject(test.obj, test.opts, 20*time.Second)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue

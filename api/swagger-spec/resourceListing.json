@@ -22,14 +22,6 @@
     "description": "get available API versions"
    },
    {
-    "path": "/apis/apps/v1beta1",
-    "description": "API at /apis/apps/v1beta1"
-   },
-   {
-    "path": "/apis/apps",
-    "description": "get information of a group"
-   },
-   {
     "path": "/apis/authentication.k8s.io/v1",
     "description": "API at /apis/authentication.k8s.io/v1"
    },
@@ -94,6 +86,14 @@
     "description": "get information of a group"
    },
    {
+    "path": "/apis/networking.k8s.io/v1",
+    "description": "API at /apis/networking.k8s.io/v1"
+   },
+   {
+    "path": "/apis/networking.k8s.io",
+    "description": "get information of a group"
+   },
+   {
     "path": "/apis/policy/v1beta1",
     "description": "API at /apis/policy/v1beta1"
    },
@@ -114,23 +114,39 @@
     "description": "get information of a group"
    },
    {
-    "path": "/apis/storage.k8s.io/v1beta1",
-    "description": "API at /apis/storage.k8s.io/v1beta1"
+    "path": "/apis/settings.k8s.io/v1alpha1",
+    "description": "API at /apis/settings.k8s.io/v1alpha1"
+   },
+   {
+    "path": "/apis/settings.k8s.io",
+    "description": "get information of a group"
    },
    {
     "path": "/apis/storage.k8s.io/v1",
     "description": "API at /apis/storage.k8s.io/v1"
    },
    {
+    "path": "/apis/storage.k8s.io/v1beta1",
+    "description": "API at /apis/storage.k8s.io/v1beta1"
+   },
+   {
     "path": "/apis/storage.k8s.io",
     "description": "get information of a group"
    },
    {
-    "path": "/apis/settings.k8s.io/v1alpha1",
-    "description": "API at /apis/settings.k8s.io/v1alpha1"
+    "path": "/apis/apps/v1beta1",
+    "description": "API at /apis/apps/v1beta1"
    },
    {
-    "path": "/apis/settings.k8s.io",
+    "path": "/apis/apps",
+    "description": "get information of a group"
+   },
+   {
+    "path": "/apis/admissionregistration.k8s.io/v1alpha1",
+    "description": "API at /apis/admissionregistration.k8s.io/v1alpha1"
+   },
+   {
+    "path": "/apis/admissionregistration.k8s.io",
     "description": "get information of a group"
    }
   ],

@@ -36,17 +36,21 @@ kube::etcd::validate() {
 
   # validate installed version is at least equal to minimum
   version=$(etcd --version | tail -n +1 | head -n 1 | cut -d " " -f 3)
-  if [[ "${version}" < "${ETCD_VERSION}" ]]; then
+  if [[ $(kube::etcd::version $ETCD_VERSION) -gt $(kube::etcd::version $version) ]]; then
    export PATH=$KUBE_ROOT/third_party/etcd:$PATH
    hash etcd
    echo $PATH
    version=$(etcd --version | head -n 1 | cut -d " " -f 3)
-   if [[ "${version}" < "${ETCD_VERSION}" ]]; then
+   if [[ $(kube::etcd::version $ETCD_VERSION) -gt $(kube::etcd::version $version) ]]; then
     kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
     kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
     exit 1
    fi
   fi
+}
+
+kube::etcd::version() {
+  printf '%s\n' "${@}" | awk -F . '{ printf("%d%03d%03d\n", $1, $2, $3) }'
 }
 
 kube::etcd::start() {

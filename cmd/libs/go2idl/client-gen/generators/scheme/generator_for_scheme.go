@@ -26,6 +26,7 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/path"
 	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 )
 
@@ -66,10 +67,10 @@ func (g *GenScheme) Imports(c *generator.Context) (imports []string) {
 					packagePath = filepath.Dir(packagePath)
 				}
 				packagePath = filepath.Join(packagePath, "install")
-				imports = append(imports, strings.ToLower(fmt.Sprintf("%s \"%s\"", group.Group.NonEmpty(), packagePath)))
+				imports = append(imports, strings.ToLower(fmt.Sprintf("%s \"%s\"", group.Group.NonEmpty(), path.Vendorless(packagePath))))
 				break
 			} else {
-				imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), packagePath)))
+				imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), path.Vendorless(packagePath))))
 			}
 		}
 	}

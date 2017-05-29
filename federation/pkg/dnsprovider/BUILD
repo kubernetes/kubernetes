@@ -18,7 +18,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//federation/pkg/dnsprovider/rrstype:go_default_library",
-        "//vendor:github.com/golang/glog",
+        "//vendor/github.com/golang/glog:go_default_library",
     ],
 )
 

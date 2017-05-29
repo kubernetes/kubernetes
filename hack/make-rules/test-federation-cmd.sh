@@ -38,10 +38,12 @@ function run_federation_apiserver() {
 
   "${KUBE_OUTPUT_HOSTBIN}/federation-apiserver" \
     --insecure-port="${API_PORT}" \
+    --secure-port="${SECURE_API_PORT}" \
     --admission-control="${ADMISSION_CONTROL}" \
     --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
     --storage-media-type="${KUBE_TEST_API_STORAGE_TYPE-}" \
-    --cert-dir="${TMPDIR:-/tmp/}" 1>&2 &
+    --cert-dir="${TMPDIR:-/tmp/}" \
+    --insecure-allow-any-token 1>&2 &
   APISERVER_PID=$!
 
   kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"
@@ -64,6 +66,7 @@ function run_federation_controller_manager() {
     --port="${CTLRMGR_PORT}" \
     --kubeconfig="${kubeconfig}" \
     --kube-api-content-type="${KUBE_TEST_API_TYPE-}" \
+    --controllers="service-dns=false" \
     --master="127.0.0.1:${API_PORT}" 1>&2 &
   CTLRMGR_PID=$!
 
@@ -75,8 +78,12 @@ kube::log::status "Running kubectl tests for federation-apiserver"
 setup
 run_federation_apiserver
 run_federation_controller_manager
-# TODO: Fix for secrets, replicasets and deployments.
-SUPPORTED_RESOURCES=("configmaps" "daemonsets" "events" "ingress" "namespaces" "services")
+# TODO: Fix for replicasets and deployments.
+SUPPORTED_RESOURCES=("configmaps" "daemonsets" "events" "ingress" "namespaces" "services" "secrets")
+# Set wait for deletion to true for federation apiserver since resources are
+# deleted asynchronously.
+# This is a temporary workaround until https://github.com/kubernetes/kubernetes/issues/42594 is fixed.
+WAIT_FOR_DELETION="true"
 # WARNING: Do not wrap this call in a subshell to capture output, e.g. output=$(runTests)
 # Doing so will suppress errexit behavior inside runTests
 runTests

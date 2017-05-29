@@ -1,4 +1,6 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
 // http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
@@ -40,6 +42,7 @@ type plugin struct {
 	fmtPkg      generator.Single
 	bytesPkg    generator.Single
 	sortkeysPkg generator.Single
+	protoPkg    generator.Single
 }
 
 func NewPlugin() *plugin {
@@ -59,6 +62,7 @@ func (p *plugin) Generate(file *generator.FileDescriptor) {
 	p.fmtPkg = p.NewImport("fmt")
 	p.bytesPkg = p.NewImport("bytes")
 	p.sortkeysPkg = p.NewImport("github.com/gogo/protobuf/sortkeys")
+	p.protoPkg = p.NewImport("github.com/gogo/protobuf/proto")
 
 	for _, msg := range file.Messages() {
 		if msg.DescriptorProto.GetOptions().GetMapEntry() {
@@ -431,17 +435,18 @@ func (p *plugin) generateMessage(file *generator.FileDescriptor, message *genera
 		}
 	}
 	if message.DescriptorProto.HasExtension() {
-		fieldname := "XXX_extensions"
 		if gogoproto.HasExtensionsMap(file.FileDescriptorProto, message.DescriptorProto) {
-			p.P(`extkeys := make([]int32, 0, len(this.`, fieldname, `)+len(that1.`, fieldname, `))`)
-			p.P(`for k, _ := range this.`, fieldname, ` {`)
+			p.P(`thismap := `, p.protoPkg.Use(), `.GetUnsafeExtensionsMap(this)`)
+			p.P(`thatmap := `, p.protoPkg.Use(), `.GetUnsafeExtensionsMap(that1)`)
+			p.P(`extkeys := make([]int32, 0, len(thismap)+len(thatmap))`)
+			p.P(`for k, _ := range thismap {`)
 			p.In()
 			p.P(`extkeys = append(extkeys, k)`)
 			p.Out()
 			p.P(`}`)
-			p.P(`for k, _ := range that1.`, fieldname, ` {`)
+			p.P(`for k, _ := range thatmap {`)
 			p.In()
-			p.P(`if _, ok := this.`, fieldname, `[k]; !ok {`)
+			p.P(`if _, ok := thismap[k]; !ok {`)
 			p.In()
 			p.P(`extkeys = append(extkeys, k)`)
 			p.Out()
@@ -451,9 +456,9 @@ func (p *plugin) generateMessage(file *generator.FileDescriptor, message *genera
 			p.P(p.sortkeysPkg.Use(), `.Int32s(extkeys)`)
 			p.P(`for _, k := range extkeys {`)
 			p.In()
-			p.P(`if v, ok := this.`, fieldname, `[k]; ok {`)
+			p.P(`if v, ok := thismap[k]; ok {`)
 			p.In()
-			p.P(`if v2, ok := that1.`, fieldname, `[k]; ok {`)
+			p.P(`if v2, ok := thatmap[k]; ok {`)
 			p.In()
 			p.P(`if c := v.Compare(&v2); c != 0 {`)
 			p.In()
@@ -475,6 +480,7 @@ func (p *plugin) generateMessage(file *generator.FileDescriptor, message *genera
 			p.Out()
 			p.P(`}`)
 		} else {
+			fieldname := "XXX_extensions"
 			p.P(`if c := `, p.bytesPkg.Use(), `.Compare(this.`, fieldname, `, that1.`, fieldname, `); c != 0 {`)
 			p.In()
 			p.P(`return c`)

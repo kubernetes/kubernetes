@@ -29,7 +29,7 @@ func RoleRefGroupKind(roleRef RoleRef) schema.GroupKind {
 	return schema.GroupKind{Group: roleRef.APIGroup, Kind: roleRef.Kind}
 }
 
-func VerbMatches(rule PolicyRule, requestedVerb string) bool {
+func VerbMatches(rule *PolicyRule, requestedVerb string) bool {
 	for _, ruleVerb := range rule.Verbs {
 		if ruleVerb == VerbAll {
 			return true
@@ -42,7 +42,7 @@ func VerbMatches(rule PolicyRule, requestedVerb string) bool {
 	return false
 }
 
-func APIGroupMatches(rule PolicyRule, requestedGroup string) bool {
+func APIGroupMatches(rule *PolicyRule, requestedGroup string) bool {
 	for _, ruleGroup := range rule.APIGroups {
 		if ruleGroup == APIGroupAll {
 			return true
@@ -55,7 +55,7 @@ func APIGroupMatches(rule PolicyRule, requestedGroup string) bool {
 	return false
 }
 
-func ResourceMatches(rule PolicyRule, requestedResource string) bool {
+func ResourceMatches(rule *PolicyRule, requestedResource string) bool {
 	for _, ruleResource := range rule.Resources {
 		if ruleResource == ResourceAll {
 			return true
@@ -68,7 +68,7 @@ func ResourceMatches(rule PolicyRule, requestedResource string) bool {
 	return false
 }
 
-func ResourceNameMatches(rule PolicyRule, requestedName string) bool {
+func ResourceNameMatches(rule *PolicyRule, requestedName string) bool {
 	if len(rule.ResourceNames) == 0 {
 		return true
 	}
@@ -82,7 +82,7 @@ func ResourceNameMatches(rule PolicyRule, requestedName string) bool {
 	return false
 }
 
-func NonResourceURLMatches(rule PolicyRule, requestedURL string) bool {
+func NonResourceURLMatches(rule *PolicyRule, requestedURL string) bool {
 	for _, ruleURL := range rule.NonResourceURLs {
 		if ruleURL == NonResourceAll {
 			return true

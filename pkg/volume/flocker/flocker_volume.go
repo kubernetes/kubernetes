@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 type volumeManager interface {
@@ -73,7 +74,7 @@ func (c *flockerVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			Name:   c.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
-				"kubernetes.io/createdby": "flocker-dynamic-provisioner",
+				volumehelper.VolumeDynamicallyCreatedByKey: "flocker-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

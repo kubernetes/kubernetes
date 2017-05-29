@@ -35,7 +35,7 @@ import (
 )
 
 var (
-	convert_long = templates.LongDesc(`
+	convert_long = templates.LongDesc(i18n.T(`
 		Convert config files between different API versions. Both YAML
 		and JSON formats are accepted.
 
@@ -44,9 +44,9 @@ var (
 		not supported, convert to latest version.
 
 		The default output will be printed to stdout in YAML format. One can use -o option
-		to change to output destination.`)
+		to change to output destination.`))
 
-	convert_example = templates.Examples(`
+	convert_example = templates.Examples(i18n.T(`
 		# Convert 'pod.yaml' to latest version and print to stdout.
 		kubectl convert -f pod.yaml
 
@@ -55,7 +55,7 @@ var (
 		kubectl convert -f pod.yaml --local -o json
 
 		# Convert all files under current directory to latest version and create them all.
-		kubectl convert -f . | kubectl create -f -`)
+		kubectl convert -f . | kubectl create -f -`))
 )
 
 // NewCmdConvert creates a command object for the generic "convert" action, which
@@ -69,7 +69,7 @@ func NewCmdConvert(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    convert_long,
 		Example: convert_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := options.Complete(f, out, cmd, args)
+			err := options.Complete(f, out, cmd)
 			cmdutil.CheckErr(err)
 			err = options.RunConvert()
 			cmdutil.CheckErr(err)
@@ -82,7 +82,7 @@ func NewCmdConvert(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddNonDeprecatedPrinterFlags(cmd)
 	cmd.Flags().BoolVar(&options.local, "local", true, "If true, convert will NOT try to contact api-server but run locally.")
-	cmd.Flags().String("output-version", "", "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
+	cmd.Flags().String("output-version", "", i18n.T("Output the formatted object with the given group version (for ex: 'extensions/v1beta1').)"))
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
@@ -117,7 +117,7 @@ func outputVersion(cmd *cobra.Command, defaultVersion *schema.GroupVersion) (sch
 }
 
 // Complete collects information required to run Convert command from command line.
-func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
+func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) (err error) {
 	o.outputVersion, err = outputVersion(cmd, &api.Registry.EnabledVersionsForGroup(api.GroupName)[0])
 	if err != nil {
 		return err
@@ -132,9 +132,9 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 
 	if o.local {
 		fmt.Fprintln(os.Stderr, "running in local mode...")
-		o.builder = resource.NewBuilder(mapper, typer, resource.DisabledClientForMapping{ClientMapper: clientMapper}, f.Decoder(true))
+		o.builder = resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.DisabledClientForMapping{ClientMapper: clientMapper}, f.Decoder(true))
 	} else {
-		o.builder = resource.NewBuilder(mapper, typer, clientMapper, f.Decoder(true))
+		o.builder = resource.NewBuilder(mapper, f.CategoryExpander(), typer, clientMapper, f.Decoder(true))
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 		if err != nil {
 			return err

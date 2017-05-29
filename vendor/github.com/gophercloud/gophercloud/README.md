@@ -125,6 +125,10 @@ The above code sample creates a new server with the parameters, and embodies the
 new resource in the `server` variable (a
 [`servers.Server`](http://godoc.org/github.com/gophercloud/gophercloud) struct).
 
+## Advanced Usage
+
+Have a look at the [FAQ](./FAQ.md) for some tips on customizing the way Gophercloud works.
+
 ## Backwards-Compatibility Guarantees
 
 None. Vendor it and write tests covering the parts you use.

@@ -62,8 +62,17 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 }
 
 func masterUpgradeGCE(rawV string) error {
+	env := os.Environ()
+	// TODO: Remove these variables when they're no longer needed for downgrades.
+	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
+		env = append(env,
+			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
+			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
+			"TEST_ETCD_IMAGE=3.0.17")
+	}
+
 	v := "v" + rawV
-	_, _, err := RunCmd(gceUpgradeScript(), "-M", v)
+	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-M", v)
 	return err
 }
 
@@ -78,7 +87,13 @@ func masterUpgradeGKE(v string) error {
 		"--master",
 		fmt.Sprintf("--cluster-version=%s", v),
 		"--quiet")
-	return err
+	if err != nil {
+		return err
+	}
+
+	waitForSSHTunnels()
+
+	return nil
 }
 
 func NodeUpgrade(f *Framework, v string, img string) error {
@@ -118,29 +133,6 @@ func nodeUpgradeGCE(rawV, img string) error {
 	return err
 }
 
-func cleanupNodeUpgradeGCE(tmplBefore string) {
-	Logf("Cleaning up any unused node templates")
-	tmplAfter, err := MigTemplate()
-	if err != nil {
-		Logf("Could not get node template post-upgrade; may have leaked template %s", tmplBefore)
-		return
-	}
-	if tmplBefore == tmplAfter {
-		// The node upgrade failed so there's no need to delete
-		// anything.
-		Logf("Node template %s is still in use; not cleaning up", tmplBefore)
-		return
-	}
-	Logf("Deleting node template %s", tmplBefore)
-	if _, _, err := retryCmd("gcloud", "compute", "instance-templates",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		"delete",
-		tmplBefore); err != nil {
-		Logf("gcloud compute instance-templates delete %s call failed with err: %v", tmplBefore, err)
-		Logf("May have leaked instance template %q", tmplBefore)
-	}
-}
-
 func nodeUpgradeGKE(v string, img string) error {
 	Logf("Upgrading nodes to version %q and image %q", v, img)
 	args := []string{
@@ -157,7 +149,14 @@ func nodeUpgradeGKE(v string, img string) error {
 		args = append(args, fmt.Sprintf("--image-type=%s", img))
 	}
 	_, _, err := RunCmd("gcloud", args...)
-	return err
+
+	if err != nil {
+		return err
+	}
+
+	waitForSSHTunnels()
+
+	return nil
 }
 
 // CheckNodesReady waits up to nt for expect nodes accessed by c to be ready,
@@ -260,4 +259,20 @@ func gceUpgradeScript() string {
 		return path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh")
 	}
 	return TestContext.GCEUpgradeScript
+}
+
+func waitForSSHTunnels() {
+	Logf("Waiting for SSH tunnels to establish")
+	RunKubectl("run", "ssh-tunnel-test",
+		"--image=gcr.io/google_containers/busybox:1.24",
+		"--restart=Never",
+		"--command", "--",
+		"echo", "Hello")
+	defer RunKubectl("delete", "pod", "ssh-tunnel-test")
+
+	// allow up to a minute for new ssh tunnels to establish
+	wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
+		_, err := RunKubectl("logs", "ssh-tunnel-test")
+		return err == nil, nil
+	})
 }

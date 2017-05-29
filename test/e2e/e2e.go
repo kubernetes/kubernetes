@@ -34,10 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/logs"
 	commontest "k8s.io/kubernetes/test/e2e/common"
@@ -73,8 +73,13 @@ func setupProviderConfig() error {
 		if err != nil {
 			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
 		}
-		managedZones := []string{zone} // Only single-zone for now
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
+		managedZones := []string{} // Manage all zones in the region
+		if !framework.TestContext.CloudConfig.MultiZone {
+			managedZones = []string{zone}
+		}
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID,
+			region, zone, managedZones, "" /* networkUrl */, "" /* subnetworkUrl */, nil, /* nodeTags */
+			"" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
 		}
@@ -83,6 +88,16 @@ func setupProviderConfig() error {
 		if cloudConfig.Zone == "" {
 			return fmt.Errorf("gce-zone must be specified for AWS")
 		}
+	case "azure":
+		if cloudConfig.ConfigFile == "" {
+			return fmt.Errorf("config-file must be specified for Azure")
+		}
+		config, err := os.Open(cloudConfig.ConfigFile)
+		if err != nil {
+			framework.Logf("Couldn't open cloud provider configuration %s: %#v",
+				cloudConfig.ConfigFile, err)
+		}
+		cloudConfig.Provider, err = azure.NewCloud(config)
 	}
 
 	return nil
@@ -116,7 +131,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 				metav1.NamespaceSystem,
 				metav1.NamespaceDefault,
 				metav1.NamespacePublic,
-				federationapi.FederationNamespaceSystem,
+				framework.FederationSystemNamespace(),
 			})
 		if err != nil {
 			framework.Failf("Error deleting orphaned namespaces: %v", err)
@@ -141,7 +156,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// #41007. To avoid those pods preventing the whole test runs (and just
 	// wasting the whole run), we allow for some not-ready pods (with the
 	// number equal to the number of allowed not-ready nodes).
-	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, framework.ImagePullerLabels, true); err != nil {
+	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, framework.ImagePullerLabels); err != nil {
 		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
 		framework.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
@@ -158,8 +173,24 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	// Dump the output of the nethealth containers only once per run
 	if framework.TestContext.DumpLogsOnFailure {
-		framework.Logf("Dumping network health container logs from all nodes")
-		framework.LogContainersInPodsWithLabels(c, metav1.NamespaceSystem, framework.ImagePullerLabels, "nethealth", framework.Logf)
+		logFunc := framework.Logf
+		if framework.TestContext.ReportDir != "" {
+			filePath := path.Join(framework.TestContext.ReportDir, "nethealth.txt")
+			file, err := os.Create(filePath)
+			if err != nil {
+				framework.Logf("Failed to create a file with network health data %v: %v\nPrinting to stdout", filePath, err)
+			} else {
+				defer file.Close()
+				if err = file.Chmod(0644); err != nil {
+					framework.Logf("Failed to chmod to 644 of %v: %v", filePath, err)
+				}
+				logFunc = framework.GetLogToFileFunc(file)
+				framework.Logf("Dumping network health container logs from all nodes to file %v", filePath)
+			}
+		} else {
+			framework.Logf("Dumping network health container logs from all nodes...")
+		}
+		framework.LogContainersInPodsWithLabels(c, metav1.NamespaceSystem, framework.ImagePullerLabels, "nethealth", logFunc)
 	}
 
 	// Reference common test to make the import valid.

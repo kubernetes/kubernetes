@@ -34,6 +34,8 @@ type FakeReplicationControllers struct {
 
 var replicationcontrollersResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "replicationcontrollers"}
 
+var replicationcontrollersKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "ReplicationController"}
+
 func (c *FakeReplicationControllers) Create(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(replicationcontrollersResource, c.ns, replicationController), &api.ReplicationController{})
@@ -90,7 +92,7 @@ func (c *FakeReplicationControllers) Get(name string, options v1.GetOptions) (re
 
 func (c *FakeReplicationControllers) List(opts v1.ListOptions) (result *api.ReplicationControllerList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(replicationcontrollersResource, c.ns, opts), &api.ReplicationControllerList{})
+		Invokes(testing.NewListAction(replicationcontrollersResource, replicationcontrollersKind, c.ns, opts), &api.ReplicationControllerList{})
 
 	if obj == nil {
 		return nil, err

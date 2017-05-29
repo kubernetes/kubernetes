@@ -25,21 +25,27 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/clock"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+)
+
+const (
+	podCleanupTimeout  = 30 * time.Second
+	podCleanupPollFreq = time.Second
 )
 
 // managerImpl implements Manager
@@ -118,7 +124,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 	// the node has memory pressure, admit if not best-effort
 	if hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) {
-		notBestEffort := v1.PodQOSBestEffort != qos.GetPodQOS(attrs.Pod)
+		notBestEffort := v1.PodQOSBestEffort != v1qos.GetPodQOS(attrs.Pod)
 		if notBestEffort {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
@@ -134,9 +140,18 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 }
 
 // Start starts the control loop to observe and response to low compute resources.
-func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, nodeProvider NodeProvider, monitoringInterval time.Duration) {
+func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, nodeProvider NodeProvider, monitoringInterval time.Duration) {
 	// start the eviction manager monitoring
-	go wait.Until(func() { m.synchronize(diskInfoProvider, podFunc, nodeProvider) }, monitoringInterval, wait.NeverStop)
+	go func() {
+		for {
+			if evictedPod := m.synchronize(diskInfoProvider, podFunc, nodeProvider); evictedPod != nil {
+				glog.Infof("eviction manager: pod %s evicted, waiting for pod to be cleaned up", format.Pod(evictedPod))
+				m.waitForPodCleanup(podCleanedUpFunc, evictedPod)
+			} else {
+				time.Sleep(monitoringInterval)
+			}
+		}
+	}()
 }
 
 // IsUnderMemoryPressure returns true if the node is under memory pressure.
@@ -187,11 +202,12 @@ func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observatio
 }
 
 // synchronize is the main control loop that enforces eviction thresholds.
-func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, nodeProvider NodeProvider) {
+// Returns the pod that was killed, or nil if no pod was killed.
+func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, nodeProvider NodeProvider) *v1.Pod {
 	// if we have nothing to do, just return
 	thresholds := m.config.Thresholds
 	if len(thresholds) == 0 {
-		return
+		return nil
 	}
 
 	glog.V(3).Infof("eviction manager: synchronize housekeeping")
@@ -202,7 +218,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		// this may error if cadvisor has yet to complete housekeeping, so we will just try again in next pass.
 		hasDedicatedImageFs, err := diskInfoProvider.HasDedicatedImageFs()
 		if err != nil {
-			return
+			return nil
 		}
 		m.resourceToRankFunc = buildResourceToRankFunc(hasDedicatedImageFs)
 		m.resourceToNodeReclaimFuncs = buildResourceToNodeReclaimFuncs(m.imageGC, hasDedicatedImageFs)
@@ -212,7 +228,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	observations, statsFunc, err := makeSignalObservations(m.summaryProvider, nodeProvider)
 	if err != nil {
 		glog.Errorf("eviction manager: unexpected err: %v", err)
-		return
+		return nil
 	}
 	debugLogObservations("observations", observations)
 
@@ -290,7 +306,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	starvedResources := getStarvedResources(thresholds)
 	if len(starvedResources) == 0 {
 		glog.V(3).Infof("eviction manager: no resources are starved")
-		return
+		return nil
 	}
 
 	// rank the resources to reclaim by eviction priority
@@ -307,7 +323,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// check if there are node-level resources we can reclaim to reduce pressure before evicting end-user pods.
 	if m.reclaimNodeLevelResources(resourceToReclaim, observations) {
 		glog.Infof("eviction manager: able to reduce %v pressure without evicting pods.", resourceToReclaim)
-		return
+		return nil
 	}
 
 	glog.Infof("eviction manager: must evict pod(s) to reclaim %v", resourceToReclaim)
@@ -316,20 +332,23 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	rank, ok := m.resourceToRankFunc[resourceToReclaim]
 	if !ok {
 		glog.Errorf("eviction manager: no ranking function for resource %s", resourceToReclaim)
-		return
+		return nil
 	}
 
 	// the only candidates viable for eviction are those pods that had anything running.
 	activePods := podFunc()
-	if len(activePods) == 0 {
-		glog.Errorf("eviction manager: eviction thresholds have been met, but no pods are active to evict")
-		return
-	}
-
 	// rank the running pods for eviction for the specified resource
 	rank(activePods, statsFunc)
 
 	glog.Infof("eviction manager: pods ranked for eviction: %s", format.Pods(activePods))
+
+	//record age of metrics for met thresholds that we are using for evictions.
+	for _, t := range thresholds {
+		timeObserved := observations[t.Signal].time
+		if !timeObserved.IsZero() {
+			metrics.EvictionStatsAge.WithLabelValues(string(t.Signal)).Observe(metrics.SinceInMicroseconds(timeObserved.Time))
+		}
+	}
 
 	// we kill at most a single pod during each eviction interval
 	for i := range activePods {
@@ -355,14 +374,29 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		// this is a blocking call and should only return when the pod and its containers are killed.
 		err := m.killPodFunc(pod, status, &gracePeriodOverride)
 		if err != nil {
-			glog.Infof("eviction manager: pod %s failed to evict %v", format.Pod(pod), err)
-			continue
+			glog.Warningf("eviction manager: error while evicting pod %s: %v", format.Pod(pod), err)
 		}
-		// success, so we return until the next housekeeping interval
-		glog.Infof("eviction manager: pod %s evicted successfully", format.Pod(pod))
-		return
+		return pod
 	}
 	glog.Infof("eviction manager: unable to evict any pods from the node")
+	return nil
+}
+
+func (m *managerImpl) waitForPodCleanup(podCleanedUpFunc PodCleanedUpFunc, pod *v1.Pod) {
+	timeout := m.clock.NewTimer(podCleanupTimeout)
+	tick := m.clock.Tick(podCleanupPollFreq)
+	for {
+		select {
+		case <-timeout.C():
+			glog.Warningf("eviction manager: timed out waiting for pod %s to be cleaned up", format.Pod(pod))
+			return
+		case <-tick:
+			if podCleanedUpFunc(pod) {
+				glog.Infof("eviction manager: pod %s successfully cleaned up", format.Pod(pod))
+				return
+			}
+		}
+	}
 }
 
 // reclaimNodeLevelResources attempts to reclaim node level resources.  returns true if thresholds were satisfied and no pod eviction is required.
@@ -371,23 +405,22 @@ func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim v1.ResourceNam
 	for _, nodeReclaimFunc := range nodeReclaimFuncs {
 		// attempt to reclaim the pressured resource.
 		reclaimed, err := nodeReclaimFunc()
-		if err == nil {
-			// update our local observations based on the amount reported to have been reclaimed.
-			// note: this is optimistic, other things could have been still consuming the pressured resource in the interim.
-			signal := resourceToSignal[resourceToReclaim]
-			value, ok := observations[signal]
-			if !ok {
-				glog.Errorf("eviction manager: unable to find value associated with signal %v", signal)
-				continue
-			}
-			value.available.Add(*reclaimed)
+		if err != nil {
+			glog.Warningf("eviction manager: unexpected error when attempting to reduce %v pressure: %v", resourceToReclaim, err)
+		}
+		// update our local observations based on the amount reported to have been reclaimed.
+		// note: this is optimistic, other things could have been still consuming the pressured resource in the interim.
+		signal := resourceToSignal[resourceToReclaim]
+		value, ok := observations[signal]
+		if !ok {
+			glog.Errorf("eviction manager: unable to find value associated with signal %v", signal)
+			continue
+		}
+		value.available.Add(*reclaimed)
 
-			// evaluate all current thresholds to see if with adjusted observations, we think we have met min reclaim goals
-			if len(thresholdsMet(m.thresholdsMet, observations, true)) == 0 {
-				return true
-			}
-		} else {
-			glog.Errorf("eviction manager: unexpected error when attempting to reduce %v pressure: %v", resourceToReclaim, err)
+		// evaluate all current thresholds to see if with adjusted observations, we think we have met min reclaim goals
+		if len(thresholdsMet(m.thresholdsMet, observations, true)) == 0 {
+			return true
 		}
 	}
 	return false

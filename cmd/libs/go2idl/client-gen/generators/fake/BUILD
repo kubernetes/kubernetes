@@ -19,11 +19,12 @@ go_library(
     deps = [
         "//cmd/libs/go2idl/client-gen/args:go_default_library",
         "//cmd/libs/go2idl/client-gen/generators/scheme:go_default_library",
+        "//cmd/libs/go2idl/client-gen/path:go_default_library",
         "//cmd/libs/go2idl/client-gen/types:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/gengo/generator",
-        "//vendor:k8s.io/gengo/namer",
-        "//vendor:k8s.io/gengo/types",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/gengo/generator:go_default_library",
+        "//vendor/k8s.io/gengo/namer:go_default_library",
+        "//vendor/k8s.io/gengo/types:go_default_library",
     ],
 )
 

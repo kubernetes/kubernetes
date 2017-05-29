@@ -38,7 +38,7 @@ var _ = framework.KubeDescribe("DNS configMap federations", func() {
 	t := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
 	BeforeEach(func() { t.c = t.f.ClientSet })
 
-	It("should be able to change federation configuration", func() {
+	It("should be able to change federation configuration [Slow][Serial]", func() {
 		t.run()
 	})
 })
@@ -169,12 +169,12 @@ func (t *dnsNameserverTest) run() {
 		"def.acme.local",
 		func(actual []string) bool { return len(actual) == 1 && actual[0] == "2.2.2.2" },
 		"dnsmasq",
-		wait.ForeverTestTimeout)
+		moreForeverTestTimeout)
 	t.checkDNSRecordFrom(
 		"widget.local",
 		func(actual []string) bool { return len(actual) == 1 && actual[0] == "3.3.3.3" },
 		"dnsmasq",
-		wait.ForeverTestTimeout)
+		moreForeverTestTimeout)
 
 	t.c.Core().ConfigMaps(t.ns).Delete(t.name, nil)
 	// Wait for the deleted ConfigMap to take effect, otherwise the
@@ -190,7 +190,7 @@ var _ = framework.KubeDescribe("DNS configMap nameserver", func() {
 	t := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
 	BeforeEach(func() { t.c = t.f.ClientSet })
 
-	It("should be able to change stubDomain configuration", func() {
+	It("should be able to change stubDomain configuration [Slow][Serial]", func() {
 		t.run()
 	})
 })

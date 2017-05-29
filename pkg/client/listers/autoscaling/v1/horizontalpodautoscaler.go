@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 )
 
@@ -89,7 +88,7 @@ func (s horizontalPodAutoscalerNamespaceLister) Get(name string) (*v1.Horizontal
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(autoscaling.Resource("horizontalpodautoscaler"), name)
+		return nil, errors.NewNotFound(v1.Resource("horizontalpodautoscaler"), name)
 	}
 	return obj.(*v1.HorizontalPodAutoscaler), nil
 }

@@ -18,7 +18,11 @@ limitations under the License.
 
 package term
 
-func SetSize(fd uintptr, size Size) error {
+import (
+	"k8s.io/client-go/tools/remotecommand"
+)
+
+func SetSize(fd uintptr, size remotecommand.TerminalSize) error {
 	// NOP
 	return nil
 }

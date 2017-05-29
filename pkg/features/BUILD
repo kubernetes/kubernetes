@@ -12,8 +12,8 @@ go_library(
     srcs = ["kube_features.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor:k8s.io/apiserver/pkg/features",
-        "//vendor:k8s.io/apiserver/pkg/util/feature",
+        "//vendor/k8s.io/apiserver/pkg/features:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 

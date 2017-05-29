@@ -18,6 +18,8 @@ limitations under the License.
 
 package volume
 
-func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
+import "k8s.io/apimachinery/pkg/types"
+
+func SetVolumeOwnership(mounter Mounter, fsGroup *types.UnixGroupID) error {
 	return nil
 }

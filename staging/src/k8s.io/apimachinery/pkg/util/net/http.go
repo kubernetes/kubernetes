@@ -17,6 +17,8 @@ limitations under the License.
 package net
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -95,7 +97,7 @@ type RoundTripperWrapper interface {
 
 type DialFunc func(net, addr string) (net.Conn, error)
 
-func Dialer(transport http.RoundTripper) (DialFunc, error) {
+func DialerFor(transport http.RoundTripper) (DialFunc, error) {
 	if transport == nil {
 		return nil, nil
 	}
@@ -104,37 +106,9 @@ func Dialer(transport http.RoundTripper) (DialFunc, error) {
 	case *http.Transport:
 		return transport.Dial, nil
 	case RoundTripperWrapper:
-		return Dialer(transport.WrappedRoundTripper())
+		return DialerFor(transport.WrappedRoundTripper())
 	default:
 		return nil, fmt.Errorf("unknown transport type: %v", transport)
-	}
-}
-
-// CloneTLSConfig returns a tls.Config with all exported fields except SessionTicketsDisabled and SessionTicketKey copied.
-// This makes it safe to call CloneTLSConfig on a config in active use by a server.
-// TODO: replace with tls.Config#Clone when we move to go1.8
-func CloneTLSConfig(cfg *tls.Config) *tls.Config {
-	if cfg == nil {
-		return &tls.Config{}
-	}
-	return &tls.Config{
-		Rand:                     cfg.Rand,
-		Time:                     cfg.Time,
-		Certificates:             cfg.Certificates,
-		NameToCertificate:        cfg.NameToCertificate,
-		GetCertificate:           cfg.GetCertificate,
-		RootCAs:                  cfg.RootCAs,
-		NextProtos:               cfg.NextProtos,
-		ServerName:               cfg.ServerName,
-		ClientAuth:               cfg.ClientAuth,
-		ClientCAs:                cfg.ClientCAs,
-		InsecureSkipVerify:       cfg.InsecureSkipVerify,
-		CipherSuites:             cfg.CipherSuites,
-		PreferServerCipherSuites: cfg.PreferServerCipherSuites,
-		ClientSessionCache:       cfg.ClientSessionCache,
-		MinVersion:               cfg.MinVersion,
-		MaxVersion:               cfg.MaxVersion,
-		CurvePreferences:         cfg.CurvePreferences,
 	}
 }
 
@@ -176,13 +150,13 @@ func GetHTTPClient(req *http.Request) string {
 	return "unknown"
 }
 
-// Extracts and returns the clients IP from the given request.
-// Looks at X-Forwarded-For header, X-Real-Ip header and request.RemoteAddr in that order.
-// Returns nil if none of them are set or is set to an invalid value.
-func GetClientIP(req *http.Request) net.IP {
+// SourceIPs splits the comma separated X-Forwarded-For header or returns the X-Real-Ip header or req.RemoteAddr,
+// in that order, ignoring invalid IPs. It returns nil if all of these are empty or invalid.
+func SourceIPs(req *http.Request) []net.IP {
 	hdr := req.Header
 	// First check the X-Forwarded-For header for requests via proxy.
 	hdrForwardedFor := hdr.Get("X-Forwarded-For")
+	forwardedForIPs := []net.IP{}
 	if hdrForwardedFor != "" {
 		// X-Forwarded-For can be a csv of IPs in case of multiple proxies.
 		// Use the first valid one.
@@ -190,9 +164,12 @@ func GetClientIP(req *http.Request) net.IP {
 		for _, part := range parts {
 			ip := net.ParseIP(strings.TrimSpace(part))
 			if ip != nil {
-				return ip
+				forwardedForIPs = append(forwardedForIPs, ip)
 			}
 		}
+	}
+	if len(forwardedForIPs) > 0 {
+		return forwardedForIPs
 	}
 
 	// Try the X-Real-Ip header.
@@ -200,7 +177,7 @@ func GetClientIP(req *http.Request) net.IP {
 	if hdrRealIp != "" {
 		ip := net.ParseIP(hdrRealIp)
 		if ip != nil {
-			return ip
+			return []net.IP{ip}
 		}
 	}
 
@@ -208,11 +185,43 @@ func GetClientIP(req *http.Request) net.IP {
 	// Remote Address in Go's HTTP server is in the form host:port so we need to split that first.
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err == nil {
-		return net.ParseIP(host)
+		if remoteIP := net.ParseIP(host); remoteIP != nil {
+			return []net.IP{remoteIP}
+		}
 	}
 
 	// Fallback if Remote Address was just IP.
-	return net.ParseIP(req.RemoteAddr)
+	if remoteIP := net.ParseIP(req.RemoteAddr); remoteIP != nil {
+		return []net.IP{remoteIP}
+	}
+
+	return nil
+}
+
+// Extracts and returns the clients IP from the given request.
+// Looks at X-Forwarded-For header, X-Real-Ip header and request.RemoteAddr in that order.
+// Returns nil if none of them are set or is set to an invalid value.
+func GetClientIP(req *http.Request) net.IP {
+	ips := SourceIPs(req)
+	if len(ips) == 0 {
+		return nil
+	}
+	return ips[0]
+}
+
+// Prepares the X-Forwarded-For header for another forwarding hop by appending the previous sender's
+// IP address to the X-Forwarded-For chain.
+func AppendForwardedForHeader(req *http.Request) {
+	// Copied from net/http/httputil/reverseproxy.go:
+	if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+		// If we aren't the first proxy retain prior
+		// X-Forwarded-For information as a comma+space
+		// separated list and fold multiple headers into one.
+		if prior, ok := req.Header["X-Forwarded-For"]; ok {
+			clientIP = strings.Join(prior, ", ") + ", " + clientIP
+		}
+		req.Header.Set("X-Forwarded-For", clientIP)
+	}
 }
 
 var defaultProxyFuncPointer = fmt.Sprintf("%p", http.ProxyFromEnvironment)
@@ -266,4 +275,127 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 
 		return delegate(req)
 	}
+}
+
+// Dialer dials a host and writes a request to it.
+type Dialer interface {
+	// Dial connects to the host specified by req's URL, writes the request to the connection, and
+	// returns the opened net.Conn.
+	Dial(req *http.Request) (net.Conn, error)
+}
+
+// ConnectWithRedirects uses dialer to send req, following up to 10 redirects (relative to
+// originalLocation). It returns the opened net.Conn and the raw response bytes.
+func ConnectWithRedirects(originalMethod string, originalLocation *url.URL, header http.Header, originalBody io.Reader, dialer Dialer) (net.Conn, []byte, error) {
+	const (
+		maxRedirects    = 10
+		maxResponseSize = 16384 // play it safe to allow the potential for lots of / large headers
+	)
+
+	var (
+		location         = originalLocation
+		method           = originalMethod
+		intermediateConn net.Conn
+		rawResponse      = bytes.NewBuffer(make([]byte, 0, 256))
+		body             = originalBody
+	)
+
+	defer func() {
+		if intermediateConn != nil {
+			intermediateConn.Close()
+		}
+	}()
+
+redirectLoop:
+	for redirects := 0; ; redirects++ {
+		if redirects > maxRedirects {
+			return nil, nil, fmt.Errorf("too many redirects (%d)", redirects)
+		}
+
+		req, err := http.NewRequest(method, location.String(), body)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		req.Header = header
+
+		intermediateConn, err = dialer.Dial(req)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Peek at the backend response.
+		rawResponse.Reset()
+		respReader := bufio.NewReader(io.TeeReader(
+			io.LimitReader(intermediateConn, maxResponseSize), // Don't read more than maxResponseSize bytes.
+			rawResponse)) // Save the raw response.
+		resp, err := http.ReadResponse(respReader, nil)
+		if err != nil {
+			// Unable to read the backend response; let the client handle it.
+			glog.Warningf("Error reading backend response: %v", err)
+			break redirectLoop
+		}
+
+		switch resp.StatusCode {
+		case http.StatusFound:
+			// Redirect, continue.
+		default:
+			// Don't redirect.
+			break redirectLoop
+		}
+
+		// Redirected requests switch to "GET" according to the HTTP spec:
+		// https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3
+		method = "GET"
+		// don't send a body when following redirects
+		body = nil
+
+		resp.Body.Close() // not used
+
+		// Reset the connection.
+		intermediateConn.Close()
+		intermediateConn = nil
+
+		// Prepare to follow the redirect.
+		redirectStr := resp.Header.Get("Location")
+		if redirectStr == "" {
+			return nil, nil, fmt.Errorf("%d response missing Location header", resp.StatusCode)
+		}
+		// We have to parse relative to the current location, NOT originalLocation. For example,
+		// if we request http://foo.com/a and get back "http://bar.com/b", the result should be
+		// http://bar.com/b. If we then make that request and get back a redirect to "/c", the result
+		// should be http://bar.com/c, not http://foo.com/c.
+		location, err = location.Parse(redirectStr)
+		if err != nil {
+			return nil, nil, fmt.Errorf("malformed Location header: %v", err)
+		}
+	}
+
+	connToReturn := intermediateConn
+	intermediateConn = nil // Don't close the connection when we return it.
+	return connToReturn, rawResponse.Bytes(), nil
+}
+
+// CloneRequest creates a shallow copy of the request along with a deep copy of the Headers.
+func CloneRequest(req *http.Request) *http.Request {
+	r := new(http.Request)
+
+	// shallow clone
+	*r = *req
+
+	// deep copy headers
+	r.Header = CloneHeader(req.Header)
+
+	return r
+}
+
+// CloneHeader creates a deep copy of an http.Header.
+func CloneHeader(in http.Header) http.Header {
+	out := make(http.Header, len(in))
+	for key, values := range in {
+		newValues := make([]string, len(values))
+		copy(newValues, values)
+		out[key] = newValues
+	}
+	return out
 }

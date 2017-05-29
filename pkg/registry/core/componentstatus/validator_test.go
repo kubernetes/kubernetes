@@ -59,7 +59,8 @@ func TestValidate(t *testing.T) {
 		}
 
 		s.Validate = test.validator
-		result, data, err := s.DoServerCheck(fakeProber)
+		s.Prober = fakeProber
+		result, data, err := s.DoServerCheck()
 		if test.expectErr && err == nil {
 			t.Error("unexpected non-error")
 		}

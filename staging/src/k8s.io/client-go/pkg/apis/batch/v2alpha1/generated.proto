@@ -19,13 +19,12 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.pkg.apis.batch.v2alpha1;
+package k8s.io.client_go.pkg.apis.batch.v2alpha1;
 
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
-import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/apis/batch/v1/generated.proto";
 
@@ -35,35 +34,35 @@ option go_package = "v2alpha1";
 // CronJob represents the configuration of a single cron job.
 message CronJob {
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec is a structure defining the expected behavior of a job, including the schedule.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // Specification of the desired behavior of a cron job, including the schedule.
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional CronJobSpec spec = 2;
 
-  // Status is a structure describing current status of a job.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // Current status of a cron job.
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional CronJobStatus status = 3;
 }
 
 // CronJobList is a collection of cron jobs.
 message CronJobList {
-  // Standard list metadata
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // Standard list metadata.
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of CronJob.
+  // items is the list of CronJobs.
   repeated CronJob items = 2;
 }
 
 // CronJobSpec describes how the job execution will look like and when it will actually run.
 message CronJobSpec {
-  // Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+  // The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
   optional string schedule = 1;
 
   // Optional deadline in seconds for starting the job if it misses scheduled
@@ -71,17 +70,17 @@ message CronJobSpec {
   // +optional
   optional int64 startingDeadlineSeconds = 2;
 
-  // ConcurrencyPolicy specifies how to treat concurrent executions of a Job.
+  // Specifies how to treat concurrent executions of a Job.
+  // Defaults to Allow.
   // +optional
   optional string concurrencyPolicy = 3;
 
-  // Suspend flag tells the controller to suspend subsequent executions, it does
+  // This flag tells the controller to suspend subsequent executions, it does
   // not apply to already started executions.  Defaults to false.
   // +optional
   optional bool suspend = 4;
 
-  // JobTemplate is the object that describes the job that will be created when
-  // executing a CronJob.
+  // Specifies the job that will be created when executing a CronJob.
   optional JobTemplateSpec jobTemplate = 5;
 
   // The number of successful finished jobs to retain.
@@ -97,11 +96,11 @@ message CronJobSpec {
 
 // CronJobStatus represents the current state of a cron job.
 message CronJobStatus {
-  // Active holds pointers to currently running jobs.
+  // A list of pointers to currently running jobs.
   // +optional
-  repeated k8s.io.kubernetes.pkg.api.v1.ObjectReference active = 1;
+  repeated k8s.io.client_go.pkg.api.v1.ObjectReference active = 1;
 
-  // LastScheduleTime keeps information of when was the last time the job was successfully scheduled.
+  // Information when was the last time the job was successfully scheduled.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastScheduleTime = 4;
 }
@@ -109,11 +108,11 @@ message CronJobStatus {
 // JobTemplate describes a template for creating copies of a predefined pod.
 message JobTemplate {
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Template defines jobs that will be created from this template
+  // Defines jobs that will be created from this template.
   // http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
   // +optional
   optional JobTemplateSpec template = 2;
@@ -122,13 +121,13 @@ message JobTemplate {
 // JobTemplateSpec describes the data a Job should have when created from a template
 message JobTemplateSpec {
   // Standard object's metadata of the jobs created from this template.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the job.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.batch.v1.JobSpec spec = 2;
+  optional k8s.io.client_go.pkg.apis.batch.v1.JobSpec spec = 2;
 }
 

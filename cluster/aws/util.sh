@@ -15,7 +15,7 @@
 # limitations under the License.
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 
 echo -e "${color_red}WARNING${color_norm}: The bash deployment for AWS is obsolete. The" >&2
 echo -e "v1.5.x releases are the last to support cluster/kube-up.sh with AWS." >&2

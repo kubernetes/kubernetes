@@ -15,7 +15,7 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm/install:go_default_library",
         "//cmd/kubeadm/app/cmd:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//vendor:github.com/spf13/pflag",
+        "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
 
@@ -42,6 +42,7 @@ filegroup(
         "//cmd/kubeadm/app/phases/certs:all-srcs",
         "//cmd/kubeadm/app/phases/kubeconfig:all-srcs",
         "//cmd/kubeadm/app/phases/token:all-srcs",
+        "//cmd/kubeadm/app/phases/validate:all-srcs",
         "//cmd/kubeadm/app/preflight:all-srcs",
         "//cmd/kubeadm/app/util:all-srcs",
     ],

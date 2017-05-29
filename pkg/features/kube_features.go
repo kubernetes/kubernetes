@@ -25,8 +25,8 @@ const (
 	// Every feature gate should add method here following this template:
 	//
 	// // owner: @username
-	// // alpha: v1.4
-	// MyFeature() bool
+	// // alpha: v1.X
+	// MyFeature utilfeature.Feature = "MyFeature"
 
 	// owner: @timstclair
 	// beta: v1.4
@@ -88,6 +88,12 @@ const (
 	// Changes the logic behind evicting Pods from not ready Nodes
 	// to take advantage of NoExecute Taints and Tolerations.
 	TaintBasedEvictions utilfeature.Feature = "TaintBasedEvictions"
+
+	// owner: @msau
+	// alpha: v1.7
+	//
+	// A new volume type that supports local disks on a node.
+	PersistentLocalVolumes utilfeature.Feature = "PersistentLocalVolumes"
 )
 
 func init() {
@@ -98,7 +104,7 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	ExternalTrafficLocalOnly:                    {Default: true, PreRelease: utilfeature.Beta},
+	ExternalTrafficLocalOnly:                    {Default: true, PreRelease: utilfeature.GA},
 	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
 	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
 	DynamicVolumeProvisioning:                   {Default: true, PreRelease: utilfeature.Alpha},
@@ -107,8 +113,10 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	AffinityInAnnotations:                       {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
+	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
+	StreamingProxyRedirects:          {Default: true, PreRelease: utilfeature.Beta},
+	genericfeatures.AdvancedAuditing: {Default: false, PreRelease: utilfeature.Alpha},
 }

@@ -20,6 +20,7 @@ package volumehelper
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
@@ -32,9 +33,17 @@ const (
 	// managed by the attach/detach controller
 	ControllerManagedAttachAnnotation string = "volumes.kubernetes.io/controller-managed-attach-detach"
 
+	// KeepTerminatedPodVolumesAnnotation is the key of the annotation on Node
+	// that decides if pod volumes are unmounted when pod is terminated
+	KeepTerminatedPodVolumesAnnotation string = "volumes.kubernetes.io/keep-terminated-pod-volumes"
+
 	// VolumeGidAnnotationKey is the of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
 	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
+
+	// VolumeDynamicallyCreatedByKey is the key of the annotation on PersistentVolume
+	// object created dynamically
+	VolumeDynamicallyCreatedByKey = "kubernetes.io/createdby"
 )
 
 // GetUniquePodName returns a unique identifier to reference a pod by
@@ -86,4 +95,35 @@ func GetUniqueVolumeNameFromSpec(
 			volumePlugin.GetPluginName(),
 			volumeName),
 		nil
+}
+
+// IsPodTerminated checks if pod is terminated
+func IsPodTerminated(pod *v1.Pod, podStatus v1.PodStatus) bool {
+	return podStatus.Phase == v1.PodFailed || podStatus.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(podStatus.ContainerStatuses))
+}
+
+// notRunning returns true if every status is terminated or waiting, or the status list
+// is empty.
+func notRunning(statuses []v1.ContainerStatus) bool {
+	for _, status := range statuses {
+		if status.State.Terminated == nil && status.State.Waiting == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// SplitUniqueName splits the unique name to plugin name and volume name strings. It expects the uniqueName to follow
+// the fromat plugin_name/volume_name and the plugin name must be namespaced as descibed by the plugin interface,
+// i.e. namespace/plugin containing exactly one '/'. This means the unique name will always be in the form of
+// plugin_namespace/plugin/volume_name, see k8s.io/kubernetes/pkg/volume/plugins.go VolumePlugin interface
+// description and pkg/volume/util/volumehelper/volumehelper.go GetUniqueVolumeNameFromSpec that constructs
+// the unique volume names.
+func SplitUniqueName(uniqueName v1.UniqueVolumeName) (string, string, error) {
+	components := strings.SplitN(string(uniqueName), "/", 3)
+	if len(components) != 3 {
+		return "", "", fmt.Errorf("cannot split volume unique name %s to plugin/volume components", uniqueName)
+	}
+	pluginName := fmt.Sprintf("%s/%s", components[0], components[1])
+	return pluginName, components[2], nil
 }

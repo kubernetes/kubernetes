@@ -47,15 +47,15 @@ func NewCmdCreateService(f cmdutil.Factory, cmdOut, errOut io.Writer) *cobra.Com
 }
 
 var (
-	serviceClusterIPLong = templates.LongDesc(`
-    Create a clusterIP service with the specified name.`)
+	serviceClusterIPLong = templates.LongDesc(i18n.T(`
+    Create a clusterIP service with the specified name.`))
 
-	serviceClusterIPExample = templates.Examples(`
+	serviceClusterIPExample = templates.Examples(i18n.T(`
     # Create a new clusterIP service named my-cs
     kubectl create service clusterip my-cs --tcp=5678:8080
 
     # Create a new clusterIP service named my-cs (in headless mode)
-    kubectl create service clusterip my-cs --clusterip="None"`)
+    kubectl create service clusterip my-cs --clusterip="None"`))
 )
 
 func addPortFlags(cmd *cobra.Command) {
@@ -110,12 +110,12 @@ func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 }
 
 var (
-	serviceNodePortLong = templates.LongDesc(`
-    Create a nodeport service with the specified name.`)
+	serviceNodePortLong = templates.LongDesc(i18n.T(`
+    Create a nodeport service with the specified name.`))
 
-	serviceNodePortExample = templates.Examples(`
+	serviceNodePortExample = templates.Examples(i18n.T(`
     # Create a new nodeport service named my-ns
-    kubectl create service nodeport my-ns --tcp=5678:8080`)
+    kubectl create service nodeport my-ns --tcp=5678:8080`))
 )
 
 // NewCmdCreateServiceNodePort is a macro command for creating a NodePort service
@@ -167,12 +167,12 @@ func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comma
 }
 
 var (
-	serviceLoadBalancerLong = templates.LongDesc(`
-    Create a LoadBalancer service with the specified name.`)
+	serviceLoadBalancerLong = templates.LongDesc(i18n.T(`
+    Create a LoadBalancer service with the specified name.`))
 
-	serviceLoadBalancerExample = templates.Examples(`
+	serviceLoadBalancerExample = templates.Examples(i18n.T(`
     # Create a new LoadBalancer service named my-lbs
-    kubectl create service loadbalancer my-lbs --tcp=5678:8080`)
+    kubectl create service loadbalancer my-lbs --tcp=5678:8080`))
 )
 
 // NewCmdCreateServiceLoadBalancer is a macro command for creating a LoadBalancer service
@@ -222,16 +222,16 @@ func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 }
 
 var (
-	serviceExternalNameLong = templates.LongDesc(`
+	serviceExternalNameLong = templates.LongDesc(i18n.T(`
 	Create an ExternalName service with the specified name.
 
 	ExternalName service references to an external DNS address instead of
 	only pods, which will allow application authors to reference services
-	that exist off platform, on other clusters, or locally.`)
+	that exist off platform, on other clusters, or locally.`))
 
-	serviceExternalNameExample = templates.Examples(`
+	serviceExternalNameExample = templates.Examples(i18n.T(`
 	# Create a new ExternalName service named my-ns 
-	kubectl create service externalname my-ns --external-name bar.com`)
+	kubectl create service externalname my-ns --external-name bar.com`))
 )
 
 // NewCmdCreateServiceExternalName is a macro command for creating a ExternalName service

@@ -41,7 +41,7 @@ spec:
           value: --no-supervisor
         resources:
           limits:
-            memory: 200Mi
+            memory: 300Mi
           requests:
             cpu: 100m
             memory: 200Mi
@@ -88,11 +88,23 @@ spec:
               then
                 exit 1;
               fi;
+      - name: prometheus-to-sd-exporter
+        image: gcr.io/google-containers/prometheus-to-sd:v0.1.0
+        command:
+          - /monitor
+          - --component=fluentd
+          - --stackdriver-prefix=container.googleapis.com/internal/addons
+          - --whitelisted-metrics=logging_line_count,logging_entry_count
+        volumeMounts:
+        - name: ssl-certs
+          mountPath: /etc/ssl/certs
       nodeSelector:
-        alpha.kubernetes.io/fluentd-ds-ready: "true"
+        beta.kubernetes.io/fluentd-ds-ready: "true"
       tolerations:
       - key: "node.alpha.kubernetes.io/ismaster"
         effect: "NoSchedule"
+      - operator: "Exists"
+        effect: "NoExecute"
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog
@@ -106,4 +118,7 @@ spec:
           path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-gcp-config
+          name: fluentd-gcp-config-v1.0
+      - name: ssl-certs
+        hostPath:
+          path: /etc/ssl/certs

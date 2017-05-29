@@ -21,6 +21,7 @@ import (
 	"math/big"
 	"math/rand"
 	"sync"
+	"time"
 )
 
 // AllocationBitmap is a contiguous block of resources that can be allocated atomically.
@@ -33,8 +34,8 @@ import (
 //
 // TODO: use RLE and compact the allocator to minimize space.
 type AllocationBitmap struct {
-	// strategy is the strategy for choosing the next available item out of the range
-	strategy allocateStrategy
+	// strategy carries the details of how to choose the next available item out of the range
+	strategy bitAllocator
 	// max is the maximum size of the usable items in the range
 	max int
 	// rangeSpec is the range specifier, matching RangeAllocation.Range
@@ -52,13 +53,17 @@ type AllocationBitmap struct {
 var _ Interface = &AllocationBitmap{}
 var _ Snapshottable = &AllocationBitmap{}
 
-// allocateStrategy is a search strategy in the allocation map for a valid item.
-type allocateStrategy func(allocated *big.Int, max, count int) (int, bool)
+// bitAllocator represents a search strategy in the allocation map for a valid item.
+type bitAllocator interface {
+	AllocateBit(allocated *big.Int, max, count int) (int, bool)
+}
 
 // NewAllocationMap creates an allocation bitmap using the random scan strategy.
 func NewAllocationMap(max int, rangeSpec string) *AllocationBitmap {
 	a := AllocationBitmap{
-		strategy:  randomScanStrategy,
+		strategy: randomScanStrategy{
+			rand: rand.New(rand.NewSource(time.Now().UnixNano())),
+		},
 		allocated: big.NewInt(0),
 		count:     0,
 		max:       max,
@@ -70,7 +75,7 @@ func NewAllocationMap(max int, rangeSpec string) *AllocationBitmap {
 // NewContiguousAllocationMap creates an allocation bitmap using the contiguous scan strategy.
 func NewContiguousAllocationMap(max int, rangeSpec string) *AllocationBitmap {
 	a := AllocationBitmap{
-		strategy:  contiguousScanStrategy,
+		strategy:  contiguousScanStrategy{},
 		allocated: big.NewInt(0),
 		count:     0,
 		max:       max,
@@ -99,7 +104,7 @@ func (r *AllocationBitmap) AllocateNext() (int, bool, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	next, ok := r.strategy(r.allocated, r.max, r.count)
+	next, ok := r.strategy.AllocateBit(r.allocated, r.max, r.count)
 	if !ok {
 		return 0, false, nil
 	}
@@ -193,11 +198,15 @@ func (r *AllocationBitmap) Restore(rangeSpec string, data []byte) error {
 // randomScanStrategy chooses a random address from the provided big.Int, and then
 // scans forward looking for the next available address (it will wrap the range if
 // necessary).
-func randomScanStrategy(allocated *big.Int, max, count int) (int, bool) {
+type randomScanStrategy struct {
+	rand *rand.Rand
+}
+
+func (rss randomScanStrategy) AllocateBit(allocated *big.Int, max, count int) (int, bool) {
 	if count >= max {
 		return 0, false
 	}
-	offset := rand.Intn(max)
+	offset := rss.rand.Intn(max)
 	for i := 0; i < max; i++ {
 		at := (offset + i) % max
 		if allocated.Bit(at) == 0 {
@@ -207,8 +216,12 @@ func randomScanStrategy(allocated *big.Int, max, count int) (int, bool) {
 	return 0, false
 }
 
+var _ bitAllocator = randomScanStrategy{}
+
 // contiguousScanStrategy tries to allocate starting at 0 and filling in any gaps
-func contiguousScanStrategy(allocated *big.Int, max, count int) (int, bool) {
+type contiguousScanStrategy struct{}
+
+func (contiguousScanStrategy) AllocateBit(allocated *big.Int, max, count int) (int, bool) {
 	if count >= max {
 		return 0, false
 	}
@@ -219,3 +232,5 @@ func contiguousScanStrategy(allocated *big.Int, max, count int) (int, bool) {
 	}
 	return 0, false
 }
+
+var _ bitAllocator = contiguousScanStrategy{}

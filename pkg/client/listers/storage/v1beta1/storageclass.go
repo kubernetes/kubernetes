@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	storage "k8s.io/kubernetes/pkg/apis/storage"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 )
 
@@ -62,7 +61,7 @@ func (s *storageClassLister) Get(name string) (*v1beta1.StorageClass, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(storage.Resource("storageclass"), name)
+		return nil, errors.NewNotFound(v1beta1.Resource("storageclass"), name)
 	}
 	return obj.(*v1beta1.StorageClass), nil
 }

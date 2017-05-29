@@ -73,7 +73,11 @@ func (dc *DeploymentController) rollback(d *extensions.Deployment, rsList []*ext
 // cleans up the rollback spec so subsequent requeues of the deployment won't end up in here.
 func (dc *DeploymentController) rollbackToTemplate(d *extensions.Deployment, rs *extensions.ReplicaSet) (bool, error) {
 	performedRollback := false
-	if !deploymentutil.EqualIgnoreHash(d.Spec.Template, rs.Spec.Template) {
+	isEqual, err := deploymentutil.EqualIgnoreHash(&d.Spec.Template, &rs.Spec.Template)
+	if err != nil {
+		return false, err
+	}
+	if !isEqual {
 		glog.V(4).Infof("Rolling back deployment %q to template spec %+v", d.Name, rs.Spec.Template.Spec)
 		deploymentutil.SetFromReplicaSetTemplate(d, rs.Spec.Template)
 		// set RS (the old RS we'll rolling back to) annotations back to the deployment;

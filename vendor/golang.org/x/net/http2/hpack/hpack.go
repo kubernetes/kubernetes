@@ -57,7 +57,7 @@ func (hf HeaderField) String() string {
 	return fmt.Sprintf("header field %q = %q%s", hf.Name, hf.Value, suffix)
 }
 
-// Size returns the size of an entry per RFC 7540 section 5.2.
+// Size returns the size of an entry per RFC 7541 section 4.1.
 func (hf HeaderField) Size() uint32 {
 	// http://http2.github.io/http2-spec/compression.html#rfc.section.4.1
 	// "The size of the dynamic table is the sum of the size of

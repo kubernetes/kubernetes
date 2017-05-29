@@ -21,29 +21,36 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os/exec"
+	"strings"
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+
+	"github.com/golang/glog"
+
+	"k8s.io/client-go/tools/remotecommand"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
-	"k8s.io/kubernetes/pkg/util/term"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 type streamingRuntime struct {
-	client      dockertools.DockerInterface
-	execHandler dockertools.ExecHandler
+	client      libdocker.Interface
+	execHandler ExecHandler
 }
 
 var _ streaming.Runtime = &streamingRuntime{}
 
-func (r *streamingRuntime) Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (r *streamingRuntime) Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	return r.exec(containerID, cmd, in, out, err, tty, resize, 0)
 }
 
 // Internal version of Exec adds a timeout.
-func (r *streamingRuntime) exec(containerID string, cmd []string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
+func (r *streamingRuntime) exec(containerID string, cmd []string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	container, err := checkContainerStatus(r.client, containerID)
 	if err != nil {
 		return err
@@ -51,20 +58,20 @@ func (r *streamingRuntime) exec(containerID string, cmd []string, in io.Reader, 
 	return r.execHandler.ExecInContainer(r.client, container, cmd, in, out, errw, tty, resize, timeout)
 }
 
-func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	_, err := checkContainerStatus(r.client, containerID)
 	if err != nil {
 		return err
 	}
 
-	return dockertools.AttachContainer(r.client, containerID, in, out, errw, tty, resize)
+	return attachContainer(r.client, containerID, in, out, errw, tty, resize)
 }
 
 func (r *streamingRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
 	if port < 0 || port > math.MaxUint16 {
 		return fmt.Errorf("invalid port %d", port)
 	}
-	return dockertools.PortForward(r.client, podSandboxID, port, stream)
+	return portForward(r.client, podSandboxID, port, stream)
 }
 
 // ExecSync executes a command in the container, and returns the stdout output.
@@ -118,7 +125,7 @@ func (ds *dockerService) PortForward(req *runtimeapi.PortForwardRequest) (*runti
 	return ds.streamingServer.GetPortForward(req)
 }
 
-func checkContainerStatus(client dockertools.DockerInterface, containerID string) (*dockertypes.ContainerJSON, error) {
+func checkContainerStatus(client libdocker.Interface, containerID string) (*dockertypes.ContainerJSON, error) {
 	container, err := client.InspectContainer(containerID)
 	if err != nil {
 		return nil, err
@@ -127,4 +134,84 @@ func checkContainerStatus(client dockertools.DockerInterface, containerID string
 		return nil, fmt.Errorf("container not running (%s)", container.ID)
 	}
 	return container, nil
+}
+
+func attachContainer(client libdocker.Interface, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+	// Have to start this before the call to client.AttachToContainer because client.AttachToContainer is a blocking
+	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
+	kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
+		client.ResizeContainerTTY(containerID, int(size.Height), int(size.Width))
+	})
+
+	// TODO(random-liu): Do we really use the *Logs* field here?
+	opts := dockertypes.ContainerAttachOptions{
+		Stream: true,
+		Stdin:  stdin != nil,
+		Stdout: stdout != nil,
+		Stderr: stderr != nil,
+	}
+	sopts := libdocker.StreamOptions{
+		InputStream:  stdin,
+		OutputStream: stdout,
+		ErrorStream:  stderr,
+		RawTerminal:  tty,
+	}
+	return client.AttachToContainer(containerID, opts, sopts)
+}
+
+func portForward(client libdocker.Interface, podInfraContainerID string, port int32, stream io.ReadWriteCloser) error {
+	container, err := client.InspectContainer(podInfraContainerID)
+	if err != nil {
+		return err
+	}
+
+	if !container.State.Running {
+		return fmt.Errorf("container not running (%s)", container.ID)
+	}
+
+	containerPid := container.State.Pid
+	socatPath, lookupErr := exec.LookPath("socat")
+	if lookupErr != nil {
+		return fmt.Errorf("unable to do port forwarding: socat not found.")
+	}
+
+	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
+
+	nsenterPath, lookupErr := exec.LookPath("nsenter")
+	if lookupErr != nil {
+		return fmt.Errorf("unable to do port forwarding: nsenter not found.")
+	}
+
+	commandString := fmt.Sprintf("%s %s", nsenterPath, strings.Join(args, " "))
+	glog.V(4).Infof("executing port forwarding command: %s", commandString)
+
+	command := exec.Command(nsenterPath, args...)
+	command.Stdout = stream
+
+	stderr := new(bytes.Buffer)
+	command.Stderr = stderr
+
+	// If we use Stdin, command.Run() won't return until the goroutine that's copying
+	// from stream finishes. Unfortunately, if you have a client like telnet connected
+	// via port forwarding, as long as the user's telnet client is connected to the user's
+	// local listener that port forwarding sets up, the telnet session never exits. This
+	// means that even if socat has finished running, command.Run() won't ever return
+	// (because the client still has the connection and stream open).
+	//
+	// The work around is to use StdinPipe(), as Wait() (called by Run()) closes the pipe
+	// when the command (socat) exits.
+	inPipe, err := command.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("unable to do port forwarding: error creating stdin pipe: %v", err)
+	}
+	go func() {
+		io.Copy(inPipe, stream)
+		inPipe.Close()
+	}()
+
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("%v: %s", err, stderr.String())
+	}
+
+	return nil
 }

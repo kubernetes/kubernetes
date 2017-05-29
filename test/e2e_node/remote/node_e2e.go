@@ -29,6 +29,8 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/builder"
 )
 
+const localCOSMounterPath = "cluster/gce/gci/mounter/mounter"
+
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
 type NodeE2ERemote struct{}
 
@@ -36,8 +38,6 @@ func InitNodeE2ERemote() TestSuite {
 	// TODO: Register flags.
 	return &NodeE2ERemote{}
 }
-
-const localCOSMounterPath = "cluster/gce/gci/mounter/mounter"
 
 // SetupTestPackage sets up the test package with binaries k8s required for node e2e tests
 func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
@@ -66,10 +66,37 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
 	}
 
 	// Include the GCI/COS mounter artifacts in the deployed tarball
+	err = tarAddCOSMounter(tardir)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// dest is relative to the root of the tar
+func tarAddFile(tar, source, dest string) error {
+	dir := filepath.Dir(dest)
+	tardir := filepath.Join(tar, dir)
+	tardest := filepath.Join(tar, dest)
+
+	out, err := exec.Command("mkdir", "-p", tardir).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to create archive bin subdir %q, was dest for file %q. Err: %v. Output:\n%s", tardir, source, err, out)
+	}
+	out, err = exec.Command("cp", source, tardest).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to copy file %q to the archive bin subdir %q. Err: %v. Output:\n%s", source, tardir, err, out)
+	}
+	return nil
+}
+
+// Includes the GCI/COS mounter artifacts in the deployed tarball
+func tarAddCOSMounter(tar string) error {
 	k8sDir, err := builder.GetK8sRootDir()
 	if err != nil {
 		return fmt.Errorf("Could not find K8s root dir! Err: %v", err)
 	}
+
 	source := filepath.Join(k8sDir, localCOSMounterPath)
 
 	// Require the GCI/COS mounter script, we want to make sure the remote test runner stays up to date if the mounter file moves
@@ -77,24 +104,13 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
 		return fmt.Errorf("Could not find GCI/COS mounter script at %q! If this script has been (re)moved, please update the e2e node remote test runner accordingly! Err: %v", source, err)
 	}
 
-	bindir := "cluster/gce/gci/mounter"
-	bin := "mounter"
-	destdir := filepath.Join(tardir, bindir)
-	dest := filepath.Join(destdir, bin)
-	out, err := exec.Command("mkdir", "-p", filepath.Join(tardir, bindir)).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to create directory %q for GCI/COS mounter script. Err: %v. Output:\n%s", destdir, err, out)
-	}
-	out, err = exec.Command("cp", source, dest).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to copy GCI/COS mounter script to the archive bin. Err: %v. Output:\n%s", err, out)
-	}
+	tarAddFile(tar, source, localCOSMounterPath)
 	return nil
 }
 
-// updateCOSMounterPath updates kubelet flags to set gci mounter path. This will only take effect for
+// updateCOSKubeletFlags updates kubelet flags to set gci mounter path, and enables memcg notifications. This will only take effect for
 // GCI/COS image.
-func updateCOSMounterPath(args, host, workspace string) (string, error) {
+func updateCOSKubeletFlags(args, host, workspace string) (string, error) {
 	// Determine if tests will run on a GCI/COS node.
 	output, err := SSH(host, "cat", "/etc/os-release")
 	if err != nil {
@@ -129,14 +145,15 @@ func updateCOSMounterPath(args, host, workspace string) (string, error) {
 		return args, fmt.Errorf("unabled to chmod 544 GCI/COS mounter script. Err: %v, Output:\n%s", err, output)
 	}
 	// Insert args at beginning of test args, so any values from command line take precedence
+	args = "--kubelet-flags=--experimental-kernel-memcg-notification=true " + args
 	args = fmt.Sprintf("--kubelet-flags=--experimental-mounter-path=%s ", mounterPath) + args
 	return args, nil
 }
 
 // RunTest runs test on the node.
 func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testArgs, ginkgoArgs string, timeout time.Duration) (string, error) {
-	// Install the cni plugin.
-	if err := installCNI(host, workspace); err != nil {
+	// Install the cni plugins and add a basic CNI configuration.
+	if err := setupCNI(host, workspace); err != nil {
 		return "", err
 	}
 
@@ -148,7 +165,7 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testA
 	// Kill any running node processes
 	cleanupNodeProcesses(host)
 
-	testArgs, err := updateCOSMounterPath(testArgs, host, workspace)
+	testArgs, err := updateCOSKubeletFlags(testArgs, host, workspace)
 	if err != nil {
 		return "", err
 	}

@@ -13,7 +13,7 @@ import (
 	"net/http"
 )
 
-func RequestCanceler(rt http.RoundTripper, req *http.Request) func() {
+func RequestCanceler(req *http.Request) func() {
 	ch := make(chan struct{})
 	req.Cancel = ch
 

@@ -50,3 +50,4 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
+      serviceAccountName: kube-dns-autoscaler

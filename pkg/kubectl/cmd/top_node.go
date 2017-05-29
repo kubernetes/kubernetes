@@ -57,17 +57,17 @@ func (o *HeapsterTopOptions) Bind(flags *pflag.FlagSet) {
 }
 
 var (
-	topNodeLong = templates.LongDesc(`
+	topNodeLong = templates.LongDesc(i18n.T(`
 		Display Resource (CPU/Memory/Storage) usage of nodes.
 
-		The top-node command allows you to see the resource consumption of nodes.`)
+		The top-node command allows you to see the resource consumption of nodes.`))
 
-	topNodeExample = templates.Examples(`
+	topNodeExample = templates.Examples(i18n.T(`
 		  # Show metrics for all nodes
 		  kubectl top node
 
 		  # Show metrics for a given node
-		  kubectl top node NODE_NAME`)
+		  kubectl top node NODE_NAME`))
 )
 
 func NewCmdTopNode(f cmdutil.Factory, out io.Writer) *cobra.Command {

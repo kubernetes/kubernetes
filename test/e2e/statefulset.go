@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
@@ -310,10 +311,13 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			sst.UpdateReplicas(ss, 1)
 
 			By("Verifying that the 2nd pod wont be removed if it is not running and ready")
-			sst.ConfirmStatefulPodCount(2, ss, 10*time.Second)
+			sst.ConfirmStatefulPodCount(2, ss, 10*time.Second, true)
 			expectedPodName := ss.Name + "-1"
 			expectedPod, err := f.ClientSet.Core().Pods(ns).Get(expectedPodName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying the 2nd pod is removed only when it becomes running and ready")
+			sst.RestoreProbe(ss, testProbe)
 			watcher, err := f.ClientSet.Core().Pods(ns).Watch(metav1.SingleObject(
 				metav1.ObjectMeta{
 					Name:            expectedPod.Name,
@@ -321,20 +325,17 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 				},
 			))
 			Expect(err).NotTo(HaveOccurred())
-
-			By("Verifying the 2nd pod is removed only when it becomes running and ready")
-			sst.RestoreProbe(ss, testProbe)
 			_, err = watch.Until(framework.StatefulSetTimeout, watcher, func(event watch.Event) (bool, error) {
 				pod := event.Object.(*v1.Pod)
 				if event.Type == watch.Deleted && pod.Name == expectedPodName {
 					return false, fmt.Errorf("Pod %v was deleted before enter running", pod.Name)
 				}
 				framework.Logf("Observed event %v for pod %v. Phase %v, Pod is ready %v",
-					event.Type, pod.Name, pod.Status.Phase, v1.IsPodReady(pod))
+					event.Type, pod.Name, pod.Status.Phase, podutil.IsPodReady(pod))
 				if pod.Name != expectedPodName {
 					return false, nil
 				}
-				if pod.Status.Phase == v1.PodRunning && v1.IsPodReady(pod) {
+				if pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod) {
 					return true, nil
 				}
 				return false, nil
@@ -368,7 +369,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			sst.WaitForRunningAndNotReady(*ss.Spec.Replicas, ss)
 			sst.WaitForStatus(ss, 0)
 			sst.UpdateReplicas(ss, 3)
-			sst.ConfirmStatefulPodCount(1, ss, 10*time.Second)
+			sst.ConfirmStatefulPodCount(1, ss, 10*time.Second, true)
 
 			By("Scaling up stateful set " + ssName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
 			sst.RestoreProbe(ss, testProbe)
@@ -399,7 +400,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			sst.WaitForStatus(ss, 0)
 			sst.WaitForRunningAndNotReady(3, ss)
 			sst.UpdateReplicas(ss, 0)
-			sst.ConfirmStatefulPodCount(3, ss, 10*time.Second)
+			sst.ConfirmStatefulPodCount(3, ss, 10*time.Second, true)
 
 			By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
 			sst.RestoreProbe(ss, testProbe)
@@ -419,6 +420,47 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 
 			})
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Burst scaling should run to completion even with unhealthy pods", func() {
+			psLabels := klabels.Set(labels)
+
+			By("Creating stateful set " + ssName + " in namespace " + ns)
+			testProbe := &v1.Probe{Handler: v1.Handler{HTTPGet: &v1.HTTPGetAction{
+				Path: "/index.html",
+				Port: intstr.IntOrString{IntVal: 80}}}}
+			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
+			ss.Spec.PodManagementPolicy = apps.ParallelPodManagement
+			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
+			ss, err := c.Apps().StatefulSets(ns).Create(ss)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
+			sst := framework.NewStatefulSetTester(c)
+			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
+
+			By("Confirming that stateful set scale up will not halt with unhealthy stateful pod")
+			sst.BreakProbe(ss, testProbe)
+			sst.WaitForRunningAndNotReady(*ss.Spec.Replicas, ss)
+			sst.WaitForStatus(ss, 0)
+			sst.UpdateReplicas(ss, 3)
+			sst.ConfirmStatefulPodCount(3, ss, 10*time.Second, false)
+
+			By("Scaling up stateful set " + ssName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
+			sst.RestoreProbe(ss, testProbe)
+			sst.WaitForRunningAndReady(3, ss)
+
+			By("Scale down will not halt with unhealthy stateful pod")
+			sst.BreakProbe(ss, testProbe)
+			sst.WaitForStatus(ss, 0)
+			sst.WaitForRunningAndNotReady(3, ss)
+			sst.UpdateReplicas(ss, 0)
+			sst.ConfirmStatefulPodCount(0, ss, 10*time.Second, false)
+
+			By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
+			sst.RestoreProbe(ss, testProbe)
+			sst.Scale(ss, 0)
+			sst.WaitForStatus(ss, 0)
 		})
 
 		It("Should recreate evicted statefulset", func() {
@@ -719,7 +761,7 @@ func (c *cockroachDBTester) name() string {
 }
 
 func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
-	cmd = fmt.Sprintf("/cockroach/cockroach sql --host %s.cockroachdb -e \"%v\"", podName, cmd)
+	cmd = fmt.Sprintf("/cockroach/cockroach sql --insecure --host %s.cockroachdb -e \"%v\"", podName, cmd)
 	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 

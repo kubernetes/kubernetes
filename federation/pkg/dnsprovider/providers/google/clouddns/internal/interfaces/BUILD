@@ -13,7 +13,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//federation/pkg/dnsprovider/rrstype:go_default_library",
-        "//vendor:google.golang.org/api/googleapi",
+        "//vendor/google.golang.org/api/googleapi:go_default_library",
     ],
 )
 

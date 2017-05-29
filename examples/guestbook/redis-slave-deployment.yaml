@@ -2,23 +2,8 @@ apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: redis-slave
-  # these labels can be applied automatically
-  # from the labels in the pod template if not set
-  # labels:
-  #   app: redis
-  #   role: slave
-  #   tier: backend
 spec:
-  # this replicas value is default
-  # modify it according to your case
   replicas: 2
-  # selector can be applied automatically
-  # from the labels in the pod template if not set
-  # selector:
-  #   matchLabels:
-  #     app: guestbook
-  #     role: slave
-  #     tier: backend
   template:
     metadata:
       labels:
@@ -39,7 +24,7 @@ spec:
           # If your cluster config does not include a dns service, then to
           # instead access an environment variable to find the master
           # service's host, comment out the 'value: dns' line above, and
-          # uncomment the line below.
+          # uncomment the line below:
           # value: env
         ports:
         - containerPort: 6379

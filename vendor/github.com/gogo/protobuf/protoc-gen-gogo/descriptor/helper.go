@@ -1,4 +1,6 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
 // http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
@@ -97,8 +99,31 @@ func (field *FieldDescriptorProto) GetKeyUint64() (x uint64) {
 	return x
 }
 
+func (field *FieldDescriptorProto) GetKey3Uint64() (x uint64) {
+	packed := field.IsPacked3()
+	wireType := field.WireType()
+	fieldNumber := field.GetNumber()
+	if packed {
+		wireType = 2
+	}
+	x = uint64(uint32(fieldNumber)<<3 | uint32(wireType))
+	return x
+}
+
 func (field *FieldDescriptorProto) GetKey() []byte {
 	x := field.GetKeyUint64()
+	i := 0
+	keybuf := make([]byte, 0)
+	for i = 0; x > 127; i++ {
+		keybuf = append(keybuf, 0x80|uint8(x&0x7F))
+		x >>= 7
+	}
+	keybuf = append(keybuf, uint8(x))
+	return keybuf
+}
+
+func (field *FieldDescriptorProto) GetKey3() []byte {
+	x := field.GetKey3Uint64()
 	i := 0
 	keybuf := make([]byte, 0)
 	for i = 0; x > 127; i++ {
@@ -348,6 +373,16 @@ func (f *FieldDescriptorProto) IsRequired() bool {
 
 func (f *FieldDescriptorProto) IsPacked() bool {
 	return f.Options != nil && f.GetOptions().GetPacked()
+}
+
+func (f *FieldDescriptorProto) IsPacked3() bool {
+	if f.IsRepeated() && f.IsScalar() {
+		if f.Options == nil || f.GetOptions().Packed == nil {
+			return true
+		}
+		return f.Options != nil && f.GetOptions().GetPacked()
+	}
+	return false
 }
 
 func (m *DescriptorProto) HasExtension() bool {

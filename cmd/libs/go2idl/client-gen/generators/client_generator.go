@@ -29,6 +29,7 @@ import (
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/fake"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/scheme"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/path"
 	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 
 	"github.com/golang/glog"
@@ -204,6 +205,58 @@ NextGroup:
 	}
 }
 
+// applyGroupOverrides applies group name overrides to each package, if applicable. If there is a
+// comment of the form "// +groupName=somegroup" or "// +groupName=somegroup.foo.bar.io", use the
+// first field (somegroup) as the name of the group when generating.
+func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Args) {
+	// Create a map from "old GV" to "new GV" so we know what changes we need to make.
+	changes := make(map[clientgentypes.GroupVersion]clientgentypes.GroupVersion)
+	for gv, inputDir := range customArgs.GroupVersionToInputPath {
+		p := universe.Package(inputDir)
+		if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
+			newGV := clientgentypes.GroupVersion{
+				Group:   clientgentypes.Group(strings.SplitN(override[0], ".", 2)[0]),
+				Version: gv.Version,
+			}
+			changes[gv] = newGV
+		}
+	}
+
+	// Modify customArgs.Groups based on the groupName overrides.
+	newGroups := make([]clientgentypes.GroupVersions, 0, len(customArgs.Groups))
+	for _, gvs := range customArgs.Groups {
+		gv := clientgentypes.GroupVersion{
+			Group:   gvs.Group,
+			Version: gvs.Versions[0], // we only need a version, and the first will do
+		}
+		if newGV, ok := changes[gv]; ok {
+			// There's an override, so use it.
+			newGVS := clientgentypes.GroupVersions{
+				Group:    newGV.Group,
+				Versions: gvs.Versions,
+			}
+			newGroups = append(newGroups, newGVS)
+		} else {
+			// No override.
+			newGroups = append(newGroups, gvs)
+		}
+	}
+	customArgs.Groups = newGroups
+
+	// Modify customArgs.GroupVersionToInputPath based on the groupName overrides.
+	newGVToInputPath := make(map[clientgentypes.GroupVersion]string)
+	for gv, inputDir := range customArgs.GroupVersionToInputPath {
+		if newGV, ok := changes[gv]; ok {
+			// There's an override, so use it.
+			newGVToInputPath[newGV] = inputDir
+		} else {
+			// No override.
+			newGVToInputPath[gv] = inputDir
+		}
+	}
+	customArgs.GroupVersionToInputPath = newGVToInputPath
+}
+
 // Packages makes the client package definition.
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	boilerplate, err := arguments.LoadGoBoilerplate()
@@ -217,11 +270,14 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 	includedTypesOverrides := customArgs.IncludedTypesOverrides
 
+	applyGroupOverrides(context.Universe, &customArgs)
+
 	generatedBy := generatedBy(customArgs)
 
 	gvToTypes := map[clientgentypes.GroupVersion][]*types.Type{}
 	for gv, inputDir := range customArgs.GroupVersionToInputPath {
-		p := context.Universe.Package(inputDir)
+		// Package are indexed with the vendor prefix stripped
+		p := context.Universe.Package(path.Vendorless(inputDir))
 		for n, t := range p.Types {
 			// filter out types which are not included in user specified overrides.
 			typesOverride, ok := includedTypesOverrides[gv]

@@ -17,6 +17,7 @@ limitations under the License.
 package testutil
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -28,16 +29,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 
+	"k8s.io/apimachinery/pkg/util/clock"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/util/clock"
+	"k8s.io/client-go/pkg/api/v1/ref"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
+	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 )
 
@@ -83,6 +88,11 @@ func (c *FakeNodeHandler) GetUpdatedNodesCopy() []*v1.Node {
 // Core returns fake CoreInterface.
 func (c *FakeNodeHandler) Core() v1core.CoreV1Interface {
 	return &FakeLegacyHandler{c.Clientset.Core(), c}
+}
+
+// CoreV1 returns fake CoreV1Interface
+func (c *FakeNodeHandler) CoreV1() v1core.CoreV1Interface {
+	return &FakeLegacyHandler{c.Clientset.CoreV1(), c}
 }
 
 // Nodes return fake NodeInterfaces.
@@ -189,6 +199,7 @@ func (m *FakeNodeHandler) Update(node *v1.Node) (*v1.Node, error) {
 		m.RequestCount++
 		m.lock.Unlock()
 	}()
+
 	nodeCopy := *node
 	for i, updateNode := range m.UpdatedNodes {
 		if updateNode.Name == nodeCopy.Name {
@@ -207,6 +218,37 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 		m.RequestCount++
 		m.lock.Unlock()
 	}()
+
+	var origNodeCopy v1.Node
+	found := false
+	for i := range m.Existing {
+		if m.Existing[i].Name == node.Name {
+			origNodeCopy = *m.Existing[i]
+			found = true
+			break
+		}
+	}
+	updatedNodeIndex := -1
+	for i := range m.UpdatedNodes {
+		if m.UpdatedNodes[i].Name == node.Name {
+			origNodeCopy = *m.UpdatedNodes[i]
+			updatedNodeIndex = i
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return nil, fmt.Errorf("Not found node %v", node)
+	}
+
+	origNodeCopy.Status = node.Status
+	if updatedNodeIndex < 0 {
+		m.UpdatedNodes = append(m.UpdatedNodes, &origNodeCopy)
+	} else {
+		m.UpdatedNodes[updatedNodeIndex] = &origNodeCopy
+	}
+
 	nodeCopy := *node
 	m.UpdatedNodeStatuses = append(m.UpdatedNodeStatuses, &nodeCopy)
 	return node, nil
@@ -225,7 +267,76 @@ func (m *FakeNodeHandler) Watch(opts metav1.ListOptions) (watch.Interface, error
 
 // Patch patches a Node in the fake store.
 func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Node, error) {
-	return nil, nil
+	m.lock.Lock()
+	defer func() {
+		m.RequestCount++
+		m.lock.Unlock()
+	}()
+	var nodeCopy v1.Node
+	for i := range m.Existing {
+		if m.Existing[i].Name == name {
+			nodeCopy = *m.Existing[i]
+		}
+	}
+	updatedNodeIndex := -1
+	for i := range m.UpdatedNodes {
+		if m.UpdatedNodes[i].Name == name {
+			nodeCopy = *m.UpdatedNodes[i]
+			updatedNodeIndex = i
+		}
+	}
+
+	originalObjJS, err := json.Marshal(nodeCopy)
+	if err != nil {
+		glog.Errorf("Failed to marshal %v", nodeCopy)
+		return nil, nil
+	}
+	var originalNode v1.Node
+	if err = json.Unmarshal(originalObjJS, &originalNode); err != nil {
+		glog.Errorf("Failed to unmarshall original object: %v", err)
+		return nil, nil
+	}
+
+	var patchedObjJS []byte
+	switch pt {
+	case types.JSONPatchType:
+		patchObj, err := jsonpatch.DecodePatch(data)
+		if err != nil {
+			glog.Error(err.Error())
+			return nil, nil
+		}
+		if patchedObjJS, err = patchObj.Apply(originalObjJS); err != nil {
+			glog.Error(err.Error())
+			return nil, nil
+		}
+	case types.MergePatchType:
+		if patchedObjJS, err = jsonpatch.MergePatch(originalObjJS, data); err != nil {
+			glog.Error(err.Error())
+			return nil, nil
+		}
+	case types.StrategicMergePatchType:
+		if patchedObjJS, err = strategicpatch.StrategicMergePatch(originalObjJS, data, originalNode); err != nil {
+			glog.Error(err.Error())
+			return nil, nil
+		}
+	default:
+		glog.Errorf("unknown Content-Type header for patch: %v", pt)
+		return nil, nil
+	}
+
+	var updatedNode v1.Node
+	if err = json.Unmarshal(patchedObjJS, &updatedNode); err != nil {
+		glog.Errorf("Failed to unmarshall patched object: %v", err)
+		return nil, nil
+	}
+
+	if updatedNodeIndex < 0 {
+		m.UpdatedNodes = append(m.UpdatedNodes, &updatedNode)
+	} else {
+		m.UpdatedNodes[updatedNodeIndex] = &updatedNode
+	}
+
+	return &updatedNode, nil
 }
 
 // FakeRecorder is used as a fake during testing.
@@ -253,7 +364,7 @@ func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp metav1.Time, eve
 func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, eventtype, reason, message string) {
 	f.Lock()
 	defer f.Unlock()
-	ref, err := clientv1.GetReference(api.Scheme, obj)
+	ref, err := ref.GetReference(api.Scheme, obj)
 	if err != nil {
 		glog.Errorf("Encoutered error while getting reference: %v", err)
 		return
