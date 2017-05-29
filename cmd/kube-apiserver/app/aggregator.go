@@ -85,11 +85,10 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 	}
 
 	return aggregatorConfig, nil
-
 }
 
-func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, kubeInformers informers.SharedInformerFactory, apiExtensionInformers apiextensionsinformers.SharedInformerFactory) (*aggregatorapiserver.APIAggregator, error) {
-	aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(delegateAPIServer)
+func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, kubeInformers informers.SharedInformerFactory, apiExtensionInformers apiextensionsinformers.SharedInformerFactory, proxyTransport *http.Transport) (*aggregatorapiserver.APIAggregator, error) {
+	aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(delegateAPIServer, proxyTransport)
 	if err != nil {
 		return nil, err
 	}
