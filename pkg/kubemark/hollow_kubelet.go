@@ -89,7 +89,9 @@ func NewHollowKubelet(
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	kubeletapp.RunKubelet(hk.KubeletFlags, hk.KubeletConfiguration, hk.KubeletDeps, false, false)
+	if err := kubeletapp.RunKubelet(hk.KubeletFlags, hk.KubeletConfiguration, hk.KubeletDeps, false, false); err != nil {
+		glog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
+	}
 	select {}
 }
 
