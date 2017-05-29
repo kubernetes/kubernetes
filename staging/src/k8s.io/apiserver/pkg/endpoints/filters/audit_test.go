@@ -19,6 +19,7 @@ package filters
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -177,10 +178,17 @@ func (*fakeHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func TestAudit(t *testing.T) {
-	shortRunningPrefix := `[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" ip="127.0.0.1" method="list" user="admin" groups="<none>" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods"`
-	longRunningPrefix := `[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" ip="127.0.0.1" method="watch" user="admin" groups="<none>" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods\?watch=true"`
+	writingShortRunningPrefix := func(stage string) string {
+		return fmt.Sprintf(`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="%s" ip="127.0.0.1" method="update" user="admin" groups="<none>" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods/foo"`, stage)
+	}
+	readOnlyShortRunningPrefix := func(stage string) string {
+		return fmt.Sprintf(`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="%s" ip="127.0.0.1" method="get" user="admin" groups="<none>" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods/foo"`, stage)
+	}
+	longRunningPrefix := func(stage string) string {
+		return fmt.Sprintf(`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="%s" ip="127.0.0.1" method="watch" user="admin" groups="<none>" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods\?watch=true"`, stage)
+	}
 
-	shortRunningPath := "/api/v1/namespaces/default/pods"
+	shortRunningPath := "/api/v1/namespaces/default/pods/foo"
 	longRunningPath := "/api/v1/namespaces/default/pods?watch=true"
 
 	delay := 500 * time.Millisecond
@@ -188,58 +196,93 @@ func TestAudit(t *testing.T) {
 	for _, test := range []struct {
 		desc     string
 		path     string
+		verb     string
 		handler  func(http.ResponseWriter, *http.Request)
 		expected []string
 	}{
-		// short running requests
+		// short running requests with read-only verb
 		{
-			"empty",
+			"read-only empty",
 			shortRunningPath,
+			"GET",
 			func(http.ResponseWriter, *http.Request) {},
 			[]string{
-				shortRunningPrefix + ` response="200"`,
+				readOnlyShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				readOnlyShortRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
 			},
 		},
 		{
-			"sleep",
+			"read-only panic",
 			shortRunningPath,
+			"GET",
+			func(w http.ResponseWriter, req *http.Request) {
+				panic("kaboom")
+			},
+			[]string{
+				readOnlyShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				readOnlyShortRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
+			},
+		},
+
+		// short running request with non-read-only verb
+		{
+			"writing empty",
+			shortRunningPath,
+			"PUT",
+			func(http.ResponseWriter, *http.Request) {},
+			[]string{
+				writingShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				writingShortRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
+			},
+		},
+		{
+			"writing sleep",
+			shortRunningPath,
+			"PUT",
 			func(http.ResponseWriter, *http.Request) {
 				time.Sleep(delay)
 			},
 			[]string{
-				shortRunningPrefix + ` response="200"`,
+				writingShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				writingShortRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
 			},
 		},
 		{
-			"403+write",
+			"writing 403+write",
 			shortRunningPath,
+			"PUT",
 			func(w http.ResponseWriter, req *http.Request) {
 				w.WriteHeader(403)
 				w.Write([]byte("foo"))
 			},
 			[]string{
-				shortRunningPrefix + ` response="403"`,
+				writingShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				writingShortRunningPrefix(auditinternal.StageResponseComplete) + ` response="403"`,
 			},
 		},
 		{
-			"panic",
+			"writing panic",
 			shortRunningPath,
+			"PUT",
 			func(w http.ResponseWriter, req *http.Request) {
 				panic("kaboom")
 			},
 			[]string{
-				shortRunningPrefix + ` response="500"`,
+				writingShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				writingShortRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
 			},
 		},
 		{
-			"write+panic",
+			"writing write+panic",
 			shortRunningPath,
+			"PUT",
 			func(w http.ResponseWriter, req *http.Request) {
 				w.Write([]byte("foo"))
 				panic("kaboom")
 			},
 			[]string{
-				shortRunningPrefix + ` response="500"`,
+				writingShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				writingShortRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
 			},
 		},
 
@@ -247,76 +290,92 @@ func TestAudit(t *testing.T) {
 		{
 			"empty longrunning",
 			longRunningPath,
+			"GET",
 			func(http.ResponseWriter, *http.Request) {},
 			[]string{
-				longRunningPrefix + ` response="200"`,
+				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="200"`,
+				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
 			},
 		},
 		{
 			"sleep longrunning",
 			longRunningPath,
+			"GET",
 			func(http.ResponseWriter, *http.Request) {
 				time.Sleep(delay)
 			},
 			[]string{
-				longRunningPrefix + ` response="200"`,
+				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="200"`,
+				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
 			},
 		},
 		{
 			"sleep+403 longrunning",
 			longRunningPath,
+			"GET",
 			func(w http.ResponseWriter, req *http.Request) {
 				time.Sleep(delay)
 				w.WriteHeader(403)
 			},
 			[]string{
-				longRunningPrefix + ` response="<deferred>"`,
-				longRunningPrefix + ` response="403"`,
+				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="403"`,
+				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="403"`,
 			},
 		},
 		{
 			"write longrunning",
 			longRunningPath,
+			"GET",
 			func(w http.ResponseWriter, req *http.Request) {
 				w.Write([]byte("foo"))
 			},
 			[]string{
-				longRunningPrefix + ` response="<deferred>"`,
-				longRunningPrefix + ` response="200"`,
+				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="200"`,
+				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
 			},
 		},
 		{
 			"403+write longrunning",
 			longRunningPath,
+			"GET",
 			func(w http.ResponseWriter, req *http.Request) {
 				w.WriteHeader(403)
 				w.Write([]byte("foo"))
 			},
 			[]string{
-				longRunningPrefix + ` response="<deferred>"`,
-				longRunningPrefix + ` response="403"`,
+				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="403"`,
+				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="403"`,
 			},
 		},
 		{
 			"panic longrunning",
 			longRunningPath,
+			"GET",
 			func(w http.ResponseWriter, req *http.Request) {
 				panic("kaboom")
 			},
 			[]string{
-				longRunningPrefix + ` response="500"`,
+				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				longRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
 			},
 		},
 		{
 			"write+panic longrunning",
 			longRunningPath,
+			"GET",
 			func(w http.ResponseWriter, req *http.Request) {
 				w.Write([]byte("foo"))
 				panic("kaboom")
 			},
 			[]string{
-				longRunningPrefix + ` response="<deferred>"`,
-				longRunningPrefix + ` response="500"`,
+				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
+				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="200"`,
+				longRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
 			},
 		},
 	} {
@@ -330,18 +389,15 @@ func TestAudit(t *testing.T) {
 			return ri.Verb == "watch"
 		})
 
-		req, _ := http.NewRequest("GET", test.path, nil)
+		req, _ := http.NewRequest(test.verb, test.path, nil)
 		req.RemoteAddr = "127.0.0.1"
 
-		done := make(chan struct{})
-		go func() {
+		func() {
 			defer func() {
 				recover()
-				close(done)
 			}()
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 		}()
-		<-done
 
 		t.Logf("[%s] audit log: %v", test.desc, buf.String())
 
@@ -393,4 +449,24 @@ func TestAuditNoPanicOnNilUser(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	handler.ServeHTTP(httptest.NewRecorder(), req)
+}
+
+func TestAuditLevelNone(t *testing.T) {
+	sink := &fakeAuditSink{}
+	var handler http.Handler
+	handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(200)
+	})
+	policyChecker := policy.FakeChecker(auditinternal.LevelNone)
+	handler = WithAudit(handler, &fakeRequestContextMapper{
+		user: &user.DefaultInfo{Name: "admin"},
+	}, sink, policyChecker, nil)
+
+	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req.RemoteAddr = "127.0.0.1"
+
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	if len(sink.events) > 0 {
+		t.Errorf("Generated events, but should not have: %#v", sink.events)
+	}
 }

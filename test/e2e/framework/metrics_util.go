@@ -224,7 +224,7 @@ func (a *APIResponsiveness) Less(i, j int) bool {
 // Only 0.5, 0.9 and 0.99 quantiles are supported.
 func (a *APIResponsiveness) addMetricRequestLatency(resource, subresource, verb string, quantile float64, latency time.Duration) {
 	for i, apicall := range a.APICalls {
-		if apicall.Resource == resource && apicall.Verb == verb {
+		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb {
 			a.APICalls[i] = setQuantileAPICall(apicall, quantile, latency)
 			return
 		}
@@ -255,7 +255,7 @@ func setQuantile(metric *LatencyMetric, quantile float64, latency time.Duration)
 // Add request count to the APICall metric entry (creating one if necessary).
 func (a *APIResponsiveness) addMetricRequestCount(resource, subresource, verb string, count int) {
 	for i, apicall := range a.APICalls {
-		if apicall.Resource == resource && apicall.Verb == verb {
+		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb {
 			a.APICalls[i].Count += count
 			return
 		}

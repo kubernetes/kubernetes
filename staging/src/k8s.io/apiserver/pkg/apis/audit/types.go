@@ -61,6 +61,8 @@ const (
 	// The stage for events generated once the response body has been completed, and no more bytes
 	// will be sent.
 	StageResponseComplete = "ResponseComplete"
+	// The stage for events generated when a panic occured.
+	StagePanic = "Panic"
 )
 
 // Event captures all the information that can be included in an API audit log.

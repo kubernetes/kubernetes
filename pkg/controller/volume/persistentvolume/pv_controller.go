@@ -1259,28 +1259,22 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		return
 	}
 
-	if storageClass != nil {
-		// Add provisioner annotation so external provisioners know when to start
-		newClaim, err := ctrl.setClaimProvisioner(claim, storageClass)
-		if err != nil {
-			// Save failed, the controller will retry in the next sync
-			glog.V(2).Infof("error saving claim %s: %v", claimToClaimKey(claim), err)
-			return
-		}
-		claim = newClaim
+	// Add provisioner annotation so external provisioners know when to start
+	newClaim, err := ctrl.setClaimProvisioner(claim, storageClass)
+	if err != nil {
+		// Save failed, the controller will retry in the next sync
+		glog.V(2).Infof("error saving claim %s: %v", claimToClaimKey(claim), err)
+		return
 	}
+	claim = newClaim
 
 	if plugin == nil {
 		// findProvisionablePlugin returned no error nor plugin.
 		// This means that an unknown provisioner is requested. Report an event
 		// and wait for the external provisioner
-		if storageClass != nil {
-			msg := fmt.Sprintf("waiting for a volume to be created, either by external provisioner %q or manually created by system administrator", storageClass.Provisioner)
-			ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ExternalProvisioning", msg)
-			glog.V(3).Infof("provisioning claim %q: %s", claimToClaimKey(claim), msg)
-		} else {
-			glog.V(3).Infof("cannot find storage class for claim %q", claimToClaimKey(claim))
-		}
+		msg := fmt.Sprintf("waiting for a volume to be created, either by external provisioner %q or manually created by system administrator", storageClass.Provisioner)
+		ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ExternalProvisioning", msg)
+		glog.V(3).Infof("provisioning claim %q: %s", claimToClaimKey(claim), msg)
 		return
 	}
 
