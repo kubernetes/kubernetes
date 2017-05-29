@@ -168,6 +168,7 @@ func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, delegateAPIServer g
 	}
 	kubeAPIServer.GenericAPIServer.AddPostStartHook("start-kube-apiserver-informers", func(context genericapiserver.PostStartHookContext) error {
 		sharedInformers.Start(context.StopCh)
+		sharedInformers.WaitForCacheSync(context.StopCh)
 		return nil
 	})
 
