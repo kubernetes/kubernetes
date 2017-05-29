@@ -13,6 +13,7 @@ cmd/gke-certificates-controller
 cmd/kube-apiserver
 cmd/kube-apiserver/app
 cmd/kube-apiserver/app/options
+cmd/kube-apiserver/app/preflight
 cmd/kube-controller-manager
 cmd/kube-controller-manager/app/options
 cmd/kube-proxy
