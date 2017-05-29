@@ -2804,9 +2804,28 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, err
 	}
 
-	err = c.ensureLoadBalancerHealthCheck(loadBalancer, listeners)
-	if err != nil {
-		return nil, err
+	if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
+		glog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to ensure health check for localized service %v on node port %v: %v", loadBalancerName, healthCheckNodePort, err)
+		}
+	} else {
+		glog.V(4).Infof("service %v does not need custom health checks", apiService.Name)
+		// We only configure a TCP health-check on the first port
+		var tcpHealthCheckPort int32
+		for _, listener := range listeners {
+			if listener.InstancePort == nil {
+				continue
+			}
+			tcpHealthCheckPort = int32(*listener.InstancePort)
+			break
+		}
+		// there must be no path on TCP health check
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "TCP", tcpHealthCheckPort, "")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = c.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
