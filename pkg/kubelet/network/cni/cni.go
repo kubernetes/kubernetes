@@ -134,7 +134,7 @@ func getDefaultCNINetwork(pluginDir, binDir, vendorCNIDirPrefix string) (*cniNet
 		// Search for vendor-specific plugins as well as default plugins in the CNI codebase.
 		vendorDir := vendorCNIDir(vendorCNIDirPrefix, confType)
 		cninet := &libcni.CNIConfig{
-			Path: []string{binDir, vendorDir},
+			Path: []string{vendorDir, binDir},
 		}
 		network := &cniNetwork{name: confList.Name, NetworkConfig: confList, CNIConfig: cninet}
 		return network, nil
