@@ -66,7 +66,7 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
 	cmd.Flags().BoolP("short", "", false, "Print just the version number.")
-	cmd.Flags().String("output", "", "one of 'yaml' or 'json'")
+	cmd.Flags().StringP("output", "o", "", "One of 'yaml' or 'json'.")
 	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
 }
@@ -117,7 +117,7 @@ func (o *VersionOptions) Run(f cmdutil.Factory, out io.Writer) error {
 		}
 		fmt.Fprintln(out, string(marshalled))
 	case "json":
-		marshalled, err := json.Marshal(&versionInfo)
+		marshalled, err := json.MarshalIndent(&versionInfo, "", "  ")
 		if err != nil {
 			return err
 		}
