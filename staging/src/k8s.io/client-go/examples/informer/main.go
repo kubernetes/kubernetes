@@ -34,11 +34,15 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
+// PodLoggingController logs the name and namespace of pods that are added,
+// deleted, or updated
 type PodLoggingController struct {
 	informerFactory informers.SharedInformerFactory
 	podInformer     coreinformers.PodInformer
 }
 
+// Run starts shared informers and waits for the shared informer cache to
+// synchronize.
 func (c *PodLoggingController) Run(stopCh chan struct{}) error {
 	// Starts all the shared informers that have been created by the factory so
 	// far.
@@ -69,6 +73,7 @@ func (c *PodLoggingController) podDelete(obj interface{}) {
 	glog.Infof("POD DELETED: %s/%s", pod.Namespace, pod.Name)
 }
 
+// NewPodLoggingController creates a PodLoggingController
 func NewPodLoggingController(informerFactory informers.SharedInformerFactory) *PodLoggingController {
 	podInformer := informerFactory.Core().V1().Pods()
 
