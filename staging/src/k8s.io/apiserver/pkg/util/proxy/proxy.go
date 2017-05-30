@@ -41,13 +41,12 @@ func findServicePort(svc *v1.Service, port intstr.IntOrString) (*v1.ServicePort,
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
-func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.EndpointsLister, namespace, id string) (*url.URL, error) {
+func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.EndpointsLister, namespace, id string, port intstr.IntOrString) (*url.URL, error) {
 	svc, err := services.Services(namespace).Get(id)
 	if err != nil {
 		return nil, err
 	}
 
-	port := intstr.FromInt(443)
 	svcPort, err := findServicePort(svc, port)
 	if err != nil {
 		return nil, err
@@ -92,13 +91,11 @@ func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.Endpo
 	return nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
 }
 
-func ResolveCluster(services listersv1.ServiceLister, namespace, id string) (*url.URL, error) {
+func ResolveCluster(services listersv1.ServiceLister, namespace, id string, port intstr.IntOrString) (*url.URL, error) {
 	svc, err := services.Services(namespace).Get(id)
 	if err != nil {
 		return nil, err
 	}
-
-	port := intstr.FromInt(443)
 
 	switch {
 	case svc.Spec.Type == v1.ServiceTypeClusterIP && svc.Spec.ClusterIP == v1.ClusterIPNone:

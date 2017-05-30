@@ -115,5 +115,8 @@ message ServiceReference {
 
   // Name is the name of the service
   optional string name = 2;
+
+  // Port is either a numeric or a named port (default: 443)
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 3;
 }
 

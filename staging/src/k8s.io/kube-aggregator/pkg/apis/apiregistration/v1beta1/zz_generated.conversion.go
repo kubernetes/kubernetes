@@ -23,6 +23,7 @@ package v1beta1
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	unsafe "unsafe"
 )
@@ -193,6 +194,7 @@ func Convert_apiregistration_APIServiceStatus_To_v1beta1_APIServiceStatus(in *ap
 func autoConvert_v1beta1_ServiceReference_To_apiregistration_ServiceReference(in *ServiceReference, out *apiregistration.ServiceReference, s conversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
+	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
 	return nil
 }
 
@@ -204,6 +206,7 @@ func Convert_v1beta1_ServiceReference_To_apiregistration_ServiceReference(in *Se
 func autoConvert_apiregistration_ServiceReference_To_v1beta1_ServiceReference(in *apiregistration.ServiceReference, out *ServiceReference, s conversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
+	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
 	return nil
 }
 

@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -31,7 +32,6 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	"net/url"
 )
 
 type targetHTTPHandler struct {
@@ -83,7 +83,7 @@ type mockedRouter struct {
 	destinationHost string
 }
 
-func (r *mockedRouter) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+func (r *mockedRouter) ResolveEndpoint(service apiregistration.ServiceReference) (*url.URL, error) {
 	return &url.URL{
 		Scheme: "https",
 		Host:   r.destinationHost,

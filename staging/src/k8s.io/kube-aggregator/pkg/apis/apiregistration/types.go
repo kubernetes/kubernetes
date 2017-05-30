@@ -16,7 +16,10 @@ limitations under the License.
 
 package apiregistration
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
 
 // APIServiceList is a list of APIService objects.
 type APIServiceList struct {
@@ -32,6 +35,8 @@ type ServiceReference struct {
 	Namespace string
 	// Name is the name of the service
 	Name string
+	// Port is either a numeric or a named port (default: 443)
+	Port *intstr.IntOrString
 }
 
 // APIServiceSpec contains information for locating and communicating with a server.

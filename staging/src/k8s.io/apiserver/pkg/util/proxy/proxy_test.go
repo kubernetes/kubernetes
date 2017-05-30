@@ -46,6 +46,9 @@ func TestResolve(t *testing.T) {
 		}}
 	}
 
+	port8443 := intstr.FromInt(8443)
+	portHTTPS := intstr.FromString("https")
+
 	type expectation struct {
 		url   string
 		error bool
@@ -55,6 +58,7 @@ func TestResolve(t *testing.T) {
 		name      string
 		services  []*v1.Service
 		endpoints func(svc *v1.Service) []*v1.Endpoints
+		port      *intstr.IntOrString
 
 		clusterMode  expectation
 		endpointMode expectation
@@ -96,6 +100,48 @@ func TestResolve(t *testing.T) {
 			endpoints: matchingEndpoints,
 
 			clusterMode:  expectation{url: "https://hit:443"},
+			endpointMode: expectation{url: "https://127.0.0.1:1443"},
+		},
+		{
+			name: "cluster ip with custom numeric port",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
+					Spec: v1.ServiceSpec{
+						Type:      v1.ServiceTypeClusterIP,
+						ClusterIP: "hit",
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 8443, TargetPort: intstr.FromInt(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+						},
+					},
+				},
+			},
+			endpoints: matchingEndpoints,
+			port:      &port8443,
+
+			clusterMode:  expectation{url: "https://hit:8443"},
+			endpointMode: expectation{url: "https://127.0.0.1:1443"},
+		},
+		{
+			name: "cluster ip with custom named port",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
+					Spec: v1.ServiceSpec{
+						Type:      v1.ServiceTypeClusterIP,
+						ClusterIP: "hit",
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 8443, TargetPort: intstr.FromInt(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+						},
+					},
+				},
+			},
+			endpoints: matchingEndpoints,
+			port:      &portHTTPS,
+
+			clusterMode:  expectation{url: "https://hit:8443"},
 			endpointMode: expectation{url: "https://127.0.0.1:1443"},
 		},
 		{
@@ -234,10 +280,14 @@ func TestResolve(t *testing.T) {
 			}
 		}
 
-		clusterURL, err := ResolveCluster(serviceLister, "one", "alfa")
+		port := intstr.FromInt(443)
+		if test.port != nil {
+			port = *test.port // this is done by defaulting in the API
+		}
+		clusterURL, err := ResolveCluster(serviceLister, "one", "alfa", port)
 		check("cluster", test.clusterMode, clusterURL, err)
 
-		endpointURL, err := ResolveEndpoint(serviceLister, endpointLister, "one", "alfa")
+		endpointURL, err := ResolveEndpoint(serviceLister, endpointLister, "one", "alfa", port)
 		check("endpoint", test.endpointMode, endpointURL, err)
 	}
 }
