@@ -119,6 +119,22 @@ func TestResolve(t *testing.T) {
 			endpointMode: expectation{error: true},
 		},
 		{
+			name: "none cluster ip",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
+					Spec: v1.ServiceSpec{
+						Type:      v1.ServiceTypeClusterIP,
+						ClusterIP: v1.ClusterIPNone,
+					},
+				},
+			},
+			endpoints: nil,
+
+			clusterMode:  expectation{error: true},
+			endpointMode: expectation{error: true},
+		},
+		{
 			name: "loadbalancer",
 			services: []*v1.Service{
 				{
