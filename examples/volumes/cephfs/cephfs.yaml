@@ -20,4 +20,4 @@ spec:
       # path: /some/path/in/side/cephfs 
       user: admin
       secretFile: "/etc/ceph/admin.secret"
-      readOnly: true
+      readOnly: false
