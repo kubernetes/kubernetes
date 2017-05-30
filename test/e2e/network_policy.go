@@ -41,7 +41,7 @@ failed or succesfully connected as expected.
 var _ = framework.KubeDescribe("NetworkPolicy", func() {
 	f := framework.NewDefaultFramework("network-policy")
 
-	It("should support setting DefaultDeny namespace policy [Feature:NetworkPolicy]", func() {
+	It("should support a 'default-deny' policy [Feature:NetworkPolicy]", func() {
 		ns := f.Namespace
 
 		By("Create a simple server.")
@@ -52,11 +52,23 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// Create a pod with name 'client-can-connect', which should be able to communicate with server.
-		By("Creating client which will be able to contact the server since isolation is off.")
+		By("Creating client which will be able to contact the server since no policies are present.")
 		testCanConnect(f, ns, "client-can-connect", service, 80)
 
-		framework.Logf("Enabling network isolation.")
-		setNamespaceIsolation(f, ns, "DefaultDeny")
+		By("Creating a network policy denying all traffic.")
+		policy := &networking.NetworkPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "deny-all",
+			},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{},
+				Ingress:     []networking.NetworkPolicyIngressRule{},
+			},
+		}
+
+		policy, err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Create(policy)
+		Expect(err).NotTo(HaveOccurred())
+		defer cleanupNetworkPolicy(f, policy)
 
 		// Create a pod with name 'client-cannot-connect', which will attempt to comunicate with the server,
 		// but should not be able to now that isolation is on.
@@ -65,7 +77,6 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 
 	It("should enforce policy based on PodSelector [Feature:NetworkPolicy]", func() {
 		ns := f.Namespace
-		setNamespaceIsolation(f, ns, "DefaultDeny")
 
 		By("Creating a simple server.")
 		serverPod, service := createServerPodAndService(f, ns, "server", []int{80})
@@ -120,16 +131,10 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		err := framework.WaitForPodRunningInNamespace(f.ClientSet, serverPod)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Testing pods can connect to both ports when isolation is off.")
+		By("Testing pods can connect to both ports when no policy is present.")
 		testCanConnect(f, ns, "basecase-reachable-80", service, 80)
 		testCanConnect(f, ns, "basecase-reachable-81", service, 81)
 
-		setNamespaceIsolation(f, ns, "DefaultDeny")
-
-		By("Testing pods cannot by default when isolation is turned on.")
-		testCannotConnect(f, ns, "basecase-unreachable-80", service, 80)
-		testCannotConnect(f, ns, "basecase-unreachable-81", service, 81)
-
 		By("Creating a network policy for the Service which allows traffic only to one port.")
 		policy := &networking.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
@@ -154,50 +159,8 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		Expect(err).NotTo(HaveOccurred())
 		defer cleanupNetworkPolicy(f, policy)
 
+		By("Testing pods can connect only to the port allowed by the policy.")
 		testCannotConnect(f, ns, "client-a", service, 80)
-		testCanConnect(f, ns, "client-b", service, 81)
-	})
-
-	It("shouldn't enforce policy when isolation is off [Feature:NetworkPolicy]", func() {
-		ns := f.Namespace
-
-		// Create Server with Service
-		By("Creating a simple server.")
-		serverPod, service := createServerPodAndService(f, ns, "server", []int{80, 81})
-		defer cleanupServerPodAndService(f, serverPod, service)
-		framework.Logf("Waiting for Server to come up.")
-		err := framework.WaitForPodRunningInNamespace(f.ClientSet, serverPod)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Testing pods can connect to both ports when isolation is off and no policy is defined.")
-		testCanConnect(f, ns, "basecase-reachable-a", service, 80)
-		testCanConnect(f, ns, "basecase-reachable-b", service, 81)
-
-		By("Creating a network policy for the Service which allows traffic only to one port.")
-		policy := &networking.NetworkPolicy{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "allow-ingress-on-port-81",
-			},
-			Spec: networking.NetworkPolicySpec{
-				// Apply to server
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"pod-name": serverPod.Name,
-					},
-				},
-				// Allow traffic only to one port.
-				Ingress: []networking.NetworkPolicyIngressRule{{
-					Ports: []networking.NetworkPolicyPort{{
-						Port: &intstr.IntOrString{IntVal: 81},
-					}},
-				}},
-			},
-		}
-		policy, err = f.InternalClientset.Networking().NetworkPolicies(ns.Name).Create(policy)
-		Expect(err).NotTo(HaveOccurred())
-		defer cleanupNetworkPolicy(f, policy)
-
-		testCanConnect(f, ns, "client-a", service, 80)
 		testCanConnect(f, ns, "client-b", service, 81)
 	})
 
@@ -212,15 +175,9 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		err := framework.WaitForPodRunningInNamespace(f.ClientSet, serverPod)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Testing pods can connect to both ports when isolation is off.")
+		By("Testing pods can connect to both ports when no policy is present.")
 		testCanConnect(f, ns, "test-a", service, 80)
 		testCanConnect(f, ns, "test-b", service, 81)
-
-		setNamespaceIsolation(f, ns, "DefaultDeny")
-
-		By("Testing pods cannot connect to either port when no policy is defined.")
-		testCannotConnect(f, ns, "test-a-2", service, 80)
-		testCannotConnect(f, ns, "test-b-2", service, 81)
 
 		By("Creating a network policy for the Service which allows traffic only to one port.")
 		policy := &networking.NetworkPolicy{
@@ -270,6 +227,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		Expect(err).NotTo(HaveOccurred())
 		defer cleanupNetworkPolicy(f, policy2)
 
+		By("Testing pods can connect to both ports when both policies are present.")
 		testCanConnect(f, ns, "client-a", service, 80)
 		testCanConnect(f, ns, "client-b", service, 81)
 	})
@@ -285,15 +243,9 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		err := framework.WaitForPodRunningInNamespace(f.ClientSet, serverPod)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Testing pods can connect to both ports when isolation is off.")
+		By("Testing pods can connect to both ports when no policy is present.")
 		testCanConnect(f, ns, "test-a", service, 80)
 		testCanConnect(f, ns, "test-b", service, 81)
-
-		setNamespaceIsolation(f, ns, "DefaultDeny")
-
-		By("Testing pods cannot connect to either port when isolation is on.")
-		testCannotConnect(f, ns, "test-a", service, 80)
-		testCannotConnect(f, ns, "test-b", service, 81)
 
 		By("Creating a network policy which allows all traffic.")
 		policy := &networking.NetworkPolicy{
@@ -312,6 +264,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		Expect(err).NotTo(HaveOccurred())
 		defer cleanupNetworkPolicy(f, policy)
 
+		By("Testing pods can connect to both ports when an 'allow-all' policy is present.")
 		testCanConnect(f, ns, "client-a", service, 80)
 		testCanConnect(f, ns, "client-b", service, 81)
 	})
@@ -326,7 +279,6 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			"ns-name": nsBName,
 		})
 		Expect(err).NotTo(HaveOccurred())
-		setNamespaceIsolation(f, nsA, "DefaultDeny")
 
 		// Create Server with Service in NS-B
 		By("Creating a webserver tied to a service.")
@@ -508,30 +460,6 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 
 	Expect(err).NotTo(HaveOccurred())
 	return pod
-}
-
-// Configure namespace network isolation by setting the network-policy annotation
-// on the namespace.
-func setNamespaceIsolation(f *framework.Framework, namespace *v1.Namespace, ingressIsolation string) {
-	var annotations = map[string]string{}
-	if ingressIsolation != "" {
-		By(fmt.Sprintf("Enabling isolation through namespace annotations on namespace %v", namespace.Name))
-		policy := fmt.Sprintf(`{"ingress":{"isolation":"%s"}}`, ingressIsolation)
-		annotations["net.beta.kubernetes.io/network-policy"] = policy
-	} else {
-		By(fmt.Sprintf("Disabling isolation through namespace annotations on namespace %v", namespace.Name))
-		delete(annotations, "net.beta.kubernetes.io/network-policy")
-	}
-
-	// Update the namespace.  We set the resource version to be an empty
-	// string, this forces the update.  If we weren't to do this, we would
-	// either need to re-query the namespace, or update the namespace
-	// references with the one returned by the update.  This approach
-	// requires less plumbing.
-	namespace.ObjectMeta.Annotations = annotations
-	namespace.ObjectMeta.ResourceVersion = ""
-	_, err := f.ClientSet.Core().Namespaces().Update(namespace)
-	Expect(err).NotTo(HaveOccurred())
 }
 
 func cleanupNetworkPolicy(f *framework.Framework, policy *networking.NetworkPolicy) {
