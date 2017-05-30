@@ -20,7 +20,7 @@ spec:
       hostNetwork: true
       containers:
       - name: ip-masq-agent
-        image: gcr.io/google-containers/ip-masq-agent-amd64:v2.0.0
+        image: gcr.io/google-containers/ip-masq-agent-amd64:v2.0.1
         securityContext:
           privileged: true
         volumeMounts:
