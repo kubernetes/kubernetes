@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 )
@@ -116,15 +117,20 @@ type basicManager struct {
 	// basicManager is keeping secretManager up-to-date.
 	secretManager secret.Manager
 
+	// basicManager is keeping configMapManager up-to-date.
+	configMapManager configmap.Manager
+
 	// A mirror pod client to create/delete mirror pods.
 	MirrorClient
 }
 
 // NewBasicPodManager returns a functional Manager.
-func NewBasicPodManager(client MirrorClient, secretManager secret.Manager) Manager {
-	pm := &basicManager{}
-	pm.secretManager = secretManager
-	pm.MirrorClient = client
+func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, configMapManager configmap.Manager) Manager {
+	pm := &basicManager{
+		secretManager:    secretManager,
+		configMapManager: configMapManager,
+		MirrorClient:     client,
+	}
 	pm.SetPods(nil)
 	return pm
 }
@@ -163,6 +169,11 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 			// not register pod, as it doesn't really matter.
 			pm.secretManager.RegisterPod(pod)
 		}
+		if pm.configMapManager != nil {
+			// TODO: Consider detecting only status update and in such case do
+			// not register pod, as it doesn't really matter.
+			pm.configMapManager.RegisterPod(pod)
+		}
 		podFullName := kubecontainer.GetPodFullName(pod)
 		if IsMirrorPod(pod) {
 			pm.mirrorPodByUID[pod.UID] = pod
@@ -185,6 +196,9 @@ func (pm *basicManager) DeletePod(pod *v1.Pod) {
 	defer pm.lock.Unlock()
 	if pm.secretManager != nil {
 		pm.secretManager.UnregisterPod(pod)
+	}
+	if pm.configMapManager != nil {
+		pm.configMapManager.UnregisterPod(pod)
 	}
 	podFullName := kubecontainer.GetPodFullName(pod)
 	if IsMirrorPod(pod) {

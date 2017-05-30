@@ -42,13 +42,15 @@ const (
 
 // configMapPlugin implements the VolumePlugin interface.
 type configMapPlugin struct {
-	host volume.VolumeHost
+	host         volume.VolumeHost
+	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
 }
 
 var _ volume.VolumePlugin = &configMapPlugin{}
 
 func (plugin *configMapPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	plugin.getConfigMap = host.GetConfigMapFunc()
 	return nil
 }
 
@@ -89,7 +91,9 @@ func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts v
 		configMapVolume: &configMapVolume{spec.Name(), pod.UID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}},
 		source:          *spec.Volume.ConfigMap,
 		pod:             *pod,
-		opts:            &opts}, nil
+		opts:            &opts,
+		getConfigMap:    plugin.getConfigMap,
+	}, nil
 }
 
 func (plugin *configMapPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -126,9 +130,10 @@ func (sv *configMapVolume) GetPath() string {
 type configMapVolumeMounter struct {
 	*configMapVolume
 
-	source v1.ConfigMapVolumeSource
-	pod    v1.Pod
-	opts   *volume.VolumeOptions
+	source       v1.ConfigMapVolumeSource
+	pod          v1.Pod
+	opts         *volume.VolumeOptions
+	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
 }
 
 var _ volume.Mounter = &configMapVolumeMounter{}
@@ -180,7 +185,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID)
 	}
 
 	optional := b.source.Optional != nil && *b.source.Optional
-	configMap, err := kubeClient.Core().ConfigMaps(b.pod.Namespace).Get(b.source.Name, metav1.GetOptions{})
+	configMap, err := b.getConfigMap(b.pod.Namespace, b.source.Name)
 	if err != nil {
 		if !(errors.IsNotFound(err) && optional) {
 			glog.Errorf("Couldn't get configMap %v/%v: %v", b.pod.Namespace, b.source.Name, err)
