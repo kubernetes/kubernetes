@@ -366,6 +366,7 @@ func updatePatchIfMissing(original, modified, patch map[string]interface{}, diff
 	}
 }
 
+// validateMergeKeyInLists checks if each map in the list has the mentryerge key.
 func validateMergeKeyInLists(mergeKey string, lists ...[]interface{}) error {
 	for _, list := range lists {
 		for _, item := range list {
@@ -381,11 +382,14 @@ func validateMergeKeyInLists(mergeKey string, lists ...[]interface{}) error {
 	return nil
 }
 
-// sortSliceByMultipleOrders sort `patch` list by patchOrder and
-// sort `serverOnly` list by serverOrder.
-// Then it merges the 2 sorted lists by serverOrder with best effort.
+// normalizeElementOrder sort `patch` list by `patchOrder` and sort `serverOnly` list by `serverOrder`.
+// Then it merges the 2 sorted lists.
 // It guarantee the relative order in the patch list and in the serverOnly list is kept.
-func sortSliceByMultipleOrders(patch, serverOnly, patchOrder, serverOrder []interface{}, mergeKey string, kind reflect.Kind) ([]interface{}, error) {
+// `patch` is a list of items in the patch, and `serverOnly` is a list of items in the live object.
+// `patchOrder` is the order we want `patch` list to have and
+// `serverOrder` is the order we want `serverOnly` list to have.
+// kind is the kind of each item in the lists `patch` and `serverOnly`.
+func normalizeElementOrder(patch, serverOnly, patchOrder, serverOrder []interface{}, mergeKey string, kind reflect.Kind) ([]interface{}, error) {
 	patch, err := sortSliceByOneOrder(patch, patchOrder, mergeKey, kind)
 	if err != nil {
 		return nil, err
@@ -400,8 +404,17 @@ func sortSliceByMultipleOrders(patch, serverOnly, patchOrder, serverOrder []inte
 }
 
 // mergeSortedSlice merges the 2 sorted lists by serverOrder with best effort.
+// It will insert each item in `left` list to `right` list. In most cases, the 2 lists will be interleaved.
+// The relative order of left and right are guaranteed to be kept.
+// They have higher precedence than the order in the live list.
+// The place for a item in `left` is found by:
+// scan from the place of last insertion in `right` to the end of `right`,
+// the place is before the first item that is greater than the item we want to insert.
+// example usage: using server-only items as left and patch items as right. We insert server-only items
+// to patch list. We use the order of live object as record for comparision.
 func mergeSortedSlice(left, right, serverOrder []interface{}, mergeKey string, kind reflect.Kind) []interface{} {
-	// returns if l is less than r, and if both have been found.
+	// Returns if l is less than r, and if both have been found.
+	// If l and r both present and l is in front of r, l is less than r.
 	less := func(l, r interface{}) (bool, bool) {
 		li := index(serverOrder, l, mergeKey, kind)
 		ri := index(serverOrder, r, mergeKey, kind)
@@ -412,18 +425,22 @@ func mergeSortedSlice(left, right, serverOrder []interface{}, mergeKey string, k
 		}
 	}
 
+	// left and right should be non-overlapping.
 	size := len(left) + len(right)
 	i, j := 0, 0
 	s := make([]interface{}, size, size)
 
 	for k := 0; k < size; k++ {
 		if i >= len(left) && j < len(right) {
+			// have items left in `right` list
 			s[k] = right[j]
 			j++
 		} else if j >= len(right) && i < len(left) {
+			// have items left in `left` list
 			s[k] = left[i]
 			i++
 		} else {
+			// compare them if i and j are both in bound
 			less, foundBoth := less(left[i], right[j])
 			if foundBoth && less {
 				s[k] = left[i]
@@ -441,10 +458,16 @@ func mergeSortedSlice(left, right, serverOrder []interface{}, mergeKey string, k
 // l must NOT be a slice of slices, this should be checked before calling.
 func index(l []interface{}, valToLookUp interface{}, mergeKey string, kind reflect.Kind) int {
 	var getValFn func(interface{}) interface{}
+	// Get the correct `getValFn` based on item `kind`.
+	// It should return the value of merge key for maps and
+	// return the item for other kinds.
 	switch kind {
 	case reflect.Map:
 		getValFn = func(item interface{}) interface{} {
-			typedItem := item.(map[string]interface{})
+			typedItem, ok := item.(map[string]interface{})
+			if !ok {
+				return nil
+			}
 			val := typedItem[mergeKey]
 			return val
 		}
@@ -1039,14 +1062,21 @@ func applyRetainKeysDirective(original, patch map[string]interface{}, options Me
 // When not merging the directive, it will make sure $setElementOrder list exist only in original.
 // When merging the directive, it will try to find the $setElementOrder list and
 // its corresponding patch list, validate it and merge it.
-// Then, sort them by the relative in setElementOrder > patch list > live list.
+// Then, sort them by the relative order in setElementOrder, patch list and live list.
+// The precedence is $setElementOrder > order in patch list > order in live list.
 // Ref: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/preserve-order-in-strategic-merge-patch.md
 func processSetElementOrderList(original, patch map[string]interface{}, t reflect.Type, mergeOptions MergeOptions) error {
 	for key, patchV := range patch {
+		// Do nothing if there is no ordering directive
 		if !strings.HasPrefix(key, setElementOrderDirectivePrefix) {
 			continue
 		}
 
+		// When not merging the directive,
+		// - if both original and patch have $setElementOrder,
+		//   we make sure they are the same and the $setElementOrder list only exists in original.
+		// - $setElementOrder exists only in patch, move it to original.
+		// - $setElementOrder exists only in original, do nothing.
 		if !mergeOptions.MergeParallelList {
 			setElementOrderListInOriginal, ok := original[key]
 			if ok {
@@ -1072,10 +1102,12 @@ func processSetElementOrderList(original, patch map[string]interface{}, t reflec
 		if !ok {
 			return mergepatch.ErrBadArgType(typedSetElementOrderList, patchV)
 		}
+		// Trim the setElementOrderDirectivePrefix to get the original key.
 		originalKey, err := extractKey(key, setElementOrderDirectivePrefix)
 		if err != nil {
 			return err
 		}
+		// try to find the list with `originalKey` in `original` and `modified` and merge them.
 		originalList, foundOriginal := original[originalKey]
 		patchList, foundPatch := patch[originalKey]
 		if foundOriginal {
@@ -1120,6 +1152,7 @@ func processSetElementOrderList(original, patch map[string]interface{}, t reflec
 			return nil
 		}
 
+		// Split all items into patch items and server-only items and then enforce the order.
 		var patchItems, serverOnlyItems []interface{}
 		if len(mergeKey) == 0 {
 			patchItems, serverOnlyItems = extractServerOnlyItemsFromListOfPrimitives(merged, typedSetElementOrderList)
@@ -1139,7 +1172,7 @@ func processSetElementOrderList(original, patch map[string]interface{}, t reflec
 		// sort merged list
 		// typedSetElementOrderList contains all the relative order in typedPatchList,
 		// so don't need to use typedPatchList
-		both, err := sortSliceByMultipleOrders(patchItems, serverOnlyItems, typedSetElementOrderList, typedOriginalList, mergeKey, kind)
+		both, err := normalizeElementOrder(patchItems, serverOnlyItems, typedSetElementOrderList, typedOriginalList, mergeKey, kind)
 		if err != nil {
 			return err
 		}
@@ -1381,7 +1414,7 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 			return nil, err
 		}
 	}
-	return sortSliceByMultipleOrders(patchItems, serverOnlyItems, patch, original, mergeKey, kind)
+	return normalizeElementOrder(patchItems, serverOnlyItems, patch, original, mergeKey, kind)
 }
 
 // mergeSliceWithSpecialElements handles special elements with directiveMarker

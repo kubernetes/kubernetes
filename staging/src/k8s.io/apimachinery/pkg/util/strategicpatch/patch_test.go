@@ -1084,7 +1084,7 @@ testCases:
       value: b
       retainKeysMap:
         name: foo
-  - description: retainKeys map with no change should not present
+  - description: retainKeys map with no change should not be present
     original:
       name: a
       retainKeysMap:
@@ -1573,7 +1573,7 @@ mergingList:
 		},
 	},
 	{
-		Description: "add duplicate item in merging list",
+		Description: "add an item that already exists in current object in merging list",
 		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
 			Original: []byte(`
 mergingList:
@@ -2704,6 +2704,7 @@ mergingList:
 `),
 		},
 	},
+
 	{
 		Description: "add field to map in merging list nested in merging list with deletion conflict",
 		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
@@ -2722,8 +2723,8 @@ $setElementOrder/mergingList:
   - name: 2
 mergingList:
   - $setElementOrder/mergingList:
-      - name: 1
       - name: 2
+      - name: 1
     name: 1
     mergingList:
       - name: 1
@@ -2733,10 +2734,10 @@ mergingList:
 mergingList:
   - name: 1
     mergingList:
-      - name: 1
-        value: 1
       - name: 2
         value: 2
+      - name: 1
+        value: 1
   - name: 2
 `),
 			Current: []byte(`
@@ -2756,8 +2757,8 @@ $setElementOrder/mergingList:
   - name: 2
 mergingList:
   - $setElementOrder/mergingList:
-      - name: 1
       - name: 2
+      - name: 1
     name: 1
     mergingList:
       - name: 1
@@ -2768,11 +2769,11 @@ mergingList:
   - name: 1
     other: a
     mergingList:
-      - name: 1
-        value: 1
       - name: 2
         value: 2
         other: d
+      - name: 1
+        value: 1
   - name: 2
     other: b
 `),
@@ -4106,6 +4107,140 @@ mergingIntList:
   - 8
   - 4
   - 3
+`),
+		},
+	},
+	{
+		// This test case is used just to demonstrate the behavior when dealing with a list with duplicate
+		Description: "behavior of set element order for a merging list with duplicate",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: dup1
+- name: 3
+- name: 2
+  value: dup2
+- name: 4
+`),
+			Current: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: dup1
+- name: 3
+- name: 2
+  value: dup2
+- name: 4
+`),
+			Modified: []byte(`
+mergingList:
+- name: 2
+  value: dup1
+- name: 1
+- name: 4
+- name: 3
+- name: 2
+  value: dup2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+- name: 2
+- name: 1
+- name: 4
+- name: 3
+- name: 2
+`),
+			TwoWayResult: []byte(`
+mergingList:
+- name: 2
+  value: dup1
+- name: 2
+  value: dup2
+- name: 1
+- name: 4
+- name: 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+- name: 2
+- name: 1
+- name: 4
+- name: 3
+- name: 2
+`),
+			Result: []byte(`
+mergingList:
+- name: 2
+  value: dup1
+- name: 2
+  value: dup2
+- name: 1
+- name: 4
+- name: 3
+`),
+		},
+	},
+	{
+		// This test case is used just to demonstrate the behavior when dealing with a list with duplicate
+		Description: "behavior of set element order for a merging int list with duplicate",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+- 1
+- 2
+- 3
+- 2
+- 4
+`),
+			Current: []byte(`
+mergingIntList:
+- 1
+- 2
+- 3
+- 2
+- 4
+`),
+			Modified: []byte(`
+mergingIntList:
+- 2
+- 1
+- 4
+- 3
+- 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+- 2
+- 1
+- 4
+- 3
+- 2
+`),
+			TwoWayResult: []byte(`
+mergingIntList:
+- 2
+- 2
+- 1
+- 4
+- 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+- 2
+- 1
+- 4
+- 3
+- 2
+`),
+			Result: []byte(`
+mergingIntList:
+- 2
+- 2
+- 1
+- 4
+- 3
 `),
 		},
 	},
@@ -6041,7 +6176,7 @@ func testPatchApplication(t *testing.T, original, patch, expected []byte, descri
 		if err != nil && strings.Contains(err.Error(), expectedError) {
 			return
 		}
-		t.Errorf("expected error should contains:\n%s\nin test case: %s\nbut got:\n%s\n", expectedError, description, err)
+		t.Errorf("expected error should contain:\n%s\nin test case: %s\nbut got:\n%s\n", expectedError, description, err)
 	}
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot apply patch:\n%s\nto original:\n%s\n",
