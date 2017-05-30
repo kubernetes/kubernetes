@@ -26,6 +26,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
@@ -3420,13 +3421,13 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 func TestVolumeZonePredicate(t *testing.T) {
 	pvInfo := FakePersistentVolumeInfo{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{metav1.LabelZoneFailureDomain: "zone_1"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "zone_1"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{metav1.LabelZoneRegion: "zone_2", "uselessLabel": "none"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{kubeletapis.LabelZoneRegion: "zone_2", "uselessLabel": "none"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{metav1.LabelZoneRegion: "zone_3"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{kubeletapis.LabelZoneRegion: "zone_3"}},
 		},
 	}
 
@@ -3463,7 +3464,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{metav1.LabelZoneFailureDomain: "zone_1"},
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "zone_1"},
 				},
 			},
 			Fits: true,
@@ -3484,7 +3485,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{metav1.LabelZoneFailureDomain: "zone_1", "uselessLabel": "none"},
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "zone_1", "uselessLabel": "none"},
 				},
 			},
 			Fits: true,
@@ -3495,7 +3496,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{metav1.LabelZoneRegion: "zone_2", "uselessLabel": "none"},
+					Labels: map[string]string{kubeletapis.LabelZoneRegion: "zone_2", "uselessLabel": "none"},
 				},
 			},
 			Fits: true,
@@ -3506,7 +3507,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{metav1.LabelZoneRegion: "no_zone_2", "uselessLabel": "none"},
+					Labels: map[string]string{kubeletapis.LabelZoneRegion: "no_zone_2", "uselessLabel": "none"},
 				},
 			},
 			Fits: false,
@@ -3517,7 +3518,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{metav1.LabelZoneFailureDomain: "no_zone_1", "uselessLabel": "none"},
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "no_zone_1", "uselessLabel": "none"},
 				},
 			},
 			Fits: false,

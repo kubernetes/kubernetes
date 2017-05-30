@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
@@ -1163,10 +1164,7 @@ func getNodeExternalIP(node *api.Node) string {
 // * a kubeadm.alpha.kubernetes.io/role label
 // If no role is found, ("", nil) is returned
 func findNodeRole(node *api.Node) string {
-	if role := node.Labels[metav1.NodeLabelRole]; role != "" {
-		return role
-	}
-	if role := node.Labels[metav1.NodeLabelKubeadmAlphaRole]; role != "" {
+	if role := node.Labels[kubeadm.NodeLabelKubeadmAlphaRole]; role != "" {
 		return role
 	}
 	// No role found

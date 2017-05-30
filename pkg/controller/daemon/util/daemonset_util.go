@@ -26,6 +26,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 // GetPodTemplateWithHash returns copy of provided template with additional
@@ -38,7 +39,7 @@ func GetPodTemplateWithGeneration(template v1.PodTemplateSpec, generation int64)
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns not ready.
 	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
-		Key:      metav1.TaintNodeNotReady,
+		Key:      algorithm.TaintNodeNotReady,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
@@ -48,7 +49,7 @@ func GetPodTemplateWithGeneration(template v1.PodTemplateSpec, generation int64)
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns unreachable.
 	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
-		Key:      metav1.TaintNodeUnreachable,
+		Key:      algorithm.TaintNodeUnreachable,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})

@@ -36,6 +36,8 @@ import (
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/node/testutil"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 // This test checks that the node is deleted when kubelet stops reporting
@@ -147,7 +149,7 @@ func TestNodeInitialized(t *testing.T) {
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
 						{
-							Key:    metav1.TaintExternalCloudProvider,
+							Key:    algorithm.TaintExternalCloudProvider,
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},
@@ -294,7 +296,7 @@ func TestGCECondition(t *testing.T) {
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
 						{
-							Key:    metav1.TaintExternalCloudProvider,
+							Key:    algorithm.TaintExternalCloudProvider,
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},
@@ -386,7 +388,7 @@ func TestZoneInitialized(t *testing.T) {
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
 						{
-							Key:    metav1.TaintExternalCloudProvider,
+							Key:    algorithm.TaintExternalCloudProvider,
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},
@@ -446,11 +448,11 @@ func TestZoneInitialized(t *testing.T) {
 		t.Errorf("Node label for Region and Zone were not set")
 	}
 
-	if fnh.UpdatedNodes[0].ObjectMeta.Labels[metav1.LabelZoneRegion] != "us-west" {
+	if fnh.UpdatedNodes[0].ObjectMeta.Labels[kubeletapis.LabelZoneRegion] != "us-west" {
 		t.Errorf("Node Region not correctly updated")
 	}
 
-	if fnh.UpdatedNodes[0].ObjectMeta.Labels[metav1.LabelZoneFailureDomain] != "us-west-1a" {
+	if fnh.UpdatedNodes[0].ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain] != "us-west-1a" {
 		t.Errorf("Node FailureDomain not correctly updated")
 	}
 }
@@ -484,7 +486,7 @@ func TestNodeAddresses(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 						{
-							Key:    metav1.TaintExternalCloudProvider,
+							Key:    algorithm.TaintExternalCloudProvider,
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},
@@ -576,7 +578,7 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{},
 					Annotations: map[string]string{
-						metav1.AnnotationProvidedIPAddr: "10.0.0.1",
+						kubeletapis.AnnotationProvidedIPAddr: "10.0.0.1",
 					},
 				},
 				Status: v1.NodeStatus{
@@ -603,7 +605,7 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 						{
-							Key:    metav1.TaintExternalCloudProvider,
+							Key:    algorithm.TaintExternalCloudProvider,
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},
