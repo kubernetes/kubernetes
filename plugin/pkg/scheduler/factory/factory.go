@@ -378,6 +378,11 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 			}
 		}
 	}
+	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
+	// Give it higher precedence than scheduler CLI configuration when it is provided.
+	if policy.HardPodAffinitySymmetricWeight != 0 {
+		f.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
+	}
 	return f.CreateFromKeys(predicateKeys, priorityKeys, extenders)
 }
 
@@ -385,8 +390,8 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*scheduler.Config, error) {
 	glog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
 
-	if f.GetHardPodAffinitySymmetricWeight() < 0 || f.GetHardPodAffinitySymmetricWeight() > 100 {
-		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 0-100", f.GetHardPodAffinitySymmetricWeight())
+	if f.GetHardPodAffinitySymmetricWeight() < 1 || f.GetHardPodAffinitySymmetricWeight() > 100 {
+		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100", f.GetHardPodAffinitySymmetricWeight())
 	}
 
 	predicateFuncs, err := f.GetPredicates(predicateKeys)
