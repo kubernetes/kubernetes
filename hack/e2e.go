@@ -112,7 +112,7 @@ func (t tester) lookKubetest() (string, error) {
 		p := filepath.Join(t.goPath, "bin", "kubetest")
 		_, err := t.stat(p)
 		if err == nil {
-			return p, err
+			return p, nil
 		}
 	}
 
