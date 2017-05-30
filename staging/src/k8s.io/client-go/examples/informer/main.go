@@ -58,15 +58,6 @@ func main() {
 
 	informer := factory.Core().V1().Pods().Informer()
 
-	stop := make(chan struct{})
-	defer close(stop)
-
-	// the controller run starts the event processing loop
-	go informer.Run(stop)
-
-	// wait until a store finished its initial synchronization
-	cache.WaitForCacheSync(stop, informer.HasSynced)
-
 	informer.AddEventHandler(
 		// Your custom resource event handlers.
 		cache.ResourceEventHandlerFuncs{
@@ -76,7 +67,6 @@ func main() {
 				glog.Infof("POD CREATED: %s/%s", pod.Namespace, pod.Name)
 			},
 			// Called on resource update and every resyncPeriod on existing resources.
-			// The Generation will not change unless the Pod has changed.
 			UpdateFunc: func(old, new interface{}) {
 				oldPod := old.(*v1.Pod)
 				newPod := new.(*v1.Pod)
@@ -92,6 +82,16 @@ func main() {
 			},
 		},
 	)
+
+	stop := make(chan struct{})
+	defer close(stop)
+
+	// Starts all the shared informers that have been created by the factory so
+	// far.
+	factory.Start(stop)
+
+	// wait for the initial synchronization of the local cache.
+	cache.WaitForCacheSync(stop, informer.HasSynced)
 
 	select {}
 }
