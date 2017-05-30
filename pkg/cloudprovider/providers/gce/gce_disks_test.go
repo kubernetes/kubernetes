@@ -22,8 +22,8 @@ import (
 	"fmt"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 func TestCreateDisk_Basic(t *testing.T) {
@@ -301,12 +301,12 @@ func TestGetAutoLabelsForPD_Basic(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if labels[metav1.LabelZoneFailureDomain] != zone {
+	if labels[kubeletapis.LabelZoneFailureDomain] != zone {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
-			labels[metav1.LabelZoneFailureDomain], zone)
+			labels[kubeletapis.LabelZoneFailureDomain], zone)
 	}
-	if labels[metav1.LabelZoneRegion] != "us-central1" {
-		t.Errorf("Region is '%v', but zone is 'us-central1'", labels[metav1.LabelZoneRegion])
+	if labels[kubeletapis.LabelZoneRegion] != "us-central1" {
+		t.Errorf("Region is '%v', but zone is 'us-central1'", labels[kubeletapis.LabelZoneRegion])
 	}
 }
 
@@ -327,12 +327,12 @@ func TestGetAutoLabelsForPD_NoZone(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if labels[metav1.LabelZoneFailureDomain] != zone {
+	if labels[kubeletapis.LabelZoneFailureDomain] != zone {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
-			labels[metav1.LabelZoneFailureDomain], zone)
+			labels[kubeletapis.LabelZoneFailureDomain], zone)
 	}
-	if labels[metav1.LabelZoneRegion] != "europe-west1" {
-		t.Errorf("Region is '%v', but zone is 'europe-west1'", labels[metav1.LabelZoneRegion])
+	if labels[kubeletapis.LabelZoneRegion] != "europe-west1" {
+		t.Errorf("Region is '%v', but zone is 'europe-west1'", labels[kubeletapis.LabelZoneRegion])
 	}
 }
 
@@ -387,12 +387,12 @@ func TestGetAutoLabelsForPD_DupDisk(t *testing.T) {
 	if err != nil {
 		t.Error("Disk name and zone uniquely identifies a disk, yet an error is returned.")
 	}
-	if labels[metav1.LabelZoneFailureDomain] != zone {
+	if labels[kubeletapis.LabelZoneFailureDomain] != zone {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
-			labels[metav1.LabelZoneFailureDomain], zone)
+			labels[kubeletapis.LabelZoneFailureDomain], zone)
 	}
-	if labels[metav1.LabelZoneRegion] != "us-west1" {
-		t.Errorf("Region is '%v', but zone is 'us-west1'", labels[metav1.LabelZoneRegion])
+	if labels[kubeletapis.LabelZoneRegion] != "us-west1" {
+		t.Errorf("Region is '%v', but zone is 'us-west1'", labels[kubeletapis.LabelZoneRegion])
 	}
 }
 

@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 var (
@@ -61,13 +62,13 @@ var (
 
 var (
 	nodeNotReady = []v1.Taint{{
-		Key:       metav1.TaintNodeNotReady,
+		Key:       algorithm.TaintNodeNotReady,
 		Effect:    v1.TaintEffectNoExecute,
 		TimeAdded: metav1.Now(),
 	}}
 
 	nodeUnreachable = []v1.Taint{{
-		Key:       metav1.TaintNodeUnreachable,
+		Key:       algorithm.TaintNodeUnreachable,
 		Effect:    v1.TaintEffectNoExecute,
 		TimeAdded: metav1.Now(),
 	}}

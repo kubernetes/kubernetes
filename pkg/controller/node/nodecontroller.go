@@ -53,6 +53,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 
 	"github.com/golang/glog"
 )
@@ -71,12 +72,12 @@ var (
 	podStatusReconciliationVersion = utilversion.MustParseSemantic("v1.2.0")
 
 	UnreachableTaintTemplate = &v1.Taint{
-		Key:    metav1.TaintNodeUnreachable,
+		Key:    algorithm.TaintNodeUnreachable,
 		Effect: v1.TaintEffectNoExecute,
 	}
 
 	NotReadyTaintTemplate = &v1.Taint{
-		Key:    metav1.TaintNodeNotReady,
+		Key:    algorithm.TaintNodeNotReady,
 		Effect: v1.TaintEffectNoExecute,
 	}
 )

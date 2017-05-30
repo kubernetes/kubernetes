@@ -39,6 +39,7 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/cloudprovider/providers/vsphere:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",

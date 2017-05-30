@@ -36,6 +36,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
@@ -413,7 +414,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 
 	nodeConstraints := make(map[string]string)
 	for k, v := range node.ObjectMeta.Labels {
-		if k != metav1.LabelZoneFailureDomain && k != metav1.LabelZoneRegion {
+		if k != kubeletapis.LabelZoneFailureDomain && k != kubeletapis.LabelZoneRegion {
 			continue
 		}
 		nodeConstraints[k] = v
@@ -459,7 +460,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 			}
 
 			for k, v := range pv.ObjectMeta.Labels {
-				if k != metav1.LabelZoneFailureDomain && k != metav1.LabelZoneRegion {
+				if k != kubeletapis.LabelZoneFailureDomain && k != kubeletapis.LabelZoneRegion {
 					continue
 				}
 				nodeV, _ := nodeConstraints[k]

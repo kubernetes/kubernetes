@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -47,7 +48,7 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 		}
 		// The node may appear to have no labels at first,
 		// so we wait for it to get hostname label.
-		_, found := n.ObjectMeta.Labels[metav1.LabelHostname]
+		_, found := n.ObjectMeta.Labels[kubeletapis.LabelHostname]
 		return found, nil
 	})
 
