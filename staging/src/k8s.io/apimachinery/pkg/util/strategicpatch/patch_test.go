@@ -4919,6 +4919,9 @@ retainKeysMap:
     - mergingIntList
     - name
     - value
+  $setElementOrder/mergingIntList:
+    - 1
+    - 2
   value: bar
 `),
 			Result: []byte(`
@@ -4960,6 +4963,10 @@ retainKeysMap:
 `),
 			TwoWay: []byte(`
 retainKeysMap:
+  $setElementOrder/mergingIntList:
+    - 1
+    - 2
+    - 4
   $retainKeys:
     - mergingIntList
     - name
@@ -4968,6 +4975,10 @@ retainKeysMap:
 `),
 			ThreeWay: []byte(`
 retainKeysMap:
+  $setElementOrder/mergingIntList:
+    - 1
+    - 2
+    - 4
   $retainKeys:
     - mergingIntList
     - name
@@ -4980,8 +4991,8 @@ retainKeysMap:
   mergingIntList:
   - 1
   - 2
-  - 3
   - 4
+  - 3
 `),
 		},
 	},
@@ -5019,6 +5030,9 @@ retainKeysMap:
     - name
   $deleteFromPrimitiveList/mergingIntList:
   - 2
+  $setElementOrder/mergingIntList:
+    - 1
+    - 3
 `),
 			ThreeWay: []byte(`
 retainKeysMap:
@@ -5027,6 +5041,9 @@ retainKeysMap:
     - name
   $deleteFromPrimitiveList/mergingIntList:
   - 2
+  $setElementOrder/mergingIntList:
+    - 1
+    - 3
 `),
 			Result: []byte(`
 retainKeysMap:
@@ -5075,6 +5092,10 @@ retainKeysMap:
   - 5
   $deleteFromPrimitiveList/mergingIntList:
   - 2
+  $setElementOrder/mergingIntList:
+    - 1
+    - 3
+    - 5
 `),
 			ThreeWay: []byte(`
 retainKeysMap:
@@ -5085,6 +5106,10 @@ retainKeysMap:
   - 5
   $deleteFromPrimitiveList/mergingIntList:
   - 2
+  $setElementOrder/mergingIntList:
+    - 1
+    - 3
+    - 5
 `),
 			Result: []byte(`
 retainKeysMap:
@@ -5092,8 +5117,8 @@ retainKeysMap:
   mergingIntList:
   - 1
   - 3
-  - 4
   - 5
+  - 4
 `),
 		},
 	},
@@ -5178,6 +5203,9 @@ retainKeysMap:
     - mergingList
     - name
     - value
+  $setElementOrder/mergingList:
+    - name: a
+    - name: b
   value: bar
 `),
 			Result: []byte(`
@@ -5222,6 +5250,10 @@ retainKeysMap:
   $retainKeys:
     - mergingList
     - name
+  $setElementOrder/mergingList:
+    - name: a
+    - name: b
+    - name: c
   mergingList:
   - name: c
 `),
@@ -5230,6 +5262,10 @@ retainKeysMap:
   $retainKeys:
     - mergingList
     - name
+  $setElementOrder/mergingList:
+    - name: a
+    - name: b
+    - name: c
   mergingList:
   - name: c
 `),
@@ -5277,6 +5313,9 @@ retainKeysMap:
   $retainKeys:
     - mergingList
     - name
+  $setElementOrder/mergingList:
+    - name: a
+    - name: b
   mergingList:
   - name: b
     value: bar
@@ -5286,6 +5325,9 @@ retainKeysMap:
   $retainKeys:
     - mergingList
     - name
+  $setElementOrder/mergingList:
+    - name: a
+    - name: b
   mergingList:
   - name: b
     value: bar
@@ -5375,6 +5417,8 @@ retainKeysMap:
   $retainKeys:
     - mergingList
     - name
+  $setElementOrder/mergingList:
+    - name: a
   mergingList:
   - name: b
     $patch: delete
@@ -5384,6 +5428,8 @@ retainKeysMap:
   $retainKeys:
     - mergingList
     - name
+  $setElementOrder/mergingList:
+    - name: a
   mergingList:
   - name: b
     $patch: delete
@@ -5421,6 +5467,9 @@ retainKeysMergingList:
 `),
 			TwoWay: []byte(`{}`),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5458,6 +5507,9 @@ retainKeysMergingList:
   value: modified
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5466,6 +5518,9 @@ retainKeysMergingList:
   value: modified
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5504,6 +5559,9 @@ retainKeysMergingList:
   value: new
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5512,6 +5570,9 @@ retainKeysMergingList:
   value: new
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5550,6 +5611,9 @@ retainKeysMergingList:
   value: new
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5558,6 +5622,9 @@ retainKeysMergingList:
   value: new
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5593,6 +5660,9 @@ retainKeysMergingList:
   value: a
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5601,6 +5671,9 @@ retainKeysMergingList:
   value: a
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5637,6 +5710,9 @@ retainKeysMergingList:
   value: a
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5645,6 +5721,9 @@ retainKeysMergingList:
   value: a
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5681,6 +5760,9 @@ retainKeysMergingList:
 - name: foo
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5688,6 +5770,9 @@ retainKeysMergingList:
   value: null
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5723,6 +5808,9 @@ retainKeysMergingList:
 - name: foo
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -5730,6 +5818,9 @@ retainKeysMergingList:
   value: null
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name

@@ -1015,7 +1015,8 @@ func applyRetainKeysDirective(original, patch map[string]interface{}, options Me
 		m[v] = struct{}{}
 	}
 	for k, v := range patch {
-		if v == nil || strings.HasPrefix(k, deleteFromPrimitiveListDirectivePrefix) {
+		if v == nil || strings.HasPrefix(k, deleteFromPrimitiveListDirectivePrefix) ||
+			strings.HasPrefix(k, setElementOrderDirectivePrefix) {
 			continue
 		}
 		// If there is an item present in the patch but not in the retainKeys list,
