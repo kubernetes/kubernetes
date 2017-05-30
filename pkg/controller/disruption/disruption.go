@@ -421,6 +421,8 @@ func (dc *DisruptionController) getPdbForPod(pod *v1.Pod) *policy.PodDisruptionB
 	return pdbs[0]
 }
 
+// This function returns pods using the PodDisruptionBudget object.
+// IMPORTANT NOTE : the returned pods should NOT be modified.
 func (dc *DisruptionController) getPodsForPdb(pdb *policy.PodDisruptionBudget) ([]*v1.Pod, error) {
 	sel, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
 	if sel.Empty() {
@@ -433,12 +435,7 @@ func (dc *DisruptionController) getPodsForPdb(pdb *policy.PodDisruptionBudget) (
 	if err != nil {
 		return []*v1.Pod{}, err
 	}
-	// TODO: Do we need to copy here?
-	result := make([]*v1.Pod, 0, len(pods))
-	for i := range pods {
-		result = append(result, &(*pods[i]))
-	}
-	return result, nil
+	return pods, nil
 }
 
 func (dc *DisruptionController) worker() {

@@ -89,6 +89,7 @@ func TestWriteStaticPodManifests(t *testing.T) {
 				t.Errorf("WriteStaticPodManifests: %v", err)
 				continue
 			}
+			defer manifest.Close()
 
 			var pod api.Pod
 			d := yaml.NewYAMLOrJSONDecoder(manifest, 4096)

@@ -225,7 +225,7 @@ message DeploymentStrategy {
 }
 
 message RollbackConfig {
-  // The revision to rollback to. If set to 0, rollbck to the last revision.
+  // The revision to rollback to. If set to 0, rollback to the last revision.
   // +optional
   optional int64 revision = 1;
 }

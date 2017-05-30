@@ -31,6 +31,7 @@ type connection interface {
 	CheckEtcdServers() (bool, error)
 }
 
+// EtcdConnection holds the Etcd server list
 type EtcdConnection struct {
 	ServerList []string
 }
@@ -44,19 +45,19 @@ func (EtcdConnection) serverReachable(address string) bool {
 }
 
 func parseServerURI(serverURI string) (string, error) {
-	connUrl, err := url.Parse(serverURI)
+	connURL, err := url.Parse(serverURI)
 	if err != nil {
 		return "", fmt.Errorf("unable to parse etcd url: %v", err)
 	}
-	return connUrl.Host, nil
+	return connURL.Host, nil
 }
 
 // CheckEtcdServers will attempt to reach all etcd servers once. If any
 // can be reached, return true.
 func (con EtcdConnection) CheckEtcdServers() (done bool, err error) {
 	// Attempt to reach every Etcd server in order
-	for _, serverUri := range con.ServerList {
-		host, err := parseServerURI(serverUri)
+	for _, serverURI := range con.ServerList {
+		host, err := parseServerURI(serverURI)
 		if err != nil {
 			return false, err
 		}

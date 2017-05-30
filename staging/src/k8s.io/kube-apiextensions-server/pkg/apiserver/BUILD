@@ -47,7 +47,7 @@ go_library(
         "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/install:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1:go_default_library",
+        "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/client/clientset/internalclientset:go_default_library",
         "//vendor/k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions:go_default_library",

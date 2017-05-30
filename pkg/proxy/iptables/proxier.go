@@ -148,12 +148,39 @@ type serviceInfo struct {
 	loadBalancerSourceRanges []string
 	onlyNodeLocalEndpoints   bool
 	healthCheckNodePort      int
+	// The following fields are computed and stored for performance reasons.
+	serviceNameString        string
+	servicePortChainName     utiliptables.Chain
+	serviceFirewallChainName utiliptables.Chain
+	serviceLBChainName       utiliptables.Chain
 }
 
 // internal struct for endpoints information
 type endpointsInfo struct {
 	endpoint string // TODO: should be an endpointString type
 	isLocal  bool
+	// The following fields we lazily compute and store here for performance
+	// reasons. If the protocol is the same as you expect it to be, then the
+	// chainName can be reused, otherwise it should be recomputed.
+	protocol  string
+	chainName utiliptables.Chain
+}
+
+// Returns just the IP part of the endpoint.
+func (e *endpointsInfo) IPPart() string {
+	if index := strings.Index(e.endpoint, ":"); index != -1 {
+		return e.endpoint[0:index]
+	}
+	return e.endpoint
+}
+
+// Returns the endpoint chain name for a given endpointsInfo.
+func (e *endpointsInfo) endpointChain(svcNameString, protocol string) utiliptables.Chain {
+	if e.protocol != protocol {
+		e.protocol = protocol
+		e.chainName = servicePortEndpointChainName(svcNameString, protocol, e.endpoint)
+	}
+	return e.chainName
 }
 
 func (e *endpointsInfo) String() string {
@@ -191,6 +218,13 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 			info.healthCheckNodePort = int(p)
 		}
 	}
+
+	// Store the following for performance reasons.
+	protocol := strings.ToLower(string(info.protocol))
+	info.serviceNameString = svcPortName.String()
+	info.servicePortChainName = servicePortChainName(info.serviceNameString, protocol)
+	info.serviceFirewallChainName = serviceFirewallChainName(info.serviceNameString, protocol)
+	info.serviceLBChainName = serviceLBChainName(info.serviceNameString, protocol)
 
 	return info
 }
@@ -346,6 +380,11 @@ type Proxier struct {
 	healthChecker  healthcheck.Server
 	healthzServer  healthcheck.HealthzUpdater
 
+	// Since converting probabilities (floats) to strings is expensive
+	// and we are using only probabilities in the format of 1/n, we are
+	// precomputing some number of those and cache for future reuse.
+	precomputedProbabilities []string
+
 	// The following buffers are used to reuse memory and avoid allocations
 	// that are significantly impacting performance.
 	iptablesData *bytes.Buffer
@@ -441,27 +480,28 @@ func NewProxier(ipt utiliptables.Interface,
 	healthChecker := healthcheck.NewServer(hostname, recorder, nil, nil) // use default implementations of deps
 
 	proxier := &Proxier{
-		portsMap:         make(map[localPort]closeable),
-		serviceMap:       make(proxyServiceMap),
-		serviceChanges:   newServiceChangeMap(),
-		endpointsMap:     make(proxyEndpointsMap),
-		endpointsChanges: newEndpointsChangeMap(hostname),
-		iptables:         ipt,
-		masqueradeAll:    masqueradeAll,
-		masqueradeMark:   masqueradeMark,
-		exec:             exec,
-		clusterCIDR:      clusterCIDR,
-		hostname:         hostname,
-		nodeIP:           nodeIP,
-		portMapper:       &listenPortOpener{},
-		recorder:         recorder,
-		healthChecker:    healthChecker,
-		healthzServer:    healthzServer,
-		iptablesData:     bytes.NewBuffer(nil),
-		filterChains:     bytes.NewBuffer(nil),
-		filterRules:      bytes.NewBuffer(nil),
-		natChains:        bytes.NewBuffer(nil),
-		natRules:         bytes.NewBuffer(nil),
+		portsMap:                 make(map[localPort]closeable),
+		serviceMap:               make(proxyServiceMap),
+		serviceChanges:           newServiceChangeMap(),
+		endpointsMap:             make(proxyEndpointsMap),
+		endpointsChanges:         newEndpointsChangeMap(hostname),
+		iptables:                 ipt,
+		masqueradeAll:            masqueradeAll,
+		masqueradeMark:           masqueradeMark,
+		exec:                     exec,
+		clusterCIDR:              clusterCIDR,
+		hostname:                 hostname,
+		nodeIP:                   nodeIP,
+		portMapper:               &listenPortOpener{},
+		recorder:                 recorder,
+		healthChecker:            healthChecker,
+		healthzServer:            healthzServer,
+		precomputedProbabilities: make([]string, 0, 1001),
+		iptablesData:             bytes.NewBuffer(nil),
+		filterChains:             bytes.NewBuffer(nil),
+		filterRules:              bytes.NewBuffer(nil),
+		natChains:                bytes.NewBuffer(nil),
+		natRules:                 bytes.NewBuffer(nil),
 	}
 	burstSyncs := 2
 	glog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
@@ -555,6 +595,28 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		}
 	}
 	return encounteredError
+}
+
+func computeProbability(n int) string {
+	return fmt.Sprintf("%0.5f", 1.0/float64(n))
+}
+
+// This assumes proxier.mu is held
+func (proxier *Proxier) precomputeProbabilities(numberOfPrecomputed int) {
+	if len(proxier.precomputedProbabilities) == 0 {
+		proxier.precomputedProbabilities = append(proxier.precomputedProbabilities, "<bad value>")
+	}
+	for i := len(proxier.precomputedProbabilities); i <= numberOfPrecomputed; i++ {
+		proxier.precomputedProbabilities = append(proxier.precomputedProbabilities, computeProbability(i))
+	}
+}
+
+// This assumes proxier.mu is held
+func (proxier *Proxier) probability(n int) string {
+	if n >= len(proxier.precomputedProbabilities) {
+		proxier.precomputeProbabilities(n)
+	}
+	return proxier.precomputedProbabilities[n]
 }
 
 // Sync is called to synchronize the proxier state to iptables as soon as possible.
@@ -751,8 +813,7 @@ func getLocalIPs(endpointsMap proxyEndpointsMap) map[types.NamespacedName]sets.S
 				if localIPs[nsn] == nil {
 					localIPs[nsn] = sets.NewString()
 				}
-				ip := strings.Split(ep.endpoint, ":")[0] // just the IP part
-				localIPs[nsn].Insert(ip)
+				localIPs[nsn].Insert(ep.IPPart()) // just the IP part
 			}
 		}
 	}
@@ -873,6 +934,13 @@ type endpointServicePair struct {
 	servicePortName proxy.ServicePortName
 }
 
+func (esp *endpointServicePair) IPPart() string {
+	if index := strings.Index(esp.endpoint, ":"); index != -1 {
+		return esp.endpoint[0:index]
+	}
+	return esp.endpoint
+}
+
 const noConnectionToDelete = "0 flow entries have been deleted"
 
 // After a UDP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
@@ -881,7 +949,7 @@ const noConnectionToDelete = "0 flow entries have been deleted"
 func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServicePair]bool) {
 	for epSvcPair := range connectionMap {
 		if svcInfo, ok := proxier.serviceMap[epSvcPair.servicePortName]; ok && svcInfo.protocol == api.ProtocolUDP {
-			endpointIP := strings.Split(epSvcPair.endpoint, ":")[0]
+			endpointIP := epSvcPair.endpoint[0:strings.Index(epSvcPair.endpoint, ":")]
 			glog.V(2).Infof("Deleting connection tracking state for service IP %s, endpoint IP %s", svcInfo.clusterIP.String(), endpointIP)
 			err := utilproxy.ExecConntrackTool(proxier.exec, "-D", "--orig-dst", svcInfo.clusterIP.String(), "--dst-nat", endpointIP, "-p", "udp")
 			if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
@@ -1053,15 +1121,28 @@ func (proxier *Proxier) syncProxyRules() {
 	// Accumulate the set of local ports that we will be holding open once this update is complete
 	replacementPortsMap := map[localPort]closeable{}
 
+	// We are creating those slices ones here to avoid memory reallocations
+	// in every loop. Note that reuse the memory, instead of doing:
+	//   slice = <some new slice>
+	// you should always do one of the below:
+	//   slice = slice[:0] // and then append to it
+	//   slice = append(slice[:0], ...)
+	endpoints := make([]*endpointsInfo, 0)
+	endpointChains := make([]utiliptables.Chain, 0)
+	// To avoid growing this slice, we arbitrarily set its size to 64,
+	// there is never more than that many arguments for a single line.
+	// Note that even if we go over 64, it will still be correct - it
+	// is just for efficiency, not correctness.
+	args := make([]string, 64)
+
 	// Build rules for each service.
+	var svcNameString string
 	for svcName, svcInfo := range proxier.serviceMap {
 		protocol := strings.ToLower(string(svcInfo.protocol))
-		// Precompute svcNameString; with many services the many calls
-		// to ServicePortName.String() show up in CPU profiles.
-		svcNameString := svcName.String()
+		svcNameString = svcInfo.serviceNameString
 
 		// Create the per-service chain, retaining counters if possible.
-		svcChain := servicePortChainName(svcNameString, protocol)
+		svcChain := svcInfo.servicePortChainName
 		if chain, ok := existingNATChains[svcChain]; ok {
 			writeLine(proxier.natChains, chain)
 		} else {
@@ -1069,7 +1150,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		activeNATChains[svcChain] = true
 
-		svcXlbChain := serviceLBChainName(svcNameString, protocol)
+		svcXlbChain := svcInfo.serviceLBChainName
 		if svcInfo.onlyNodeLocalEndpoints {
 			// Only for services request OnlyLocal traffic
 			// create the per-service LB chain, retaining counters if possible.
@@ -1085,13 +1166,13 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture the clusterIP.
-		args := []string{
+		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcNameString),
 			"-m", protocol, "-p", protocol,
 			"-d", fmt.Sprintf("%s/32", svcInfo.clusterIP.String()),
-			"--dport", fmt.Sprintf("%d", svcInfo.port),
-		}
+			"--dport", strconv.Itoa(svcInfo.port),
+		)
 		if proxier.masqueradeAll {
 			writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 		}
@@ -1135,13 +1216,13 @@ func (proxier *Proxier) syncProxyRules() {
 					replacementPortsMap[lp] = socket
 				}
 			} // We're holding the port, so it's OK to install iptables rules.
-			args := []string{
+			args = append(args[:0],
 				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcNameString),
 				"-m", protocol, "-p", protocol,
 				"-d", fmt.Sprintf("%s/32", externalIP),
-				"--dport", fmt.Sprintf("%d", svcInfo.port),
-			}
+				"--dport", strconv.Itoa(svcInfo.port),
+			)
 			// We have to SNAT packets to external IPs.
 			writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 
@@ -1166,17 +1247,17 @@ func (proxier *Proxier) syncProxyRules() {
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 					"-m", protocol, "-p", protocol,
 					"-d", fmt.Sprintf("%s/32", externalIP),
-					"--dport", fmt.Sprintf("%d", svcInfo.port),
+					"--dport", strconv.Itoa(svcInfo.port),
 					"-j", "REJECT",
 				)
 			}
 		}
 
 		// Capture load-balancer ingress.
+		fwChain := svcInfo.serviceFirewallChainName
 		for _, ingress := range svcInfo.loadBalancerStatus.Ingress {
 			if ingress.IP != "" {
 				// create service firewall chain
-				fwChain := serviceFirewallChainName(svcNameString, protocol)
 				if chain, ok := existingNATChains[fwChain]; ok {
 					writeLine(proxier.natChains, chain)
 				} else {
@@ -1187,20 +1268,20 @@ func (proxier *Proxier) syncProxyRules() {
 				// This currently works for loadbalancers that preserves source ips.
 				// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
 
-				args := []string{
+				args = append(args[:0],
 					"-A", string(kubeServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
 					"-m", protocol, "-p", protocol,
 					"-d", fmt.Sprintf("%s/32", ingress.IP),
-					"--dport", fmt.Sprintf("%d", svcInfo.port),
-				}
+					"--dport", strconv.Itoa(svcInfo.port),
+				)
 				// jump to service firewall chain
 				writeLine(proxier.natRules, append(args, "-j", string(fwChain))...)
 
-				args = []string{
+				args = append(args[:0],
 					"-A", string(fwChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
-				}
+				)
 
 				// Each source match rule in the FW chain may jump to either the SVC or the XLB chain
 				chosenChain := svcXlbChain
@@ -1266,12 +1347,12 @@ func (proxier *Proxier) syncProxyRules() {
 				replacementPortsMap[lp] = socket
 			} // We're holding the port, so it's OK to install iptables rules.
 
-			args := []string{
+			args = append(args[:0],
 				"-A", string(kubeNodePortsChain),
 				"-m", "comment", "--comment", svcNameString,
 				"-m", protocol, "-p", protocol,
-				"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
-			}
+				"--dport", strconv.Itoa(svcInfo.nodePort),
+			)
 			if !svcInfo.onlyNodeLocalEndpoints {
 				// Nodeports need SNAT, unless they're local.
 				writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
@@ -1293,7 +1374,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 					"-m", "addrtype", "--dst-type", "LOCAL",
 					"-m", protocol, "-p", protocol,
-					"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
+					"--dport", strconv.Itoa(svcInfo.nodePort),
 					"-j", "REJECT",
 				)
 			}
@@ -1306,7 +1387,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 				"-m", protocol, "-p", protocol,
 				"-d", fmt.Sprintf("%s/32", svcInfo.clusterIP.String()),
-				"--dport", fmt.Sprintf("%d", svcInfo.port),
+				"--dport", strconv.Itoa(svcInfo.port),
 				"-j", "REJECT",
 			)
 			continue
@@ -1317,11 +1398,12 @@ func (proxier *Proxier) syncProxyRules() {
 		// Generate the per-endpoint chains.  We do this in multiple passes so we
 		// can group rules together.
 		// These two slices parallel each other - keep in sync
-		endpoints := make([]*endpointsInfo, 0)
-		endpointChains := make([]utiliptables.Chain, 0)
+		endpoints = endpoints[:0]
+		endpointChains = endpointChains[:0]
+		var endpointChain utiliptables.Chain
 		for _, ep := range proxier.endpointsMap[svcName] {
 			endpoints = append(endpoints, ep)
-			endpointChain := servicePortEndpointChainName(svcNameString, protocol, ep.endpoint)
+			endpointChain = ep.endpointChain(svcNameString, protocol)
 			endpointChains = append(endpointChains, endpointChain)
 
 			// Create the endpoint chain, retaining counters if possible.
@@ -1340,7 +1422,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-A", string(svcChain),
 					"-m", "comment", "--comment", svcNameString,
 					"-m", "recent", "--name", string(endpointChain),
-					"--rcheck", "--seconds", fmt.Sprintf("%d", svcInfo.stickyMaxAgeMinutes*60), "--reap",
+					"--rcheck", "--seconds", strconv.Itoa(svcInfo.stickyMaxAgeMinutes*60), "--reap",
 					"-j", string(endpointChain))
 			}
 		}
@@ -1349,29 +1431,29 @@ func (proxier *Proxier) syncProxyRules() {
 		n := len(endpointChains)
 		for i, endpointChain := range endpointChains {
 			// Balancing rules in the per-service chain.
-			args := []string{
+			args = append(args[:0], []string{
 				"-A", string(svcChain),
 				"-m", "comment", "--comment", svcNameString,
-			}
+			}...)
 			if i < (n - 1) {
 				// Each rule is a probabilistic match.
 				args = append(args,
 					"-m", "statistic",
 					"--mode", "random",
-					"--probability", fmt.Sprintf("%0.5f", 1.0/float64(n-i)))
+					"--probability", proxier.probability(n-i))
 			}
 			// The final (or only if n == 1) rule is a guaranteed match.
 			args = append(args, "-j", string(endpointChain))
 			writeLine(proxier.natRules, args...)
 
 			// Rules in the per-endpoint chain.
-			args = []string{
+			args = append(args[:0],
 				"-A", string(endpointChain),
 				"-m", "comment", "--comment", svcNameString,
-			}
+			)
 			// Handle traffic that loops back to the originator with SNAT.
 			writeLine(proxier.natRules, append(args,
-				"-s", fmt.Sprintf("%s/32", strings.Split(endpoints[i].endpoint, ":")[0]),
+				"-s", fmt.Sprintf("%s/32", endpoints[i].IPPart()),
 				"-j", string(KubeMarkMasqChain))...)
 			// Update client-affinity lists.
 			if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
@@ -1402,42 +1484,42 @@ func (proxier *Proxier) syncProxyRules() {
 		// Service's ClusterIP instead. This happens whether or not we have local
 		// endpoints; only if clusterCIDR is specified
 		if len(proxier.clusterCIDR) > 0 {
-			args = []string{
+			args = append(args[:0],
 				"-A", string(svcXlbChain),
 				"-m", "comment", "--comment",
-				fmt.Sprintf(`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`),
+				`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
 				"-s", proxier.clusterCIDR,
 				"-j", string(svcChain),
-			}
+			)
 			writeLine(proxier.natRules, args...)
 		}
 
 		numLocalEndpoints := len(localEndpointChains)
 		if numLocalEndpoints == 0 {
 			// Blackhole all traffic since there are no local endpoints
-			args := []string{
+			args = append(args[:0],
 				"-A", string(svcXlbChain),
 				"-m", "comment", "--comment",
 				fmt.Sprintf(`"%s has no local endpoints"`, svcNameString),
 				"-j",
 				string(KubeMarkDropChain),
-			}
+			)
 			writeLine(proxier.natRules, args...)
 		} else {
 			// Setup probability filter rules only over local endpoints
 			for i, endpointChain := range localEndpointChains {
 				// Balancing rules in the per-service chain.
-				args := []string{
+				args = append(args[:0],
 					"-A", string(svcXlbChain),
 					"-m", "comment", "--comment",
 					fmt.Sprintf(`"Balancing rule %d for %s"`, i, svcNameString),
-				}
+				)
 				if i < (numLocalEndpoints - 1) {
 					// Each rule is a probabilistic match.
 					args = append(args,
 						"-m", "statistic",
 						"--mode", "random",
-						"--probability", fmt.Sprintf("%0.5f", 1.0/float64(numLocalEndpoints-i)))
+						"--probability", proxier.probability(numLocalEndpoints-i))
 				}
 				// The final (or only if n == 1) rule is a guaranteed match.
 				args = append(args, "-j", string(endpointChain))

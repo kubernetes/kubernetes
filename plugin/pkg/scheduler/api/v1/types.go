@@ -32,6 +32,10 @@ type Policy struct {
 	Priorities []PriorityPolicy `json:"priorities"`
 	// Holds the information to communicate with the extender(s)
 	ExtenderConfigs []ExtenderConfig `json:"extenders"`
+	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
+	// corresponding to every RequiredDuringScheduling affinity rule.
+	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 1-100.
+	HardPodAffinitySymmetricWeight int `json:"hardPodAffinitySymmetricWeight"`
 }
 
 type PredicatePolicy struct {

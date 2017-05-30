@@ -143,8 +143,7 @@ type Store struct {
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated and before it is decorated, optional.
 	AfterUpdate ObjectFunc
-	// DeleteStrategy implements resource-specific behavior during deletion,
-	// optional.
+	// DeleteStrategy implements resource-specific behavior during deletion.
 	DeleteStrategy rest.RESTDeleteStrategy
 	// AfterDelete implements a further operation to run after a resource is
 	// deleted and before it is decorated, optional.
@@ -1032,7 +1031,16 @@ func (e *Store) Watch(ctx genericapirequest.Context, options *metainternalversio
 func (e *Store) WatchPredicate(ctx genericapirequest.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			w, err := e.Storage.Watch(ctx, key, resourceVersion, p)
+			// For performance reasons, we can optimize the further computations of
+			// selector, by removing then "matches-single" fields, because they are
+			// already satisfied by choosing appropriate key.
+			sp, err := p.RemoveMatchesSingleRequirements()
+			if err != nil {
+				glog.Warningf("Couldn't remove matches-single requirements: %v", err)
+				// Since we couldn't optimize selector, reset to the original one.
+				sp = p
+			}
+			w, err := e.Storage.Watch(ctx, key, resourceVersion, sp)
 			if err != nil {
 				return nil, err
 			}
@@ -1136,6 +1144,10 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		isNamespaced = e.UpdateStrategy.NamespaceScoped()
 	default:
 		return fmt.Errorf("store for %s must have CreateStrategy or UpdateStrategy set", e.QualifiedResource.String())
+	}
+
+	if e.DeleteStrategy == nil {
+		return fmt.Errorf("store for %s must have DeleteStrategy set", e.QualifiedResource.String())
 	}
 
 	if options.RESTOptions == nil {

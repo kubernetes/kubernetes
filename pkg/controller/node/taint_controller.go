@@ -61,7 +61,7 @@ type podUpdateItem struct {
 	newTolerations []v1.Toleration
 }
 
-// NoExecuteTaintManager listens to Taint/Toleration changes and is resposible for removing Pods
+// NoExecuteTaintManager listens to Taint/Toleration changes and is responsible for removing Pods
 // from Nodes tainted with NoExecute Taints.
 type NoExecuteTaintManager struct {
 	client   clientset.Interface

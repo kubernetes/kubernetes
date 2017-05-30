@@ -355,8 +355,8 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 	return loadBalancer, nil
 }
 
-// Makes sure that the health check for an ELB matches the configured listeners
-func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDescription, listeners []*elb.Listener) error {
+// Makes sure that the health check for an ELB matches the configured health check node port
+func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDescription, protocol string, port int32, path string) error {
 	name := aws.StringValue(loadBalancer.LoadBalancerName)
 
 	actual := loadBalancer.HealthCheck
@@ -367,19 +367,7 @@ func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDesc
 	expectedTimeout := int64(5)
 	expectedInterval := int64(10)
 
-	// We only configure a TCP health-check on the first port
-	expectedTarget := ""
-	for _, listener := range listeners {
-		if listener.InstancePort == nil {
-			continue
-		}
-		expectedTarget = "TCP:" + strconv.FormatInt(*listener.InstancePort, 10)
-		break
-	}
-
-	if expectedTarget == "" {
-		return fmt.Errorf("unable to determine health check port for %q (no valid listeners)", name)
-	}
+	expectedTarget := protocol + ":" + strconv.FormatInt(int64(port), 10) + path
 
 	if expectedTarget == orEmpty(actual.Target) &&
 		expectedHealthyThreshold == orZero(actual.HealthyThreshold) &&

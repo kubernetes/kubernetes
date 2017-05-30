@@ -50670,7 +50670,7 @@
    "io.k8s.kubernetes.pkg.apis.apps.v1beta1.RollbackConfig": {
     "properties": {
      "revision": {
-      "description": "The revision to rollback to. If set to 0, rollbck to the last revision.",
+      "description": "The revision to rollback to. If set to 0, rollback to the last revision.",
       "type": "integer",
       "format": "int64"
      }
@@ -53319,6 +53319,13 @@
        "type": "string"
       }
      },
+     "allowedHostPaths": {
+      "description": "AllowedHostPaths is a white list of allowed host path prefixes. Empty indicates that all host paths may be used.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
      "defaultAddCapabilities": {
       "description": "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capabiility in both DefaultAddCapabilities and RequiredDropCapabilities.",
       "type": "array",
@@ -53548,7 +53555,7 @@
    "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.RollbackConfig": {
     "properties": {
      "revision": {
-      "description": "The revision to rollback to. If set to 0, rollbck to the last revision.",
+      "description": "The revision to rollback to. If set to 0, rollback to the last revision.",
       "type": "integer",
       "format": "int64"
      }

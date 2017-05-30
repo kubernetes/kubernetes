@@ -85,6 +85,7 @@ go_library(
         "network_policy.go",
         "networking.go",
         "networking_perf.go",
+        "no-snat.go",
         "nodeoutofdisk.go",
         "nvidia-gpus.go",
         "pod_gc.go",

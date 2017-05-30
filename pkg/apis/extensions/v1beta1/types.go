@@ -228,7 +228,7 @@ type DeploymentRollback struct {
 }
 
 type RollbackConfig struct {
-	// The revision to rollback to. If set to 0, rollbck to the last revision.
+	// The revision to rollback to. If set to 0, rollback to the last revision.
 	// +optional
 	Revision int64 `json:"revision,omitempty" protobuf:"varint,1,opt,name=revision"`
 }
@@ -909,6 +909,10 @@ type PodSecurityPolicySpec struct {
 	// will not be forced to.
 	// +optional
 	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,14,opt,name=readOnlyRootFilesystem"`
+	// AllowedHostPaths is a white list of allowed host path prefixes. Empty indicates that all
+	// host paths may be used.
+	// +optional
+	AllowedHostPaths []string `json:"allowedHostPaths,omitempty" protobuf:"bytes,15,opt,name=allowedHostPaths"`
 }
 
 // FS Type gives strong typing to different file systems that are used by volumes.

@@ -2599,7 +2599,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for AWS ELB")
 	}
 
-	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes))
+	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes), "running")
 	if err != nil {
 		return nil, err
 	}
@@ -2804,9 +2804,28 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, err
 	}
 
-	err = c.ensureLoadBalancerHealthCheck(loadBalancer, listeners)
-	if err != nil {
-		return nil, err
+	if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
+		glog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to ensure health check for localized service %v on node port %v: %v", loadBalancerName, healthCheckNodePort, err)
+		}
+	} else {
+		glog.V(4).Infof("service %v does not need custom health checks", apiService.Name)
+		// We only configure a TCP health-check on the first port
+		var tcpHealthCheckPort int32
+		for _, listener := range listeners {
+			if listener.InstancePort == nil {
+				continue
+			}
+			tcpHealthCheckPort = int32(*listener.InstancePort)
+			break
+		}
+		// there must be no path on TCP health check
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "TCP", tcpHealthCheckPort, "")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = c.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
@@ -3157,7 +3176,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
 func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes))
+	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes), "running")
 	if err != nil {
 		return err
 	}
@@ -3229,10 +3248,11 @@ func (c *Cloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Instan
 	return instancesByID, nil
 }
 
-// Fetches and caches instances by node names; returns an error if any cannot be found.
+// Fetches and caches instances in the given state, by node names; returns an error if any cannot be found. If no states
+// are given, no state filter is used and instances of all states are fetched.
 // This is implemented with a multi value filter on the node names, fetching the desired instances with a single query.
 // TODO(therc): make all the caching more rational during the 1.4 timeframe
-func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Instance, error) {
+func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String, states ...string) ([]*ec2.Instance, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if nodeNames.Equal(c.lastNodeNames) {
@@ -3243,7 +3263,7 @@ func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Ins
 			return c.lastInstancesByNodeNames, nil
 		}
 	}
-	instances, err := c.getInstancesByNodeNames(nodeNames.List())
+	instances, err := c.getInstancesByNodeNames(nodeNames.List(), states...)
 
 	if err != nil {
 		return nil, err
@@ -3259,7 +3279,7 @@ func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Ins
 	return instances, nil
 }
 
-func (c *Cloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance, error) {
+func (c *Cloud) getInstancesByNodeNames(nodeNames []string, states ...string) ([]*ec2.Instance, error) {
 	names := aws.StringSlice(nodeNames)
 
 	nodeNameFilter := &ec2.Filter{
@@ -3267,9 +3287,9 @@ func (c *Cloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance, er
 		Values: names,
 	}
 
-	filters := []*ec2.Filter{
-		nodeNameFilter,
-		newEc2Filter("instance-state-name", "running"),
+	filters := []*ec2.Filter{nodeNameFilter}
+	if len(states) > 0 {
+		filters = append(filters, newEc2Filter("instance-state-name", states...))
 	}
 
 	instances, err := c.describeInstances(filters)

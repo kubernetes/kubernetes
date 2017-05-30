@@ -13,6 +13,7 @@ cmd/gke-certificates-controller
 cmd/kube-apiserver
 cmd/kube-apiserver/app
 cmd/kube-apiserver/app/options
+cmd/kube-apiserver/app/preflight
 cmd/kube-controller-manager
 cmd/kube-controller-manager/app/options
 cmd/kube-proxy
@@ -323,6 +324,8 @@ staging/src/k8s.io/apimachinery/pkg/api/errors
 staging/src/k8s.io/apimachinery/pkg/api/resource
 staging/src/k8s.io/apimachinery/pkg/apimachinery
 staging/src/k8s.io/apimachinery/pkg/conversion/queryparams
+staging/src/k8s.io/apimachinery/pkg/fields
+staging/src/k8s.io/apimachinery/pkg/labels
 staging/src/k8s.io/apimachinery/pkg/runtime
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/recognizer/testing
@@ -433,12 +436,12 @@ staging/src/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/install
 staging/src/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/validation
 staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions
 staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions/apiextensions
-staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions/apiextensions/v1alpha1
+staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions/apiextensions/v1beta1
 staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion
 staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion/apiextensions
 staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion/apiextensions/internalversion
 staging/src/k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/internalversion
-staging/src/k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/v1alpha1
+staging/src/k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/v1beta1
 staging/src/k8s.io/kube-apiextensions-server/test/integration
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics/install
 staging/src/k8s.io/metrics/pkg/apis/metrics/install

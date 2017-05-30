@@ -163,6 +163,7 @@ test/e2e/common/projected.go:			Command: []string{"/mt", "--break_on_expected_co
 test/e2e/common/secrets.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
 test/e2e/common/secrets.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/delete/data-1"},
 test/e2e/common/secrets.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/update/data-3"},
+test/e2e/no-snat.go:	node_ip := v1.EnvVar{
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be %d; found %d", pid, expectedOOMScoreAdj, oomScore)
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be < %d; found %d", pid, expectedMaxOOMScoreAdj, oomScore)
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be >= %d; found %d", pid, expectedMinOOMScoreAdj, oomScore)

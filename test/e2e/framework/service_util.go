@@ -716,7 +716,8 @@ func (j *ServiceTestJig) GetHTTPContent(host string, port int, timeout time.Dura
 	var body bytes.Buffer
 	var err error
 	if pollErr := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		result, err := TestReachableHTTPWithContent(host, port, url, "", &body)
+		var result bool
+		result, err = TestReachableHTTPWithContent(host, port, url, "", &body)
 		if err != nil {
 			Logf("Error hitting %v:%v%v, retrying: %v", host, port, url, err)
 			return false, nil

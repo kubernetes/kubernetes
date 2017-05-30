@@ -672,7 +672,6 @@ items:
     verbs:
     - create
     - delete
-    - get
   - apiGroups:
     - ""
     resources:

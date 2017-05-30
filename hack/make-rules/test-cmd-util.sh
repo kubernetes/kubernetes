@@ -1322,7 +1322,7 @@ run_crd_tests() {
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1alpha1",
+  "apiVersion": "apiextensions.k8s.io/v1beta1",
   "metadata": {
     "name": "foos.company.com"
   },
@@ -1343,7 +1343,7 @@ __EOF__
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1alpha1",
+  "apiVersion": "apiextensions.k8s.io/v1beta1",
   "metadata": {
     "name": "bars.company.com"
   },

@@ -47,7 +47,7 @@ func createAPIExtensionsConfig(kubeAPIServerConfig genericapiserver.Config, comm
 
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
-	etcdOptions.StorageConfig.Codec = apiextensionsapiserver.Codecs.LegacyCodec(schema.GroupVersion{Group: "apiextensions.k8s.io", Version: "v1alpha1"})
+	etcdOptions.StorageConfig.Codec = apiextensionsapiserver.Codecs.LegacyCodec(schema.GroupVersion{Group: "apiextensions.k8s.io", Version: "v1beta1"})
 	etcdOptions.StorageConfig.Copier = apiextensionsapiserver.Scheme
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
