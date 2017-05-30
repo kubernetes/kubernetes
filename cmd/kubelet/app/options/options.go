@@ -235,6 +235,7 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.NetworkPluginDir, "network-plugin-dir", c.NetworkPluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for network plugins or CNI config")
 	fs.StringVar(&c.CNIConfDir, "cni-conf-dir", c.CNIConfDir, "<Warning: Alpha feature> The full path of the directory in which to search for CNI config files. Default: /etc/cni/net.d")
 	fs.StringVar(&c.CNIBinDir, "cni-bin-dir", c.CNIBinDir, "<Warning: Alpha feature> The full path of the directory in which to search for CNI plugin binaries. Default: /opt/cni/bin")
+	fs.StringVar(&c.CNIVendorDirPrefix, "cni-vendor-dir-prefix", c.CNIVendorDirPrefix, "<Warning: Alpha feature> The full path of parent directory that houses all vendor CNI plugin binaries according to VendorCNIDirTemplate(\"<this-prefix>/opt/<cni-plugin-type>/bin\").  Default: \"\"")
 	fs.Int32Var(&c.NetworkPluginMTU, "network-plugin-mtu", c.NetworkPluginMTU, "<Warning: Alpha feature> The MTU to be passed to the network plugin, to override the default. Set to 0 to use the default 1460 MTU.")
 	fs.StringVar(&c.VolumePluginDir, "volume-plugin-dir", c.VolumePluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for additional third party volume plugins")
 	fs.StringVar(&c.CloudProvider, "cloud-provider", c.CloudProvider, "The provider for cloud services. By default, kubelet will attempt to auto-detect the cloud provider. Specify empty string for running with no cloud provider.")

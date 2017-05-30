@@ -403,6 +403,10 @@ type KubeletConfiguration struct {
 	// CNIBinDir is the full path of the directory in which to search for
 	// CNI plugin binaries
 	CNIBinDir string `json:"cniBinDir"`
+	// CNIVendorDirPrefix is full path of parent directory that houses all
+	// vendor CNI binaries according to VendorCNIDirTemplate
+	// ("<this-prefix>/opt/<plugin-type>/bin").  Default: ""
+	CNIVendorDirPrefix string `json:"cniVendorDirPrefix"`
 	// networkPluginMTU is the MTU to be passed to the network plugin,
 	// and overrides the default MTU for cases where it cannot be automatically
 	// computed (such as IPSEC).
