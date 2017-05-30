@@ -54,7 +54,7 @@ func main() {
 		glog.Fatal(err)
 	}
 
-	factory := informers.NewSharedInformerFactory(clientset, time.Second*10)
+	factory := informers.NewSharedInformerFactory(clientset, time.Hour*24)
 
 	informer := factory.Core().V1().Pods().Informer()
 
