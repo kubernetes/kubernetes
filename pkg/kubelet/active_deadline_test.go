@@ -93,3 +93,55 @@ func TestActiveDeadlineHandler(t *testing.T) {
 		}
 	}
 }
+
+// TestActiveDeadlineHandlerOverflow verifies the active deadline handler handles overflows.
+func TestActiveDeadlineHandlerOverflow(t *testing.T) {
+	pods := newTestPods(4)
+	fakeClock := clock.NewFakeClock(time.Now())
+	podStatusProvider := &mockPodStatusProvider{pods: pods}
+	fakeRecorder := &record.FakeRecorder{}
+	handler, err := newActiveDeadlineHandler(podStatusProvider, fakeRecorder, fakeClock)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	now := metav1.Now()
+	startTime := metav1.NewTime(now.Time.Add(-1 * time.Minute))
+
+	// this pod has exceeded its active deadline
+	exceededActiveDeadlineSeconds := int64(30)
+	pods[0].Status.StartTime = &startTime
+	pods[0].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
+
+	// this pod has not exceeded its active deadline (but this will cause an overflow)
+	notYetActiveDeadlineSeconds := int64(341547784951046144)
+	pods[1].Status.StartTime = &startTime
+	pods[1].Spec.ActiveDeadlineSeconds = &notYetActiveDeadlineSeconds
+
+	// this pod has no deadline
+	pods[2].Status.StartTime = &startTime
+	pods[2].Spec.ActiveDeadlineSeconds = nil
+
+	testCases := []struct {
+		pod      *v1.Pod
+		expected bool
+	}{{pods[0], true}, {pods[1], false}, {pods[2], false}, {pods[3], false}}
+
+	for i, testCase := range testCases {
+		if actual := handler.ShouldSync(testCase.pod); actual != testCase.expected {
+			t.Errorf("[%d] ShouldSync expected %#v, got %#v", i, testCase.expected, actual)
+		}
+		actual := handler.ShouldEvict(testCase.pod)
+		if actual.Evict != testCase.expected {
+			t.Errorf("[%d] ShouldEvict.Evict expected %#v, got %#v", i, testCase.expected, actual.Evict)
+		}
+		if testCase.expected {
+			if actual.Reason != reason {
+				t.Errorf("[%d] ShouldEvict.Reason expected %#v, got %#v", i, message, actual.Reason)
+			}
+			if actual.Message != message {
+				t.Errorf("[%d] ShouldEvict.Message expected %#v, got %#v", i, message, actual.Message)
+			}
+		}
+	}
+}

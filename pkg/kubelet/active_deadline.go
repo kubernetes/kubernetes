@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -94,5 +95,9 @@ func (m *activeDeadlineHandler) pastActiveDeadline(pod *v1.Pod) bool {
 	start := podStatus.StartTime.Time
 	duration := m.clock.Since(start)
 	allowedDuration := time.Duration(*pod.Spec.ActiveDeadlineSeconds) * time.Second
+	// check for an overflow, and if overflows, enforce the actual allowed max
+	if int64(allowedDuration) < int64(0) {
+		allowedDuration = time.Duration(math.MaxInt64)
+	}
 	return duration >= allowedDuration
 }
