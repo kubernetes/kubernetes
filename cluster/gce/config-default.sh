@@ -217,7 +217,7 @@ fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota,PodSecurityPolicy
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
@@ -262,3 +262,6 @@ SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-false}" # true, false
 # authentication) in metadata should be treated as canonical, and therefore disk
 # copies ought to be recreated/clobbered.
 METADATA_CLOBBERS_CONFIG=${METADATA_CLOBBERS_CONFIG:-false}
+
+# Optional: use a default, fairly open PodSecurityPolicy
+ENABLE_LENIENT_POD_SECURITY_POLICY="${ENABLE_LENIENT_POD_SECURITY_POLICY:-true}"
