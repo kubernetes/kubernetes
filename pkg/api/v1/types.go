@@ -3939,11 +3939,13 @@ type Event struct {
 
 	// The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
 	// +optional
-	FirstTimestamp metav1.Time `json:"firstTimestamp,omitempty" protobuf:"bytes,6,opt,name=firstTimestamp"`
+	FirstTimestamp      metav1.Time      `json:"firstTimestamp,omitempty" protobuf:"bytes,6,opt,name=firstTimestamp"`
+	FirstTimestampMicro metav1.MicroTime `json:"firstTimestampMicro,omitempty" protobuf:"bytes,10,opt,name=firstTimestampMicro"`
 
 	// The time at which the most recent occurrence of this event was recorded.
 	// +optional
-	LastTimestamp metav1.Time `json:"lastTimestamp,omitempty" protobuf:"bytes,7,opt,name=lastTimestamp"`
+	LastTimestamp      metav1.Time      `json:"lastTimestamp,omitempty" protobuf:"bytes,7,opt,name=lastTimestamp"`
+	LastTimestampMicro metav1.MicroTime `json:"lastTimestampMicro,omitempty" protobuf:"bytes,11,opt,name=lastTimestampMicro"`
 
 	// The number of times this event has occurred.
 	// +optional
@@ -3952,7 +3954,38 @@ type Event struct {
 	// Type of this event (Normal, Warning), new types could be added in the future
 	// +optional
 	Type string `json:"type,omitempty" protobuf:"bytes,9,opt,name=type"`
+
+	// Required - active actor in the event
+	Subject EventSubject `json:"subject" protobuf:"bytes,12,opt,name=subject"`
+	// Required - short, machine understandable action that subject took
+	Action string `json:"action" protobuf:"bytes,13,opt,name=action"`
+	// Optional - reference to Kubernetes object Subject acts on, if any
+	Object *ObjectReference `json:"object" protobuf:"bytes,14,opt,name=object"`
+
+	Severity EventSeverity `json:"severity" protobuf:"bytes,15,opt,name=severity"`
 }
+
+// EventSubject is a union to keep active actor of the Event
+type EventSubject struct {
+	Object    *ObjectReference `json:"object" protobuf:"bytes,1,opt,name=object"`
+	Component *EventSource     `json:"component" protobuf:"bytes,1,opt,name=component"`
+}
+
+const (
+	NodeControllerComponent   = "node-controller"
+	RouteControllerComponent  = "route-controller"
+	PodGCComponent            = "pod-gc"
+	GarbageCollectorComponent = "garbage-collector"
+	KubeletComponent          = "kubelet"
+)
+
+type EventSeverity string
+
+const (
+	SeverityNormal   = "severityNormal"   // e.g. Pod scheduled
+	SeverityAbnormal = "severityAbnormal" // e.g. Pod unable to schedule, cluster autoscaler adding Node
+	SeverityCritical = "severityCritical" // e.g. Node unreachable
+)
 
 // EventList is a list of events.
 type EventList struct {

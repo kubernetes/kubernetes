@@ -3391,8 +3391,7 @@ type Event struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Required. The object that this event is about.
-	// +optional
+	// +deprecated by Subject
 	InvolvedObject ObjectReference
 
 	// Optional; this should be a short, machine understandable string that gives the reason
@@ -3402,31 +3401,60 @@ type Event struct {
 	// +optional
 	Reason string
 
-	// Optional. A human-readable description of the status of this operation.
-	// TODO: decide on maximum length.
-	// +optional
+	// +deprecated by Action and Object
 	Message string
 
-	// Optional. The component reporting this event. Should be a short machine understandable string.
-	// +optional
+	// +deprecated by Subject
 	Source EventSource
 
 	// The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
 	// +optional
-	FirstTimestamp metav1.Time
+	FirstTimestamp      metav1.Time
+	FirstTimestampMicro metav1.MicroTime
 
 	// The time at which the most recent occurrence of this event was recorded.
 	// +optional
-	LastTimestamp metav1.Time
+	LastTimestamp      metav1.Time
+	LastTimestampMicro metav1.MicroTime
 
 	// The number of times this event has occurred.
 	// +optional
 	Count int32
 
-	// Type of this event (Normal, Warning), new types could be added in the future.
-	// +optional
+	// +deprecated, replaced by Severity
 	Type string
+
+	// Required - active actor in the event
+	Subject EventSubject
+	// Required - short, machine understandable action that subject took
+	Action string
+	// Optional - reference to Kubernetes object Subject acts on, if any
+	Object *ObjectReference
+
+	Severity EventSeverity
 }
+
+// EventSubject is a union to keep active actor of the Event
+type EventSubject struct {
+	Object    *ObjectReference
+	Component *EventSource
+}
+
+type EventSeverity string
+
+const (
+	SeverityNormal   = "severityNormal"   // e.g. Pod scheduled
+	SeverityAbnormal = "severityAbnormal" // e.g. Pod unable to schedule, cluster autoscaler adding Node
+	SeverityCritical = "severityCritical" // e.g. Node unreachable
+)
+
+const (
+	NodeControllerComponent   = "node-controller"
+	RouteControllerComponent  = "route-controller"
+	PodGCComponent            = "pod-gc"
+	GarbageCollectorComponent = "garbage-collector"
+	KubeletComponent          = "kubelet"
+)
 
 // EventList is a list of events.
 type EventList struct {
