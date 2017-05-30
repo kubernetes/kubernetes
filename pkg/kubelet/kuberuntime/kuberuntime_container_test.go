@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -164,4 +165,94 @@ func TestToKubeContainerStatus(t *testing.T) {
 		actual := toKubeContainerStatus(test.input, cid.Type)
 		assert.Equal(t, test.expected, actual, desc)
 	}
+}
+
+func makeExpetectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
+	container := &pod.Spec.Containers[containerIndex]
+	podIP := ""
+	restartCount := 0
+	opts, _, _ := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
+	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
+	restartCountUint32 := uint32(restartCount)
+	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
+
+	expectedConfig := &runtimeapi.ContainerConfig{
+		Metadata: &runtimeapi.ContainerMetadata{
+			Name:    container.Name,
+			Attempt: restartCountUint32,
+		},
+		Image:       &runtimeapi.ImageSpec{Image: container.Image},
+		Command:     container.Command,
+		Args:        []string(nil),
+		WorkingDir:  container.WorkingDir,
+		Labels:      newContainerLabels(container, pod),
+		Annotations: newContainerAnnotations(container, pod, restartCount),
+		Devices:     makeDevices(opts),
+		Mounts:      m.makeMounts(opts, container),
+		LogPath:     containerLogsPath,
+		Stdin:       container.Stdin,
+		StdinOnce:   container.StdinOnce,
+		Tty:         container.TTY,
+		Linux:       m.generateLinuxContainerConfig(container, pod, new(int64), ""),
+		Envs:        envs,
+	}
+	return expectedConfig
+}
+
+func TestGenerateContainerConfig(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Command:         []string{"testCommand"},
+					WorkingDir:      "testWorkingDir",
+				},
+			},
+		},
+	}
+
+	expectedConfig := makeExpetectedConfig(m, pod, 0)
+	containerConfig, err := m.generateContainerConfig(&pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
+
+	runAsUser := types.UnixUserID(0)
+	RunAsNonRoot := false
+	podWithContainerSecurityContext := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Command:         []string{"testCommand"},
+					WorkingDir:      "testWorkingDir",
+					SecurityContext: &v1.SecurityContext{
+						RunAsNonRoot: &RunAsNonRoot,
+						RunAsUser:    &runAsUser,
+					},
+				},
+			},
+		},
+	}
+
+	expectedConfig = makeExpetectedConfig(m, podWithContainerSecurityContext, 0)
+	containerConfig, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image)
+	assert.Error(t, err)
 }
