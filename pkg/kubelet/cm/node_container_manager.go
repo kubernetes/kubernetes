@@ -185,12 +185,14 @@ func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
 func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList {
 	evictionReservation := hardEvictionReservation(cm.HardEvictionThresholds, cm.capacity)
 	if _, ok := cm.capacity[v1.ResourceStorage]; !ok {
-		if rootfs, err := cm.cadvisorInterface.RootFsInfo(); err == nil {
-			for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
-				cm.capacity[rName] = rCap
+		if cm.cadvisorInterface != nil {
+			if rootfs, err := cm.cadvisorInterface.RootFsInfo(); err == nil {
+				for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
+					cm.capacity[rName] = rCap
+				}
+			} else {
+				glog.Warning("Error getting rootfs info: %v", err)
 			}
-		} else {
-			glog.Warning("Error getting rootfs info: %v", err)
 		}
 	}
 	result := make(v1.ResourceList)
