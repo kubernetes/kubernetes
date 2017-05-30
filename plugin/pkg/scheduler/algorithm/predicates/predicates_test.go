@@ -1288,7 +1288,7 @@ func TestPodFitsSelector(t *testing.T) {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&node)
 
-		fits, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+		fits, reasons, err := PodMatchNodeSelector(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -2999,7 +2999,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				nodeInfo := schedulercache.NewNodeInfo()
 				nodeInfo.SetNode(&node)
 				nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
-				fits2, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+				fits2, reasons, err := PodMatchNodeSelector(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
 				if err != nil {
 					t.Errorf("%s: unexpected error: %v", test.test, err)
 				}
@@ -3951,7 +3951,7 @@ func TestPodAnnotationFitsSelector(t *testing.T) {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&node)
 
-		fits, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+		fits, reasons, err := PodMatchNodeSelector(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -4767,7 +4767,7 @@ func TestInterPodAffinityAnnotationsWithMultipleNodes(t *testing.T) {
 				nodeInfo := schedulercache.NewNodeInfo()
 				nodeInfo.SetNode(&node)
 				nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
-				fits2, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+				fits2, reasons, err := PodMatchNodeSelector(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
 				if err != nil {
 					t.Errorf("%s: unexpected error: %v", test.test, err)
 				}

@@ -658,7 +658,7 @@ func podMatchesNodeLabels(pod *v1.Pod, node *v1.Node) bool {
 	return nodeAffinityMatches
 }
 
-func PodSelectorMatches(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func PodMatchNodeSelector(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
@@ -936,7 +936,7 @@ func EssentialPredicates(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache
 		predicateFails = append(predicateFails, reasons...)
 	}
 
-	fit, reasons, err = PodSelectorMatches(pod, meta, nodeInfo)
+	fit, reasons, err = PodMatchNodeSelector(pod, meta, nodeInfo)
 	if err != nil {
 		return false, predicateFails, err
 	}
