@@ -26,7 +26,19 @@ set -o pipefail
 # automatically restart the process.
 function docker_monitoring {
   while [ 1 ]; do
-    if ! timeout 60 docker ps > /dev/null; then
+    n=0
+    dockerpscheck=1
+    until [ $n -ge 10 ]; do
+      if ! timeout 60 docker ps > /dev/null; then
+        echo 'Docker ps failed, attempt ' $((n + 1))
+        sleep "${SLEEP_SECONDS}"
+        n=$[$n+1]
+      else
+        dockerpscheck=0
+        break
+      fi
+    done
+    if [ $dockerpscheck = 1 ]; then
       echo "Docker daemon failed!"
       pkill docker
       # Wait for a while, as we don't want to kill it again before it is really up.
