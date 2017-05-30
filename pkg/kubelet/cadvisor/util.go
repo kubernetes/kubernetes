@@ -43,3 +43,12 @@ func StorageScratchCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceList 
 	}
 	return c
 }
+
+func StorageOverlayCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceList {
+	c := v1.ResourceList{
+		v1.ResourceStorageOverlay: *resource.NewQuantity(
+			int64(info.Capacity),
+			resource.BinarySI),
+	}
+	return c
+}

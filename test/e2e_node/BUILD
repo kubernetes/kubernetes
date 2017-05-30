@@ -76,6 +76,7 @@ go_test(
         "inode_eviction_test.go",
         "kubelet_test.go",
         "lifecycle_hook_test.go",
+        "local_storage_allocatable_eviction_test.go",
         "log_path_test.go",
         "memory_eviction_test.go",
         "mirror_pod_test.go",

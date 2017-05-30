@@ -76,9 +76,10 @@ type Resource struct {
 
 func (r *Resource) ResourceList() v1.ResourceList {
 	result := v1.ResourceList{
-		v1.ResourceCPU:       *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
-		v1.ResourceMemory:    *resource.NewQuantity(r.Memory, resource.BinarySI),
-		v1.ResourceNvidiaGPU: *resource.NewQuantity(r.NvidiaGPU, resource.DecimalSI),
+		v1.ResourceCPU:            *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
+		v1.ResourceMemory:         *resource.NewQuantity(r.Memory, resource.BinarySI),
+		v1.ResourceNvidiaGPU:      *resource.NewQuantity(r.NvidiaGPU, resource.DecimalSI),
+		v1.ResourceStorageOverlay: *resource.NewQuantity(r.StorageOverlay, resource.BinarySI),
 	}
 	for rName, rQuant := range r.OpaqueIntResources {
 		result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
@@ -264,6 +265,8 @@ func (n *NodeInfo) addPod(pod *v1.Pod) {
 	n.requestedResource.MilliCPU += res.MilliCPU
 	n.requestedResource.Memory += res.Memory
 	n.requestedResource.NvidiaGPU += res.NvidiaGPU
+	n.requestedResource.StorageOverlay += res.StorageOverlay
+	n.requestedResource.StorageScratch += res.StorageScratch
 	if n.requestedResource.OpaqueIntResources == nil && len(res.OpaqueIntResources) > 0 {
 		n.requestedResource.OpaqueIntResources = map[v1.ResourceName]int64{}
 	}
@@ -349,6 +352,8 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 				res.Memory += rQuant.Value()
 			case v1.ResourceNvidiaGPU:
 				res.NvidiaGPU += rQuant.Value()
+			case v1.ResourceStorageOverlay:
+				res.StorageOverlay += rQuant.Value()
 			default:
 				if v1helper.IsOpaqueIntResourceName(rName) {
 					res.AddOpaque(rName, rQuant.Value())
@@ -361,6 +366,15 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 		non0_mem += non0_mem_req
 		// No non-zero resources for GPUs or opaque resources.
 	}
+
+	// Account for storage requested by emptydir volumes
+	// If the storage medium is memory, should exclude the size
+	for _, vol := range pod.Spec.Volumes {
+		if vol.EmptyDir != nil && vol.EmptyDir.Medium != v1.StorageMediumMemory {
+			res.StorageScratch += vol.EmptyDir.SizeLimit.Value()
+		}
+	}
+
 	return
 }
 
@@ -391,6 +405,10 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			n.allocatableResource.NvidiaGPU = rQuant.Value()
 		case v1.ResourcePods:
 			n.allowedPodNumber = int(rQuant.Value())
+		case v1.ResourceStorage:
+			n.allocatableResource.StorageScratch = rQuant.Value()
+		case v1.ResourceStorageOverlay:
+			n.allocatableResource.StorageOverlay = rQuant.Value()
 		default:
 			if v1helper.IsOpaqueIntResourceName(rName) {
 				n.allocatableResource.SetOpaque(rName, rQuant.Value())
