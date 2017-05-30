@@ -506,12 +506,13 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		binDir = kubeCfg.NetworkPluginDir
 	}
 	pluginSettings := dockershim.NetworkPluginSettings{
-		HairpinMode:       hairpinMode,
-		NonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
-		PluginName:        kubeCfg.NetworkPluginName,
-		PluginConfDir:     kubeCfg.CNIConfDir,
-		PluginBinDir:      binDir,
-		MTU:               int(kubeCfg.NetworkPluginMTU),
+		HairpinMode:           hairpinMode,
+		NonMasqueradeCIDR:     kubeCfg.NonMasqueradeCIDR,
+		PluginName:            kubeCfg.NetworkPluginName,
+		PluginConfDir:         kubeCfg.CNIConfDir,
+		PluginBinDir:          binDir,
+		PluginVendorDirPrefix: kubeCfg.CNIVendorDirPrefix,
+		MTU: int(kubeCfg.NetworkPluginMTU),
 	}
 
 	// Remote runtime shim just cannot talk back to kubelet, so it doesn't
