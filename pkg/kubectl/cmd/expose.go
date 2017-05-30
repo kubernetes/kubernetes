@@ -34,9 +34,9 @@ import (
 )
 
 var (
-	expose_resources = `pod (po), service (svc), replicationcontroller (rc), deployment (deploy), replicaset (rs)`
+	exposeResources = `pod (po), service (svc), replicationcontroller (rc), deployment (deploy), replicaset (rs)`
 
-	expose_long = templates.LongDesc(`
+	exposeLong = templates.LongDesc(`
 		Expose a resource as a new Kubernetes service.
 
 		Looks up a deployment, service, replica set, replication controller or pod by name and uses the selector
@@ -48,9 +48,9 @@ var (
 
 		Possible resources include (case insensitive):
 
-		` + expose_resources)
+		` + exposeResources)
 
-	expose_example = templates.Examples(i18n.T(`
+	exposeExample = templates.Examples(i18n.T(`
 		# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 		kubectl expose rc nginx --port=80 --target-port=8000
 
@@ -77,7 +77,7 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	validArgs, argAliases := []string{}, []string{}
-	resources := regexp.MustCompile(`\s*,`).Split(expose_resources, -1)
+	resources := regexp.MustCompile(`\s*,`).Split(exposeResources, -1)
 	for _, r := range resources {
 		validArgs = append(validArgs, strings.Fields(r)[0])
 		argAliases = kubectl.ResourceAliases(validArgs)
@@ -86,8 +86,8 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]",
 		Short:   i18n.T("Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service"),
-		Long:    expose_long,
-		Example: expose_example,
+		Long:    exposeLong,
+		Example: exposeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunExpose(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
