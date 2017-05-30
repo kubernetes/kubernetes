@@ -323,6 +323,8 @@ staging/src/k8s.io/apimachinery/pkg/api/errors
 staging/src/k8s.io/apimachinery/pkg/api/resource
 staging/src/k8s.io/apimachinery/pkg/apimachinery
 staging/src/k8s.io/apimachinery/pkg/conversion/queryparams
+staging/src/k8s.io/apimachinery/pkg/fields
+staging/src/k8s.io/apimachinery/pkg/labels
 staging/src/k8s.io/apimachinery/pkg/runtime
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/recognizer/testing
