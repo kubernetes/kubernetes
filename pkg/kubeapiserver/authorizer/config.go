@@ -28,10 +28,13 @@ import (
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
+	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	rbaclisters "k8s.io/kubernetes/pkg/client/listers/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/node"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
 type AuthorizationConfig struct {
@@ -107,6 +110,19 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, error) {
 		}
 		// Keep cases in sync with constant list above.
 		switch authorizationMode {
+		case modes.ModeNode:
+			graph := node.NewGraph()
+			node.AddGraphEventHandlers(
+				graph,
+				config.InformerFactory.Core().InternalVersion().Pods(),
+				config.InformerFactory.Core().InternalVersion().PersistentVolumes(),
+			)
+			nodeAuthorizer := node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
+			authorizers = append(authorizers, nodeAuthorizer)
+
+			// Don't bind system:nodes to the system:node role
+			bootstrappolicy.AddClusterRoleBindingFilter(bootstrappolicy.OmitNodesGroupBinding)
+
 		case modes.ModeAlwaysAllow:
 			authorizers = append(authorizers, authorizerfactory.NewAlwaysAllowAuthorizer())
 		case modes.ModeAlwaysDeny:
