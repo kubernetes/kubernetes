@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -3350,6 +3351,7 @@ func TestValidateDNSPolicy(t *testing.T) {
 
 func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSeconds := int64(30)
+	activeDeadlineSecondsMax := int64(math.MaxUint32)
 
 	minUserID := types.UnixUserID(0)
 	maxUserID := types.UnixUserID(2147483647)
@@ -3376,6 +3378,21 @@ func TestValidatePodSpec(t *testing.T) {
 			NodeName:              "foobar",
 			DNSPolicy:             api.DNSClusterFirst,
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
+			ServiceAccountName:    "acct",
+		},
+		{ // Populate all fields with larger active deadline.
+			Volumes: []api.Volume{
+				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+			},
+			Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			InitContainers: []api.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:  api.RestartPolicyAlways,
+			NodeSelector: map[string]string{
+				"key": "value",
+			},
+			NodeName:              "foobar",
+			DNSPolicy:             api.DNSClusterFirst,
+			ActiveDeadlineSeconds: &activeDeadlineSecondsMax,
 			ServiceAccountName:    "acct",
 		},
 		{ // Populate HostNetwork.
@@ -3450,6 +3467,7 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 
 	activeDeadlineSeconds = int64(0)
+	activeDeadlineSecondsTooLarge := int64(math.MaxUint32 + 1)
 
 	minUserID = types.UnixUserID(-1)
 	maxUserID = types.UnixUserID(2147483648)
@@ -3590,6 +3608,19 @@ func TestValidatePodSpec(t *testing.T) {
 			NodeName:              "foobar",
 			DNSPolicy:             api.DNSClusterFirst,
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
+		},
+		"active-deadline-seconds-too-large": {
+			Volumes: []api.Volume{
+				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+			},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			NodeSelector: map[string]string{
+				"key": "value",
+			},
+			NodeName:              "foobar",
+			DNSPolicy:             api.DNSClusterFirst,
+			ActiveDeadlineSeconds: &activeDeadlineSecondsTooLarge,
 		},
 		"bad nodeName": {
 			NodeName:      "node name",
