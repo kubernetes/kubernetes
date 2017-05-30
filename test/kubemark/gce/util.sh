@@ -113,7 +113,7 @@ function execute-cmd-on-master-with-retries() {
 }
 
 function copy-files() {
-	run-gcloud-compute-with-retries copy-files --zone="${ZONE}" --project="${PROJECT}" $@
+	run-gcloud-compute-with-retries scp --recurse --zone="${ZONE}" --project="${PROJECT}" $@
 }
 
 function delete-master-instance-and-resources {
