@@ -77,6 +77,7 @@ go_test(
         "kubelet_test.go",
         "lifecycle_hook_test.go",
         "local_storage_allocatable_eviction_test.go",
+        "local_storage_isolation_eviction_test.go",
         "log_path_test.go",
         "memory_eviction_test.go",
         "mirror_pod_test.go",
@@ -137,6 +138,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
