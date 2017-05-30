@@ -1811,7 +1811,6 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 }
 
 // dispatchWork starts the asynchronous sync of the pod in a pod worker.
-// If the pod is terminated, dispatchWork
 func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mirrorPod *v1.Pod, start time.Time) {
 	if kl.podIsTerminated(pod) {
 		if pod.DeletionTimestamp != nil {
