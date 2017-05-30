@@ -151,6 +151,30 @@ var _ = framework.KubeDescribe("GPU [Serial]", func() {
 
 			By("Checking if the pod outputted Success to its logs")
 			framework.ExpectNoError(f.PodClient().MatchContainerOutput(podFailure.Name, podFailure.Name, "Success"))
+
+			By("Creating a pod that will consume all GPUs")
+			podSuccess = makePod(getGPUsAvailable(f), "gpus-success")
+			podSuccess = f.PodClient().CreateSync(podSuccess)
+
+			By("Checking if the pod outputted Success to its logs")
+			framework.ExpectNoError(f.PodClient().MatchContainerOutput(podSuccess.Name, podSuccess.Name, "Success"))
+
+			By("restarting the kubelet")
+			if stdout, err := exec.Command("sudo", "pkill", "kubelet").CombinedOutput(); err != nil {
+				framework.Failf("Failed to trigger kubelet restart with pkill: %v, stdout: %q", err, string(stdout))
+			}
+			time.Sleep(20 * time.Second)
+
+			By("Creating a new pod requesting a GPU and noticing that it is rejected by the Kubelet")
+			podFailure = makePod(1, "gpu-failure")
+			framework.WaitForPodCondition(f.ClientSet, f.Namespace.Name, podFailure.Name, "pod rejected", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+				if pod.Status.Phase == v1.PodFailed {
+					return true, nil
+
+				}
+				return false, nil
+			})
+
 		})
 	})
 })
