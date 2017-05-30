@@ -499,7 +499,7 @@ func (ReplicationControllerDummy) SwaggerDoc() map[string]string {
 }
 
 var map_RollbackConfig = map[string]string{
-	"revision": "The revision to rollback to. If set to 0, rollbck to the last revision.",
+	"revision": "The revision to rollback to. If set to 0, rollback to the last revision.",
 }
 
 func (RollbackConfig) SwaggerDoc() map[string]string {
