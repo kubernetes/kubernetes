@@ -25,18 +25,26 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
-
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 )
 
 func TestResolve(t *testing.T) {
-	endpoints := []*v1.Endpoints{{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
-		Subsets: []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{{Hostname: "dummy-host", IP: "127.0.0.1"}},
-			Ports:     []v1.EndpointPort{{Port: 443}},
-		}},
-	}}
+	matchingEndpoints := func(svc *v1.Service) []*v1.Endpoints {
+		ports := []v1.EndpointPort{}
+		for _, p := range svc.Spec.Ports {
+			if p.TargetPort.Type != intstr.Int {
+				continue
+			}
+			ports = append(ports, v1.EndpointPort{Name: p.Name, Port: p.TargetPort.IntVal})
+		}
+
+		return []*v1.Endpoints{{
+			ObjectMeta: metav1.ObjectMeta{Namespace: svc.Namespace, Name: svc.Name},
+			Subsets: []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{Hostname: "dummy-host", IP: "127.0.0.1"}},
+				Ports:     ports,
+			}},
+		}}
+	}
 
 	type expectation struct {
 		url   string
@@ -44,37 +52,30 @@ func TestResolve(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		services   []*v1.Service
-		endpoints  []*v1.Endpoints
-		apiService *apiregistration.APIService
+		name      string
+		services  []*v1.Service
+		endpoints func(svc *v1.Service) []*v1.Endpoints
 
 		clusterMode  expectation
 		endpointMode expectation
 	}{
 		{
-			name: "cluster ip without ports",
+			name: "cluster ip without 443 port",
 			services: []*v1.Service{
 				{
 					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
 					Spec: v1.ServiceSpec{
 						Type:      v1.ServiceTypeClusterIP,
 						ClusterIP: "hit",
+						Ports: []v1.ServicePort{
+							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+						},
 					},
 				},
 			},
-			endpoints: endpoints, // TODO: do we have endpoints without ports?
-			apiService: &apiregistration.APIService{
-				ObjectMeta: metav1.ObjectMeta{Name: "v1."},
-				Spec: apiregistration.APIServiceSpec{
-					Service: &apiregistration.ServiceReference{
-						Namespace: "one",
-						Name:      "alfa",
-					},
-				},
-			},
+			endpoints: matchingEndpoints,
 
-			clusterMode:  expectation{url: "https://hit"}, // TODO: this should be an error as well
+			clusterMode:  expectation{error: true},
 			endpointMode: expectation{error: true},
 		},
 		{
@@ -85,22 +86,17 @@ func TestResolve(t *testing.T) {
 					Spec: v1.ServiceSpec{
 						Type:      v1.ServiceTypeClusterIP,
 						ClusterIP: "hit",
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+						},
 					},
 				},
 			},
-			endpoints: endpoints,
-			apiService: &apiregistration.APIService{
-				ObjectMeta: metav1.ObjectMeta{Name: "v1."},
-				Spec: apiregistration.APIServiceSpec{
-					Service: &apiregistration.ServiceReference{
-						Namespace: "one",
-						Name:      "alfa",
-					},
-				},
-			},
+			endpoints: matchingEndpoints,
 
-			clusterMode:  expectation{url: "https://hit"},
-			endpointMode: expectation{url: "https://127.0.0.1"},
+			clusterMode:  expectation{url: "https://hit:443"},
+			endpointMode: expectation{url: "https://127.0.0.1:1443"},
 		},
 		{
 			name: "cluster ip without endpoints",
@@ -110,21 +106,16 @@ func TestResolve(t *testing.T) {
 					Spec: v1.ServiceSpec{
 						Type:      v1.ServiceTypeClusterIP,
 						ClusterIP: "hit",
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+						},
 					},
 				},
 			},
 			endpoints: nil,
-			apiService: &apiregistration.APIService{
-				ObjectMeta: metav1.ObjectMeta{Name: "v1."},
-				Spec: apiregistration.APIServiceSpec{
-					Service: &apiregistration.ServiceReference{
-						Namespace: "one",
-						Name:      "alfa",
-					},
-				},
-			},
 
-			clusterMode:  expectation{url: "https://hit"},
+			clusterMode:  expectation{url: "https://hit:443"},
 			endpointMode: expectation{error: true},
 		},
 		{
@@ -135,22 +126,17 @@ func TestResolve(t *testing.T) {
 					Spec: v1.ServiceSpec{
 						Type:      v1.ServiceTypeLoadBalancer,
 						ClusterIP: "lb",
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+						},
 					},
 				},
 			},
-			endpoints: nil,
-			apiService: &apiregistration.APIService{
-				ObjectMeta: metav1.ObjectMeta{Name: "v1."},
-				Spec: apiregistration.APIServiceSpec{
-					Service: &apiregistration.ServiceReference{
-						Namespace: "one",
-						Name:      "alfa",
-					},
-				},
-			},
+			endpoints: matchingEndpoints,
 
-			clusterMode:  expectation{url: "https://lb"},
-			endpointMode: expectation{error: true},
+			clusterMode:  expectation{url: "https://lb:443"},
+			endpointMode: expectation{url: "https://127.0.0.1:1443"},
 		},
 		{
 			name: "node port",
@@ -160,53 +146,47 @@ func TestResolve(t *testing.T) {
 					Spec: v1.ServiceSpec{
 						Type:      v1.ServiceTypeNodePort,
 						ClusterIP: "np",
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 443, TargetPort: intstr.FromInt(1443)},
+							{Port: 1234, TargetPort: intstr.FromInt(1234)},
+						},
 					},
 				},
 			},
-			endpoints: nil,
-			apiService: &apiregistration.APIService{
-				ObjectMeta: metav1.ObjectMeta{Name: "v1."},
-				Spec: apiregistration.APIServiceSpec{
-					Service: &apiregistration.ServiceReference{
-						Namespace: "one",
-						Name:      "alfa",
-					},
-				},
-			},
+			endpoints: matchingEndpoints,
 
-			clusterMode:  expectation{url: "https://np"},
-			endpointMode: expectation{error: true},
+			clusterMode:  expectation{url: "https://np:443"},
+			endpointMode: expectation{url: "https://127.0.0.1:1443"},
 		},
 		{
 			name:      "missing service",
 			services:  nil,
 			endpoints: nil,
-			apiService: &apiregistration.APIService{
-				ObjectMeta: metav1.ObjectMeta{Name: "v1."},
-				Spec: apiregistration.APIServiceSpec{
-					Service: &apiregistration.ServiceReference{
-						Namespace: "one",
-						Name:      "alfa",
-					},
-				},
-			},
 
-			clusterMode:  expectation{url: "https://alfa.one.svc"}, // defaulting to 443 due to https:// prefix
+			clusterMode:  expectation{error: true},
 			endpointMode: expectation{error: true},
 		},
 	}
 
 	for _, test := range tests {
-		serviceCache := cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		serviceCache := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		serviceLister := v1listers.NewServiceLister(serviceCache)
 		for i := range test.services {
-			serviceCache.Add(test.services[i])
+			if err := serviceCache.Add(test.services[i]); err != nil {
+				t.Fatalf("%s unexpected service add error: %v", test.name, err)
+			}
 		}
 
-		endpointCache := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+		endpointCache := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		endpointLister := v1listers.NewEndpointsLister(endpointCache)
-		for i := range test.endpoints {
-			endpointCache.Add(test.endpoints[i])
+		if test.endpoints != nil {
+			for _, svc := range test.services {
+				for _, ep := range test.endpoints(svc) {
+					if err := endpointCache.Add(ep); err != nil {
+						t.Fatalf("%s unexpected endpoint add error: %v", test.name, err)
+					}
+				}
+			}
 		}
 
 		check := func(mode string, expected expectation, url *url.URL, err error) {
