@@ -826,6 +826,51 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 	}
 }
 
+func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+		ColumnLabels: []string{},
+		Wide:         true,
+	})
+	AddHandlers(printer)
+
+	table := []struct {
+		node                    api.Node
+		containerRuntimeVersion string
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+				Status: api.NodeStatus{
+					NodeInfo:  api.NodeSystemInfo{ContainerRuntimeVersion: "foo://1.2.3"},
+					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				},
+			},
+			containerRuntimeVersion: "foo://1.2.3",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
+				Status: api.NodeStatus{
+					NodeInfo:  api.NodeSystemInfo{},
+					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				},
+			},
+			containerRuntimeVersion: "<unknown>",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.node, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Node: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.containerRuntimeVersion) {
+			t.Fatalf("Expect printing node %s with kernel version %#v, got: %#v", test.node.Name, test.containerRuntimeVersion, buffer.String())
+		}
+	}
+}
+
 func TestPrintNodeName(t *testing.T) {
 	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 		Wide: true,

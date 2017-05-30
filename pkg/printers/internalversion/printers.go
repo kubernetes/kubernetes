@@ -71,7 +71,7 @@ var (
 	statefulSetColumns               = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 	endpointColumns                  = []string{"NAME", "ENDPOINTS", "AGE"}
 	nodeColumns                      = []string{"NAME", "STATUS", "AGE", "VERSION"}
-	nodeWideColumns                  = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION"}
+	nodeWideColumns                  = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION", "CONTAINER-RUNTIME"}
 	daemonSetColumns                 = []string{"NAME", "DESIRED", "CURRENT", "READY", "UP-TO-DATE", "AVAILABLE", "NODE-SELECTOR", "AGE"}
 	daemonSetWideColumns             = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 	eventColumns                     = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
@@ -1127,14 +1127,17 @@ func printNode(node *api.Node, w io.Writer, options printers.PrintOptions) error
 	}
 
 	if options.Wide {
-		osImage, kernelVersion := node.Status.NodeInfo.OSImage, node.Status.NodeInfo.KernelVersion
+		osImage, kernelVersion, crVersion := node.Status.NodeInfo.OSImage, node.Status.NodeInfo.KernelVersion, node.Status.NodeInfo.ContainerRuntimeVersion
 		if osImage == "" {
 			osImage = "<unknown>"
 		}
 		if kernelVersion == "" {
 			kernelVersion = "<unknown>"
 		}
-		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s", getNodeExternalIP(node), osImage, kernelVersion); err != nil {
+		if crVersion == "" {
+			crVersion = "<unknown>"
+		}
+		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s\t%s", getNodeExternalIP(node), osImage, kernelVersion, crVersion); err != nil {
 			return err
 		}
 	}
