@@ -778,7 +778,7 @@ function create-subnetworks() {
       --network ${NETWORK} \
       --region ${REGION} \
       --range ${NODE_IP_RANGE} \
-      --secondary-range "name=pods-default,range=${CLUSTER_IP_RANGE}"
+      --secondary-range "pods-default=${CLUSTER_IP_RANGE}"
     echo "Created subnetwork ${IP_ALIAS_SUBNETWORK}"
   else
     if ! echo ${subnet} | grep --quiet secondaryIpRanges ${subnet}; then
