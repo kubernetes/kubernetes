@@ -19,11 +19,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 
 	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
@@ -31,6 +33,62 @@ import (
 	// Only required to authenticate against GKE clusters
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
+
+type PodLoggingController struct {
+	informerFactory informers.SharedInformerFactory
+	podInformer     coreinformers.PodInformer
+}
+
+func (c *PodLoggingController) Run(stopCh chan struct{}) error {
+	// Starts all the shared informers that have been created by the factory so
+	// far.
+	c.informerFactory.Start(stopCh)
+	// wait for the initial synchronization of the local cache.
+	if !cache.WaitForCacheSync(stopCh, c.podInformer.Informer().HasSynced) {
+		return fmt.Errorf("Failed to sync")
+	}
+	return nil
+}
+
+func (c *PodLoggingController) podAdd(obj interface{}) {
+	pod := obj.(*v1.Pod)
+	glog.Infof("POD CREATED: %s/%s", pod.Namespace, pod.Name)
+}
+
+func (c *PodLoggingController) podUpdate(old, new interface{}) {
+	oldPod := old.(*v1.Pod)
+	newPod := new.(*v1.Pod)
+	glog.Infof(
+		"POD UPDATED. %s/%s %s",
+		oldPod.Namespace, oldPod.Name, newPod.Status.Phase,
+	)
+}
+
+func (c *PodLoggingController) podDelete(obj interface{}) {
+	pod := obj.(*v1.Pod)
+	glog.Infof("POD DELETED: %s/%s", pod.Namespace, pod.Name)
+}
+
+func NewPodLoggingController(informerFactory informers.SharedInformerFactory) *PodLoggingController {
+	podInformer := informerFactory.Core().V1().Pods()
+
+	c := &PodLoggingController{
+		informerFactory: informerFactory,
+		podInformer:     podInformer,
+	}
+	podInformer.Informer().AddEventHandler(
+		// Your custom resource event handlers.
+		cache.ResourceEventHandlerFuncs{
+			// Called on creation
+			AddFunc: c.podAdd,
+			// Called on resource update and every resyncPeriod on existing resources.
+			UpdateFunc: c.podUpdate,
+			// Called on resource deletion.
+			DeleteFunc: c.podDelete,
+		},
+	)
+	return c
+}
 
 func main() {
 	var kubeconfig string
@@ -55,43 +113,12 @@ func main() {
 	}
 
 	factory := informers.NewSharedInformerFactory(clientset, time.Hour*24)
-
-	informer := factory.Core().V1().Pods().Informer()
-
-	informer.AddEventHandler(
-		// Your custom resource event handlers.
-		cache.ResourceEventHandlerFuncs{
-			// Called on creation
-			AddFunc: func(obj interface{}) {
-				pod := obj.(*v1.Pod)
-				glog.Infof("POD CREATED: %s/%s", pod.Namespace, pod.Name)
-			},
-			// Called on resource update and every resyncPeriod on existing resources.
-			UpdateFunc: func(old, new interface{}) {
-				oldPod := old.(*v1.Pod)
-				newPod := new.(*v1.Pod)
-				glog.Infof(
-					"POD UPDATED. %s/%s %s",
-					oldPod.Namespace, oldPod.Name, newPod.Status.Phase,
-				)
-			},
-			// Called on resource deletion.
-			DeleteFunc: func(obj interface{}) {
-				pod := obj.(*v1.Pod)
-				glog.Infof("POD DELETED: %s/%s", pod.Namespace, pod.Name)
-			},
-		},
-	)
-
+	controller := NewPodLoggingController(factory)
 	stop := make(chan struct{})
 	defer close(stop)
-
-	// Starts all the shared informers that have been created by the factory so
-	// far.
-	factory.Start(stop)
-
-	// wait for the initial synchronization of the local cache.
-	cache.WaitForCacheSync(stop, informer.HasSynced)
-
+	err = controller.Run(stop)
+	if err != nil {
+		glog.Fatal(err)
+	}
 	select {}
 }
