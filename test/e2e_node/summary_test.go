@@ -35,8 +35,6 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-const restartCount = 3
-
 var _ = framework.KubeDescribe("Summary API", func() {
 	f := framework.NewDefaultFramework("summary-test")
 	Context("when querying /stats/summary", func() {
@@ -55,10 +53,22 @@ var _ = framework.KubeDescribe("Summary API", func() {
 			const pod1 = "stats-busybox-1"
 
 			By("Creating test pods")
-			pods := getSummaryTestPods(f, pod0, pod1)
+			numRestarts := int32(1)
+			pods := getSummaryTestPods(f, numRestarts, pod0, pod1)
 			f.PodClient().CreateBatch(pods)
-			// Wait for cAdvisor to collect 2 stats points, and for pods to restart
-			time.Sleep(45 * time.Second)
+
+			Eventually(func() error {
+				for _, pod := range pods {
+					err := verifyPodRestartCount(f, pod.Name, len(pod.Spec.Containers), numRestarts)
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			}, time.Minute, 5*time.Second).Should(BeNil())
+
+			// Wait for cAdvisor to collect 2 stats points
+			time.Sleep(15 * time.Second)
 
 			// Setup expectations.
 			const (
@@ -134,8 +144,8 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						"StartTime": recent(maxStartAge),
 						"CPU": ptrMatchAllFields(gstruct.Fields{
 							"Time":                 recent(maxStatsAge),
-							"UsageNanoCores":       bounded(100000, 1000000000),
-							"UsageCoreNanoSeconds": bounded(10000000, 100000000000),
+							"UsageNanoCores":       bounded(100000, 1E9),
+							"UsageCoreNanoSeconds": bounded(10000000, 1E11),
 						}),
 						"Memory": ptrMatchAllFields(gstruct.Fields{
 							"Time":            recent(maxStatsAge),
@@ -262,7 +272,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 	})
 })
 
-func getSummaryTestPods(f *framework.Framework, names ...string) []*v1.Pod {
+func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...string) []*v1.Pod {
 	pods := make([]*v1.Pod, 0, len(names))
 	for _, name := range names {
 		pods = append(pods, &v1.Pod{
@@ -275,7 +285,7 @@ func getSummaryTestPods(f *framework.Framework, names ...string) []*v1.Pod {
 					{
 						Name:    "busybox-container",
 						Image:   "gcr.io/google_containers/busybox:1.24",
-						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, restartCount, "ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file"),
+						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file"),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
 								// Must set memory limit to get MemoryStats.AvailableBytes
