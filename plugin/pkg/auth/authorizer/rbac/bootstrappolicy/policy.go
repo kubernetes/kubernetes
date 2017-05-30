@@ -226,7 +226,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				// TODO: remove once mirror pods are removed
 				// TODO: restrict deletion to mirror pods created by the bound node once supported
 				// Needed for the node to create/delete mirror pods
-				rbac.NewRule("get", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				rbac.NewRule("create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 				// TODO: restrict to pods scheduled on the bound node once supported
 				rbac.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
 
