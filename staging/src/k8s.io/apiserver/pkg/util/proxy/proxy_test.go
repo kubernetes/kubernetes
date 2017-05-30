@@ -175,6 +175,22 @@ func TestResolve(t *testing.T) {
 			endpointMode: expectation{url: "https://127.0.0.1:1443"},
 		},
 		{
+			name: "external name",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
+					Spec: v1.ServiceSpec{
+						Type:         v1.ServiceTypeExternalName,
+						ExternalName: "foo.bar.com",
+					},
+				},
+			},
+			endpoints: nil,
+
+			clusterMode:  expectation{url: "https://foo.bar.com:443"},
+			endpointMode: expectation{error: true},
+		},
+		{
 			name:      "missing service",
 			services:  nil,
 			endpoints: nil,

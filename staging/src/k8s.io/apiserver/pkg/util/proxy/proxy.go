@@ -113,6 +113,14 @@ func ResolveCluster(services listersv1.ServiceLister, namespace, id string) (*ur
 			Scheme: "https",
 			Host:   net.JoinHostPort(svc.Spec.ClusterIP, fmt.Sprintf("%d", svcPort.Port)),
 		}, nil
+	case svc.Spec.Type == v1.ServiceTypeExternalName:
+		if port.Type != intstr.Int {
+			return nil, fmt.Errorf("named ports not supported")
+		}
+		return &url.URL{
+			Scheme: "https",
+			Host:   net.JoinHostPort(svc.Spec.ExternalName, port.String()),
+		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported service type %q", svc.Spec.Type)
 	}
