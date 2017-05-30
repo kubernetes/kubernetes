@@ -813,7 +813,8 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl describe", func() {
-		It("should check if kubectl describe prints relevant information for rc and pods [Conformance]", func() {
+		// Flaky issue: #41898
+		It("should check if kubectl describe prints relevant information for rc and pods [Conformance] [Flaky]", func() {
 			framework.SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c.Discovery())
 			kv, err := framework.KubectlVersion()
 			Expect(err).NotTo(HaveOccurred())
