@@ -88,8 +88,8 @@ func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, binDir, vendorCNIDirPr
 	return []network.NetworkPlugin{plugin}
 }
 
-func ProbeNetworkPlugins(pluginDir, binDir string) []network.NetworkPlugin {
-	return probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, binDir, "")
+func ProbeNetworkPlugins(pluginDir, binDir, vendorDirPrefix string) []network.NetworkPlugin {
+	return probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, binDir, vendorDirPrefix)
 }
 
 func getDefaultCNINetwork(pluginDir, binDir, vendorCNIDirPrefix string) (*cniNetwork, error) {

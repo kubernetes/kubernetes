@@ -112,6 +112,7 @@ cluster-signing-key-file
 cluster-tag
 cni-bin-dir
 cni-conf-dir
+cni-vendor-dir-prefix
 concurrent-deployment-syncs
 concurrent-endpoint-syncs
 concurrent-gc-syncs

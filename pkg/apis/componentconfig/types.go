@@ -332,6 +332,10 @@ type KubeletConfiguration struct {
 	// CNIBinDir is the full path of the directory in which to search for
 	// CNI plugin binaries
 	CNIBinDir string
+	// CNIVendorDirPrefix is full path of parent directory that houses all
+	// vendor CNI binaries according to VendorCNIDirTemplate
+	// ("<this-prefix>/opt/<plugin-type>/bin").  Default: ""
+	CNIVendorDirPrefix string
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string

@@ -435,6 +435,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.NetworkPluginDir = in.NetworkPluginDir
 	out.CNIConfDir = in.CNIConfDir
 	out.CNIBinDir = in.CNIBinDir
+	out.CNIVendorDirPrefix = in.CNIVendorDirPrefix
 	out.NetworkPluginMTU = in.NetworkPluginMTU
 	out.VolumePluginDir = in.VolumePluginDir
 	out.CloudProvider = in.CloudProvider
@@ -632,6 +633,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.NetworkPluginDir = in.NetworkPluginDir
 	out.CNIConfDir = in.CNIConfDir
 	out.CNIBinDir = in.CNIBinDir
+	out.CNIVendorDirPrefix = in.CNIVendorDirPrefix
 	out.VolumePluginDir = in.VolumePluginDir
 	out.CloudProvider = in.CloudProvider
 	out.CloudConfigFile = in.CloudConfigFile
