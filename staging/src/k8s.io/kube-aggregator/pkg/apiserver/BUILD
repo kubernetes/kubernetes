@@ -11,7 +11,6 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
-        "apiservice_controller_test.go",
         "handler_apis_test.go",
         "handler_proxy_test.go",
     ],
