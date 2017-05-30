@@ -30,11 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (
@@ -61,7 +61,7 @@ func Register(plugins *admission.Plugins) {
 // It enforces life-cycle constraints around a Namespace depending on its Phase
 type lifecycle struct {
 	*admission.Handler
-	client             internalclientset.Interface
+	client             kubernetes.Interface
 	immortalNamespaces sets.String
 	namespaceLister    corelisters.NamespaceLister
 	// forceLiveLookupCache holds a list of entries for namespaces that we have a strong reason to believe are stale in our local cache.
@@ -73,11 +73,11 @@ type forceLiveLookupEntry struct {
 	expiry time.Time
 }
 
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&lifecycle{})
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&lifecycle{})
+var _ = initializer.WantsExternalKubeInformerFactory(&lifecycle{})
+var _ = initializer.WantsExternalKubeClientSet(&lifecycle{})
 
-func makeNamespaceKey(namespace string) *api.Namespace {
-	return &api.Namespace{
+func makeNamespaceKey(namespace string) *v1.Namespace {
+	return &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      namespace,
 			Namespace: "",
@@ -87,14 +87,14 @@ func makeNamespaceKey(namespace string) *api.Namespace {
 
 func (l *lifecycle) Admit(a admission.Attributes) error {
 	// prevent deletion of immortal namespaces
-	if a.GetOperation() == admission.Delete && a.GetKind().GroupKind() == api.Kind("Namespace") && l.immortalNamespaces.Has(a.GetName()) {
+	if a.GetOperation() == admission.Delete && a.GetKind().GroupKind() == v1.SchemeGroupVersion.WithKind("Namespace").GroupKind() && l.immortalNamespaces.Has(a.GetName()) {
 		return errors.NewForbidden(a.GetResource().GroupResource(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
 	}
 
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.
-	if len(a.GetNamespace()) == 0 || a.GetKind().GroupKind() == api.Kind("Namespace") {
+	if len(a.GetNamespace()) == 0 || a.GetKind().GroupKind() == v1.SchemeGroupVersion.WithKind("Namespace").GroupKind() {
 		// if a namespace is deleted, we want to prevent all further creates into it
 		// while it is undergoing termination.  to reduce incidences where the cache
 		// is slow to update, we add the namespace into a force live lookup list to ensure
@@ -151,7 +151,7 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 	forceLiveLookup := false
 	if _, ok := l.forceLiveLookupCache.Get(a.GetNamespace()); ok {
 		// we think the namespace was marked for deletion, but our current local cache says otherwise, we will force a live lookup.
-		forceLiveLookup = exists && namespace.Status.Phase == api.NamespaceActive
+		forceLiveLookup = exists && namespace.Status.Phase == v1.NamespaceActive
 	}
 
 	// refuse to operate on non-existent namespaces
@@ -169,7 +169,7 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 
 	// ensure that we're not trying to create objects in terminating namespaces
 	if a.GetOperation() == admission.Create {
-		if namespace.Status.Phase != api.NamespaceTerminating {
+		if namespace.Status.Phase != v1.NamespaceTerminating {
 			return nil
 		}
 
@@ -194,13 +194,13 @@ func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock
 	}, nil
 }
 
-func (l *lifecycle) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	namespaceInformer := f.Core().InternalVersion().Namespaces()
+func (l *lifecycle) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	namespaceInformer := f.Core().V1().Namespaces()
 	l.namespaceLister = namespaceInformer.Lister()
 	l.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
-func (l *lifecycle) SetInternalKubeClientSet(client internalclientset.Interface) {
+func (l *lifecycle) SetExternalKubeClientSet(client kubernetes.Interface) {
 	l.client = client
 }
 

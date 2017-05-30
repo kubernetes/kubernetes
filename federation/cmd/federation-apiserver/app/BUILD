@@ -67,7 +67,6 @@ go_library(
         "//plugin/pkg/admission/admit:go_default_library",
         "//plugin/pkg/admission/deny:go_default_library",
         "//plugin/pkg/admission/gc:go_default_library",
-        "//plugin/pkg/admission/namespace/lifecycle:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",

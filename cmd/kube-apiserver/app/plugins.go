@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
-	"k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
 	noderestriction "k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
@@ -64,7 +63,6 @@ func registerAllAdmissionPlugins(plugins *admission.Plugins) {
 	limitranger.Register(plugins)
 	autoprovision.Register(plugins)
 	exists.Register(plugins)
-	lifecycle.Register(plugins)
 	noderestriction.Register(plugins)
 	label.Register(plugins)
 	podnodeselector.Register(plugins)

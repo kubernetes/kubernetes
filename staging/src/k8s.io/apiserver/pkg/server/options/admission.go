@@ -35,11 +35,16 @@ type AdmissionOptions struct {
 }
 
 // NewAdmissionOptions creates a new instance of AdmissionOptions
+// Note:
+// In addition it calls RegisterAllAdmissionPlugins to register
+// all generic admission plugins.
 func NewAdmissionOptions() *AdmissionOptions {
-	return &AdmissionOptions{
+	options := &AdmissionOptions{
 		Plugins:     &admission.Plugins{},
 		PluginNames: []string{},
 	}
+	server.RegisterAllAdmissionPlugins(options.Plugins)
+	return options
 }
 
 // AddFlags adds flags related to admission for a specific APIServer to the specified FlagSet
