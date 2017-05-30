@@ -15,13 +15,6 @@
   {% set api_servers = "--api-servers=https://" + ips[0][0] -%}
 {% endif -%}
 
-# TODO: remove nginx for other cloud providers.
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'photon-controller', 'openstack', 'azure-legacy']  %}
-  {% set api_servers_with_port = api_servers -%}
-{% else -%}
-  {% set api_servers_with_port = api_servers + ":6443" -%}
-{% endif -%}
-
 {% set master_kubelet_args = "" %}
 
 {% set debugging_handlers = "--enable-debugging-handlers=true" -%}
@@ -32,10 +25,10 @@
     # Unless given a specific directive, disable registration for the kubelet
     # running on the master.
     {% if grains.kubelet_api_servers is defined -%}
-      {% set api_servers_with_port = "--api-servers=https://" + grains.kubelet_api_servers -%}
+      {% set api_servers = "--api-servers=https://" + grains.kubelet_api_servers -%}
       {% set master_kubelet_args = master_kubelet_args + "--register-schedulable=false" -%}
     {% else -%}
-      {% set api_servers_with_port = "" -%}
+      {% set api_servers = "" -%}
     {% endif -%}
 
     # Disable the debugging handlers (/run and /exec) to prevent arbitrary
@@ -113,7 +106,7 @@
 {% if grains['roles'][0] == 'kubernetes-master' %}
   {% if grains.get('cbr-cidr') %}
     {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
-  {% elif api_servers_with_port == '' and pillar.get('network_provider', '').lower() == 'kubenet' %}
+  {% elif api_servers == '' and pillar.get('network_provider', '').lower() == 'kubenet' %}
     # Kubelet standalone mode needs a PodCIDR since there is no controller-manager
     {% set pod_cidr = "--pod-cidr=10.76.0.0/16" %}
   {% endif -%}
@@ -186,4 +179,4 @@
 {% set kubelet_auth = "--anonymous-auth=false --authorization-mode=Webhook --client-ca-file=" + pillar.get('ca_cert_bundle_path', '/var/lib/kubelet/ca.crt') %}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{eviction_hard}} {{kubelet_auth}} {{feature_gates}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{eviction_hard}} {{kubelet_auth}} {{feature_gates}} {{test_args}}"
