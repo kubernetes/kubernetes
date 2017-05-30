@@ -436,12 +436,12 @@ staging/src/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/install
 staging/src/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/validation
 staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions
 staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions/apiextensions
-staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions/apiextensions/v1alpha1
+staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/externalversions/apiextensions/v1beta1
 staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion
 staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion/apiextensions
 staging/src/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion/apiextensions/internalversion
 staging/src/k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/internalversion
-staging/src/k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/v1alpha1
+staging/src/k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/v1beta1
 staging/src/k8s.io/kube-apiextensions-server/test/integration
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics/install
 staging/src/k8s.io/metrics/pkg/apis/metrics/install

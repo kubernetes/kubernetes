@@ -22,7 +22,7 @@ import (
 	"fmt"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
-	v1alpha1 "k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
+	v1beta1 "k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1beta1"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other
@@ -51,9 +51,9 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=Apiextensions, Version=V1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("customresourcedefinitions"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apiextensions().V1alpha1().CustomResourceDefinitions().Informer()}, nil
+	// Group=Apiextensions, Version=V1beta1
+	case v1beta1.SchemeGroupVersion.WithResource("customresourcedefinitions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()}, nil
 
 	}
 

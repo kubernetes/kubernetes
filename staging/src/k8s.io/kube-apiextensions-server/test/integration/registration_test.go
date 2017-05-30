@@ -34,12 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
-	apiextensionsv1alpha1 "k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
+	apiextensionsv1beta1 "k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1beta1"
 	extensionsapiserver "k8s.io/kube-apiextensions-server/pkg/apiserver"
 	"k8s.io/kube-apiextensions-server/test/integration/testserver"
 )
 
-func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client *dynamic.ResourceClient, definition *apiextensionsv1alpha1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
+func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client *dynamic.ResourceClient, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
 	createdInstance, err := client.Create(instanceToCreate)
 	if err != nil {
 		t.Logf("%#v", createdInstance)
@@ -66,10 +66,10 @@ func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unst
 	return createdInstance, nil
 }
 
-func NewNamespacedCustomResourceClient(ns string, client *dynamic.Client, definition *apiextensionsv1alpha1.CustomResourceDefinition) *dynamic.ResourceClient {
+func NewNamespacedCustomResourceClient(ns string, client *dynamic.Client, definition *apiextensionsv1beta1.CustomResourceDefinition) *dynamic.ResourceClient {
 	return client.Resource(&metav1.APIResource{
 		Name:       definition.Spec.Names.Plural,
-		Namespaced: definition.Spec.Scope == apiextensionsv1alpha1.NamespaceScoped,
+		Namespaced: definition.Spec.Scope == apiextensionsv1beta1.NamespaceScoped,
 	}, ns)
 }
 
@@ -81,7 +81,7 @@ func TestMultipleResourceInstances(t *testing.T) {
 	defer close(stopCh)
 
 	ns := "not-the-default"
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
 	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
 	if err != nil {
 		t.Fatal(err)
@@ -206,7 +206,7 @@ func TestMultipleRegistration(t *testing.T) {
 
 	ns := "not-the-default"
 	sameInstanceName := "foo"
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
 	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
 	if err != nil {
 		t.Fatal(err)
@@ -225,7 +225,7 @@ func TestMultipleRegistration(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	curletDefinition := testserver.NewCurletCustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
+	curletDefinition := testserver.NewCurletCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
 	curletVersionClient, err := testserver.CreateNewCustomResourceDefinition(curletDefinition, apiExtensionClient, clientPool)
 	if err != nil {
 		t.Fatal(err)
@@ -259,7 +259,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer close(stopCh)
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
 	ns := "not-the-default"
 	sameInstanceName := "foo"
 	func() {
@@ -356,7 +356,7 @@ func TestEtcdStorage(t *testing.T) {
 	etcdPrefix := getPrefixFromConfig(t, config)
 
 	ns1 := "another-default-is-possible"
-	curletDefinition := testserver.NewCurletCustomResourceDefinition(apiextensionsv1alpha1.ClusterScoped)
+	curletDefinition := testserver.NewCurletCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
 	curletVersionClient, err := testserver.CreateNewCustomResourceDefinition(curletDefinition, apiExtensionClient, clientPool)
 	if err != nil {
 		t.Fatal(err)
@@ -367,7 +367,7 @@ func TestEtcdStorage(t *testing.T) {
 	}
 
 	ns2 := "the-cruel-default"
-	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1alpha1.NamespaceScoped)
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
 	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
 	if err != nil {
 		t.Fatal(err)
@@ -385,11 +385,11 @@ func TestEtcdStorage(t *testing.T) {
 			etcdPath: path.Join("/", etcdPrefix, "apiextensions.k8s.io/customresourcedefinitions/noxus.mygroup.example.com"), // TODO: Double check this, no namespace?
 			expectedObject: &metaObject{
 				Kind:       "CustomResourceDefinition",
-				APIVersion: "apiextensions.k8s.io/v1alpha1",
+				APIVersion: "apiextensions.k8s.io/v1beta1",
 				Metadata: Metadata{
 					Name:      "noxus.mygroup.example.com",
 					Namespace: "",
-					SelfLink:  "/apis/apiextensions.k8s.io/v1alpha1/customresourcedefinitions/noxus.mygroup.example.com",
+					SelfLink:  "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/noxus.mygroup.example.com",
 				},
 			},
 		},
@@ -397,7 +397,7 @@ func TestEtcdStorage(t *testing.T) {
 			etcdPath: path.Join("/", etcdPrefix, "mygroup.example.com/noxus/the-cruel-default/foo"),
 			expectedObject: &metaObject{
 				Kind:       "WishIHadChosenNoxu",
-				APIVersion: "mygroup.example.com/v1alpha1",
+				APIVersion: "mygroup.example.com/v1beta1",
 				Metadata: Metadata{
 					Name:      "foo",
 					Namespace: "the-cruel-default",
@@ -410,11 +410,11 @@ func TestEtcdStorage(t *testing.T) {
 			etcdPath: path.Join("/", etcdPrefix, "apiextensions.k8s.io/customresourcedefinitions/curlets.mygroup.example.com"),
 			expectedObject: &metaObject{
 				Kind:       "CustomResourceDefinition",
-				APIVersion: "apiextensions.k8s.io/v1alpha1",
+				APIVersion: "apiextensions.k8s.io/v1beta1",
 				Metadata: Metadata{
 					Name:      "curlets.mygroup.example.com",
 					Namespace: "",
-					SelfLink:  "/apis/apiextensions.k8s.io/v1alpha1/customresourcedefinitions/curlets.mygroup.example.com",
+					SelfLink:  "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/curlets.mygroup.example.com",
 				},
 			},
 		},
@@ -423,7 +423,7 @@ func TestEtcdStorage(t *testing.T) {
 			etcdPath: path.Join("/", etcdPrefix, "mygroup.example.com/curlets/bar"),
 			expectedObject: &metaObject{
 				Kind:       "Curlet",
-				APIVersion: "mygroup.example.com/v1alpha1",
+				APIVersion: "mygroup.example.com/v1beta1",
 				Metadata: Metadata{
 					Name:      "bar",
 					Namespace: "",

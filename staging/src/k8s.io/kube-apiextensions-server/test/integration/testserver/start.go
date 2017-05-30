@@ -140,7 +140,7 @@ func StartServer(config *extensionsapiserver.Config) (chan struct{}, clientset.I
 		return nil, nil, nil, err
 	}
 
-	bytes, _ := apiExtensionsClient.Discovery().RESTClient().Get().AbsPath("/apis/apiextensions.k8s.io/v1alpha1").DoRaw()
+	bytes, _ := apiExtensionsClient.Discovery().RESTClient().Get().AbsPath("/apis/apiextensions.k8s.io/v1beta1").DoRaw()
 	fmt.Print(string(bytes))
 
 	return stopCh, apiExtensionsClient, dynamic.NewDynamicClientPool(server.GenericAPIServer.LoopbackClientConfig), nil

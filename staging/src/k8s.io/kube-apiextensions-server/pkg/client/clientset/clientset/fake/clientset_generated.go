@@ -23,8 +23,8 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset"
-	apiextensionsv1alpha1 "k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset/typed/apiextensions/v1alpha1"
-	fakeapiextensionsv1alpha1 "k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset/typed/apiextensions/v1alpha1/fake"
+	apiextensionsv1beta1 "k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+	fakeapiextensionsv1beta1 "k8s.io/kube-apiextensions-server/pkg/client/clientset/clientset/typed/apiextensions/v1beta1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -60,12 +60,12 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
-// ApiextensionsV1alpha1 retrieves the ApiextensionsV1alpha1Client
-func (c *Clientset) ApiextensionsV1alpha1() apiextensionsv1alpha1.ApiextensionsV1alpha1Interface {
-	return &fakeapiextensionsv1alpha1.FakeApiextensionsV1alpha1{Fake: &c.Fake}
+// ApiextensionsV1beta1 retrieves the ApiextensionsV1beta1Client
+func (c *Clientset) ApiextensionsV1beta1() apiextensionsv1beta1.ApiextensionsV1beta1Interface {
+	return &fakeapiextensionsv1beta1.FakeApiextensionsV1beta1{Fake: &c.Fake}
 }
 
-// Apiextensions retrieves the ApiextensionsV1alpha1Client
-func (c *Clientset) Apiextensions() apiextensionsv1alpha1.ApiextensionsV1alpha1Interface {
-	return &fakeapiextensionsv1alpha1.FakeApiextensionsV1alpha1{Fake: &c.Fake}
+// Apiextensions retrieves the ApiextensionsV1beta1Client
+func (c *Clientset) Apiextensions() apiextensionsv1beta1.ApiextensionsV1beta1Interface {
+	return &fakeapiextensionsv1beta1.FakeApiextensionsV1beta1{Fake: &c.Fake}
 }
