@@ -2190,11 +2190,9 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	if spec.ActiveDeadlineSeconds != nil {
-		if spec.ActiveDeadlineSeconds != nil {
-			value := *spec.ActiveDeadlineSeconds
-			if value < 1 || value > math.MaxUint32 {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), value, validation.InclusiveRangeError(1, math.MaxUint32)))
-			}
+		value := *spec.ActiveDeadlineSeconds
+		if value < 1 || value > math.MaxUint32 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), value, validation.InclusiveRangeError(1, math.MaxUint32)))
 		}
 	}
 
