@@ -787,6 +787,17 @@ func TestInconsistentNameSelectorDaemonSetDoesNothing(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
+// DaemonSet with node selector, matching some nodes, should launch pods on all the nodes.
+func TestSelectorDaemonSetLaunchesPods(t *testing.T) {
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+	manager, podControl, _ := newTestController(ds)
+	addNodes(manager.nodeStore, 0, 4, nil)
+	addNodes(manager.nodeStore, 4, 3, simpleNodeLabel)
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 3, 0)
+}
+
 // Daemon with node affinity should launch pods on nodes matching affinity.
 func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 	daemon := newDaemonSet("foo")
