@@ -154,8 +154,4 @@ func (test getContextsTest) run(t *testing.T) {
 		}
 		return
 	}
-
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
 }
