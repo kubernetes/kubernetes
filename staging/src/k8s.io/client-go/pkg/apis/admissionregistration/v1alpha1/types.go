@@ -66,6 +66,7 @@ type Initializer struct {
 
 	// Rules describes what resources/subresources the initializer cares about.
 	// The initializer cares about an operation if it matches _any_ Rule.
+	// Rule.Resources must not include subresources.
 	Rules []Rule `json:"rules,omitempty" protobuf:"bytes,2,rep,name=rules"`
 
 	// FailurePolicy defines what happens if the responsible initializer controller
@@ -99,7 +100,10 @@ type Rule struct {
 	// '*/scale' means all scale subresources.
 	// '*/*' means all resources and their subresources.
 	//
-	// If '*' or '*/*' is present, the length of the slice must be one.
+	// If wildcard is present, the validation rule will ensure resources do not
+	// overlap with each other.
+	//
+	// Depending on the enclosing object, subresources might not be allowed.
 	// Required.
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
 }
