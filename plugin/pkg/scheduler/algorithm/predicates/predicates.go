@@ -29,14 +29,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	"k8s.io/kubernetes/pkg/features"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/metrics/pkg/client/clientset_generated/clientset"
 )
 
 // predicatePrecomputations: Helper types/variables...
@@ -1261,6 +1265,84 @@ func CheckNodeDiskPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *sch
 	// is node under presure?
 	if nodeInfo.DiskPressureCondition() == v1.ConditionTrue {
 		return false, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}, nil
+	}
+	return true, nil, nil
+}
+
+type VolumeNodeChecker struct {
+	pvInfo  PersistentVolumeInfo
+	pvcInfo PersistentVolumeClaimInfo
+	client  clientset.Interface
+}
+
+// VolumeNodeChecker evaluates if a pod can fit due to the volumes it requests, given
+// that some volumes have node topology constraints, particularly when using Local PVs.
+// The requirement is that any pod that uses a PVC that is bound to a PV with topology constraints
+// must be scheduled to a node that satisfies the PV's topology labels.
+func NewVolumeNodePredicate(pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, client clientset.Interface) algorithm.FitPredicate {
+	c := &VolumeNodeChecker{
+		pvInfo:  pvInfo,
+		pvcInfo: pvcInfo,
+		client:  client,
+	}
+	return c.predicate
+}
+
+func (c *VolumeNodeChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
+		return true, nil, nil
+	}
+
+	// If a pod doesn't have any volume attached to it, the predicate will always be true.
+	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
+	if len(pod.Spec.Volumes) == 0 {
+		return true, nil, nil
+	}
+
+	node := nodeInfo.Node()
+	if node == nil {
+		return false, nil, fmt.Errorf("node not found")
+	}
+
+	glog.V(2).Infof("Checking for prebound volumes with node affinity")
+	namespace := pod.Namespace
+	manifest := &(pod.Spec)
+	for i := range manifest.Volumes {
+		volume := &manifest.Volumes[i]
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
+		pvcName := volume.PersistentVolumeClaim.ClaimName
+		if pvcName == "" {
+			return false, nil, fmt.Errorf("PersistentVolumeClaim had no name")
+		}
+		pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
+		if err != nil {
+			return false, nil, err
+		}
+
+		if pvc == nil {
+			return false, nil, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
+		}
+		pvName := pvc.Spec.VolumeName
+		if pvName == "" {
+			return false, nil, fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
+		}
+
+		pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
+		if err != nil {
+			return false, nil, err
+		}
+		if pv == nil {
+			return false, nil, fmt.Errorf("PersistentVolume not found: %q", pvName)
+		}
+
+		err = volumeutil.CheckNodeAffinity(pv, node.Labels)
+		if err != nil {
+			glog.V(2).Infof("Won't schedule pod %q onto node %q due to volume %q node mismatch: %v", pod.Name, node.Name, pvName, err.Error())
+			return false, []algorithm.PredicateFailureReason{ErrVolumeNodeConflict}, nil
+		}
+		glog.V(4).Infof("VolumeNode predicate allows node %q for pod %q due to volume %q", node.Name, pod.Name, pvName)
 	}
 	return true, nil, nil
 }
