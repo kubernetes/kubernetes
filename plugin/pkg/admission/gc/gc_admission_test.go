@@ -74,7 +74,7 @@ func newGCPermissionsEnforcement() *gcPermissionsEnforcement {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		whiteList: whiteList,
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, fakeAuthorizer{}, nil, api.Registry.RESTMapper(), nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, fakeAuthorizer{}, nil, api.Registry.RESTMapper(), nil)
 	pluginInitializer.Initialize(gcAdmit)
 	return gcAdmit
 }
