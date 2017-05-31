@@ -21,19 +21,20 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-# Excluded checks are always skipped.
-EXCLUDED_CHECKS=(
-  "verify-linkcheck.sh"   # runs in separate Jenkins job once per day due to high network usage
-  "verify-govet.sh"       # it has a separate make vet target
-  "verify-test-owners.sh" # TODO(rmmh): figure out how to avoid endless conflicts
+# Excluded check patterns are always skipped.
+EXCLUDED_PATTERNS=(
+  "verify-all.sh"                # this script calls the make rule and would cause a loop
+  "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
+  "verify-govet.sh"              # it has a separate make vet target
+  "verify-test-owners.sh"        # TODO(rmmh): figure out how to avoid endless conflicts
+  "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   )
 
+EXCLUDED_CHECKS=$(ls ${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || true)
+
 function is-excluded {
-  if [[ $1 -ef "$KUBE_ROOT/hack/verify-all.sh" ]]; then
-    return
-  fi
   for e in ${EXCLUDED_CHECKS[@]}; do
-    if [[ $1 -ef "$KUBE_ROOT/hack/$e" ]]; then
+    if [[ $1 -ef "$e" ]]; then
       return
     fi
   done
