@@ -45,10 +45,10 @@ func newInitializerConfigurationInformer(client kubernetes.Interface, resyncPeri
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.AdmissionregistrationV1alpha1().InitializerConfigurations(v1.NamespaceAll).List(options)
+				return client.AdmissionregistrationV1alpha1().InitializerConfigurations().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.AdmissionregistrationV1alpha1().InitializerConfigurations(v1.NamespaceAll).Watch(options)
+				return client.AdmissionregistrationV1alpha1().InitializerConfigurations().Watch(options)
 			},
 		},
 		&admissionregistration_v1alpha1.InitializerConfiguration{},

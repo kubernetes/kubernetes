@@ -26,12 +26,12 @@ type FakeAdmissionregistration struct {
 	*testing.Fake
 }
 
-func (c *FakeAdmissionregistration) ExternalAdmissionHookConfigurations(namespace string) internalversion.ExternalAdmissionHookConfigurationInterface {
-	return &FakeExternalAdmissionHookConfigurations{c, namespace}
+func (c *FakeAdmissionregistration) ExternalAdmissionHookConfigurations() internalversion.ExternalAdmissionHookConfigurationInterface {
+	return &FakeExternalAdmissionHookConfigurations{c}
 }
 
-func (c *FakeAdmissionregistration) InitializerConfigurations(namespace string) internalversion.InitializerConfigurationInterface {
-	return &FakeInitializerConfigurations{c, namespace}
+func (c *FakeAdmissionregistration) InitializerConfigurations() internalversion.InitializerConfigurationInterface {
+	return &FakeInitializerConfigurations{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
