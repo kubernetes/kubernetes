@@ -3443,7 +3443,7 @@ func TestValidateDNSPolicy(t *testing.T) {
 
 func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSeconds := int64(30)
-	activeDeadlineSecondsMax := int64(math.MaxUint32)
+	activeDeadlineSecondsMax := int64(math.MaxInt32)
 
 	minUserID := types.UnixUserID(0)
 	maxUserID := types.UnixUserID(2147483647)
@@ -3559,7 +3559,7 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 
 	activeDeadlineSeconds = int64(0)
-	activeDeadlineSecondsTooLarge := int64(math.MaxUint32 + 1)
+	activeDeadlineSecondsTooLarge := int64(math.MaxInt32 + 1)
 
 	minUserID = types.UnixUserID(-1)
 	maxUserID = types.UnixUserID(2147483648)
