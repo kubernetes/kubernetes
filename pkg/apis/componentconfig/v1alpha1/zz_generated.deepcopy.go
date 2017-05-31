@@ -335,16 +335,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
-		if in.ExperimentalDockershim != nil {
-			in, out := &in.ExperimentalDockershim, &out.ExperimentalDockershim
-			*out = new(bool)
-			**out = **in
-		}
-		if in.DockerDisableSharedPID != nil {
-			in, out := &in.DockerDisableSharedPID, &out.DockerDisableSharedPID
-			*out = new(bool)
-			**out = **in
-		}
 		if in.SystemReserved != nil {
 			in, out := &in.SystemReserved, &out.SystemReserved
 			*out = make(map[string]string)

@@ -111,6 +111,8 @@ func GetHollowKubeletConfig(
 	// Flags struct
 	f := &options.KubeletFlags{
 		HostnameOverride: nodeName,
+		// Use the default runtime options.
+		ContainerRuntimeOptions: *options.NewContainerRuntimeOptions(),
 	}
 
 	// Config struct
@@ -137,7 +139,6 @@ func GetHollowKubeletConfig(
 	c.MaxPods = int32(maxPods)
 	c.PodsPerCore = int32(podsPerCore)
 	c.ClusterDNS = []string{}
-	c.DockerExecHandlerName = "native"
 	c.ImageGCHighThresholdPercent = 90
 	c.ImageGCLowThresholdPercent = 80
 	c.LowDiskSpaceThresholdMB = 256
@@ -168,12 +169,5 @@ func GetHollowKubeletConfig(
 	c.SystemCgroups = ""
 	c.ProtectKernelDefaults = false
 
-	// TODO(mtaufen): Note that PodInfraContainerImage was being set to the empty value before,
-	//                but this may not have been intentional. (previous code (SimpleKubelet)
-	//                was peeling it off of a componentconfig.KubeletConfiguration{}, but may
-	//                have actually wanted the default).
-	//                The default will be present in the KubeletConfiguration contstructed above.
-
 	return f, c
-
 }
