@@ -71,61 +71,61 @@ type Event struct {
 	metav1.TypeMeta `json:",inline"`
 	// ObjectMeta is included for interoperability with API infrastructure.
 	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// AuditLevel at which event was generated
-	Level Level `json:"level"`
+	Level Level `json:"level" protobuf:"bytes,2,opt,name=level,casttype=Level"`
 
 	// Time the request reached the apiserver.
-	Timestamp metav1.Time `json:"timestamp"`
+	Timestamp metav1.Time `json:"timestamp" protobuf:"bytes,3,opt,name=timestamp"`
 	// Unique audit ID, generated for each request.
-	AuditID types.UID `json:"auditID"`
+	AuditID types.UID `json:"auditID" protobuf:"bytes,4,opt,name=auditID,casttype=k8s.io/apimachinery/pkg/types.UID"`
 	// Stage of the request handling when this event instance was generated.
-	Stage Stage `json:"stage"`
+	Stage Stage `json:"stage" protobuf:"bytes,5,opt,name=stage,casttype=Stage"`
 
 	// RequestURI is the request URI as sent by the client to a server.
-	RequestURI string `json:"requestURI"`
+	RequestURI string `json:"requestURI" protobuf:"bytes,6,opt,name=requestURI"`
 	// Verb is the kubernetes verb associated with the request.
 	// For non-resource requests, this is the lower-cased HTTP method.
-	Verb string `json:"verb"`
+	Verb string `json:"verb" protobuf:"bytes,7,opt,name=verb"`
 	// Authenticated user information.
-	User authnv1.UserInfo `json:"user"`
+	User authnv1.UserInfo `json:"user" protobuf:"bytes,8,opt,name=user"`
 	// Impersonated user information.
 	// +optional
-	ImpersonatedUser *authnv1.UserInfo `json:"impersonatedUser,omitempty"`
+	ImpersonatedUser *authnv1.UserInfo `json:"impersonatedUser,omitempty" protobuf:"bytes,9,opt,name=impersonatedUser"`
 	// Source IPs, from where the request originated and intermediate proxies.
 	// +optional
-	SourceIPs []string `json:"sourceIPs,omitempty"`
+	SourceIPs []string `json:"sourceIPs,omitempty" protobuf:"bytes,10,rep,name=sourceIPs"`
 	// Object reference this request is targeted at.
 	// Does not apply for List-type requests, or non-resource requests.
 	// +optional
-	ObjectRef *ObjectReference `json:"objectRef,omitempty"`
+	ObjectRef *ObjectReference `json:"objectRef,omitempty" protobuf:"bytes,11,opt,name=objectRef"`
 	// The response status, populated even when the ResponseObject is not a Status type.
 	// For successful responses, this will only include the Code and StatusSuccess.
 	// For non-status type error responses, this will be auto-populated with the error Message.
 	// +optional
-	ResponseStatus *metav1.Status `json:"responseStatus,omitempty"`
+	ResponseStatus *metav1.Status `json:"responseStatus,omitempty" protobuf:"bytes,12,opt,name=responseStatus"`
 
 	// API object from the request, in JSON format. The RequestObject is recorded as-is in the request
 	// (possibly re-encoded as JSON), prior to version conversion, defaulting, admission or
 	// merging. It is an external versioned object type, and may not be a valid object on its own.
 	// Omitted for non-resource requests.  Only logged at Request Level and higher.
 	// +optional
-	RequestObject *runtime.Unknown `json:"requestObject,omitempty"`
+	RequestObject *runtime.Unknown `json:"requestObject,omitempty" protobuf:"bytes,13,opt,name=requestObject"`
 	// API object returned in the response, in JSON. The ResponseObject is recorded after conversion
 	// to the external type, and serialized as JSON.  Omitted for non-resource requests.  Only logged
 	// at Response Level.
 	// +optional
-	ResponseObject *runtime.Unknown `json:"responseObject,omitempty"`
+	ResponseObject *runtime.Unknown `json:"responseObject,omitempty" protobuf:"bytes,14,opt,name=responseObject"`
 }
 
 // EventList is a list of audit Events.
 type EventList struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	Items []Event `json:"items"`
+	Items []Event `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // Policy defines the configuration of audit logging, and the rules for how different request
@@ -134,44 +134,44 @@ type Policy struct {
 	metav1.TypeMeta `json:",inline"`
 	// ObjectMeta is included for interoperability with API infrastructure.
 	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Rules specify the audit Level a request should be recorded at.
 	// A request may match multiple rules, in which case the FIRST matching rule is used.
 	// The default audit level is None, but can be overridden by a catch-all rule at the end of the list.
 	// PolicyRules are strictly ordered.
-	Rules []PolicyRule `json:"rules"`
+	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 }
 
 // PolicyList is a list of audit Policies.
 type PolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	Items []Policy `json:"items"`
+	Items []Policy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // PolicyRule maps requests based off metadata to an audit Level.
 // Requests must match the rules of every field (an intersection of rules).
 type PolicyRule struct {
 	// The Level that requests matching this rule are recorded at.
-	Level Level `json:"level"`
+	Level Level `json:"level" protobuf:"bytes,1,opt,name=level,casttype=Level"`
 
 	// The users (by authenticated user name) this rule applies to.
 	// An empty list implies every user.
 	// +optional
-	Users []string `json:"users,omitempty"`
+	Users []string `json:"users,omitempty" protobuf:"bytes,2,rep,name=users"`
 	// The user groups this rule applies to. A user is considered matching
 	// if it is a member of any of the UserGroups.
 	// An empty list implies every user group.
 	// +optional
-	UserGroups []string `json:"userGroups,omitempty"`
+	UserGroups []string `json:"userGroups,omitempty" protobuf:"bytes,3,rep,name=userGroups"`
 
 	// The verbs that match this rule.
 	// An empty list implies every verb.
 	// +optional
-	Verbs []string `json:"verbs,omitempty"`
+	Verbs []string `json:"verbs,omitempty" protobuf:"bytes,4,rep,name=verbs"`
 
 	// Rules can apply to API resources (such as "pods" or "secrets"),
 	// non-resource URL paths (such as "/api"), or neither, but not both.
@@ -179,12 +179,12 @@ type PolicyRule struct {
 
 	// Resources that this rule matches. An empty list implies all kinds in all API groups.
 	// +optional
-	Resources []GroupResources `json:"resources,omitempty"`
+	Resources []GroupResources `json:"resources,omitempty" protobuf:"bytes,5,rep,name=resources"`
 	// Namespaces that this rule matches.
 	// The empty string "" matches non-namespaced resources.
 	// An empty list implies every namespace.
 	// +optional
-	Namespaces []string `json:"namespaces,omitempty"`
+	Namespaces []string `json:"namespaces,omitempty" protobuf:"bytes,6,rep,name=namespaces"`
 
 	// NonResourceURLs is a set of URL paths that should be audited.
 	// *s are allowed, but only as the full, final step in the path.
@@ -192,7 +192,7 @@ type PolicyRule struct {
 	//  "/metrics" - Log requests for apiserver metrics
 	//  "/healthz*" - Log all health checks
 	// +optional
-	NonResourceURLs []string `json:"nonResourceURLs,omitempty"`
+	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,7,rep,name=nonResourceURLs"`
 }
 
 // GroupResources represents resource kinds in an API group.
@@ -200,27 +200,27 @@ type GroupResources struct {
 	// Group is the name of the API group that contains the resources.
 	// The empty string represents the core API group.
 	// +optional
-	Group string `json:"group,omitempty"`
+	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
 	// Resources is a list of resources within the API group.
 	// Any empty list implies every resource kind in the API group.
 	// +optional
-	Resources []string `json:"resources,omitempty"`
+	Resources []string `json:"resources,omitempty" protobuf:"bytes,2,rep,name=resources"`
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
 	// +optional
-	Resource string `json:"resource,omitempty"`
+	Resource string `json:"resource,omitempty" protobuf:"bytes,1,opt,name=resource"`
 	// +optional
-	Namespace string `json:"namespace,omitempty"`
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
 	// +optional
-	Name string `json:"name,omitempty"`
+	Name string `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
 	// +optional
-	UID types.UID `json:"uid,omitempty"`
+	UID types.UID `json:"uid,omitempty" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 	// +optional
-	APIVersion string `json:"apiVersion,omitempty"`
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,5,opt,name=apiVersion"`
 	// +optional
-	ResourceVersion string `json:"resourceVersion,omitempty"`
+	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,6,opt,name=resourceVersion"`
 	// +optional
-	Subresource string `json:"subresource,omitempty"`
+	Subresource string `json:"subresource,omitempty" protobuf:"bytes,7,opt,name=subresource"`
 }
