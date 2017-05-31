@@ -378,7 +378,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
 	cmds.AddCommand(deprecatedAlias("apiversions", NewCmdApiVersions(f, out)))
-	cmds.AddCommand(NewCmdOptions())
+	cmds.AddCommand(NewCmdOptions(out))
 
 	return cmds
 }
