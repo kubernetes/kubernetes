@@ -35,24 +35,25 @@ import (
 
 var (
 	serviceaccount_resources = `
-	replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs)`
+	replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs), statefulset`
 
 	serviceaccount_long = templates.LongDesc(`
-	Update ServiceAccount of resources.
+	Update ServiceAccount of pod template resources.
 
 	Possible resources (case insensitive) can be : 
 	` + serviceaccount_resources)
 
 	serviceaccount_example = templates.Examples(`
-	#Set ReplicationController nginx-controller's ServiceAccount to serviceaccount1
+	# Set ReplicationController nginx-controller's ServiceAccount to serviceaccount1
 	kubectl set serviceaccount replicationcontroller nginx-controller serviceaccount1
 
-	#Short form of the above command
+	# Short form of the above command
 	kubectl set sa rc nginx-controller serviceaccount1
+
+	# Print result in yaml format of updated nginx controller from local file, without hitting apiserver
+	kubectl set sa -f nginx-rc.yaml serviceaccount1 --local --dry-run -o yaml
 	`)
 )
-
-const usageStr = "(serviceaccount | sa) (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT"
 
 type ServiceAccountConfig struct {
 	fileNameOptions resource.FilenameOptions
@@ -69,8 +70,6 @@ type ServiceAccountConfig struct {
 	output                 string
 	changeCause            string
 	local                  bool
-	Resources              []string
-	ServiceAccountName     string
 	categoryExpander       resource.CategoryExpander
 	clientMapper           resource.ClientMapper
 	typer                  runtime.ObjectTyper
@@ -81,14 +80,14 @@ type ServiceAccountConfig struct {
 	updatePodSpecForObject func(runtime.Object, func(*api.PodSpec) error) (bool, error)
 }
 
-func NewCmdServiceAccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
+func NewCmdServiceaccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	saConfig := &ServiceAccountConfig{
 		out: out,
 		err: err,
 	}
 
 	cmd := &cobra.Command{
-		Use:     usageStr,
+		Use:     "serviceaccount (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT",
 		Aliases: []string{"sa"},
 		Short:   i18n.T("Update ServiceAccount of a resource"),
 		Long:    serviceaccount_long,
@@ -98,7 +97,9 @@ func NewCmdServiceAccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command 
 			if err := saConfig.Validate(); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
-			cmdutil.CheckErr(saConfig.Run())
+			if err := saConfig.Run(); err != nil {
+				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+			}
 		},
 	}
 	cmdutil.AddPrinterFlags(cmd)
@@ -122,9 +123,9 @@ func (saConfig *ServiceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	saConfig.dryRun = cmdutil.GetDryRunFlag(cmd)
 	saConfig.output = cmdutil.GetFlagString(cmd, "output")
 	saConfig.args = args
-	saConfig.ServiceAccountName = args[len(args)-1]
+
 	saConfig.decoder = f.Decoder(true)
-	saConfig.Resources = args[:len(args)-1]
+
 	saConfig.updatePodSpecForObject = f.UpdatePodSpecForObject
 	saConfig.clientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	saConfig.categoryExpander = f.CategoryExpander()
@@ -143,17 +144,15 @@ func (saConfig *ServiceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 func (saConfig *ServiceAccountConfig) Validate() error {
 
 	if len(saConfig.args) == 0 {
-		return fmt.Errorf("serviceaccount needed")
-	}
-
-	if len(saConfig.args) == 1 && cmdutil.IsFilenameEmpty(saConfig.fileNameOptions.Filenames) {
-		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
+		return fmt.Errorf("serviceaccount is required")
 	}
 	return nil
 }
 
 func (saConfig *ServiceAccountConfig) Run() error {
 
+	serviceAccountName := saConfig.args[len(saConfig.args)-1]
+	resources := saConfig.args[:len(saConfig.args)-1]
 	builder := resource.NewBuilder(saConfig.mapper, saConfig.categoryExpander, saConfig.typer, saConfig.clientMapper, saConfig.decoder).
 		ContinueOnError().
 		NamespaceParam(saConfig.namespace).DefaultNamespace().
@@ -161,7 +160,7 @@ func (saConfig *ServiceAccountConfig) Run() error {
 		Flatten()
 	if !saConfig.local {
 		builder.
-			ResourceTypeOrNameArgs(saConfig.all, saConfig.Resources...).
+			ResourceTypeOrNameArgs(saConfig.all, resources...).
 			Latest()
 	}
 
@@ -169,10 +168,11 @@ func (saConfig *ServiceAccountConfig) Run() error {
 	if err != nil {
 		return err
 	}
+
 	patchErrs := []error{}
 	patchFn := func(info *resource.Info) ([]byte, error) {
 		saConfig.updatePodSpecForObject(info.Object, func(podSpec *api.PodSpec) error {
-			podSpec.ServiceAccountName = saConfig.ServiceAccountName
+			podSpec.ServiceAccountName = serviceAccountName
 			return nil
 		})
 		return runtime.Encode(saConfig.encoder, info.Object)

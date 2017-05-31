@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
-	"strings"
 	"testing"
 
 	"fmt"
@@ -66,7 +65,7 @@ func TestServiceAccountLocal(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	out := bytes.NewBuffer([]byte{})
-	cmd := NewCmdServiceAccount(f, out, out)
+	cmd := NewCmdServiceaccount(f, out, out)
 	cmd.SetOutput(out)
 	cmd.Flags().Set("output", "yaml")
 	cmd.Flags().Set("local", "true")
@@ -78,16 +77,12 @@ func TestServiceAccountLocal(t *testing.T) {
 			out:   out,
 			local: true}
 		err := saConfig.Complete(f, cmd, []string{serviceAccount})
-		if err == nil {
-			err = saConfig.Validate()
-		}
-		if err == nil {
-			err = saConfig.Run()
-		}
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		assert.True(t, strings.Contains(out.String(), "serviceAccountName: "+serviceAccount))
+		assert.NoError(t, err)
+		err = saConfig.Validate()
+		assert.NoError(t, err)
+		err = saConfig.Run()
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), "serviceAccountName: "+serviceAccount, fmt.Sprintf("serviceaccount not updated for %s", input.yaml))
 	}
 }
 
@@ -170,7 +165,7 @@ func TestServiceAccountRemote(t *testing.T) {
 					if err != nil {
 						return nil, err
 					}
-					assert.True(t, strings.Contains(string(bytes), `"serviceAccountName":`+`"`+serviceAccount+`"`))
+					assert.Contains(t, string(bytes), `"serviceAccountName":`+`"`+serviceAccount+`"`, fmt.Sprintf("serviceaccount not updated for %#v", input.object))
 					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
 				default:
 					t.Errorf("%s: unexpected request: %s %#v\n%#v", "serviceaccount", req.Method, req.URL, req)
@@ -181,7 +176,7 @@ func TestServiceAccountRemote(t *testing.T) {
 			GroupName:        input.apiGroup,
 		}
 		out := bytes.NewBuffer([]byte{})
-		cmd := NewCmdServiceAccount(f, out, out)
+		cmd := NewCmdServiceaccount(f, out, out)
 		cmd.SetOutput(out)
 		cmd.Flags().Set("output", "yaml")
 
@@ -189,18 +184,42 @@ func TestServiceAccountRemote(t *testing.T) {
 			out:   out,
 			local: false}
 		err := saConfig.Complete(f, cmd, input.args)
-		if err == nil {
-			saConfig.categoryExpander = resource.LegacyCategoryExpander
-			err = saConfig.Validate()
-		}
-		if err == nil {
-			err = saConfig.Run()
-		}
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		assert.NoError(t, err)
+		saConfig.categoryExpander = resource.LegacyCategoryExpander
+		err = saConfig.Validate()
+		assert.NoError(t, err)
+		err = saConfig.Run()
+		assert.NoError(t, err)
 	}
+}
 
+func TestServiceAccountValidation(t *testing.T) {
+	inputs := []struct {
+		args        []string
+		errorString string
+	}{
+		{args: []string{}, errorString: "serviceaccount is required"},
+	}
+	for _, input := range inputs {
+		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		tf.Client = &fake.RESTClient{
+			APIRegistry: api.Registry,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+				return nil, nil
+			}),
+		}
+		tf.Namespace = "test"
+		out := bytes.NewBuffer([]byte{})
+		cmd := NewCmdServiceaccount(f, out, out)
+		cmd.SetOutput(out)
+
+		saConfig := &ServiceAccountConfig{}
+		err := saConfig.Complete(f, cmd, input.args)
+		assert.NoError(t, err)
+		err = saConfig.Validate()
+		assert.EqualError(t, err, input.errorString)
+	}
 }
 
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
