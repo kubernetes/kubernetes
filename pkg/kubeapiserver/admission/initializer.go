@@ -23,6 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/quota"
@@ -33,6 +34,12 @@ import (
 // WantsInternalKubeClientSet defines a function which sets ClientSet for admission plugins that need it
 type WantsInternalKubeClientSet interface {
 	SetInternalKubeClientSet(internalclientset.Interface)
+	admission.Validator
+}
+
+// WantsExternalKubeClientSet defines a function which sets ClientSet for admission plugins that need it
+type WantsExternalKubeClientSet interface {
+	SetExternalKubeClientSet(clientset.Interface)
 	admission.Validator
 }
 
@@ -95,6 +102,7 @@ type WebhookSource interface {
 
 type PluginInitializer struct {
 	internalClient  internalclientset.Interface
+	externalClient  clientset.Interface
 	informers       informers.SharedInformerFactory
 	authorizer      authorizer.Authorizer
 	cloudConfig     []byte
@@ -113,14 +121,18 @@ var _ admission.PluginInitializer = &PluginInitializer{}
 // NewPluginInitializer constructs new instance of PluginInitializer
 // TODO: switch these parameters to use the builder pattern or just make them
 // all public, this construction method is pointless boilerplate.
-func NewPluginInitializer(internalClient internalclientset.Interface,
+func NewPluginInitializer(
+	internalClient internalclientset.Interface,
+	externalClient clientset.Interface,
 	sharedInformers informers.SharedInformerFactory,
 	authz authorizer.Authorizer,
 	cloudConfig []byte,
 	restMapper meta.RESTMapper,
-	quotaRegistry quota.Registry) *PluginInitializer {
+	quotaRegistry quota.Registry,
+) *PluginInitializer {
 	return &PluginInitializer{
 		internalClient: internalClient,
+		externalClient: externalClient,
 		informers:      sharedInformers,
 		authorizer:     authz,
 		cloudConfig:    cloudConfig,
@@ -155,6 +167,10 @@ func (i *PluginInitializer) SetWebhookSource(w WebhookSource) *PluginInitializer
 func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 	if wants, ok := plugin.(WantsInternalKubeClientSet); ok {
 		wants.SetInternalKubeClientSet(i.internalClient)
+	}
+
+	if wants, ok := plugin.(WantsExternalKubeClientSet); ok {
+		wants.SetExternalKubeClientSet(i.externalClient)
 	}
 
 	if wants, ok := plugin.(WantsInternalKubeInformerFactory); ok {

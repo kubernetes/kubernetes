@@ -26,6 +26,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/admissionregistration:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/quota:go_default_library",
