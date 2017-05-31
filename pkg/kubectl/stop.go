@@ -37,7 +37,6 @@ import (
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
-	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -343,34 +342,6 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	waitForStatefulSet := NewRetryParams(reaper.pollInterval, reaper.timeout)
 	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForStatefulSet); err != nil {
 		return err
-	}
-
-	// TODO: This shouldn't be needed, see corresponding TODO in StatefulSetHasDesiredReplicas.
-	// StatefulSet should track generation number.
-	pods := reaper.podClient.Pods(namespace)
-	selector, _ := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
-	options := metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err := pods.List(options)
-	if err != nil {
-		return err
-	}
-
-	errList := []error{}
-	for i := range podList.Items {
-		pod := &podList.Items[i]
-		controllerRef := controller.GetControllerOf(pod)
-		// Ignore Pod if it's an orphan or owned by someone else.
-		if controllerRef == nil || controllerRef.UID != ss.UID {
-			continue
-		}
-		if err := pods.Delete(pod.Name, gracePeriod); err != nil {
-			if !errors.IsNotFound(err) {
-				errList = append(errList, err)
-			}
-		}
-	}
-	if len(errList) > 0 {
-		return utilerrors.NewAggregate(errList)
 	}
 
 	// TODO: Cleanup volumes? We don't want to accidentally delete volumes from
