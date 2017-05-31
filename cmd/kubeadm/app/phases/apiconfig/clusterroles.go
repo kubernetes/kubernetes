@@ -35,31 +35,15 @@ const (
 	// BootstrapSignerClusterRoleName sets the name for the ClusterRole that allows access to ConfigMaps in the kube-public ns
 	BootstrapSignerClusterRoleName = "system:bootstrap-signer-clusterinfo"
 
-	// Constants
-	clusterRoleKind    = "ClusterRole"
-	roleKind           = "Role"
-	serviceAccountKind = "ServiceAccount"
-	rbacAPIGroup       = "rbac.authorization.k8s.io"
-	anonymousUser      = "system:anonymous"
+	clusterRoleKind          = "ClusterRole"
+	roleKind                 = "Role"
+	serviceAccountKind       = "ServiceAccount"
+	rbacAPIGroup             = "rbac.authorization.k8s.io"
+	anonymousUser            = "system:anonymous"
+	nodeAutoApproveBootstrap = "kubeadm:node-autoapprove-bootstrap"
 )
 
 // TODO: Are there any unit tests that could be made for this file other than duplicating all values and logic in a separate file?
-
-// CreateRBACRules creates the essential RBAC rules for a minimally set-up cluster
-func CreateRBACRules(clientset *clientset.Clientset) error {
-	if err := CreateRoles(clientset); err != nil {
-		return err
-	}
-	if err := CreateRoleBindings(clientset); err != nil {
-		return err
-	}
-	if err := CreateClusterRoleBindings(clientset); err != nil {
-		return err
-	}
-
-	fmt.Println("[apiconfig] Created RBAC rules")
-	return nil
-}
 
 // CreateServiceAccounts creates the necessary serviceaccounts that kubeadm uses/might use.
 func CreateServiceAccounts(clientset *clientset.Clientset) error {
@@ -86,8 +70,26 @@ func CreateServiceAccounts(clientset *clientset.Clientset) error {
 	return nil
 }
 
-// CreateRoles creates namespaces RBAC Roles
-func CreateRoles(clientset *clientset.Clientset) error {
+// CreateRBACRules creates the essential RBAC rules for a minimally set-up cluster
+func CreateRBACRules(clientset *clientset.Clientset) error {
+	if err := createRoles(clientset); err != nil {
+		return err
+	}
+	if err := createRoleBindings(clientset); err != nil {
+		return err
+	}
+	if err := createClusterRoles(clientset); err != nil {
+		return err
+	}
+	if err := createClusterRoleBindings(clientset); err != nil {
+		return err
+	}
+
+	fmt.Println("[apiconfig] Created RBAC rules")
+	return nil
+}
+
+func createRoles(clientset *clientset.Clientset) error {
 	roles := []rbac.Role{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -107,8 +109,7 @@ func CreateRoles(clientset *clientset.Clientset) error {
 	return nil
 }
 
-// CreateRoleBindings creates all namespaced and necessary bindings between bootstrapped & kubeadm-created ClusterRoles and subjects kubeadm is using
-func CreateRoleBindings(clientset *clientset.Clientset) error {
+func createRoleBindings(clientset *clientset.Clientset) error {
 	roleBindings := []rbac.RoleBinding{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -137,8 +138,27 @@ func CreateRoleBindings(clientset *clientset.Clientset) error {
 	return nil
 }
 
-// CreateClusterRoleBindings creates all necessary bindings between bootstrapped & kubeadm-created ClusterRoles and subjects kubeadm is using
-func CreateClusterRoleBindings(clientset *clientset.Clientset) error {
+func createClusterRoles(clientset *clientset.Clientset) error {
+	clusterRoles := []rbac.ClusterRole{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: nodeAutoApproveBootstrap,
+			},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("create").Groups("certificates.k8s.io").Resources("certificatesigningrequests/nodeclient").RuleOrDie(),
+			},
+		},
+	}
+
+	for _, roleBinding := range clusterRoles {
+		if _, err := clientset.RbacV1beta1().ClusterRoles().Create(&roleBinding); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func createClusterRoleBindings(clientset *clientset.Clientset) error {
 	clusterRoleBindings := []rbac.ClusterRoleBinding{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -148,6 +168,22 @@ func CreateClusterRoleBindings(clientset *clientset.Clientset) error {
 				APIGroup: rbacAPIGroup,
 				Kind:     clusterRoleKind,
 				Name:     NodeBootstrapperClusterRoleName,
+			},
+			Subjects: []rbac.Subject{
+				{
+					Kind: "Group",
+					Name: bootstrapapi.BootstrapGroup,
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: nodeAutoApproveBootstrap,
+			},
+			RoleRef: rbac.RoleRef{
+				APIGroup: rbacAPIGroup,
+				Kind:     clusterRoleKind,
+				Name:     nodeAutoApproveBootstrap,
 			},
 			Subjects: []rbac.Subject{
 				{
