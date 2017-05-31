@@ -62,8 +62,10 @@ func (plugin *hugePagesPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 	return spec.Name(), nil
 }
 
+var readFile = ioutil.ReadFile
+
 func detectHugepages() int {
-	data, err := ioutil.ReadFile("/proc/meminfo")
+	data, err := readFile("/proc/meminfo")
 	if err != nil {
 		return -1
 	}
