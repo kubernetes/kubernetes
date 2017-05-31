@@ -27,6 +27,8 @@ const (
 	// KubernetesDir is the directory kubernetes owns for storing various configuration files
 	KubernetesDir = "/etc/kubernetes"
 
+	ManifestsSubDirName = "manifests"
+
 	CACertAndKeyBaseName = "ca"
 	CACertName           = "ca.crt"
 	CAKeyName            = "ca.key"
