@@ -43,7 +43,7 @@ func getSecretString(secret *v1.Secret, key string) string {
 // parseSecretName parses the name of the secret to extract the secret ID.
 func parseSecretName(name string) (secretID string, ok bool) {
 	r := nameRegExp.FindStringSubmatch(name)
-	if r == nil {
+	if r == nil || len(r) != 2 {
 		return "", false
 	}
 	return r[1], true
@@ -93,10 +93,10 @@ func validateSecretForSigning(secret *v1.Secret) (tokenID, tokenSecret string, o
 func isSecretExpired(secret *v1.Secret) bool {
 	expiration := getSecretString(secret, bootstrapapi.BootstrapTokenExpirationKey)
 	if len(expiration) > 0 {
-		expTime, err2 := time.Parse(time.RFC3339, expiration)
-		if err2 != nil {
+		expTime, err := time.Parse(time.RFC3339, expiration)
+		if err != nil {
 			glog.V(3).Infof("Unparseable expiration time (%s) in %s/%s Secret: %v. Treating as expired.",
-				expiration, secret.Namespace, secret.Name, err2)
+				expiration, secret.Namespace, secret.Name, err)
 			return true
 		}
 		if time.Now().After(expTime) {
