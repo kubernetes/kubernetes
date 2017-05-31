@@ -22,15 +22,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"testing"
 	"syscall"
+	"testing"
 
 	utiltesting "k8s.io/client-go/util/testing"
 	. "k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
-func getExpectedBlockSize(path string) (int64) {
+func getExpectedBlockSize(path string) int64 {
 	statfs := &syscall.Statfs_t{}
 	err := syscall.Statfs(path, statfs)
 	if err != nil {
