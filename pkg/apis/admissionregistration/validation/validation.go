@@ -49,7 +49,8 @@ func validateInitializer(initializer *admissionregistration.Initializer, fldPath
 	}
 
 	for i, rule := range initializer.Rules {
-		allErrors = append(allErrors, validateRule(&rule, fldPath.Child("rules").Index(i))...)
+		notAllowSubresources := false
+		allErrors = append(allErrors, validateRule(&rule, fldPath.Child("rules").Index(i), notAllowSubresources)...)
 	}
 	// TODO: relax the validation rule when admissionregistration is beta.
 	if initializer.FailurePolicy != nil && *initializer.FailurePolicy != admissionregistration.Ignore {
@@ -102,10 +103,10 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 		}
 		res, sub := parts[0], parts[1]
 		if _, ok := resourcesWithWildcardSubresoures[res]; ok {
-			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resources[i], fmt.Sprintf("if '%s/*' is present, must not specify %s", res, resources[i])))
+			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resSub, fmt.Sprintf("if '%s/*' is present, must not specify %s", res, resSub)))
 		}
 		if _, ok := subResoucesWithWildcardResource[sub]; ok {
-			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resources[i], fmt.Sprintf("if '*/%s' is present, must not specify %s", sub, resources[i])))
+			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resSub, fmt.Sprintf("if '*/%s' is present, must not specify %s", sub, resSub)))
 		}
 		if sub == "*" {
 			resourcesWithWildcardSubresoures[res] = struct{}{}
@@ -123,7 +124,26 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 	return allErrors
 }
 
-func validateRule(rule *admissionregistration.Rule, fldPath *field.Path) field.ErrorList {
+func validateResourcesNoSubResources(resources []string, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	if len(resources) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath, ""))
+	}
+	for i, resource := range resources {
+		if resource == "" {
+			allErrors = append(allErrors, field.Required(fldPath.Index(i), ""))
+		}
+		if strings.Contains(resource, "/") {
+			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resource, "must not specify subresources"))
+		}
+	}
+	if len(resources) > 1 && hasWildcard(resources) {
+		allErrors = append(allErrors, field.Invalid(fldPath, resources, "if '*' is present, must not specify other resources"))
+	}
+	return allErrors
+}
+
+func validateRule(rule *admissionregistration.Rule, fldPath *field.Path, allowSubResource bool) field.ErrorList {
 	var allErrors field.ErrorList
 	if len(rule.APIGroups) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("apiGroups"), ""))
@@ -143,7 +163,11 @@ func validateRule(rule *admissionregistration.Rule, fldPath *field.Path) field.E
 			allErrors = append(allErrors, field.Required(fldPath.Child("apiVersions").Index(i), ""))
 		}
 	}
-	allErrors = append(allErrors, validateResources(rule.Resources, fldPath.Child("resources"))...)
+	if allowSubResource {
+		allErrors = append(allErrors, validateResources(rule.Resources, fldPath.Child("resources"))...)
+	} else {
+		allErrors = append(allErrors, validateResourcesNoSubResources(rule.Resources, fldPath.Child("resources"))...)
+	}
 	return allErrors
 }
 
@@ -154,7 +178,7 @@ func ValidateInitializerConfigurationUpdate(newIC, oldIC *admissionregistration.
 func ValidateExternalAdmissionHookConfiguration(e *admissionregistration.ExternalAdmissionHookConfiguration) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	for i, hook := range e.ExternalAdmissionHooks {
-		allErrors = append(allErrors, validateExternalAdmissionHook(&hook, field.NewPath("externalAdmissionHook").Index(i))...)
+		allErrors = append(allErrors, validateExternalAdmissionHook(&hook, field.NewPath("externalAdmissionHooks").Index(i))...)
 	}
 	return allErrors
 }
@@ -212,7 +236,8 @@ func validateRuleWithOperations(ruleWithOperations *admissionregistration.RuleWi
 			allErrors = append(allErrors, field.NotSupported(fldPath.Child("operations").Index(i), operation, supportedOperations.List()))
 		}
 	}
-	allErrors = append(allErrors, validateRule(&ruleWithOperations.Rule, fldPath)...)
+	allowSubResource := true
+	allErrors = append(allErrors, validateRule(&ruleWithOperations.Rule, fldPath, allowSubResource)...)
 	return allErrors
 }
 
