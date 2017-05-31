@@ -65,6 +65,9 @@ const (
 	defaultBatchMaxWait    = time.Minute // Send events at least once a minute.
 )
 
+// The plugin name reported in error metrics.
+const pluginName = "webhook"
+
 // NewBackend returns an audit backend that sends events over HTTP to an external service.
 // The mode indicates the caching behavior of the webhook. Either blocking (ModeBlocking)
 // or buffered with batch POSTs (ModeBatch).
@@ -119,7 +122,7 @@ func (b *blockingBackend) Run(stopCh <-chan struct{}) error {
 
 func (b *blockingBackend) ProcessEvents(ev ...*auditinternal.Event) {
 	if err := b.processEvents(ev...); err != nil {
-		glog.Errorf("failed to POST webhook events: %v", err)
+		audit.HandlePluginError(pluginName, err, ev...)
 	}
 }
 
@@ -259,7 +262,11 @@ L:
 			return b.w.RestClient.Post().Body(&list).Do().Error()
 		})
 		if err != nil {
-			glog.Errorf("failed to POST webhook events: %v", err)
+			impacted := make([]*auditinternal.Event, len(events))
+			for i := range events {
+				impacted[i] = &events[i]
+			}
+			audit.HandlePluginError(pluginName, err, impacted...)
 		}
 	}()
 	return
@@ -278,7 +285,7 @@ func (b *batchBackend) ProcessEvents(ev ...*auditinternal.Event) {
 		select {
 		case b.buffer <- event:
 		default:
-			glog.Errorf("audit webhook queue blocked, failed to send %d event(s)", len(ev)-i)
+			audit.HandlePluginError(pluginName, fmt.Errorf("audit webhook queue blocked"), ev[i:]...)
 			return
 		}
 	}
