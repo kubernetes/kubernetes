@@ -19,7 +19,7 @@ package node
 import (
 	"encoding/binary"
 	"fmt"
-	"math/big"
+	"github.com/RoaringBitmap/roaring"
 	"net"
 	"sync"
 )
@@ -31,7 +31,7 @@ type cidrSet struct {
 	clusterMaskSize int
 	maxCIDRs        int
 	nextCandidate   int
-	used            big.Int
+	used            *roaring.Bitmap
 	subNetMaskSize  int
 }
 
@@ -39,12 +39,14 @@ func newCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) *cidrSet {
 	clusterMask := clusterCIDR.Mask
 	clusterMaskSize, _ := clusterMask.Size()
 	maxCIDRs := 1 << uint32(subNetMaskSize-clusterMaskSize)
+	used := roaring.NewBitmap()
 	return &cidrSet{
 		clusterCIDR:     clusterCIDR,
 		clusterIP:       clusterCIDR.IP.To4(),
 		clusterMaskSize: clusterMaskSize,
 		maxCIDRs:        maxCIDRs,
 		subNetMaskSize:  subNetMaskSize,
+		used:            used,
 	}
 }
 
@@ -55,7 +57,7 @@ func (s *cidrSet) allocateNext() (*net.IPNet, error) {
 	nextUnused := -1
 	for i := 0; i < s.maxCIDRs; i++ {
 		candidate := (i + s.nextCandidate) % s.maxCIDRs
-		if s.used.Bit(candidate) == 0 {
+		if s.used.ContainsInt(candidate) == false {
 			nextUnused = candidate
 			break
 		}
@@ -65,7 +67,7 @@ func (s *cidrSet) allocateNext() (*net.IPNet, error) {
 	}
 	s.nextCandidate = (nextUnused + 1) % s.maxCIDRs
 
-	s.used.SetBit(&s.used, nextUnused, 1)
+	s.used.AddInt(nextUnused)
 
 	j := uint32(nextUnused) << uint32(32-s.subNetMaskSize)
 	ipInt := (binary.BigEndian.Uint32(s.clusterIP)) | j
@@ -119,7 +121,7 @@ func (s *cidrSet) release(cidr *net.IPNet) error {
 	s.Lock()
 	defer s.Unlock()
 	for i := begin; i <= end; i++ {
-		s.used.SetBit(&s.used, i, 0)
+		s.used.Remove(uint32(i))
 	}
 	return nil
 }
@@ -133,7 +135,7 @@ func (s *cidrSet) occupy(cidr *net.IPNet) (err error) {
 	s.Lock()
 	defer s.Unlock()
 	for i := begin; i <= end; i++ {
-		s.used.SetBit(&s.used, i, 1)
+		s.used.AddInt(i)
 	}
 
 	return nil

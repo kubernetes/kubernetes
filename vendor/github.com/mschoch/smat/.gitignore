@@ -1,0 +1,14 @@
+#*
+*.sublime-*
+*~
+.#*
+.project
+.settings
+**/.idea/
+**/*.iml
+/examples/bolt/boltsmat-fuzz.zip
+/examples/bolt/workdir/
+.DS_Store
+coverage.out
+*.test
+tags
