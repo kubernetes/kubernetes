@@ -45,10 +45,10 @@ func newInitializerConfigurationInformer(client internalclientset.Interface, res
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Admissionregistration().InitializerConfigurations(v1.NamespaceAll).List(options)
+				return client.Admissionregistration().InitializerConfigurations().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Admissionregistration().InitializerConfigurations(v1.NamespaceAll).Watch(options)
+				return client.Admissionregistration().InitializerConfigurations().Watch(options)
 			},
 		},
 		&admissionregistration.InitializerConfiguration{},

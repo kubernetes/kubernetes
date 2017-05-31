@@ -21,6 +21,7 @@ import (
 )
 
 // +genclient=true
+// +nonNamespaced=true
 
 // InitializerConfiguration describes the configuration of initializers.
 type InitializerConfiguration struct {
@@ -116,6 +117,7 @@ const (
 )
 
 // +genclient=true
+// +nonNamespaced=true
 
 // ExternalAdmissionHookConfiguration describes the configuration of initializers.
 type ExternalAdmissionHookConfiguration struct {
