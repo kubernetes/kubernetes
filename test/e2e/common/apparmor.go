@@ -60,6 +60,7 @@ elif ! touch %[2]s; then
   exit 2
 elif ! grep "%[3]s" /proc/1/attr/current; then
   echo "FAILURE: not running with expected profile %[3]s"
+  echo "found: $(cat /proc/1/attr/current)"
   exit 3
 fi`, appArmorDeniedPath, appArmorAllowedPath, appArmorProfilePrefix+f.Namespace.Name)
 

@@ -26,13 +26,20 @@ import (
 var _ = framework.KubeDescribe("AppArmor", func() {
 	f := framework.NewDefaultFramework("apparmor")
 
-	BeforeEach(func() {
-		common.SkipIfAppArmorNotSupported()
-		common.LoadAppArmorProfiles(f)
-	})
+	Context("load AppArmor profiles", func() {
+		BeforeEach(func() {
+			common.SkipIfAppArmorNotSupported()
+			common.LoadAppArmorProfiles(f)
+		})
+		AfterEach(func() {
+			if !CurrentGinkgoTestDescription().Failed {
+				return
+			}
+			framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+		})
 
-	It("should enforce an AppArmor profile", func() {
-		common.CreateAppArmorTestPod(f, true)
-		framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+		It("should enforce an AppArmor profile", func() {
+			common.CreateAppArmorTestPod(f, true)
+		})
 	})
 })
