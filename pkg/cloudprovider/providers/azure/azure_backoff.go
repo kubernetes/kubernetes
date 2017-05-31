@@ -46,7 +46,7 @@ var azAPIBackoff = wait.Backoff{
 }
 
 // CreateOrUpdateSGWithRetry invokes az.SecurityGroupsClient.CreateOrUpdate with exponential backoff retry
-func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup, delay time.Duration) error {
+func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup) error {
 	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		resp, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
