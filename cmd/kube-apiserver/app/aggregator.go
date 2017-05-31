@@ -33,6 +33,7 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	kubeclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
@@ -52,14 +53,9 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 	genericConfig.OpenAPIConfig = nil
 	genericConfig.SwaggerConfig = nil
 
-	// copy the loopbackclientconfig.  We're going to change the contenttype back to json until we get protobuf serializations for it
-	t := *kubeAPIServerConfig.LoopbackClientConfig
-	genericConfig.LoopbackClientConfig = &t
-	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = ""
-
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
-	etcdOptions.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(schema.GroupVersion{Group: "apiregistration.k8s.io", Version: "v1beta1"})
+	etcdOptions.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)
 	etcdOptions.StorageConfig.Copier = aggregatorapiserver.Scheme
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
