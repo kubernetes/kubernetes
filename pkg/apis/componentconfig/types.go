@@ -499,7 +499,7 @@ type KubeletConfiguration struct {
 	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
 	KubeReservedCgroup string
 	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
-	// This flag accepts a list of options. Acceptible options are `pods`, `system-reserved` & `kube-reserved`.
+	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved` & `kube-reserved`.
 	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
 	EnforceNodeAllocatable []string
 	// This flag, if set, will avoid including `EvictionHard` limits while computing Node Allocatable.
@@ -837,7 +837,7 @@ type KubeControllerManagerConfiguration struct {
 	GCIgnoredResources []GroupResource
 	// nodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
 	NodeEvictionRate float32
-	// secondaryNodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is unhealty
+	// secondaryNodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is unhealthy
 	SecondaryNodeEvictionRate float32
 	// secondaryNodeEvictionRate is implicitly overridden to 0 for clusters smaller than or equal to largeClusterSizeThreshold
 	LargeClusterSizeThreshold int32
