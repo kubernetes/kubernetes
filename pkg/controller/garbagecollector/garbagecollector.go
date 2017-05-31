@@ -453,6 +453,26 @@ func (gc *GarbageCollector) attemptToOrphanWorker() bool {
 		gc.attemptToOrphan.AddRateLimited(item)
 		return true
 	}
+
+	count := 0
+	// wait until gc has observed there is no more dependents
+	err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		owner.dependentsLock.RLock()
+		owner.dependentsLock.RUnlock()
+		if len(owner.dependents) == 0 {
+			return true, nil
+		} else {
+			count++
+			return false, nil
+		}
+	})
+	if err != nil {
+		glog.V(6).Infof("timeout observing oprhaning of dependents of %s, %v", owner.identity, err)
+		gc.orphanQueue.AddWithTimestamp(owner, start)
+		return
+	}
+	glog.V(2).Infof("all dependents are observed as orphaned after %d seconds", count)
+
 	// update the owner, remove "orphaningFinalizer" from its finalizers list
 	err = gc.removeFinalizer(owner, metav1.FinalizerOrphanDependents)
 	if err != nil {
