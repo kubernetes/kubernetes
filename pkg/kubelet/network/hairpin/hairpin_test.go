@@ -30,8 +30,9 @@ import (
 func TestFindPairInterfaceOfContainerInterface(t *testing.T) {
 	// there should be at least "lo" on any system
 	interfaces, _ := net.Interfaces()
-	validOutput := fmt.Sprintf("garbage\n   peer_ifindex: %d", interfaces[0].Index)
-	invalidOutput := fmt.Sprintf("garbage\n   unknown: %d", interfaces[0].Index)
+	// let's imagine eth0 in a container connects to iface index 1 on the host system (=localhost)
+	validOutput := fmt.Sprintf("2: eth0@if1: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc pfifo_fast state DOWN mode DEFAULT group default qlen 1000")
+	invalidOutput := fmt.Sprintf("2: eth0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc pfifo_fast state DOWN mode DEFAULT group default qlen 1000")
 
 	tests := []struct {
 		output       string
