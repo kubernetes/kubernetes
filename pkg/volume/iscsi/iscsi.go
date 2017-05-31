@@ -136,10 +136,10 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 		iscsiDisk: &iscsiDisk{
 			podUID:         podUID,
 			volName:        spec.Name(),
-			portals:        bkportal,
-			iqn:            iscsi.IQN,
+			Portals:        bkportal,
+			Iqn:            iscsi.IQN,
 			lun:            lun,
-			iface:          iface,
+			Iface:          iface,
 			chap_discovery: iscsi.DiscoveryCHAPAuth,
 			chap_session:   iscsi.SessionCHAPAuth,
 			secret:         secret,
@@ -191,10 +191,10 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 type iscsiDisk struct {
 	volName        string
 	podUID         types.UID
-	portals        []string
-	iqn            string
+	Portals        []string
+	Iqn            string
 	lun            string
-	iface          string
+	Iface          string
 	chap_discovery bool
 	chap_session   bool
 	secret         map[string]string
