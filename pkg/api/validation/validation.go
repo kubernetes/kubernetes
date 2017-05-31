@@ -29,6 +29,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"math"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -2188,8 +2190,11 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	if spec.ActiveDeadlineSeconds != nil {
-		if *spec.ActiveDeadlineSeconds <= 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), spec.ActiveDeadlineSeconds, "must be greater than 0"))
+		if spec.ActiveDeadlineSeconds != nil {
+			value := *spec.ActiveDeadlineSeconds
+			if value < 1 || value > math.MaxUint32 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), value, validation.InclusiveRangeError(1, math.MaxUint32)))
+			}
 		}
 	}
 
@@ -2575,8 +2580,8 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 	// 2.  from a positive value to a lesser, non-negative value
 	if newPod.Spec.ActiveDeadlineSeconds != nil {
 		newActiveDeadlineSeconds := *newPod.Spec.ActiveDeadlineSeconds
-		if newActiveDeadlineSeconds < 0 {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("activeDeadlineSeconds"), newActiveDeadlineSeconds, isNegativeErrorMsg))
+		if newActiveDeadlineSeconds < 0 || newActiveDeadlineSeconds > math.MaxUint32 {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("activeDeadlineSeconds"), newActiveDeadlineSeconds, validation.InclusiveRangeError(0, math.MaxUint32)))
 			return allErrs
 		}
 		if oldPod.Spec.ActiveDeadlineSeconds != nil {
