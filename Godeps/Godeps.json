@@ -308,8 +308,8 @@
 		},
 		{
 			"ImportPath": "github.com/blang/semver",
-			"Comment": "v3.0.1",
-			"Rev": "31b736133b98f26d5e078ec9eb591666edfd091f"
+			"Comment": "v3.5.0",
+			"Rev": "b38d23b8782a487059e8fc8773e9a5b228a77cb6"
 		},
 		{
 			"ImportPath": "github.com/boltdb/bolt",
