@@ -88,9 +88,12 @@ spec:
       # has to decide what command-line flags to use when starting CockroachDB.
       # This only matters when a pod's persistent volume is empty - if it has
       # data from a previous execution, that data will always be used.
+      #
+      # If your Kubernetes cluster uses a custom DNS domain, you will have
+      # to add an additional arg to this pod: "-domain=<your-custom-domain>"
       initContainers:
       - name: bootstrap
-        image: cockroachdb/cockroach-k8s-init:0.1
+        image: cockroachdb/cockroach-k8s-init:0.2
         imagePullPolicy: IfNotPresent
         args:
         - "-on-start=/on-start.sh"
@@ -117,7 +120,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
       - name: cockroachdb
-        image: cockroachdb/cockroach:v1.0
+        image: cockroachdb/cockroach:v1.0.1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 26257
