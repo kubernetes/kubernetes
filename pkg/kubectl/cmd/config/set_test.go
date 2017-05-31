@@ -79,7 +79,7 @@ func (test setConfigTest) run(t *testing.T) {
 	}
 	if len(test.expected) != 0 {
 		if buf.String() != test.expected {
-			t.Errorf("Failded in:%q\n expected %v\n but got %v", test.description, test.expected, buf.String())
+			t.Errorf("Failed in:%q\n expected %v\n but got %v", test.description, test.expected, buf.String())
 		}
 	}
 	if !reflect.DeepEqual(*config, test.expectedConfig) {

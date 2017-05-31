@@ -103,9 +103,12 @@ func TestRenameToAlreadyExistingContext(t *testing.T) {
 }
 
 func (test renameContextTest) run(t *testing.T) {
-	fakeKubeFile, _ := ioutil.TempFile("", "")
+	fakeKubeFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	defer os.Remove(fakeKubeFile.Name())
-	err := clientcmd.WriteToFile(test.initialConfig, fakeKubeFile.Name())
+	err = clientcmd.WriteToFile(test.initialConfig, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
