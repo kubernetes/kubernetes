@@ -47,3 +47,6 @@ KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-false}
 # authentication) in metadata should be treated as canonical, and therefore disk
 # copies ought to be recreated/clobbered.
 METADATA_CLOBBERS_CONFIG=true
+
+# Default the ABAC authorizer to off
+ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-false}" # true, false
