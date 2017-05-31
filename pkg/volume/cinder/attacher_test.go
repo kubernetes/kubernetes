@@ -18,19 +18,21 @@ package cinder
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 
+	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-
-	"fmt"
-	"sort"
-
-	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const VolumeStatusPending = "pending"
@@ -85,6 +87,9 @@ func TestGetDeviceMountPath(t *testing.T) {
 	}
 }
 
+var instanceID string = "instance"
+var nodeName types.NodeName = types.NodeName("nodeName")
+
 // One testcase for TestAttachDetach table test below
 type testcase struct {
 	name string
@@ -96,8 +101,8 @@ type testcase struct {
 	disksAreAttached disksAreAttachedCall
 	diskPath         diskPathCall
 	t                *testing.T
+	instanceID       string
 
-	instanceID string
 	// Actual test to run
 	test func(test *testcase) (string, error)
 	// Expected return of the test
@@ -107,10 +112,8 @@ type testcase struct {
 
 func TestAttachDetach(t *testing.T) {
 	volumeID := "disk"
-	instanceID := "instance"
 	pending := VolumeStatusPending
 	done := VolumeStatusDone
-	nodeName := types.NodeName("nodeName")
 	readOnly := false
 	spec := createVolSpec(volumeID, readOnly)
 	attachError := errors.New("Fake attach error")
@@ -351,15 +354,18 @@ func newPlugin() *cinderPlugin {
 }
 
 func newAttacher(testcase *testcase) *cinderDiskAttacher {
+	kclient := createTestClient()
 	return &cinderDiskAttacher{
-		host:           nil,
+		host:           volumetest.NewFakeVolumeHost("/tmp", kclient, nil),
 		cinderProvider: testcase,
 	}
 }
 
 func newDetacher(testcase *testcase) *cinderDiskDetacher {
+	kclient := createTestClient()
 	return &cinderDiskDetacher{
 		cinderProvider: testcase,
+		host:           volumetest.NewFakeVolumeHost("/tmp", kclient, nil),
 	}
 }
 
@@ -599,6 +605,28 @@ func (testcase *testcase) DisksAreAttached(instanceID string, volumeIDs []string
 	glog.V(4).Infof("DisksAreAttached call: %v, %s, returning %v, %v", volumeIDs, instanceID, expected.areAttached, expected.ret)
 
 	return expected.areAttached, expected.ret
+}
+
+func createTestClient() *fake.Clientset {
+	fakeClient := &fake.Clientset{}
+	fakeClient.AddReactor("get", "nodes",
+		func(action core.Action) (bool, runtime.Object, error) {
+			return true, &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: string(nodeName)},
+				Status: v1.NodeStatus{
+					VolumesAttached: []v1.AttachedVolume{
+						{
+							Name:       "fake-plugin/volume-name",
+							DevicePath: "fake/path",
+						},
+					}},
+				Spec: v1.NodeSpec{ProviderID: string("provider://" + instanceID)},
+			}, nil
+		})
+	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
+		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+	})
+	return fakeClient
 }
 
 // Implementation of fake cloudprovider.Instances
