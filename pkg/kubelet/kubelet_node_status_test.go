@@ -1103,7 +1103,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	// generate one more than maxImagesInNodeStatus in inputImageList
-	inputImageList, expectedImageList := generateTestingImageList(maxImagesInNodeStatus + 1)
+	inputImageList, _ := generateTestingImageList(maxImagesInNodeStatus + 1)
 	testKubelet := newTestKubeletWithImageList(
 		t, inputImageList, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
@@ -1111,8 +1111,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(40000, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+			v1.ResourceCPU: *resource.NewMilliQuantity(40000, resource.DecimalSI),
 		},
 	}
 	kubeClient := testKubelet.fakeKubeClient
@@ -1141,52 +1140,6 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
-			Conditions: []v1.NodeCondition{
-				{
-					Type:               v1.NodeOutOfDisk,
-					Status:             v1.ConditionFalse,
-					Reason:             "KubeletHasSufficientDisk",
-					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-					LastHeartbeatTime:  metav1.Time{},
-					LastTransitionTime: metav1.Time{},
-				},
-				{
-					Type:               v1.NodeMemoryPressure,
-					Status:             v1.ConditionFalse,
-					Reason:             "KubeletHasSufficientMemory",
-					Message:            fmt.Sprintf("kubelet has sufficient memory available"),
-					LastHeartbeatTime:  metav1.Time{},
-					LastTransitionTime: metav1.Time{},
-				},
-				{
-					Type:               v1.NodeDiskPressure,
-					Status:             v1.ConditionFalse,
-					Reason:             "KubeletHasNoDiskPressure",
-					Message:            fmt.Sprintf("kubelet has no disk pressure"),
-					LastHeartbeatTime:  metav1.Time{},
-					LastTransitionTime: metav1.Time{},
-				},
-				{
-					Type:               v1.NodeReady,
-					Status:             v1.ConditionTrue,
-					Reason:             "KubeletReady",
-					Message:            fmt.Sprintf("kubelet is posting ready status"),
-					LastHeartbeatTime:  metav1.Time{},
-					LastTransitionTime: metav1.Time{},
-				},
-			},
-			NodeInfo: v1.NodeSystemInfo{
-				MachineID:               "123",
-				SystemUUID:              "abc",
-				BootID:                  "1b3",
-				KernelVersion:           "3.16.0-0.bpo.4-amd64",
-				OSImage:                 "Debian GNU/Linux 7 (wheezy)",
-				OperatingSystem:         goruntime.GOOS,
-				Architecture:            goruntime.GOARCH,
-				ContainerRuntimeVersion: "test://1.5.0",
-				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
-			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
@@ -1194,14 +1147,9 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 			},
 			Allocatable: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(9900E6, resource.BinarySI),
+				v1.ResourceMemory: *resource.NewQuantity(10E9, resource.BinarySI),
 				v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
 			},
-			Addresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			Images: expectedImageList,
 		},
 	}
 
@@ -1214,15 +1162,5 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 
 	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
 	assert.NoError(t, err)
-	for i, cond := range updatedNode.Status.Conditions {
-		assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
-		assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition  is zero", cond.Type)
-		updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
-		updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
-	}
-
-	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
-	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type, "NotReady should be last")
-	assert.Len(t, updatedNode.Status.Images, maxImagesInNodeStatus)
-	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
+	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable), "%s", diff.ObjectDiff(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable))
 }
