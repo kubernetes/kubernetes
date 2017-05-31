@@ -565,3 +565,7 @@ func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.N
 		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
 	}
 }
+
+func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {
+	return nil, fmt.Errorf("GetNodeLabels() unsupported in Attach/Detach controller")
+}

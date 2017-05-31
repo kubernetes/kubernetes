@@ -517,6 +517,10 @@ func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*v1.No
 // Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
 // TODO: update when storage node affinity graduates to beta
 func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *v1.NodeAffinity) error {
+	if affinity == nil {
+		return nil
+	}
+
 	json, err := json.Marshal(*affinity)
 	if err != nil {
 		return err
