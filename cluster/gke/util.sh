@@ -197,6 +197,14 @@ function kube-up() {
     create_args+=("--cluster-ipv4-cidr=${CLUSTER_IP_RANGE}")
   fi
 
+  if [[ ! -z "${ENABLE_LEGACY_ABAC:-}" ]]; then
+    if [[ "${ENABLE_LEGACY_ABAC:-}" == "true" ]]; then
+      create_args+=("--enable-legacy-authorization")
+    else
+      create_args+=("--no-enable-legacy-authorization")
+    fi
+  fi
+
   create_args+=( ${GKE_CREATE_FLAGS:-} )
 
   # Bring up the cluster.
