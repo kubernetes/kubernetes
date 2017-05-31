@@ -298,8 +298,7 @@ func (r *hostPathDeleter) Delete() error {
 	return os.RemoveAll(r.GetPath())
 }
 
-func getVolumeSource(
-	spec *volume.Spec) (*v1.HostPathVolumeSource, bool, error) {
+func getVolumeSource(spec *volume.Spec) (*v1.HostPathVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.HostPath != nil {
 		return spec.Volume.HostPath, spec.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&

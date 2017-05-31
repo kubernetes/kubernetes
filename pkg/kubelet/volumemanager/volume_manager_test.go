@@ -182,10 +182,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 	}
 }
 
-func newTestVolumeManager(
-	tmpDir string,
-	podManager pod.Manager,
-	kubeClient clientset.Interface) (VolumeManager, error) {
+func newTestVolumeManager(tmpDir string, podManager pod.Manager, kubeClient clientset.Interface) (VolumeManager, error) {
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	fakeRecorder := &record.FakeRecorder{}
 	plugMgr := &volume.VolumePluginMgr{}
@@ -275,10 +272,7 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 	return node, pod, pv, claim
 }
 
-func simulateVolumeInUseUpdate(
-	volumeName v1.UniqueVolumeName,
-	stopCh <-chan struct{},
-	volumeManager VolumeManager) {
+func simulateVolumeInUseUpdate(volumeName v1.UniqueVolumeName, stopCh <-chan struct{}, volumeManager VolumeManager) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {
