@@ -267,11 +267,16 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 		return ret
 	}
 
+	kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.Kind}
 	storage := customresource.NewREST(
 		schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural},
 		schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.ListKind},
 		UnstructuredCopier{},
-		customresource.NewStrategy(discovery.NewUnstructuredObjectTyper(nil), crd.Spec.Scope == apiextensions.NamespaceScoped),
+		customresource.NewStrategy(
+			discovery.NewUnstructuredObjectTyper(nil),
+			crd.Spec.Scope == apiextensions.NamespaceScoped,
+			kind,
+		),
 		r.restOptionsGetter,
 	)
 
@@ -319,7 +324,7 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 		UnsafeConvertor: unstructured.UnstructuredObjectConverter{},
 
 		Resource:    schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural},
-		Kind:        schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.Kind},
+		Kind:        kind,
 		Subresource: "",
 
 		MetaGroupVersion: metav1.SchemeGroupVersion,
