@@ -466,6 +466,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		} else {
 			if s.RequireKubeConfig {
 				return fmt.Errorf("invalid kubeconfig: %v", err)
+			} else if s.KubeConfig.Provided() && !standaloneMode {
+				glog.Warningf("Invalid kubeconfig: %v", err)
 			}
 			if standaloneMode {
 				glog.Warningf("No API client: %v", err)
