@@ -322,7 +322,7 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(p *api.ServiceExternalTrafficPolicyType, c fuzz.Continue) {
-			types := []api.ServiceExternalTrafficPolicyType{api.ServiceExternalTrafficPolicyTypeGlobal, api.ServiceExternalTrafficPolicyTypeLocal}
+			types := []api.ServiceExternalTrafficPolicyType{api.ServiceExternalTrafficPolicyTypeCluster, api.ServiceExternalTrafficPolicyTypeLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(ct *api.Container, c fuzz.Continue) {

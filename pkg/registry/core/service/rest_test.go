@@ -1189,7 +1189,7 @@ func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 				Protocol:   api.ProtocolTCP,
 				TargetPort: intstr.FromInt(6502),
 			}},
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	}
 	created_svc, err := storage.Create(ctx, svc)

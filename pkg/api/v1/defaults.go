@@ -120,7 +120,7 @@ func SetDefaults_Service(obj *Service) {
 	} else if (obj.Spec.Type == ServiceTypeNodePort ||
 		obj.Spec.Type == ServiceTypeLoadBalancer) &&
 		obj.Spec.ExternalTrafficPolicy == "" {
-		obj.Spec.ExternalTrafficPolicy = ServiceExternalTrafficPolicyTypeGlobal
+		obj.Spec.ExternalTrafficPolicy = ServiceExternalTrafficPolicyTypeCluster
 	}
 }
 func SetDefaults_Pod(obj *Pod) {

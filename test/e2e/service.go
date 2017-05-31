@@ -1456,7 +1456,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 
 		By("turning ESIPP off")
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeGlobal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 		})
 		if service.GetServiceHealthCheckNodePort(svc) > 0 {
 			framework.Failf("Service HealthCheck NodePort still present")
