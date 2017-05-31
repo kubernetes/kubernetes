@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package noderestriction
 
 import (
 	"strings"
@@ -82,7 +82,6 @@ func Test_nodePlugin_Admit(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		strict     bool
 		podsGetter coreinternalversion.PodsGetter
 		attributes admission.Attributes
 		err        string
@@ -473,7 +472,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewPlugin(nodeidentifier.NewDefaultNodeIdentifier(), tt.strict)
+			c := NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
 			c.podsGetter = tt.podsGetter
 			err := c.Admit(tt.attributes)
 			if (err == nil) != (len(tt.err) == 0) {

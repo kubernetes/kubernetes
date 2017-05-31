@@ -76,6 +76,7 @@ ENABLE_APISERVER_BASIC_AUDIT=${ENABLE_APISERVER_BASIC_AUDIT:-false}
 # RBAC Mode options
 ALLOW_ANY_TOKEN=${ALLOW_ANY_TOKEN:-false}
 ENABLE_RBAC=${ENABLE_RBAC:-false}
+AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-""}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
 
@@ -201,6 +202,8 @@ KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
+# Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
+LOG_SPEC=${LOG_SPEC:-""}
 LOG_DIR=${LOG_DIR:-"/tmp"}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
@@ -435,6 +438,12 @@ function start_apiserver {
     if [[ "${ENABLE_RBAC}" = true ]]; then
       authorizer_arg="--authorization-mode=RBAC "
     fi
+    if [[ -n "${AUTHORIZATION_MODE}" ]]; then
+      if [[ "${ENABLE_RBAC}" = true ]]; then
+        warning "AUTHORIZATION_MODE=$AUTHORIZATION_MODE overrode ENABLE_RBAC=true"
+      fi
+      authorizer_arg="--authorization-mode=${AUTHORIZATION_MODE} "
+    fi
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged "
@@ -487,6 +496,7 @@ function start_apiserver {
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
+      --vmodule="${LOG_SPEC}" \
       --cert-dir="${CERT_DIR}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
@@ -894,7 +904,7 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
     esac
 fi
 
-if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
+if [[ -n "${PSP_ADMISSION}" && ("${ENABLE_RBAC}" = true || "${AUTHORIZATION_MODE}" = *RBAC* ) ]]; then
   create_psp_policy
 fi
 

@@ -59,6 +59,7 @@ pkg/api/errors
 pkg/api/events
 pkg/api/install
 pkg/api/meta
+pkg/api/persistentvolume
 pkg/api/pod
 pkg/api/resource
 pkg/api/service
