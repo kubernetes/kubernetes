@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,9 @@ limitations under the License.
 package azure
 
 import (
+	"net/http"
+	"regexp"
+	"strconv"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -29,11 +32,23 @@ import (
 const (
 	operationPollInterval        = 3 * time.Second
 	operationPollTimeoutDuration = time.Hour
+	backoffRetries               = 12
+	backoffExponent              = 2
+	backoffDuration              = 1 * time.Second
+	backoffJitter                = 1.0
 )
 
+var azAPIBackoff = wait.Backoff{
+	Steps:    backoffRetries,
+	Factor:   backoffExponent,
+	Duration: backoffDuration,
+	Jitter:   backoffJitter,
+}
+
 // CreateOrUpdateSGWithRetry invokes az.SecurityGroupsClient.CreateOrUpdate with exponential backoff retry
-func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup) error {
-	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
+func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup, delay time.Duration) error {
+	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
 		return processRetryResponse(resp, err)
 	})
@@ -41,7 +56,8 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup) error {
 
 // CreateOrUpdateLBWithRetry invokes az.LoadBalancerClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateLBWithRetry(lb network.LoadBalancer) error {
-	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
+	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
 		return processRetryResponse(resp, err)
 	})
@@ -49,7 +65,8 @@ func (az *Cloud) CreateOrUpdateLBWithRetry(lb network.LoadBalancer) error {
 
 // CreateOrUpdatePIPWithRetry invokes az.PublicIPAddressesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdatePIPWithRetry(pip network.PublicIPAddress) error {
-	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
+	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.PublicIPAddressesClient.CreateOrUpdate(az.ResourceGroup, *pip.Name, pip, nil)
 		return processRetryResponse(resp, err)
 	})
@@ -57,7 +74,8 @@ func (az *Cloud) CreateOrUpdatePIPWithRetry(pip network.PublicIPAddress) error {
 
 // CreateOrUpdateInterfaceWithRetry invokes az.PublicIPAddressesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateInterfaceWithRetry(nic network.Interface) error {
-	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
+	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.InterfacesClient.CreateOrUpdate(az.ResourceGroup, *nic.Name, nic, nil)
 		return processRetryResponse(resp, err)
 	})
@@ -65,7 +83,8 @@ func (az *Cloud) CreateOrUpdateInterfaceWithRetry(nic network.Interface) error {
 
 // DeletePublicIPWithRetry invokes az.PublicIPAddressesClient.Delete with exponential backoff retry
 func (az *Cloud) DeletePublicIPWithRetry(pipName string) error {
-	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
+	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.PublicIPAddressesClient.Delete(az.ResourceGroup, pipName, nil)
 		return processRetryResponse(resp, err)
 	})
@@ -73,7 +92,8 @@ func (az *Cloud) DeletePublicIPWithRetry(pipName string) error {
 
 // DeleteLBWithRetry invokes az.LoadBalancerClient.Delete with exponential backoff retry
 func (az *Cloud) DeleteLBWithRetry(lbName string) error {
-	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
+	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.LoadBalancerClient.Delete(az.ResourceGroup, lbName, nil)
 		return processRetryResponse(resp, err)
 	})
@@ -81,7 +101,8 @@ func (az *Cloud) DeleteLBWithRetry(lbName string) error {
 
 // CreateOrUpdateRouteTableWithRetry invokes az.RouteTablesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateRouteTableWithRetry(routeTable network.RouteTable) error {
-	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
+	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.RouteTablesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, routeTable, nil)
 		return processRetryResponse(resp, err)
 	})
@@ -89,7 +110,8 @@ func (az *Cloud) CreateOrUpdateRouteTableWithRetry(routeTable network.RouteTable
 
 // CreateOrUpdateRouteWithRetry invokes az.RoutesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateRouteWithRetry(route network.Route) error {
-	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
+	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.RoutesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, *route.Name, route, nil)
 		return processRetryResponse(resp, err)
 	})
@@ -97,7 +119,8 @@ func (az *Cloud) CreateOrUpdateRouteWithRetry(route network.Route) error {
 
 // DeleteRouteWithRetry invokes az.RoutesClient.Delete with exponential backoff retry
 func (az *Cloud) DeleteRouteWithRetry(routeName string) error {
-	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
+	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.RoutesClient.Delete(az.ResourceGroup, az.RouteTableName, routeName, nil)
 		return processRetryResponse(resp, err)
 	})
@@ -105,7 +128,8 @@ func (az *Cloud) DeleteRouteWithRetry(routeName string) error {
 
 // CreateOrUpdateVMWithRetry invokes az.VirtualMachinesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateVMWithRetry(vmName string, newVM compute.VirtualMachine) error {
-	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
+	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
 		return processRetryResponse(resp, err)
 	})
@@ -129,11 +153,19 @@ func processRetryResponse(resp autorest.Response, err error) (bool, error) {
 
 // shouldRetryAPIRequest determines if the response from an HTTP request suggests periodic retry behavior
 func shouldRetryAPIRequest(resp autorest.Response, err error) bool {
-	// TODO determine the complete set of retry conditions
 	if err != nil {
 		return true
 	}
-	if resp.StatusCode == 429 || resp.StatusCode == 500 {
+	// HTTP 429 suggests we should retry
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return true
+	}
+	// HTTP 5xx suggests we should retry
+	r, err := regexp.Compile(`^5\d\d$`)
+	if err != nil {
+		return false
+	}
+	if r.MatchString(strconv.Itoa(resp.StatusCode)) {
 		return true
 	}
 	return false
@@ -141,8 +173,12 @@ func shouldRetryAPIRequest(resp autorest.Response, err error) bool {
 
 // isSuccessHTTPResponse determines if the response from an HTTP request suggests success
 func isSuccessHTTPResponse(resp autorest.Response) bool {
-	// TODO determine the complete set of success conditions
-	if resp.StatusCode == 200 || resp.StatusCode == 201 || resp.StatusCode == 202 {
+	// HTTP 2xx suggests a successful response
+	r, err := regexp.Compile(`^2\d\d$`)
+	if err != nil {
+		return false
+	}
+	if r.MatchString(strconv.Itoa(resp.StatusCode)) {
 		return true
 	}
 	return false
