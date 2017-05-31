@@ -399,6 +399,20 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	proxyMode := getProxyMode(string(config.Mode), iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")
+		var nodeIP net.IP
+		if config.BindAddress == "0.0.0.0" || config.BindAddress == "" {
+			nodeIP = getNodeIP(client, hostname)
+		} else {
+			nodeIP = net.ParseIP(config.BindAddress)
+			if nodeIP == nil {
+				return nil, fmt.Errorf("bind-address %s must be valid ip", config.BindAddress)
+			}
+			if local, err := isLocalIP(nodeIP.String()); err != nil {
+				return nil, fmt.Errorf("can't determine if IP is local, assuming not: %v", err)
+			} else if !local {
+				return nil, fmt.Errorf("bind-address %s must be local ip", config.BindAddress)
+			}
+		}
 		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
 			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
@@ -415,7 +429,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 			int(*config.IPTables.MasqueradeBit),
 			config.ClusterCIDR,
 			hostname,
-			getNodeIP(client, hostname),
+			nodeIP,
 			recorder,
 			healthzServer,
 		)
@@ -698,4 +712,21 @@ func getNodeIP(client clientset.Interface, hostname string) net.IP {
 		return nil
 	}
 	return nodeIP
+}
+
+func isLocalIP(ip string) (bool, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return false, err
+	}
+	for i := range addrs {
+		intf, _, err := net.ParseCIDR(addrs[i].String())
+		if err != nil {
+			return false, err
+		}
+		if net.ParseIP(ip).Equal(intf) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
