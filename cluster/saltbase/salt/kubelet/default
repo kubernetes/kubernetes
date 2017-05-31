@@ -39,7 +39,7 @@
 {% endif -%}
 
 {% if grains.cloud == 'gce' -%}
-  {% set api_servers = "--experimental-bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig --require-kubeconfig --kubeconfig=/var/lib/kubelet/kubeconfig" -%}
+  {% set api_servers = "--bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig --require-kubeconfig --kubeconfig=/var/lib/kubelet/kubeconfig" -%}
 {% endif -%}
 
 {% set cloud_provider = "" -%}
