@@ -195,6 +195,9 @@ func (s *fileStore) Update(certData, keyData []byte) (*tls.Certificate, error) {
 	ts := time.Now().Format("2006-01-02-15-04-05")
 	pemFilename := s.filename(ts)
 
+	if err := os.MkdirAll(s.certDirectory, 0755); err != nil {
+		return nil, fmt.Errorf("could not create directory %q to store certificates: %v", s.certDirectory, err)
+	}
 	certPath := filepath.Join(s.certDirectory, pemFilename)
 
 	f, err := os.OpenFile(certPath, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600)
