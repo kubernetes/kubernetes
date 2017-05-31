@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -2256,4 +2257,81 @@ func TestAllowMissingKeys(t *testing.T) {
 			t.Errorf("in %s, expect %q, got %q", test.Name, test.Expect, buf.String())
 		}
 	}
+}
+
+func TestPrintControllerRevision(t *testing.T) {
+	tests := []struct {
+		history apps.ControllerRevision
+		expect  string
+	}{
+		{
+			apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							Controller: boolP(true),
+							Kind:       "DaemonSet",
+							Name:       "foo",
+						},
+					},
+				},
+				Revision: 1,
+			},
+			"test1\tDaemonSet/foo\t1\t0s\n",
+		},
+		{
+			apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							Controller: boolP(false),
+							Kind:       "ABC",
+							Name:       "foo",
+						},
+					},
+				},
+				Revision: 2,
+			},
+			"test2\t<none>\t2\t0s\n",
+		},
+		{
+			apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test3",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					OwnerReferences:   []metav1.OwnerReference{},
+				},
+				Revision: 3,
+			},
+			"test3\t<none>\t3\t0s\n",
+		},
+		{
+			apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test4",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					OwnerReferences:   nil,
+				},
+				Revision: 4,
+			},
+			"test4\t<none>\t4\t0s\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printControllerRevision(&test.history, buf, printers.PrintOptions{})
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func boolP(b bool) *bool {
+	return &b
 }
