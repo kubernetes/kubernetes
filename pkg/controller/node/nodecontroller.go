@@ -294,7 +294,7 @@ func NewNodeController(
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod, isPod := obj.(*v1.Pod)
-			// We can get DeletedFinalStateUnknown instead of *v1.Node here and we need to handle that correctly. #34692
+			// We can get DeletedFinalStateUnknown instead of *v1.Pod here and we need to handle that correctly.
 			if !isPod {
 				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
@@ -303,7 +303,7 @@ func NewNodeController(
 				}
 				pod, ok = deletedState.Obj.(*v1.Pod)
 				if !ok {
-					glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+					glog.Errorf("DeletedFinalStateUnknown contained non-Pod object: %v", deletedState.Obj)
 					return
 				}
 			}
