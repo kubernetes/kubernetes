@@ -40,10 +40,52 @@ Features
 - Comparator-like comparisons
 - Compare Helper Methods
 - InPlace manipulation
+- Ranges `>=1.0.0 <2.0.0 || >=3.0.0 !3.0.1-beta.1`
 - Sortable (implements sort.Interface)
 - database/sql compatible (sql.Scanner/Valuer)
 - encoding/json compatible (json.Marshaler/Unmarshaler)
 
+Ranges
+------
+
+A `Range` is a set of conditions which specify which versions satisfy the range.
+
+A condition is composed of an operator and a version. The supported operators are:
+
+- `<1.0.0` Less than `1.0.0`
+- `<=1.0.0` Less than or equal to `1.0.0`
+- `>1.0.0` Greater than `1.0.0`
+- `>=1.0.0` Greater than or equal to `1.0.0`
+- `1.0.0`, `=1.0.0`, `==1.0.0` Equal to `1.0.0`
+- `!1.0.0`, `!=1.0.0` Not equal to `1.0.0`. Excludes version `1.0.0`.
+
+A `Range` can link multiple `Ranges` separated by space:
+
+Ranges can be linked by logical AND:
+
+  - `>1.0.0 <2.0.0` would match between both ranges, so `1.1.1` and `1.8.7` but not `1.0.0` or `2.0.0`
+  - `>1.0.0 <3.0.0 !2.0.3-beta.2` would match every version between `1.0.0` and `3.0.0` except `2.0.3-beta.2`
+
+Ranges can also be linked by logical OR:
+
+  - `<2.0.0 || >=3.0.0` would match `1.x.x` and `3.x.x` but not `2.x.x`
+
+AND has a higher precedence than OR. It's not possible to use brackets.
+
+Ranges can be combined by both AND and OR
+
+  - `>1.0.0 <2.0.0 || >3.0.0 !4.2.1` would match `1.2.3`, `1.9.9`, `3.1.1`, but not `4.2.1`, `2.1.1`
+
+Range usage:
+
+```
+v, err := semver.Parse("1.2.3")
+range, err := semver.ParseRange(">1.0.0 <2.0.0 || >=3.0.0")
+if range(v) {
+    //valid
+}
+
+```
 
 Example
 -----
@@ -103,23 +145,30 @@ if err != nil {
 }
 ```
 
+
 Benchmarks
 -----
 
-    BenchmarkParseSimple         5000000      328    ns/op    49 B/op   1 allocs/op
-    BenchmarkParseComplex        1000000     2105    ns/op   263 B/op   7 allocs/op
-    BenchmarkParseAverage        1000000     1301    ns/op   168 B/op   4 allocs/op
-    BenchmarkStringSimple       10000000      130    ns/op     5 B/op   1 allocs/op
-    BenchmarkStringLarger        5000000      280    ns/op    32 B/op   2 allocs/op
-    BenchmarkStringComplex       3000000      512    ns/op    80 B/op   3 allocs/op
-    BenchmarkStringAverage       5000000      387    ns/op    47 B/op   2 allocs/op
-    BenchmarkValidateSimple    500000000        7.92 ns/op     0 B/op   0 allocs/op
-    BenchmarkValidateComplex     2000000      923    ns/op     0 B/op   0 allocs/op
-    BenchmarkValidateAverage     5000000      452    ns/op     0 B/op   0 allocs/op
-    BenchmarkCompareSimple     100000000       11.2  ns/op     0 B/op   0 allocs/op
-    BenchmarkCompareComplex     50000000       40.9  ns/op     0 B/op   0 allocs/op
-    BenchmarkCompareAverage     50000000       43.8  ns/op     0 B/op   0 allocs/op
-    BenchmarkSort                5000000      436    ns/op   259 B/op   2 allocs/op
+    BenchmarkParseSimple-4           5000000    390    ns/op    48 B/op   1 allocs/op
+    BenchmarkParseComplex-4          1000000   1813    ns/op   256 B/op   7 allocs/op
+    BenchmarkParseAverage-4          1000000   1171    ns/op   163 B/op   4 allocs/op
+    BenchmarkStringSimple-4         20000000    119    ns/op    16 B/op   1 allocs/op
+    BenchmarkStringLarger-4         10000000    206    ns/op    32 B/op   2 allocs/op
+    BenchmarkStringComplex-4         5000000    324    ns/op    80 B/op   3 allocs/op
+    BenchmarkStringAverage-4         5000000    273    ns/op    53 B/op   2 allocs/op
+    BenchmarkValidateSimple-4      200000000      9.33 ns/op     0 B/op   0 allocs/op
+    BenchmarkValidateComplex-4       3000000    469    ns/op     0 B/op   0 allocs/op
+    BenchmarkValidateAverage-4       5000000    256    ns/op     0 B/op   0 allocs/op
+    BenchmarkCompareSimple-4       100000000     11.8  ns/op     0 B/op   0 allocs/op
+    BenchmarkCompareComplex-4       50000000     30.8  ns/op     0 B/op   0 allocs/op
+    BenchmarkCompareAverage-4       30000000     41.5  ns/op     0 B/op   0 allocs/op
+    BenchmarkSort-4                  3000000    419    ns/op   256 B/op   2 allocs/op
+    BenchmarkRangeParseSimple-4      2000000    850    ns/op   192 B/op   5 allocs/op
+    BenchmarkRangeParseAverage-4     1000000   1677    ns/op   400 B/op  10 allocs/op
+    BenchmarkRangeParseComplex-4      300000   5214    ns/op  1440 B/op  30 allocs/op
+    BenchmarkRangeMatchSimple-4     50000000     25.6  ns/op     0 B/op   0 allocs/op
+    BenchmarkRangeMatchAverage-4    30000000     56.4  ns/op     0 B/op   0 allocs/op
+    BenchmarkRangeMatchComplex-4    10000000    153    ns/op     0 B/op   0 allocs/op
 
 See benchmark cases at [semver_test.go](semver_test.go)
 
