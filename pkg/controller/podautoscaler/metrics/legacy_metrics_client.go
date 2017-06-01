@@ -19,6 +19,7 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,12 +63,26 @@ func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, ser
 	}
 }
 
+// use the first exposed port on the service
+func (h *HeapsterMetricsClient) getHeapsterPort() string {
+	if h.heapsterPort != "" {
+		return h.heapsterPort
+	}
+	
+	svc, err := h.services.Get(h.heapsterService, metav1.GetOptions{})
+	if err != nil || len(svc.Spec.Ports) == 0 {
+		return ""
+	}
+	
+	return strconv.Itoa(int(svc.Spec.Ports[0].Port))
+}
+
 func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
 	metricPath := fmt.Sprintf("/apis/metrics/v1alpha1/namespaces/%s/pods", namespace)
 	params := map[string]string{"labelSelector": selector.String()}
 
 	resultRaw, err := h.services.
-		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, params).
+		ProxyGet(h.heapsterScheme, h.heapsterService, h.getHeapsterPort(), metricPath, params).
 		DoRaw()
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get pod resource metrics: %v", err)
@@ -134,7 +149,7 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 		metricName)
 
 	resultRaw, err := h.services.
-		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, map[string]string{"start": startTime.Format(time.RFC3339)}).
+		ProxyGet(h.heapsterScheme, h.heapsterService, h.getHeapsterPort(), metricPath, map[string]string{"start": startTime.Format(time.RFC3339)}).
 		DoRaw()
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get pod metrics: %v", err)
