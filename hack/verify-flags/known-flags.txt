@@ -216,6 +216,7 @@ etcd-mutation-timeout
 etcd-persistent-storage
 etcd-prefix
 etcd-pv-capacity
+etcd-pv-storage-class
 etcd-quorum-read
 etcd-server
 etcd-servers
