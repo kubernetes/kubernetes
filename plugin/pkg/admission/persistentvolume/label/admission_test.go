@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 )
 
 type mockVolumes struct {
@@ -99,6 +100,16 @@ func TestAdmission(t *testing.T) {
 			},
 		},
 	}
+	gcePV := api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "noncloud", Namespace: "myns"},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+					PDName: "123",
+				},
+			},
+		},
+	}
 
 	// Non-cloud PVs are ignored
 	err := handler.Admit(admission.NewAttributesRecord(&ignoredPV, nil, api.Kind("PersistentVolume").WithVersion("version"), ignoredPV.Namespace, ignoredPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, nil))
@@ -165,4 +176,9 @@ func TestAdmission(t *testing.T) {
 		t.Errorf("Expected (non-conflicting) user provided labels to be honored when creating aws pv")
 	}
 
+	pvHandler.gceCloudProvider = &gce.GCECloud{}
+	err = handler.Admit(admission.NewAttributesRecord(&gcePV, nil, api.Kind("PersistentVolume").WithVersion("version"), gcePV.Namespace, gcePV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected error when GCECloud null")
+	}
 }
