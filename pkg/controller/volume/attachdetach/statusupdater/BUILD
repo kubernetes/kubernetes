@@ -21,7 +21,6 @@ go_library(
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
     ],
 )

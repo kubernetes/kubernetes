@@ -256,8 +256,9 @@ func (c *mesosClient) pollMasterForState(ctx context.Context) (*mesosState, erro
 			}
 			defer res.Body.Close()
 			if handler, ok := tt.handlers[res.StatusCode]; ok {
-				if err := handler(res); err != nil {
-					return err
+				err1 := handler(res)
+				if err1 != nil {
+					return err1
 				}
 			}
 			// no handler for this error code, proceed to the next connection type

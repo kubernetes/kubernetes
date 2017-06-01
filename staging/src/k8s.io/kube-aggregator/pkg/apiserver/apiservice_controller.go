@@ -39,7 +39,7 @@ import (
 )
 
 type APIHandlerManager interface {
-	AddAPIService(apiService *apiregistration.APIService)
+	AddAPIService(apiService *apiregistration.APIService, destinationHost string)
 	RemoveAPIService(apiServiceName string)
 }
 
@@ -102,7 +102,8 @@ func (c *APIServiceRegistrationController) sync(key string) error {
 		return nil
 	}
 
-	c.apiHandlerManager.AddAPIService(apiService)
+	// TODO move the destination host to status so that you can see where its going
+	c.apiHandlerManager.AddAPIService(apiService, c.getDestinationHost(apiService))
 	return nil
 }
 

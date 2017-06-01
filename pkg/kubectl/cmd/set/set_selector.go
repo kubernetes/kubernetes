@@ -172,6 +172,7 @@ func (o *SelectorOptions) RunSelector() error {
 			return patch.Err
 		}
 		if o.local || o.dryrun {
+			fmt.Fprintln(o.out, "running in local/dry-run mode...")
 			o.PrintObject(info.Object)
 			return nil
 		}

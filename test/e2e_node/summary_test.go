@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	systemdutil "github.com/coreos/go-systemd/util"
@@ -53,20 +53,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 			const pod1 = "stats-busybox-1"
 
 			By("Creating test pods")
-			numRestarts := int32(1)
-			pods := getSummaryTestPods(f, numRestarts, pod0, pod1)
-			f.PodClient().CreateBatch(pods)
-
-			Eventually(func() error {
-				for _, pod := range pods {
-					err := verifyPodRestartCount(f, pod.Name, len(pod.Spec.Containers), numRestarts)
-					if err != nil {
-						return err
-					}
-				}
-				return nil
-			}, time.Minute, 5*time.Second).Should(BeNil())
-
+			createSummaryTestPods(f, pod0, pod1)
 			// Wait for cAdvisor to collect 2 stats points
 			time.Sleep(15 * time.Second)
 
@@ -144,16 +131,16 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						"StartTime": recent(maxStartAge),
 						"CPU": ptrMatchAllFields(gstruct.Fields{
 							"Time":                 recent(maxStatsAge),
-							"UsageNanoCores":       bounded(100000, 1E9),
-							"UsageCoreNanoSeconds": bounded(10000000, 1E11),
+							"UsageNanoCores":       bounded(100000, 100000000),
+							"UsageCoreNanoSeconds": bounded(10000000, 1000000000),
 						}),
 						"Memory": ptrMatchAllFields(gstruct.Fields{
 							"Time":            recent(maxStatsAge),
-							"AvailableBytes":  bounded(10*kb, 10*mb),
-							"UsageBytes":      bounded(10*kb, 20*mb),
-							"WorkingSetBytes": bounded(10*kb, 20*mb),
+							"AvailableBytes":  bounded(1*mb, 10*mb),
+							"UsageBytes":      bounded(10*kb, 5*mb),
+							"WorkingSetBytes": bounded(10*kb, 2*mb),
 							"RSSBytes":        bounded(1*kb, mb),
-							"PageFaults":      bounded(100, 1000000),
+							"PageFaults":      bounded(100, 100000),
 							"MajorPageFaults": bounded(0, 10),
 						}),
 						"Rootfs": ptrMatchAllFields(gstruct.Fields{
@@ -272,7 +259,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 	})
 })
 
-func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...string) []*v1.Pod {
+func createSummaryTestPods(f *framework.Framework, names ...string) {
 	pods := make([]*v1.Pod, 0, len(names))
 	for _, name := range names {
 		pods = append(pods, &v1.Pod{
@@ -285,7 +272,7 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 					{
 						Name:    "busybox-container",
 						Image:   "gcr.io/google_containers/busybox:1.24",
-						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file"),
+						Command: []string{"sh", "-c", "ping -c 1 google.com; while true; do echo 'hello world' >> /test-empty-dir-mnt/file ; sleep 1; done"},
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
 								// Must set memory limit to get MemoryStats.AvailableBytes
@@ -310,7 +297,7 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 			},
 		})
 	}
-	return pods
+	f.PodClient().CreateBatch(pods)
 }
 
 // Mapping function for gstruct.MatchAllElements

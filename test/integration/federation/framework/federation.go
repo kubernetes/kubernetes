@@ -18,12 +18,12 @@ package framework
 
 import (
 	"fmt"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/master"
@@ -31,10 +31,10 @@ import (
 )
 
 type MemberCluster struct {
-	CloseFn framework.CloseFunc
-	Config  *master.Config
-	Client  clientset.Interface
-	Host    string
+	Server *httptest.Server
+	Config *master.Config
+	Client clientset.Interface
+	Host   string
 }
 
 // FederationFixture manages a federation api server and a set of member clusters
@@ -44,7 +44,6 @@ type FederationFixture struct {
 	Clusters            []*MemberCluster
 	ClusterClients      []clientset.Interface
 	ClusterController   *clustercontroller.ClusterController
-	fedClient           federationclientset.Interface
 	stopChan            chan struct{}
 }
 
@@ -66,47 +65,46 @@ func (f *FederationFixture) SetUp(t *testing.T) {
 	monitorPeriod := 1 * time.Second
 	clustercontroller.StartClusterController(f.APIFixture.NewConfig(), f.stopChan, monitorPeriod)
 
-	f.fedClient = f.APIFixture.NewClient("federation-fixture")
-	for i := 0; i < f.DesiredClusterCount; i++ {
-		f.StartCluster(t)
-	}
+	f.startClusters()
 }
 
-func (f *FederationFixture) StartCluster(t *testing.T) {
-	config := framework.NewMasterConfig()
-	_, _, closeFn := framework.RunAMaster(config)
-	host := config.GenericConfig.LoopbackClientConfig.Host
+func (f *FederationFixture) startClusters() {
+	fedClient := f.APIFixture.NewClient("federation-fixture")
+	for i := 0; i < f.DesiredClusterCount; i++ {
+		config := framework.NewMasterConfig()
+		_, server := framework.RunAMaster(config)
+		host := config.GenericConfig.LoopbackClientConfig.Host
 
-	clusterClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
-	f.ClusterClients = append(f.ClusterClients, clusterClient)
-	f.Clusters = append(f.Clusters, &MemberCluster{
-		CloseFn: closeFn,
-		Config:  config,
-		Client:  clusterClient,
-		Host:    host,
-	})
+		// Use fmt to ensure the output will be visible when run with go test -v
+		fmt.Printf("Federated cluster %d serving on %s", i, host)
 
-	clusterId := len(f.ClusterClients)
+		clusterClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
+		f.Clusters = append(f.Clusters, &MemberCluster{
+			Server: server,
+			Config: config,
+			Client: clusterClient,
+			Host:   host,
+		})
 
-	t.Logf("Federated cluster %d serving on %s", clusterId, host)
+		f.ClusterClients = append(f.ClusterClients, clusterClient)
 
-	cluster := &federationapi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   fmt.Sprintf("cluster-%d", clusterId),
-			Labels: map[string]string{"cluster": fmt.Sprintf("%d", clusterId)},
-		},
-		Spec: federationapi.ClusterSpec{
-			ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
-				{
-					ClientCIDR:    "0.0.0.0/0",
-					ServerAddress: host,
-				},
+		cluster := &federationapi.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("cluster-%d", i),
 			},
-			// Use insecure access
-			SecretRef: nil,
-		},
+			Spec: federationapi.ClusterSpec{
+				ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
+					{
+						ClientCIDR:    "0.0.0.0/0",
+						ServerAddress: host,
+					},
+				},
+				// Use insecure access
+				SecretRef: nil,
+			},
+		}
+		fedClient.FederationV1beta1().Clusters().Create(cluster)
 	}
-	f.fedClient.FederationV1beta1().Clusters().Create(cluster)
 }
 
 func (f *FederationFixture) TearDown(t *testing.T) {
@@ -115,7 +113,7 @@ func (f *FederationFixture) TearDown(t *testing.T) {
 		f.stopChan = nil
 	}
 	for _, cluster := range f.Clusters {
-		cluster.CloseFn()
+		cluster.Server.Close()
 	}
 	f.Clusters = nil
 	if f.APIFixture != nil {

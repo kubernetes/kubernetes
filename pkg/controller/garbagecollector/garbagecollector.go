@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/workqueue"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	// install the prometheus plugin
@@ -70,17 +69,9 @@ type GarbageCollector struct {
 	registeredRateLimiter *RegisteredRateLimiter
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *UIDCache
-	sharedInformers  informers.SharedInformerFactory
 }
 
-func NewGarbageCollector(
-	metaOnlyClientPool dynamic.ClientPool,
-	clientPool dynamic.ClientPool,
-	mapper meta.RESTMapper,
-	deletableResources map[schema.GroupVersionResource]struct{},
-	ignoredResources map[schema.GroupResource]struct{},
-	sharedInformers informers.SharedInformerFactory,
-) (*GarbageCollector, error) {
+func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, deletableResources map[schema.GroupVersionResource]struct{}) (*GarbageCollector, error) {
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewUIDCache(500)
@@ -103,8 +94,6 @@ func NewGarbageCollector(
 		attemptToDelete:  attemptToDelete,
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
-		sharedInformers:  sharedInformers,
-		ignoredResources: ignoredResources,
 	}
 	if err := gb.monitorsForResources(deletableResources); err != nil {
 		return nil, err

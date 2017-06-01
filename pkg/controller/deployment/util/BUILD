@@ -18,6 +18,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/annotations:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
@@ -48,7 +49,6 @@ go_test(
     srcs = [
         "deployment_util_test.go",
         "hash_test.go",
-        "pod_util_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
@@ -58,7 +58,6 @@ go_test(
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/controller:go_default_library",
-        "//pkg/util/hash:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

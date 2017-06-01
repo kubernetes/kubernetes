@@ -90,25 +90,20 @@ func NewMemCGThresholdNotifier(path, attribute, threshold, description string, h
 	}, nil
 }
 
-func getThresholdEvents(eventfd int, eventCh chan<- struct{}, stopCh <-chan struct{}) {
+func getThresholdEvents(eventfd int, eventCh chan<- int) {
 	for {
 		buf := make([]byte, 8)
 		_, err := syscall.Read(eventfd, buf)
 		if err != nil {
 			return
 		}
-
-		select {
-		case eventCh <- struct{}{}:
-		case <-stopCh:
-			return
-		}
+		eventCh <- 0
 	}
 }
 
 func (n *memcgThresholdNotifier) Start(stopCh <-chan struct{}) {
-	eventCh := make(chan struct{})
-	go getThresholdEvents(n.eventfd, eventCh, stopCh)
+	eventCh := make(chan int, 1)
+	go getThresholdEvents(n.eventfd, eventCh)
 	for {
 		select {
 		case <-stopCh:
@@ -116,6 +111,7 @@ func (n *memcgThresholdNotifier) Start(stopCh <-chan struct{}) {
 			syscall.Close(n.watchfd)
 			syscall.Close(n.controlfd)
 			syscall.Close(n.eventfd)
+			close(eventCh)
 			return
 		case <-eventCh:
 			glog.V(2).Infof("eviction: threshold crossed")

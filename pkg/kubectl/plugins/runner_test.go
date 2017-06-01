@@ -18,7 +18,6 @@ package plugins
 
 import (
 	"bytes"
-	"os"
 	"testing"
 )
 
@@ -39,15 +38,7 @@ func TestExecRunner(t *testing.T) {
 			command:     "false",
 			expectedErr: "exit status 1",
 		},
-		{
-			name:        "env",
-			command:     "echo $KUBECTL_PLUGINS_TEST",
-			expectedMsg: "ok\n",
-		},
 	}
-
-	os.Setenv("KUBECTL_PLUGINS_TEST", "ok")
-	defer os.Unsetenv("KUBECTL_PLUGINS_TEST")
 
 	for _, test := range tests {
 		outBuf := bytes.NewBuffer([]byte{})
@@ -61,9 +52,8 @@ func TestExecRunner(t *testing.T) {
 		}
 
 		ctx := RunningContext{
-			Out:         outBuf,
-			WorkingDir:  ".",
-			EnvProvider: &EmptyEnvProvider{},
+			Out:        outBuf,
+			WorkingDir: ".",
 		}
 
 		runner := &ExecPluginRunner{}

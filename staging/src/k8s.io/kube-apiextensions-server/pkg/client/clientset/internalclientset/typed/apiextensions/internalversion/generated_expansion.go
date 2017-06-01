@@ -16,4 +16,4 @@ limitations under the License.
 
 package internalversion
 
-type CustomResourceDefinitionExpansion interface{}
+type CustomResourceExpansion interface{}

@@ -31,7 +31,7 @@ func TestParseServerURIGood(t *testing.T) {
 
 	reference := "127.0.0.1:2379"
 	if host != reference {
-		t.Fatalf("server uri was not parsed correctly, host %s was invalid", host)
+		t.Fatal("server uri was not parsed correctly")
 	}
 }
 

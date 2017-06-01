@@ -42,7 +42,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -73,8 +72,7 @@ type RequestScope struct {
 }
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
-	ctx := scope.ContextFunc(req)
-	responsewriters.ErrorNegotiated(ctx, err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
 }
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -104,18 +102,12 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 			scope.err(err, w, req)
 			return
 		}
-		requestInfo, ok := request.RequestInfoFrom(ctx)
-		if !ok {
-			scope.err(fmt.Errorf("missing requestInfo"), w, req)
-			return
-		}
-		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
+		if err := setSelfLink(result, req, scope.Namer); err != nil {
 			scope.err(err, w, req)
 			return
 		}
-
 		trace.Step("About to write a response")
-		responsewriters.WriteObject(ctx, http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
@@ -234,8 +226,7 @@ type responder struct {
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	ctx := r.scope.ContextFunc(r.req)
-	responsewriters.WriteObject(ctx, statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.w, r.req)
+	responsewriters.WriteObject(statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.w, r.req)
 }
 
 func (r *responder) Error(err error) {
@@ -301,11 +292,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			opts.FieldSelector = nameSelector
 		}
 
-		if opts.Watch || forceWatch {
-			if rw == nil {
-				scope.err(errors.NewMethodNotSupported(scope.Resource.GroupResource(), "watch"), w, req)
-				return
-			}
+		if (opts.Watch || forceWatch) && rw != nil {
 			// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
 			timeout := time.Duration(0)
 			if opts.TimeoutSeconds != nil {
@@ -334,7 +321,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			return
 		}
 		trace.Step("Listing from storage done")
-		numberOfItems, err := setListSelfLink(result, ctx, req, scope.Namer)
+		numberOfItems, err := setListSelfLink(result, req, scope.Namer)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -347,8 +334,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				return
 			}
 		}
-
-		responsewriters.WriteObject(ctx, http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
 }
@@ -409,9 +395,6 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 		trace.Step("Conversion done")
 
-		ae := request.AuditEventFrom(ctx)
-		audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
-
 		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := request.UserFrom(ctx)
 
@@ -436,18 +419,13 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 		trace.Step("Object stored in database")
 
-		requestInfo, ok := request.RequestInfoFrom(ctx)
-		if !ok {
-			scope.err(fmt.Errorf("missing requestInfo"), w, req)
-			return
-		}
-		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
+		if err := setSelfLink(result, req, scope.Namer); err != nil {
 			scope.err(err, w, req)
 			return
 		}
 		trace.Step("Self-link added")
 
-		responsewriters.WriteObject(ctx, http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		responsewriters.WriteObject(http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
@@ -507,9 +485,6 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		ae := request.AuditEventFrom(ctx)
-		audit.LogRequestPatch(ae, patchJS)
-
 		s, ok := runtime.SerializerInfoForMediaType(scope.Serializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
 		if !ok {
 			scope.err(fmt.Errorf("no serializer defined for JSON"), w, req)
@@ -537,17 +512,12 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		requestInfo, ok := request.RequestInfoFrom(ctx)
-		if !ok {
-			scope.err(fmt.Errorf("missing requestInfo"), w, req)
-			return
-		}
-		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
+		if err := setSelfLink(result, req, scope.Namer); err != nil {
 			scope.err(err, w, req)
 			return
 		}
 
-		responsewriters.WriteObject(ctx, http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 
 }
@@ -833,9 +803,6 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 		trace.Step("Conversion done")
 
-		ae := request.AuditEventFrom(ctx)
-		audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
-
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
 			scope.err(err, w, req)
 			return
@@ -862,12 +829,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 		trace.Step("Object stored in database")
 
-		requestInfo, ok := request.RequestInfoFrom(ctx)
-		if !ok {
-			scope.err(fmt.Errorf("missing requestInfo"), w, req)
-			return
-		}
-		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
+		if err := setSelfLink(result, req, scope.Namer); err != nil {
 			scope.err(err, w, req)
 			return
 		}
@@ -877,7 +839,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if wasCreated {
 			status = http.StatusCreated
 		}
-		responsewriters.WriteObject(ctx, status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
@@ -924,9 +886,6 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), w, req)
 					return
 				}
-
-				ae := request.AuditEventFrom(ctx)
-				audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
 			} else {
 				if values := req.URL.Query(); len(values) > 0 {
 					if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, options); err != nil {
@@ -983,20 +942,14 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			}
 		} else {
 			// when a non-status response is returned, set the self link
-			requestInfo, ok := request.RequestInfoFrom(ctx)
-			if !ok {
-				scope.err(fmt.Errorf("missing requestInfo"), w, req)
-				return
-			}
 			if _, ok := result.(*metav1.Status); !ok {
-				if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
+				if err := setSelfLink(result, req, scope.Namer); err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 		}
-
-		responsewriters.WriteObject(ctx, status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
@@ -1068,9 +1021,6 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), w, req)
 					return
 				}
-
-				ae := request.AuditEventFrom(ctx)
-				audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
 			}
 		}
 
@@ -1095,14 +1045,13 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		} else {
 			// when a non-status response is returned, set the self link
 			if _, ok := result.(*metav1.Status); !ok {
-				if _, err := setListSelfLink(result, ctx, req, scope.Namer); err != nil {
+				if _, err := setListSelfLink(result, req, scope.Namer); err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 		}
-
-		responsewriters.WriteObjectNegotiated(ctx, scope.Serializer, scope.Kind.GroupVersion(), w, req, http.StatusOK, result)
+		responsewriters.WriteObjectNegotiated(scope.Serializer, scope.Kind.GroupVersion(), w, req, http.StatusOK, result)
 	}
 }
 
@@ -1110,7 +1059,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 type resultFunc func() (runtime.Object, error)
 
 // finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
-// An api.Status object with status != success is considered an "error", which interrupts the normal response flow.
+// Any api.Status object returned is considered an "error", which interrupts the normal response flow.
 func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object, err error) {
 	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
 	// when the select statement reads something other than the one the goroutine sends on.
@@ -1134,9 +1083,7 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	select {
 	case result = <-ch:
 		if status, ok := result.(*metav1.Status); ok {
-			if status.Status != metav1.StatusSuccess {
-				return nil, errors.FromObject(status)
-			}
+			return nil, errors.FromObject(status)
 		}
 		return result, nil
 	case err = <-errCh:
@@ -1164,9 +1111,9 @@ func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime
 
 // setSelfLink sets the self link of an object (or the child items in a list) to the base URL of the request
 // plus the path and query generated by the provided linkFunc
-func setSelfLink(obj runtime.Object, requestInfo *request.RequestInfo, namer ScopeNamer) error {
+func setSelfLink(obj runtime.Object, req *http.Request, namer ScopeNamer) error {
 	// TODO: SelfLink generation should return a full URL?
-	uri, err := namer.GenerateLink(requestInfo, obj)
+	uri, err := namer.GenerateLink(req, obj)
 	if err != nil {
 		return nil
 	}
@@ -1211,7 +1158,7 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 
 // setListSelfLink sets the self link of a list to the base URL, then sets the self links
 // on all child objects returned. Returns the number of items in the list.
-func setListSelfLink(obj runtime.Object, ctx request.Context, req *http.Request, namer ScopeNamer) (int, error) {
+func setListSelfLink(obj runtime.Object, req *http.Request, namer ScopeNamer) (int, error) {
 	if !meta.IsListType(obj) {
 		return 0, nil
 	}
@@ -1223,15 +1170,11 @@ func setListSelfLink(obj runtime.Object, ctx request.Context, req *http.Request,
 	if err := namer.SetSelfLink(obj, uri); err != nil {
 		glog.V(4).Infof("Unable to set self link on object: %v", err)
 	}
-	requestInfo, ok := request.RequestInfoFrom(ctx)
-	if !ok {
-		return 0, fmt.Errorf("missing requestInfo")
-	}
 
 	count := 0
 	err = meta.EachListItem(obj, func(obj runtime.Object) error {
 		count++
-		return setSelfLink(obj, requestInfo, namer)
+		return setSelfLink(obj, req, namer)
 	})
 	return count, err
 }

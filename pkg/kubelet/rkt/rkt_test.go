@@ -46,7 +46,6 @@ import (
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	"strings"
 )
 
 func mustMarshalPodManifest(man *appcschema.PodManifest) []byte {
@@ -584,7 +583,6 @@ func TestGetPodStatus(t *testing.T) {
 	defer ctrl.Finish()
 	fr := newFakeRktInterface()
 	fs := newFakeSystemd()
-	fug := newfakeUnitGetter()
 	fnp := nettest.NewMockNetworkPlugin(ctrl)
 	fos := &containertesting.FakeOS{}
 	frh := &containertesting.FakeRuntimeHelper{}
@@ -594,7 +592,6 @@ func TestGetPodStatus(t *testing.T) {
 		runtimeHelper: frh,
 		os:            fos,
 		network:       network.NewPluginManager(fnp),
-		unitGetter:    fug,
 	}
 
 	ns := func(seconds int64) int64 {
@@ -811,8 +808,6 @@ func TestGetPodStatus(t *testing.T) {
 			podTimes[podFinishedMarkerPath(r.runtimeHelper.GetPodDir(tt.result.ID), pod.Id)] = tt.result.ContainerStatuses[0].FinishedAt
 		}
 
-		ctrl := gomock.NewController(t)
-
 		r.os.(*containertesting.FakeOS).StatFn = func(name string) (os.FileInfo, error) {
 			podTime, ok := podTimes[name]
 			if !ok {
@@ -822,13 +817,9 @@ func TestGetPodStatus(t *testing.T) {
 			mockFI.EXPECT().ModTime().Return(podTime)
 			return mockFI, nil
 		}
+		fnp.EXPECT().Name().Return(tt.networkPluginName)
 
-		if tt.networkPluginName == network.DefaultPluginName {
-			fnp.EXPECT().Name().Return(tt.networkPluginName)
-		}
-
-		if tt.pods != nil && tt.networkPluginName == kubenet.KubenetPluginName {
-			fnp.EXPECT().Name().Return(tt.networkPluginName)
+		if tt.networkPluginName == kubenet.KubenetPluginName {
 			if tt.result.IP != "" {
 				fnp.EXPECT().GetPodNetworkStatus("default", "guestbook", kubecontainer.ContainerID{ID: "42"}).
 					Return(&network.PodNetworkStatus{IP: net.ParseIP(tt.result.IP)}, nil)
@@ -847,9 +838,7 @@ func TestGetPodStatus(t *testing.T) {
 
 		assert.Equal(t, tt.result, status, testCaseHint)
 		assert.Equal(t, []string{"ListPods"}, fr.called, testCaseHint)
-		fug.networkNamespace = kubecontainer.ContainerID{}
 		fr.CleanCalls()
-		ctrl.Finish()
 	}
 }
 
@@ -1634,8 +1623,6 @@ func TestGarbageCollect(t *testing.T) {
 	cli := newFakeRktCli()
 	fakeOS := kubetesting.NewFakeOS()
 	getter := newFakePodGetter()
-	fug := newfakeUnitGetter()
-	frh := &containertesting.FakeRuntimeHelper{}
 
 	rkt := &Runtime{
 		os:                  fakeOS,
@@ -1644,8 +1631,6 @@ func TestGarbageCollect(t *testing.T) {
 		podGetter:           getter,
 		systemd:             fs,
 		containerRefManager: kubecontainer.NewRefManager(),
-		unitGetter:          fug,
-		runtimeHelper:       frh,
 	}
 
 	fakeApp := &rktapi.App{Name: "app-foo"}
@@ -1656,7 +1641,7 @@ func TestGarbageCollect(t *testing.T) {
 		pods                 []*rktapi.Pod
 		serviceFilesOnDisk   []string
 		expectedCommands     []string
-		expectedDeletedFiles []string
+		expectedServiceFiles []string
 	}{
 		// All running pods, should not be gc'd.
 		// Dead, new pods should not be gc'd.
@@ -1743,7 +1728,7 @@ func TestGarbageCollect(t *testing.T) {
 			},
 			[]string{"k8s_dead-old.service", "k8s_deleted-foo.service", "k8s_non-existing-bar.service"},
 			[]string{"rkt rm dead-old", "rkt rm deleted-foo"},
-			[]string{"/poddir/fake/finished-dead-old", "/poddir/fake/finished-deleted-foo", "/poddir/fake/finished-non-existing-bar", "/run/systemd/system/k8s_dead-old.service", "/run/systemd/system/k8s_deleted-foo.service", "/run/systemd/system/k8s_non-existing-bar.service"},
+			[]string{"/run/systemd/system/k8s_dead-old.service", "/run/systemd/system/k8s_deleted-foo.service", "/run/systemd/system/k8s_non-existing-bar.service"},
 		},
 		// gcPolicy.MaxContainers should be enforced.
 		// Oldest ones are removed first.
@@ -1800,7 +1785,7 @@ func TestGarbageCollect(t *testing.T) {
 			},
 			[]string{"k8s_dead-0.service", "k8s_dead-1.service", "k8s_dead-2.service"},
 			[]string{"rkt rm dead-0", "rkt rm dead-1"},
-			[]string{"/poddir/fake/finished-dead-0", "/poddir/fake/finished-dead-1", "/run/systemd/system/k8s_dead-0.service", "/run/systemd/system/k8s_dead-1.service"},
+			[]string{"/run/systemd/system/k8s_dead-0.service", "/run/systemd/system/k8s_dead-1.service"},
 		},
 	}
 
@@ -1815,10 +1800,6 @@ func TestGarbageCollect(t *testing.T) {
 
 			for _, name := range serviceFileNames {
 				mockFI := containertesting.NewMockFileInfo(ctrl)
-				// we need to specify two calls
-				// first: get all systemd units
-				// second: filter only the files with a k8s_ prefix
-				mockFI.EXPECT().Name().Return(name)
 				mockFI.EXPECT().Name().Return(name)
 				fileInfos = append(fileInfos, mockFI)
 			}
@@ -1839,17 +1820,14 @@ func TestGarbageCollect(t *testing.T) {
 
 		assert.Equal(t, tt.expectedCommands, cli.cmds, testCaseHint)
 
-		sort.Sort(sortedStringList(tt.expectedDeletedFiles))
+		sort.Sort(sortedStringList(tt.expectedServiceFiles))
 		sort.Sort(sortedStringList(fakeOS.Removes))
 		sort.Sort(sortedStringList(fs.resetFailedUnits))
 
-		assert.Equal(t, tt.expectedDeletedFiles, fakeOS.Removes, testCaseHint)
+		assert.Equal(t, tt.expectedServiceFiles, fakeOS.Removes, testCaseHint)
 		var expectedService []string
-		for _, f := range tt.expectedDeletedFiles {
-			unit := filepath.Base(f)
-			if strings.HasSuffix(unit, ".service") && strings.HasPrefix(unit, kubernetesUnitPrefix) {
-				expectedService = append(expectedService, unit)
-			}
+		for _, f := range tt.expectedServiceFiles {
+			expectedService = append(expectedService, filepath.Base(f))
 		}
 		assert.Equal(t, expectedService, fs.resetFailedUnits, testCaseHint)
 
@@ -2022,55 +2000,5 @@ func TestConstructSyslogIdentifier(t *testing.T) {
 	for i, testCase := range testCases {
 		identifier := constructSyslogIdentifier(testCase.podGenerateName, testCase.podName)
 		assert.Equal(t, testCase.identifier, identifier, fmt.Sprintf("Test case #%d", i))
-	}
-}
-
-func TestGetPodSystemdServiceFiles(t *testing.T) {
-	fs := kubetesting.NewFakeOS()
-	r := &Runtime{os: fs}
-
-	testCases := []struct {
-		serviceFilesOnDisk []string
-		expected           []string
-	}{
-		{
-			[]string{"one.service", "two.service", "k8s_513ce947-8f6e-4d27-8c03-99f97b78d680.service", "k8s_184482df-8630-4d41-b84f-302684871758.service", "k8s_f4a244d8-5ec2-4f59-b7dd-c9e130d6e7a3.service", "k8s_f5aad446-5598-488f-93a4-5a27e03e7fcb.service"},
-			[]string{"k8s_513ce947-8f6e-4d27-8c03-99f97b78d680.service", "k8s_184482df-8630-4d41-b84f-302684871758.service", "k8s_f4a244d8-5ec2-4f59-b7dd-c9e130d6e7a3.service", "k8s_f5aad446-5598-488f-93a4-5a27e03e7fcb.service"},
-		},
-		{
-			[]string{"one.service", "two.service"},
-			[]string{},
-		},
-		{
-			[]string{"one.service", "k8s_513ce947-8f6e-4d27-8c03-99f97b78d680.service"},
-			[]string{"k8s_513ce947-8f6e-4d27-8c03-99f97b78d680.service"},
-		},
-	}
-	for i, tt := range testCases {
-		ctrl := gomock.NewController(t)
-
-		fs.ReadDirFn = func(dirname string) ([]os.FileInfo, error) {
-			serviceFileNames := tt.serviceFilesOnDisk
-			var fileInfos []os.FileInfo
-
-			for _, name := range serviceFileNames {
-				mockFI := containertesting.NewMockFileInfo(ctrl)
-				// we need to specify two calls
-				// first: get all systemd units
-				// second: filter only the files with a k8s_ prefix
-				mockFI.EXPECT().Name().Return(name)
-				mockFI.EXPECT().Name().Return(name)
-				fileInfos = append(fileInfos, mockFI)
-			}
-			return fileInfos, nil
-		}
-		serviceFiles, err := r.getPodSystemdServiceFiles()
-		if err != nil {
-			t.Errorf("%v", err)
-		}
-		for _, f := range serviceFiles {
-			assert.Contains(t, tt.expected, f.Name(), fmt.Sprintf("Test case #%d", i))
-
-		}
 	}
 }

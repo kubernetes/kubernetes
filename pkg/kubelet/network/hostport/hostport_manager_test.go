@@ -17,7 +17,6 @@ limitations under the License.
 package hostport
 
 import (
-	"bytes"
 	"net"
 	"testing"
 
@@ -133,11 +132,10 @@ func TestHostportManager(t *testing.T) {
 	}
 
 	// Check Iptables-save result after adding hostports
-	raw := bytes.NewBuffer(nil)
-	err := iptables.SaveInto(utiliptables.TableNAT, raw)
+	raw, err := iptables.Save(utiliptables.TableNAT)
 	assert.NoError(t, err)
 
-	lines := strings.Split(string(raw.Bytes()), "\n")
+	lines := strings.Split(string(raw), "\n")
 	expectedLines := map[string]bool{
 		`*nat`: true,
 		`:KUBE-HOSTPORTS - [0:0]`:                                                                                                         true,
@@ -177,10 +175,9 @@ func TestHostportManager(t *testing.T) {
 	}
 
 	// Check Iptables-save result after deleting hostports
-	raw.Reset()
-	err = iptables.SaveInto(utiliptables.TableNAT, raw)
+	raw, err = iptables.Save(utiliptables.TableNAT)
 	assert.NoError(t, err)
-	lines = strings.Split(string(raw.Bytes()), "\n")
+	lines = strings.Split(string(raw), "\n")
 	remainingChains := make(map[string]bool)
 	for _, line := range lines {
 		if strings.HasPrefix(line, ":") {

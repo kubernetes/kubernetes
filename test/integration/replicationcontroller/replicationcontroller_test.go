@@ -121,9 +121,9 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 	return ret, nil
 }
 
-func rmSetup(t *testing.T, stopCh chan struct{}) (*httptest.Server, framework.CloseFunc, *replication.ReplicationManager, informers.SharedInformerFactory, clientset.Interface) {
+func rmSetup(t *testing.T, stopCh chan struct{}) (*httptest.Server, *replication.ReplicationManager, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	_, s := framework.RunAMaster(masterConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -136,7 +136,7 @@ func rmSetup(t *testing.T, stopCh chan struct{}) (*httptest.Server, framework.Cl
 	rm := replication.NewReplicationManager(informers.Core().V1().Pods(), informers.Core().V1().ReplicationControllers(), clientSet, replication.BurstReplicas)
 	informers.Start(stopCh)
 
-	return s, closeFn, rm, informers, clientSet
+	return s, rm, informers, clientSet
 }
 
 // wait for the podInformer to observe the pods. Call this function before
@@ -207,8 +207,7 @@ func TestAdoption(t *testing.T) {
 	}
 	for i, tc := range testCases {
 		stopCh := make(chan struct{})
-		s, closeFn, rm, informers, clientSet := rmSetup(t, stopCh)
-		defer closeFn()
+		s, rm, informers, clientSet := rmSetup(t, stopCh)
 		ns := framework.CreateTestingNamespace(fmt.Sprintf("adoption-%d", i), s, t)
 		defer framework.DeleteTestingNamespace(ns, s, t)
 
@@ -285,8 +284,7 @@ func TestUpdateSelectorToAdopt(t *testing.T) {
 	// matches pod1 only; change the selector to match pod2 as well. Verify
 	// there is only one pod left.
 	stopCh := make(chan struct{})
-	s, closeFn, rm, _, clientSet := rmSetup(t, stopCh)
-	defer closeFn()
+	s, rm, _, clientSet := rmSetup(t, stopCh)
 	ns := framework.CreateTestingNamespace("update-selector-to-adopt", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rc := newRC("rc", ns.Name, 1)
@@ -325,8 +323,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 	// that rc creates one more pod, so there are 3 pods. Also verify that
 	// pod2's controllerRef is cleared.
 	stopCh := make(chan struct{})
-	s, closeFn, rm, informers, clientSet := rmSetup(t, stopCh)
-	defer closeFn()
+	s, rm, informers, clientSet := rmSetup(t, stopCh)
 	ns := framework.CreateTestingNamespace("update-selector-to-remove-controllerref", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rc := newRC("rc", ns.Name, 2)
@@ -371,8 +368,7 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 	// that rc creates one more pod, so there are 3 pods. Also verify that
 	// pod2's controllerRef is cleared.
 	stopCh := make(chan struct{})
-	s, closeFn, rm, _, clientSet := rmSetup(t, stopCh)
-	defer closeFn()
+	s, rm, _, clientSet := rmSetup(t, stopCh)
 	ns := framework.CreateTestingNamespace("update-label-to-remove-controllerref", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rc := newRC("rc", ns.Name, 2)
@@ -413,8 +409,7 @@ func TestUpdateLabelToBeAdopted(t *testing.T) {
 	// controller adopts pod2 and delete one of them, so there is only 1 pod
 	// left.
 	stopCh := make(chan struct{})
-	s, closeFn, rm, _, clientSet := rmSetup(t, stopCh)
-	defer closeFn()
+	s, rm, _, clientSet := rmSetup(t, stopCh)
 	ns := framework.CreateTestingNamespace("update-label-to-be-adopted", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rc := newRC("rc", ns.Name, 1)

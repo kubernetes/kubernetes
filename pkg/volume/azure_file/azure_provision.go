@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 var _ volume.DeletableVolumePlugin = &azureFilePlugin{}
@@ -173,7 +172,7 @@ func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
 			Name:   a.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "azure-file-dynamic-provisioner",
+				"kubernetes.io/createdby": "azure-file-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

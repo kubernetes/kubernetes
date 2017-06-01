@@ -22,7 +22,6 @@ import (
 
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -63,9 +62,6 @@ const (
 
 	// userAgentKey is the context key for the request user agent.
 	userAgentKey
-
-	// auditKey is the context key for the audit event.
-	auditKey
 
 	namespaceDefault = "default" // TODO(sttts): solve import cycle when using metav1.NamespaceDefault
 )
@@ -146,15 +142,4 @@ func WithUserAgent(parent Context, userAgent string) Context {
 func UserAgentFrom(ctx Context) (string, bool) {
 	userAgent, ok := ctx.Value(userAgentKey).(string)
 	return userAgent, ok
-}
-
-// WithAuditEvent returns set audit event struct.
-func WithAuditEvent(parent Context, ev *audit.Event) Context {
-	return WithValue(parent, auditKey, ev)
-}
-
-// AuditEventFrom returns the audit event struct on the ctx
-func AuditEventFrom(ctx Context) *audit.Event {
-	ev, _ := ctx.Value(auditKey).(*audit.Event)
-	return ev
 }

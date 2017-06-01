@@ -243,7 +243,7 @@ func (s *Scheme) ObjectKinds(obj Object) ([]schema.GroupVersionKind, bool, error
 
 	gvks, ok := s.typeToGVK[t]
 	if !ok {
-		return nil, false, NewNotRegisteredErrForType(t)
+		return nil, false, NewNotRegisteredErr(schema.GroupVersionKind{}, t)
 	}
 	_, unversionedType := s.unversionedTypes[t]
 
@@ -281,7 +281,7 @@ func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
 	if t, exists := s.unversionedKinds[kind.Kind]; exists {
 		return reflect.New(t).Interface().(Object), nil
 	}
-	return nil, NewNotRegisteredErrForKind(kind)
+	return nil, NewNotRegisteredErr(kind, nil)
 }
 
 // AddGenericConversionFunc adds a function that accepts the ConversionFunc call pattern
@@ -492,7 +492,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	}
 	kinds, ok := s.typeToGVK[t]
 	if !ok || len(kinds) == 0 {
-		return nil, NewNotRegisteredErrForType(t)
+		return nil, NewNotRegisteredErr(schema.GroupVersionKind{}, t)
 	}
 
 	gvk, ok := target.KindForGroupVersionKinds(kinds)
@@ -506,7 +506,8 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 			return copyAndSetTargetKind(copy, s, in, unversionedKind)
 		}
 
-		return nil, NewNotRegisteredErrForTarget(t, target)
+		// TODO: should this be a typed error?
+		return nil, fmt.Errorf("%v is not suitable for converting to %q", t, target)
 	}
 
 	// target wants to use the existing type, set kind and return (no conversion necessary)

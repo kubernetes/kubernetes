@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"testing"
 
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 )
@@ -92,8 +91,7 @@ func TestPluginCmd(t *testing.T) {
 			success: test.expectedSuccess,
 		}
 
-		f, _, _, _ := cmdtesting.NewAPIFactory()
-		cmd := NewCmdForPlugin(f, test.plugin, runner, inBuf, outBuf, errBuf)
+		cmd := NewCmdForPlugin(test.plugin, runner, inBuf, outBuf, errBuf)
 		if cmd == nil {
 			if !test.expectedNilCmd {
 				t.Fatalf("%s: command was unexpectedly not registered", test.name)

@@ -21,7 +21,7 @@ import sys
 import urllib2
 
 PULLQUERY=("https://api.github.com/repos/"
-           "kubernetes/kubernetes/pulls/{pull}")
+           "GoogleCloudPlatform/kubernetes/pulls/{pull}")
 LOGIN="login"
 TITLE="title"
 USER="user"

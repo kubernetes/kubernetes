@@ -28,7 +28,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
@@ -40,10 +39,9 @@ import (
 type DiscoveryController struct {
 	versionHandler *versionDiscoveryHandler
 	groupHandler   *groupDiscoveryHandler
-	contextMapper  request.RequestContextMapper
 
-	crdLister  listers.CustomResourceDefinitionLister
-	crdsSynced cache.InformerSynced
+	customResourceLister  listers.CustomResourceLister
+	customResourcesSynced cache.InformerSynced
 
 	// To allow injection for testing.
 	syncFn func(version schema.GroupVersion) error
@@ -51,21 +49,20 @@ type DiscoveryController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler, contextMapper request.RequestContextMapper) *DiscoveryController {
+func NewDiscoveryController(customResourceInformer informers.CustomResourceInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler) *DiscoveryController {
 	c := &DiscoveryController{
-		versionHandler: versionHandler,
-		groupHandler:   groupHandler,
-		crdLister:      crdInformer.Lister(),
-		crdsSynced:     crdInformer.Informer().HasSynced,
-		contextMapper:  contextMapper,
+		versionHandler:        versionHandler,
+		groupHandler:          groupHandler,
+		customResourceLister:  customResourceInformer.Lister(),
+		customResourcesSynced: customResourceInformer.Informer().HasSynced,
 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DiscoveryController"),
 	}
 
-	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.addCustomResourceDefinition,
-		UpdateFunc: c.updateCustomResourceDefinition,
-		DeleteFunc: c.deleteCustomResourceDefinition,
+	customResourceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.addCustomResource,
+		UpdateFunc: c.updateCustomResource,
+		DeleteFunc: c.deleteCustomResource,
 	})
 
 	c.syncFn = c.sync
@@ -78,44 +75,36 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	apiVersionsForDiscovery := []metav1.GroupVersionForDiscovery{}
 	apiResourcesForDiscovery := []metav1.APIResource{}
 
-	crds, err := c.crdLister.List(labels.Everything())
+	customResources, err := c.customResourceLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
 	foundVersion := false
 	foundGroup := false
-	for _, crd := range crds {
-		if !apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
-			continue
-		}
+	for _, customResource := range customResources {
+		// TODO add status checking
 
-		if crd.Spec.Group != version.Group {
+		if customResource.Spec.Group != version.Group {
 			continue
 		}
 		foundGroup = true
 		apiVersionsForDiscovery = append(apiVersionsForDiscovery, metav1.GroupVersionForDiscovery{
-			GroupVersion: crd.Spec.Group + "/" + crd.Spec.Version,
-			Version:      crd.Spec.Version,
+			GroupVersion: customResource.Spec.Group + "/" + customResource.Spec.Version,
+			Version:      customResource.Spec.Version,
 		})
 
-		if crd.Spec.Version != version.Version {
+		if customResource.Spec.Version != version.Version {
 			continue
 		}
 		foundVersion = true
 
-		verbs := metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"})
-		// if we're terminating we don't allow some verbs
-		if apiextensions.IsCRDConditionTrue(crd, apiextensions.Terminating) {
-			verbs = metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "watch"})
-		}
-
 		apiResourcesForDiscovery = append(apiResourcesForDiscovery, metav1.APIResource{
-			Name:         crd.Status.AcceptedNames.Plural,
-			SingularName: crd.Status.AcceptedNames.Singular,
-			Namespaced:   crd.Spec.Scope == apiextensions.NamespaceScoped,
-			Kind:         crd.Status.AcceptedNames.Kind,
-			Verbs:        verbs,
-			ShortNames:   crd.Status.AcceptedNames.ShortNames,
+			Name:         customResource.Spec.Names.Plural,
+			SingularName: customResource.Spec.Names.Singular,
+			Namespaced:   customResource.Spec.Scope == apiextensions.NamespaceScoped,
+			Kind:         customResource.Spec.Names.Kind,
+			Verbs:        metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"}),
+			ShortNames:   customResource.Spec.Names.ShortNames,
 		})
 	}
 
@@ -131,7 +120,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 		// the preferred versions for a group is arbitrary since there cannot be duplicate resources
 		PreferredVersion: apiVersionsForDiscovery[0],
 	}
-	c.groupHandler.setDiscovery(version.Group, discovery.NewAPIGroupHandler(Codecs, apiGroup, c.contextMapper))
+	c.groupHandler.setDiscovery(version.Group, discovery.NewAPIGroupHandler(Codecs, apiGroup))
 
 	if !foundVersion {
 		c.versionHandler.unsetDiscovery(version)
@@ -139,7 +128,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	}
 	c.versionHandler.setDiscovery(version, discovery.NewAPIVersionHandler(Codecs, version, discovery.APIResourceListerFunc(func() []metav1.APIResource {
 		return apiResourcesForDiscovery
-	}), c.contextMapper))
+	})))
 
 	return nil
 }
@@ -151,7 +140,7 @@ func (c *DiscoveryController) Run(stopCh <-chan struct{}) {
 
 	glog.Infof("Starting DiscoveryController")
 
-	if !cache.WaitForCacheSync(stopCh, c.crdsSynced) {
+	if !cache.WaitForCacheSync(stopCh, c.customResourcesSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
@@ -187,36 +176,36 @@ func (c *DiscoveryController) processNextWorkItem() bool {
 	return true
 }
 
-func (c *DiscoveryController) enqueue(obj *apiextensions.CustomResourceDefinition) {
+func (c *DiscoveryController) enqueue(obj *apiextensions.CustomResource) {
 	c.queue.Add(schema.GroupVersion{Group: obj.Spec.Group, Version: obj.Spec.Version})
 }
 
-func (c *DiscoveryController) addCustomResourceDefinition(obj interface{}) {
-	castObj := obj.(*apiextensions.CustomResourceDefinition)
-	glog.V(4).Infof("Adding customresourcedefinition %s", castObj.Name)
+func (c *DiscoveryController) addCustomResource(obj interface{}) {
+	castObj := obj.(*apiextensions.CustomResource)
+	glog.V(4).Infof("Adding customresource %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
-func (c *DiscoveryController) updateCustomResourceDefinition(obj, _ interface{}) {
-	castObj := obj.(*apiextensions.CustomResourceDefinition)
-	glog.V(4).Infof("Updating customresourcedefinition %s", castObj.Name)
+func (c *DiscoveryController) updateCustomResource(obj, _ interface{}) {
+	castObj := obj.(*apiextensions.CustomResource)
+	glog.V(4).Infof("Updating customresource %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
-func (c *DiscoveryController) deleteCustomResourceDefinition(obj interface{}) {
-	castObj, ok := obj.(*apiextensions.CustomResourceDefinition)
+func (c *DiscoveryController) deleteCustomResource(obj interface{}) {
+	castObj, ok := obj.(*apiextensions.CustomResource)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			glog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
-		castObj, ok = tombstone.Obj.(*apiextensions.CustomResourceDefinition)
+		castObj, ok = tombstone.Obj.(*apiextensions.CustomResource)
 		if !ok {
 			glog.Errorf("Tombstone contained object that is not expected %#v", obj)
 			return
 		}
 	}
-	glog.V(4).Infof("Deleting customresourcedefinition %q", castObj.Name)
+	glog.V(4).Infof("Deleting customresource %q", castObj.Name)
 	c.enqueue(castObj)
 }

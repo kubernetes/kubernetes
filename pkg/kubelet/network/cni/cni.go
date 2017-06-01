@@ -251,11 +251,9 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	if err := plugin.checkInitialized(); err != nil {
 		return err
 	}
-
-	// Lack of namespace should not be fatal on teardown
 	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
-		glog.Warningf("CNI failed to retrieve network namespace path: %v", err)
+		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
 	return plugin.deleteFromNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath)
@@ -267,9 +265,6 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
 		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
-	}
-	if netnsPath == "" {
-		return nil, fmt.Errorf("Cannot find the network namespace, skipping pod network status for container %q", id)
 	}
 
 	ip, err := network.GetPodIP(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
@@ -283,7 +278,7 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (cnitypes.Result, error) {
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
 	if err != nil {
-		glog.Errorf("Error adding network when building cni runtime conf: %v", err)
+		glog.Errorf("Error adding network when buliding cni runtime conf: %v", err)
 		return nil, err
 	}
 
@@ -301,7 +296,7 @@ func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string
 func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) error {
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
 	if err != nil {
-		glog.Errorf("Error deleting network when building cni runtime conf: %v", err)
+		glog.Errorf("Error deleting network when buliding cni runtime conf: %v", err)
 		return err
 	}
 

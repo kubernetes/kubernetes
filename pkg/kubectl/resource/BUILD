@@ -1,3 +1,5 @@
+package(default_visibility = ["//visibility:public"])
+
 licenses(["notice"])
 
 load(
@@ -20,9 +22,6 @@ go_library(
         "visitor.go",
     ],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_resource_CONSUMERS",
-    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
@@ -90,13 +89,11 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
+    visibility = ["//visibility:private"],
 )
 
 filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_resource_CONSUMERS",
-    ],
 )

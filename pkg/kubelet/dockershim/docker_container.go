@@ -28,8 +28,8 @@ import (
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
 	"github.com/golang/glog"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
 // ListContainers lists all containers matching the filter.
@@ -287,6 +287,7 @@ func (ds *dockerService) StopContainer(containerID string, timeout int64) error 
 }
 
 // RemoveContainer removes the container.
+// TODO: If a container is still running, should we forcibly remove it?
 func (ds *dockerService) RemoveContainer(containerID string) error {
 	// Ideally, log lifecycle should be independent of container lifecycle.
 	// However, docker will remove container log after container is removed,
@@ -295,7 +296,7 @@ func (ds *dockerService) RemoveContainer(containerID string) error {
 	if err != nil {
 		return err
 	}
-	err = ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true, Force: true})
+	err = ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
 	if err != nil {
 		return fmt.Errorf("failed to remove container %q: %v", containerID, err)
 	}
@@ -306,15 +307,15 @@ func getContainerTimestamps(r *dockertypes.ContainerJSON) (time.Time, time.Time,
 	var createdAt, startedAt, finishedAt time.Time
 	var err error
 
-	createdAt, err = libdocker.ParseDockerTimestamp(r.Created)
+	createdAt, err = dockertools.ParseDockerTimestamp(r.Created)
 	if err != nil {
 		return createdAt, startedAt, finishedAt, err
 	}
-	startedAt, err = libdocker.ParseDockerTimestamp(r.State.StartedAt)
+	startedAt, err = dockertools.ParseDockerTimestamp(r.State.StartedAt)
 	if err != nil {
 		return createdAt, startedAt, finishedAt, err
 	}
-	finishedAt, err = libdocker.ParseDockerTimestamp(r.State.FinishedAt)
+	finishedAt, err = dockertools.ParseDockerTimestamp(r.State.FinishedAt)
 	if err != nil {
 		return createdAt, startedAt, finishedAt, err
 	}
@@ -328,7 +329,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 		return nil, err
 	}
 
-	// Parse the timestamps.
+	// Parse the timstamps.
 	createdAt, startedAt, finishedAt, err := getContainerTimestamps(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", containerID, err)
@@ -342,7 +343,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 	imageID := toPullableImageID(r.Image, ir)
 
 	// Convert the mounts.
-	mounts := make([]*runtimeapi.Mount, 0, len(r.Mounts))
+	mounts := []*runtimeapi.Mount{}
 	for i := range r.Mounts {
 		m := r.Mounts[i]
 		readonly := !m.RW
@@ -429,6 +430,5 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 		Message:     message,
 		Labels:      labels,
 		Annotations: annotations,
-		LogPath:     r.Config.Labels[containerLogPathLabelKey],
 	}, nil
 }

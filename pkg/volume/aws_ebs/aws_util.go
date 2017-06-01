@@ -91,18 +91,12 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 	}
 	// Apply Parameters (case-insensitive). We leave validation of
 	// the values to the cloud provider.
-	volumeOptions.ZonePresent = false
-	volumeOptions.ZonesPresent = false
 	for k, v := range c.options.Parameters {
 		switch strings.ToLower(k) {
 		case "type":
 			volumeOptions.VolumeType = v
 		case "zone":
-			volumeOptions.ZonePresent = true
 			volumeOptions.AvailabilityZone = v
-		case "zones":
-			volumeOptions.ZonesPresent = true
-			volumeOptions.AvailabilityZones = v
 		case "iopspergb":
 			volumeOptions.IOPSPerGB, err = strconv.Atoi(v)
 			if err != nil {
@@ -118,10 +112,6 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 		default:
 			return "", 0, nil, fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
 		}
-	}
-
-	if volumeOptions.ZonePresent && volumeOptions.ZonesPresent {
-		return "", 0, nil, fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
 	}
 
 	// TODO: implement PVC.Selector parsing

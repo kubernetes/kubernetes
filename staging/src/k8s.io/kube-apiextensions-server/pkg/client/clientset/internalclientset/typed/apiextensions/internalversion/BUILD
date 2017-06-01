@@ -11,7 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "apiextensions_client.go",
-        "customresourcedefinition.go",
+        "customresource.go",
         "doc.go",
         "generated_expansion.go",
     ],

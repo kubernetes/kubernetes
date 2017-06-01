@@ -46,9 +46,6 @@ const (
 // manager. In the background it communicates with the API server to get new
 // certificates for certificates about to expire.
 type Manager interface {
-	// CertificateSigningRequestClient sets the client interface that is used for
-	// signing new certificates generated as part of rotation.
-	SetCertificateSigningRequestClient(certificatesclient.CertificateSigningRequestInterface) error
 	// Start the API server status sync loop.
 	Start()
 	// Current returns the currently selected certificate from the
@@ -122,7 +119,6 @@ type manager struct {
 	certStore                Store
 	certAccessLock           sync.RWMutex
 	cert                     *tls.Certificate
-	rotationDeadline         time.Time
 	forceRotation            bool
 }
 
@@ -160,20 +156,6 @@ func (m *manager) Current() *tls.Certificate {
 	return m.cert
 }
 
-// SetCertificateSigningRequestClient sets the client interface that is used
-// for signing new certificates generated as part of rotation. It must be
-// called before Start() and can not be used to change the
-// CertificateSigningRequestClient that has already been set. This method is to
-// support the one specific scenario where the CertificateSigningRequestClient
-// uses the CertificateManager.
-func (m *manager) SetCertificateSigningRequestClient(certSigningRequestClient certificatesclient.CertificateSigningRequestInterface) error {
-	if m.certSigningRequestClient == nil {
-		m.certSigningRequestClient = certSigningRequestClient
-		return nil
-	}
-	return fmt.Errorf("CertificateSigningRequestClient is already set.")
-}
-
 // Start will start the background work of rotating the certificates.
 func (m *manager) Start() {
 	// Certificate rotation depends on access to the API server certificate
@@ -187,28 +169,16 @@ func (m *manager) Start() {
 
 	glog.V(2).Infof("Certificate rotation is enabled.")
 
-	m.setRotationDeadline()
-
-	// Synchronously request a certificate before entering the background
-	// loop to allow bootstrap scenarios, where the certificate manager
-	// doesn't have a certificate at all yet.
-	if m.shouldRotate() {
-		_, err := m.rotateCerts()
-		if err != nil {
-			glog.Errorf("Could not rotate certificates: %v", err)
-		}
-	}
-	backoff := wait.Backoff{
-		Duration: 2 * time.Second,
-		Factor:   2,
-		Jitter:   0.1,
-		Steps:    7,
+	err := m.rotateCerts()
+	if err != nil {
+		glog.Errorf("Could not rotate certificates: %v", err)
 	}
 	go wait.Forever(func() {
-		time.Sleep(m.rotationDeadline.Sub(time.Now()))
-		if err := wait.ExponentialBackoff(backoff, m.rotateCerts); err != nil {
-			glog.Errorf("Reached backoff limit, still unable to rotate certs: %v", err)
-			wait.PollInfinite(128*time.Second, m.rotateCerts)
+		for range time.Tick(syncPeriod) {
+			err := m.rotateCerts()
+			if err != nil {
+				glog.Errorf("Could not rotate certificates: %v", err)
+			}
 		}
 	}, 0)
 }
@@ -255,49 +225,6 @@ func (m *manager) shouldRotate() bool {
 	if m.cert == nil {
 		return true
 	}
-	if m.forceRotation {
-		return true
-	}
-	return time.Now().After(m.rotationDeadline)
-}
-
-func (m *manager) rotateCerts() (bool, error) {
-	csrPEM, keyPEM, err := m.generateCSR()
-	if err != nil {
-		glog.Errorf("Unable to generate a certificate signing request: %v", err)
-		return false, nil
-	}
-
-	// Call the Certificate Signing Request API to get a certificate for the
-	// new private key.
-	crtPEM, err := requestCertificate(m.certSigningRequestClient, csrPEM, m.usages)
-	if err != nil {
-		glog.Errorf("Failed while requesting a signed certificate from the master: %v", err)
-		return false, nil
-	}
-
-	cert, err := m.certStore.Update(crtPEM, keyPEM)
-	if err != nil {
-		glog.Errorf("Unable to store the new cert/key pair: %v", err)
-		return false, nil
-	}
-
-	m.updateCached(cert)
-	m.setRotationDeadline()
-	m.forceRotation = false
-	return true, nil
-}
-
-// setRotationDeadline sets a cached value for the threshold at which the
-// current certificate should be rotated, 80%+/-10% of the expiration of the
-// certificate.
-func (m *manager) setRotationDeadline() {
-	m.certAccessLock.RLock()
-	defer m.certAccessLock.RUnlock()
-	if m.cert == nil {
-		m.rotationDeadline = time.Now()
-		return
-	}
 
 	notAfter := m.cert.Leaf.NotAfter
 	totalDuration := float64(notAfter.Sub(m.cert.Leaf.NotBefore))
@@ -309,7 +236,36 @@ func (m *manager) setRotationDeadline() {
 	// certificates at the same time for the rest of the life of the cluster.
 	jitteryDuration := wait.Jitter(time.Duration(totalDuration), 0.2) - time.Duration(totalDuration*0.3)
 
-	m.rotationDeadline = m.cert.Leaf.NotBefore.Add(jitteryDuration)
+	rotationThreshold := m.cert.Leaf.NotBefore.Add(jitteryDuration)
+	passedThreshold := time.Now().After(rotationThreshold)
+	return m.forceRotation || passedThreshold
+}
+
+func (m *manager) rotateCerts() error {
+	if !m.shouldRotate() {
+		return nil
+	}
+
+	csrPEM, keyPEM, err := m.generateCSR()
+	if err != nil {
+		return err
+	}
+
+	// Call the Certificate Signing Request API to get a certificate for the
+	// new private key.
+	crtPEM, err := requestCertificate(m.certSigningRequestClient, csrPEM, m.usages)
+	if err != nil {
+		return fmt.Errorf("unable to get a new key signed: %v", err)
+	}
+
+	cert, err := m.certStore.Update(crtPEM, keyPEM)
+	if err != nil {
+		return fmt.Errorf("unable to store the new cert/key pair: %v", err)
+	}
+
+	m.updateCached(cert)
+	m.forceRotation = false
+	return nil
 }
 
 func (m *manager) updateCached(cert *tls.Certificate) {

@@ -379,13 +379,10 @@ func deleteServiceShard(c *fedframework.Cluster, namespace, service string) erro
 
 // equivalent returns true if the two services are equivalent.  Fields which are expected to differ between
 // federated services and the underlying cluster services (e.g. ClusterIP, NodePort) are ignored.
-func equivalent(clusterService, federationService v1.Service) bool {
-	federationService.Spec.ClusterIP = clusterService.Spec.ClusterIP
-	for i := range federationService.Spec.Ports {
-		federationService.Spec.Ports[i].NodePort = clusterService.Spec.Ports[i].NodePort
-	}
-	if federationService.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyType("") {
-		federationService.Spec.ExternalTrafficPolicy = clusterService.Spec.ExternalTrafficPolicy
+func equivalent(federationService, clusterService v1.Service) bool {
+	clusterService.Spec.ClusterIP = federationService.Spec.ClusterIP
+	for i := range clusterService.Spec.Ports {
+		clusterService.Spec.Ports[i].NodePort = federationService.Spec.Ports[i].NodePort
 	}
 
 	if federationService.Name != clusterService.Name || federationService.Namespace != clusterService.Namespace {

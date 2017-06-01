@@ -37,6 +37,5 @@ go_library(
         "//vendor/k8s.io/client-go/pkg/api:go_default_library",
         "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
         "//vendor/k8s.io/client-go/pkg/apis/extensions:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/apis/networking:go_default_library",
     ],
 )

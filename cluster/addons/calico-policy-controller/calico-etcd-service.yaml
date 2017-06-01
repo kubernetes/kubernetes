@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    k8s-app: calico-etcd
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: calico-etcd
+  namespace: kube-system
+spec:
+  clusterIP: 10.0.0.17
+  ports:
+    - port: 6666
+  selector:
+    k8s-app: calico-etcd

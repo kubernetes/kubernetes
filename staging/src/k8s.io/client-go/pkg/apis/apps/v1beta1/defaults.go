@@ -27,9 +27,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_StatefulSet(obj *StatefulSet) {
-	if len(obj.Spec.PodManagementPolicy) == 0 {
-		obj.Spec.PodManagementPolicy = OrderedReadyPodManagement
-	}
 	labels := obj.Spec.Template.Labels
 	if labels != nil {
 		if obj.Spec.Selector == nil {

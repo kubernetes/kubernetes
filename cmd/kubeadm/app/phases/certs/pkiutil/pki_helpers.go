@@ -21,7 +21,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"os"
-	"path/filepath"
+	"path"
 	"time"
 
 	certutil "k8s.io/client-go/util/cert"
@@ -198,13 +198,13 @@ func pathsForCertAndKey(pkiPath, name string) (string, string) {
 }
 
 func pathForCert(pkiPath, name string) string {
-	return filepath.Join(pkiPath, fmt.Sprintf("%s.crt", name))
+	return path.Join(pkiPath, fmt.Sprintf("%s.crt", name))
 }
 
 func pathForKey(pkiPath, name string) string {
-	return filepath.Join(pkiPath, fmt.Sprintf("%s.key", name))
+	return path.Join(pkiPath, fmt.Sprintf("%s.key", name))
 }
 
 func pathForPublicKey(pkiPath, name string) string {
-	return filepath.Join(pkiPath, fmt.Sprintf("%s.pub", name))
+	return path.Join(pkiPath, fmt.Sprintf("%s.pub", name))
 }

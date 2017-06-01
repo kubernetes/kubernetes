@@ -20,10 +20,8 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
-        "//pkg/api/v1/helper/qos:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
-        "//pkg/features:go_default_library",
-        "//pkg/volume/util:go_default_library",
+        "//pkg/kubelet/qos:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
@@ -32,9 +30,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
-        "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset:go_default_library",
     ],
 )
 

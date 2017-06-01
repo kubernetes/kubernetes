@@ -673,24 +673,6 @@ func TestDoesExternalLoadBalancerNeedsUpdate(t *testing.T) {
 			},
 			expectedNeedsUpdate: true,
 		},
-		{
-			testName: "If ExternalTrafficPolicy is different",
-			updateFn: func() {
-				oldSvc = defaultExternalService()
-				newSvc = defaultExternalService()
-				newSvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
-			},
-			expectedNeedsUpdate: true,
-		},
-		{
-			testName: "If HealthCheckNodePort is different",
-			updateFn: func() {
-				oldSvc = defaultExternalService()
-				newSvc = defaultExternalService()
-				newSvc.Spec.HealthCheckNodePort = 30123
-			},
-			expectedNeedsUpdate: true,
-		},
 	}
 
 	controller, _, _ := newController()

@@ -48,8 +48,11 @@ type FederatedOperation struct {
 
 // A helper that executes the given set of updates on federation, in parallel.
 type FederatedUpdater interface {
-	// Executes the given set of operations.
-	Update([]FederatedOperation) error
+	// Executes the given set of operations within the specified timeout.
+	// Timeout is best-effort. There is no guarantee that the underlying operations are
+	// stopped when it is reached. However the function will return after the timeout
+	// with a non-nil error.
+	Update([]FederatedOperation, time.Duration) error
 }
 
 // A function that executes some operation using the passed client and object.
@@ -60,8 +63,6 @@ type federatedUpdaterImpl struct {
 
 	kind string
 
-	timeout time.Duration
-
 	eventRecorder record.EventRecorder
 
 	addFunction    FederatedOperationHandler
@@ -69,11 +70,10 @@ type federatedUpdaterImpl struct {
 	deleteFunction FederatedOperationHandler
 }
 
-func NewFederatedUpdater(federation FederationView, kind string, timeout time.Duration, recorder record.EventRecorder, add, update, del FederatedOperationHandler) FederatedUpdater {
+func NewFederatedUpdater(federation FederationView, kind string, recorder record.EventRecorder, add, update, del FederatedOperationHandler) FederatedUpdater {
 	return &federatedUpdaterImpl{
 		federation:     federation,
 		kind:           kind,
-		timeout:        timeout,
 		eventRecorder:  recorder,
 		addFunction:    add,
 		updateFunction: update,
@@ -86,11 +86,7 @@ func (fu *federatedUpdaterImpl) recordEvent(obj runtime.Object, eventType, event
 	fu.eventRecorder.Eventf(obj, api.EventTypeNormal, eventType, messageFmt, args...)
 }
 
-// Update executes the given set of operations within the timeout specified for
-// the instance. Timeout is best-effort. There is no guarantee that the
-// underlying operations are stopped when it is reached. However the function
-// will return after the timeout with a non-nil error.
-func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation) error {
+func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation, timeout time.Duration) error {
 	done := make(chan error, len(ops))
 	for _, op := range ops {
 		go func(op FederatedOperation) {
@@ -122,7 +118,7 @@ func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation) error {
 				fu.recordEvent(op.Obj, eventType, "Deleting", eventArgs...)
 				err = fu.deleteFunction(clientset, op.Obj)
 				// IsNotFound error is fine since that means the object is deleted already.
-				if errors.IsNotFound(err) {
+				if err != nil && !errors.IsNotFound(err) {
 					err = nil
 				}
 			}
@@ -140,16 +136,16 @@ func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation) error {
 	start := time.Now()
 	for i := 0; i < len(ops); i++ {
 		now := time.Now()
-		if !now.Before(start.Add(fu.timeout)) {
-			return fmt.Errorf("failed to finish all operations in %v", fu.timeout)
+		if !now.Before(start.Add(timeout)) {
+			return fmt.Errorf("failed to finish all operations in %v", timeout)
 		}
 		select {
 		case err := <-done:
 			if err != nil {
 				return err
 			}
-		case <-time.After(start.Add(fu.timeout).Sub(now)):
-			return fmt.Errorf("failed to finish all operations in %v", fu.timeout)
+		case <-time.After(start.Add(timeout).Sub(now)):
+			return fmt.Errorf("failed to finish all operations in %v", timeout)
 		}
 	}
 	// All operations finished in time.

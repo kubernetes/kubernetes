@@ -26,20 +26,17 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
-
 	"github.com/golang/glog"
-
-	"k8s.io/client-go/tools/remotecommand"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
-
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 type streamingRuntime struct {
-	client      libdocker.Interface
+	client      dockertools.DockerInterface
 	execHandler ExecHandler
 }
 
@@ -125,7 +122,7 @@ func (ds *dockerService) PortForward(req *runtimeapi.PortForwardRequest) (*runti
 	return ds.streamingServer.GetPortForward(req)
 }
 
-func checkContainerStatus(client libdocker.Interface, containerID string) (*dockertypes.ContainerJSON, error) {
+func checkContainerStatus(client dockertools.DockerInterface, containerID string) (*dockertypes.ContainerJSON, error) {
 	container, err := client.InspectContainer(containerID)
 	if err != nil {
 		return nil, err
@@ -136,7 +133,7 @@ func checkContainerStatus(client libdocker.Interface, containerID string) (*dock
 	return container, nil
 }
 
-func attachContainer(client libdocker.Interface, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func attachContainer(client dockertools.DockerInterface, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	// Have to start this before the call to client.AttachToContainer because client.AttachToContainer is a blocking
 	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
 	kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
@@ -150,7 +147,7 @@ func attachContainer(client libdocker.Interface, containerID string, stdin io.Re
 		Stdout: stdout != nil,
 		Stderr: stderr != nil,
 	}
-	sopts := libdocker.StreamOptions{
+	sopts := dockertools.StreamOptions{
 		InputStream:  stdin,
 		OutputStream: stdout,
 		ErrorStream:  stderr,
@@ -159,7 +156,7 @@ func attachContainer(client libdocker.Interface, containerID string, stdin io.Re
 	return client.AttachToContainer(containerID, opts, sopts)
 }
 
-func portForward(client libdocker.Interface, podInfraContainerID string, port int32, stream io.ReadWriteCloser) error {
+func portForward(client dockertools.DockerInterface, podInfraContainerID string, port int32, stream io.ReadWriteCloser) error {
 	container, err := client.InspectContainer(podInfraContainerID)
 	if err != nil {
 		return err

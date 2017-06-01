@@ -61,6 +61,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/autoscaling/install:go_default_library",
         "//pkg/apis/autoscaling/v1:go_default_library",
@@ -83,6 +84,7 @@ go_test(
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
         "//vendor/k8s.io/heapster/metrics/api/v1/types:go_default_library",
+        "//vendor/k8s.io/heapster/metrics/apis/metrics/v1alpha1:go_default_library",
         "//vendor/k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1:go_default_library",
         "//vendor/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",
         "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/fake:go_default_library",

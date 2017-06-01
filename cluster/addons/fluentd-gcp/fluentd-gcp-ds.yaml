@@ -103,8 +103,6 @@ spec:
       tolerations:
       - key: "node.alpha.kubernetes.io/ismaster"
         effect: "NoSchedule"
-      - operator: "Exists"
-        effect: "NoExecute"
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog
@@ -118,7 +116,7 @@ spec:
           path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-gcp-config-v1.0
+          name: fluentd-gcp-config
       - name: ssl-certs
         hostPath:
           path: /etc/ssl/certs

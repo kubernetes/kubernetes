@@ -1,4 +1,4 @@
-// +build !linux,!windows
+// +build !linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -21,13 +21,13 @@ package cm
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
 type unsupportedContainerManager struct {
 }
 
-func NewContainerManager(_ string, _ libdocker.Interface) ContainerManager {
+func NewContainerManager(_ string, _ dockertools.DockerInterface) ContainerManager {
 	return &unsupportedContainerManager{}
 }
 

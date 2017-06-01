@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-proxy/app"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
+	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 func main() {
@@ -40,6 +41,8 @@ func main() {
 	// utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
+
+	verflag.PrintAndExitIfRequested()
 
 	if err := command.Execute(); err != nil {
 		os.Exit(1)

@@ -19,7 +19,7 @@ package master
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+	"path"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -338,5 +338,5 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Vo
 }
 
 func buildStaticManifestFilepath(name string) string {
-	return filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests", name+".yaml")
+	return path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests", name+".yaml")
 }

@@ -267,6 +267,7 @@ kube::golang::set_platform_envs() {
 
   # Do not set CC when building natively on a platform, only if cross-compiling from linux/amd64
   if [[ $(kube::golang::host_platform) == "linux/amd64" ]]; then
+
     # Dynamic CGO linking for other server architectures than linux/amd64 goes here
     # If you want to include support for more server platforms than these, add arch-specific gcc names here
     case "${platform}" in

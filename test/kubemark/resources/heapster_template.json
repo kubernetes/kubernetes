@@ -36,7 +36,7 @@
 					"image": "gcr.io/google_containers/heapster:v1.3.0",
 					"resources": {
 						"requests": {
-							"cpu": "{{METRICS_CPU}}m",
+							"cpu": "100m",
 							"memory": "{{METRICS_MEM}}Mi"
 						}
 					},
@@ -58,6 +58,7 @@
 					"image": "gcr.io/google_containers/heapster:v1.3.0",
 					"resources": {
 						"requests": {
+							"cpu": "100m",
 							"memory": "{{EVENTER_MEM}}Ki"
 						}
 					},

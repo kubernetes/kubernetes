@@ -17,7 +17,6 @@ limitations under the License.
 package rest
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net"
@@ -117,10 +116,16 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 		h.Transport = h.defaultProxyTransport(req.URL, h.Transport)
 	}
 
-	// WithContext creates a shallow clone of the request with the new context.
-	newReq := req.WithContext(context.Background())
-	newReq.Header = utilnet.CloneHeader(req.Header)
-	newReq.URL = &loc
+	newReq, err := http.NewRequest(req.Method, loc.String(), req.Body)
+	if err != nil {
+		h.Responder.Error(err)
+		return
+	}
+	newReq.Header = req.Header
+	newReq.ContentLength = req.ContentLength
+	// Copy the TransferEncoding is for future-proofing. Currently Go only supports "chunked" and
+	// it can determine the TransferEncoding based on ContentLength and the Body.
+	newReq.TransferEncoding = req.TransferEncoding
 
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host})
 	proxy.Transport = h.Transport
@@ -140,13 +145,10 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 		err         error
 	)
 
-	clone := utilnet.CloneRequest(req)
-	// Only append X-Forwarded-For in the upgrade path, since httputil.NewSingleHostReverseProxy
-	// handles this in the non-upgrade path.
-	utilnet.AppendForwardedForHeader(clone)
 	if h.InterceptRedirects && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects) {
-		backendConn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, h.Location, clone.Header, req.Body, h)
+		backendConn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, h.Location, req.Header, req.Body, h)
 	} else {
+		clone := utilnet.CloneRequest(req)
 		clone.URL = h.Location
 		backendConn, err = h.Dial(clone)
 	}

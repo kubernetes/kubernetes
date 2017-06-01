@@ -53,12 +53,9 @@ func TestDeleteContext(t *testing.T) {
 }
 
 func (test deleteContextTest) run(t *testing.T) {
-	fakeKubeFile, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	fakeKubeFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(fakeKubeFile.Name())
-	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
+	err := clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

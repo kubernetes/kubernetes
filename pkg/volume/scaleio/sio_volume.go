@@ -34,7 +34,6 @@ import (
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 type sioVolume struct {
@@ -275,7 +274,7 @@ func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
 			Namespace: v.options.PVC.Namespace,
 			Labels:    map[string]string{},
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "scaleio-dynamic-provisioner",
+				"kubernetes.io/createdby": "scaleio-dynamic-provisioner",
 			},
 		},
 		Spec: api.PersistentVolumeSpec{

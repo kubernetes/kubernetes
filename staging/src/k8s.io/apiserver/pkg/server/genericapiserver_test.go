@@ -48,8 +48,6 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -92,12 +90,6 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
 
-	clientset := fake.NewSimpleClientset()
-	if clientset == nil {
-		t.Fatal("unable to create fake client set")
-	}
-	config.SharedInformerFactory = informers.NewSharedInformerFactory(clientset, config.LoopbackClientConfig.Timeout)
-
 	// TODO restore this test, but right now, eliminate our cycle
 	// config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, runtime.NewScheme())
 	// config.OpenAPIConfig.Info = &spec.Info{
@@ -114,7 +106,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdserver, config, assert := setUp(t)
 
-	s, err := config.Complete().New("test", EmptyDelegate)
+	s, err := config.Complete().New(EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -146,7 +138,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
 	config.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: "ExternalAddress"}
 
-	s, err := config.SkipComplete().New("test", EmptyDelegate)
+	s, err := config.SkipComplete().New(EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -308,13 +300,17 @@ func TestPrepareRun(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	assert.NotNil(config.SwaggerConfig)
+	// assert.NotNil(config.OpenAPIConfig)
 
-	server := httptest.NewServer(s.Handler.Director)
+	server := httptest.NewServer(s.Handler.GoRestfulContainer.ServeMux)
 	defer server.Close()
-	done := make(chan struct{})
 
 	s.PrepareRun()
-	s.RunPostStartHooks(done)
+
+	// openapi is installed in PrepareRun
+	// resp, err := http.Get(server.URL + "/swagger.json")
+	// assert.NoError(err)
+	// assert.Equal(http.StatusOK, resp.StatusCode)
 
 	// swagger is installed in PrepareRun
 	resp, err := http.Get(server.URL + "/swaggerapi/")
@@ -347,13 +343,13 @@ func TestCustomHandlerChain(t *testing.T) {
 		called = true
 	})
 
-	s, err := config.SkipComplete().New("test", EmptyDelegate)
+	s, err := config.SkipComplete().New(EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
 
-	s.Handler.NonGoRestfulMux.Handle("/nonswagger", handler)
-	s.Handler.NonGoRestfulMux.Handle("/secret", handler)
+	s.Handler.PostGoRestfulMux.Handle("/nonswagger", handler)
+	s.Handler.PostGoRestfulMux.Handle("/secret", handler)
 
 	type Test struct {
 		handler   http.Handler
@@ -402,7 +398,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	kubeVersion := fakeVersion()
 	config.Version = &kubeVersion
 
-	s, err := config.SkipComplete().New("test", EmptyDelegate)
+	s, err := config.SkipComplete().New(EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}

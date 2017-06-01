@@ -17,6 +17,7 @@ limitations under the License.
 package etcd3
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -326,7 +327,7 @@ type testCodec struct {
 }
 
 func (c *testCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	return nil, nil, errTestingDecode
+	return nil, nil, errors.New("Expected decoding failure")
 }
 
 func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {

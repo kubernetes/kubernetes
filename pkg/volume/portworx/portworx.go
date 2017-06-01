@@ -29,17 +29,16 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&portworxVolumePlugin{nil, nil}}
+	return []volume.VolumePlugin{&portworxVolumePlugin{nil}}
 }
 
 type portworxVolumePlugin struct {
 	host volume.VolumeHost
-	util *PortworxVolumeUtil
 }
 
 var _ volume.VolumePlugin = &portworxVolumePlugin{}
@@ -57,7 +56,6 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 
 func (plugin *portworxVolumePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
-	plugin.util = &PortworxVolumeUtil{}
 	return nil
 }
 
@@ -91,7 +89,7 @@ func (plugin *portworxVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccess
 }
 
 func (plugin *portworxVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod.UID, plugin.util, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod.UID, &PortworxVolumeUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *portworxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager portworxManager, mounter mount.Interface) (volume.Mounter, error) {
@@ -119,11 +117,10 @@ func (plugin *portworxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID
 }
 
 func (plugin *portworxVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, plugin.util, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, &PortworxVolumeUtil{}, plugin.host.GetMounter())
 }
 
-func (plugin *portworxVolumePlugin) newUnmounterInternal(volName string, podUID types.UID, manager portworxManager,
-	mounter mount.Interface) (volume.Unmounter, error) {
+func (plugin *portworxVolumePlugin) newUnmounterInternal(volName string, podUID types.UID, manager portworxManager, mounter mount.Interface) (volume.Unmounter, error) {
 	return &portworxVolumeUnmounter{
 		&portworxVolume{
 			podUID:          podUID,
@@ -136,14 +133,13 @@ func (plugin *portworxVolumePlugin) newUnmounterInternal(volName string, podUID 
 }
 
 func (plugin *portworxVolumePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	return plugin.newDeleterInternal(spec, plugin.util)
+	return plugin.newDeleterInternal(spec, &PortworxVolumeUtil{})
 }
 
 func (plugin *portworxVolumePlugin) newDeleterInternal(spec *volume.Spec, manager portworxManager) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.PortworxVolume == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.PortworxVolume is nil")
 	}
-
 	return &portworxVolumeDeleter{
 		portworxVolume: &portworxVolume{
 			volName:  spec.Name(),
@@ -154,7 +150,7 @@ func (plugin *portworxVolumePlugin) newDeleterInternal(spec *volume.Spec, manage
 }
 
 func (plugin *portworxVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	return plugin.newProvisionerInternal(options, plugin.util)
+	return plugin.newProvisionerInternal(options, &PortworxVolumeUtil{})
 }
 
 func (plugin *portworxVolumePlugin) newProvisionerInternal(options volume.VolumeOptions, manager portworxManager) (volume.Provisioner, error) {
@@ -315,6 +311,11 @@ func (c *portworxVolumeUnmounter) TearDown() error {
 // resource was the last reference to that disk on the kubelet.
 func (c *portworxVolumeUnmounter) TearDownAt(dir string) error {
 	glog.V(4).Infof("Portworx Volume TearDown of %s", dir)
+	// Unmount the bind mount inside the pod
+	if err := util.UnmountPath(dir, c.mounter); err != nil {
+		return err
+	}
+
 	// Call Portworx Unmount for Portworx's book-keeping.
 	if err := c.manager.UnmountVolume(c, dir); err != nil {
 		return err
@@ -361,7 +362,7 @@ func (c *portworxVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			Name:   c.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "portworx-volume-dynamic-provisioner",
+				"kubernetes.io/createdby": "portworx-volume-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

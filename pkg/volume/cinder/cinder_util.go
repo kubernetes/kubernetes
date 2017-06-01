@@ -201,18 +201,18 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 		}
 	}
 
-	volumeID, volumeAZ, errr := cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
+	volumeId, volumeAZ, errr := cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
 	if errr != nil {
 		glog.V(2).Infof("Error creating cinder volume: %v", errr)
 		return "", 0, nil, errr
 	}
-	glog.V(2).Infof("Successfully created cinder volume %s", volumeID)
+	glog.V(2).Infof("Successfully created cinder volume %s", volumeId)
 
 	// these are needed that pod is spawning to same AZ
 	volumeLabels = make(map[string]string)
 	volumeLabels[metav1.LabelZoneFailureDomain] = volumeAZ
 
-	return volumeID, volSizeGB, volumeLabels, nil
+	return volumeId, volSizeGB, volumeLabels, nil
 }
 
 func probeAttachedVolume() error {

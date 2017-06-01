@@ -620,7 +620,7 @@ func SetObjectDefaults_SecretList(in *SecretList) {
 }
 
 func SetObjectDefaults_Service(in *Service) {
-	SetDefaults_Service(in)
+	SetDefaults_ServiceSpec(&in.Spec)
 }
 
 func SetObjectDefaults_ServiceList(in *ServiceList) {

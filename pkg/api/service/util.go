@@ -56,7 +56,7 @@ func GetLoadBalancerSourceRanges(service *api.Service) (netsets.IPNet, error) {
 			return nil, fmt.Errorf("service.Spec.LoadBalancerSourceRanges: %v is not valid. Expecting a list of IP ranges. For example, 10.0.0.0/24. Error msg: %v", specs, err)
 		}
 	} else {
-		val := service.Annotations[api.AnnotationLoadBalancerSourceRangesKey]
+		val := service.Annotations[AnnotationLoadBalancerSourceRangesKey]
 		val = strings.TrimSpace(val)
 		if val == "" {
 			val = defaultLoadBalancerSourceRanges
@@ -64,7 +64,7 @@ func GetLoadBalancerSourceRanges(service *api.Service) (netsets.IPNet, error) {
 		specs := strings.Split(val, ",")
 		ipnets, err = netsets.ParseIPNets(specs...)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %s is not valid. Expecting a comma-separated list of source IP ranges. For example, 10.0.0.0/24,192.168.2.0/24", api.AnnotationLoadBalancerSourceRangesKey, val)
+			return nil, fmt.Errorf("%s: %s is not valid. Expecting a comma-separated list of source IP ranges. For example, 10.0.0.0/24,192.168.2.0/24", AnnotationLoadBalancerSourceRangesKey, val)
 		}
 	}
 	return ipnets, nil
@@ -76,22 +76,23 @@ func RequestsOnlyLocalTraffic(service *api.Service) bool {
 		service.Spec.Type != api.ServiceTypeNodePort {
 		return false
 	}
-
-	// First check the beta annotation and then the first class field. This is so that
-	// existing Services continue to work till the user decides to transition to the
-	// first class field.
-	if l, ok := service.Annotations[api.BetaAnnotationExternalTraffic]; ok {
-		switch l {
-		case api.AnnotationValueExternalTrafficLocal:
-			return true
-		case api.AnnotationValueExternalTrafficGlobal:
-			return false
-		default:
-			glog.Errorf("Invalid value for annotation %v: %v", api.BetaAnnotationExternalTraffic, l)
-			return false
+	// First check the alpha annotation and then the beta. This is so existing
+	// Services continue to work till the user decides to transition to beta.
+	// If they transition to beta, there's no way to go back to alpha without
+	// rolling back the cluster.
+	for _, annotation := range []string{AlphaAnnotationExternalTraffic, BetaAnnotationExternalTraffic} {
+		if l, ok := service.Annotations[annotation]; ok {
+			switch l {
+			case AnnotationValueExternalTrafficLocal:
+				return true
+			case AnnotationValueExternalTrafficGlobal:
+				return false
+			default:
+				glog.Errorf("Invalid value for annotation %v: %v", annotation, l)
+			}
 		}
 	}
-	return service.Spec.ExternalTrafficPolicy == api.ServiceExternalTrafficPolicyTypeLocal
+	return false
 }
 
 // NeedsHealthCheck Check if service needs health check.
@@ -102,47 +103,21 @@ func NeedsHealthCheck(service *api.Service) bool {
 	return RequestsOnlyLocalTraffic(service)
 }
 
-// GetServiceHealthCheckNodePort Return health check node port for service, if one exists
+// GetServiceHealthCheckNodePort Return health check node port annotation for service, if one exists
 func GetServiceHealthCheckNodePort(service *api.Service) int32 {
-	// First check the beta annotation and then the first class field. This is so that
-	// existing Services continue to work till the user decides to transition to the
-	// first class field.
-	if l, ok := service.Annotations[api.BetaAnnotationHealthCheckNodePort]; ok {
-		p, err := strconv.Atoi(l)
-		if err != nil {
-			glog.Errorf("Failed to parse annotation %v: %v", api.BetaAnnotationHealthCheckNodePort, err)
-			return 0
+	// First check the alpha annotation and then the beta. This is so existing
+	// Services continue to work till the user decides to transition to beta.
+	// If they transition to beta, there's no way to go back to alpha without
+	// rolling back the cluster.
+	for _, annotation := range []string{AlphaAnnotationHealthCheckNodePort, BetaAnnotationHealthCheckNodePort} {
+		if l, ok := service.Annotations[annotation]; ok {
+			p, err := strconv.Atoi(l)
+			if err != nil {
+				glog.Errorf("Failed to parse annotation %v: %v", annotation, err)
+				continue
+			}
+			return int32(p)
 		}
-		return int32(p)
 	}
-	return service.Spec.HealthCheckNodePort
-}
-
-// ClearExternalTrafficPolicy resets the ExternalTrafficPolicy field.
-func ClearExternalTrafficPolicy(service *api.Service) {
-	// First check the beta annotation and then the first class field. This is so that
-	// existing Services continue to work till the user decides to transition to the
-	// first class field.
-	if _, ok := service.Annotations[api.BetaAnnotationExternalTraffic]; ok {
-		delete(service.Annotations, api.BetaAnnotationExternalTraffic)
-		return
-	}
-	service.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyType("")
-}
-
-// SetServiceHealthCheckNodePort sets the given health check node port on service.
-// It does not check whether this service needs healthCheckNodePort.
-func SetServiceHealthCheckNodePort(service *api.Service, hcNodePort int32) {
-	// First check the beta annotation and then the first class field. This is so that
-	// existing Services continue to work till the user decides to transition to the
-	// first class field.
-	if _, ok := service.Annotations[api.BetaAnnotationExternalTraffic]; ok {
-		if hcNodePort == 0 {
-			delete(service.Annotations, api.BetaAnnotationHealthCheckNodePort)
-		} else {
-			service.Annotations[api.BetaAnnotationHealthCheckNodePort] = fmt.Sprintf("%d", hcNodePort)
-		}
-		return
-	}
-	service.Spec.HealthCheckNodePort = hcNodePort
+	return 0
 }

@@ -24,7 +24,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -65,20 +64,14 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 	nodesToUpdate := nsu.actualStateOfWorld.GetVolumesToReportAttached()
 	for nodeName, attachedVolumes := range nodesToUpdate {
 		nodeObj, err := nsu.nodeLister.Get(string(nodeName))
-		if errors.IsNotFound(err) {
-			// If node does not exist, its status cannot be updated.
-			// Remove the node entry from the collection of attach updates, preventing the
-			// status updater from unnecessarily updating the node.
+		if nodeObj == nil || err != nil {
+			// If node does not exist, its status cannot be updated, log error and
+			// reset flag statusUpdateNeeded back to true to indicate this node status
+			// needs to be updated again
 			glog.V(2).Infof(
-				"Could not update node status. Failed to find node %q in NodeInformer cache. Error: '%v'",
+				"Could not update node status. Failed to find node %q in NodeInformer cache. %v",
 				nodeName,
 				err)
-			nsu.actualStateOfWorld.RemoveNodeFromAttachUpdates(nodeName)
-			continue
-		} else if err != nil {
-			// For all other errors, log error and reset flag statusUpdateNeeded
-			// back to true to indicate this node status needs to be updated again.
-			glog.V(2).Infof("Error retrieving nodes from node lister. Error: %v", err)
 			nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
 			continue
 		}

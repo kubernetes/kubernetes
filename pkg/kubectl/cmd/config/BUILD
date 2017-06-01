@@ -1,3 +1,5 @@
+package(default_visibility = ["//visibility:public"])
+
 licenses(["notice"])
 
 load(
@@ -19,16 +21,12 @@ go_library(
         "get_clusters.go",
         "get_contexts.go",
         "navigation_step_parser.go",
-        "rename_context.go",
         "set.go",
         "unset.go",
         "use_context.go",
         "view.go",
     ],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_config_CONSUMERS",
-    ],
     deps = [
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
@@ -58,7 +56,6 @@ go_test(
         "get_clusters_test.go",
         "get_contexts_test.go",
         "navigation_step_parser_test.go",
-        "rename_context_test.go",
         "set_test.go",
         "unset_test.go",
         "use_context_test.go",
@@ -80,13 +77,11 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
+    visibility = ["//visibility:private"],
 )
 
 filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_config_CONSUMERS",
-    ],
 )

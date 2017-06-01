@@ -88,15 +88,8 @@ func (l *DirectoryPluginLoader) Load() (Plugins, error) {
 			return nil
 		}
 
-		var setSource func(path string, fileInfo os.FileInfo, p *Plugin)
-		setSource = func(path string, fileInfo os.FileInfo, p *Plugin) {
-			p.Dir = filepath.Dir(path)
-			p.DescriptorName = fileInfo.Name()
-			for _, child := range p.Tree {
-				setSource(path, fileInfo, child)
-			}
-		}
-		setSource(path, fileInfo, plugin)
+		plugin.Dir = filepath.Dir(path)
+		plugin.DescriptorName = fileInfo.Name()
 
 		glog.V(6).Infof("Plugin loaded: %s", plugin.Name)
 		list = append(list, plugin)
@@ -152,10 +145,10 @@ func XDGDataPluginLoader() PluginLoader {
 	}
 	return TolerantMultiPluginLoader{
 		&DirectoryPluginLoader{
-			Directory: "/usr/local/share/kubectl/plugins",
+			Directory: "/usr/local/share",
 		},
 		&DirectoryPluginLoader{
-			Directory: "/usr/share/kubectl/plugins",
+			Directory: "/usr/share",
 		},
 	}
 }

@@ -112,7 +112,9 @@ spec:
       containers:
       - name: minio
         # Pulls the default Minio image from Docker Hub
-        image: minio/minio:latest
+        image: minio/minio
+        command:
+        - minio
         args:
         - server
         - /storage
@@ -259,7 +261,9 @@ spec:
           value: "minio"
         - name: MINIO_SECRET_KEY
           value: "minio123"
-        image: minio/minio:latest
+        image: minio/minio
+        command:
+        - minio
         args:
         - server
         - http://minio-0.minio.default.svc.cluster.local/data

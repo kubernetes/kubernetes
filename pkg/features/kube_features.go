@@ -25,8 +25,8 @@ const (
 	// Every feature gate should add method here following this template:
 	//
 	// // owner: @username
-	// // alpha: v1.X
-	// MyFeature utilfeature.Feature = "MyFeature"
+	// // alpha: v1.4
+	// MyFeature() bool
 
 	// owner: @timstclair
 	// beta: v1.4
@@ -88,20 +88,6 @@ const (
 	// Changes the logic behind evicting Pods from not ready Nodes
 	// to take advantage of NoExecute Taints and Tolerations.
 	TaintBasedEvictions utilfeature.Feature = "TaintBasedEvictions"
-
-	// owner: @jcbsmpsn
-	// alpha: v1.7
-	//
-	// Gets a server certificate for the kubelet from the Certificate Signing
-	// Request API instead of generating one self signed and auto rotates the
-	// certificate as expiration approaches.
-	RotateKubeletServerCertificate utilfeature.Feature = "RotateKubeletServerCertificate"
-
-	// owner: @msau
-	// alpha: v1.7
-	//
-	// A new volume type that supports local disks on a node.
-	PersistentLocalVolumes utilfeature.Feature = "PersistentLocalVolumes"
 )
 
 func init() {
@@ -112,7 +98,7 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	ExternalTrafficLocalOnly:                    {Default: true, PreRelease: utilfeature.GA},
+	ExternalTrafficLocalOnly:                    {Default: true, PreRelease: utilfeature.Beta},
 	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
 	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
 	DynamicVolumeProvisioning:                   {Default: true, PreRelease: utilfeature.Alpha},
@@ -121,11 +107,8 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	AffinityInAnnotations:                       {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
-	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
-	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	StreamingProxyRedirects:          {Default: true, PreRelease: utilfeature.Beta},
-	genericfeatures.AdvancedAuditing: {Default: false, PreRelease: utilfeature.Alpha},
+	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
 }

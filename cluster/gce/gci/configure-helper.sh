@@ -326,11 +326,6 @@ token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
 network-name = ${NODE_NETWORK}
 EOF
-    if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
-      cat <<EOF >>/etc/gce.conf
-subnetwork-name = ${NODE_SUBNETWORK}
-EOF
-    fi
   fi
   if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
     use_cloud_config="true"
@@ -673,6 +668,7 @@ function start-kubelet {
   echo "Using kubelet binary at ${kubelet_bin}"
   local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
   flags+=" --allow-privileged=true"
+  flags+=" --babysit-daemons=true"
   flags+=" --cgroup-root=/"
   flags+=" --cloud-provider=gce"
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
@@ -685,7 +681,6 @@ function start-kubelet {
     flags+=" --port=${KUBELET_PORT}"
   fi
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
-    flags+="${MASTER_KUBELET_TEST_ARGS:-}"
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
     if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
@@ -696,7 +691,6 @@ function start-kubelet {
       flags+=" --pod-cidr=${MASTER_IP_RANGE}"
     fi
   else # For nodes
-    flags+="${NODE_KUBELET_TEST_ARGS:-}"
     flags+=" --enable-debugging-handlers=true"
     flags+=" --api-servers=https://${KUBERNETES_MASTER_NAME}"
     if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
@@ -707,19 +701,13 @@ function start-kubelet {
     flags+=" --anonymous-auth=false --authorization-mode=Webhook --client-ca-file=${CA_CERT_BUNDLE_PATH}"
   fi
   # Network plugin
-  if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
-    if [[ "${NETWORK_PROVIDER:-}" == "cni" || "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
+  if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
+    if [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
       flags+=" --cni-bin-dir=/home/kubernetes/bin"
     else
       flags+=" --network-plugin-dir=/home/kubernetes/bin"
     fi
-    if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
-      # Calico uses CNI always.
-      flags+=" --network-plugin=cni"
-    else
-      # Otherwise use the configured value.
-      flags+=" --network-plugin=${NETWORK_PROVIDER}"
-    fi
+    flags+=" --network-plugin=${NETWORK_PROVIDER}"
   fi
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
     flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
@@ -825,7 +813,6 @@ function start-kube-proxy {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
-  params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s"
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
   fi
@@ -1015,7 +1002,6 @@ function start-kube-apiserver {
   params+=" --secure-port=443"
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
-  params+=" --enable-aggregator-routing=true"
   if [[ -e "${APISERVER_CLIENT_CERT_PATH}" ]] && [[ -e "${APISERVER_CLIENT_KEY_PATH}" ]]; then
     params+=" --kubelet-client-certificate=${APISERVER_CLIENT_CERT_PATH}"
     params+=" --kubelet-client-key=${APISERVER_CLIENT_KEY_PATH}"
@@ -1066,10 +1052,6 @@ function start-kube-apiserver {
     # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
     # never restarts. Please manually restart apiserver before this time.
     params+=" --audit-log-maxsize=2000000000"
-  fi
-
-  if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
-    params+=" --enable-logs-handler=false"
   fi
 
   local admission_controller_config_mount=""
@@ -1437,16 +1419,9 @@ function start-kube-addons {
   fi
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
-
-    # Replace the cluster cidr.
-    local -r calico_file="${dst_dir}/calico-policy-controller/calico-node.yaml"
-    sed -i -e "s@__CLUSTER_CIDR__@${CLUSTER_IP_RANGE}@g" "${calico_file}"
   fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
-  fi
-  if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
-    setup-addon-manifests "addons" "ip-masq-agent"
   fi
 
   # Place addon manager pod manifest.
@@ -1616,5 +1591,4 @@ else
 fi
 reset-motd
 prepare-mounter-rootfs
-modprobe configs
 echo "Done for the configuration for kubernetes"

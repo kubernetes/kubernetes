@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 	"sort"
 
 	"github.com/spf13/cobra"
@@ -37,7 +38,9 @@ var (
 
 func NewCmdApiVersions(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "api-versions",
+		Use: "api-versions",
+		// apiversions is deprecated.
+		Aliases: []string{"apiversions"},
 		Short:   "Print the supported API versions on the server, in the form of \"group/version\"",
 		Long:    "Print the supported API versions on the server, in the form of \"group/version\"",
 		Example: apiversionsExample,
@@ -50,6 +53,10 @@ func NewCmdApiVersions(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunApiVersions(f cmdutil.Factory, w io.Writer) error {
+	if len(os.Args) > 1 && os.Args[1] == "apiversions" {
+		printDeprecationWarning("api-versions", "apiversions")
+	}
+
 	discoveryclient, err := f.DiscoveryClient()
 	if err != nil {
 		return err

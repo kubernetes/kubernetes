@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2017 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2016 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"path"
-	"strings"
 
 	"github.com/vmware/govmomi/list"
 	"github.com/vmware/govmomi/object"
@@ -31,18 +30,17 @@ import (
 )
 
 type Finder struct {
-	client  *vim25.Client
-	r       recurser
+	client   *vim25.Client
+	recurser list.Recurser
+
 	dc      *object.Datacenter
-	si      *object.SearchIndex
 	folders *object.DatacenterFolders
 }
 
 func NewFinder(client *vim25.Client, all bool) *Finder {
 	f := &Finder{
 		client: client,
-		si:     object.NewSearchIndex(client),
-		r: recurser{
+		recurser: list.Recurser{
 			Collector: property.DefaultCollector(client),
 			All:       all,
 		},
@@ -57,41 +55,9 @@ func (f *Finder) SetDatacenter(dc *object.Datacenter) *Finder {
 	return f
 }
 
-// findRoot makes it possible to use "find" mode with a different root path.
-// Example: ResourcePoolList("/dc1/host/cluster1/...")
-func (f *Finder) findRoot(ctx context.Context, root *list.Element, parts []string) bool {
-	if len(parts) == 0 {
-		return false
-	}
+type findRelativeFunc func(ctx context.Context) (object.Reference, error)
 
-	ix := len(parts) - 1
-
-	if parts[ix] != "..." {
-		return false
-	}
-
-	if ix == 0 {
-		return true // We already have the Object for root.Path
-	}
-
-	// Lookup the Object for the new root.Path
-	rootPath := path.Join(root.Path, path.Join(parts[:ix]...))
-
-	ref, err := f.si.FindByInventoryPath(ctx, rootPath)
-	if err != nil || ref == nil {
-		// If we get an error or fail to match, fall through to find() with the original root and path
-		return false
-	}
-
-	root.Path = rootPath
-	root.Object = ref
-
-	return true
-}
-
-func (f *Finder) find(ctx context.Context, arg string, s *spec) ([]list.Element, error) {
-	isPath := strings.Contains(arg, "/")
-
+func (f *Finder) find(ctx context.Context, fn findRelativeFunc, tl bool, arg string) ([]list.Element, error) {
 	root := list.Element{
 		Path:   "/",
 		Object: object.NewRootFolder(f.client),
@@ -104,7 +70,7 @@ func (f *Finder) find(ctx context.Context, arg string, s *spec) ([]list.Element,
 		case "..": // Not supported; many edge case, little value
 			return nil, errors.New("cannot traverse up a tree")
 		case ".": // Relative to whatever
-			pivot, err := s.Relative(ctx)
+			pivot, err := fn(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -127,17 +93,13 @@ func (f *Finder) find(ctx context.Context, arg string, s *spec) ([]list.Element,
 		}
 	}
 
-	if s.listMode(isPath) {
-		if f.findRoot(ctx, &root, parts) {
-			parts = []string{"*"}
-		} else {
-			return f.r.List(ctx, s, root, parts)
-		}
+	f.recurser.TraverseLeafs = tl
+	es, err := f.recurser.Recurse(ctx, root, parts)
+	if err != nil {
+		return nil, err
 	}
 
-	s.Parents = append(s.Parents, s.Nested...)
-
-	return f.r.Find(ctx, s, root, parts)
+	return es, nil
 }
 
 func (f *Finder) datacenter() (*object.Datacenter, error) {
@@ -246,7 +208,7 @@ func (f *Finder) rootFolder(_ context.Context) (object.Reference, error) {
 	return object.NewRootFolder(f.client), nil
 }
 
-func (f *Finder) managedObjectList(ctx context.Context, path string, tl bool, include []string) ([]list.Element, error) {
+func (f *Finder) managedObjectList(ctx context.Context, path string, tl bool) ([]list.Element, error) {
 	fn := f.rootFolder
 
 	if f.dc != nil {
@@ -257,18 +219,7 @@ func (f *Finder) managedObjectList(ctx context.Context, path string, tl bool, in
 		path = "."
 	}
 
-	s := &spec{
-		Relative: fn,
-		Parents:  []string{"ComputeResource", "ClusterComputeResource", "HostSystem", "VirtualApp", "StoragePod"},
-		Include:  include,
-	}
-
-	if tl {
-		s.Contents = true
-		s.ListMode = types.NewBool(true)
-	}
-
-	return f.find(ctx, path, s)
+	return f.find(ctx, fn, tl, path)
 }
 
 // Element returns an Element for the given ManagedObjectReference
@@ -278,11 +229,7 @@ func (f *Finder) Element(ctx context.Context, ref types.ManagedObjectReference) 
 		return ref, nil
 	}
 
-	s := &spec{
-		Relative: rl,
-	}
-
-	e, err := f.find(ctx, "./", s)
+	e, err := f.find(ctx, rl, false, ".")
 	if err != nil {
 		return nil, err
 	}
@@ -323,21 +270,16 @@ func (f *Finder) ObjectReference(ctx context.Context, ref types.ManagedObjectRef
 	return r, nil
 }
 
-func (f *Finder) ManagedObjectList(ctx context.Context, path string, include ...string) ([]list.Element, error) {
-	return f.managedObjectList(ctx, path, false, include)
+func (f *Finder) ManagedObjectList(ctx context.Context, path string) ([]list.Element, error) {
+	return f.managedObjectList(ctx, path, false)
 }
 
-func (f *Finder) ManagedObjectListChildren(ctx context.Context, path string, include ...string) ([]list.Element, error) {
-	return f.managedObjectList(ctx, path, true, include)
+func (f *Finder) ManagedObjectListChildren(ctx context.Context, path string) ([]list.Element, error) {
+	return f.managedObjectList(ctx, path, true)
 }
 
 func (f *Finder) DatacenterList(ctx context.Context, path string) ([]*object.Datacenter, error) {
-	s := &spec{
-		Relative: f.rootFolder,
-		Include:  []string{"Datacenter"},
-	}
-
-	es, err := f.find(ctx, path, s)
+	es, err := f.find(ctx, f.rootFolder, false, path)
 	if err != nil {
 		return nil, err
 	}
@@ -394,12 +336,7 @@ func (f *Finder) DatacenterOrDefault(ctx context.Context, path string) (*object.
 }
 
 func (f *Finder) DatastoreList(ctx context.Context, path string) ([]*object.Datastore, error) {
-	s := &spec{
-		Relative: f.datastoreFolder,
-		Parents:  []string{"StoragePod"},
-	}
-
-	es, err := f.find(ctx, path, s)
+	es, err := f.find(ctx, f.datastoreFolder, false, path)
 	if err != nil {
 		return nil, err
 	}
@@ -467,11 +404,7 @@ func (f *Finder) DatastoreOrDefault(ctx context.Context, path string) (*object.D
 }
 
 func (f *Finder) DatastoreClusterList(ctx context.Context, path string) ([]*object.StoragePod, error) {
-	s := &spec{
-		Relative: f.datastoreFolder,
-	}
-
-	es, err := f.find(ctx, path, s)
+	es, err := f.find(ctx, f.datastoreFolder, false, path)
 	if err != nil {
 		return nil, err
 	}
@@ -528,11 +461,7 @@ func (f *Finder) DatastoreClusterOrDefault(ctx context.Context, path string) (*o
 }
 
 func (f *Finder) ComputeResourceList(ctx context.Context, path string) ([]*object.ComputeResource, error) {
-	s := &spec{
-		Relative: f.hostFolder,
-	}
-
-	es, err := f.find(ctx, path, s)
+	es, err := f.find(ctx, f.hostFolder, false, path)
 	if err != nil {
 		return nil, err
 	}
@@ -594,11 +523,7 @@ func (f *Finder) ComputeResourceOrDefault(ctx context.Context, path string) (*ob
 }
 
 func (f *Finder) ClusterComputeResourceList(ctx context.Context, path string) ([]*object.ClusterComputeResource, error) {
-	s := &spec{
-		Relative: f.hostFolder,
-	}
-
-	es, err := f.find(ctx, path, s)
+	es, err := f.find(ctx, f.hostFolder, false, path)
 	if err != nil {
 		return nil, err
 	}
@@ -639,13 +564,7 @@ func (f *Finder) ClusterComputeResource(ctx context.Context, path string) (*obje
 }
 
 func (f *Finder) HostSystemList(ctx context.Context, path string) ([]*object.HostSystem, error) {
-	s := &spec{
-		Relative: f.hostFolder,
-		Parents:  []string{"ComputeResource", "ClusterComputeResource"},
-		Include:  []string{"HostSystem"},
-	}
-
-	es, err := f.find(ctx, path, s)
+	es, err := f.find(ctx, f.hostFolder, false, path)
 	if err != nil {
 		return nil, err
 	}
@@ -716,11 +635,7 @@ func (f *Finder) HostSystemOrDefault(ctx context.Context, path string) (*object.
 }
 
 func (f *Finder) NetworkList(ctx context.Context, path string) ([]object.NetworkReference, error) {
-	s := &spec{
-		Relative: f.networkFolder,
-	}
-
-	es, err := f.find(ctx, path, s)
+	es, err := f.find(ctx, f.networkFolder, false, path)
 	if err != nil {
 		return nil, err
 	}
@@ -729,12 +644,8 @@ func (f *Finder) NetworkList(ctx context.Context, path string) ([]object.Network
 	for _, e := range es {
 		ref := e.Object.Reference()
 		switch ref.Type {
-		case "Network":
+		case "Network", "OpaqueNetwork":
 			r := object.NewNetwork(f.client, ref)
-			r.InventoryPath = e.Path
-			ns = append(ns, r)
-		case "OpaqueNetwork":
-			r := object.NewOpaqueNetwork(f.client, ref)
 			r.InventoryPath = e.Path
 			ns = append(ns, r)
 		case "DistributedVirtualPortgroup":
@@ -790,14 +701,7 @@ func (f *Finder) NetworkOrDefault(ctx context.Context, path string) (object.Netw
 }
 
 func (f *Finder) ResourcePoolList(ctx context.Context, path string) ([]*object.ResourcePool, error) {
-	s := &spec{
-		Relative: f.hostFolder,
-		Parents:  []string{"ComputeResource", "ClusterComputeResource", "VirtualApp"},
-		Nested:   []string{"ResourcePool"},
-		Contents: true,
-	}
-
-	es, err := f.find(ctx, path, s)
+	es, err := f.find(ctx, f.hostFolder, true, path)
 	if err != nil {
 		return nil, err
 	}
@@ -900,12 +804,7 @@ func (f *Finder) FolderOrDefault(ctx context.Context, path string) (*object.Fold
 }
 
 func (f *Finder) VirtualMachineList(ctx context.Context, path string) ([]*object.VirtualMachine, error) {
-	s := &spec{
-		Relative: f.vmFolder,
-		Parents:  []string{"VirtualApp"},
-	}
-
-	es, err := f.find(ctx, path, s)
+	es, err := f.find(ctx, f.vmFolder, false, path)
 	if err != nil {
 		return nil, err
 	}
@@ -941,11 +840,7 @@ func (f *Finder) VirtualMachine(ctx context.Context, path string) (*object.Virtu
 }
 
 func (f *Finder) VirtualAppList(ctx context.Context, path string) ([]*object.VirtualApp, error) {
-	s := &spec{
-		Relative: f.vmFolder,
-	}
-
-	es, err := f.find(ctx, path, s)
+	es, err := f.find(ctx, f.vmFolder, false, path)
 	if err != nil {
 		return nil, err
 	}

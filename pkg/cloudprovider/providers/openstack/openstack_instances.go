@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/pagination"
 
@@ -37,8 +38,11 @@ type Instances struct {
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	glog.V(4).Info("openstack.Instances() called")
 
-	compute, err := os.NewComputeV2()
+	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
+	})
 	if err != nil {
+		glog.Warningf("Failed to find compute endpoint: %v", err)
 		return nil, false
 	}
 

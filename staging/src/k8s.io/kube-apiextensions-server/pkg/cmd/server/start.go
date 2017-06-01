@@ -24,25 +24,24 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1alpha1"
 	"k8s.io/kube-apiextensions-server/pkg/apiserver"
 )
 
 const defaultEtcdPathPrefix = "/registry/apiextensions.kubernetes.io"
 
-type CustomResourceDefinitionsServerOptions struct {
+type CustomResourcesServerOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
 
 	StdOut io.Writer
 	StdErr io.Writer
 }
 
-func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
-	o := &CustomResourceDefinitionsServerOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Scheme, apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
+func NewCustomResourcesServerOptions(out, errOut io.Writer) *CustomResourcesServerOptions {
+	o := &CustomResourcesServerOptions{
+		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Scheme, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
 
 		StdOut: out,
 		StdErr: errOut,
@@ -51,8 +50,8 @@ func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomRes
 	return o
 }
 
-func NewCommandStartCustomResourceDefinitionsServer(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
-	o := NewCustomResourceDefinitionsServerOptions(out, errOut)
+func NewCommandStartCustomResourcesServer(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
+	o := NewCustomResourcesServerOptions(out, errOut)
 
 	cmd := &cobra.Command{
 		Short: "Launch an API extensions API server",
@@ -64,7 +63,7 @@ func NewCommandStartCustomResourceDefinitionsServer(out, errOut io.Writer, stopC
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunCustomResourceDefinitionsServer(stopCh); err != nil {
+			if err := o.RunCustomResourcesServer(stopCh); err != nil {
 				return err
 			}
 			return nil
@@ -77,15 +76,15 @@ func NewCommandStartCustomResourceDefinitionsServer(out, errOut io.Writer, stopC
 	return cmd
 }
 
-func (o CustomResourceDefinitionsServerOptions) Validate(args []string) error {
+func (o CustomResourcesServerOptions) Validate(args []string) error {
 	return nil
 }
 
-func (o *CustomResourceDefinitionsServerOptions) Complete() error {
+func (o *CustomResourcesServerOptions) Complete() error {
 	return nil
 }
 
-func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, error) {
+func (o CustomResourcesServerOptions) Config() (*apiserver.Config, error) {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -96,35 +95,31 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		return nil, err
 	}
 
+	customResourceRESTOptionsGetter := apiserver.CustomResourceRESTOptionsGetter{
+		StorageConfig:           o.RecommendedOptions.Etcd.StorageConfig,
+		StoragePrefix:           o.RecommendedOptions.Etcd.StorageConfig.Prefix,
+		EnableWatchCache:        o.RecommendedOptions.Etcd.EnableWatchCache,
+		DefaultWatchCacheSize:   o.RecommendedOptions.Etcd.DefaultWatchCacheSize,
+		EnableGarbageCollection: o.RecommendedOptions.Etcd.EnableGarbageCollection,
+		DeleteCollectionWorkers: o.RecommendedOptions.Etcd.DeleteCollectionWorkers,
+	}
+	customResourceRESTOptionsGetter.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	customResourceRESTOptionsGetter.StorageConfig.Copier = apiserver.UnstructuredCopier{}
+
 	config := &apiserver.Config{
-		GenericConfig:        serverConfig,
-		CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
+		GenericConfig:                   serverConfig,
+		CustomResourceRESTOptionsGetter: customResourceRESTOptionsGetter,
 	}
 	return config, nil
 }
 
-func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregistry.RESTOptionsGetter {
-	ret := apiserver.CRDRESTOptionsGetter{
-		StorageConfig:           etcdOptions.StorageConfig,
-		StoragePrefix:           etcdOptions.StorageConfig.Prefix,
-		EnableWatchCache:        etcdOptions.EnableWatchCache,
-		DefaultWatchCacheSize:   etcdOptions.DefaultWatchCacheSize,
-		EnableGarbageCollection: etcdOptions.EnableGarbageCollection,
-		DeleteCollectionWorkers: etcdOptions.DeleteCollectionWorkers,
-	}
-	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
-	ret.StorageConfig.Copier = apiserver.UnstructuredCopier{}
-
-	return ret
-}
-
-func (o CustomResourceDefinitionsServerOptions) RunCustomResourceDefinitionsServer(stopCh <-chan struct{}) error {
+func (o CustomResourcesServerOptions) RunCustomResourcesServer(stopCh <-chan struct{}) error {
 	config, err := o.Config()
 	if err != nil {
 		return err
 	}
 
-	server, err := config.Complete().New(genericapiserver.EmptyDelegate)
+	server, err := config.Complete().New(genericapiserver.EmptyDelegate, stopCh)
 	if err != nil {
 		return err
 	}

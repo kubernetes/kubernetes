@@ -17,7 +17,7 @@ limitations under the License.
 package constants
 
 import (
-	"path/filepath"
+	"path"
 	"time"
 
 	"k8s.io/client-go/pkg/api/v1"
@@ -102,8 +102,8 @@ var (
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	AuthorizationPolicyPath        = filepath.Join(KubernetesDir, "abac_policy.json")
-	AuthorizationWebhookConfigPath = filepath.Join(KubernetesDir, "webhook_authz.conf")
+	AuthorizationPolicyPath        = path.Join(KubernetesDir, "abac_policy.json")
+	AuthorizationWebhookConfigPath = path.Join(KubernetesDir, "webhook_authz.conf")
 
 	// DefaultTokenUsages specifies the default functions a token will get
 	DefaultTokenUsages = []string{"signing", "authentication"}

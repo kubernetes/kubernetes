@@ -973,26 +973,53 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 		Protocol listeners.Protocol
 		Port     int
 	}
-	var listenerIDs []string
+
 	lbListeners := make(map[portKey]listeners.Listener)
-	allListeners, err := getListenersByLoadBalancerID(lbaas.network, loadbalancer.ID)
+	err = listeners.List(lbaas.network, listeners.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
+		listenersList, err := listeners.ExtractListeners(page)
+		if err != nil {
+			return false, err
+		}
+		for _, l := range listenersList {
+			for _, lb := range l.Loadbalancers {
+				// Double check this Listener belongs to the LB we're updating. Neutron's API filtering
+				// can't be counted on in older releases (i.e Liberty).
+				if loadbalancer.ID == lb.ID {
+					key := portKey{Protocol: listeners.Protocol(l.Protocol), Port: l.ProtocolPort}
+					lbListeners[key] = l
+					break
+				}
+			}
+		}
+		return true, nil
+	})
 	if err != nil {
-		return fmt.Errorf("Error getting listeners for LB %s: %v", loadBalancerName, err)
-	}
-	for _, l := range allListeners {
-		key := portKey{Protocol: listeners.Protocol(l.Protocol), Port: l.ProtocolPort}
-		lbListeners[key] = l
-		listenerIDs = append(listenerIDs, l.ID)
+		return err
 	}
 
 	// Get all pools for this loadbalancer, by listener ID.
 	lbPools := make(map[string]v2pools.Pool)
-	for _, listenerID := range listenerIDs {
-		pool, err := getPoolByListenerID(lbaas.network, loadbalancer.ID, listenerID)
+	err = v2pools.List(lbaas.network, v2pools.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
+		poolsList, err := v2pools.ExtractPools(page)
 		if err != nil {
-			return fmt.Errorf("Error getting pool for listener %s: %v", listenerID, err)
+			return false, err
 		}
-		lbPools[listenerID] = *pool
+		for _, p := range poolsList {
+			for _, l := range p.Listeners {
+				// Double check this Pool belongs to the LB we're deleting. Neutron's API filtering
+				// can't be counted on in older releases (i.e Liberty).
+				for _, val := range lbListeners {
+					if val.ID == l.ID {
+						lbPools[l.ID] = p
+						break
+					}
+				}
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return err
 	}
 
 	// Compose Set of member (addresses) that _should_ exist
@@ -1023,13 +1050,19 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 		}
 
 		// Find existing pool members (by address) for this port
-		getMembers, err := getMembersByPoolID(lbaas.network, pool.ID)
-		if err != nil {
-			return fmt.Errorf("Error getting pool members %s: %v", pool.ID, err)
-		}
 		members := make(map[string]v2pools.Member)
-		for _, member := range getMembers {
-			members[member.Address] = member
+		err := v2pools.ListMembers(lbaas.network, pool.ID, v2pools.ListMembersOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+			membersList, err := v2pools.ExtractMembers(page)
+			if err != nil {
+				return false, err
+			}
+			for _, member := range membersList {
+				members[member.Address] = member
+			}
+			return true, nil
+		})
+		if err != nil {
+			return err
 		}
 
 		// Add any new members for this port
@@ -1092,32 +1125,60 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	}
 
 	// get all listeners associated with this loadbalancer
-	listenerList, err := getListenersByLoadBalancerID(lbaas.network, loadbalancer.ID)
+	var listenerIDs []string
+	err = listeners.List(lbaas.network, listeners.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
+		listenerList, err := listeners.ExtractListeners(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, listener := range listenerList {
+			listenerIDs = append(listenerIDs, listener.ID)
+		}
+
+		return true, nil
+	})
 	if err != nil {
-		return fmt.Errorf("Error getting LB %s listeners: %v", loadbalancer.ID, err)
+		return err
 	}
 
 	// get all pools (and health monitors) associated with this loadbalancer
 	var poolIDs []string
 	var monitorIDs []string
-	for _, listener := range listenerList {
-		pool, err := getPoolByListenerID(lbaas.network, loadbalancer.ID, listener.ID)
+	err = v2pools.List(lbaas.network, v2pools.ListOpts{LoadbalancerID: loadbalancer.ID}).EachPage(func(page pagination.Page) (bool, error) {
+		poolsList, err := v2pools.ExtractPools(page)
 		if err != nil {
-			return fmt.Errorf("Error getting pool for listener %s: %v", listener.ID, err)
+			return false, err
 		}
-		poolIDs = append(poolIDs, pool.ID)
-		monitorIDs = append(monitorIDs, pool.MonitorID)
+
+		for _, pool := range poolsList {
+			poolIDs = append(poolIDs, pool.ID)
+			monitorIDs = append(monitorIDs, pool.MonitorID)
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		return err
 	}
 
 	// get all members associated with each poolIDs
 	var memberIDs []string
-	for _, pool := range poolIDs {
-		membersList, err := getMembersByPoolID(lbaas.network, pool)
-		if err != nil && !isNotFound(err) {
-			return fmt.Errorf("Error getting pool members %s: %v", pool, err)
-		}
-		for _, member := range membersList {
-			memberIDs = append(memberIDs, member.ID)
+	for _, poolID := range poolIDs {
+		err := v2pools.ListMembers(lbaas.network, poolID, v2pools.ListMembersOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+			membersList, err := v2pools.ExtractMembers(page)
+			if err != nil {
+				return false, err
+			}
+
+			for _, member := range membersList {
+				memberIDs = append(memberIDs, member.ID)
+			}
+
+			return true, nil
+		})
+		if err != nil {
+			return err
 		}
 	}
 
@@ -1150,8 +1211,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	}
 
 	// delete all listeners
-	for _, listener := range listenerList {
-		err := listeners.Delete(lbaas.network, listener.ID).ExtractErr()
+	for _, listenerID := range listenerIDs {
+		err := listeners.Delete(lbaas.network, listenerID).ExtractErr()
 		if err != nil && !isNotFound(err) {
 			return err
 		}
