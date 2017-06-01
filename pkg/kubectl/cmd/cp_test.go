@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"archive/tar"
 	"bytes"
 	"io"
 	"io/ioutil"
@@ -175,6 +176,56 @@ func TestTarUntar(t *testing.T) {
 		io.Copy(buff, f)
 		if file.data != string(buff.Bytes()) {
 			t.Errorf("expected: %s, saw: %s", file.data, string(buff.Bytes()))
+		}
+	}
+}
+
+func TestMakeTar(t *testing.T) {
+	dir, err := ioutil.TempDir(os.TempDir(), "input")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("Unexpected error cleaning up: %v", err)
+		}
+	}()
+
+	filename := "atest"
+	pathname := path.Join(dir, filename)
+	err = ioutil.WriteFile(pathname, []byte{'a'}, 0666)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tarTest := []struct {
+		path         string
+		expectedFile string
+	}{
+		{
+			path:         dir,
+			expectedFile: path.Join(path.Base(dir), filename),
+		},
+		{
+			path:         dir + "/",
+			expectedFile: filename,
+		},
+	}
+
+	for _, test := range tarTest {
+		b := &bytes.Buffer{}
+		if err := makeTar(test.path, b); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		r := tar.NewReader(b)
+		h, err := r.Next()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if h.Name != test.expectedFile {
+			t.Errorf("unexpected file: %v", h.Name)
 		}
 	}
 }
