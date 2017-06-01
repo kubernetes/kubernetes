@@ -59,7 +59,7 @@ func ToValidOperationID(s string, capitalizeFirstLetter bool) string {
 }
 
 // GetOperationIDAndTags returns a customize operation ID and a list of tags for kubernetes API server's OpenAPI spec to prevent duplicate IDs.
-func GetOperationIDAndTags(servePath string, r *restful.Route) (string, []string, error) {
+func GetOperationIDAndTags(r *restful.Route) (string, []string, error) {
 	op := r.Operation
 	path := r.Path
 	var tags []string
@@ -67,33 +67,29 @@ func GetOperationIDAndTags(servePath string, r *restful.Route) (string, []string
 	if strings.HasPrefix(path, "/apis/extensions/v1beta1/namespaces/{namespace}/") && strings.HasSuffix(op, "ScaleScale") {
 		op = op[:len(op)-10] + strings.Title(strings.Split(path[48:], "/")[0]) + "Scale"
 	}
-	switch servePath {
-	case "/swagger.json":
-		prefix, exists := verbs.GetPrefix(op)
-		if !exists {
-			return op, tags, fmt.Errorf("operation names should start with a verb. Cannot determine operation verb from %v", op)
-		}
-		op = op[len(prefix):]
-		parts := strings.Split(strings.Trim(path, "/"), "/")
-		// Assume /api is /apis/core, remove this when we actually server /api/... on /apis/core/...
-		if len(parts) >= 1 && parts[0] == "api" {
-			parts = append([]string{"apis", "core"}, parts[1:]...)
-		}
-		if len(parts) >= 2 && parts[0] == "apis" {
-			prefix = prefix + ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), prefix != "")
-			tag := ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), false)
-			if len(parts) > 2 {
-				prefix = prefix + ToValidOperationID(parts[2], prefix != "")
-				tag = tag + "_" + ToValidOperationID(parts[2], false)
-			}
-			tags = append(tags, tag)
-		} else if len(parts) >= 1 {
-			tags = append(tags, ToValidOperationID(parts[0], false))
-		}
-		return prefix + ToValidOperationID(op, prefix != ""), tags, nil
-	default:
-		return op, tags, nil
+	prefix, exists := verbs.GetPrefix(op)
+	if !exists {
+		return op, tags, fmt.Errorf("operation names should start with a verb. Cannot determine operation verb from %v", op)
 	}
+	op = op[len(prefix):]
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	// Assume /api is /apis/core, remove this when we actually server /api/... on /apis/core/...
+	if len(parts) >= 1 && parts[0] == "api" {
+		parts = append([]string{"apis", "core"}, parts[1:]...)
+	}
+	if len(parts) >= 2 && parts[0] == "apis" {
+		trimmed := strings.TrimSuffix(parts[1], ".k8s.io")
+		prefix = prefix + ToValidOperationID(trimmed, prefix != "")
+		tag := ToValidOperationID(trimmed, false)
+		if len(parts) > 2 {
+			prefix = prefix + ToValidOperationID(parts[2], prefix != "")
+			tag = tag + "_" + ToValidOperationID(parts[2], false)
+		}
+		tags = append(tags, tag)
+	} else if len(parts) >= 1 {
+		tags = append(tags, ToValidOperationID(parts[0], false))
+	}
+	return prefix + ToValidOperationID(op, prefix != ""), tags, nil
 }
 
 type groupVersionKinds []v1.GroupVersionKind
@@ -161,7 +157,7 @@ func NewDefinitionNamer(s *runtime.Scheme) DefinitionNamer {
 }
 
 // GetDefinitionName returns the name and tags for a given definition
-func (d *DefinitionNamer) GetDefinitionName(servePath string, name string) (string, spec.Extensions) {
+func (d *DefinitionNamer) GetDefinitionName(name string) (string, spec.Extensions) {
 	if groupVersionKinds, ok := d.typeGroupVersionKinds[name]; ok {
 		return friendlyName(name), spec.Extensions{
 			extensionGVK: []v1.GroupVersionKind(groupVersionKinds),
