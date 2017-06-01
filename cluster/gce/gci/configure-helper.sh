@@ -1481,10 +1481,6 @@ function start-kube-addons {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/addons"
 
-  # TODO(mikedanese): only enable these in e2e
-  # prep the additional bindings that are particular to e2e users and groups
-  setup-addon-manifests "addons" "e2e-rbac-bindings"
-
   # prep addition kube-up specific rbac objects
   setup-addon-manifests "addons" "rbac"
 
@@ -1495,6 +1491,7 @@ function start-kube-addons {
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "standalone" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "googleinfluxdb" ]]; then
     local -r file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
+    setup-addon-manifests "addons" "cluster-monitoring"
     setup-addon-manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
     base_metrics_memory="140Mi"
