@@ -63,7 +63,7 @@ func (kl *Kubelet) podVolumesExist(podUID types.UID) bool {
 
 // newVolumeMounterFromPlugins attempts to find a plugin by volume spec, pod
 // and volume options and then creates a Mounter.
-// Returns a valid Unmounter or an error.
+// Returns a valid mounter or an error.
 func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
