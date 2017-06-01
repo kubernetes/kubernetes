@@ -23,11 +23,12 @@ import (
 )
 
 var (
-	ErrBadJSONDoc                     = errors.New("invalid JSON document")
-	ErrNoListOfLists                  = errors.New("lists of lists are not supported")
-	ErrBadPatchFormatForPrimitiveList = errors.New("invalid patch format of primitive list")
-	ErrBadPatchFormatForRetainKeys    = errors.New("invalid patch format of retainKeys")
-	ErrPatchContentNotMatchRetainKeys = errors.New("patch content doesn't match retainKeys list")
+	ErrBadJSONDoc                           = errors.New("invalid JSON document")
+	ErrNoListOfLists                        = errors.New("lists of lists are not supported")
+	ErrBadPatchFormatForPrimitiveList       = errors.New("invalid patch format of primitive list")
+	ErrBadPatchFormatForRetainKeys          = errors.New("invalid patch format of retainKeys")
+	ErrBadPatchFormatForSetElementOrderList = errors.New("invalid patch format of setElementOrder list")
+	ErrPatchContentNotMatchRetainKeys       = errors.New("patch content doesn't match retainKeys list")
 )
 
 func ErrNoMergeKey(m map[string]interface{}, k string) error {
