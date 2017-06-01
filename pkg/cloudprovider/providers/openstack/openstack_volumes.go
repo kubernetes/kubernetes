@@ -27,7 +27,6 @@ import (
 	k8s_volume "k8s.io/kubernetes/pkg/volume"
 
 	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
 	volumes_v1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
@@ -221,11 +220,8 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 		glog.Errorf(errmsg)
 		return "", errors.New(errmsg)
 	}
-	cClient, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-	if err != nil || cClient == nil {
-		glog.Errorf("Unable to initialize nova client for region: %s", os.region)
+	cClient, err := os.NewComputeV2()
+	if err != nil {
 		return "", err
 	}
 
@@ -267,11 +263,8 @@ func (os *OpenStack) DetachDisk(instanceID, volumeID string) error {
 		glog.Errorf(errmsg)
 		return errors.New(errmsg)
 	}
-	cClient, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-	if err != nil || cClient == nil {
-		glog.Errorf("Unable to initialize nova client for region: %s", os.region)
+	cClient, err := os.NewComputeV2()
+	if err != nil {
 		return err
 	}
 	if volume.AttachedServerId != instanceID {

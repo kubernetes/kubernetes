@@ -75,9 +75,9 @@ func (gk *GroupKind) String() string {
 //
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 type GroupVersionKind struct {
-	Group   string `protobuf:"bytes,1,opt,name=group"`
-	Version string `protobuf:"bytes,2,opt,name=version"`
-	Kind    string `protobuf:"bytes,3,opt,name=kind"`
+	Group   string `json:"group" protobuf:"bytes,1,opt,name=group"`
+	Version string `json:"version" protobuf:"bytes,2,opt,name=version"`
+	Kind    string `json:"kind" protobuf:"bytes,3,opt,name=kind"`
 }
 
 func (gvk GroupVersionKind) String() string {

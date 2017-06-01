@@ -57,15 +57,11 @@ func startCSRApprovingController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
 		return false, nil
 	}
-	if ctx.Options.ApproveAllKubeletCSRsForGroup == "" {
-		return false, nil
-	}
 	c := ctx.ClientBuilder.ClientOrDie("certificate-controller")
 
 	approver, err := approver.NewCSRApprovingController(
 		c,
 		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
-		ctx.Options.ApproveAllKubeletCSRsForGroup,
 	)
 	if err != nil {
 		// TODO this is failing consistently in test-cmd and local-up-cluster.sh.  Fix them and make it consistent with all others which

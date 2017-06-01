@@ -483,7 +483,10 @@ func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 }
 
 func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
-	return !kubepod.IsMirrorPod(pod) && m.podDeletionSafety.PodResourcesAreReclaimed(pod, status) && pod.DeletionTimestamp != nil
+	if pod.DeletionTimestamp == nil || kubepod.IsMirrorPod(pod) {
+		return false
+	}
+	return m.podDeletionSafety.PodResourcesAreReclaimed(pod, status)
 }
 
 // needsReconcile compares the given status with the status in the pod manager (which

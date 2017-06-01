@@ -33,7 +33,6 @@ import (
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/version"
@@ -419,16 +418,15 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 	}
 
 	defaultArguments := map[string]string{
-		"address":                                                  "127.0.0.1",
-		"leader-elect":                                             "true",
-		"kubeconfig":                                               filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
-		"root-ca-file":                                             filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
-		"service-account-private-key-file":                         filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName),
-		"cluster-signing-cert-file":                                filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
-		"cluster-signing-key-file":                                 filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName),
-		"insecure-experimental-approve-all-kubelet-csrs-for-group": bootstrapapi.BootstrapGroup,
-		"use-service-account-credentials":                          "true",
-		"controllers":                                              "*,bootstrapsigner,tokencleaner",
+		"address":                          "127.0.0.1",
+		"leader-elect":                     "true",
+		"kubeconfig":                       filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
+		"root-ca-file":                     filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"service-account-private-key-file": filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName),
+		"cluster-signing-cert-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"cluster-signing-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName),
+		"use-service-account-credentials":  "true",
+		"controllers":                      "*,bootstrapsigner,tokencleaner",
 	}
 
 	command = getComponentBaseCommand(controllerManager)

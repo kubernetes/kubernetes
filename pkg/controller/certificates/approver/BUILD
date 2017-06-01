@@ -10,22 +10,29 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["groupapprove_test.go"],
+    srcs = ["sarapprove_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/apis/certificates/v1beta1:go_default_library"],
+    deps = [
+        "//pkg/apis/authorization/v1beta1:go_default_library",
+        "//pkg/apis/certificates/v1beta1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/client-go/testing:go_default_library",
+    ],
 )
 
 go_library(
     name = "go_default_library",
-    srcs = ["groupapprove.go"],
+    srcs = ["sarapprove.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/apis/authorization/v1beta1:go_default_library",
         "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/certificates/v1beta1:go_default_library",
         "//pkg/controller/certificates:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
     ],
 )
 

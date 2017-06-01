@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -41,7 +42,13 @@ var _ volume.Attacher = &cinderDiskAttacher{}
 var _ volume.AttachableVolumePlugin = &cinderPlugin{}
 
 const (
-	checkSleepDuration = time.Second
+	checkSleepDuration       = 1 * time.Second
+	operationFinishInitDealy = 1 * time.Second
+	operationFinishFactor    = 1.1
+	operationFinishSteps     = 10
+	diskDetachInitDealy      = 1 * time.Second
+	diskDetachFactor         = 1.2
+	diskDetachSteps          = 13
 )
 
 func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
@@ -267,6 +274,63 @@ func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
+func (detacher *cinderDiskDetacher) waitOperationFinished(volumeID string) error {
+	backoff := wait.Backoff{
+		Duration: operationFinishInitDealy,
+		Factor:   operationFinishFactor,
+		Steps:    operationFinishSteps,
+	}
+
+	var volumeStatus string
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		var pending bool
+		var err error
+		pending, volumeStatus, err = detacher.cinderProvider.OperationPending(volumeID)
+		if err == nil {
+			if pending == false {
+				return true, nil
+			} else {
+				return false, nil
+			}
+		} else {
+			return false, err
+		}
+	})
+
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("Volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
+	}
+
+	return err
+}
+
+func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string) error {
+	backoff := wait.Backoff{
+		Duration: diskDetachInitDealy,
+		Factor:   diskDetachFactor,
+		Steps:    diskDetachSteps,
+	}
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		attached, err := detacher.cinderProvider.DiskIsAttached(instanceID, volumeID)
+		if err == nil {
+			if attached == false {
+				return true, nil
+			} else {
+				return false, nil
+			}
+		} else {
+			return false, err
+		}
+	})
+
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("Volume %q failed to detach within the alloted time", volumeID)
+	}
+
+	return err
+}
+
 func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
 	volumeID := path.Base(deviceMountPath)
 	instances, res := detacher.cinderProvider.Instances()
@@ -276,6 +340,10 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName type
 	instanceID, err := instances.InstanceID(nodeName)
 	if ind := strings.LastIndex(instanceID, "/"); ind >= 0 {
 		instanceID = instanceID[(ind + 1):]
+	}
+
+	if err := detacher.waitOperationFinished(volumeID); err != nil {
+		return err
 	}
 
 	attached, err := detacher.cinderProvider.DiskIsAttached(instanceID, volumeID)
@@ -293,10 +361,14 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName type
 	}
 
 	if err = detacher.cinderProvider.DetachDisk(instanceID, volumeID); err != nil {
-		glog.Errorf("Error detaching volume %q: %v", volumeID, err)
+		glog.Errorf("Error detaching volume %q from node %q: %v", volumeID, nodeName, err)
 		return err
 	}
-	glog.Infof("detached volume %q from instance %q", volumeID, instanceID)
+	if err = detacher.waitDiskDetached(instanceID, volumeID); err != nil {
+		glog.Errorf("Error waiting for volume %q to detach from node %q: %v", volumeID, nodeName, err)
+		return err
+	}
+	glog.Infof("detached volume %q from node %q", volumeID, nodeName)
 	return nil
 }
 

@@ -20,9 +20,6 @@ base:
 {% elif pillar.get('network_provider', '').lower() == 'cni' %}
     - cni
 {% endif %}
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure-legacy' %}
-    - openvpn-client
-{% endif %}
     - helpers
     - kube-client-tools
     - kube-node-unpacker
@@ -67,10 +64,6 @@ base:
     - logrotate
 {% endif %}
     - kube-addons
-{% if grains['cloud'] is defined and grains['cloud'] == 'azure-legacy' %}
-    - openvpn
-    - nginx
-{% endif %}
 {% if grains['cloud'] is defined and grains['cloud'] in [ 'vagrant', 'gce', 'aws', 'photon-controller', 'openstack', 'azure-legacy'] %}
     - docker
     - kubelet

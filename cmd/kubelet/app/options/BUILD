@@ -9,7 +9,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["options.go"],
+    srcs = [
+        "container_runtime.go",
+        "options.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
@@ -18,6 +21,7 @@ go_library(
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
     ],

@@ -13,6 +13,7 @@ go_library(
     srcs = [
         "metadata.go",
         "openstack.go",
+        "openstack_client.go",
         "openstack_instances.go",
         "openstack_loadbalancer.go",
         "openstack_metrics.go",

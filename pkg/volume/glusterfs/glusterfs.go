@@ -381,52 +381,6 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	options = append(options, "backup-volfile-servers="+dstrings.Join(addrlist[:], ":"))
 	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
 
-	//fetch client version.
-	mountBinaryVerStr := ""
-	mountStr := ""
-
-	cmdOut, err := b.exe.Command(linuxGlusterMountBinary, "-V").CombinedOutput()
-	if err != nil {
-		glog.Warningf("Failed to get binary %q version", linuxGlusterMountBinary)
-	} else {
-		//cmdOut will be filled as shown below.
-		/*
-				[root@]# mount.glusterfs -V
-				glusterfs 3.10.1
-				Repository revision: git://git.gluster.org/glusterfs.git
-				Copyright (c) 2006-2016 Red Hat, Inc. <https://www.gluster.org/>
-				GlusterFS comes with ABSOLUTELY NO WARRANTY.
-			    .........
-		*/
-
-		parseStr := string(cmdOut)
-		if parseStr != "" {
-
-			//Store the version line from parseStr
-			mountStrSlice := dstrings.Split(parseStr, "\n")
-			if len(mountStrSlice) > 0 {
-				mountStr = mountStrSlice[0]
-			}
-			if mountStr != "" {
-
-				// Get the [binary, version]  slice.
-				mountBinaryVerSlice := dstrings.Split(mountStr, " ")
-				if len(mountBinaryVerSlice) >= 2 {
-
-					// Get the 'version' string in mountBinaryVerStr
-					mountBinaryVerStr = mountBinaryVerSlice[1]
-				}
-
-			}
-		}
-
-		for i := len(mountOptions) - 1; i >= 0; i-- {
-			if mountOptions[i] == "auto_unmount" && mountBinaryVerStr != "" && mountBinaryVerStr < autoUnmountBinaryVer {
-				mountOptions = append(mountOptions[:i], mountOptions[i+1:]...)
-			}
-		}
-	}
-
 	// Avoid mount storm, pick a host randomly.
 	// Iterate all hosts until mount succeeds.
 	for _, ip := range addrlist {
@@ -435,6 +389,25 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 			glog.Infof("glusterfs: successfully mounted %s", dir)
 			return nil
 		}
+
+		// Give a try without `auto_unmount mount option, because
+		// it could be that gluster fuse client is older version and
+		// mount.glusterfs is unaware of `auto_unmount`.
+		// Use a mount string without `auto_unmount``
+
+		autoMountOptions := make([]string, len(mountOptions))
+		for _, opt := range mountOptions {
+			if opt != "auto_unmount" {
+				autoMountOptions = append(autoMountOptions, opt)
+			}
+		}
+
+		autoerrs := b.mounter.Mount(ip+":"+b.path, dir, "glusterfs", autoMountOptions)
+		if autoerrs == nil {
+			glog.Infof("glusterfs: successfully mounted %s", dir)
+			return nil
+		}
+
 	}
 
 	// Failed mount scenario.
@@ -446,6 +419,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 		return fmt.Errorf("glusterfs: mount failed: %v the following error information was pulled from the glusterfs log to help diagnose this issue: %v", errs, logerror)
 	}
 	return fmt.Errorf("glusterfs: mount failed: %v", errs)
+
 }
 
 func getVolumeSource(
