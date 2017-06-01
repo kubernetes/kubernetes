@@ -121,7 +121,7 @@ func isSysFSWritable() (bool, error) {
 		if len(mountPoint.Opts) > 0 && mountPoint.Opts[0] == permWritable {
 			return true, nil
 		}
-		glog.Errorf("sysfs is not writable: %+v (mount options are %v)",
+		glog.Errorf("sysfs is not writable: $+v (mount options are %v)",
 			mountPoint, mountPoint.Opts)
 		return false, readOnlySysFSError
 	}
