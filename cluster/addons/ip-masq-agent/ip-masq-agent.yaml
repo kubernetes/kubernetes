@@ -18,6 +18,13 @@ spec:
       containers:
       - name: ip-masq-agent
         image: gcr.io/google-containers/ip-masq-agent-amd64:v2.0.1
+        resources:
+          limits:
+            cpu: 100m
+            memory: 8Mi
+          requests:
+            cpu: 10m
+            memory: 8Mi
         securityContext:
           privileged: true
         volumeMounts:
