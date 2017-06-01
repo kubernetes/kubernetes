@@ -37,6 +37,8 @@ func GetStandardPrinter(format, formatArgument string, noHeaders, allowMissingTe
 		printer = &JSONPrinter{}
 	case "yaml":
 		printer = &YAMLPrinter{}
+	case "config":
+		printer = &ConfigPrinter{}
 	case "name":
 		printer = &NamePrinter{
 			Typer:    typer,

@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/ghodss/yaml"
@@ -97,5 +99,51 @@ func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 
 // TODO: implement HandledResources()
 func (p *YAMLPrinter) HandledResources() []string {
+	return []string{}
+}
+
+// ConfigPrinter is an implementation of ResourcePrinter which outputs an object as CONFIG.
+type ConfigPrinter struct {
+}
+
+func (p *ConfigPrinter) AfterPrint(w io.Writer, res string) error {
+	return nil
+}
+
+// PrintObj is an implementation of ResourcePrinter.PrintObj which simply writes the object to the Writer.
+func (p *ConfigPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	switch obj := obj.(type) {
+	case *runtime.Unknown:
+		var buf bytes.Buffer
+		err := json.Indent(&buf, obj.Raw, "", "    ")
+		if err != nil {
+			return err
+		}
+		buf.WriteRune('\n')
+		_, err = buf.WriteTo(w)
+		return err
+	}
+
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetNamespace("")
+	accessor.SetResourceVersion("")
+	accessor.SetSelfLink("")
+	accessor.SetUID("")
+	accessor.SetCreationTimestamp(metav1.Now())
+
+	data, err := json.MarshalIndent(obj, "", "    ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	_, err = w.Write(data)
+	return err
+}
+
+// TODO: implement HandledResources()
+func (p *ConfigPrinter) HandledResources() []string {
 	return []string{}
 }
