@@ -58,9 +58,11 @@ func ValidateAPIService(apiService *apiregistration.APIService) field.ErrorList 
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "version"), apiService.Spec.Version, errString))
 	}
 
-	if apiService.Spec.Priority <= 0 || apiService.Spec.Priority > 1000 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "priority"), apiService.Spec.Priority, "priority must be positive and less than 1000"))
-
+	if apiService.Spec.GroupPriorityMinimum <= 0 || apiService.Spec.GroupPriorityMinimum > 10000 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "groupPriorityMinimum"), apiService.Spec.GroupPriorityMinimum, "must be positive and less than 10000"))
+	}
+	if apiService.Spec.VersionPriority <= 0 || apiService.Spec.VersionPriority > 1000 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "versionPriority"), apiService.Spec.VersionPriority, "must be positive and less than 1000"))
 	}
 
 	if apiService.Spec.Service == nil {

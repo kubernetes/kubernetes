@@ -147,9 +147,10 @@ func makeAPIService(gv schema.GroupVersion) *apiregistration.APIService {
 	return &apiregistration.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: gv.Version + "." + gv.Group},
 		Spec: apiregistration.APIServiceSpec{
-			Group:    gv.Group,
-			Version:  gv.Version,
-			Priority: 100,
+			Group:           gv.Group,
+			Version:         gv.Version,
+			GroupPriority:   1000,
+			VersionPriority: 10,
 		},
 	}
 }
@@ -180,7 +181,7 @@ func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, 
 		// but for now its a special case
 		// apps has to come last for compatibility with 1.5 kubectl clients
 		if apiService.Spec.Group == "apps" {
-			apiService.Spec.Priority = 110
+			apiService.Spec.GroupPriority = 1100
 		}
 
 		registration.AddAPIServiceToSync(apiService)

@@ -23,12 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func SortedByGroup(servers []*APIService) [][]*APIService {
-	serversByPriority := ByPriority(servers)
-	sort.Sort(serversByPriority)
+func SortedByGroupAndVersion(servers []*APIService) [][]*APIService {
+	serversByGroupPriority := ByGroupPriority(servers)
+	sort.Sort(serversByGroupPriority)
 
 	ret := [][]*APIService{}
-	for _, curr := range serversByPriority {
+	for _, curr := range serversByGroupPriority {
 		// check to see if we already have an entry for this group
 		existingIndex := -1
 		for j, groupInReturn := range ret {
@@ -40,6 +40,7 @@ func SortedByGroup(servers []*APIService) [][]*APIService {
 
 		if existingIndex >= 0 {
 			ret[existingIndex] = append(ret[existingIndex], curr)
+			sort.Sort(ByVersionPriority(ret[existingIndex]))
 			continue
 		}
 
@@ -49,15 +50,26 @@ func SortedByGroup(servers []*APIService) [][]*APIService {
 	return ret
 }
 
-type ByPriority []*APIService
+type ByGroupPriority []*APIService
 
-func (s ByPriority) Len() int      { return len(s) }
-func (s ByPriority) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s ByPriority) Less(i, j int) bool {
-	if s[i].Spec.Priority == s[j].Spec.Priority {
-		return s[i].Name < s[j].Name
+func (s ByGroupPriority) Len() int      { return len(s) }
+func (s ByGroupPriority) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s ByGroupPriority) Less(i, j int) bool {
+	if s[i].Spec.GroupPriority != s[j].Spec.GroupPriority {
+		return s[i].Spec.GroupPriority < s[j].Spec.GroupPriority
 	}
-	return s[i].Spec.Priority < s[j].Spec.Priority
+	return s[i].Name < s[j].Name
+}
+
+type ByVersionPriority []*APIService
+
+func (s ByVersionPriority) Len() int      { return len(s) }
+func (s ByVersionPriority) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s ByVersionPriority) Less(i, j int) bool {
+	if s[i].Spec.VersionPriority != s[j].Spec.VersionPriority {
+		return s[i].Spec.VersionPriority < s[j].Spec.VersionPriority
+	}
+	return s[i].Name < s[j].Name
 }
 
 // APIServiceNameToGroupVersion returns the GroupVersion for a given apiServiceName.  The name
