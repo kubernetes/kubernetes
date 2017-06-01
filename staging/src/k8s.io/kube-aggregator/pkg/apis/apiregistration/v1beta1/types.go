@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1beta1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
 
 // APIServiceList is a list of APIService objects.
 type APIServiceList struct {
@@ -32,6 +35,8 @@ type ServiceReference struct {
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
 	// Name is the name of the service
 	Name string `json:"name,omitempty" protobuf:"bytes,2,opt,name=name"`
+	// Port is either a numeric or a named port (default: 443)
+	Port *intstr.IntOrString `json:"port,omitempty" protobuf:"bytes,3,opt,name=port"`
 }
 
 // APIServiceSpec contains information for locating and communicating with a server.

@@ -37,6 +37,7 @@ import (
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/pkg/version"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
@@ -74,7 +75,7 @@ func init() {
 const legacyAPIServiceName = "v1."
 
 type ServiceResolver interface {
-	ResolveEndpoint(namespace, name string) (*url.URL, error)
+	ResolveEndpoint(service apiregistration.ServiceReference) (*url.URL, error)
 }
 
 type aggregatorEndpointRouting struct {
@@ -150,12 +151,22 @@ func (c *Config) SkipComplete() completedConfig {
 	return completedConfig{c}
 }
 
-func (r *aggregatorEndpointRouting) ResolveEndpoint(namespace, name string) (*url.URL, error) {
-	return proxy.ResolveEndpoint(r.services, r.endpoints, namespace, name)
+func (r *aggregatorEndpointRouting) ResolveEndpoint(service apiregistration.ServiceReference) (*url.URL, error) {
+	// TODO: replace with defaulting as soon as https://github.com/kubernetes/gengo/pull/59 is merged
+	port := intstr.FromInt(443)
+	if service.Port != nil {
+		port = *service.Port
+	}
+	return proxy.ResolveEndpoint(r.services, r.endpoints, service.Namespace, service.Name, port)
 }
 
-func (r *aggregatorClusterRouting) ResolveEndpoint(namespace, name string) (*url.URL, error) {
-	return proxy.ResolveCluster(r.services, namespace, name)
+func (r *aggregatorClusterRouting) ResolveEndpoint(service apiregistration.ServiceReference) (*url.URL, error) {
+	// TODO: replace with defaulting as soon as https://github.com/kubernetes/gengo/pull/59 is merged
+	port := intstr.FromInt(443)
+	if service.Port != nil {
+		port = *service.Port
+	}
+	return proxy.ResolveCluster(r.services, service.Namespace, service.Name, port)
 }
 
 // New returns a new instance of APIAggregator from the given config.

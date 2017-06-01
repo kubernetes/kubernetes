@@ -67,10 +67,8 @@ type proxyHandlingInfo struct {
 	transportBuildingError error
 	// proxyRoundTripper is the re-useable portion of the transport.  It does not vary with any request.
 	proxyRoundTripper http.RoundTripper
-	// serviceName is the name of the service this handler proxies to
-	serviceName string
-	// namespace is the namespace the service lives in
-	serviceNamespace string
+	// serviceRef is the service this handler proxies to
+	serviceRef *apiregistrationapi.ServiceReference
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -113,7 +111,11 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// write a new location based on the existing request pointed at the target service
 	location := &url.URL{}
 	location.Scheme = "https"
-	rloc, err := r.routing.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName)
+	if handlingInfo.serviceRef == nil {
+		http.Error(w, "missing service reference", http.StatusInternalServerError)
+		return
+	}
+	rloc, err := r.routing.ResolveEndpoint(*handlingInfo.serviceRef)
 	if err != nil {
 		http.Error(w, "missing route", http.StatusInternalServerError)
 		return
@@ -201,8 +203,7 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 				CAData:     apiService.Spec.CABundle,
 			},
 		},
-		serviceName:      apiService.Spec.Service.Name,
-		serviceNamespace: apiService.Spec.Service.Namespace,
+		serviceRef: apiService.Spec.Service,
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
 	r.handlingInfo.Store(newInfo)

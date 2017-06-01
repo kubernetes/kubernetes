@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	reflect "reflect"
 )
 
@@ -109,8 +110,11 @@ func DeepCopy_v1beta1_APIServiceSpec(in interface{}, out interface{}, c *convers
 		*out = *in
 		if in.Service != nil {
 			in, out := &in.Service, &out.Service
-			*out = new(ServiceReference)
-			**out = **in
+			if newVal, err := c.DeepCopy(*in); err != nil {
+				return err
+			} else {
+				*out = newVal.(*ServiceReference)
+			}
 		}
 		if in.CABundle != nil {
 			in, out := &in.CABundle, &out.CABundle
@@ -148,6 +152,11 @@ func DeepCopy_v1beta1_ServiceReference(in interface{}, out interface{}, c *conve
 		in := in.(*ServiceReference)
 		out := out.(*ServiceReference)
 		*out = *in
+		if in.Port != nil {
+			in, out := &in.Port, &out.Port
+			*out = new(intstr.IntOrString)
+			**out = **in
+		}
 		return nil
 	}
 }
