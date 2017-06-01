@@ -1219,6 +1219,43 @@ func TestUpdateNode(t *testing.T) {
 			ds:            newDaemonSet("ds"),
 			shouldEnqueue: true,
 		},
+		{
+			test: "Node conditions changed",
+			oldNode: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{
+					{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue},
+				}
+				return node
+			}(),
+			newNode:       newNode("node1", nil),
+			ds:            newDaemonSet("ds"),
+			shouldEnqueue: true,
+		},
+		{
+			test: "Node conditions not changed",
+			oldNode: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{
+					{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue},
+					{Type: v1.NodeMemoryPressure, Status: v1.ConditionFalse},
+					{Type: v1.NodeDiskPressure, Status: v1.ConditionFalse},
+					{Type: v1.NodeNetworkUnavailable, Status: v1.ConditionFalse},
+					{Type: v1.NodeInodePressure, Status: v1.ConditionFalse},
+				}
+				return node
+			}(),
+			newNode: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{
+					{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue},
+					{Type: v1.NodeInodePressure, Status: v1.ConditionFalse},
+				}
+				return node
+			}(),
+			ds:            newDaemonSet("ds"),
+			shouldEnqueue: false,
+		},
 	}
 	for _, c := range cases {
 		manager, podControl, _ := newTestController()
