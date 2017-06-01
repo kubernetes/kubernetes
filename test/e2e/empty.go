@@ -43,7 +43,7 @@ var _ = framework.KubeDescribe("Empty [Feature:Empty]", func() {
 	})
 
 	It("starts a pod", func() {
-		configs, _ := perf.GenerateConfigsForGroup([]*v1.Namespace{f.Namespace}, "empty-pod", 1, 1, framework.GetPauseImageName(f.ClientSet), []string{}, api.Kind("ReplicationController"), 0)
+		configs, _, _ := perf.GenerateConfigsForGroup([]*v1.Namespace{f.Namespace}, "empty-pod", 1, 1, framework.GetPauseImageName(f.ClientSet), []string{}, api.Kind("ReplicationController"), 0, 0)
 		if len(configs) != 1 {
 			framework.Failf("generateConfigs should have generated single config")
 		}
