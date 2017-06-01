@@ -125,6 +125,7 @@ filegroup(
         "//pkg/controller/statefulset:all-srcs",
         "//pkg/controller/ttl:all-srcs",
         "//pkg/controller/volume/attachdetach:all-srcs",
+        "//pkg/controller/volume/events:all-srcs",
         "//pkg/controller/volume/persistentvolume:all-srcs",
     ],
     tags = ["automanaged"],
