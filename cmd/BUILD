@@ -28,6 +28,7 @@ filegroup(
         "//cmd/kube-controller-manager:all-srcs",
         "//cmd/kube-proxy:all-srcs",
         "//cmd/kubeadm:all-srcs",
+        "//cmd/kubebackup:all-srcs",
         "//cmd/kubectl:all-srcs",
         "//cmd/kubelet:all-srcs",
         "//cmd/kubemark:all-srcs",
