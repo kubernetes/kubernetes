@@ -36,11 +36,12 @@ import (
 )
 
 func getTestTaint() v1.Taint {
+	now := metav1.Now()
 	return v1.Taint{
 		Key:       "kubernetes.io/e2e-evict-taint-key",
 		Value:     "evictTaintVal",
 		Effect:    v1.TaintEffectNoExecute,
-		TimeAdded: metav1.Now(),
+		TimeAdded: &now,
 	}
 }
 

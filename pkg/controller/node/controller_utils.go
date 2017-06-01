@@ -290,7 +290,8 @@ func recordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, new_st
 
 // Returns true in case of success and false otherwise
 func swapNodeControllerTaint(kubeClient clientset.Interface, taintToAdd, taintToRemove *v1.Taint, node *v1.Node) bool {
-	taintToAdd.TimeAdded = metav1.Now()
+	now := metav1.Now()
+	taintToAdd.TimeAdded = &now
 	err := controller.AddOrUpdateTaintOnNode(kubeClient, node.Name, taintToAdd)
 	if err != nil {
 		utilruntime.HandleError(
