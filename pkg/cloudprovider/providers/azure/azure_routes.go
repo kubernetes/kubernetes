@@ -80,7 +80,7 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 		if shouldRetryAPIRequest(resp, err) {
 			retryErr := az.CreateOrUpdateRouteTableWithRetry(routeTable)
 			if retryErr != nil {
-				return retryErr
+				err = retryErr
 			}
 		}
 		if err != nil {
@@ -113,7 +113,7 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 	if shouldRetryAPIRequest(resp, err) {
 		retryErr := az.CreateOrUpdateRouteWithRetry(route)
 		if retryErr != nil {
-			return retryErr
+			err = retryErr
 		}
 	}
 	if err != nil {
@@ -134,7 +134,7 @@ func (az *Cloud) DeleteRoute(clusterName string, kubeRoute *cloudprovider.Route)
 	if shouldRetryAPIRequest(resp, err) {
 		retryErr := az.DeleteRouteWithRetry(routeName)
 		if retryErr != nil {
-			return retryErr
+			err = retryErr
 		}
 	}
 	if err != nil {

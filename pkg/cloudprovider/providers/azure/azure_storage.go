@@ -68,7 +68,7 @@ func (az *Cloud) AttachDisk(diskName, diskURI string, nodeName types.NodeName, l
 	if shouldRetryAPIRequest(resp, err) {
 		retryErr := az.CreateOrUpdateVMWithRetry(vmName, newVM)
 		if retryErr != nil {
-			return retryErr
+			err = retryErr
 		}
 	}
 	if err != nil {
@@ -145,7 +145,7 @@ func (az *Cloud) DetachDiskByName(diskName, diskURI string, nodeName types.NodeN
 	if shouldRetryAPIRequest(resp, err) {
 		retryErr := az.CreateOrUpdateVMWithRetry(vmName, newVM)
 		if retryErr != nil {
-			return retryErr
+			err = retryErr
 		}
 	}
 	if err != nil {

@@ -17,9 +17,6 @@ limitations under the License.
 package azure
 
 import (
-	"net/http"
-	"regexp"
-	"strconv"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -153,19 +150,12 @@ func processRetryResponse(resp autorest.Response, err error) (bool, error) {
 
 // shouldRetryAPIRequest determines if the response from an HTTP request suggests periodic retry behavior
 func shouldRetryAPIRequest(resp autorest.Response, err error) bool {
+	// non-nil error from HTTP request suggests we should retry
 	if err != nil {
 		return true
 	}
-	// HTTP 429 suggests we should retry
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return true
-	}
-	// HTTP 5xx suggests we should retry
-	r, err := regexp.Compile(`^5\d\d$`)
-	if err != nil {
-		return false
-	}
-	if r.MatchString(strconv.Itoa(resp.StatusCode)) {
+	// HTTP 4xx or 5xx suggests we should retry
+	if 399 < resp.StatusCode && resp.StatusCode < 600 {
 		return true
 	}
 	return false
@@ -174,11 +164,7 @@ func shouldRetryAPIRequest(resp autorest.Response, err error) bool {
 // isSuccessHTTPResponse determines if the response from an HTTP request suggests success
 func isSuccessHTTPResponse(resp autorest.Response) bool {
 	// HTTP 2xx suggests a successful response
-	r, err := regexp.Compile(`^2\d\d$`)
-	if err != nil {
-		return false
-	}
-	if r.MatchString(strconv.Itoa(resp.StatusCode)) {
+	if 199 < resp.StatusCode && resp.StatusCode < 300 {
 		return true
 	}
 	return false
