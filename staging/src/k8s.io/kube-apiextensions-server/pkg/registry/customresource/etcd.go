@@ -17,11 +17,10 @@ limitations under the License.
 package customresource
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
 )
 
 // rest implements a RESTStorage for API services against etcd
@@ -30,24 +29,24 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against API services.
-func NewREST(resource schema.GroupResource, listKind schema.GroupVersionKind, copier runtime.ObjectCopier, strategy CustomResourceDefinitionStorageStrategy, optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST {
+	strategy := NewStrategy(scheme)
+
 	store := &genericregistry.Store{
-		Copier:  copier,
-		NewFunc: func() runtime.Object { return &unstructured.Unstructured{} },
-		NewListFunc: func() runtime.Object {
-			// lists are never stored, only manufactured, so stomp in the right kind
-			ret := &unstructured.UnstructuredList{}
-			ret.SetGroupVersionKind(listKind)
-			return ret
+		Copier:      scheme,
+		NewFunc:     func() runtime.Object { return &apiextensions.CustomResource{} },
+		NewListFunc: func() runtime.Object { return &apiextensions.CustomResourceList{} },
+		ObjectNameFunc: func(obj runtime.Object) (string, error) {
+			return obj.(*apiextensions.CustomResource).Name, nil
 		},
-		PredicateFunc:     strategy.MatchCustomResourceDefinitionStorage,
-		QualifiedResource: resource,
+		PredicateFunc:     MatchCustomResource,
+		QualifiedResource: apiextensions.Resource("customresources"),
 
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,
 		DeleteStrategy: strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: strategy.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

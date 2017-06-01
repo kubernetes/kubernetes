@@ -103,21 +103,15 @@ func SetInitContainersStatusesAnnotations(pod *v1.Pod) error {
 		}
 		pod.Annotations[v1.PodInitContainerStatusesAnnotationKey] = string(value)
 		pod.Annotations[v1.PodInitContainerStatusesBetaAnnotationKey] = string(value)
-	} else {
-		delete(pod.Annotations, v1.PodInitContainerStatusesAnnotationKey)
-		delete(pod.Annotations, v1.PodInitContainerStatusesBetaAnnotationKey)
 	}
 	return nil
 }
-
-// Visitor is called with each object name, and returns true if visiting should continue
-type Visitor func(name string) (shouldContinue bool)
 
 // VisitPodSecretNames invokes the visitor function with the name of every secret
 // referenced by the pod spec. If visitor returns false, visiting is short-circuited.
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
-func VisitPodSecretNames(pod *v1.Pod, visitor Visitor) bool {
+func VisitPodSecretNames(pod *v1.Pod, visitor func(string) bool) bool {
 	for _, reference := range pod.Spec.ImagePullSecrets {
 		if !visitor(reference.Name) {
 			return false
@@ -179,7 +173,7 @@ func VisitPodSecretNames(pod *v1.Pod, visitor Visitor) bool {
 	return true
 }
 
-func visitContainerSecretNames(container *v1.Container, visitor Visitor) bool {
+func visitContainerSecretNames(container *v1.Container, visitor func(string) bool) bool {
 	for _, env := range container.EnvFrom {
 		if env.SecretRef != nil {
 			if !visitor(env.SecretRef.Name) {

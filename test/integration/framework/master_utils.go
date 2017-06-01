@@ -47,8 +47,6 @@ import (
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	extinformers "k8s.io/client-go/informers"
-	extclient "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
@@ -100,8 +98,6 @@ type MasterComponents struct {
 	ClientSet clientset.Interface
 	// Replication controller manager
 	ControllerManager *replicationcontroller.ReplicationManager
-	// CloseFn shuts down the server
-	CloseFn CloseFunc
 	// Channel for stop signals to rc manager
 	rcStopCh chan struct{}
 	// Used to stop master components individually, and via MasterComponents.Stop
@@ -122,7 +118,7 @@ type Config struct {
 
 // NewMasterComponents creates, initializes and starts master components based on the given config.
 func NewMasterComponents(c *Config) *MasterComponents {
-	m, s, closeFn := startMasterOrDie(c.MasterConfig, nil, nil)
+	m, s := startMasterOrDie(c.MasterConfig, nil, nil)
 	// TODO: Allow callers to pipe through a different master url and create a client/start components using it.
 	glog.Infof("Master %+v", s.URL)
 	// TODO: caesarxuchao: remove this client when the refactoring of client libraray is done.
@@ -142,7 +138,6 @@ func NewMasterComponents(c *Config) *MasterComponents {
 		KubeMaster:        m,
 		ClientSet:         clientset,
 		ControllerManager: controllerManager,
-		CloseFn:           closeFn,
 		rcStopCh:          rcStopCh,
 	}
 }
@@ -178,7 +173,7 @@ func (h *MasterHolder) SetMaster(m *master.Master) {
 }
 
 // startMasterOrDie starts a kubernetes master and an httpserver to handle api requests
-func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
+func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server) {
 	var m *master.Master
 	var s *httptest.Server
 
@@ -188,12 +183,6 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		s = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			m.GenericAPIServer.Handler.ServeHTTP(w, req)
 		}))
-	}
-
-	stopCh := make(chan struct{})
-	closeFn := func() {
-		close(stopCh)
-		s.Close()
 	}
 
 	if masterConfig == nil {
@@ -247,15 +236,8 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	masterConfig.GenericConfig.LoopbackClientConfig.BearerToken = privilegedLoopbackToken
 
-	clientset, err := extclient.NewForConfig(masterConfig.GenericConfig.LoopbackClientConfig)
+	m, err := masterConfig.Complete().New(genericapiserver.EmptyDelegate)
 	if err != nil {
-		glog.Fatal(err)
-	}
-	masterConfig.GenericConfig.SharedInformerFactory = extinformers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
-
-	m, err = masterConfig.Complete().New(genericapiserver.EmptyDelegate)
-	if err != nil {
-		closeFn()
 		glog.Fatalf("error in bringing up the master: %v", err)
 	}
 	if masterReceiver != nil {
@@ -266,13 +248,12 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	// this method never actually calls the `Run` method for the API server
 	// fire the post hooks ourselves
 	m.GenericAPIServer.PrepareRun()
-	m.GenericAPIServer.RunPostStartHooks(stopCh)
+	m.GenericAPIServer.RunPostStartHooks()
 
 	cfg := *masterConfig.GenericConfig.LoopbackClientConfig
 	cfg.ContentConfig.GroupVersion = &schema.GroupVersion{}
 	privilegedClient, err := restclient.RESTClientFor(&cfg)
 	if err != nil {
-		closeFn()
 		glog.Fatal(err)
 	}
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
@@ -285,7 +266,6 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		return false, nil
 	})
 	if err != nil {
-		closeFn()
 		glog.Fatal(err)
 	}
 
@@ -295,7 +275,6 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		coreClient := coreclient.NewForConfigOrDie(&cfg)
 		svcWatch, err := coreClient.Services(metav1.NamespaceDefault).Watch(metav1.ListOptions{})
 		if err != nil {
-			closeFn()
 			glog.Fatal(err)
 		}
 		_, err = watch.Until(30*time.Second, svcWatch, func(event watch.Event) (bool, error) {
@@ -308,12 +287,11 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 			return false, nil
 		})
 		if err != nil {
-			closeFn()
 			glog.Fatal(err)
 		}
 	}
 
-	return m, s, closeFn
+	return m, s
 }
 
 func parseCIDROrDie(cidr string) *net.IPNet {
@@ -424,7 +402,7 @@ func (m *MasterComponents) Stop(apiServer, rcManager bool) {
 		m.once.Do(m.stopRCManager)
 	}
 	if apiServer {
-		m.CloseFn()
+		m.ApiServer.Close()
 	}
 }
 
@@ -489,10 +467,7 @@ func ScaleRC(name, ns string, replicas int32, clientset internalclientset.Interf
 	return scaled, nil
 }
 
-// CloseFunc can be called to cleanup the master
-type CloseFunc func()
-
-func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server, CloseFunc) {
+func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server) {
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
@@ -501,7 +476,7 @@ func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server, 
 	return startMasterOrDie(masterConfig, nil, nil)
 }
 
-func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
+func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server) {
 	return startMasterOrDie(masterConfig, s, masterReceiver)
 }
 

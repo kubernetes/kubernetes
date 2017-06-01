@@ -17,7 +17,6 @@ go_library(
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1beta1:go_default_library",
@@ -30,7 +29,6 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes/typed/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/extensions/v1beta1:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/networking/v1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/policy/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/rbac/v1alpha1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/rbac/v1beta1:go_default_library",

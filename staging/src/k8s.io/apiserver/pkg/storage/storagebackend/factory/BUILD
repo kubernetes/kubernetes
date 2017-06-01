@@ -46,6 +46,5 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/storage/etcd:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd3:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
     ],
 )

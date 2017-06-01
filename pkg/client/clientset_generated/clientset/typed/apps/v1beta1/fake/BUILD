@@ -12,7 +12,6 @@ go_library(
     srcs = [
         "doc.go",
         "fake_apps_client.go",
-        "fake_controllerrevision.go",
         "fake_deployment.go",
         "fake_scale.go",
         "fake_statefulset.go",

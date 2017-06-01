@@ -18,6 +18,6 @@ limitations under the License.
 
 package internalversion
 
-// CustomResourceDefinitionListerExpansion allows custom methods to be added to
-// CustomResourceDefinitionLister.
-type CustomResourceDefinitionListerExpansion interface{}
+// CustomResourceListerExpansion allows custom methods to be added to
+// CustomResourceLister.
+type CustomResourceListerExpansion interface{}

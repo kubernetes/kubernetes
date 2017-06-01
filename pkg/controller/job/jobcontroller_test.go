@@ -268,16 +268,8 @@ func TestControllerSyncJob(t *testing.T) {
 
 		// run
 		err := manager.syncJob(getKey(job, t))
-
-		// We need requeue syncJob task if podController error
-		if tc.podControllerError != nil {
-			if err == nil {
-				t.Errorf("%s: Syncing jobs would return error when podController exception", name)
-			}
-		} else {
-			if err != nil {
-				t.Errorf("%s: unexpected error when syncing jobs %v", name, err)
-			}
+		if err != nil {
+			t.Errorf("%s: unexpected error when syncing jobs %v", name, err)
 		}
 
 		// validate created/deleted pods

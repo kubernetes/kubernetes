@@ -65,7 +65,9 @@ func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	cmd := &cobra.Command{
-		Use:     "replace -f FILENAME",
+		Use: "replace -f FILENAME",
+		// update is deprecated.
+		Aliases: []string{"update"},
 		Short:   i18n.T("Replace a resource by filename or stdin"),
 		Long:    replaceLong,
 		Example: replaceExample,
@@ -92,6 +94,9 @@ func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		printDeprecationWarning("replace", "update")
+	}
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
 		return err

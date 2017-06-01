@@ -18,22 +18,22 @@ package apiextensions
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-// CustomResourceDefinitionSpec describes how a user wants their resource to appear
-type CustomResourceDefinitionSpec struct {
+// CustomResourceSpec describes how a user wants their resource to appear
+type CustomResourceSpec struct {
 	// Group is the group this resource belongs in
 	Group string
 	// Version is the version this resource belongs in
 	Version string
 	// Names are the names used to describe this custom resource
-	Names CustomResourceDefinitionNames
+	Names CustomResourceNames
 
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
 	Scope ResourceScope
 }
 
-// CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition
-type CustomResourceDefinitionNames struct {
-	// Plural is the plural name of the resource to serve.  It must match the name of the CustomResourceDefinition-registration
+// CustomResourceNames indicates the names to serve this CustomResource
+type CustomResourceNames struct {
+	// Plural is the plural name of the resource to serve.  It must match the name of the CustomResource-registration
 	// too: plural.group and it must be all lowercase.
 	Plural string
 	// Singular is the singular name of the resource.  It must be all lowercase  Defaults to lowercased <kind>
@@ -66,25 +66,20 @@ const (
 	ConditionUnknown ConditionStatus = "Unknown"
 )
 
-// CustomResourceDefinitionConditionType is a valid value for CustomResourceDefinitionCondition.Type
-type CustomResourceDefinitionConditionType string
+// CustomResourceConditionType is a valid value for CustomResourceCondition.Type
+type CustomResourceConditionType string
 
 const (
-	// Established means that the resource has become active. A resource is established when all names are
-	// accepted without a conflict for the first time. A resource stays established until deleted, even during
-	// a later NamesAccepted due to changed names. Note that not all names can be changed.
-	Established CustomResourceDefinitionConditionType = "Established"
-	// NamesAccepted means the names chosen for this CustomResourceDefinition do not conflict with others in
-	// the group and are therefore accepted.
-	NamesAccepted CustomResourceDefinitionConditionType = "NamesAccepted"
-	// Terminating means that the CustomResourceDefinition has been deleted and is cleaning up.
-	Terminating CustomResourceDefinitionConditionType = "Terminating"
+	// NameConflict means the names chosen for this CustomResource conflict with others in the group.
+	NameConflict CustomResourceConditionType = "NameConflict"
+	// Terminating means that the CustomResource has been deleted and is cleaning up.
+	Terminating CustomResourceConditionType = "Terminating"
 )
 
-// CustomResourceDefinitionCondition contains details for the current condition of this pod.
-type CustomResourceDefinitionCondition struct {
+// CustomResourceCondition contains details for the current condition of this pod.
+type CustomResourceCondition struct {
 	// Type is the type of the condition.
-	Type CustomResourceDefinitionConditionType
+	Type CustomResourceConditionType
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
 	Status ConditionStatus
@@ -99,40 +94,36 @@ type CustomResourceDefinitionCondition struct {
 	Message string
 }
 
-// CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
-type CustomResourceDefinitionStatus struct {
-	// Conditions indicate state for particular aspects of a CustomResourceDefinition
-	Conditions []CustomResourceDefinitionCondition
+// CustomResourceStatus indicates the state of the CustomResource
+type CustomResourceStatus struct {
+	// Conditions indicate state for particular aspects of a CustomResource
+	Conditions []CustomResourceCondition
 
 	// AcceptedNames are the names that are actually being used to serve discovery
 	// They may be different than the names in spec.
-	AcceptedNames CustomResourceDefinitionNames
+	AcceptedNames CustomResourceNames
 }
-
-// CustomResourceCleanupFinalizer is the name of the finalizer which will delete instances of
-// a CustomResourceDefinition
-const CustomResourceCleanupFinalizer = "customresourcecleanup.apiextensions.k8s.io"
 
 // +genclient=true
 // +nonNamespaced=true
 
-// CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
+// CustomResource represents a resource that should be exposed on the API server.  Its name MUST be in the format
 // <.spec.name>.<.spec.group>.
-type CustomResourceDefinition struct {
+type CustomResource struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
 
 	// Spec describes how the user wants the resources to appear
-	Spec CustomResourceDefinitionSpec
-	// Status indicates the actual state of the CustomResourceDefinition
-	Status CustomResourceDefinitionStatus
+	Spec CustomResourceSpec
+	// Status indicates the actual state of the CustomResource
+	Status CustomResourceStatus
 }
 
-// CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
-type CustomResourceDefinitionList struct {
+// CustomResourceList is a list of CustomResource objects.
+type CustomResourceList struct {
 	metav1.TypeMeta
 	metav1.ListMeta
 
-	// Items individual CustomResourceDefinitions
-	Items []CustomResourceDefinition
+	// Items individual CustomResources
+	Items []CustomResource
 }

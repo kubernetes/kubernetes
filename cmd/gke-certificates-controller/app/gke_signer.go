@@ -29,13 +29,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
-	capi "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/controller/certificates"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 )
 
 var (
-	groupVersions = []schema.GroupVersion{capi.SchemeGroupVersion}
+	groupVersions = []schema.GroupVersion{certificates.SchemeGroupVersion}
 )
 
 // GKESigner uses external calls to GKE in order to sign certificate signing
@@ -45,11 +43,10 @@ type GKESigner struct {
 	kubeConfigFile string
 	retryBackoff   time.Duration
 	recorder       record.EventRecorder
-	client         clientset.Interface
 }
 
 // NewGKESigner will create a new instance of a GKESigner.
-func NewGKESigner(kubeConfigFile string, retryBackoff time.Duration, recorder record.EventRecorder, client clientset.Interface) (*GKESigner, error) {
+func NewGKESigner(kubeConfigFile string, retryBackoff time.Duration, recorder record.EventRecorder) (*GKESigner, error) {
 	webhook, err := webhook.NewGenericWebhook(api.Registry, api.Codecs, kubeConfigFile, groupVersions, retryBackoff)
 	if err != nil {
 		return nil, err
@@ -60,29 +57,13 @@ func NewGKESigner(kubeConfigFile string, retryBackoff time.Duration, recorder re
 		kubeConfigFile: kubeConfigFile,
 		retryBackoff:   retryBackoff,
 		recorder:       recorder,
-		client:         client,
 	}, nil
 }
 
-func (s *GKESigner) handle(csr *capi.CertificateSigningRequest) error {
-	if !certificates.IsCertificateRequestApproved(csr) {
-		return nil
-	}
-	csr, err := s.sign(csr)
-	if err != nil {
-		return fmt.Errorf("error auto signing csr: %v", err)
-	}
-	_, err = s.client.Certificates().CertificateSigningRequests().UpdateStatus(csr)
-	if err != nil {
-		return fmt.Errorf("error updating signature for csr: %v", err)
-	}
-	return nil
-}
-
 // Sign will make an external call to GKE order to sign the given
-// *capi.CertificateSigningRequest, using the GKESigner's
+// *certificates.CertificateSigningRequest, using the GKESigner's
 // kubeConfigFile.
-func (s *GKESigner) sign(csr *capi.CertificateSigningRequest) (*capi.CertificateSigningRequest, error) {
+func (s *GKESigner) Sign(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
 	result := s.webhook.WithExponentialBackoff(func() rest.Result {
 		return s.webhook.RestClient.Post().Body(csr).Do()
 	})
@@ -99,7 +80,7 @@ func (s *GKESigner) sign(csr *capi.CertificateSigningRequest) (*capi.Certificate
 		return nil, s.webhookError(csr, fmt.Errorf("received unsuccessful response code from webhook: %d", statusCode))
 	}
 
-	result_csr := &capi.CertificateSigningRequest{}
+	result_csr := &certificates.CertificateSigningRequest{}
 
 	if err := result.Into(result_csr); err != nil {
 		return nil, s.webhookError(result_csr, err)
@@ -110,7 +91,7 @@ func (s *GKESigner) sign(csr *capi.CertificateSigningRequest) (*capi.Certificate
 	return csr, nil
 }
 
-func (s *GKESigner) webhookError(csr *capi.CertificateSigningRequest, err error) error {
+func (s *GKESigner) webhookError(csr *certificates.CertificateSigningRequest, err error) error {
 	glog.V(2).Infof("error contacting webhook backend: %s", err)
 	s.recorder.Eventf(csr, "Warning", "SigningError", "error while calling GKE: %v", err)
 	return err

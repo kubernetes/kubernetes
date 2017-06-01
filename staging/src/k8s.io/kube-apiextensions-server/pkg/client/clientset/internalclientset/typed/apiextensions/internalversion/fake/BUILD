@@ -12,7 +12,7 @@ go_library(
     srcs = [
         "doc.go",
         "fake_apiextensions_client.go",
-        "fake_customresourcedefinition.go",
+        "fake_customresource.go",
     ],
     tags = ["automanaged"],
     deps = [

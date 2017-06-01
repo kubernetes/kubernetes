@@ -25,9 +25,8 @@ import (
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/util"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
@@ -38,13 +37,9 @@ type RemoteRuntimeService struct {
 }
 
 // NewRemoteRuntimeService creates a new internalapi.RuntimeService.
-func NewRemoteRuntimeService(endpoint string, connectionTimout time.Duration) (internalapi.RuntimeService, error) {
-	glog.Infof("Connecting to runtime service %s", endpoint)
-	addr, dailer, err := util.GetAddressAndDialer(endpoint)
-	if err != nil {
-		return nil, err
-	}
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimout), grpc.WithDialer(dailer))
+func NewRemoteRuntimeService(addr string, connectionTimout time.Duration) (internalapi.RuntimeService, error) {
+	glog.Infof("Connecting to runtime service %s", addr)
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimout), grpc.WithDialer(dial))
 	if err != nil {
 		glog.Errorf("Connect remote runtime %s failed: %v", addr, err)
 		return nil, err
@@ -214,10 +209,11 @@ func (r *RemoteRuntimeService) StartContainer(containerID string) error {
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (r *RemoteRuntimeService) StopContainer(containerID string, timeout int64) error {
-	// Use timeout + default timeout (2 minutes) as timeout to leave extra time
-	// for SIGKILL container and request latency.
-	t := r.timeout + time.Duration(timeout)*time.Second
-	ctx, cancel := getContextWithTimeout(t)
+	ctx, cancel := getContextWithTimeout(time.Duration(timeout) * time.Second)
+	if timeout == 0 {
+		// Use default timeout if stop timeout is 0.
+		ctx, cancel = getContextWithTimeout(r.timeout)
+	}
 	defer cancel()
 
 	_, err := r.runtimeClient.StopContainer(ctx, &runtimeapi.StopContainerRequest{
@@ -419,12 +415,4 @@ func (r *RemoteRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
 	}
 
 	return resp.Status, nil
-}
-
-func (r *RemoteRuntimeService) ContainerStats(req *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
-}
-
-func (r *RemoteRuntimeService) ListContainerStats(req *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
 }

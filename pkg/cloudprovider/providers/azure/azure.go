@@ -20,10 +20,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"time"
 
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -32,6 +30,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
+	"time"
 )
 
 // CloudProviderName is the value used for the --cloud-provider flag
@@ -180,9 +179,6 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	return &az, nil
 }
 
-// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (az *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
-
 // LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 func (az *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return az, true
@@ -218,11 +214,7 @@ func (az *Cloud) ProviderName() string {
 	return CloudProviderName
 }
 
-// configureUserAgent configures the autorest client with a user agent that
-// includes "kubernetes" and the full kubernetes git version string
-// example:
-// Azure-SDK-for-Go/7.0.1-beta arm-network/2016-09-01; kubernetes-cloudprovider/v1.7.0-alpha.2.711+a2fadef8170bb0-dirty;
 func configureUserAgent(client *autorest.Client) {
 	k8sVersion := version.Get().GitVersion
-	client.UserAgent = fmt.Sprintf("%s; kubernetes-cloudprovider/%s", client.UserAgent, k8sVersion)
+	client.UserAgent = fmt.Sprintf("%s; %s", client.UserAgent, k8sVersion)
 }

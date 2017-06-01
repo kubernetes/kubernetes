@@ -100,7 +100,6 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
-	out.EnableProfiling = in.EnableProfiling
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
 	if err := Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
@@ -131,7 +130,6 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
-	out.EnableProfiling = in.EnableProfiling
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
 	if err := Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
@@ -381,6 +379,8 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := Convert_v1alpha1_KubeletAuthorization_To_componentconfig_KubeletAuthorization(&in.Authorization, &out.Authorization, s); err != nil {
 		return err
 	}
+	out.PodInfraContainerImage = in.PodInfraContainerImage
+	out.DockerEndpoint = in.DockerEndpoint
 	out.RootDirectory = in.RootDirectory
 	out.SeccompProfileRoot = in.SeccompProfileRoot
 	if err := v1.Convert_Pointer_bool_To_bool(&in.AllowPrivileged, &out.AllowPrivileged, s); err != nil {
@@ -429,6 +429,11 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	}
 	out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
+	out.NetworkPluginName = in.NetworkPluginName
+	out.NetworkPluginDir = in.NetworkPluginDir
+	out.CNIConfDir = in.CNIConfDir
+	out.CNIBinDir = in.CNIBinDir
+	out.NetworkPluginMTU = in.NetworkPluginMTU
 	out.VolumePluginDir = in.VolumePluginDir
 	out.CloudProvider = in.CloudProvider
 	out.CloudConfigFile = in.CloudConfigFile
@@ -444,13 +449,19 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
 	out.RemoteImageEndpoint = in.RemoteImageEndpoint
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+	out.ImagePullProgressDeadline = in.ImagePullProgressDeadline
+	out.RktPath = in.RktPath
 	out.ExperimentalMounterPath = in.ExperimentalMounterPath
+	out.RktAPIEndpoint = in.RktAPIEndpoint
+	out.RktStage1Image = in.RktStage1Image
 	if err := v1.Convert_Pointer_string_To_string(&in.LockFilePath, &out.LockFilePath, s); err != nil {
 		return err
 	}
 	out.ExitOnLockContention = in.ExitOnLockContention
 	out.HairpinMode = in.HairpinMode
+	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
+	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
 	out.ResolverConfig = in.ResolverConfig
 	if err := v1.Convert_Pointer_bool_To_bool(&in.CPUCFSQuota, &out.CPUCFSQuota, s); err != nil {
@@ -504,9 +515,18 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	}
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.FeatureGates = in.FeatureGates
+	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableCRI, &out.EnableCRI, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_Pointer_bool_To_bool(&in.ExperimentalDockershim, &out.ExperimentalDockershim, s); err != nil {
+		return err
+	}
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
 	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
+	if err := v1.Convert_Pointer_bool_To_bool(&in.DockerEnableSharedPID, &out.DockerEnableSharedPID, s); err != nil {
+		return err
+	}
 	out.SystemReserved = *(*componentconfig.ConfigurationMap)(unsafe.Pointer(&in.SystemReserved))
 	out.KubeReserved = *(*componentconfig.ConfigurationMap)(unsafe.Pointer(&in.KubeReserved))
 	out.SystemReservedCgroup = in.SystemReservedCgroup
@@ -543,6 +563,8 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := Convert_componentconfig_KubeletAuthorization_To_v1alpha1_KubeletAuthorization(&in.Authorization, &out.Authorization, s); err != nil {
 		return err
 	}
+	out.PodInfraContainerImage = in.PodInfraContainerImage
+	out.DockerEndpoint = in.DockerEndpoint
 	out.RootDirectory = in.RootDirectory
 	out.SeccompProfileRoot = in.SeccompProfileRoot
 	if err := v1.Convert_bool_To_Pointer_bool(&in.AllowPrivileged, &out.AllowPrivileged, s); err != nil {
@@ -607,6 +629,11 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	}
 	out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
+	out.NetworkPluginName = in.NetworkPluginName
+	out.NetworkPluginMTU = in.NetworkPluginMTU
+	out.NetworkPluginDir = in.NetworkPluginDir
+	out.CNIConfDir = in.CNIConfDir
+	out.CNIBinDir = in.CNIBinDir
 	out.VolumePluginDir = in.VolumePluginDir
 	out.CloudProvider = in.CloudProvider
 	out.CloudConfigFile = in.CloudConfigFile
@@ -622,13 +649,19 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
 	out.RemoteImageEndpoint = in.RemoteImageEndpoint
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+	out.ImagePullProgressDeadline = in.ImagePullProgressDeadline
+	out.RktPath = in.RktPath
 	out.ExperimentalMounterPath = in.ExperimentalMounterPath
+	out.RktAPIEndpoint = in.RktAPIEndpoint
+	out.RktStage1Image = in.RktStage1Image
 	if err := v1.Convert_string_To_Pointer_string(&in.LockFilePath, &out.LockFilePath, s); err != nil {
 		return err
 	}
 	out.ExitOnLockContention = in.ExitOnLockContention
 	out.HairpinMode = in.HairpinMode
+	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
+	out.DockerExecHandlerName = in.DockerExecHandlerName
 	out.PodCIDR = in.PodCIDR
 	out.ResolverConfig = in.ResolverConfig
 	if err := v1.Convert_bool_To_Pointer_bool(&in.CPUCFSQuota, &out.CPUCFSQuota, s); err != nil {
@@ -686,18 +719,23 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	}
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.FeatureGates = in.FeatureGates
+	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableCRI, &out.EnableCRI, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_bool_To_Pointer_bool(&in.ExperimentalDockershim, &out.ExperimentalDockershim, s); err != nil {
+		return err
+	}
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
 	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
+	if err := v1.Convert_bool_To_Pointer_bool(&in.DockerEnableSharedPID, &out.DockerEnableSharedPID, s); err != nil {
+		return err
+	}
 	out.SystemReserved = *(*map[string]string)(unsafe.Pointer(&in.SystemReserved))
 	out.KubeReserved = *(*map[string]string)(unsafe.Pointer(&in.KubeReserved))
 	out.SystemReservedCgroup = in.SystemReservedCgroup
 	out.KubeReservedCgroup = in.KubeReservedCgroup
-	if in.EnforceNodeAllocatable == nil {
-		out.EnforceNodeAllocatable = make([]string, 0)
-	} else {
-		out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
-	}
+	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
 	out.ExperimentalNodeAllocatableIgnoreEvictionThreshold = in.ExperimentalNodeAllocatableIgnoreEvictionThreshold
 	return nil
 }
@@ -782,7 +820,6 @@ func autoConvert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderE
 	out.LeaseDuration = in.LeaseDuration
 	out.RenewDeadline = in.RenewDeadline
 	out.RetryPeriod = in.RetryPeriod
-	out.ResourceLock = in.ResourceLock
 	return nil
 }
 
@@ -798,7 +835,6 @@ func autoConvert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderE
 	out.LeaseDuration = in.LeaseDuration
 	out.RenewDeadline = in.RenewDeadline
 	out.RetryPeriod = in.RetryPeriod
-	out.ResourceLock = in.ResourceLock
 	return nil
 }
 

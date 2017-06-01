@@ -52,8 +52,7 @@ function unjoin_clusters() {
         "${context}" \
         --federation-system-namespace=${FEDERATION_NAMESPACE} \
         --context="${FEDERATION_KUBE_CONTEXT}" \
-        --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
-        --v=4
+        --host-cluster-context="${HOST_CLUSTER_CONTEXT}"
   done
 }
 

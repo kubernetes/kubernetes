@@ -17,14 +17,13 @@ limitations under the License.
 package factory
 
 import (
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/pkg/transport"
-	"golang.org/x/net/context"
-
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/apiserver/pkg/storage/value"
+
+	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/pkg/transport"
+	"golang.org/x/net/context"
 )
 
 func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
@@ -56,12 +55,8 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 		cancel()
 		client.Close()
 	}
-	transformer := c.Transformer
-	if transformer == nil {
-		transformer = value.IdentityTransformer
-	}
 	if c.Quorum {
-		return etcd3.New(client, c.Codec, c.Prefix, transformer), destroyFunc, nil
+		return etcd3.New(client, c.Codec, c.Prefix, etcd3.IdentityTransformer), destroyFunc, nil
 	}
-	return etcd3.NewWithNoQuorumRead(client, c.Codec, c.Prefix, transformer), destroyFunc, nil
+	return etcd3.NewWithNoQuorumRead(client, c.Codec, c.Prefix, etcd3.IdentityTransformer), destroyFunc, nil
 }

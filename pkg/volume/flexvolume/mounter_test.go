@@ -19,7 +19,6 @@ package flexvolume
 import (
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -27,16 +26,7 @@ import (
 
 func TestSetUpAt(t *testing.T) {
 	spec := fakeVolumeSpec()
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-pod",
-			Namespace: "my-ns",
-			UID:       types.UID("my-uid"),
-		},
-		Spec: v1.PodSpec{
-			ServiceAccountName: "my-sa",
-		},
-	}
+	pod := &v1.Pod{}
 	mounter := &mount.FakeMounter{}
 
 	plugin, rootDir := testPlugin()
@@ -44,21 +34,12 @@ func TestSetUpAt(t *testing.T) {
 	plugin.runner = fakeRunner(
 		// first call without fsGroup
 		assertDriverCall(t, successOutput(), mountCmd, rootDir+"/mount-dir",
-			specJson(plugin, spec, map[string]string{
-				optionKeyPodName:            "my-pod",
-				optionKeyPodNamespace:       "my-ns",
-				optionKeyPodUID:             "my-uid",
-				optionKeyServiceAccountName: "my-sa",
-			})),
+			specJson(plugin, spec, nil)),
 
 		// second test has fsGroup
 		assertDriverCall(t, notSupportedOutput(), mountCmd, rootDir+"/mount-dir",
 			specJson(plugin, spec, map[string]string{
-				optionFSGroup:               "42",
-				optionKeyPodName:            "my-pod",
-				optionKeyPodNamespace:       "my-ns",
-				optionKeyPodUID:             "my-uid",
-				optionKeyServiceAccountName: "my-sa",
+				optionFSGroup: "42",
 			})),
 		assertDriverCall(t, fakeVolumeNameOutput("sdx"), getVolumeNameCmd,
 			specJson(plugin, spec, nil)),

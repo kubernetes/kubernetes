@@ -16,10 +16,7 @@ limitations under the License.
 
 package plugins
 
-import (
-	"fmt"
-	"strings"
-)
+import "fmt"
 
 // Plugin is the representation of a CLI extension (plugin).
 type Plugin struct {
@@ -31,12 +28,11 @@ type Plugin struct {
 // PluginDescription holds everything needed to register a
 // plugin as a command. Usually comes from a descriptor file.
 type Description struct {
-	Name      string    `json:"name"`
-	ShortDesc string    `json:"shortDesc"`
-	LongDesc  string    `json:"longDesc,omitempty"`
-	Example   string    `json:"example,omitempty"`
-	Command   string    `json:"command"`
-	Tree      []*Plugin `json:"tree,omitempty"`
+	Name      string `json:"name"`
+	ShortDesc string `json:"shortDesc"`
+	LongDesc  string `json:"longDesc,omitempty"`
+	Example   string `json:"example,omitempty"`
+	Command   string `json:"command"`
 }
 
 // PluginSource holds the location of a given plugin in the filesystem.
@@ -45,22 +41,11 @@ type Source struct {
 	DescriptorName string `json:"-"`
 }
 
-var (
-	IncompleteError  = fmt.Errorf("incomplete plugin descriptor: name, shortDesc and command fields are required")
-	InvalidNameError = fmt.Errorf("plugin name can't contain spaces")
-)
+var IncompleteError = fmt.Errorf("incomplete plugin descriptor: name, shortDesc and command fields are required")
 
 func (p Plugin) Validate() error {
-	if len(p.Name) == 0 || len(p.ShortDesc) == 0 || (len(p.Command) == 0 && len(p.Tree) == 0) {
+	if len(p.Name) == 0 || len(p.ShortDesc) == 0 || len(p.Command) == 0 {
 		return IncompleteError
-	}
-	if strings.Index(p.Name, " ") > -1 {
-		return InvalidNameError
-	}
-	for _, child := range p.Tree {
-		if err := child.Validate(); err != nil {
-			return err
-		}
 	}
 	return nil
 }

@@ -47,30 +47,30 @@ func TestCreateQuota(t *testing.T) {
 	tf.Namespace = "test"
 
 	tests := map[string]struct {
-		flags          []string
+		flags          map[string]string
 		expectedOutput string
 	}{
 		"single resource": {
-			flags:          []string{"--hard=cpu=1"},
+			flags:          map[string]string{"hard": "cpu=1", "output": "name"},
 			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
 		},
 		"single resource with a scope": {
-			flags:          []string{"--hard=cpu=1", "--scopes=BestEffort"},
+			flags:          map[string]string{"hard": "cpu=1", "output": "name", "scopes": "BestEffort"},
 			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
 		},
 		"multiple resources": {
-			flags:          []string{"--hard=cpu=1,pods=42", "--scopes=BestEffort"},
+			flags:          map[string]string{"hard": "cpu=1,pods=42", "output": "name", "scopes": "BestEffort"},
 			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
 		},
 		"single resource with multiple scopes": {
-			flags:          []string{"--hard=cpu=1", "--scopes=BestEffort,NotTerminating"},
+			flags:          map[string]string{"hard": "cpu=1", "output": "name", "scopes": "BestEffort,NotTerminating"},
 			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
 		},
 	}
 	for name, test := range tests {
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdCreateQuota(f, buf)
-		cmd.Flags().Parse(test.flags)
+		cmd.Flags().Set("hard", "cpu=1")
 		cmd.Flags().Set("output", "name")
 		cmd.Run(cmd, []string{resourceQuotaObject.Name})
 

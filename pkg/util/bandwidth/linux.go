@@ -101,7 +101,7 @@ func hexCIDR(cidr string) (string, error) {
 		return "", err
 	}
 	ip = ip.Mask(ipnet.Mask)
-	hexIP := hex.EncodeToString([]byte(ip))
+	hexIP := hex.EncodeToString([]byte(ip.To4()))
 	hexMask := ipnet.Mask.String()
 	return hexIP + "/" + hexMask, nil
 }
@@ -119,9 +119,6 @@ func asciiCIDR(cidr string) (string, error) {
 	ip := net.IP(ipData)
 
 	maskData, err := hex.DecodeString(parts[1])
-	if err != nil {
-		return "", err
-	}
 	mask := net.IPMask(maskData)
 	size, _ := mask.Size()
 

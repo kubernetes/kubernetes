@@ -408,7 +408,6 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	serviceAccountAdmission.SetInternalKubeClientSet(internalRootClientset)
 	internalInformers := internalinformers.NewSharedInformerFactory(internalRootClientset, controller.NoResyncPeriodFunc())
 	serviceAccountAdmission.SetInternalKubeInformerFactory(internalInformers)
-	informers := informers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())
 
 	masterConfig := framework.NewMasterConfig()
 	masterConfig.GenericConfig.EnableIndex = true
@@ -419,14 +418,10 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})
-	tokenController := serviceaccountcontroller.NewTokensController(
-		informers.Core().V1().ServiceAccounts(),
-		informers.Core().V1().Secrets(),
-		rootClientset,
-		serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)},
-	)
+	tokenController := serviceaccountcontroller.NewTokensController(rootClientset, serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
 	go tokenController.Run(1, stopCh)
 
+	informers := informers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())
 	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Namespaces(),

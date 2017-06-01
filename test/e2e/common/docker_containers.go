@@ -71,7 +71,6 @@ const testContainerName = "test-container"
 func entrypointTestPod() *v1.Pod {
 	podName := "client-containers-" + string(uuid.NewUUID())
 
-	one := int64(1)
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
@@ -83,8 +82,7 @@ func entrypointTestPod() *v1.Pod {
 					Image: "gcr.io/google_containers/eptest:0.1",
 				},
 			},
-			RestartPolicy:                 v1.RestartPolicyNever,
-			TerminationGracePeriodSeconds: &one,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 }

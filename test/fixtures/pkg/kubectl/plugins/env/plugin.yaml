@@ -1,3 +1,0 @@
-name: env
-shortDesc: "The plugin envs plugin"
-command: "./env.sh"

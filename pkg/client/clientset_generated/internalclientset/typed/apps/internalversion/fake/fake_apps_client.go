@@ -26,10 +26,6 @@ type FakeApps struct {
 	*testing.Fake
 }
 
-func (c *FakeApps) ControllerRevisions(namespace string) internalversion.ControllerRevisionInterface {
-	return &FakeControllerRevisions{c, namespace}
-}
-
 func (c *FakeApps) StatefulSets(namespace string) internalversion.StatefulSetInterface {
 	return &FakeStatefulSets{c, namespace}
 }

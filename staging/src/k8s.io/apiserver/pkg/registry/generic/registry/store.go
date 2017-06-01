@@ -143,7 +143,8 @@ type Store struct {
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated and before it is decorated, optional.
 	AfterUpdate ObjectFunc
-	// DeleteStrategy implements resource-specific behavior during deletion.
+	// DeleteStrategy implements resource-specific behavior during deletion,
+	// optional.
 	DeleteStrategy rest.RESTDeleteStrategy
 	// AfterDelete implements a further operation to run after a resource is
 	// deleted and before it is decorated, optional.
@@ -991,20 +992,7 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 		}
 		return obj, nil
 	}
-	// Return information about the deleted object, which enables clients to
-	// verify that the object was actually deleted and not waiting for finalizers.
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, err
-	}
-	details := &metav1.StatusDetails{
-		Name:  accessor.GetName(),
-		Group: e.QualifiedResource.Group,
-		Kind:  e.QualifiedResource.Resource, // Yes we set Kind field to resource.
-		UID:   accessor.GetUID(),
-	}
-	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
-	return status, nil
+	return &metav1.Status{Status: metav1.StatusSuccess}, nil
 }
 
 // Watch makes a matcher for the given label and field, and calls
@@ -1031,16 +1019,7 @@ func (e *Store) Watch(ctx genericapirequest.Context, options *metainternalversio
 func (e *Store) WatchPredicate(ctx genericapirequest.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			// For performance reasons, we can optimize the further computations of
-			// selector, by removing then "matches-single" fields, because they are
-			// already satisfied by choosing appropriate key.
-			sp, err := p.RemoveMatchesSingleRequirements()
-			if err != nil {
-				glog.Warningf("Couldn't remove matches-single requirements: %v", err)
-				// Since we couldn't optimize selector, reset to the original one.
-				sp = p
-			}
-			w, err := e.Storage.Watch(ctx, key, resourceVersion, sp)
+			w, err := e.Storage.Watch(ctx, key, resourceVersion, p)
 			if err != nil {
 				return nil, err
 			}
@@ -1144,10 +1123,6 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		isNamespaced = e.UpdateStrategy.NamespaceScoped()
 	default:
 		return fmt.Errorf("store for %s must have CreateStrategy or UpdateStrategy set", e.QualifiedResource.String())
-	}
-
-	if e.DeleteStrategy == nil {
-		return fmt.Errorf("store for %s must have DeleteStrategy set", e.QualifiedResource.String())
 	}
 
 	if options.RESTOptions == nil {

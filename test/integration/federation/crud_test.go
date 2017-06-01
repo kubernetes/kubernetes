@@ -22,10 +22,7 @@ import (
 
 	"github.com/pborman/uuid"
 
-	pkgruntime "k8s.io/apimachinery/pkg/runtime"
-	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
-	"k8s.io/kubernetes/federation/pkg/federatedtypes/crudtester"
 	"k8s.io/kubernetes/test/integration/federation/framework"
 )
 
@@ -38,77 +35,41 @@ func TestFederationCRUD(t *testing.T) {
 	federatedTypes := federatedtypes.FederatedTypes()
 	for kind, fedType := range federatedTypes {
 		t.Run(kind, func(t *testing.T) {
-			fixture, crudTester, obj, _ := initCRUDTest(t, &fedFixture, fedType.AdapterFactory, kind)
+			config := fedFixture.APIFixture.NewConfig()
+			fixture := framework.NewControllerFixture(t, kind, fedType.AdapterFactory, config)
 			defer fixture.TearDown(t)
 
-			crudTester.CheckLifecycle(obj)
+			client := fedFixture.APIFixture.NewClient(fmt.Sprintf("crud-test-%s", kind))
+			adapter := fedType.AdapterFactory(client)
+
+			crudtester := framework.NewFederatedTypeCRUDTester(t, adapter, fedFixture.ClusterClients)
+			obj := adapter.NewTestObject(uuid.New())
+			crudtester.CheckLifecycle(obj)
 		})
 	}
 
-	// The following tests target a single type since the underlying logic is common across all types.
-	kind := federatedtypes.SecretKind
-	adapterFactory := federatedtypes.NewSecretAdapter
-
-	// Validate deletion handling where orphanDependents is true or nil
+	// Validate deletion handling where orphanDependents is true or nil for a single resource type since the
+	// underlying logic is common across all types.
 	orphanedDependents := true
 	testCases := map[string]*bool{
-		"Resource should not be deleted from underlying clusters when OrphanDependents is true": &orphanedDependents,
-		"Resource should not be deleted from underlying clusters when OrphanDependents is nil":  nil,
+		"Resources should not be deleted from underlying clusters when OrphanDependents is true": &orphanedDependents,
+		"Resources should not be deleted from underlying clusters when OrphanDependents is nil":  nil,
 	}
+	kind := federatedtypes.SecretKind
+	adapterFactory := federatedtypes.NewSecretAdapter
 	for testName, orphanDependents := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			fixture, crudTester, obj, _ := initCRUDTest(t, &fedFixture, adapterFactory, kind)
+			config := fedFixture.APIFixture.NewConfig()
+			fixture := framework.NewControllerFixture(t, kind, adapterFactory, config)
 			defer fixture.TearDown(t)
 
-			updatedObj := crudTester.CheckCreate(obj)
-			crudTester.CheckDelete(updatedObj, orphanDependents)
+			client := fedFixture.APIFixture.NewClient(fmt.Sprintf("deletion-test-%s", kind))
+			adapter := adapterFactory(client)
+
+			crudtester := framework.NewFederatedTypeCRUDTester(t, adapter, fedFixture.ClusterClients)
+			obj := adapter.NewTestObject(uuid.New())
+			updatedObj := crudtester.CheckCreate(obj)
+			crudtester.CheckDelete(updatedObj, orphanDependents)
 		})
 	}
-
-	t.Run("Resource should be propagated to a newly added cluster", func(t *testing.T) {
-		fixture, crudTester, obj, _ := initCRUDTest(t, &fedFixture, adapterFactory, kind)
-		defer fixture.TearDown(t)
-
-		updatedObj := crudTester.CheckCreate(obj)
-		// Start a new cluster and validate that the resource is propagated to it.
-		fedFixture.StartCluster(t)
-		// Check propagation to the new cluster by providing the updated set of clients
-		objectExpected := true
-		crudTester.CheckPropagationForClients(updatedObj, fedFixture.ClusterClients, objectExpected)
-	})
-
-	t.Run("Resource should only be propagated to the cluster with a matching selector", func(t *testing.T) {
-		fixture, crudTester, obj, adapter := initCRUDTest(t, &fedFixture, adapterFactory, kind)
-		defer fixture.TearDown(t)
-
-		// Set an annotation to specify that the object is isolated to cluster 1.
-		federatedtypes.SetAnnotation(adapter, obj, federationapi.FederationClusterSelectorAnnotation, `[{"key": "cluster", "operator": "==", "values": ["1"]}]`)
-
-		updatedObj := crudTester.Create(obj)
-
-		// Check propagation to the first cluster
-		objectExpected := true
-		crudTester.CheckPropagationForClients(updatedObj, fedFixture.ClusterClients[0:1], objectExpected)
-
-		// Verify the object is not sent to the second cluster
-		objectExpected = false
-		crudTester.CheckPropagationForClients(updatedObj, fedFixture.ClusterClients[1:2], objectExpected)
-
-	})
-}
-
-// initCRUDTest initializes common elements of a crud test
-func initCRUDTest(t *testing.T, fedFixture *framework.FederationFixture, adapterFactory federatedtypes.AdapterFactory, kind string) (
-	*framework.ControllerFixture, *crudtester.FederatedTypeCRUDTester, pkgruntime.Object, federatedtypes.FederatedTypeAdapter) {
-	config := fedFixture.APIFixture.NewConfig()
-	fixture := framework.NewControllerFixture(t, kind, adapterFactory, config)
-
-	client := fedFixture.APIFixture.NewClient(fmt.Sprintf("crud-test-%s", kind))
-	adapter := adapterFactory(client)
-
-	crudTester := framework.NewFederatedTypeCRUDTester(t, adapter, fedFixture.ClusterClients)
-
-	obj := adapter.NewTestObject(uuid.New())
-
-	return fixture, crudTester, obj, adapter
 }

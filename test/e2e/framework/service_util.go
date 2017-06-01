@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/retry"
@@ -49,10 +50,6 @@ const (
 	// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very
 	// liberal. Fix tracked in #20567.
 	KubeProxyLagTimeout = 5 * time.Minute
-
-	// KubeProxyEndpointLagTimeout is the maximum time a kube-proxy daemon on a node is allowed
-	// to not notice an Endpoint update.
-	KubeProxyEndpointLagTimeout = 30 * time.Second
 
 	// LoadBalancerLagTimeoutDefault is the maximum time a load balancer is allowed to
 	// not respond after creation.
@@ -192,15 +189,15 @@ func (j *ServiceTestJig) ChangeServiceType(namespace, name string, newType v1.Se
 	}
 }
 
-// CreateOnlyLocalNodePortService creates a NodePort service with
-// ExternalTrafficPolicy set to Local and sanity checks its nodePort.
-// If createPod is true, it also creates an RC with 1 replica of
+// CreateOnlyLocalNodePortService creates a loadbalancer service and sanity checks its
+// nodePort. If createPod is true, it also creates an RC with 1 replica of
 // the standard netexec container used everywhere in this test.
 func (j *ServiceTestJig) CreateOnlyLocalNodePortService(namespace, serviceName string, createPod bool) *v1.Service {
-	By("creating a service " + namespace + "/" + serviceName + " with type=NodePort and ExternalTrafficPolicy=Local")
+	By("creating a service " + namespace + "/" + serviceName + " with type=NodePort and annotation for local-traffic-only")
 	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeNodePort
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.ObjectMeta.Annotations = map[string]string{
+			service.BetaAnnotationExternalTraffic: service.AnnotationValueExternalTrafficLocal}
 		svc.Spec.Ports = []v1.ServicePort{{Protocol: "TCP", Port: 80}}
 	})
 
@@ -212,18 +209,18 @@ func (j *ServiceTestJig) CreateOnlyLocalNodePortService(namespace, serviceName s
 	return svc
 }
 
-// CreateOnlyLocalLoadBalancerService creates a loadbalancer service with
-// ExternalTrafficPolicy set to Local and waits for it to acquire an ingress IP.
-// If createPod is true, it also creates an RC with 1 replica of
-// the standard netexec container used everywhere in this test.
+// CreateOnlyLocalLoadBalancerService creates a loadbalancer service and waits for it to
+// acquire an ingress IP. If createPod is true, it also creates an RC with 1
+// replica of the standard netexec container used everywhere in this test.
 func (j *ServiceTestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceName string, timeout time.Duration, createPod bool,
 	tweak func(svc *v1.Service)) *v1.Service {
-	By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer and ExternalTrafficPolicy=Local")
+	By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer and annotation for local-traffic-only")
 	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		// We need to turn affinity off for our LB distribution tests
 		svc.Spec.SessionAffinity = v1.ServiceAffinityNone
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.ObjectMeta.Annotations = map[string]string{
+			service.BetaAnnotationExternalTraffic: service.AnnotationValueExternalTrafficLocal}
 		if tweak != nil {
 			tweak(svc)
 		}
@@ -233,25 +230,6 @@ func (j *ServiceTestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceNa
 		By("creating a pod to be part of the service " + serviceName)
 		j.RunOrFail(namespace, nil)
 	}
-	By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
-	svc = j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
-	j.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
-	return svc
-}
-
-// CreateLoadBalancerService creates a loadbalancer service and waits
-// for it to acquire an ingress IP.
-func (j *ServiceTestJig) CreateLoadBalancerService(namespace, serviceName string, timeout time.Duration, tweak func(svc *v1.Service)) *v1.Service {
-	By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer")
-	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
-		svc.Spec.Type = v1.ServiceTypeLoadBalancer
-		// We need to turn affinity off for our LB distribution tests
-		svc.Spec.SessionAffinity = v1.ServiceAffinityNone
-		if tweak != nil {
-			tweak(svc)
-		}
-	})
-
 	By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
 	svc = j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
 	j.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
@@ -346,10 +324,6 @@ func (j *ServiceTestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName 
 		endpoints, err := j.Client.Core().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
 			Logf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
-			return false, nil
-		}
-		if len(endpoints.Subsets) == 0 {
-			Logf("Expect endpoints with subsets, got none.")
 			return false, nil
 		}
 		// TODO: Handle multiple endpoints
@@ -716,8 +690,7 @@ func (j *ServiceTestJig) GetHTTPContent(host string, port int, timeout time.Dura
 	var body bytes.Buffer
 	var err error
 	if pollErr := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		var result bool
-		result, err = TestReachableHTTPWithContent(host, port, url, "", &body)
+		result, err := TestReachableHTTPWithContent(host, port, url, "", &body)
 		if err != nil {
 			Logf("Error hitting %v:%v%v, retrying: %v", host, port, url, err)
 			return false, nil
@@ -757,24 +730,18 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 	return false, fmt.Errorf("Unexpected HTTP response code %s from health check responder at %s", resp.Status, url)
 }
 
-func (j *ServiceTestJig) TestHTTPHealthCheckNodePort(host string, port int, request string, timeout time.Duration, expectSucceed bool, threshold int) error {
-	count := 0
-	condition := func() (bool, error) {
-		success, _ := testHTTPHealthCheckNodePort(host, port, request)
-		if success && expectSucceed ||
-			!success && !expectSucceed {
-			count++
+func (j *ServiceTestJig) TestHTTPHealthCheckNodePort(host string, port int, request string, tries int) (pass, fail int, statusMsg string) {
+	for i := 0; i < tries; i++ {
+		success, err := testHTTPHealthCheckNodePort(host, port, request)
+		if success {
+			pass++
+		} else {
+			fail++
 		}
-		if count >= threshold {
-			return true, nil
-		}
-		return false, nil
+		statusMsg += fmt.Sprintf("\nAttempt %d Error %v", i, err)
+		time.Sleep(1 * time.Second)
 	}
-
-	if err := wait.PollImmediate(time.Second, timeout, condition); err != nil {
-		return fmt.Errorf("error waiting for healthCheckNodePort: expected at least %d succeed=%v on %v%v, got %d", threshold, expectSucceed, host, port, count)
-	}
-	return nil
+	return pass, fail, statusMsg
 }
 
 // Simple helper class to avoid too much boilerplate in tests

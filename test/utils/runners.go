@@ -494,7 +494,6 @@ func (config *RCConfig) create() error {
 	if config.DNSPolicy == nil {
 		config.DNSPolicy = &dnsDefault
 	}
-	one := int64(1)
 	rc := &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
@@ -518,9 +517,8 @@ func (config *RCConfig) create() error {
 							ReadinessProbe: config.ReadinessProbe,
 						},
 					},
-					DNSPolicy:                     *config.DNSPolicy,
-					NodeSelector:                  config.NodeSelector,
-					TerminationGracePeriodSeconds: &one,
+					DNSPolicy:    *config.DNSPolicy,
+					NodeSelector: config.NodeSelector,
 				},
 			},
 		},

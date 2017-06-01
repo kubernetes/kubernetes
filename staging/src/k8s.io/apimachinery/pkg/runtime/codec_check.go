@@ -28,7 +28,8 @@ import (
 // object. (Will modify internalObject.) (Assumes JSON serialization.)
 // TODO: verify that the correct external version is chosen on encode...
 func CheckCodec(c Codec, internalType Object, externalTypes ...schema.GroupVersionKind) error {
-	if _, err := Encode(c, internalType); err != nil {
+	_, err := Encode(c, internalType)
+	if err != nil {
 		return fmt.Errorf("Internal type not encodable: %v", err)
 	}
 	for _, et := range externalTypes {
@@ -40,8 +41,9 @@ func CheckCodec(c Codec, internalType Object, externalTypes ...schema.GroupVersi
 		if reflect.TypeOf(obj) != reflect.TypeOf(internalType) {
 			return fmt.Errorf("decode of external type %s produced: %#v", et, obj)
 		}
-		if err = DecodeInto(c, exBytes, internalType); err != nil {
-			return fmt.Errorf("external type %s not convertible to internal type: %v", et, err)
+		err = DecodeInto(c, exBytes, internalType)
+		if err != nil {
+			return fmt.Errorf("external type %s not convertable to internal type: %v", et, err)
 		}
 	}
 	return nil

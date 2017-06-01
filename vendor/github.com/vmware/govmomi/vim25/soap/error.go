@@ -36,13 +36,7 @@ type soapFaultError struct {
 }
 
 func (s soapFaultError) Error() string {
-	msg := s.fault.String
-
-	if msg == "" {
-		msg = reflect.TypeOf(s.fault.Detail.Fault).Name()
-	}
-
-	return fmt.Sprintf("%s: %s", s.fault.Code, msg)
+	return fmt.Sprintf("%s: %s", s.fault.Code, s.fault.String)
 }
 
 type vimFaultError struct {

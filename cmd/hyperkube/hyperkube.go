@@ -119,7 +119,8 @@ func (hk *HyperKube) Run(args []string) error {
 	// If we are called directly, parse all flags up to the first real
 	// argument.  That should be the server to run.
 	command := args[0]
-	serverName := path.Base(command)
+	baseCommand := path.Base(command)
+	serverName := baseCommand
 	args = args[1:]
 	if serverName == hk.Name {
 
@@ -143,6 +144,7 @@ func (hk *HyperKube) Run(args []string) error {
 		args = baseFlags.Args()
 		if len(args) > 0 && len(args[0]) > 0 {
 			serverName = args[0]
+			baseCommand = baseCommand + " " + serverName
 			args = args[1:]
 		} else {
 			err = errors.New("no server specified")

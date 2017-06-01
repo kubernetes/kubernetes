@@ -28,8 +28,6 @@ filegroup(
         "//test/images/net:all-srcs",
         "//test/images/netexec:all-srcs",
         "//test/images/network-tester:all-srcs",
-        "//test/images/no-snat-test:all-srcs",
-        "//test/images/no-snat-test-proxy:all-srcs",
         "//test/images/port-forward-tester:all-srcs",
         "//test/images/porter:all-srcs",
         "//test/images/resource-consumer:all-srcs",

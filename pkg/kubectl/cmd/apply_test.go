@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -162,7 +163,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	if currentAnnotations == nil {
 		currentAnnotations = make(map[string]string)
 	}
-	currentAnnotations[api.LastAppliedConfigAnnotation] = string(original)
+	currentAnnotations[annotations.LastAppliedConfigAnnotation] = string(original)
 	currentAccessor.SetAnnotations(currentAnnotations)
 	current, err := runtime.Encode(testapi.Default.Codec(), currentObj)
 	if err != nil {
@@ -202,7 +203,7 @@ func validatePatchApplication(t *testing.T, req *http.Request) {
 	}
 
 	annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-	if _, ok := annotationsMap[api.LastAppliedConfigAnnotation]; !ok {
+	if _, ok := annotationsMap[annotations.LastAppliedConfigAnnotation]; !ok {
 		t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 	}
 
@@ -705,7 +706,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 					t.Fatal(err)
 				}
 				annotationMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-				if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
+				if _, ok := annotationMap[annotations.LastAppliedConfigAnnotation]; !ok {
 					t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 				}
 				strategy := walkMapPath(t, patchMap, []string{"spec", "strategy"})
@@ -1005,7 +1006,7 @@ func checkPatchString(t *testing.T, req *http.Request) {
 	}
 
 	annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-	if _, ok := annotationsMap[api.LastAppliedConfigAnnotation]; !ok {
+	if _, ok := annotationsMap[annotations.LastAppliedConfigAnnotation]; !ok {
 		t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 	}
 

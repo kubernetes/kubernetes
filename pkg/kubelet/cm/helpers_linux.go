@@ -26,8 +26,7 @@ import (
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
 
 const (
@@ -85,43 +84,30 @@ func MilliCPUToShares(milliCPU int64) int64 {
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
-	// sum requests and limits.
-	reqs, limits, err := resource.PodRequestsAndLimits(pod)
-	if err != nil {
-		return &ResourceConfig{}
-	}
-
+	// sum requests and limits, track if limits were applied for each resource.
 	cpuRequests := int64(0)
 	cpuLimits := int64(0)
 	memoryLimits := int64(0)
-	if request, found := reqs[v1.ResourceCPU]; found {
-		cpuRequests = request.MilliValue()
-	}
-	if limit, found := limits[v1.ResourceCPU]; found {
-		cpuLimits = limit.MilliValue()
-	}
-	if limit, found := limits[v1.ResourceMemory]; found {
-		memoryLimits = limit.Value()
+	memoryLimitsDeclared := true
+	cpuLimitsDeclared := true
+	for _, container := range pod.Spec.Containers {
+		cpuRequests += container.Resources.Requests.Cpu().MilliValue()
+		cpuLimits += container.Resources.Limits.Cpu().MilliValue()
+		if container.Resources.Limits.Cpu().IsZero() {
+			cpuLimitsDeclared = false
+		}
+		memoryLimits += container.Resources.Limits.Memory().Value()
+		if container.Resources.Limits.Memory().IsZero() {
+			memoryLimitsDeclared = false
+		}
 	}
 
 	// convert to CFS values
 	cpuShares := MilliCPUToShares(cpuRequests)
 	cpuQuota, cpuPeriod := MilliCPUToQuota(cpuLimits)
 
-	// track if limits were applied for each resource.
-	memoryLimitsDeclared := true
-	cpuLimitsDeclared := true
-	for _, container := range pod.Spec.Containers {
-		if container.Resources.Limits.Cpu().IsZero() {
-			cpuLimitsDeclared = false
-		}
-		if container.Resources.Limits.Memory().IsZero() {
-			memoryLimitsDeclared = false
-		}
-	}
-
 	// determine the qos class
-	qosClass := v1qos.GetPodQOS(pod)
+	qosClass := qos.GetPodQOS(pod)
 
 	// build the result
 	result := &ResourceConfig{}

@@ -1,4 +1,14 @@
-approvers:
-- sig-apps-api-approvers
 reviewers:
-- sig-apps-reviewers
+- thockin
+- lavalamp
+- smarterclayton
+- deads2k
+- caesarxuchao
+- sttts
+- ncdc
+- timothysc
+- dims
+- mml
+- mbohlool
+- david-mcmahon
+- jianhuiz

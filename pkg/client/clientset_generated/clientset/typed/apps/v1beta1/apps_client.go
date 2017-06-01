@@ -25,7 +25,6 @@ import (
 
 type AppsV1beta1Interface interface {
 	RESTClient() rest.Interface
-	ControllerRevisionsGetter
 	DeploymentsGetter
 	ScalesGetter
 	StatefulSetsGetter
@@ -34,10 +33,6 @@ type AppsV1beta1Interface interface {
 // AppsV1beta1Client is used to interact with features provided by the apps group.
 type AppsV1beta1Client struct {
 	restClient rest.Interface
-}
-
-func (c *AppsV1beta1Client) ControllerRevisions(namespace string) ControllerRevisionInterface {
-	return newControllerRevisions(c, namespace)
 }
 
 func (c *AppsV1beta1Client) Deployments(namespace string) DeploymentInterface {

@@ -37,6 +37,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/github.com/emicklei/go-restful-swagger12/test_package:all-srcs",
+    ],
     tags = ["automanaged"],
 )

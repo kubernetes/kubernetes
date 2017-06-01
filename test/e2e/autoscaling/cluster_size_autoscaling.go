@@ -478,7 +478,6 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, podsPerNode, 
 	defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "reschedulable-pods")
 
 	By("Create a PodDisruptionBudget")
-	minAvailable := intstr.FromInt(numPods - pdbSize)
 	pdb := &policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pdb",
@@ -486,7 +485,7 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, podsPerNode, 
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: labelMap},
-			MinAvailable: &minAvailable,
+			MinAvailable: intstr.FromInt(numPods - pdbSize),
 		},
 	}
 	_, err = f.StagingClient.Policy().PodDisruptionBudgets(namespace).Create(pdb)

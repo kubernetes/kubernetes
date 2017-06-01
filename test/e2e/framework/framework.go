@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -30,6 +31,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -89,10 +91,6 @@ type Framework struct {
 
 	// configuration for framework's client
 	Options FrameworkOptions
-
-	// Place where various additional data is stored during test run to be printed to ReportDir,
-	// or stdout if ReportDir is not set once test ends.
-	TestSummaries []TestDataSummary
 }
 
 type TestDataSummary interface {
@@ -309,24 +307,26 @@ func (f *Framework) AfterEach() {
 		LogContainersInPodsWithLabels(f.ClientSet, metav1.NamespaceSystem, ImagePullerLabels, "image-puller", logFunc)
 	}
 
+	summaries := make([]TestDataSummary, 0)
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
 		By("Collecting resource usage data")
 		summary, resourceViolationError := f.gatherer.stopAndSummarize([]int{90, 99, 100}, f.AddonResourceConstraints)
 		defer ExpectNoError(resourceViolationError)
-		f.TestSummaries = append(f.TestSummaries, summary)
+		summaries = append(summaries, summary)
 	}
 
 	if TestContext.GatherLogsSizes {
 		By("Gathering log sizes data")
 		close(f.logsSizeCloseChannel)
 		f.logsSizeWaitGroup.Wait()
-		f.TestSummaries = append(f.TestSummaries, f.logsSizeVerifier.GetSummary())
+		summaries = append(summaries, f.logsSizeVerifier.GetSummary())
 	}
 
 	if TestContext.GatherMetricsAfterTest {
 		By("Gathering metrics")
-		// Grab apiserver, scheduler, controller-manager metrics and nodes' kubelet metrics (for non-kubemark case).
-		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, !ProviderIs("kubemark"), true, true, true)
+		// Grab apiserver metrics and nodes' kubelet metrics (for non-kubemark case).
+		// TODO: enable Scheduler and ControllerManager metrics grabbing when Master's Kubelet will be registered.
+		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, !ProviderIs("kubemark"), false, false, true)
 		if err != nil {
 			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 		} else {
@@ -334,12 +334,44 @@ func (f *Framework) AfterEach() {
 			if err != nil {
 				Logf("MetricsGrabber failed to grab metrics (skipping metrics gathering): %v", err)
 			} else {
-				f.TestSummaries = append(f.TestSummaries, (*MetricsForE2E)(&received))
+				summaries = append(summaries, (*MetricsForE2E)(&received))
 			}
 		}
 	}
 
-	PrintSummaries(f.TestSummaries, f.BaseName)
+	outputTypes := strings.Split(TestContext.OutputPrintType, ",")
+	now := time.Now()
+	for _, printType := range outputTypes {
+		switch printType {
+		case "hr":
+			for i := range summaries {
+				if TestContext.ReportDir == "" {
+					Logf(summaries[i].PrintHumanReadable())
+				} else {
+					// TODO: learn to extract test name and append it to the kind instead of timestamp.
+					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+f.BaseName+"_"+now.Format(time.RFC3339)+".txt")
+					if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
+						Logf("Failed to write file %v with test performance data: %v", filePath, err)
+					}
+				}
+			}
+		case "json":
+			for i := range summaries {
+				if TestContext.ReportDir == "" {
+					Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
+					Logf("Finished")
+				} else {
+					// TODO: learn to extract test name and append it to the kind instead of timestamp.
+					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+f.BaseName+"_"+now.Format(time.RFC3339)+".json")
+					if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
+						Logf("Failed to write file %v with test performance data: %v", filePath, err)
+					}
+				}
+			}
+		default:
+			Logf("Unknown output type: %v. Skipping.", printType)
+		}
+	}
 
 	// Check whether all nodes are ready after the test.
 	// This is explicitly done at the very end of the test, to avoid
@@ -403,6 +435,52 @@ func (f *Framework) TestContainerOutput(scenarioName string, pod *v1.Pod, contai
 // the specified container log against the given expected output using a regexp matcher.
 func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
 	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, MatchRegexp)
+}
+
+// WaitForAnEndpoint waits for at least one endpoint to become available in the
+// service's corresponding endpoints object.
+func (f *Framework) WaitForAnEndpoint(serviceName string) error {
+	for {
+		// TODO: Endpoints client should take a field selector so we
+		// don't have to list everything.
+		list, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).List(metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		rv := list.ResourceVersion
+
+		isOK := func(e *v1.Endpoints) bool {
+			return e.Name == serviceName && len(e.Subsets) > 0 && len(e.Subsets[0].Addresses) > 0
+		}
+		for i := range list.Items {
+			if isOK(&list.Items[i]) {
+				return nil
+			}
+		}
+
+		options := metav1.ListOptions{
+			FieldSelector:   fields.Set{"metadata.name": serviceName}.AsSelector().String(),
+			ResourceVersion: rv,
+		}
+		w, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).Watch(options)
+		if err != nil {
+			return err
+		}
+		defer w.Stop()
+
+		for {
+			val, ok := <-w.ResultChan()
+			if !ok {
+				// reget and re-watch
+				break
+			}
+			if e, ok := val.Object.(*v1.Endpoints); ok {
+				if isOK(e) {
+					return nil
+				}
+			}
+		}
+	}
 }
 
 // Write a file using kubectl exec echo <contents> > <path> via specified container

@@ -7,14 +7,9 @@ import (
 	"os"
 )
 
-type FdReader interface {
-	io.Reader
-	Fd() uintptr
-}
-
-var defaultGetCh = func(r io.Reader) (byte, error) {
+var defaultGetCh = func() (byte, error) {
 	buf := make([]byte, 1)
-	if n, err := r.Read(buf); n == 0 || err != nil {
+	if n, err := os.Stdin.Read(buf); n == 0 || err != nil {
 		if err != nil {
 			return 0, err
 		}
@@ -33,10 +28,9 @@ var (
 )
 
 // getPasswd returns the input read from terminal.
-// If prompt is not empty, it will be output as a prompt to the user
 // If masked is true, typing will be matched by asterisks on the screen.
 // Otherwise, typing will echo nothing.
-func getPasswd(prompt string, masked bool, r FdReader, w io.Writer) ([]byte, error) {
+func getPasswd(masked bool) ([]byte, error) {
 	var err error
 	var pass, bs, mask []byte
 	if masked {
@@ -44,19 +38,12 @@ func getPasswd(prompt string, masked bool, r FdReader, w io.Writer) ([]byte, err
 		mask = []byte("*")
 	}
 
-	if isTerminal(r.Fd()) {
-		if oldState, err := makeRaw(r.Fd()); err != nil {
+	if isTerminal(os.Stdin.Fd()) {
+		if oldState, err := makeRaw(os.Stdin.Fd()); err != nil {
 			return pass, err
 		} else {
-			defer func() {
-				restore(r.Fd(), oldState)
-				fmt.Fprintln(w)
-			}()
+			defer restore(os.Stdin.Fd(), oldState)
 		}
-	}
-
-	if prompt != "" {
-		fmt.Fprint(w, prompt)
 	}
 
 	// Track total bytes read, not just bytes in the password.  This ensures any
@@ -64,13 +51,13 @@ func getPasswd(prompt string, masked bool, r FdReader, w io.Writer) ([]byte, err
 	// capped.
 	var counter int
 	for counter = 0; counter <= maxLength; counter++ {
-		if v, e := getch(r); e != nil {
+		if v, e := getch(); e != nil {
 			err = e
 			break
 		} else if v == 127 || v == 8 {
 			if l := len(pass); l > 0 {
 				pass = pass[:l-1]
-				fmt.Fprint(w, string(bs))
+				fmt.Print(string(bs))
 			}
 		} else if v == 13 || v == 10 {
 			break
@@ -79,7 +66,7 @@ func getPasswd(prompt string, masked bool, r FdReader, w io.Writer) ([]byte, err
 			break
 		} else if v != 0 {
 			pass = append(pass, v)
-			fmt.Fprint(w, string(mask))
+			fmt.Print(string(mask))
 		}
 	}
 
@@ -87,24 +74,18 @@ func getPasswd(prompt string, masked bool, r FdReader, w io.Writer) ([]byte, err
 		err = ErrMaxLengthExceeded
 	}
 
+	fmt.Println()
 	return pass, err
 }
 
 // GetPasswd returns the password read from the terminal without echoing input.
 // The returned byte array does not include end-of-line characters.
 func GetPasswd() ([]byte, error) {
-	return getPasswd("", false, os.Stdin, os.Stdout)
+	return getPasswd(false)
 }
 
 // GetPasswdMasked returns the password read from the terminal, echoing asterisks.
 // The returned byte array does not include end-of-line characters.
 func GetPasswdMasked() ([]byte, error) {
-	return getPasswd("", true, os.Stdin, os.Stdout)
-}
-
-// GetPasswdPrompt prompts the user and returns the password read from the terminal.
-// If mask is true, then asterisks are echoed.
-// The returned byte array does not include end-of-line characters.
-func GetPasswdPrompt(prompt string, mask bool, r FdReader, w io.Writer) ([]byte, error) {
-	return getPasswd(prompt, mask, r, w)
+	return getPasswd(true)
 }

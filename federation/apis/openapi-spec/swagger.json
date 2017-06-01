@@ -101,12 +101,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -115,13 +109,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -191,12 +178,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Event"
      }
     },
     "parameters": [
@@ -205,13 +186,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -281,13 +255,6 @@
       },
       {
        "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -325,12 +292,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
      }
     },
     "post": {
@@ -370,12 +331,72 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
+     }
+    },
+    "delete": {
+     "description": "delete collection of Namespace",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "deleteCoreV1CollectionNamespace",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
      }
     },
     "parameters": [
@@ -418,13 +439,6 @@
       },
       {
        "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -462,12 +476,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMap"
      }
     },
     "post": {
@@ -507,12 +515,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMap"
      }
     },
     "delete": {
@@ -538,13 +540,6 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -586,12 +581,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "deletecollection",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -656,12 +645,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMap"
      }
     },
     "put": {
@@ -701,12 +684,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMap"
      }
     },
     "delete": {
@@ -767,12 +744,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "delete",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMap"
      }
     },
     "patch": {
@@ -814,12 +785,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -878,13 +843,6 @@
       },
       {
        "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -922,12 +880,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Event"
      }
     },
     "post": {
@@ -967,12 +919,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Event"
      }
     },
     "delete": {
@@ -998,13 +944,6 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -1046,12 +985,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "deletecollection",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Event"
      }
     },
     "parameters": [
@@ -1116,12 +1049,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Event"
      }
     },
     "put": {
@@ -1161,12 +1088,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Event"
      }
     },
     "delete": {
@@ -1227,12 +1148,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "delete",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Event"
      }
     },
     "patch": {
@@ -1274,12 +1189,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Event"
      }
     },
     "parameters": [
@@ -1338,13 +1247,6 @@
       },
       {
        "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -1382,12 +1284,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Secret"
      }
     },
     "post": {
@@ -1427,12 +1323,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Secret"
      }
     },
     "delete": {
@@ -1458,13 +1348,6 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -1506,12 +1389,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "deletecollection",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Secret"
      }
     },
     "parameters": [
@@ -1576,12 +1453,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Secret"
      }
     },
     "put": {
@@ -1621,12 +1492,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Secret"
      }
     },
     "delete": {
@@ -1687,12 +1552,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "delete",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Secret"
      }
     },
     "patch": {
@@ -1734,12 +1593,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Secret"
      }
     },
     "parameters": [
@@ -1798,13 +1651,6 @@
       },
       {
        "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -1842,12 +1688,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "post": {
@@ -1887,12 +1727,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "delete": {
@@ -1918,13 +1752,6 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -1966,12 +1793,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "deletecollection",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "parameters": [
@@ -2036,12 +1857,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "put": {
@@ -2081,12 +1896,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "delete": {
@@ -2147,12 +1956,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "delete",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "patch": {
@@ -2194,12 +1997,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "parameters": [
@@ -2256,12 +2053,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "put": {
@@ -2301,12 +2092,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "patch": {
@@ -2348,12 +2133,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "parameters": [
@@ -2426,12 +2205,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
      }
     },
     "put": {
@@ -2471,12 +2244,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
      }
     },
     "delete": {
@@ -2537,12 +2304,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "delete",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
      }
     },
     "patch": {
@@ -2584,12 +2345,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
      }
     },
     "parameters": [
@@ -2648,12 +2403,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
      }
     },
     "parameters": [
@@ -2702,12 +2451,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
      }
     },
     "put": {
@@ -2747,12 +2490,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
      }
     },
     "patch": {
@@ -2794,12 +2531,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
      }
     },
     "parameters": [
@@ -2850,12 +2581,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Secret"
      }
     },
     "parameters": [
@@ -2864,13 +2589,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -2940,12 +2658,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "parameters": [
@@ -2954,13 +2666,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -3030,12 +2735,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -3044,13 +2743,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -3120,12 +2812,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Event"
      }
     },
     "parameters": [
@@ -3134,13 +2820,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -3210,12 +2889,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
      }
     },
     "parameters": [
@@ -3224,13 +2897,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -3300,12 +2966,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -3314,13 +2974,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -3398,12 +3051,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watch",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMap"
      }
     },
     "parameters": [
@@ -3412,13 +3059,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -3504,12 +3144,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Event"
      }
     },
     "parameters": [
@@ -3518,13 +3152,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -3602,12 +3229,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watch",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Event"
      }
     },
     "parameters": [
@@ -3616,13 +3237,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -3708,12 +3322,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Secret"
      }
     },
     "parameters": [
@@ -3722,13 +3330,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -3806,12 +3407,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watch",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Secret"
      }
     },
     "parameters": [
@@ -3820,13 +3415,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -3912,12 +3500,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "parameters": [
@@ -3926,13 +3508,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -4010,12 +3585,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watch",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "parameters": [
@@ -4024,13 +3593,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -4116,12 +3678,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watch",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
      }
     },
     "parameters": [
@@ -4130,13 +3686,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -4214,12 +3763,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Secret"
      }
     },
     "parameters": [
@@ -4228,13 +3771,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -4304,12 +3840,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
      }
     },
     "parameters": [
@@ -4318,13 +3848,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -4493,12 +4016,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -4507,13 +4024,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -4583,12 +4093,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -4597,13 +4101,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -4673,12 +4170,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -4687,13 +4178,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -4763,13 +4247,6 @@
       },
       {
        "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -4807,12 +4284,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "post": {
@@ -4852,12 +4323,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "delete": {
@@ -4883,13 +4348,6 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -4931,12 +4389,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "deletecollection",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -5001,12 +4453,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "put": {
@@ -5046,12 +4492,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "delete": {
@@ -5112,12 +4552,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "delete",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "patch": {
@@ -5159,12 +4593,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -5221,12 +4649,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "put": {
@@ -5266,12 +4688,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "patch": {
@@ -5313,12 +4729,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -5377,13 +4787,6 @@
       },
       {
        "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -5421,12 +4824,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "post": {
@@ -5466,12 +4863,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "delete": {
@@ -5497,13 +4888,6 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -5545,12 +4929,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "deletecollection",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -5615,12 +4993,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "put": {
@@ -5660,12 +5032,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "delete": {
@@ -5726,12 +5092,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "delete",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "patch": {
@@ -5773,12 +5133,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -5845,12 +5199,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DeploymentRollback"
      }
     },
     "parameters": [
@@ -5907,12 +5255,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Scale"
      }
     },
     "put": {
@@ -5952,12 +5294,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Scale"
      }
     },
     "patch": {
@@ -5999,12 +5335,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Scale"
      }
     },
     "parameters": [
@@ -6061,12 +5391,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "put": {
@@ -6106,12 +5430,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "patch": {
@@ -6153,12 +5471,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -6217,13 +5529,6 @@
       },
       {
        "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -6261,12 +5566,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "post": {
@@ -6306,12 +5605,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "delete": {
@@ -6337,13 +5630,6 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -6385,12 +5671,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "deletecollection",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -6455,12 +5735,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "put": {
@@ -6500,12 +5774,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "delete": {
@@ -6566,12 +5834,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "delete",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "patch": {
@@ -6613,12 +5875,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -6675,12 +5931,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "put": {
@@ -6720,12 +5970,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "patch": {
@@ -6767,12 +6011,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -6831,13 +6069,6 @@
       },
       {
        "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -6875,12 +6106,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "post": {
@@ -6920,12 +6145,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "delete": {
@@ -6951,13 +6170,6 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -6999,12 +6211,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "deletecollection",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -7069,12 +6275,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "put": {
@@ -7114,12 +6314,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "delete": {
@@ -7180,12 +6374,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "delete",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "patch": {
@@ -7227,12 +6415,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -7289,12 +6471,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Scale"
      }
     },
     "put": {
@@ -7334,12 +6510,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Scale"
      }
     },
     "patch": {
@@ -7381,12 +6551,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Scale"
      }
     },
     "parameters": [
@@ -7443,12 +6607,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "put": {
@@ -7488,12 +6646,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "patch": {
@@ -7535,12 +6687,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -7599,12 +6745,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -7613,13 +6753,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -7689,12 +6822,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -7703,13 +6830,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -7779,12 +6899,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -7793,13 +6907,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -7869,12 +6976,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -7883,13 +6984,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -7959,12 +7053,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -7973,13 +7061,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -8057,12 +7138,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
      }
     },
     "parameters": [
@@ -8071,13 +7146,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -8163,12 +7231,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -8177,13 +7239,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -8261,12 +7316,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
      }
     },
     "parameters": [
@@ -8275,13 +7324,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -8367,12 +7409,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -8381,13 +7417,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -8465,12 +7494,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
      }
     },
     "parameters": [
@@ -8479,13 +7502,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -8571,12 +7587,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -8585,13 +7595,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -8669,12 +7672,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watch",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -8683,13 +7680,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -8775,12 +7765,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
      }
     },
     "parameters": [
@@ -8789,13 +7773,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -8931,13 +7908,6 @@
       },
       {
        "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
        "name": "labelSelector",
@@ -8975,12 +7945,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "federation",
-      "version": "v1beta1",
-      "kind": "Cluster"
      }
     },
     "post": {
@@ -9020,12 +7984,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "federation",
-      "version": "v1beta1",
-      "kind": "Cluster"
      }
     },
     "delete": {
@@ -9051,13 +8009,6 @@
        "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "If true, partially initialized resources are included in the response.",
-       "name": "includeUninitialized",
        "in": "query"
       },
       {
@@ -9099,12 +8050,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "deletecollection",
-     "x-kubernetes-group-version-kind": {
-      "group": "federation",
-      "version": "v1beta1",
-      "kind": "Cluster"
      }
     },
     "parameters": [
@@ -9161,12 +8106,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "get",
-     "x-kubernetes-group-version-kind": {
-      "group": "federation",
-      "version": "v1beta1",
-      "kind": "Cluster"
      }
     },
     "put": {
@@ -9206,12 +8145,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "federation",
-      "version": "v1beta1",
-      "kind": "Cluster"
      }
     },
     "delete": {
@@ -9272,12 +8205,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "delete",
-     "x-kubernetes-group-version-kind": {
-      "group": "federation",
-      "version": "v1beta1",
-      "kind": "Cluster"
      }
     },
     "patch": {
@@ -9319,12 +8246,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "patch",
-     "x-kubernetes-group-version-kind": {
-      "group": "federation",
-      "version": "v1beta1",
-      "kind": "Cluster"
      }
     },
     "parameters": [
@@ -9383,12 +8304,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "put",
-     "x-kubernetes-group-version-kind": {
-      "group": "federation",
-      "version": "v1beta1",
-      "kind": "Cluster"
      }
     },
     "parameters": [
@@ -9439,12 +8354,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "federation",
-      "version": "v1beta1",
-      "kind": "Cluster"
      }
     },
     "parameters": [
@@ -9453,13 +8362,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -9529,12 +8431,6 @@
       "401": {
        "description": "Unauthorized"
       }
-     },
-     "x-kubernetes-action": "watch",
-     "x-kubernetes-group-version-kind": {
-      "group": "federation",
-      "version": "v1beta1",
-      "kind": "Cluster"
      }
     },
     "parameters": [
@@ -9543,13 +8439,6 @@
       "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
       "in": "query"
      },
      {
@@ -9888,37 +8777,6 @@
      }
     }
    },
-   "io.k8s.apimachinery.pkg.apis.meta.v1.Initializer": {
-    "description": "Initializer is information about an initializer that has not yet completed.",
-    "required": [
-     "name"
-    ],
-    "properties": {
-     "name": {
-      "description": "name of the process that is responsible for initializing this object.",
-      "type": "string"
-     }
-    }
-   },
-   "io.k8s.apimachinery.pkg.apis.meta.v1.Initializers": {
-    "description": "Initializers tracks the progress of initialization.",
-    "required": [
-     "pending"
-    ],
-    "properties": {
-     "pending": {
-      "description": "Pending is a list of initializers that must execute in order before this object is visible. When the last pending initializer is removed, and no failing result is set, the initializers struct will be set to nil and the object is considered as initialized and visible to all clients.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Initializer"
-      }
-     },
-     "result": {
-      "description": "If result is set with the Failure field, the object will be persisted to storage and then deleted, ensuring that other clients can observe the deletion.",
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
-     }
-    }
-   },
    "io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector": {
     "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
     "properties": {
@@ -10020,10 +8878,6 @@
       "description": "A sequence number representing a specific generation of the desired state. Populated by the system. Read-only.",
       "type": "integer",
       "format": "int64"
-     },
-     "initializers": {
-      "description": "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user.",
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Initializers"
      },
      "labels": {
       "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels",
@@ -10208,10 +9062,6 @@
       "description": "If specified, the time in seconds before the operation should be retried.",
       "type": "integer",
       "format": "int32"
-     },
-     "uid": {
-      "description": "UID of the resource. (when there is a single resource which can be described). More info: http://kubernetes.io/docs/user-guide/identifiers#uids",
-      "type": "string"
      }
     }
    },
@@ -10307,7 +9157,7 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "spec": {
@@ -10321,9 +9171,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "federation",
-      "version": "v1beta1",
-      "kind": "Cluster"
+      "Group": "federation",
+      "Version": "v1beta1",
+      "Kind": "Cluster"
      }
     ]
    },
@@ -10382,15 +9232,15 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "federation",
-      "version": "v1beta1",
-      "kind": "ClusterList"
+      "Group": "federation",
+      "Version": "v1beta1",
+      "Kind": "ClusterList"
      }
     ]
    },
@@ -10462,7 +9312,7 @@
     ],
     "properties": {
      "fsType": {
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore",
       "type": "string"
      },
      "partition": {
@@ -10471,11 +9321,11 @@
       "format": "int32"
      },
      "readOnly": {
-      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
+      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore",
       "type": "boolean"
      },
      "volumeID": {
-      "description": "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
+      "description": "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore",
       "type": "string"
      }
     }
@@ -10518,10 +9368,6 @@
      },
      "fsType": {
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
-      "type": "string"
-     },
-     "kind": {
-      "description": "Expected values Shared: mulitple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared",
       "type": "string"
      },
      "readOnly": {
@@ -10577,7 +9423,7 @@
     ],
     "properties": {
      "monitors": {
-      "description": "Required: Monitors is a collection of Ceph monitors More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "description": "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
       "type": "array",
       "items": {
        "type": "string"
@@ -10588,19 +9434,19 @@
       "type": "string"
      },
      "readOnly": {
-      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
       "type": "boolean"
      },
      "secretFile": {
-      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
       "type": "string"
      },
      "secretRef": {
-      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalObjectReference"
      },
      "user": {
-      "description": "Optional: User is the rados user name, default is admin More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "description": "Optional: User is the rados user name, default is admin More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
       "type": "string"
      }
     }
@@ -10612,15 +9458,15 @@
     ],
     "properties": {
      "fsType": {
-      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
       "type": "string"
      },
      "readOnly": {
-      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
       "type": "boolean"
      },
      "volumeID": {
-      "description": "volume id used to identify the volume in cinder More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+      "description": "volume id used to identify the volume in cinder More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
       "type": "string"
      }
     }
@@ -10644,15 +9490,15 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMap"
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMap"
      }
     ]
    },
@@ -10660,7 +9506,7 @@
     "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
     "properties": {
      "name": {
-      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
      },
      "optional": {
@@ -10680,7 +9526,7 @@
       "type": "string"
      },
      "name": {
-      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
      },
      "optional": {
@@ -10711,15 +9557,15 @@
       "type": "string"
      },
      "metadata": {
-      "description": "More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+      "description": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "",
-      "version": "v1",
-      "kind": "ConfigMapList"
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ConfigMapList"
      }
     ]
    },
@@ -10734,7 +9580,7 @@
       }
      },
      "name": {
-      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
      },
      "optional": {
@@ -10759,7 +9605,7 @@
       }
      },
      "name": {
-      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
      },
      "optional": {
@@ -10775,14 +9621,14 @@
     ],
     "properties": {
      "args": {
-      "description": "Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell",
+      "description": "Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers#containers-and-commands",
       "type": "array",
       "items": {
        "type": "string"
       }
      },
      "command": {
-      "description": "Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell",
+      "description": "Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers#containers-and-commands",
       "type": "array",
       "items": {
        "type": "string"
@@ -10805,11 +9651,11 @@
       }
      },
      "image": {
-      "description": "Docker image name. More info: https://kubernetes.io/docs/concepts/containers/images",
+      "description": "Docker image name. More info: http://kubernetes.io/docs/user-guide/images",
       "type": "string"
      },
      "imagePullPolicy": {
-      "description": "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images",
+      "description": "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/images#updating-images",
       "type": "string"
      },
      "lifecycle": {
@@ -10817,7 +9663,7 @@
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Lifecycle"
      },
      "livenessProbe": {
-      "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+      "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Probe"
      },
      "name": {
@@ -10834,15 +9680,15 @@
       "x-kubernetes-patch-strategy": "merge"
      },
      "readinessProbe": {
-      "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+      "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Probe"
      },
      "resources": {
-      "description": "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
+      "description": "Compute Resources required by this container. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ResourceRequirements"
      },
      "securityContext": {
-      "description": "Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/security_context.md",
+      "description": "Security options the pod should run with. More info: http://releases.k8s.io/HEAD/docs/design/security_context.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.SecurityContext"
      },
      "stdin": {
@@ -10968,7 +9814,7 @@
     "description": "Represents an empty directory for a pod. Empty directory volumes support ownership management and SELinux relabeling.",
     "properties": {
      "medium": {
-      "description": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
+      "description": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
       "type": "string"
      }
     }
@@ -11068,7 +9914,7 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "reason": {
@@ -11086,9 +9932,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "",
-      "version": "v1",
-      "kind": "Event"
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Event"
      }
     ]
    },
@@ -11114,15 +9960,15 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "",
-      "version": "v1",
-      "kind": "EventList"
+      "Group": "",
+      "Version": "v1",
+      "Kind": "EventList"
      }
     ]
    },
@@ -11231,20 +10077,20 @@
     ],
     "properties": {
      "fsType": {
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk",
       "type": "string"
      },
      "partition": {
-      "description": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+      "description": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk",
       "type": "integer",
       "format": "int32"
      },
      "pdName": {
-      "description": "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+      "description": "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk",
       "type": "string"
      },
      "readOnly": {
-      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk",
       "type": "boolean"
      }
     }
@@ -11277,15 +10123,15 @@
     ],
     "properties": {
      "endpoints": {
-      "description": "EndpointsName is the endpoint name that details Glusterfs topology. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+      "description": "EndpointsName is the endpoint name that details Glusterfs topology. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
       "type": "string"
      },
      "path": {
-      "description": "Path is the Glusterfs volume path. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+      "description": "Path is the Glusterfs volume path. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
       "type": "string"
      },
      "readOnly": {
-      "description": "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+      "description": "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
       "type": "boolean"
      }
     }
@@ -11378,7 +10224,7 @@
     ],
     "properties": {
      "path": {
-      "description": "Path of the directory on the host. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
+      "description": "Path of the directory on the host. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath",
       "type": "string"
      }
     }
@@ -11400,7 +10246,7 @@
       "type": "boolean"
      },
      "fsType": {
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi",
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#iscsi",
       "type": "string"
      },
      "iqn": {
@@ -11463,11 +10309,11 @@
     "description": "Lifecycle describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.",
     "properties": {
      "postStart": {
-      "description": "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks",
+      "description": "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: http://kubernetes.io/docs/user-guide/container-environment#hook-details",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Handler"
      },
      "preStop": {
-      "description": "PreStop is called immediately before a container is terminated. The container is terminated after the handler completes. The reason for termination is passed to the handler. Regardless of the outcome of the handler, the container is eventually terminated. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks",
+      "description": "PreStop is called immediately before a container is terminated. The container is terminated after the handler completes. The reason for termination is passed to the handler. Regardless of the outcome of the handler, the container is eventually terminated. Other management of the container blocks until the hook completes. More info: http://kubernetes.io/docs/user-guide/container-environment#hook-details",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Handler"
      }
     }
@@ -11501,7 +10347,7 @@
     "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
     "properties": {
      "name": {
-      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
      }
     }
@@ -11514,15 +10360,15 @@
     ],
     "properties": {
      "path": {
-      "description": "Path that is exported by the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
+      "description": "Path that is exported by the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs",
       "type": "string"
      },
      "readOnly": {
-      "description": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
+      "description": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: http://kubernetes.io/docs/user-guide/volumes#nfs",
       "type": "boolean"
      },
      "server": {
-      "description": "Server is the hostname or IP address of the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
+      "description": "Server is the hostname or IP address of the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs",
       "type": "string"
      }
     }
@@ -11539,23 +10385,23 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "spec": {
-      "description": "Spec defines the behavior of the Namespace. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+      "description": "Spec defines the behavior of the Namespace. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NamespaceSpec"
      },
      "status": {
-      "description": "Status describes the current status of a Namespace. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+      "description": "Status describes the current status of a Namespace. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NamespaceStatus"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "",
-      "version": "v1",
-      "kind": "Namespace"
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Namespace"
      }
     ]
    },
@@ -11570,7 +10416,7 @@
       "type": "string"
      },
      "items": {
-      "description": "Items is the list of Namespace objects in the list. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/",
+      "description": "Items is the list of Namespace objects in the list. More info: http://kubernetes.io/docs/user-guide/namespaces",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Namespace"
@@ -11581,15 +10427,15 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "",
-      "version": "v1",
-      "kind": "NamespaceList"
+      "Group": "",
+      "Version": "v1",
+      "Kind": "NamespaceList"
      }
     ]
    },
@@ -11597,7 +10443,7 @@
     "description": "NamespaceSpec describes the attributes on a Namespace.",
     "properties": {
      "finalizers": {
-      "description": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/namespaces.md#finalizers",
+      "description": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#finalizers",
       "type": "array",
       "items": {
        "type": "string"
@@ -11609,7 +10455,7 @@
     "description": "NamespaceStatus is information about the current status of a Namespace.",
     "properties": {
      "phase": {
-      "description": "Phase is the current lifecycle phase of the namespace. More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/namespaces.md#phases",
+      "description": "Phase is the current lifecycle phase of the namespace. More info: http://releases.k8s.io/HEAD/docs/design/namespaces.md#phases",
       "type": "string"
      }
     }
@@ -11714,23 +10560,23 @@
       "type": "string"
      },
      "kind": {
-      "description": "Kind of the referent. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds",
+      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
       "type": "string"
      },
      "name": {
-      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
      },
      "namespace": {
-      "description": "Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/",
+      "description": "Namespace of the referent. More info: http://kubernetes.io/docs/user-guide/namespaces",
       "type": "string"
      },
      "resourceVersion": {
-      "description": "Specific resourceVersion to which this reference is made, if any. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency",
+      "description": "Specific resourceVersion to which this reference is made, if any. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency",
       "type": "string"
      },
      "uid": {
-      "description": "UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids",
+      "description": "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids",
       "type": "string"
      }
     }
@@ -11742,7 +10588,7 @@
     ],
     "properties": {
      "claimName": {
-      "description": "ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
+      "description": "ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims",
       "type": "string"
      },
      "readOnly": {
@@ -11876,7 +10722,7 @@
       "type": "boolean"
      },
      "containers": {
-      "description": "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated.",
+      "description": "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Container"
@@ -11914,7 +10760,7 @@
       "type": "string"
      },
      "imagePullSecrets": {
-      "description": "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: https://kubernetes.io/docs/concepts/containers/images#specifying-imagepullsecrets-on-a-pod",
+      "description": "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: http://kubernetes.io/docs/user-guide/images#specifying-imagepullsecrets-on-a-pod",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalObjectReference"
@@ -11923,7 +10769,7 @@
       "x-kubernetes-patch-strategy": "merge"
      },
      "initContainers": {
-      "description": "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, or Liveness probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
+      "description": "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, or Liveness probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Container"
@@ -11936,14 +10782,14 @@
       "type": "string"
      },
      "nodeSelector": {
-      "description": "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/",
+      "description": "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://kubernetes.io/docs/user-guide/node-selection/README.md",
       "type": "object",
       "additionalProperties": {
        "type": "string"
       }
      },
      "restartPolicy": {
-      "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
+      "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy",
       "type": "string"
      },
      "schedulerName": {
@@ -11959,7 +10805,7 @@
       "type": "string"
      },
      "serviceAccountName": {
-      "description": "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/",
+      "description": "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md",
       "type": "string"
      },
      "subdomain": {
@@ -11979,7 +10825,7 @@
       }
      },
      "volumes": {
-      "description": "List of volumes that can be mounted by containers belonging to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes",
+      "description": "List of volumes that can be mounted by containers belonging to the pod. More info: http://kubernetes.io/docs/user-guide/volumes",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Volume"
@@ -11993,11 +10839,11 @@
     "description": "PodTemplateSpec describes the data a pod should have when created from a template",
     "properties": {
      "metadata": {
-      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "spec": {
-      "description": "Specification of the desired behavior of the pod. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+      "description": "Specification of the desired behavior of the pod. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodSpec"
      }
     }
@@ -12057,7 +10903,7 @@
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.HTTPGetAction"
      },
      "initialDelaySeconds": {
-      "description": "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+      "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes",
       "type": "integer",
       "format": "int32"
      },
@@ -12076,7 +10922,7 @@
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.TCPSocketAction"
      },
      "timeoutSeconds": {
-      "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+      "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes",
       "type": "integer",
       "format": "int32"
      }
@@ -12139,38 +10985,38 @@
     ],
     "properties": {
      "fsType": {
-      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd",
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#rbd",
       "type": "string"
      },
      "image": {
-      "description": "The rados image name. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "description": "The rados image name. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
       "type": "string"
      },
      "keyring": {
-      "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
       "type": "string"
      },
      "monitors": {
-      "description": "A collection of Ceph monitors. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "description": "A collection of Ceph monitors. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
       "type": "array",
       "items": {
        "type": "string"
       }
      },
      "pool": {
-      "description": "The rados pool name. Default is rbd. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "description": "The rados pool name. Default is rbd. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it.",
       "type": "string"
      },
      "readOnly": {
-      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
       "type": "boolean"
      },
      "secretRef": {
-      "description": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "description": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.LocalObjectReference"
      },
      "user": {
-      "description": "The rados user name. Default is admin. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "description": "The rados user name. Default is admin. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
       "type": "string"
      }
     }
@@ -12199,14 +11045,14 @@
     "description": "ResourceRequirements describes the compute resource requirements.",
     "properties": {
      "limits": {
-      "description": "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
+      "description": "Limits describes the maximum amount of compute resources allowed. More info: http://kubernetes.io/docs/user-guide/compute-resources/",
       "type": "object",
       "additionalProperties": {
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
      "requests": {
-      "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
+      "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: http://kubernetes.io/docs/user-guide/compute-resources/",
       "type": "object",
       "additionalProperties": {
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
@@ -12305,7 +11151,7 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "stringData": {
@@ -12322,9 +11168,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "",
-      "version": "v1",
-      "kind": "Secret"
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Secret"
      }
     ]
    },
@@ -12332,7 +11178,7 @@
     "description": "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
     "properties": {
      "name": {
-      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
      },
      "optional": {
@@ -12352,7 +11198,7 @@
       "type": "string"
      },
      "name": {
-      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
      },
      "optional": {
@@ -12372,7 +11218,7 @@
       "type": "string"
      },
      "items": {
-      "description": "Items is a list of secret objects. More info: https://kubernetes.io/docs/concepts/configuration/secret",
+      "description": "Items is a list of secret objects. More info: http://kubernetes.io/docs/user-guide/secrets",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.Secret"
@@ -12383,15 +11229,15 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "",
-      "version": "v1",
-      "kind": "SecretList"
+      "Group": "",
+      "Version": "v1",
+      "Kind": "SecretList"
      }
     ]
    },
@@ -12406,7 +11252,7 @@
       }
      },
      "name": {
-      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
      },
      "optional": {
@@ -12435,7 +11281,7 @@
       "type": "boolean"
      },
      "secretName": {
-      "description": "Name of the secret in the pod's namespace to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret",
+      "description": "Name of the secret in the pod's namespace to use. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
       "type": "string"
      }
     }
@@ -12482,23 +11328,23 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "spec": {
-      "description": "Spec defines the behavior of a service. https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+      "description": "Spec defines the behavior of a service. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ServiceSpec"
      },
      "status": {
-      "description": "Most recently observed status of the service. Populated by the system. Read-only. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+      "description": "Most recently observed status of the service. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ServiceStatus"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "",
-      "version": "v1",
-      "kind": "Service"
+      "Group": "",
+      "Version": "v1",
+      "Kind": "Service"
      }
     ]
    },
@@ -12524,15 +11370,15 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "",
-      "version": "v1",
-      "kind": "ServiceList"
+      "Group": "",
+      "Version": "v1",
+      "Kind": "ServiceList"
      }
     ]
    },
@@ -12547,7 +11393,7 @@
       "type": "string"
      },
      "nodePort": {
-      "description": "The port on each node on which this service is exposed when type=NodePort or LoadBalancer. Usually assigned by the system. If specified, it will be allocated to the service if unused or else creation of the service will fail. Default is to auto-allocate a port if the ServiceType of this Service requires one. More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport",
+      "description": "The port on each node on which this service is exposed when type=NodePort or LoadBalancer. Usually assigned by the system. If specified, it will be allocated to the service if unused or else creation of the service will fail. Default is to auto-allocate a port if the ServiceType of this Service requires one. More info: http://kubernetes.io/docs/user-guide/services#type--nodeport",
       "type": "integer",
       "format": "int32"
      },
@@ -12561,7 +11407,7 @@
       "type": "string"
      },
      "targetPort": {
-      "description": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of the 'port' field is used (an identity map). This field is ignored for services with clusterIP=None, and should be omitted or set equal to the 'port' field. More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service",
+      "description": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of the 'port' field is used (an identity map). This field is ignored for services with clusterIP=None, and should be omitted or set equal to the 'port' field. More info: http://kubernetes.io/docs/user-guide/services#defining-a-service",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
      }
     }
@@ -12570,7 +11416,7 @@
     "description": "ServiceSpec describes the attributes that a user creates on a service.",
     "properties": {
      "clusterIP": {
-      "description": "clusterIP is the IP address of the service and is usually assigned randomly by the master. If an address is specified manually and is not in use by others, it will be allocated to the service; otherwise, creation of the service will fail. This field can not be changed through updates. Valid values are \"None\", empty string (\"\"), or a valid IP address. \"None\" can be specified for headless services when proxying is not required. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies",
+      "description": "clusterIP is the IP address of the service and is usually assigned randomly by the master. If an address is specified manually and is not in use by others, it will be allocated to the service; otherwise, creation of the service will fail. This field can not be changed through updates. Valid values are \"None\", empty string (\"\"), or a valid IP address. \"None\" can be specified for headless services when proxying is not required. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies",
       "type": "string"
      },
      "externalIPs": {
@@ -12584,28 +11430,19 @@
       "description": "externalName is the external reference that kubedns or equivalent will return as a CNAME record for this service. No proxying will be involved. Must be a valid DNS name and requires Type to be ExternalName.",
       "type": "string"
      },
-     "externalTrafficPolicy": {
-      "description": "externalTrafficPolicy denotes if this Service desires to route external traffic to local endpoints only. This preserves Source IP and avoids a second hop for LoadBalancer and Nodeport type services.",
-      "type": "string"
-     },
-     "healthCheckNodePort": {
-      "description": "healthCheckNodePort specifies the healthcheck nodePort for the service. If not specified, HealthCheckNodePort is created by the service api backend with the allocated nodePort. Will use user-specified nodePort value if specified by the client. Only effects when Type is set to LoadBalancer and ExternalTrafficPolicy is set to Local.",
-      "type": "integer",
-      "format": "int32"
-     },
      "loadBalancerIP": {
       "description": "Only applies to Service Type: LoadBalancer LoadBalancer will get created with the IP specified in this field. This feature depends on whether the underlying cloud-provider supports specifying the loadBalancerIP when a load balancer is created. This field will be ignored if the cloud-provider does not support the feature.",
       "type": "string"
      },
      "loadBalancerSourceRanges": {
-      "description": "If specified and supported by the platform, this will restrict traffic through the cloud-provider load-balancer will be restricted to the specified client IPs. This field will be ignored if the cloud-provider does not support the feature.\" More info: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/",
+      "description": "If specified and supported by the platform, this will restrict traffic through the cloud-provider load-balancer will be restricted to the specified client IPs. This field will be ignored if the cloud-provider does not support the feature.\" More info: http://kubernetes.io/docs/user-guide/services-firewalls",
       "type": "array",
       "items": {
        "type": "string"
       }
      },
      "ports": {
-      "description": "The list of ports that are exposed by this service. More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies",
+      "description": "The list of ports that are exposed by this service. More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ServicePort"
@@ -12614,18 +11451,18 @@
       "x-kubernetes-patch-strategy": "merge"
      },
      "selector": {
-      "description": "Route service traffic to pods with label keys and values matching this selector. If empty or not present, the service is assumed to have an external process managing its endpoints, which Kubernetes will not modify. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: https://kubernetes.io/docs/concepts/services-networking/service/",
+      "description": "Route service traffic to pods with label keys and values matching this selector. If empty or not present, the service is assumed to have an external process managing its endpoints, which Kubernetes will not modify. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: http://kubernetes.io/docs/user-guide/services#overview",
       "type": "object",
       "additionalProperties": {
        "type": "string"
       }
      },
      "sessionAffinity": {
-      "description": "Supports \"ClientIP\" and \"None\". Used to maintain session affinity. Enable client IP based session affinity. Must be ClientIP or None. Defaults to None. More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies",
+      "description": "Supports \"ClientIP\" and \"None\". Used to maintain session affinity. Enable client IP based session affinity. Must be ClientIP or None. Defaults to None. More info: http://kubernetes.io/docs/user-guide/services#virtual-ips-and-service-proxies",
       "type": "string"
      },
      "type": {
-      "description": "type determines how the Service is exposed. Defaults to ClusterIP. Valid options are ExternalName, ClusterIP, NodePort, and LoadBalancer. \"ExternalName\" maps to the specified externalName. \"ClusterIP\" allocates a cluster-internal IP address for load-balancing to endpoints. Endpoints are determined by the selector or if that is not specified, by manual construction of an Endpoints object. If clusterIP is \"None\", no virtual IP is allocated and the endpoints are published as a set of endpoints rather than a stable IP. \"NodePort\" builds on ClusterIP and allocates a port on every node which routes to the clusterIP. \"LoadBalancer\" builds on NodePort and creates an external load-balancer (if supported in the current cloud) which routes to the clusterIP. More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services---service-types",
+      "description": "type determines how the Service is exposed. Defaults to ClusterIP. Valid options are ExternalName, ClusterIP, NodePort, and LoadBalancer. \"ExternalName\" maps to the specified externalName. \"ClusterIP\" allocates a cluster-internal IP address for load-balancing to endpoints. Endpoints are determined by the selector or if that is not specified, by manual construction of an Endpoints object. If clusterIP is \"None\", no virtual IP is allocated and the endpoints are published as a set of endpoints rather than a stable IP. \"NodePort\" builds on ClusterIP and allocates a port on every node which routes to the clusterIP. \"LoadBalancer\" builds on NodePort and creates an external load-balancer (if supported in the current cloud) which routes to the clusterIP. More info: http://kubernetes.io/docs/user-guide/services#overview",
       "type": "string"
      }
     }
@@ -12690,7 +11527,7 @@
     ],
     "properties": {
      "awsElasticBlockStore": {
-      "description": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
+      "description": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.AWSElasticBlockStoreVolumeSource"
      },
      "azureDisk": {
@@ -12706,7 +11543,7 @@
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.CephFSVolumeSource"
      },
      "cinder": {
-      "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+      "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.CinderVolumeSource"
      },
      "configMap": {
@@ -12718,7 +11555,7 @@
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.DownwardAPIVolumeSource"
      },
      "emptyDir": {
-      "description": "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
+      "description": "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.EmptyDirVolumeSource"
      },
      "fc": {
@@ -12734,7 +11571,7 @@
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.FlockerVolumeSource"
      },
      "gcePersistentDisk": {
-      "description": "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+      "description": "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.GCEPersistentDiskVolumeSource"
      },
      "gitRepo": {
@@ -12742,27 +11579,27 @@
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.GitRepoVolumeSource"
      },
      "glusterfs": {
-      "description": "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md",
+      "description": "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.GlusterfsVolumeSource"
      },
      "hostPath": {
-      "description": "HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
+      "description": "HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.HostPathVolumeSource"
      },
      "iscsi": {
-      "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md",
+      "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ISCSIVolumeSource"
      },
      "name": {
-      "description": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+      "description": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
      },
      "nfs": {
-      "description": "NFS represents an NFS mount on the host that shares a pod's lifetime More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
+      "description": "NFS represents an NFS mount on the host that shares a pod's lifetime More info: http://kubernetes.io/docs/user-guide/volumes#nfs",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.NFSVolumeSource"
      },
      "persistentVolumeClaim": {
-      "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
+      "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PersistentVolumeClaimVolumeSource"
      },
      "photonPersistentDisk": {
@@ -12782,7 +11619,7 @@
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.QuobyteVolumeSource"
      },
      "rbd": {
-      "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
+      "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.RBDVolumeSource"
      },
      "scaleIO": {
@@ -12790,7 +11627,7 @@
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ScaleIOVolumeSource"
      },
      "secret": {
-      "description": "Secret represents a secret that should populate this volume. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret",
+      "description": "Secret represents a secret that should populate this volume. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.SecretVolumeSource"
      },
      "vsphereVolume": {
@@ -12851,14 +11688,6 @@
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
       "type": "string"
      },
-     "storagePolicyID": {
-      "description": "Storage Policy Based Management (SPBM) profile ID associated with the StoragePolicyName.",
-      "type": "string"
-     },
-     "storagePolicyName": {
-      "description": "Storage Policy Based Management (SPBM) profile name.",
-      "type": "string"
-     },
      "volumePath": {
       "description": "Path that identifies vSphere volume vmdk",
       "type": "string"
@@ -12895,23 +11724,23 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "spec": {
-      "description": "The desired behavior of this daemon set. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+      "description": "The desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetSpec"
      },
      "status": {
-      "description": "The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+      "description": "The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DaemonSetStatus"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSet"
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSet"
      }
     ]
    },
@@ -12937,15 +11766,15 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DaemonSetList"
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DaemonSetList"
      }
     ]
    },
@@ -12961,11 +11790,11 @@
       "format": "int32"
      },
      "selector": {
-      "description": "A label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+      "description": "A label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "template": {
-      "description": "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
+      "description": "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec"
      },
      "templateGeneration": {
@@ -12989,12 +11818,12 @@
     ],
     "properties": {
      "currentNumberScheduled": {
-      "description": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+      "description": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
       "type": "integer",
       "format": "int32"
      },
      "desiredNumberScheduled": {
-      "description": "The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+      "description": "The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
       "type": "integer",
       "format": "int32"
      },
@@ -13004,7 +11833,7 @@
       "format": "int32"
      },
      "numberMisscheduled": {
-      "description": "The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
+      "description": "The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
       "type": "integer",
       "format": "int32"
      },
@@ -13068,9 +11897,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Deployment"
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Deployment"
      }
     ]
    },
@@ -13135,9 +11964,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DeploymentList"
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DeploymentList"
      }
     ]
    },
@@ -13174,9 +12003,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "DeploymentRollback"
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "DeploymentRollback"
      }
     ]
    },
@@ -13235,11 +12064,6 @@
       "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
       "type": "integer",
       "format": "int32"
-     },
-     "collisionCount": {
-      "description": "Count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
-      "type": "integer",
-      "format": "int64"
      },
      "conditions": {
       "description": "Represents the latest available observations of a deployment's current state.",
@@ -13333,23 +12157,23 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "spec": {
-      "description": "Spec is the desired state of the Ingress. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+      "description": "Spec is the desired state of the Ingress. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressSpec"
      },
      "status": {
-      "description": "Status is the current state of the Ingress. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+      "description": "Status is the current state of the Ingress. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.IngressStatus"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Ingress"
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Ingress"
      }
     ]
    },
@@ -13392,15 +12216,15 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "IngressList"
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "IngressList"
      }
     ]
    },
@@ -13480,19 +12304,19 @@
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
      "spec": {
-      "description": "Spec defines the specification of the desired behavior of the ReplicaSet. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+      "description": "Spec defines the specification of the desired behavior of the ReplicaSet. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetSpec"
      },
      "status": {
-      "description": "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+      "description": "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSetStatus"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSet"
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSet"
      }
     ]
    },
@@ -13536,7 +12360,7 @@
       "type": "string"
      },
      "items": {
-      "description": "List of ReplicaSets. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller",
+      "description": "List of ReplicaSets. More info: http://kubernetes.io/docs/user-guide/replication-controller",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.extensions.v1beta1.ReplicaSet"
@@ -13547,15 +12371,15 @@
       "type": "string"
      },
      "metadata": {
-      "description": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "ReplicaSetList"
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "ReplicaSetList"
      }
     ]
    },
@@ -13568,16 +12392,16 @@
       "format": "int32"
      },
      "replicas": {
-      "description": "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
+      "description": "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller",
       "type": "integer",
       "format": "int32"
      },
      "selector": {
-      "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+      "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "template": {
-      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
+      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec"
      }
     }
@@ -13618,7 +12442,7 @@
       "format": "int32"
      },
      "replicas": {
-      "description": "Replicas is the most recently oberved number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
+      "description": "Replicas is the most recently oberved number of replicas. More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller",
       "type": "integer",
       "format": "int32"
      }
@@ -13627,7 +12451,7 @@
    "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.RollbackConfig": {
     "properties": {
      "revision": {
-      "description": "The revision to rollback to. If set to 0, rollback to the last revision.",
+      "description": "The revision to rollback to. If set to 0, rollbck to the last revision.",
       "type": "integer",
       "format": "int64"
      }
@@ -13681,9 +12505,9 @@
     },
     "x-kubernetes-group-version-kind": [
      {
-      "group": "extensions",
-      "version": "v1beta1",
-      "kind": "Scale"
+      "Group": "extensions",
+      "Version": "v1beta1",
+      "Kind": "Scale"
      }
     ]
    },
@@ -13716,7 +12540,7 @@
       }
      },
      "targetSelector": {
-      "description": "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+      "description": "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
       "type": "string"
      }
     }

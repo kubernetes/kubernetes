@@ -370,15 +370,15 @@ func (o *Resources) getGroupVersionKind(s spec.Schema) (schema.GroupVersionKind,
 	if !ok {
 		return empty, fmt.Errorf("%s extension has unexpected type %T in %s", groupVersionKindExtensionKey, gvk, s.Extensions)
 	}
-	group, ok := gvkMap["group"].(string)
+	group, ok := gvkMap["Group"].(string)
 	if !ok {
 		return empty, fmt.Errorf("%s extension missing Group: %v", groupVersionKindExtensionKey, gvkMap)
 	}
-	version, ok := gvkMap["version"].(string)
+	version, ok := gvkMap["Version"].(string)
 	if !ok {
 		return empty, fmt.Errorf("%s extension missing Version: %v", groupVersionKindExtensionKey, gvkMap)
 	}
-	kind, ok := gvkMap["kind"].(string)
+	kind, ok := gvkMap["Kind"].(string)
 	if !ok {
 		return empty, fmt.Errorf("%s extension missing Kind: %v", groupVersionKindExtensionKey, gvkMap)
 	}

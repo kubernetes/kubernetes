@@ -11,7 +11,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "aggregator.go",
-        "apiextensions.go",
         "plugins.go",
         "server.go",
     ],
@@ -23,7 +22,6 @@ go_library(
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/apis/networking:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
@@ -40,7 +38,6 @@ go_library(
         "//pkg/master:go_default_library",
         "//pkg/master/thirdparty:go_default_library",
         "//pkg/master/tunneler:go_default_library",
-        "//pkg/quota/install:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/rbac/rest:go_default_library",
         "//pkg/version:go_default_library",
@@ -56,7 +53,7 @@ go_library(
         "//plugin/pkg/admission/limitranger:go_default_library",
         "//plugin/pkg/admission/namespace/autoprovision:go_default_library",
         "//plugin/pkg/admission/namespace/exists:go_default_library",
-        "//plugin/pkg/admission/noderestriction:go_default_library",
+        "//plugin/pkg/admission/namespace/lifecycle:go_default_library",
         "//plugin/pkg/admission/persistentvolume/label:go_default_library",
         "//plugin/pkg/admission/podnodeselector:go_default_library",
         "//plugin/pkg/admission/podpreset:go_default_library",
@@ -92,9 +89,6 @@ go_library(
         "//vendor/k8s.io/kube-aggregator/pkg/apiserver:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/controllers/autoregister:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/apiserver:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/cmd/server:go_default_library",
     ],
 )
 

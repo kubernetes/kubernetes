@@ -32,7 +32,7 @@ type ReplicaSetListerExpansion interface {
 }
 
 // ReplicaSetNamespaceListerExpansion allows custom methods to be added to
-// ReplicaSetNamespaceLister.
+// ReplicaSetNamespaeLister.
 type ReplicaSetNamespaceListerExpansion interface{}
 
 // GetPodReplicaSets returns a list of ReplicaSets that potentially match a pod.

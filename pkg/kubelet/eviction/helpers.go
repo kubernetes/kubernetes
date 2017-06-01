@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 )
@@ -513,8 +513,8 @@ func (ms *multiSorter) Less(i, j int) bool {
 
 // qosComparator compares pods by QoS (BestEffort < Burstable < Guaranteed)
 func qosComparator(p1, p2 *v1.Pod) int {
-	qosP1 := v1qos.GetPodQOS(p1)
-	qosP2 := v1qos.GetPodQOS(p2)
+	qosP1 := qos.GetPodQOS(p1)
+	qosP2 := qos.GetPodQOS(p2)
 	// its a tie
 	if qosP1 == qosP2 {
 		return 0
@@ -932,7 +932,7 @@ func isSoftEvictionThresholds(thresholds []evictionapi.Threshold, starvedResourc
 	return true
 }
 
-// isHardEvictionThreshold returns true if eviction should immediately occur
+// isSoftEviction returns true if the thresholds met for the starved resource are only soft thresholds
 func isHardEvictionThreshold(threshold evictionapi.Threshold) bool {
 	return threshold.GracePeriod == time.Duration(0)
 }
@@ -1001,10 +1001,13 @@ func deleteImages(imageGC ImageGC, reportBytesFreed bool) nodeReclaimFunc {
 	return func() (*resource.Quantity, error) {
 		glog.Infof("eviction manager: attempting to delete unused images")
 		bytesFreed, err := imageGC.DeleteUnusedImages()
+		if err != nil {
+			return nil, err
+		}
 		reclaimed := int64(0)
 		if reportBytesFreed {
 			reclaimed = bytesFreed
 		}
-		return resource.NewQuantity(reclaimed, resource.BinarySI), err
+		return resource.NewQuantity(reclaimed, resource.BinarySI), nil
 	}
 }

@@ -19,64 +19,24 @@ package filters
 import (
 	"bufio"
 	"bytes"
-	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"regexp"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
-	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	pluginlog "k8s.io/apiserver/plugin/pkg/audit/log"
 )
 
-type fakeAuditSink struct {
-	lock   sync.Mutex
-	events []*auditinternal.Event
+type simpleResponseWriter struct {
+	http.ResponseWriter
 }
 
-func (s *fakeAuditSink) ProcessEvents(evs ...*auditinternal.Event) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.events = append(s.events, evs...)
-}
-
-func (s *fakeAuditSink) Events() []*auditinternal.Event {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	return append([]*auditinternal.Event{}, s.events...)
-}
-
-func (s *fakeAuditSink) Pop(timeout time.Duration) (*auditinternal.Event, error) {
-	var result *auditinternal.Event
-	err := wait.Poll(50*time.Millisecond, wait.ForeverTestTimeout, wait.ConditionFunc(func() (done bool, err error) {
-		s.lock.Lock()
-		defer s.lock.Unlock()
-		if len(s.events) == 0 {
-			return false, nil
-		}
-		result = s.events[0]
-		s.events = s.events[1:]
-		return true, nil
-	}))
-	return result, err
-}
-
-type simpleResponseWriter struct{}
-
-var _ http.ResponseWriter = &simpleResponseWriter{}
-
-func (*simpleResponseWriter) WriteHeader(code int)         {}
-func (*simpleResponseWriter) Write(bs []byte) (int, error) { return len(bs), nil }
-func (*simpleResponseWriter) Header() http.Header          { return http.Header{} }
+func (*simpleResponseWriter) WriteHeader(code int) {}
 
 type fancyResponseWriter struct {
 	simpleResponseWriter
@@ -89,85 +49,18 @@ func (*fancyResponseWriter) Flush() {}
 func (*fancyResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) { return nil, nil, nil }
 
 func TestConstructResponseWriter(t *testing.T) {
-	actual := decorateResponseWriter(&simpleResponseWriter{}, nil, nil)
+	actual := decorateResponseWriter(&simpleResponseWriter{}, ioutil.Discard, "")
 	switch v := actual.(type) {
 	case *auditResponseWriter:
 	default:
 		t.Errorf("Expected auditResponseWriter, got %v", reflect.TypeOf(v))
 	}
 
-	actual = decorateResponseWriter(&fancyResponseWriter{}, nil, nil)
+	actual = decorateResponseWriter(&fancyResponseWriter{}, ioutil.Discard, "")
 	switch v := actual.(type) {
 	case *fancyResponseWriterDelegator:
 	default:
 		t.Errorf("Expected fancyResponseWriterDelegator, got %v", reflect.TypeOf(v))
-	}
-}
-
-func TestDecorateResponseWriterWithoutChannel(t *testing.T) {
-	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(&simpleResponseWriter{}, ev, nil)
-
-	// write status. This will not block because firstEventSentCh is nil
-	actual.WriteHeader(42)
-	if ev.ResponseStatus == nil {
-		t.Fatalf("Expected ResponseStatus to be non-nil")
-	}
-	if ev.ResponseStatus.Code != 42 {
-		t.Errorf("expected status code 42, got %d", ev.ResponseStatus.Code)
-	}
-}
-
-func TestDecorateResponseWriterWithImplicitWrite(t *testing.T) {
-	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(&simpleResponseWriter{}, ev, nil)
-
-	// write status. This will not block because firstEventSentCh is nil
-	actual.Write([]byte("foo"))
-	if ev.ResponseStatus == nil {
-		t.Fatalf("Expected ResponseStatus to be non-nil")
-	}
-	if ev.ResponseStatus.Code != 200 {
-		t.Errorf("expected status code 200, got %d", ev.ResponseStatus.Code)
-	}
-}
-
-func TestDecorateResponseWriterChannel(t *testing.T) {
-	sink := &fakeAuditSink{}
-	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(&simpleResponseWriter{}, ev, sink)
-
-	done := make(chan struct{})
-	go func() {
-		t.Log("Writing status code 42")
-		actual.WriteHeader(42)
-		t.Log("Finished writing status code 42")
-		close(done)
-
-		actual.Write([]byte("foo"))
-	}()
-
-	// sleep some time to give write the possibility to do wrong stuff
-	time.Sleep(100 * time.Millisecond)
-
-	t.Log("Waiting for event in the channel")
-	ev1, err := sink.Pop(time.Second)
-	if err != nil {
-		t.Fatal("Timeout waiting for events")
-	}
-	t.Logf("Seen event with status %v", ev1.ResponseStatus)
-
-	if ev != ev1 {
-		t.Fatalf("ev1 and ev must be equal")
-	}
-
-	<-done
-	t.Log("Seen the go routine finished")
-
-	// write again
-	_, err = actual.Write([]byte("foo"))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
 	}
 }
 
@@ -178,245 +71,32 @@ func (*fakeHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func TestAudit(t *testing.T) {
-	writingShortRunningPrefix := func(stage string) string {
-		return fmt.Sprintf(`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="%s" ip="127.0.0.1" method="update" user="admin" groups="<none>" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods/foo"`, stage)
+	var buf bytes.Buffer
+
+	handler := WithAudit(&fakeHTTPHandler{}, &fakeRequestContextMapper{
+		user: &user.DefaultInfo{Name: "admin"},
+	}, &buf)
+
+	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req.RemoteAddr = "127.0.0.1"
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	line := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(line) != 2 {
+		t.Fatalf("Unexpected amount of lines in audit log: %d", len(line))
 	}
-	readOnlyShortRunningPrefix := func(stage string) string {
-		return fmt.Sprintf(`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="%s" ip="127.0.0.1" method="get" user="admin" groups="<none>" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods/foo"`, stage)
+	match, err := regexp.MatchString(`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" ip="127.0.0.1" method="GET" user="admin" groups="<none>" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods"`, line[0])
+	if err != nil {
+		t.Errorf("Unexpected error matching first line: %v", err)
 	}
-	longRunningPrefix := func(stage string) string {
-		return fmt.Sprintf(`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="%s" ip="127.0.0.1" method="watch" user="admin" groups="<none>" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods\?watch=true"`, stage)
+	if !match {
+		t.Errorf("Unexpected first line of audit: %s", line[0])
 	}
-
-	shortRunningPath := "/api/v1/namespaces/default/pods/foo"
-	longRunningPath := "/api/v1/namespaces/default/pods?watch=true"
-
-	delay := 500 * time.Millisecond
-
-	for _, test := range []struct {
-		desc     string
-		path     string
-		verb     string
-		handler  func(http.ResponseWriter, *http.Request)
-		expected []string
-	}{
-		// short running requests with read-only verb
-		{
-			"read-only empty",
-			shortRunningPath,
-			"GET",
-			func(http.ResponseWriter, *http.Request) {},
-			[]string{
-				readOnlyShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				readOnlyShortRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
-			},
-		},
-		{
-			"read-only panic",
-			shortRunningPath,
-			"GET",
-			func(w http.ResponseWriter, req *http.Request) {
-				panic("kaboom")
-			},
-			[]string{
-				readOnlyShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				readOnlyShortRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
-			},
-		},
-
-		// short running request with non-read-only verb
-		{
-			"writing empty",
-			shortRunningPath,
-			"PUT",
-			func(http.ResponseWriter, *http.Request) {},
-			[]string{
-				writingShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				writingShortRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
-			},
-		},
-		{
-			"writing sleep",
-			shortRunningPath,
-			"PUT",
-			func(http.ResponseWriter, *http.Request) {
-				time.Sleep(delay)
-			},
-			[]string{
-				writingShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				writingShortRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
-			},
-		},
-		{
-			"writing 403+write",
-			shortRunningPath,
-			"PUT",
-			func(w http.ResponseWriter, req *http.Request) {
-				w.WriteHeader(403)
-				w.Write([]byte("foo"))
-			},
-			[]string{
-				writingShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				writingShortRunningPrefix(auditinternal.StageResponseComplete) + ` response="403"`,
-			},
-		},
-		{
-			"writing panic",
-			shortRunningPath,
-			"PUT",
-			func(w http.ResponseWriter, req *http.Request) {
-				panic("kaboom")
-			},
-			[]string{
-				writingShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				writingShortRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
-			},
-		},
-		{
-			"writing write+panic",
-			shortRunningPath,
-			"PUT",
-			func(w http.ResponseWriter, req *http.Request) {
-				w.Write([]byte("foo"))
-				panic("kaboom")
-			},
-			[]string{
-				writingShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				writingShortRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
-			},
-		},
-
-		// long running requests
-		{
-			"empty longrunning",
-			longRunningPath,
-			"GET",
-			func(http.ResponseWriter, *http.Request) {},
-			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="200"`,
-				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
-			},
-		},
-		{
-			"sleep longrunning",
-			longRunningPath,
-			"GET",
-			func(http.ResponseWriter, *http.Request) {
-				time.Sleep(delay)
-			},
-			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="200"`,
-				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
-			},
-		},
-		{
-			"sleep+403 longrunning",
-			longRunningPath,
-			"GET",
-			func(w http.ResponseWriter, req *http.Request) {
-				time.Sleep(delay)
-				w.WriteHeader(403)
-			},
-			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="403"`,
-				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="403"`,
-			},
-		},
-		{
-			"write longrunning",
-			longRunningPath,
-			"GET",
-			func(w http.ResponseWriter, req *http.Request) {
-				w.Write([]byte("foo"))
-			},
-			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="200"`,
-				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
-			},
-		},
-		{
-			"403+write longrunning",
-			longRunningPath,
-			"GET",
-			func(w http.ResponseWriter, req *http.Request) {
-				w.WriteHeader(403)
-				w.Write([]byte("foo"))
-			},
-			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="403"`,
-				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="403"`,
-			},
-		},
-		{
-			"panic longrunning",
-			longRunningPath,
-			"GET",
-			func(w http.ResponseWriter, req *http.Request) {
-				panic("kaboom")
-			},
-			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				longRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
-			},
-		},
-		{
-			"write+panic longrunning",
-			longRunningPath,
-			"GET",
-			func(w http.ResponseWriter, req *http.Request) {
-				w.Write([]byte("foo"))
-				panic("kaboom")
-			},
-			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
-				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="200"`,
-				longRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
-			},
-		},
-	} {
-		var buf bytes.Buffer
-		backend := pluginlog.NewBackend(&buf)
-		policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse)
-		handler := WithAudit(http.HandlerFunc(test.handler), &fakeRequestContextMapper{
-			user: &user.DefaultInfo{Name: "admin"},
-		}, backend, policyChecker, func(r *http.Request, ri *request.RequestInfo) bool {
-			// simplified long-running check
-			return ri.Verb == "watch"
-		})
-
-		req, _ := http.NewRequest(test.verb, test.path, nil)
-		req.RemoteAddr = "127.0.0.1"
-
-		func() {
-			defer func() {
-				recover()
-			}()
-			handler.ServeHTTP(httptest.NewRecorder(), req)
-		}()
-
-		t.Logf("[%s] audit log: %v", test.desc, buf.String())
-
-		line := strings.Split(strings.TrimSpace(buf.String()), "\n")
-		if len(line) != len(test.expected) {
-			t.Errorf("[%s] Unexpected amount of lines in audit log: %d", test.desc, len(line))
-			continue
-		}
-
-		for i, re := range test.expected {
-			match, err := regexp.MatchString(re, line[i])
-			if err != nil {
-				t.Errorf("[%s] Unexpected error matching line %d: %v", test.desc, i, err)
-				continue
-			}
-			if !match {
-				t.Errorf("[%s] Unexpected line %d of audit: %s", test.desc, i, line[i])
-			}
-		}
+	match, err = regexp.MatchString(`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" response="200"`, line[1])
+	if err != nil {
+		t.Errorf("Unexpected error matching second line: %v", err)
+	}
+	if !match {
+		t.Errorf("Unexpected second line of audit: %s", line[1])
 	}
 }
 
@@ -444,29 +124,29 @@ func (*fakeRequestContextMapper) Update(req *http.Request, context request.Conte
 }
 
 func TestAuditNoPanicOnNilUser(t *testing.T) {
-	policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse)
-	handler := WithAudit(&fakeHTTPHandler{}, &fakeRequestContextMapper{}, &fakeAuditSink{}, policyChecker, nil)
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
-	req.RemoteAddr = "127.0.0.1"
-	handler.ServeHTTP(httptest.NewRecorder(), req)
-}
+	var buf bytes.Buffer
 
-func TestAuditLevelNone(t *testing.T) {
-	sink := &fakeAuditSink{}
-	var handler http.Handler
-	handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(200)
-	})
-	policyChecker := policy.FakeChecker(auditinternal.LevelNone)
-	handler = WithAudit(handler, &fakeRequestContextMapper{
-		user: &user.DefaultInfo{Name: "admin"},
-	}, sink, policyChecker, nil)
+	handler := WithAudit(&fakeHTTPHandler{}, &fakeRequestContextMapper{}, &buf)
 
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
-
 	handler.ServeHTTP(httptest.NewRecorder(), req)
-	if len(sink.events) > 0 {
-		t.Errorf("Generated events, but should not have: %#v", sink.events)
+	line := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(line) != 2 {
+		t.Fatalf("Unexpected amount of lines in audit log: %d", len(line))
+	}
+	match, err := regexp.MatchString(`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" ip="127.0.0.1" method="GET" user="<none>" groups="<none>" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods"`, line[0])
+	if err != nil {
+		t.Errorf("Unexpected error matching first line: %v", err)
+	}
+	if !match {
+		t.Errorf("Unexpected first line of audit: %s", line[0])
+	}
+	match, err = regexp.MatchString(`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" response="200"`, line[1])
+	if err != nil {
+		t.Errorf("Unexpected error matching second line: %v", err)
+	}
+	if !match {
+		t.Errorf("Unexpected second line of audit: %s", line[1])
 	}
 }

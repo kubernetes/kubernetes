@@ -224,6 +224,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 
 		if o.Local || o.DryRun {
+			fmt.Fprintln(o.Out, "running in local/dry-run mode...")
 			return o.PrintObject(o.Mapper, info.Object, o.Out)
 		}
 

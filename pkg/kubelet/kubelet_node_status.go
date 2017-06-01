@@ -246,14 +246,6 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		glog.Infof("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
 
-	if kl.kubeletConfiguration.KeepTerminatedPodVolumes {
-		if node.Annotations == nil {
-			node.Annotations = make(map[string]string)
-		}
-		glog.Infof("Setting node annotation to keep pod volumes of terminated pods attached to the node")
-		node.Annotations[volumehelper.KeepTerminatedPodVolumesAnnotation] = "true"
-	}
-
 	// @question: should this be place after the call to the cloud provider? which also applies labels
 	for k, v := range kl.nodeLabels {
 		if cv, found := node.ObjectMeta.Labels[k]; found {
@@ -568,10 +560,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		value := *(v.Copy())
 		if res, exists := allocatableReservation[k]; exists {
 			value.Sub(res)
-		}
-		if value.Sign() < 0 {
-			// Negative Allocatable resources don't make sense.
-			value.Set(0)
 		}
 		node.Status.Allocatable[k] = value
 	}

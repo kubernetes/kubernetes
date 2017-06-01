@@ -108,15 +108,13 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 	source, readOnly := getVolumeSource(spec)
 	return &flexVolumeMounter{
 		flexVolume: &flexVolume{
-			driverName:            source.Driver,
-			execPath:              plugin.getExecutable(),
-			mounter:               mounter,
-			plugin:                plugin,
-			podName:               pod.Name,
-			podUID:                pod.UID,
-			podNamespace:          pod.Namespace,
-			podServiceAccountName: pod.Spec.ServiceAccountName,
-			volName:               spec.Name(),
+			driverName:   source.Driver,
+			execPath:     plugin.getExecutable(),
+			mounter:      mounter,
+			plugin:       plugin,
+			podUID:       pod.UID,
+			podNamespace: pod.Namespace,
+			volName:      spec.Name(),
 		},
 		runner:             runner,
 		spec:               spec,

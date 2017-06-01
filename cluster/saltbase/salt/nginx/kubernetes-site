@@ -1,0 +1,66 @@
+#server {
+	#listen   80; ## listen for ipv4; this line is default and implied
+	#listen   [::]:80 default_server ipv6only=on; ## listen for ipv6
+
+#	root /usr/share/nginx/www;
+#	index index.html index.htm;
+
+	# Make site accessible from http://localhost/
+#	server_name localhost;
+#       location / {
+#         auth_basic            "Restricted";
+#          auth_basic_user_file  /usr/share/nginx/htpasswd;
+
+          # Proxy settings.
+#          proxy_pass http://localhost:8080/;
+#          proxy_connect_timeout 159s;
+#          proxy_send_timeout   600s;
+#          proxy_read_timeout   600s;
+#          proxy_buffer_size    64k;
+#          proxy_buffers     16 32k;
+#          proxy_busy_buffers_size 64k;
+#          proxy_temp_file_write_size 64k;
+#        }
+#}
+
+# HTTPS server
+#
+server {
+        listen 443;
+        server_name localhost;
+
+        root html;
+        index index.html index.htm;
+
+        ssl on;
+        ssl_certificate /srv/kubernetes/server.cert;
+        ssl_certificate_key /srv/kubernetes/server.key;
+
+        ssl_session_timeout 5m;
+
+        # don't use SSLv3 because of POODLE
+        ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+        ssl_ciphers ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+3DES:!aNULL:!MD5:!DSS;
+        ssl_prefer_server_ciphers on;
+
+        location / {
+          auth_basic            "Restricted";
+          auth_basic_user_file  /usr/share/nginx/htpasswd;
+
+          # Proxy settings
+          # disable buffering so that watch works
+          proxy_buffering off;
+          proxy_pass http://127.0.0.1:8080/;
+          proxy_connect_timeout 159s;
+          proxy_send_timeout   600s;
+          proxy_read_timeout   600s;
+
+          # Disable retry
+          proxy_next_upstream off;
+
+          # Support web sockets
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+        }
+}

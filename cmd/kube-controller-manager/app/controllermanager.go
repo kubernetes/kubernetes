@@ -32,6 +32,7 @@ import (
 	"strconv"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -191,20 +192,21 @@ func Run(s *options.CMServer) error {
 		return err
 	}
 
-	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
-		"kube-system",
-		"kube-controller-manager",
-		leaderElectionClient,
-		resourcelock.ResourceLockConfig{
+	// TODO: enable other lock types
+	rl := resourcelock.EndpointsLock{
+		EndpointsMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "kube-controller-manager",
+		},
+		Client: leaderElectionClient,
+		LockConfig: resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
-		})
-	if err != nil {
-		glog.Fatalf("error creating lock: %v", err)
+		},
 	}
 
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
-		Lock:          rl,
+		Lock:          &rl,
 		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
 		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
@@ -307,10 +309,9 @@ func NewControllerInitializers() map[string]InitFunc {
 	controllers["replicaset"] = startReplicaSetController
 	controllers["horizontalpodautoscaling"] = startHPAController
 	controllers["disruption"] = startDisruptionController
-	controllers["statefulset"] = startStatefulSetController
+	controllers["statefuleset"] = startStatefulSetController
 	controllers["cronjob"] = startCronJobController
-	controllers["csrsigning"] = startCSRSigningController
-	controllers["csrapproving"] = startCSRApprovingController
+	controllers["certificatesigningrequests"] = startCSRController
 	controllers["ttl"] = startTTLController
 	controllers["bootstrapsigner"] = startBootstrapSignerController
 	controllers["tokencleaner"] = startTokenCleanerController
@@ -398,20 +399,14 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 				rootCA = rootClientBuilder.ConfigOrDie("tokens-controller").CAData
 			}
 
-			controller := serviceaccountcontroller.NewTokensController(
-				sharedInformers.Core().V1().ServiceAccounts(),
-				sharedInformers.Core().V1().Secrets(),
+			go serviceaccountcontroller.NewTokensController(
 				rootClientBuilder.ClientOrDie("tokens-controller"),
 				serviceaccountcontroller.TokensControllerOptions{
 					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
 					RootCA:         rootCA,
 				},
-			)
+			).Run(int(s.ConcurrentSATokenSyncs), stop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
-			go controller.Run(int(s.ConcurrentSATokenSyncs), stop)
-
-			// start the first set of informers now so that other controllers can start
-			sharedInformers.Start(stop)
 		}
 
 	} else {
@@ -456,11 +451,6 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	if err != nil {
 		return fmt.Errorf("cloud provider could not be initialized: %v", err)
-	}
-
-	if cloud != nil {
-		// Initialize the cloud provider with a reference to the clientBuilder
-		cloud.Initialize(clientBuilder)
 	}
 
 	if ctx.IsControllerEnabled(nodeControllerName) {
@@ -579,7 +569,8 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 				cloud,
 				ProbeAttachableVolumePlugins(s.VolumeConfiguration),
 				s.DisableAttachDetachReconcilerSync,
-				s.ReconcilerSyncLoopPeriod.Duration)
+				s.ReconcilerSyncLoopPeriod.Duration,
+			)
 		if attachDetachControllerErr != nil {
 			return fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 		}

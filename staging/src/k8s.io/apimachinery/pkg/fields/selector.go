@@ -40,8 +40,6 @@ type Selector interface {
 
 	// Transform returns a new copy of the selector after TransformFunc has been
 	// applied to the entire selector, or an error if fn returns an error.
-	// If for a given requirement both field and value are transformed to empty
-	// string, the requirement is skipped.
 	Transform(fn TransformFunc) (Selector, error)
 
 	// Requirements converts this interface to Requirements to expose
@@ -81,9 +79,6 @@ func (t *hasTerm) Transform(fn TransformFunc) (Selector, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(field) == 0 && len(value) == 0 {
-		return Everything(), nil
-	}
 	return &hasTerm{field, value}, nil
 }
 
@@ -119,9 +114,6 @@ func (t *notHasTerm) Transform(fn TransformFunc) (Selector, error) {
 	field, value, err := fn(t.field, t.value)
 	if err != nil {
 		return nil, err
-	}
-	if len(field) == 0 && len(value) == 0 {
-		return Everything(), nil
 	}
 	return &notHasTerm{field, value}, nil
 }
@@ -177,15 +169,13 @@ func (t andTerm) RequiresExactMatch(field string) (string, bool) {
 }
 
 func (t andTerm) Transform(fn TransformFunc) (Selector, error) {
-	next := make([]Selector, 0, len([]Selector(t)))
-	for _, s := range []Selector(t) {
+	next := make([]Selector, len([]Selector(t)))
+	for i, s := range []Selector(t) {
 		n, err := s.Transform(fn)
 		if err != nil {
 			return nil, err
 		}
-		if !n.Empty() {
-			next = append(next, n)
-		}
+		next[i] = n
 	}
 	return andTerm(next), nil
 }
@@ -232,7 +222,7 @@ var valueEscaper = strings.NewReplacer(
 	`=`, `\=`,
 )
 
-// EscapeValue escapes an arbitrary literal string for use as a fieldSelector value
+// Escapes an arbitrary literal string for use as a fieldSelector value
 func EscapeValue(s string) string {
 	return valueEscaper.Replace(s)
 }
@@ -255,7 +245,7 @@ func (i UnescapedRune) Error() string {
 	return fmt.Sprintf("invalid field selector: unescaped character in value: %v", i.r)
 }
 
-// UnescapeValue unescapes a fieldSelector value and returns the original literal value.
+// Unescapes a fieldSelector value and returns the original literal value.
 // May return the original string if it contains no escaped or special characters.
 func UnescapeValue(s string) (string, error) {
 	// if there's no escaping or special characters, just return to avoid allocation
@@ -317,12 +307,12 @@ func ParseSelector(selector string) (Selector, error) {
 		})
 }
 
-// ParseAndTransformSelector parses the selector and runs them through the given TransformFunc.
+// Parses the selector and runs them through the given TransformFunc.
 func ParseAndTransformSelector(selector string, fn TransformFunc) (Selector, error) {
 	return parseSelector(selector, fn)
 }
 
-// TransformFunc transforms selectors.
+// Function to transform selectors.
 type TransformFunc func(field, value string) (newField, newValue string, err error)
 
 // splitTerms returns the comma-separated terms contained in the given fieldSelector.

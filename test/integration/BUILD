@@ -39,7 +39,6 @@ filegroup(
         "//test/integration/client:all-srcs",
         "//test/integration/configmap:all-srcs",
         "//test/integration/defaulttolerationseconds:all-srcs",
-        "//test/integration/deployment:all-srcs",
         "//test/integration/etcd:all-srcs",
         "//test/integration/evictions:all-srcs",
         "//test/integration/examples:all-srcs",

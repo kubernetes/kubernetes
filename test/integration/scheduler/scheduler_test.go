@@ -76,8 +76,8 @@ func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo
 // from configurations provided by a ConfigMap object and then verifies that the
 // configuration is applied correctly.
 func TestSchedulerCreationFromConfigMap(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	_, s := framework.RunAMaster(nil)
+	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("configmap", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -122,7 +122,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	ss.PolicyConfigMapName = configPolicyName
 	sched, err := app.CreateScheduler(ss, clientSet,
 		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -156,8 +155,8 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 // TestSchedulerCreationFromNonExistentConfigMap ensures that creation of the
 // scheduler from a non-existent ConfigMap fails.
 func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	_, s := framework.RunAMaster(nil)
+	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("configmap", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -175,7 +174,6 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 
 	_, err := app.CreateScheduler(ss, clientSet,
 		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -193,8 +191,8 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 // TestSchedulerCreationInLegacyMode ensures that creation of the scheduler
 // works fine when legacy mode is enabled.
 func TestSchedulerCreationInLegacyMode(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	_, s := framework.RunAMaster(nil)
+	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("configmap", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -213,7 +211,6 @@ func TestSchedulerCreationInLegacyMode(t *testing.T) {
 
 	sched, err := app.CreateScheduler(ss, clientSet,
 		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -235,8 +232,8 @@ func TestSchedulerCreationInLegacyMode(t *testing.T) {
 }
 
 func TestUnschedulableNodes(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	_, s := framework.RunAMaster(nil)
+	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("unschedulable-nodes", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -248,7 +245,6 @@ func TestUnschedulableNodes(t *testing.T) {
 		v1.DefaultSchedulerName,
 		clientSet,
 		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -492,7 +488,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 }
 
 func TestMultiScheduler(t *testing.T) {
-	_, s, _ := framework.RunAMaster(nil)
+	_, s := framework.RunAMaster(nil)
 	// TODO: Uncomment when fix #19254
 	// This seems to be a different issue - it still doesn't work.
 	// defer s.Close()
@@ -531,7 +527,6 @@ func TestMultiScheduler(t *testing.T) {
 		v1.DefaultSchedulerName,
 		clientSet,
 		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -617,7 +612,6 @@ func TestMultiScheduler(t *testing.T) {
 		"foo-scheduler",
 		clientSet2,
 		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -709,8 +703,8 @@ func createPod(client clientset.Interface, name string, scheduler string) *v1.Po
 
 // This test will verify scheduler can work well regardless of whether kubelet is allocatable aware or not.
 func TestAllocatable(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	_, s := framework.RunAMaster(nil)
+	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("allocatable", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -727,7 +721,6 @@ func TestAllocatable(t *testing.T) {
 		v1.DefaultSchedulerName,
 		clientSet,
 		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),

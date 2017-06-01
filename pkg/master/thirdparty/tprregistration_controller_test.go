@@ -25,8 +25,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
-	crdlisters "k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/internalversion"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	listers "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
 )
@@ -58,18 +56,17 @@ func TestEnqueue(t *testing.T) {
 	}
 }
 
-func TestHandleVersionUpdate(t *testing.T) {
+func TestHandleTPR(t *testing.T) {
 	tests := []struct {
 		name         string
 		startingTPRs []*extensions.ThirdPartyResource
-		startingCRDs []*apiextensions.CustomResourceDefinition
 		version      schema.GroupVersion
 
 		expectedAdded   []*apiregistration.APIService
 		expectedRemoved []string
 	}{
 		{
-			name: "simple add tpr",
+			name: "simple add",
 			startingTPRs: []*extensions.ThirdPartyResource{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "resource.group.com"},
@@ -92,49 +89,12 @@ func TestHandleVersionUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "simple remove tpr",
+			name: "simple remove",
 			startingTPRs: []*extensions.ThirdPartyResource{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "resource.group.com"},
 					Versions: []extensions.APIVersion{
 						{Name: "v1"},
-					},
-				},
-			},
-			version: schema.GroupVersion{Group: "group.com", Version: "v2"},
-
-			expectedRemoved: []string{"v2.group.com"},
-		},
-		{
-			name: "simple add crd",
-			startingCRDs: []*apiextensions.CustomResourceDefinition{
-				{
-					Spec: apiextensions.CustomResourceDefinitionSpec{
-						Group:   "group.com",
-						Version: "v1",
-					},
-				},
-			},
-			version: schema.GroupVersion{Group: "group.com", Version: "v1"},
-
-			expectedAdded: []*apiregistration.APIService{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "v1.group.com"},
-					Spec: apiregistration.APIServiceSpec{
-						Group:    "group.com",
-						Version:  "v1",
-						Priority: 500,
-					},
-				},
-			},
-		},
-		{
-			name: "simple remove crd",
-			startingCRDs: []*apiextensions.CustomResourceDefinition{
-				{
-					Spec: apiextensions.CustomResourceDefinitionSpec{
-						Group:   "group.com",
-						Version: "v1",
 					},
 				},
 			},
@@ -148,21 +108,15 @@ func TestHandleVersionUpdate(t *testing.T) {
 		registration := &fakeAPIServiceRegistration{}
 		tprCache := cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		tprLister := listers.NewThirdPartyResourceLister(tprCache)
-		crdCache := cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-		crdLister := crdlisters.NewCustomResourceDefinitionLister(crdCache)
 		c := tprRegistrationController{
 			tprLister:              tprLister,
-			crdLister:              crdLister,
 			apiServiceRegistration: registration,
 		}
 		for i := range test.startingTPRs {
 			tprCache.Add(test.startingTPRs[i])
 		}
-		for i := range test.startingCRDs {
-			crdCache.Add(test.startingCRDs[i])
-		}
 
-		c.handleVersionUpdate(test.version)
+		c.handleTPR(test.version)
 
 		if !reflect.DeepEqual(test.expectedAdded, registration.added) {
 			t.Errorf("%s expected %v, got %v", test.name, test.expectedAdded, registration.added)

@@ -77,6 +77,3 @@ spec:
         hostPath:
           path: /etc/localtime
       serviceAccountName: node-problem-detector
-      tolerations:
-      - operator: "Exists"
-        effect: "NoExecute"

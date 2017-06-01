@@ -31,23 +31,16 @@ var (
 )
 
 func main() {
-	var errorCount int
+	errors := []error{}
 
 	kubectl := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
-	errors := cmdsanity.RunCmdChecks(kubectl, cmdsanity.AllCmdChecks, []string{})
-	for _, err := range errors {
-		errorCount++
-		fmt.Fprintf(os.Stderr, "     %d. %s\n", errorCount, err)
-	}
+	result := cmdsanity.CheckCmdTree(kubectl, cmdsanity.AllCmdChecks, []string{})
+	errors = append(errors, result...)
 
-	errors = cmdsanity.RunGlobalChecks(cmdsanity.AllGlobalChecks)
-	for _, err := range errors {
-		errorCount++
-		fmt.Fprintf(os.Stderr, "     %d. %s\n", errorCount, err)
-	}
-
-	if errorCount > 0 {
-		fmt.Fprintf(os.Stdout, "Found %d errors.\n", errorCount)
+	if len(errors) > 0 {
+		for i, err := range errors {
+			fmt.Fprintf(os.Stderr, "%d. %s\n\n", i+1, err)
+		}
 		os.Exit(1)
 	}
 

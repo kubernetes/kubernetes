@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"net/http"
-	"net/url"
 	"time"
 
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
@@ -31,15 +30,13 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/util/proxy"
 	kubeinformers "k8s.io/client-go/informers"
 	kubeclientset "k8s.io/client-go/kubernetes"
-	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/pkg/version"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
@@ -73,19 +70,6 @@ func init() {
 // legacyAPIServiceName is the fixed name of the only non-groupified API version
 const legacyAPIServiceName = "v1."
 
-type ServiceResolver interface {
-	ResolveEndpoint(namespace, name string) (*url.URL, error)
-}
-
-type aggregatorEndpointRouting struct {
-	services  listersv1.ServiceLister
-	endpoints listersv1.EndpointsLister
-}
-
-type aggregatorClusterRouting struct {
-	services listersv1.ServiceLister
-}
-
 type Config struct {
 	GenericConfig       *genericapiserver.Config
 	CoreAPIServerClient kubeclientset.Interface
@@ -94,9 +78,6 @@ type Config struct {
 	// this to confirm the proxy's identity
 	ProxyClientCert []byte
 	ProxyClientKey  []byte
-
-	// Indicates if the Aggregator should send to the cluster IP (false) or route to the endpoints IP (true)
-	EnableAggregatorRouting bool
 }
 
 // APIAggregator contains state for a Kubernetes cluster master/api server.
@@ -123,9 +104,6 @@ type APIAggregator struct {
 
 	// provided for easier embedding
 	APIRegistrationInformers informers.SharedInformerFactory
-
-	// Information needed to determine routing for the aggregator
-	routing ServiceResolver
 }
 
 type completedConfig struct {
@@ -150,17 +128,9 @@ func (c *Config) SkipComplete() completedConfig {
 	return completedConfig{c}
 }
 
-func (r *aggregatorEndpointRouting) ResolveEndpoint(namespace, name string) (*url.URL, error) {
-	return proxy.ResolveEndpoint(r.services, r.endpoints, namespace, name)
-}
-
-func (r *aggregatorClusterRouting) ResolveEndpoint(namespace, name string) (*url.URL, error) {
-	return proxy.ResolveCluster(r.services, namespace, name)
-}
-
 // New returns a new instance of APIAggregator from the given config.
-func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
-	genericServer, err := c.Config.GenericConfig.SkipComplete().New("kube-aggregator", delegationTarget) // completion is done in Complete, no need for a second time
+func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget, stopCh <-chan struct{}) (*APIAggregator, error) {
+	genericServer, err := c.Config.GenericConfig.SkipComplete().New(delegationTarget) // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
 	}
@@ -175,18 +145,6 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	)
 	kubeInformers := kubeinformers.NewSharedInformerFactory(c.CoreAPIServerClient, 5*time.Minute)
 
-	var routing ServiceResolver
-	if c.EnableAggregatorRouting {
-		routing = &aggregatorEndpointRouting{
-			services:  kubeInformers.Core().V1().Services().Lister(),
-			endpoints: kubeInformers.Core().V1().Endpoints().Lister(),
-		}
-	} else {
-		routing = &aggregatorClusterRouting{
-			services: kubeInformers.Core().V1().Services().Lister(),
-		}
-	}
-
 	s := &APIAggregator{
 		GenericAPIServer: genericServer,
 		delegateHandler:  delegationTarget.UnprotectedHandler(),
@@ -197,16 +155,15 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		handledGroups:    sets.String{},
 		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
 		APIRegistrationInformers: informerFactory,
-		routing:                  routing,
 	}
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
-	apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
-	v1beta1storage := map[string]rest.Storage{}
+	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
+	v1alpha1storage := map[string]rest.Storage{}
 	apiServiceREST := apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
-	v1beta1storage["apiservices"] = apiServiceREST
-	v1beta1storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
-	apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = v1beta1storage
+	v1alpha1storage["apiservices"] = apiServiceREST
+	v1alpha1storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
+	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
 
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
@@ -215,10 +172,9 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	apisHandler := &apisHandler{
 		codecs: Codecs,
 		lister: s.lister,
-		mapper: s.contextMapper,
 	}
-	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
-	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle("/apis", apisHandler)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), kubeInformers.Core().V1().Services(), s)
 	availableController := statuscontrollers.NewAvailableConditionController(
@@ -229,16 +185,16 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	)
 
 	s.GenericAPIServer.AddPostStartHook("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
-		informerFactory.Start(context.StopCh)
-		kubeInformers.Start(context.StopCh)
+		informerFactory.Start(stopCh)
+		kubeInformers.Start(stopCh)
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHook("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
-		go apiserviceRegistrationController.Run(context.StopCh)
+		go apiserviceRegistrationController.Run(stopCh)
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHook("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
-		go availableController.Run(context.StopCh)
+		go availableController.Run(stopCh)
 		return nil
 	})
 
@@ -247,11 +203,11 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.
 // It's a slow moving API, so its ok to run the controller on a single thread
-func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
+func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService, destinationHost string) {
 	// if the proxyHandler already exists, it needs to be updated. The aggregation bits do not
 	// since they are wired against listers because they require multiple resources to respond
 	if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
-		proxyHandler.updateAPIService(apiService)
+		proxyHandler.updateAPIService(apiService, destinationHost)
 		return
 	}
 
@@ -267,12 +223,11 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
 		localDelegate:   s.delegateHandler,
 		proxyClientCert: s.proxyClientCert,
 		proxyClientKey:  s.proxyClientKey,
-		routing:         s.routing,
 	}
-	proxyHandler.updateAPIService(apiService)
+	proxyHandler.updateAPIService(apiService, destinationHost)
 	s.proxyHandlers[apiService.Name] = proxyHandler
-	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandler)
-	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandler)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle(proxyPath, proxyHandler)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandler)
 
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {
@@ -287,15 +242,14 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
 	// it's time to register the group aggregation endpoint
 	groupPath := "/apis/" + apiService.Spec.Group
 	groupDiscoveryHandler := &apiGroupHandler{
-		codecs:        Codecs,
-		groupName:     apiService.Spec.Group,
-		lister:        s.lister,
-		delegate:      s.delegateHandler,
-		contextMapper: s.contextMapper,
+		codecs:    Codecs,
+		groupName: apiService.Spec.Group,
+		lister:    s.lister,
+		delegate:  s.delegateHandler,
 	}
 	// aggregation is protected
-	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(groupPath, groupDiscoveryHandler)
-	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle(groupPath+"/", groupDiscoveryHandler)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.Handle(groupPath, groupDiscoveryHandler)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.UnlistedHandle(groupPath+"/", groupDiscoveryHandler)
 	s.handledGroups.Insert(apiService.Spec.Group)
 }
 
@@ -309,8 +263,8 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	if apiServiceName == legacyAPIServiceName {
 		proxyPath = "/api"
 	}
-	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(proxyPath)
-	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(proxyPath + "/")
+	s.GenericAPIServer.Handler.PostGoRestfulMux.Unregister(proxyPath)
+	s.GenericAPIServer.Handler.PostGoRestfulMux.Unregister(proxyPath + "/")
 	delete(s.proxyHandlers, apiServiceName)
 
 	// TODO unregister group level discovery when there are no more versions for the group

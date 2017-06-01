@@ -261,8 +261,7 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 	for _, test := range tests {
 		framework.Logf("Wait up to %v for host's (%v) %q to be %v", timeout, nodeIP, test.feature, condMsg)
 		err = wait.Poll(poll, timeout, func() (bool, error) {
-			result, err := framework.NodeExec(nodeIP, test.cmd)
-			Expect(err).NotTo(HaveOccurred())
+			result, _ := nodeExec(nodeIP, test.cmd)
 			framework.LogSSHResult(result)
 			ok := (result.Code == 0 && len(result.Stdout) > 0 && len(result.Stderr) == 0)
 			if expectClean && ok { // keep trying

@@ -24,27 +24,16 @@ import (
 )
 
 type notRegisteredErr struct {
-	gvk    schema.GroupVersionKind
-	target GroupVersioner
-	t      reflect.Type
+	gvk schema.GroupVersionKind
+	t   reflect.Type
 }
 
-func NewNotRegisteredErrForKind(gvk schema.GroupVersionKind) error {
-	return &notRegisteredErr{gvk: gvk}
-}
-
-func NewNotRegisteredErrForType(t reflect.Type) error {
-	return &notRegisteredErr{t: t}
-}
-
-func NewNotRegisteredErrForTarget(t reflect.Type, target GroupVersioner) error {
-	return &notRegisteredErr{t: t, target: target}
+// NewNotRegisteredErr is exposed for testing.
+func NewNotRegisteredErr(gvk schema.GroupVersionKind, t reflect.Type) error {
+	return &notRegisteredErr{gvk: gvk, t: t}
 }
 
 func (k *notRegisteredErr) Error() string {
-	if k.t != nil && k.target != nil {
-		return fmt.Sprintf("%v is not suitable for converting to %q", k.t, k.target)
-	}
 	if k.t != nil {
 		return fmt.Sprintf("no kind is registered for the type %v", k.t)
 	}

@@ -43,8 +43,6 @@ type PostStartHookFunc func(context PostStartHookContext) error
 type PostStartHookContext struct {
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
-	// StopCh is the channel that will be closed when the server stops
-	StopCh <-chan struct{}
 }
 
 // PostStartHookProvider is an interface in addition to provide a post start hook for the api server
@@ -91,27 +89,16 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 }
 
 // RunPostStartHooks runs the PostStartHooks for the server
-func (s *GenericAPIServer) RunPostStartHooks(stopCh <-chan struct{}) {
+func (s *GenericAPIServer) RunPostStartHooks() {
 	s.postStartHookLock.Lock()
 	defer s.postStartHookLock.Unlock()
 	s.postStartHooksCalled = true
 
-	context := PostStartHookContext{
-		LoopbackClientConfig: s.LoopbackClientConfig,
-		StopCh:               stopCh,
-	}
+	context := PostStartHookContext{LoopbackClientConfig: s.LoopbackClientConfig}
 
 	for hookName, hookEntry := range s.postStartHooks {
 		go runPostStartHook(hookName, hookEntry, context)
 	}
-}
-
-// isHookRegistered checks whether a given hook is registered
-func (s *GenericAPIServer) isHookRegistered(name string) bool {
-	s.postStartHookLock.Lock()
-	defer s.postStartHookLock.Unlock()
-	_, exists := s.postStartHooks[name]
-	return exists
 }
 
 func runPostStartHook(name string, entry postStartHookEntry, context PostStartHookContext) {
@@ -125,6 +112,7 @@ func runPostStartHook(name string, entry postStartHookEntry, context PostStartHo
 	if err != nil {
 		glog.Fatalf("PostStartHook %q failed: %v", name, err)
 	}
+
 	close(entry.done)
 }
 

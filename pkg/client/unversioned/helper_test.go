@@ -42,7 +42,7 @@ func TestSetKubernetesDefaults(t *testing.T) {
 			restclient.Config{
 				APIPath: "/api",
 				ContentConfig: restclient.ContentConfig{
-					GroupVersion:         &schema.GroupVersion{},
+					GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 					NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 				},
 			},

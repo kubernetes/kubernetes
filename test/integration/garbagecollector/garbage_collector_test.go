@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	"k8s.io/kubernetes/test/integration"
@@ -124,10 +123,10 @@ func newOwnerRC(name, namespace string) *v1.ReplicationController {
 	}
 }
 
-func setup(t *testing.T, stop chan struct{}) (*httptest.Server, framework.CloseFunc, *garbagecollector.GarbageCollector, clientset.Interface) {
+func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.EnableCoreControllers = false
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	_, s := framework.RunAMaster(masterConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
 	if err != nil {
@@ -147,37 +146,19 @@ func setup(t *testing.T, stop chan struct{}) (*httptest.Server, framework.CloseF
 	metaOnlyClientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
 	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
-	gc, err := garbagecollector.NewGarbageCollector(
-		metaOnlyClientPool,
-		clientPool,
-		api.Registry.RESTMapper(),
-		deletableGroupVersionResources,
-		garbagecollector.DefaultIgnoredResources(),
-		sharedInformers,
-	)
+	gc, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), deletableGroupVersionResources)
 	if err != nil {
 		t.Fatalf("Failed to create garbage collector")
 	}
-
-	go sharedInformers.Start(stop)
-
-	return s, closeFn, gc, clientSet
+	return s, gc, clientSet
 }
 
 // This test simulates the cascading deletion.
 func TestCascadingDeletion(t *testing.T) {
-	stopCh := make(chan struct{})
-
 	glog.V(6).Infof("TestCascadingDeletion starts")
 	defer glog.V(6).Infof("TestCascadingDeletion ends")
-	s, closeFn, gc, clientSet := setup(t, stopCh)
-	defer func() {
-		// We have to close the stop channel first, so the shared informers can terminate their watches;
-		// otherwise closeFn() will hang waiting for active client connections to finish.
-		close(stopCh)
-		closeFn()
-	}()
+	s, gc, clientSet := setup(t)
+	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("gc-cascading-deletion", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -234,7 +215,9 @@ func TestCascadingDeletion(t *testing.T) {
 	if len(pods.Items) != 3 {
 		t.Fatalf("Expect only 3 pods")
 	}
+	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
+	defer close(stopCh)
 	// delete one of the replication controller
 	if err := rcClient.Delete(toBeDeletedRCName, getNonOrphanOptions()); err != nil {
 		t.Fatalf("failed to delete replication controller: %v", err)
@@ -262,14 +245,8 @@ func TestCascadingDeletion(t *testing.T) {
 // This test simulates the case where an object is created with an owner that
 // doesn't exist. It verifies the GC will delete such an object.
 func TestCreateWithNonExistentOwner(t *testing.T) {
-	stopCh := make(chan struct{})
-	s, closeFn, gc, clientSet := setup(t, stopCh)
-	defer func() {
-		// We have to close the stop channel first, so the shared informers can terminate their watches;
-		// otherwise closeFn() will hang waiting for active client connections to finish.
-		close(stopCh)
-		closeFn()
-	}()
+	s, gc, clientSet := setup(t)
+	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("gc-non-existing-owner", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -290,7 +267,9 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	if len(pods.Items) != 1 {
 		t.Fatalf("Expect only 1 pod")
 	}
+	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
+	defer close(stopCh)
 	// wait for the garbage collector to delete the pod
 	if err := integration.WaitForPodToDisappear(podClient, garbageCollectedPodName, 5*time.Second, 30*time.Second); err != nil {
 		t.Fatalf("expect pod %s to be garbage collected, got err= %v", garbageCollectedPodName, err)
@@ -362,20 +341,15 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 // e2e tests that put more stress.
 func TestStressingCascadingDeletion(t *testing.T) {
 	t.Logf("starts garbage collector stress test")
-	stopCh := make(chan struct{})
-	s, closeFn, gc, clientSet := setup(t, stopCh)
-
-	defer func() {
-		// We have to close the stop channel first, so the shared informers can terminate their watches;
-		// otherwise closeFn() will hang waiting for active client connections to finish.
-		close(stopCh)
-		closeFn()
-	}()
+	s, gc, clientSet := setup(t)
+	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("gc-stressing-cascading-deletion", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
+	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
+	defer close(stopCh)
 
 	const collections = 10
 	var wg sync.WaitGroup
@@ -428,15 +402,8 @@ func TestStressingCascadingDeletion(t *testing.T) {
 }
 
 func TestOrphaning(t *testing.T) {
-	stopCh := make(chan struct{})
-	s, closeFn, gc, clientSet := setup(t, stopCh)
-
-	defer func() {
-		// We have to close the stop channel first, so the shared informers can terminate their watches;
-		// otherwise closeFn() will hang waiting for active client connections to finish.
-		close(stopCh)
-		closeFn()
-	}()
+	s, gc, clientSet := setup(t)
+	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("gc-orphaning", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -462,7 +429,9 @@ func TestOrphaning(t *testing.T) {
 		}
 		podUIDs = append(podUIDs, pod.ObjectMeta.UID)
 	}
+	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
+	defer close(stopCh)
 
 	// we need wait for the gc to observe the creation of the pods, otherwise if
 	// the deletion of RC is observed before the creation of the pods, the pods
@@ -504,15 +473,8 @@ func TestOrphaning(t *testing.T) {
 }
 
 func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
-	stopCh := make(chan struct{})
-	s, closeFn, gc, clientSet := setup(t, stopCh)
-
-	defer func() {
-		// We have to close the stop channel first, so the shared informers can terminate their watches;
-		// otherwise closeFn() will hang waiting for active client connections to finish.
-		close(stopCh)
-		closeFn()
-	}()
+	s, gc, clientSet := setup(t)
+	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("gc-foreground1", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -538,7 +500,9 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
+	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
+	defer close(stopCh)
 
 	err = rcClient.Delete(toBeDeletedRCName, getForegroundOptions())
 	if err != nil {
@@ -571,15 +535,8 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 }
 
 func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
-	stopCh := make(chan struct{})
-	s, closeFn, gc, clientSet := setup(t, stopCh)
-
-	defer func() {
-		// We have to close the stop channel first, so the shared informers can terminate their watches;
-		// otherwise closeFn() will hang waiting for active client connections to finish.
-		close(stopCh)
-		closeFn()
-	}()
+	s, gc, clientSet := setup(t)
+	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("gc-foreground2", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -613,7 +570,9 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
+	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
+	defer close(stopCh)
 
 	err = rcClient.Delete(toBeDeletedRCName, getForegroundOptions())
 	if err != nil {
@@ -644,15 +603,8 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 }
 
 func TestBlockingOwnerRefDoesBlock(t *testing.T) {
-	stopCh := make(chan struct{})
-	s, closeFn, gc, clientSet := setup(t, stopCh)
-
-	defer func() {
-		// We have to close the stop channel first, so the shared informers can terminate their watches;
-		// otherwise closeFn() will hang waiting for active client connections to finish.
-		close(stopCh)
-		closeFn()
-	}()
+	s, gc, clientSet := setup(t)
+	defer s.Close()
 
 	ns := framework.CreateTestingNamespace("gc-foreground3", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -675,7 +627,9 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
+	stopCh := make(chan struct{})
 	go gc.Run(5, stopCh)
+	defer close(stopCh)
 
 	// this makes sure the garbage collector will have added the pod to its
 	// dependency graph before handling the foreground deletion of the rc.

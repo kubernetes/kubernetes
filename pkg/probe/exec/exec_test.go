@@ -30,10 +30,6 @@ type FakeCmd struct {
 	err    error
 }
 
-func (f *FakeCmd) Run() error {
-	return nil
-}
-
 func (f *FakeCmd) CombinedOutput() ([]byte, error) {
 	return f.out, f.err
 }
@@ -47,8 +43,6 @@ func (f *FakeCmd) SetDir(dir string) {}
 func (f *FakeCmd) SetStdin(in io.Reader) {}
 
 func (f *FakeCmd) SetStdout(out io.Writer) {}
-
-func (f *FakeCmd) SetStderr(out io.Writer) {}
 
 func (f *FakeCmd) Stop() {}
 

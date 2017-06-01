@@ -18,26 +18,23 @@ package sync
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/client-go/util/workqueue"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util/clusterselector"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
@@ -72,9 +69,6 @@ type FederationSyncController struct {
 	store cache.Store
 	// Informer controller for resources that should be federated.
 	controller cache.Controller
-
-	// Work queue allowing parallel processing of resources
-	workQueue workqueue.Interface
 
 	// Backoff manager
 	backoff *flowcontrol.Backoff
@@ -116,7 +110,6 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 		clusterAvailableDelay: time.Second * 20,
 		smallDelay:            time.Second * 3,
 		updateTimeout:         time.Second * 30,
-		workQueue:             workqueue.New(),
 		backoff:               flowcontrol.NewBackOff(5*time.Second, time.Minute),
 		eventRecorder:         recorder,
 		adapter:               adapter,
@@ -173,7 +166,7 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 	)
 
 	// Federated updeater along with Create/Update/Delete operations.
-	s.updater = util.NewFederatedUpdater(s.informer, adapter.Kind(), s.updateTimeout, s.eventRecorder,
+	s.updater = util.NewFederatedUpdater(s.informer, adapter.Kind(), s.eventRecorder,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			_, err := adapter.ClusterCreate(client, obj)
 			return err
@@ -195,6 +188,7 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 		func(obj pkgruntime.Object) string {
 			return adapter.NamespacedName(obj).String()
 		},
+		s.updateTimeout,
 		s.informer,
 		s.updater,
 	)
@@ -218,60 +212,18 @@ func (s *FederationSyncController) updateObject(obj pkgruntime.Object) (pkgrunti
 func (s *FederationSyncController) Run(stopChan <-chan struct{}) {
 	go s.controller.Run(stopChan)
 	s.informer.Start()
+	go func() {
+		<-stopChan
+		s.informer.Stop()
+	}()
 	s.deliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
-		s.workQueue.Add(item)
+		namespacedName := item.Value.(*types.NamespacedName)
+		s.reconcile(*namespacedName)
 	})
 	s.clusterDeliverer.StartWithHandler(func(_ *util.DelayingDelivererItem) {
 		s.reconcileOnClusterChange()
 	})
-
-	// TODO: Allow multiple workers.
-	go wait.Until(s.worker, time.Second, stopChan)
-
 	util.StartBackoffGC(s.backoff, stopChan)
-
-	// Ensure all goroutines are cleaned up when the stop channel closes
-	go func() {
-		<-stopChan
-		s.informer.Stop()
-		s.workQueue.ShutDown()
-		s.deliverer.Stop()
-		s.clusterDeliverer.Stop()
-	}()
-}
-
-type reconciliationStatus int
-
-const (
-	statusAllOK reconciliationStatus = iota
-	statusNeedsRecheck
-	statusError
-	statusNotSynced
-)
-
-func (s *FederationSyncController) worker() {
-	for {
-		obj, quit := s.workQueue.Get()
-		if quit {
-			return
-		}
-
-		item := obj.(*util.DelayingDelivererItem)
-		namespacedName := item.Value.(*types.NamespacedName)
-		status := s.reconcile(*namespacedName)
-		s.workQueue.Done(item)
-
-		switch status {
-		case statusAllOK:
-			break
-		case statusError:
-			s.deliver(*namespacedName, 0, true)
-		case statusNeedsRecheck:
-			s.deliver(*namespacedName, s.reviewDelay, false)
-		case statusNotSynced:
-			s.deliver(*namespacedName, s.clusterAvailableDelay, false)
-		}
-	}
 }
 
 func (s *FederationSyncController) deliverObj(obj pkgruntime.Object, delay time.Duration, failed bool) {
@@ -300,7 +252,7 @@ func (s *FederationSyncController) isSynced() bool {
 	}
 	clusters, err := s.informer.GetReadyClusters()
 	if err != nil {
-		runtime.HandleError(fmt.Errorf("Failed to get ready clusters: %v", err))
+		glog.Errorf("Failed to get ready clusters: %v", err)
 		return false
 	}
 	if !s.informer.GetTargetStore().ClustersSynced(clusters) {
@@ -320,91 +272,126 @@ func (s *FederationSyncController) reconcileOnClusterChange() {
 	}
 }
 
-func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName) reconciliationStatus {
+func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName) {
 	if !s.isSynced() {
-		return statusNotSynced
+		s.deliver(namespacedName, s.clusterAvailableDelay, false)
+		return
 	}
 
-	kind := s.adapter.Kind()
 	key := namespacedName.String()
-
-	obj, err := s.objFromCache(kind, key)
-	if err != nil {
-		return statusError
-	}
-	if obj == nil {
-		return statusAllOK
-	}
-
-	meta := s.adapter.ObjectMeta(obj)
-	if meta.DeletionTimestamp != nil {
-		err := s.delete(obj, kind, namespacedName)
-		if err != nil {
-			msg := "Failed to delete %s %q: %v"
-			args := []interface{}{kind, namespacedName, err}
-			runtime.HandleError(fmt.Errorf(msg, args...))
-			s.eventRecorder.Eventf(obj, api.EventTypeWarning, "DeleteFailed", msg, args...)
-			return statusError
-		}
-		return statusAllOK
-	}
-
-	glog.V(3).Infof("Ensuring finalizers exist on %s %q", kind, key)
-	obj, err = s.deletionHelper.EnsureFinalizers(obj)
-	if err != nil {
-		runtime.HandleError(fmt.Errorf("Failed to ensure finalizers for %s %q: %v", kind, key, err))
-		return statusError
-	}
-
-	operationsAccessor := func(adapter federatedtypes.FederatedTypeAdapter, selectedClusters []*federationapi.Cluster, unselectedClusters []*federationapi.Cluster, obj pkgruntime.Object) ([]util.FederatedOperation, error) {
-		operations, err := clusterOperations(adapter, selectedClusters, unselectedClusters, obj, key, func(clusterName string) (interface{}, bool, error) {
-			return s.informer.GetTargetStore().GetByKey(clusterName, key)
-		})
-		if err != nil {
-			s.eventRecorder.Eventf(obj, api.EventTypeWarning, "FedClusterOperationsError", "Error obtaining sync operations for %s: %s error: %s", kind, key, err.Error())
-		}
-		return operations, err
-	}
-
-	return syncToClusters(
-		s.informer.GetReadyClusters,
-		operationsAccessor,
-		selectedClusters,
-		s.updater.Update,
-		s.adapter,
-		obj,
-	)
-}
-
-func (s *FederationSyncController) objFromCache(kind, key string) (pkgruntime.Object, error) {
+	kind := s.adapter.Kind()
 	cachedObj, exist, err := s.store.GetByKey(key)
 	if err != nil {
-		wrappedErr := fmt.Errorf("Failed to query %s store for %q: %v", kind, key, err)
-		runtime.HandleError(wrappedErr)
-		return nil, err
-	}
-	if !exist {
-		return nil, nil
+		glog.Errorf("Failed to query main %s store for %v: %v", kind, key, err)
+		s.deliver(namespacedName, 0, true)
+		return
 	}
 
-	// Create a copy before modifying the resource to prevent racing with other readers.
+	if !exist {
+		// Not federated, ignoring.
+		return
+	}
+
+	// Create a copy before modifying the resource to prevent racing
+	// with other readers.
 	copiedObj, err := api.Scheme.DeepCopy(cachedObj)
 	if err != nil {
-		wrappedErr := fmt.Errorf("Error in retrieving %s %q from store: %v", kind, key, err)
-		runtime.HandleError(wrappedErr)
-		return nil, err
+		glog.Errorf("Error in retrieving %s from store: %v", kind, err)
+		s.deliver(namespacedName, 0, true)
+		return
 	}
 	if !s.adapter.IsExpectedType(copiedObj) {
-		err = fmt.Errorf("Object is not the expected type: %v", copiedObj)
-		runtime.HandleError(err)
-		return nil, err
+		glog.Errorf("Object is not the expected type: %v", copiedObj)
+		s.deliver(namespacedName, 0, true)
+		return
 	}
-	return copiedObj.(pkgruntime.Object), nil
+	obj := copiedObj.(pkgruntime.Object)
+	meta := s.adapter.ObjectMeta(obj)
+
+	if meta.DeletionTimestamp != nil {
+		if err := s.delete(obj, namespacedName); err != nil {
+			glog.Errorf("Failed to delete %s %s: %v", kind, namespacedName, err)
+			s.eventRecorder.Eventf(obj, api.EventTypeWarning, "DeleteFailed",
+				"%s delete failed: %v", strings.ToTitle(kind), err)
+			s.deliver(namespacedName, 0, true)
+		}
+		return
+	}
+
+	glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for %s: %s",
+		kind, namespacedName)
+	// Add the required finalizers before creating the resource in underlying clusters.
+	obj, err = s.deletionHelper.EnsureFinalizers(obj)
+	if err != nil {
+		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in %s %s: %v",
+			kind, namespacedName, err)
+		s.deliver(namespacedName, 0, false)
+		return
+	}
+
+	glog.V(3).Infof("Syncing %s %s in underlying clusters", kind, namespacedName)
+
+	clusters, err := s.informer.GetReadyClusters()
+	if err != nil {
+		glog.Errorf("Failed to get cluster list: %v", err)
+		s.deliver(namespacedName, s.clusterAvailableDelay, false)
+		return
+	}
+
+	operations := make([]util.FederatedOperation, 0)
+	for _, cluster := range clusters {
+		clusterObj, found, err := s.informer.GetTargetStore().GetByKey(cluster.Name, key)
+		if err != nil {
+			glog.Errorf("Failed to get %s from %s: %v", key, cluster.Name, err)
+			s.deliver(namespacedName, 0, true)
+			return
+		}
+
+		// The data should not be modified.
+		desiredObj := s.adapter.Copy(obj)
+
+		if !found {
+			operations = append(operations, util.FederatedOperation{
+				Type:        util.OperationTypeAdd,
+				Obj:         desiredObj,
+				ClusterName: cluster.Name,
+				Key:         key,
+			})
+		} else {
+			clusterObj := clusterObj.(pkgruntime.Object)
+
+			// Update existing resource, if needed.
+			if !s.adapter.Equivalent(desiredObj, clusterObj) {
+				operations = append(operations, util.FederatedOperation{
+					Type:        util.OperationTypeUpdate,
+					Obj:         desiredObj,
+					ClusterName: cluster.Name,
+					Key:         key,
+				})
+			}
+		}
+	}
+
+	if len(operations) == 0 {
+		// Everything is in order
+		return
+	}
+	err = s.updater.Update(operations, s.updateTimeout)
+
+	if err != nil {
+		glog.Errorf("Failed to execute updates for %s: %v", key, err)
+		s.deliver(namespacedName, 0, true)
+		return
+	}
+
+	// Evertyhing is in order but lets be double sure
+	s.deliver(namespacedName, s.reviewDelay, false)
 }
 
 // delete deletes the given resource or returns error if the deletion was not complete.
-func (s *FederationSyncController) delete(obj pkgruntime.Object, kind string, namespacedName types.NamespacedName) error {
-	glog.V(3).Infof("Handling deletion of %s %q", kind, namespacedName)
+func (s *FederationSyncController) delete(obj pkgruntime.Object, namespacedName types.NamespacedName) error {
+	kind := s.adapter.Kind()
+	glog.V(3).Infof("Handling deletion of %s: %v", kind, namespacedName)
 	_, err := s.deletionHelper.HandleObjectInUnderlyingClusters(obj)
 	if err != nil {
 		return err
@@ -416,123 +403,8 @@ func (s *FederationSyncController) delete(obj pkgruntime.Object, kind string, na
 		// This is expected when we are processing an update as a result of finalizer deletion.
 		// The process that deleted the last finalizer is also going to delete the resource and we do not have to do anything.
 		if !errors.IsNotFound(err) {
-			return err
+			return fmt.Errorf("failed to delete %s: %v", kind, err)
 		}
 	}
 	return nil
-}
-
-type clustersAccessorFunc func() ([]*federationapi.Cluster, error)
-type operationsFunc func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, []*federationapi.Cluster, pkgruntime.Object) ([]util.FederatedOperation, error)
-type clusterSelectorFunc func(*metav1.ObjectMeta, func(map[string]string, map[string]string) (bool, error), []*federationapi.Cluster) ([]*federationapi.Cluster, []*federationapi.Cluster, error)
-type executionFunc func([]util.FederatedOperation) error
-
-// syncToClusters ensures that the state of the given object is synchronized to member clusters.
-func syncToClusters(clustersAccessor clustersAccessorFunc, operationsAccessor operationsFunc, selector clusterSelectorFunc, execute executionFunc, adapter federatedtypes.FederatedTypeAdapter, obj pkgruntime.Object) reconciliationStatus {
-	kind := adapter.Kind()
-	key := federatedtypes.ObjectKey(adapter, obj)
-
-	glog.V(3).Infof("Syncing %s %q in underlying clusters", kind, key)
-
-	clusters, err := clustersAccessor()
-	if err != nil {
-		runtime.HandleError(fmt.Errorf("Failed to get cluster list: %v", err))
-		return statusNotSynced
-	}
-
-	selectedClusters, unselectedClusters, err := selector(adapter.ObjectMeta(obj), clusterselector.SendToCluster, clusters)
-	if err != nil {
-		return statusError
-	}
-
-	operations, err := operationsAccessor(adapter, selectedClusters, unselectedClusters, obj)
-	if err != nil {
-		return statusError
-	}
-	if len(operations) == 0 {
-		return statusAllOK
-	}
-
-	err = execute(operations)
-	if err != nil {
-		runtime.HandleError(fmt.Errorf("Failed to execute updates for %s %q: %v", kind, key, err))
-		return statusError
-	}
-
-	// Evertyhing is in order but let's be double sure
-	return statusNeedsRecheck
-}
-
-// selectedClusters filters the provided clusters into two slices, one containing the clusters selected by selector and the other containing the rest of the provided clusters.
-func selectedClusters(objMeta *metav1.ObjectMeta, selector func(map[string]string, map[string]string) (bool, error), clusters []*federationapi.Cluster) ([]*federationapi.Cluster, []*federationapi.Cluster, error) {
-	selectedClusters := []*federationapi.Cluster{}
-	unselectedClusters := []*federationapi.Cluster{}
-
-	for _, cluster := range clusters {
-		send, err := selector(cluster.Labels, objMeta.Annotations)
-		if err != nil {
-			return nil, nil, err
-		} else if !send {
-			unselectedClusters = append(unselectedClusters, cluster)
-		} else {
-			selectedClusters = append(selectedClusters, cluster)
-		}
-	}
-	return selectedClusters, unselectedClusters, nil
-}
-
-type clusterObjectAccessorFunc func(clusterName string) (interface{}, bool, error)
-
-// clusterOperations returns the list of operations needed to synchronize the state of the given object to the provided clusters
-func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, selectedClusters []*federationapi.Cluster, unselectedClusters []*federationapi.Cluster, obj pkgruntime.Object, key string, accessor clusterObjectAccessorFunc) ([]util.FederatedOperation, error) {
-	// The data should not be modified.
-	desiredObj := adapter.Copy(obj)
-	operations := make([]util.FederatedOperation, 0)
-
-	for _, cluster := range selectedClusters {
-		clusterObj, found, err := accessor(cluster.Name)
-		if err != nil {
-			wrappedErr := fmt.Errorf("Failed to get %s %q from cluster %q: %v", adapter.Kind(), key, cluster.Name, err)
-			runtime.HandleError(wrappedErr)
-			return nil, wrappedErr
-		}
-
-		var operationType util.FederatedOperationType = ""
-		if found {
-			clusterObj := clusterObj.(pkgruntime.Object)
-			if !adapter.Equivalent(desiredObj, clusterObj) {
-				operationType = util.OperationTypeUpdate
-			}
-		} else {
-			operationType = util.OperationTypeAdd
-		}
-
-		if len(operationType) > 0 {
-			operations = append(operations, util.FederatedOperation{
-				Type:        operationType,
-				Obj:         desiredObj,
-				ClusterName: cluster.Name,
-				Key:         key,
-			})
-		}
-	}
-
-	for _, cluster := range unselectedClusters {
-		_, found, err := accessor(cluster.Name)
-		if err != nil {
-			wrappedErr := fmt.Errorf("Failed to get %s %q from cluster %q: %v", adapter.Kind(), key, cluster.Name, err)
-			runtime.HandleError(wrappedErr)
-			return nil, wrappedErr
-		}
-		if found {
-			operations = append(operations, util.FederatedOperation{
-				Type:        util.OperationTypeDelete,
-				Obj:         desiredObj,
-				ClusterName: cluster.Name,
-				Key:         key,
-			})
-		}
-	}
-
-	return operations, nil
 }

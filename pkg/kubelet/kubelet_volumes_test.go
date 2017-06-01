@@ -33,7 +33,6 @@ import (
 
 func TestListVolumesForPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{

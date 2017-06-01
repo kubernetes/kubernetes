@@ -93,23 +93,24 @@ spec:
         image: cockroachdb/cockroach-k8s-init:0.1
         imagePullPolicy: IfNotPresent
         args:
-        - "-on-start=/on-start.sh"
-        - "-service=cockroachdb"
+          - "-on-start=/on-start.sh"
+          - "-service=cockroachdb"
         env:
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        volumeMounts:
-        - name: datadir
-          mountPath: "/cockroach/cockroach-data"
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+       volumeMounts:
+       - name: datadir
+         mountPath: "/cockroach/cockroach-data"
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 100
             podAffinityTerm:
               labelSelector:
-                matchExpressions:
+                matchExpress:
                 - key: app
                   operator: In
                   values:
@@ -117,7 +118,12 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
       - name: cockroachdb
-        image: cockroachdb/cockroach:v1.0
+        # Runs the master branch. Not recommended for production, but since
+        # CockroachDB is in Beta, you don't want to run it in production
+        # anyway. See
+        # https://hub.docker.com/r/cockroachdb/cockroach/tags/
+        # if you prefer to run a beta release.
+        image: cockroachdb/cockroach
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 26257

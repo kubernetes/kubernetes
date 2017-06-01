@@ -53,8 +53,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&extensions.Scale{},
 		&StatefulSet{},
 		&StatefulSetList{},
-		&ControllerRevision{},
-		&ControllerRevisionList{},
 	)
 	return nil
 }

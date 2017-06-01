@@ -1,3 +1,5 @@
+package(default_visibility = ["//visibility:public"])
+
 licenses(["notice"])
 
 load(
@@ -9,9 +11,6 @@ go_library(
     name = "go_default_library",
     srcs = ["kubectl.go"],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:cmd_kubectl_app_CONSUMERS",
-    ],
     deps = [
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/kubectl/cmd:go_default_library",
@@ -26,13 +25,11 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
+    visibility = ["//visibility:private"],
 )
 
 filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:cmd_kubectl_app_CONSUMERS",
-    ],
 )

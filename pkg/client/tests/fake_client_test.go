@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 
+	_ "k8s.io/client-go/pkg/api/install"
 	_ "k8s.io/kubernetes/pkg/api/install"
 )
 

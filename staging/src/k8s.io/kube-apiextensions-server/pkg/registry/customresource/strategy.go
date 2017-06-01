@@ -17,97 +17,77 @@ limitations under the License.
 package customresource
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/validation"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+
+	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
 )
 
-type CustomResourceDefinitionStorageStrategy struct {
+type apiServerStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
-
-	namespaceScoped bool
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool) CustomResourceDefinitionStorageStrategy {
-	return CustomResourceDefinitionStorageStrategy{typer, names.SimpleNameGenerator, namespaceScoped}
+func NewStrategy(typer runtime.ObjectTyper) apiServerStrategy {
+	return apiServerStrategy{typer, names.SimpleNameGenerator}
 }
 
-func (a CustomResourceDefinitionStorageStrategy) NamespaceScoped() bool {
-	return a.namespaceScoped
-}
-
-func (CustomResourceDefinitionStorageStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
-}
-
-func (CustomResourceDefinitionStorageStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
-}
-
-func (a CustomResourceDefinitionStorageStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
-	}
-
-	return validation.ValidateObjectMetaAccessor(accessor, a.namespaceScoped, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
-}
-
-func (CustomResourceDefinitionStorageStrategy) AllowCreateOnUpdate() bool {
+func (apiServerStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func (CustomResourceDefinitionStorageStrategy) AllowUnconditionalUpdate() bool {
+func (apiServerStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+}
+
+func (apiServerStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+}
+
+func (apiServerStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+	return field.ErrorList{}
+}
+
+func (apiServerStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (CustomResourceDefinitionStorageStrategy) Canonicalize(obj runtime.Object) {
+func (apiServerStrategy) AllowUnconditionalUpdate() bool {
+	return false
 }
 
-func (CustomResourceDefinitionStorageStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	objAccessor, err := meta.Accessor(obj)
-	if err != nil {
-		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
-	}
-	oldAccessor, err := meta.Accessor(old)
-	if err != nil {
-		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
-	}
-
-	return validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))
+func (apiServerStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (a CustomResourceDefinitionStorageStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, nil, err
-	}
-	return labels.Set(accessor.GetLabels()), objectMetaFieldsSet(accessor, a.namespaceScoped), nil
+func (apiServerStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return field.ErrorList{}
 }
 
-// objectMetaFieldsSet returns a fields that represent the ObjectMeta.
-func objectMetaFieldsSet(objectMeta metav1.Object, namespaceScoped bool) fields.Set {
-	if namespaceScoped {
-		return fields.Set{
-			"metadata.name":      objectMeta.GetName(),
-			"metadata.namespace": objectMeta.GetNamespace(),
-		}
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	apiserver, ok := obj.(*apiextensions.CustomResource)
+	if !ok {
+		return nil, nil, fmt.Errorf("given object is not a CustomResource.")
 	}
-	return fields.Set{
-		"metadata.name": objectMeta.GetName(),
-	}
+	return labels.Set(apiserver.ObjectMeta.Labels), CustomResourceToSelectableFields(apiserver), nil
 }
 
-func (a CustomResourceDefinitionStorageStrategy) MatchCustomResourceDefinitionStorage(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+// MatchCustomResource is the filter used by the generic etcd backend to watch events
+// from etcd to clients of the apiserver only interested in specific labels/fields.
+func MatchCustomResource(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
 		Label:    label,
 		Field:    field,
-		GetAttrs: a.GetAttrs,
+		GetAttrs: GetAttrs,
 	}
+}
+
+// CustomResourceToSelectableFields returns a field set that represents the object.
+func CustomResourceToSelectableFields(obj *apiextensions.CustomResource) fields.Set {
+	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
 }

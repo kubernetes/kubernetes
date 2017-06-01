@@ -344,6 +344,8 @@ func (f *followDatastoreFile) Read(p []byte) (int, error) {
 	offset := f.r.offset.seek
 	stop := false
 
+	defer f.r.Close()
+
 	for {
 		n, err := f.r.Read(p)
 		if err != nil && err == io.EOF {

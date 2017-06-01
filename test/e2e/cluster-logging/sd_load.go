@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	loadTestMaxAllowedLostFraction    = 0.01
+	loadTestMaxAllowedLostFraction    = 0.001
 	loadTestMaxAllowedFluentdRestarts = 1
 )
 
