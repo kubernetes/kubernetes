@@ -54,6 +54,7 @@ type qosContainerManagerImpl struct {
 	getNodeAllocatable func() v1.ResourceList
 	cgroupRoot         string
 	qosReserved        map[v1.ResourceName]int64
+	cpuManager         CPUManager
 }
 
 func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot string, nodeConfig NodeConfig) (QOSContainerManager, error) {
@@ -68,6 +69,7 @@ func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot string, nod
 		cgroupManager: NewCgroupManager(subsystems, nodeConfig.CgroupDriver),
 		cgroupRoot:    cgroupRoot,
 		qosReserved:   nodeConfig.ExperimentalQOSReserved,
+		cpuManager:    GetCPUManagerSingleton(nodeConfig.CgroupsPerQOS),
 	}, nil
 }
 
@@ -81,6 +83,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 	if !cm.Exists(CgroupName(rootContainer)) {
 		return fmt.Errorf("root container %s doesn't exist", rootContainer)
 	}
+	m.cpuManager.Start()
 
 	// Top level for Qos containers are created only for Burstable
 	// and Best Effort classes
