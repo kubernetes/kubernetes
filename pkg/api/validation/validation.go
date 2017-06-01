@@ -2105,7 +2105,7 @@ func ValidateHostAliases(hostAliases []api.HostAlias, fldPath *field.Path) field
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), hostAlias.IP, "must be valid IP address"))
 		}
 		for _, hostname := range hostAlias.Hostnames {
-			allErrs = append(allErrs, ValidateDNS1123Label(hostname, fldPath.Child("hostnames"))...)
+			allErrs = append(allErrs, ValidateDNS1123Subdomain(hostname, fldPath.Child("hostnames"))...)
 		}
 	}
 	return allErrs
