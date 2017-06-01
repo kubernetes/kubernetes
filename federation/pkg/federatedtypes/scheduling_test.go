@@ -24,21 +24,22 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestClusterReplicaState(t *testing.T) {
-	uncalledPodsGetter := func(clusterName string, replicaSet *extensionsv1.ReplicaSet) (*apiv1.PodList, error) {
-		t.Fatal("podsGetter should not be called when replica sets are all ready.")
+	uncalledPodsGetter := func(clusterName string, obj pkgruntime.Object) (*apiv1.PodList, error) {
+		t.Fatal("podsGetter should not be called when workload objects are all ready.")
 		return nil, nil
 	}
 
-	podsByReplicaSet := make(map[*extensionsv1.ReplicaSet][]*apiv1.Pod)
-	podsGetter := func(clusterName string, replicaSet *extensionsv1.ReplicaSet) (*apiv1.PodList, error) {
-		pods, ok := podsByReplicaSet[replicaSet]
+	podsByReplicaSet := make(map[pkgruntime.Object][]*apiv1.Pod)
+	podsGetter := func(clusterName string, obj pkgruntime.Object) (*apiv1.PodList, error) {
+		pods, ok := podsByReplicaSet[obj]
 		if !ok {
-			t.Fatalf("No pods found in test data for replica set named %v", replicaSet.Name)
+			t.Fatalf("No pods found in test data for replica set %v", obj)
 			return nil, fmt.Errorf("Not found")
 		}
 		var podListPods []apiv1.Pod
@@ -64,7 +65,7 @@ func TestClusterReplicaState(t *testing.T) {
 		rs2Replicas                   int32
 		rs1ReadyReplicas              int32
 		rs2ReadyReplicas              int32
-		podsGetter                    func(clusterName string, replicaSet *extensionsv1.ReplicaSet) (*apiv1.PodList, error)
+		podsGetter                    func(clusterName string, obj pkgruntime.Object) (*apiv1.PodList, error)
 		pod1Phase                     apiv1.PodPhase
 		pod1Condition                 apiv1.PodCondition
 		pod2Phase                     apiv1.PodPhase

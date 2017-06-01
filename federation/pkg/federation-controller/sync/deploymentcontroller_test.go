@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package deployment
+package sync
 
 import (
 	"flag"
 	"fmt"
 	"testing"
-	"time"
 
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1 "k8s.io/api/extensions/v1beta1"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
+	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -39,18 +39,12 @@ import (
 
 const (
 	deployments = "deployments"
-	pods        = "pods"
 )
 
 func TestDeploymentController(t *testing.T) {
 	flag.Set("logtostderr", "true")
 	flag.Set("v", "5")
 	flag.Parse()
-
-	deploymentReviewDelay = 500 * time.Millisecond
-	clusterAvailableDelay = 100 * time.Millisecond
-	clusterUnavailableDelay = 100 * time.Millisecond
-	allDeploymentReviewDelay = 500 * time.Millisecond
 
 	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
@@ -65,18 +59,15 @@ func TestDeploymentController(t *testing.T) {
 
 	cluster1Client := &fakekubeclientset.Clientset{}
 	cluster1Watch := RegisterFakeWatch(deployments, &cluster1Client.Fake)
-	_ = RegisterFakeWatch(pods, &cluster1Client.Fake)
-	RegisterFakeList(deployments, &cluster1Client.Fake, &extensionsv1.DeploymentList{Items: []extensionsv1.Deployment{}})
 	cluster1CreateChan := RegisterFakeCopyOnCreate(deployments, &cluster1Client.Fake, cluster1Watch)
 	cluster1UpdateChan := RegisterFakeCopyOnUpdate(deployments, &cluster1Client.Fake, cluster1Watch)
 
 	cluster2Client := &fakekubeclientset.Clientset{}
 	cluster2Watch := RegisterFakeWatch(deployments, &cluster2Client.Fake)
-	_ = RegisterFakeWatch(pods, &cluster2Client.Fake)
-	RegisterFakeList(deployments, &cluster2Client.Fake, &extensionsv1.DeploymentList{Items: []extensionsv1.Deployment{}})
 	cluster2CreateChan := RegisterFakeCopyOnCreate(deployments, &cluster2Client.Fake, cluster2Watch)
 
-	deploymentController := NewDeploymentController(fakeClient)
+	deploymentController := newFederationSyncController(fakeClient, federatedtypes.NewDeploymentAdapter(fakeClient))
+	deploymentController.minimizeLatency()
 	clientFactory := func(cluster *fedv1.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
@@ -87,11 +78,10 @@ func TestDeploymentController(t *testing.T) {
 			return nil, fmt.Errorf("Unknown cluster")
 		}
 	}
-	ToFederatedInformerForTestOnly(deploymentController.fedDeploymentInformer).SetClientFactory(clientFactory)
-	ToFederatedInformerForTestOnly(deploymentController.fedPodInformer).SetClientFactory(clientFactory)
+	ToFederatedInformerForTestOnly(deploymentController.informer).SetClientFactory(clientFactory)
 
 	stop := make(chan struct{})
-	go deploymentController.Run(5, stop)
+	go deploymentController.Run(stop)
 
 	// Create deployment. Expect to see it in cluster1.
 	dep1 := newDeploymentWithReplicas("depA", 6)
@@ -113,7 +103,7 @@ func TestDeploymentController(t *testing.T) {
 	}
 	assert.NoError(t, CheckObjectFromChan(cluster1CreateChan, checkDeployment(dep1, *dep1.Spec.Replicas)))
 	err := WaitForStoreUpdate(
-		deploymentController.fedDeploymentInformer.GetTargetStore(),
+		deploymentController.informer.GetTargetStore(),
 		cluster1.Name, types.NamespacedName{Namespace: dep1.Namespace, Name: dep1.Name}.String(), wait.ForeverTestTimeout)
 	assert.Nil(t, err, "deployment should have appeared in the informer store")
 
@@ -132,7 +122,7 @@ func TestDeploymentController(t *testing.T) {
 	// Add new deployment with non-default replica placement preferences.
 	dep2 := newDeploymentWithReplicas("deployment2", 9)
 	dep2.Annotations = make(map[string]string)
-	dep2.Annotations[FedDeploymentPreferencesAnnotation] = `{"rebalance": true,
+	dep2.Annotations[federatedtypes.FedDeploymentPreferencesAnnotation] = `{"rebalance": true,
 		  "clusters": {
 		    "cluster1": {"weight": 2},
 		    "cluster2": {"weight": 1}
