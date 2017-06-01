@@ -8,6 +8,8 @@
 // translations/kubectl/en_US/LC_MESSAGES/k8s.po
 // translations/kubectl/fr_FR/LC_MESSAGES/k8s.mo
 // translations/kubectl/fr_FR/LC_MESSAGES/k8s.po
+// translations/kubectl/ja_JP/LC_MESSAGES/k8s.mo
+// translations/kubectl/ja_JP/LC_MESSAGES/k8s.po
 // translations/kubectl/template.pot
 // translations/kubectl/zh_CN/LC_MESSAGES/k8s.mo
 // translations/kubectl/zh_CN/LC_MESSAGES/k8s.po
@@ -7287,6 +7289,131 @@ func translationsKubectlFr_frLc_messagesK8sPo() (*asset, error) {
 	return a, nil
 }
 
+var _translationsKubectlJa_jpLc_messagesK8sMo = []byte("\xde\x12\x04\x95\x00\x00\x00\x00\x02\x00\x00\x00\x1c\x00\x00\x00,\x00\x00\x00\x05\x00\x00\x00<\x00\x00\x00\x00\x00\x00\x00P\x00\x00\x00\xc5\x00\x00\x00Q\x00\x00\x00{\x01\x00\x00\x17\x01\x00\x00\x8e\x00\x00\x00\x93\x02\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00watch is only supported on individual resources and resource collections - %d resources were found\x00watch is only supported on individual resources and resource collections - %d resources were found\x00Project-Id-Version: gettext-go-examples-hello\nReport-Msgid-Bugs-To: \nPOT-Creation-Date: 2013-12-12 20:03+0000\nPO-Revision-Date: 2017-05-31 23:11-0700\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nX-Generator: Poedit 2.0.1\nX-Poedit-SourceCharset: UTF-8\nLanguage-Team: \nPlural-Forms: nplurals=1; plural=0;\nLast-Translator: \nLanguage: ja\n\x00watch\u306f\u5358\u4e00\u30ea\u30bd\u30fc\u30b9\u53ca\u3073\u30ea\u30bd\u30fc\u30b9\u30b3\u30ec\u30af\u30b7\u30e7\u30f3\u306e\u307f\u30b5\u30dd\u30fc\u30c8\u3057\u3066\u3044\u307e\u3059 - %d\u500b\u306e\u30ea\u30bd\u30fc\u30b9\u304c\u898b\u3064\u304b\u308a\u307e\u3057\u305f\x00")
+
+func translationsKubectlJa_jpLc_messagesK8sMoBytes() ([]byte, error) {
+	return _translationsKubectlJa_jpLc_messagesK8sMo, nil
+}
+
+func translationsKubectlJa_jpLc_messagesK8sMo() (*asset, error) {
+	bytes, err := translationsKubectlJa_jpLc_messagesK8sMoBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "translations/kubectl/ja_JP/LC_MESSAGES/k8s.mo", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _translationsKubectlJa_jpLc_messagesK8sPo = []byte(`# Test translations for unit tests.
+# Copyright (C) 2017
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR girikuncoro@gmail.com, 2017.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: gettext-go-examples-hello\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-12-12 20:03+0000\n"
+"PO-Revision-Date: 2017-01-29 22:54-0800\n"
+"Last-Translator: Giri Kuncoro <girikuncoro@gmail.com>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 1.6.10\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"Language-Team: \n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"Language: ja\n"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/apply.go#L98
+msgid "Apply a configuration to a resource by filename or stdin"
+msgstr "ファイル名を指定または標準入力経由でリソースにコンフィグを適用する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
+msgid "Delete the specified cluster from the kubeconfig"
+msgstr "kubeconfigから指定したクラスターを削除する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_context.go#L38
+msgid "Delete the specified context from the kubeconfig"
+msgstr "kubeconfigから指定したコンテキストを削除する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_contexts.go#L62
+msgid "Describe one or many contexts"
+msgstr "1つまたは複数のコンテキストを記述する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
+msgid "Display clusters defined in the kubeconfig"
+msgstr "kubeconfigで定義されたクラスターを表示する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/view.go#L64
+msgid "Display merged kubeconfig settings or a specified kubeconfig file"
+msgstr "マージされたkubeconfigの設定または指定されたkubeconfigファイルを表示する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
+msgid "Displays the current-context"
+msgstr "カレントコンテキストを表示する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
+msgid "Modify kubeconfig files"
+msgstr "kubeconfigファイルを変更する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
+msgid "Sets a cluster entry in kubeconfig"
+msgstr "kubeconfigにクラスターエントリを設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_context.go#L57
+msgid "Sets a context entry in kubeconfig"
+msgstr "kubeconfigにコンテキストエントリを設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_authinfo.go#L103
+msgid "Sets a user entry in kubeconfig"
+msgstr "kubeconfigにユーザーエントリを設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
+msgid "Sets an individual value in a kubeconfig file"
+msgstr "kubeconfigファイル内の変数を個別に設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
+msgid "Sets the current-context in a kubeconfig file"
+msgstr "kubeconfigにカレントコンテキストを設定する"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
+msgid "Unsets an individual value in a kubeconfig file"
+msgstr "kubeconfigファイルから変数を個別に削除する"
+
+msgid "Update the annotations on a resource"
+msgstr "リソースのアノテーションを更新する"
+
+msgid ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgid_plural ""
+"watch is only supported on individual resources and resource collections - "
+"%d resources were found"
+msgstr[0] ""
+"watchは単一リソース及びリソースコレクションのみサポートしています - "
+"%d個のリソースが見つかりました"
+msgstr[1] ""
+"watchは単一リソース及びリソースコレクションのみサポートしています - "
+"%d個のリソースが見つかりました"`)
+
+func translationsKubectlJa_jpLc_messagesK8sPoBytes() ([]byte, error) {
+	return _translationsKubectlJa_jpLc_messagesK8sPo, nil
+}
+
+func translationsKubectlJa_jpLc_messagesK8sPo() (*asset, error) {
+	bytes, err := translationsKubectlJa_jpLc_messagesK8sPoBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "translations/kubectl/ja_JP/LC_MESSAGES/k8s.po", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _translationsKubectlTemplatePot = []byte(`# SOME DESCRIPTIVE TITLE.
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
@@ -9729,6 +9856,8 @@ var _bindata = map[string]func() (*asset, error){
 	"translations/kubectl/en_US/LC_MESSAGES/k8s.po":   translationsKubectlEn_usLc_messagesK8sPo,
 	"translations/kubectl/fr_FR/LC_MESSAGES/k8s.mo":   translationsKubectlFr_frLc_messagesK8sMo,
 	"translations/kubectl/fr_FR/LC_MESSAGES/k8s.po":   translationsKubectlFr_frLc_messagesK8sPo,
+	"translations/kubectl/ja_JP/LC_MESSAGES/k8s.mo":   translationsKubectlJa_jpLc_messagesK8sMo,
+	"translations/kubectl/ja_JP/LC_MESSAGES/k8s.po":   translationsKubectlJa_jpLc_messagesK8sPo,
 	"translations/kubectl/template.pot":               translationsKubectlTemplatePot,
 	"translations/kubectl/zh_CN/LC_MESSAGES/k8s.mo":   translationsKubectlZh_cnLc_messagesK8sMo,
 	"translations/kubectl/zh_CN/LC_MESSAGES/k8s.po":   translationsKubectlZh_cnLc_messagesK8sPo,
@@ -9799,6 +9928,12 @@ var _bintree = &bintree{nil, map[string]*bintree{
 				"LC_MESSAGES": {nil, map[string]*bintree{
 					"k8s.mo": {translationsKubectlFr_frLc_messagesK8sMo, map[string]*bintree{}},
 					"k8s.po": {translationsKubectlFr_frLc_messagesK8sPo, map[string]*bintree{}},
+				}},
+			}},
+			"ja_JP": {nil, map[string]*bintree{
+				"LC_MESSAGES": {nil, map[string]*bintree{
+					"k8s.mo": {translationsKubectlJa_jpLc_messagesK8sMo, map[string]*bintree{}},
+					"k8s.po": {translationsKubectlJa_jpLc_messagesK8sPo, map[string]*bintree{}},
 				}},
 			}},
 			"template.pot": {translationsKubectlTemplatePot, map[string]*bintree{}},
