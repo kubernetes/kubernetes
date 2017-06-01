@@ -154,11 +154,23 @@ function copy-to-staging() {
   local -r gs_url=$2
   local -r tar=$3
   local -r hash=$4
+  local -r basename_tar=$(basename ${tar})
+
+  #check whether this tar alread exists and has the same hash
+  #if it matches, then don't bother uploading it again
+  local -r remote_tar_hash=$(gsutil hash -h -m ${staging_path}/${basename_tar} 2>/dev/null | grep "Hash (md5):" | awk -F ':' '{print $2}')
+  if [[ -n ${remote_tar_hash} ]]; then
+    local -r local_tar_hash=$(gsutil hash -h -m ${tar} 2>/dev/null | grep "Hash (md5):" | awk -F ':' '{print $2}')
+    if [[ "${remote_tar_hash}" == "${local_tar_hash}" ]]; then
+      echo "+++ ${basename_tar} uploaded earlier and hash matches"
+      return 0
+    fi
+  fi
 
   echo "${hash}" > "${tar}.sha1"
   gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha1" "${staging_path}"
   gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha1" >/dev/null 2>&1
-  echo "+++ $(basename ${tar}) uploaded (sha1 = ${hash})"
+  echo "+++ ${basename_tar} uploaded (sha1 = ${hash})"
 }
 
 # Given the cluster zone, return the list of regional GCS release
