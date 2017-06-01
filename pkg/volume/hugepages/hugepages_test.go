@@ -18,18 +18,13 @@ limitations under the License.
 package hugepages
 
 import (
-	//"io/ioutil"
-	//"os"
-	"testing"
-	//
-	//"github.com/stretchr/testify/assert"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	//"k8s.io/apimachinery/pkg/types"
-	//"k8s.io/kubernetes/pkg/util/mount"
-	//"k8s.io/kubernetes/pkg/volume"
-	//
 	"fmt"
+	"io/ioutil"
+	"os"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
@@ -54,8 +49,11 @@ func TestHugePagesPlugin_CanSupport(t *testing.T) {
 	}{
 		{
 			shouldDetectHugePages: false,
-			volumeSpec:            &v1.Volume{"test", v1.VolumeSource{HugePages: &v1.HugePagesVolumeSource{}}},
-			expectedResult:        false,
+			volumeSpec: &v1.Volume{
+				Name:         "test",
+				VolumeSource: v1.VolumeSource{HugePages: &v1.HugePagesVolumeSource{}},
+			},
+			expectedResult: false,
 		},
 		{
 			shouldDetectHugePages: true,
@@ -64,13 +62,19 @@ func TestHugePagesPlugin_CanSupport(t *testing.T) {
 		},
 		{
 			shouldDetectHugePages: true,
-			volumeSpec:            &v1.Volume{"test", v1.VolumeSource{}},
-			expectedResult:        false,
+			volumeSpec: &v1.Volume{
+				Name:         "test",
+				VolumeSource: v1.VolumeSource{},
+			},
+			expectedResult: false,
 		},
 		{
 			shouldDetectHugePages: true,
-			volumeSpec:            &v1.Volume{"test", v1.VolumeSource{HugePages: &v1.HugePagesVolumeSource{}}},
-			expectedResult:        true,
+			volumeSpec: &v1.Volume{
+				Name:         "test",
+				VolumeSource: v1.VolumeSource{HugePages: &v1.HugePagesVolumeSource{}},
+			},
+			expectedResult: true,
 		},
 	}
 
@@ -139,7 +143,10 @@ func TestHugePagesPlugin_GetVolumeName(t *testing.T) {
 	}{
 		"positiveCase": {
 			inputSpec: &volume.Spec{
-				Volume: &v1.Volume{"test", v1.VolumeSource{HugePages: &v1.HugePagesVolumeSource{}}},
+				Volume: &v1.Volume{
+					Name:         "test",
+					VolumeSource: v1.VolumeSource{HugePages: &v1.HugePagesVolumeSource{}},
+				},
 			},
 			outputStr: "test",
 			throwErr:  false,
@@ -151,7 +158,10 @@ func TestHugePagesPlugin_GetVolumeName(t *testing.T) {
 		},
 		"emptyHugePagesVolumeSources": {
 			inputSpec: &volume.Spec{
-				Volume: &v1.Volume{"test", v1.VolumeSource{}},
+				Volume: &v1.Volume{
+					Name:         "test",
+					VolumeSource: v1.VolumeSource{},
+				},
 			},
 			outputStr: "",
 			throwErr:  true,
@@ -197,9 +207,9 @@ func TestHugePagesPlugin_NewMounter(t *testing.T) {
 			},
 			expectedOutput: &hugePages{
 				volName:  "test",
-				pageSize: "10G",
-				size:     "400T",
-				minSize:  "10k",
+				pageSize: "2M",
+				size:     "512M",
+				minSize:  "10M",
 			},
 		},
 		"unrealisticCase": {
@@ -228,7 +238,7 @@ func TestHugePagesPlugin_NewMounter(t *testing.T) {
 			},
 		}
 		actual, _ := plug.NewMounter(spec, nil, volume.VolumeOptions{})
-		hugePagesValidator(t, testCase.expectedOutput, (actual.(*hugePages)))
+		hugePagesValidator(t, testCase.expectedOutput, actual.(*hugePages))
 	}
 }
 
@@ -247,87 +257,156 @@ func TestHugePagesPlugin_NewUnmounter(t *testing.T) {
 	}{
 		"realisticCase": {
 			name: "test",
+			UID:  "xxxxxx-yyyyyyyyyyy-zzzzzzzzzz",
 			expectedOutput: &hugePages{
 				volName: "test",
 				pod: &v1.Pod{
-					metav1.ObjectMeta{
-						UID: "xxxxxx-yyyyyyyyyyy-zzzzzzzzzz",
-					},
+					TypeMeta:   metav1.TypeMeta{},
+					ObjectMeta: metav1.ObjectMeta{UID: "xxxxxx-yyyyyyyyyyy-zzzzzzzzzz"},
+					Spec:       v1.PodSpec{},
+					Status:     v1.PodStatus{},
 				},
 			},
 		},
-		"unrealisticCase": {
-			name: "test",
-			hugePagesVolumeSource: &v1.HugePagesVolumeSource{
-				PageSize: "10G",
-				MaxSize:  "400T",
-				MinSize:  "10k",
-			},
+		"emptyUIDcase": {
+			name: "test2",
+			UID:  "",
 			expectedOutput: &hugePages{
-				volName:  "test",
-				pageSize: "10G",
-				size:     "400T",
-				minSize:  "10k",
+				volName: "test2",
+				pod: &v1.Pod{
+					TypeMeta:   metav1.TypeMeta{},
+					ObjectMeta: metav1.ObjectMeta{UID: ""},
+					Spec:       v1.PodSpec{},
+					Status:     v1.PodStatus{},
+				},
+			},
+		},
+		"emptyNameCase": {
+			name: "",
+			UID:  "xxxxxxxxxx",
+			expectedOutput: &hugePages{
+				volName: "",
+				pod: &v1.Pod{
+					TypeMeta:   metav1.TypeMeta{},
+					ObjectMeta: metav1.ObjectMeta{UID: "xxxxxxxxxx"},
+					Spec:       v1.PodSpec{},
+					Status:     v1.PodStatus{},
+				},
 			},
 		},
 	}
 
 	for _, testCase := range testCases {
-		spec := &volume.Spec{
-			Volume: &v1.Volume{
-				Name: testCase.name,
-				VolumeSource: v1.VolumeSource{
-					HugePages: testCase.hugePagesVolumeSource,
-				},
-			},
-		}
-		actual, _ := plug.NewMounter(spec, nil, volume.VolumeOptions{})
-		hugePagesValidator(t, testCase.expectedOutput, (actual.(*hugePages)))
+		actual, _ := plug.NewUnmounter(testCase.name, testCase.UID)
+		hugePagesValidator(t, testCase.expectedOutput, actual.(*hugePages))
 	}
 }
 
-//
-//func fakeVolumeHostCreator(location string) volume.VolumeHost {
-//	fakeVolumeHost := kubeTesting.NewFakeVolumeHost(location, nil, nil)
-//	return volume.VolumeHost(fakeVolumeHost)
-//}
-//
-//func TestHugePages_SetUpAt(t *testing.T) {
-//	testCases := []struct {
-//		prepareFunc     func() (string, func() error, error)
-//		isExpectedError bool
-//		mockedHP        *hugePages
-//		unixGroupID     types.UnixGroupID
-//	}{
-//		{
-//			prepareFunc: func() (string, func() error, error) {
-//				location, err := ioutil.TempDir("/tmp", "hugepageTest")
-//				return location, func() error {
-//					return os.RemoveAll(location)
-//				}, err
-//			},
-//			isExpectedError: false,
-//			mockedHP: &hugePages{
-//				pod: &v1.Pod{
-//					metav1.ObjectMeta{
-//						UID:
-//					},
-//				},
-//				mounter: &mount.FakeMounter{},
-//				plugin:  &hugePagesPlugin{},
-//			},
-//			unixGroupID: 1000,
-//		},
-//	}
-//
-//	for _, testCase := range testCases {
-//		location, cleanup, err := testCase.prepareFunc()
-//		assert.Nil(t, err)
-//
-//		t.Log(location)
-//		testCase.mockedHP.plugin.Init(fakeVolumeHostCreator(location))
-//		testCase.mockedHP.SetUpAt(location, &testCase.unixGroupID)
-//		err = cleanup()
-//		assert.Nil(t, err)
-//	}
-//}
+func TestHugePagesPlugin_ConstructVolumeSpec(t *testing.T) {
+	specValidator := func(t *testing.T, expected, actual *volume.Spec) {
+		assert.Equal(t, expected.Volume.Name, actual.Volume.Name)
+	}
+
+	plug := setup(t)
+	testCases := map[string]struct {
+		expectedOutput *volume.Spec
+		volName        string
+	}{
+		"workingCase": {
+			expectedOutput: &volume.Spec{
+				Volume: &v1.Volume{
+					Name: "test",
+				},
+			},
+			volName: "test",
+		},
+		"emptyVolNameCase": {
+			expectedOutput: &volume.Spec{
+				Volume: &v1.Volume{
+					Name: "",
+				},
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		actual, _ := plug.ConstructVolumeSpec(testCase.volName, "")
+		specValidator(t, testCase.expectedOutput, actual)
+	}
+}
+
+func hugePagesSetup(t *testing.T) *hugePages {
+	plugin := setup(t).(*hugePagesPlugin)
+	return &hugePages{
+		mounter: plugin.host.GetMounter(),
+		plugin:  plugin,
+	}
+}
+
+func TestHugePages_GetAttributes(t *testing.T) {
+	hp := hugePagesSetup(t)
+	attributes := hp.GetAttributes()
+	assert.False(t, attributes.Managed)
+	assert.False(t, attributes.SupportsSELinux)
+	assert.False(t, attributes.ReadOnly)
+}
+
+func TestHugePages_CanMount(t *testing.T) {
+	hp := hugePagesSetup(t)
+	assert.Nil(t, hp.CanMount())
+}
+
+func testSetUp(t *testing.T, setUpFunction func(gId int, location string) func() error) {
+	testCases := map[string]struct {
+		prepareFunc   func() (string, error)
+		groupId       int
+		isThrowingErr bool
+		postFunc      func(location string) error
+	}{
+		"workingCase": {
+			prepareFunc: func() (string, error) {
+				return ioutil.TempDir("/tmp", "hp")
+			},
+			groupId:       600,
+			isThrowingErr: false,
+			postFunc: func(location string) error {
+				return os.RemoveAll(location)
+			},
+		},
+		"notExistingLocationCase": {
+			prepareFunc: func() (string, error) {
+				return "/xyz/notexisting", nil
+			},
+			groupId:       000,
+			isThrowingErr: true,
+			postFunc: func(location string) error {
+				return nil
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		location, err := testCase.prepareFunc()
+		assert.Nil(t, err)
+		err = setUpFunction(testCase.groupId, location)()
+		assert.Equal(t, testCase.isThrowingErr, err != nil)
+		err = testCase.postFunc(location)
+		assert.Nil(t, err)
+	}
+}
+
+func TestHugePages_SetUpAt(t *testing.T) {
+	hp := hugePagesSetup(t)
+	hp.pod = &v1.Pod{
+		TypeMeta:   metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{UID: ""},
+		Spec:       v1.PodSpec{},
+		Status:     v1.PodStatus{},
+	}
+	setUpFunction := func(gId int, location string) func() error {
+		return func() error {
+			gId := types.UnixGroupID(gId)
+			return hp.SetUpAt(location, &gId)
+		}
+	}
+	testSetUp(t, setUpFunction)
+}
