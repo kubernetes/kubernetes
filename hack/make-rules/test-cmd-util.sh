@@ -181,6 +181,7 @@ function kubectl-with-retry()
 # wait-for-pods-with-label "app=foo" "nginx-0nginx-1"
 function wait-for-pods-with-label()
 {
+  local i
   for i in $(seq 1 10); do
     kubeout=`kubectl get po -l $1 --template '{{range.items}}{{.metadata.name}}{{end}}' --sort-by metadata.name "${kube_flags[@]}"`
     if [[ $kubeout = $2 ]]; then
@@ -1413,6 +1414,101 @@ __EOF__
   # teardown
   kubectl delete thirdpartyresources/foo.company.com "${kube_flags[@]}"
   kubectl delete thirdpartyresources/bar.company.com "${kube_flags[@]}"
+}
+
+run_tpr_migration_tests() {
+  local i tries
+  create_and_use_new_namespace
+
+  # Create CRD first. This is sort of backwards so we can create a marker below.
+  kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "metadata": {
+    "name": "foos.company.crd"
+  },
+  "spec": {
+    "group": "company.crd",
+    "version": "v1",
+    "names": {
+      "plural": "foos",
+      "kind": "Foo"
+    }
+  }
+}
+__EOF__
+  # Wait for API to become available.
+  tries=0
+  until kubectl "${kube_flags[@]}" get foos.company.crd || [ $tries -gt 10 ]; do
+    tries=$((tries+1))
+    sleep ${tries}
+  done
+  kube::test::get_object_assert foos.company.crd '{{len .items}}' '0'
+
+  # Create a marker that only exists in CRD so we know when CRD is active vs. TPR.
+  kubectl "${kube_flags[@]}" create -f - << __EOF__
+{
+  "kind": "Foo",
+  "apiVersion": "company.crd/v1",
+  "metadata": {
+    "name": "crd-marker"
+  },
+  "testValue": "only exists in CRD"
+}
+__EOF__
+  kube::test::get_object_assert foos.company.crd '{{len .items}}' '1'
+
+  # Now create a TPR that sits in front of the CRD and hides it.
+  kubectl "${kube_flags[@]}" create -f - << __EOF__
+{
+  "kind": "ThirdPartyResource",
+  "apiVersion": "extensions/v1beta1",
+  "metadata": {
+    "name": "foo.company.crd"
+  },
+  "versions": [
+    {
+      "name": "v1"
+    }
+  ]
+}
+__EOF__
+  # The marker should disappear.
+  kube::test::wait_object_assert foos.company.crd '{{len .items}}' '0'
+
+  # Add some items to the TPR.
+  for i in {1..10}; do
+    kubectl "${kube_flags[@]}" create -f - << __EOF__
+{
+  "kind": "Foo",
+  "apiVersion": "company.crd/v1",
+  "metadata": {
+    "name": "tpr-${i}"
+  },
+  "testValue": "migrate-${i}"
+}
+__EOF__
+  done
+  kube::test::get_object_assert foos.company.crd '{{len .items}}' '10'
+
+  # Delete the TPR and wait for the CRD to take over.
+  kubectl "${kube_flags[@]}" delete thirdpartyresource/foo.company.crd
+  tries=0
+  until kubectl "${kube_flags[@]}" get foos.company.crd/crd-marker || [ $tries -gt 10 ]; do
+    tries=$((tries+1))
+    sleep ${tries}
+  done
+  kube::test::get_object_assert foos.company.crd/crd-marker '{{.testValue}}' 'only exists in CRD'
+
+  # Check if the TPR items were migrated to CRD.
+  kube::test::get_object_assert foos.company.crd '{{len .items}}' '11'
+  for i in {1..10}; do
+    kube::test::get_object_assert foos.company.crd/tpr-${i} '{{.testValue}}' "migrate-${i}"
+  done
+
+  # teardown
+  kubectl delete customresourcedefinitions/foos.company.crd "${kube_flags_with_token[@]}"
 }
 
 
@@ -2953,12 +3049,12 @@ runTests() {
   kube::log::status "Checking kubectl version"
   kubectl version
 
-  i=0
+  ns_num=0
   create_and_use_new_namespace() {
-    i=$(($i+1))
-    kube::log::status "Creating namespace namespace${i}"
-    kubectl create namespace "namespace${i}"
-    kubectl config set-context "${CONTEXT}" --namespace="namespace${i}"
+    ns_num=$(($ns_num+1))
+    kube::log::status "Creating namespace namespace${ns_num}"
+    kubectl create namespace "namespace${ns_num}"
+    kubectl config set-context "${CONTEXT}" --namespace="namespace${ns_num}"
   }
 
   kube_flags=(
@@ -3292,6 +3388,9 @@ runTests() {
 
   if kube::test::if_supports_resource "${thirdpartyresources}" ; then
     run_tpr_tests
+    if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
+      run_tpr_migration_tests
+    fi
   fi
 
   #################
