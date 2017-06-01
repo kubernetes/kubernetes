@@ -228,9 +228,6 @@ func TestIsRunningAndReady(t *testing.T) {
 
 func TestAscendingOrdinal(t *testing.T) {
 	set := newStatefulSet(10)
-	for i := 0; i < 10; i++ {
-
-	}
 	pods := make([]*v1.Pod, 10)
 	perm := rand.Perm(10)
 	for i, v := range perm {
