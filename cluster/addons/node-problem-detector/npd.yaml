@@ -80,3 +80,5 @@ spec:
       tolerations:
       - operator: "Exists"
         effect: "NoExecute"
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
