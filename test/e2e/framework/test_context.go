@@ -138,7 +138,7 @@ type CloudConfig struct {
 	MultiZone         bool
 	Cluster           string
 	MasterName        string
-	NodeInstanceGroup string
+	NodeInstanceGroup string // comma-delimited list of groups' names
 	NumNodes          int
 	ClusterTag        string
 	Network           string
