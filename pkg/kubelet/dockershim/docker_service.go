@@ -21,7 +21,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/blang/semver"
@@ -176,7 +175,6 @@ func NewDockerService(client libdocker.Interface, seccompProfileRoot string, pod
 		containerManager:  cm.NewContainerManager(cgroupsName, client),
 		checkpointHandler: checkpointHandler,
 		disableSharedPID:  disableSharedPID,
-		networkReady:      make(map[string]bool),
 	}
 
 	// check docker version compatibility.
@@ -250,13 +248,8 @@ type dockerService struct {
 	podSandboxImage    string
 	streamingRuntime   *streamingRuntime
 	streamingServer    streaming.Server
-
-	network *network.PluginManager
-	// Map of podSandboxID :: network-is-ready
-	networkReady     map[string]bool
-	networkReadyLock sync.Mutex
-
-	containerManager cm.ContainerManager
+	network            *network.PluginManager
+	containerManager   cm.ContainerManager
 	// cgroup driver used by Docker runtime.
 	cgroupDriver      string
 	checkpointHandler CheckpointHandler
@@ -322,7 +315,7 @@ func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return getNetworkNamespace(r)
+	return getNetworkNamespace(r), nil
 }
 
 // GetPodPortMappings returns the port mappings of the given podSandbox ID.
