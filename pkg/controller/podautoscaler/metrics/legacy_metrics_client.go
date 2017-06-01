@@ -63,6 +63,7 @@ func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, ser
 	}
 }
 
+// use the first exposed port on the service
 func (h *HeapsterMetricsClient) getHeapsterPort() string {
 	if h.heapsterPort != "" {
 		return h.heapsterPort
