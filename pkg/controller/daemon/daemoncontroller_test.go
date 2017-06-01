@@ -1175,7 +1175,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 	}
 }
 
-// DaemonSets should be resynced when node labels or taints changed
+// DaemonSets should be resynced when node labels, taints, allocatable or conditions changed
 func TestUpdateNode(t *testing.T) {
 	var enqueued bool
 
@@ -1218,6 +1218,55 @@ func TestUpdateNode(t *testing.T) {
 			newNode:       newNode("node1", nil),
 			ds:            newDaemonSet("ds"),
 			shouldEnqueue: true,
+		},
+		{
+			test: "Node allocatable changed",
+			oldNode: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Allocatable = map[v1.ResourceName]resource.Quantity{
+					v1.ResourcePods: resource.MustParse("0"),
+				}
+				return node
+			}(),
+			newNode:       newNode("node1", nil),
+			ds:            newDaemonSet("ds"),
+			shouldEnqueue: true,
+		},
+		{
+			test: "Node conditions changed",
+			oldNode: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{{
+					Type:   v1.NodeOutOfDisk,
+					Status: v1.ConditionTrue,
+				}}
+				return node
+			}(),
+			newNode:       newNode("node1", nil),
+			ds:            newDaemonSet("ds"),
+			shouldEnqueue: true,
+		},
+		{
+			test: "Node conditions only timestamp changed",
+			oldNode: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{{
+					Type:   v1.NodeOutOfDisk,
+					Status: v1.ConditionTrue,
+				}}
+				return node
+			}(),
+			newNode: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{{
+					Type:              v1.NodeOutOfDisk,
+					Status:            v1.ConditionTrue,
+					LastHeartbeatTime: metav1.Now(),
+				}}
+				return node
+			}(),
+			ds:            newDaemonSet("ds"),
+			shouldEnqueue: false,
 		},
 	}
 	for _, c := range cases {
