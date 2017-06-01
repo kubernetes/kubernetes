@@ -17,14 +17,30 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"io"
+	"strings"
+	"text/template"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/pkg/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+)
+
+const (
+	// kubeadmUsageTemplateRequiredImages is appended to default usage template,
+	// so that user can see information about how to get required images.
+	kubeadmUsageTemplateRequiredImages = `Use "{{.CommandPath}} help required-images" for information about all images required to initialize a Kubernetes cluster.
+`
+	kubeadmRequiredImagesTemplate = `Required images:{{range .RequiredImages}}
+  {{ . }}{{end}}`
 )
 
 func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
@@ -93,5 +109,60 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	experimentalCmd.AddCommand(phases.NewCmdPhase(out))
 	cmds.AddCommand(experimentalCmd)
 
+	cmds.SetHelpCommand(newKubeadmHelpCmd(cmds.Name()))
+	cmds.SetUsageTemplate(cmds.UsageTemplate() + kubeadmUsageTemplateRequiredImages)
 	return cmds
+}
+
+// newKubeadmHelpCmd returns a help command for kubeadm root command.
+// see cobra.Command#initHelpCmd() (command.go)
+func newKubeadmHelpCmd(cmdName string) *cobra.Command {
+	return &cobra.Command{
+		Use:   "help [command]",
+		Short: "Help about any command",
+		Long: `Help provides help for any command in the application.
+    Simply type ` + cmdName + ` help [path to command] for full details.`,
+		PersistentPreRun:  func(cmd *cobra.Command, args []string) {},
+		PersistentPostRun: func(cmd *cobra.Command, args []string) {},
+
+		Run: func(c *cobra.Command, args []string) {
+			if len(args) == 1 && strings.TrimSpace(args[0]) == "required-images" {
+				if s, err := getKubeadmRequiredImages(); err != nil {
+					c.Println("failed to get kubeadm required images : %v", err)
+				} else {
+					c.Println(s)
+				}
+			} else {
+				cmd, _, e := c.Root().Find(args)
+				if cmd == nil || e != nil {
+					c.Printf("Unknown help topic %#q.", args)
+					c.Root().Usage()
+				} else {
+					cmd.Help()
+				}
+			}
+		},
+	}
+}
+func getKubeadmRequiredImages() (string, error) {
+	versioned := &kubeadmapiext.MasterConfiguration{}
+	api.Scheme.Default(versioned)
+	cfg := kubeadmapi.MasterConfiguration{}
+	api.Scheme.Convert(versioned, &cfg, nil)
+
+	requiredImages := []string{
+		images.GetCoreImage(images.KubeAPIServerImage, &cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+		images.GetCoreImage(images.KubeControllerManagerImage, &cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+		images.GetCoreImage(images.KubeSchedulerImage, &cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+		images.GetCoreImage(images.KubeProxyImage, &cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+		images.GetCoreImage(images.KubeEtcdImage, &cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
+	}
+	var buf bytes.Buffer
+	t := template.New("")
+	template.Must(t.Parse(kubeadmRequiredImagesTemplate))
+	if err := t.Execute(&buf, map[string][]string{"RequiredImages": requiredImages}); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+
 }
