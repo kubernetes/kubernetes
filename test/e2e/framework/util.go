@@ -294,7 +294,7 @@ func Failf(format string, args ...interface{}) {
 func FailfWithOffset(offset int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	log("INFO", msg)
-	Fail(nowStamp()+": "+msg, 1 + offset)
+	Fail(nowStamp()+": "+msg, 1+offset)
 }
 
 func Skipf(format string, args ...interface{}) {
@@ -1932,7 +1932,7 @@ func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	if err != nil {
 		Logf("Unexpected error occurred: %v", err)
 	}
-	ExpectWithOffset(1 + offset, err).NotTo(HaveOccurred(), explain...)
+	ExpectWithOffset(1+offset, err).NotTo(HaveOccurred(), explain...)
 }
 
 func ExpectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interface{}) {
