@@ -340,6 +340,6 @@ func prefixEach(msgs []string, prefix string) []string {
 
 // InclusiveRangeError returns a string explanation of a numeric "must be
 // between" validation failure.
-func InclusiveRangeError(lo, hi int) string {
+func InclusiveRangeError(lo, hi int64) string {
 	return fmt.Sprintf(`must be between %d and %d, inclusive`, lo, hi)
 }
