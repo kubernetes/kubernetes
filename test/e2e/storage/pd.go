@@ -43,7 +43,7 @@ import (
 const (
 	gcePDDetachTimeout  = 10 * time.Minute
 	gcePDDetachPollTime = 10 * time.Second
-	nodeStatusTimeout   = 1 * time.Minute
+	nodeStatusTimeout   = 3 * time.Minute
 	nodeStatusPollTime  = 1 * time.Second
 	maxReadRetry        = 3
 )
@@ -428,6 +428,8 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			By("Cleaning up PD-RW test env")
 			podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
 			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
+			framework.WaitForNodeToBeReady(f.ClientSet, string(host0Name), nodeStatusTimeout)
+			Expect(len(nodes.Items)).To(Equal(initialGroupSize))
 		}()
 
 		By("submitting host0Pod to kubernetes")
