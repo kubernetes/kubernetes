@@ -425,13 +425,46 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 	}
 }
 
+// nodeInSameCondition returns true if all effective types ("Status" is true) equals;
+// otherwise, returns false.
+func nodeInSameCondition(old []v1.NodeCondition, cur []v1.NodeCondition) bool {
+	if len(old) == 0 && len(cur) == 0 {
+		return true
+	}
+
+	c1map := map[v1.NodeConditionType]v1.ConditionStatus{}
+	for _, c := range old {
+		if c.Status == v1.ConditionTrue {
+			c1map[c.Type] = c.Status
+		}
+	}
+
+	for _, c := range cur {
+		if c.Status != v1.ConditionTrue {
+			continue
+		}
+
+		if _, found := c1map[c.Type]; !found {
+			return false
+		}
+
+		delete(c1map, c.Type)
+	}
+
+	return len(c1map) == 0
+}
+
 func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 	oldNode := old.(*v1.Node)
 	curNode := cur.(*v1.Node)
-	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) && reflect.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints) {
-		// If node labels and taints didn't change, we can ignore this update.
+
+	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) &&
+		reflect.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints) &&
+		nodeInSameCondition(oldNode.Status.Conditions, curNode.Status.Conditions) {
+		// If node labels, taints and condition didn't change, we can ignore this update.
 		return
 	}
+
 	dsList, err := dsc.dsLister.List(labels.Everything())
 	if err != nil {
 		glog.V(4).Infof("Error enqueueing daemon sets: %v", err)

@@ -42,7 +42,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	}
 
 	options := server.NewCustomResourceDefinitionsServerOptions(os.Stdout, os.Stderr)
-	options.RecommendedOptions.Audit.Path = "-"
+	options.RecommendedOptions.Audit.LogOptions.Path = "-"
 	options.RecommendedOptions.SecureServing.BindPort = port
 	options.RecommendedOptions.Authentication.SkipInClusterLookup = true
 	options.RecommendedOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")

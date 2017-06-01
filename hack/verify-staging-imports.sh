@@ -37,7 +37,8 @@ function print_forbidden_imports () {
         go list -f $'{{with $package := .ImportPath}}{{range $.Imports}}{{$package}} imports {{.}}\n{{end}}{{end}}' ./vendor/k8s.io/${PACKAGE}/... |
         sed 's|^k8s.io/kubernetes/vendor/||;s| k8s.io/kubernetes/vendor/| |' |
         grep -v " k8s.io/${PACKAGE}" |
-        grep -e "imports \(${RE}\)"
+        grep " k8s.io/" |
+        grep -v -e "imports \(${RE}\)"
     )
     if [ -n "${FORBIDDEN}" ]; then
         echo "${PACKAGE} has a forbidden dependency:"
@@ -50,7 +51,8 @@ function print_forbidden_imports () {
         go list -f $'{{with $package := .ImportPath}}{{range $.TestImports}}{{$package}} imports {{.}}\n{{end}}{{end}}' ./vendor/k8s.io/${PACKAGE}/... |
         sed 's|^k8s.io/kubernetes/vendor/||;s| k8s.io/kubernetes/vendor/| |' |
         grep -v " k8s.io/${PACKAGE}" |
-        grep -e "imports \(${RE}\)"
+        grep " k8s.io/" |
+        grep -v -e "imports \(${RE}\)"
     )
     if [ -n "${TEST_FORBIDDEN}" ]; then
         echo "${PACKAGE} has a forbidden dependency in test code:"
@@ -63,11 +65,11 @@ function print_forbidden_imports () {
 }
 
 RC=0
-print_forbidden_imports apimachinery k8s.io/ || RC=1
-print_forbidden_imports apiserver k8s.io/kubernetes k8s.io/sample-apiserver k8s.io/kube-aggregator || RC=1
-print_forbidden_imports client-go k8s.io/kubernetes k8s.io/apiserver k8s.io/sample-apiserver k8s.io/kube-aggregator || RC=1
-print_forbidden_imports kube-aggregator k8s.io/kubernetes k8s.io/sample-apiserver || RC=1
-print_forbidden_imports sample-apiserver k8s.io/kubernetes k8s.io/kube-aggregator || RC=1
+print_forbidden_imports apimachinery || RC=1
+print_forbidden_imports client-go k8s.io/apimachinery || RC=1
+print_forbidden_imports apiserver k8s.io/apimachinery k8s.io/client-go || RC=1
+print_forbidden_imports kube-aggregator k8s.io/apimachinery k8s.io/client-go k8s.io/apiserver || RC=1
+print_forbidden_imports sample-apiserver k8s.io/apimachinery k8s.io/client-go k8s.io/apiserver || RC=1
 if [ ${RC} != 0 ]; then
     exit ${RC}
 fi

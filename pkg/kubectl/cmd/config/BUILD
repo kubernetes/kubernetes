@@ -51,6 +51,7 @@ go_test(
     srcs = [
         "config_test.go",
         "create_authinfo_test.go",
+        "create_cluster_test.go",
         "create_context_test.go",
         "current_context_test.go",
         "delete_cluster_test.go",
