@@ -156,6 +156,18 @@ func TestParseAnnotations(t *testing.T) {
 			scenario:    "incorrect annotation input (missing =value)",
 			expectErr:   true,
 		},
+		{
+			annotations: []string{"-"},
+			expectedErr: "invalid annotation format: -",
+			scenario:    "incorrect annotation input (missing key)",
+			expectErr:   true,
+		},
+		{
+			annotations: []string{"=bar"},
+			expectedErr: "invalid annotation format: =bar",
+			scenario:    "incorrect annotation input (missing key)",
+			expectErr:   true,
+		},
 	}
 	for _, test := range tests {
 		annotations, remove, err := parseAnnotations(test.annotations)
@@ -376,6 +388,18 @@ func TestAnnotateErrors(t *testing.T) {
 		},
 		"not enough annotations": {
 			args: []string{"pods"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "at least one annotation update is required")
+			},
+		},
+		"wrong annotations": {
+			args: []string{"pods", "-"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "at least one annotation update is required")
+			},
+		},
+		"wrong annotations 2": {
+			args: []string{"pods", "=bar"},
 			errFn: func(err error) bool {
 				return strings.Contains(err.Error(), "at least one annotation update is required")
 			},
