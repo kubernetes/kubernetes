@@ -45,8 +45,9 @@ const (
 )
 
 type projectedPlugin struct {
-	host      volume.VolumeHost
-	getSecret func(namespace, name string) (*v1.Secret, error)
+	host         volume.VolumeHost
+	getSecret    func(namespace, name string) (*v1.Secret, error)
+	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
 }
 
 var _ volume.VolumePlugin = &projectedPlugin{}
@@ -68,6 +69,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 func (plugin *projectedPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	plugin.getSecret = host.GetSecretFunc()
+	plugin.getConfigMap = host.GetConfigMapFunc()
 	return nil
 }
 
@@ -235,10 +237,10 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			secretapi, err := s.plugin.getSecret(s.pod.Namespace, source.Secret.Name)
 			if err != nil {
 				if !(errors.IsNotFound(err) && optional) {
-					glog.Errorf("Couldn't get secret %v/%v", s.pod.Namespace, source.Secret.Name)
+					glog.Errorf("Couldn't get secret %v/%v: %v", s.pod.Namespace, source.Secret.Name, err)
 					errlist = append(errlist, err)
+					continue
 				}
-
 				secretapi = &v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: s.pod.Namespace,
@@ -248,17 +250,16 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			}
 			secretPayload, err := secret.MakePayload(source.Secret.Items, secretapi, s.source.DefaultMode, optional)
 			if err != nil {
-				glog.Errorf("Couldn't get secret %v/%v: %v", s.pod.Namespace, source.Secret.Name, err)
+				glog.Errorf("Couldn't get secret payload %v/%v: %v", s.pod.Namespace, source.Secret.Name, err)
 				errlist = append(errlist, err)
 				continue
 			}
-
 			for k, v := range secretPayload {
 				payload[k] = v
 			}
 		} else if source.ConfigMap != nil {
 			optional := source.ConfigMap.Optional != nil && *source.ConfigMap.Optional
-			configMap, err := kubeClient.Core().ConfigMaps(s.pod.Namespace).Get(source.ConfigMap.Name, metav1.GetOptions{})
+			configMap, err := s.plugin.getConfigMap(s.pod.Namespace, source.ConfigMap.Name)
 			if err != nil {
 				if !(errors.IsNotFound(err) && optional) {
 					glog.Errorf("Couldn't get configMap %v/%v: %v", s.pod.Namespace, source.ConfigMap.Name, err)
@@ -274,6 +275,7 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			}
 			configMapPayload, err := configmap.MakePayload(source.ConfigMap.Items, configMap, s.source.DefaultMode, optional)
 			if err != nil {
+				glog.Errorf("Couldn't get configMap payload %v/%v: %v", s.pod.Namespace, source.ConfigMap.Name, err)
 				errlist = append(errlist, err)
 				continue
 			}

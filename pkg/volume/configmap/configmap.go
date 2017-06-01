@@ -42,13 +42,15 @@ const (
 
 // configMapPlugin implements the VolumePlugin interface.
 type configMapPlugin struct {
-	host volume.VolumeHost
+	host         volume.VolumeHost
+	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
 }
 
 var _ volume.VolumePlugin = &configMapPlugin{}
 
 func (plugin *configMapPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	plugin.getConfigMap = host.GetConfigMapFunc()
 	return nil
 }
 
@@ -86,14 +88,32 @@ func (plugin *configMapPlugin) SupportsBulkVolumeVerification() bool {
 
 func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &configMapVolumeMounter{
-		configMapVolume: &configMapVolume{spec.Name(), pod.UID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}},
-		source:          *spec.Volume.ConfigMap,
-		pod:             *pod,
-		opts:            &opts}, nil
+		configMapVolume: &configMapVolume{
+			spec.Name(),
+			pod.UID,
+			plugin,
+			plugin.host.GetMounter(),
+			plugin.host.GetWriter(),
+			volume.MetricsNil{},
+		},
+		source:       *spec.Volume.ConfigMap,
+		pod:          *pod,
+		opts:         &opts,
+		getConfigMap: plugin.getConfigMap,
+	}, nil
 }
 
 func (plugin *configMapPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return &configMapVolumeUnmounter{&configMapVolume{volName, podUID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}}}, nil
+	return &configMapVolumeUnmounter{
+		&configMapVolume{
+			volName,
+			podUID,
+			plugin,
+			plugin.host.GetMounter(),
+			plugin.host.GetWriter(),
+			volume.MetricsNil{},
+		},
+	}, nil
 }
 
 func (plugin *configMapPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -126,9 +146,10 @@ func (sv *configMapVolume) GetPath() string {
 type configMapVolumeMounter struct {
 	*configMapVolume
 
-	source v1.ConfigMapVolumeSource
-	pod    v1.Pod
-	opts   *volume.VolumeOptions
+	source       v1.ConfigMapVolumeSource
+	pod          v1.Pod
+	opts         *volume.VolumeOptions
+	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
 }
 
 var _ volume.Mounter = &configMapVolumeMounter{}
@@ -174,13 +195,8 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID)
 		return err
 	}
 
-	kubeClient := b.plugin.host.GetKubeClient()
-	if kubeClient == nil {
-		return fmt.Errorf("Cannot setup configMap volume %v because kube client is not configured", b.volName)
-	}
-
 	optional := b.source.Optional != nil && *b.source.Optional
-	configMap, err := kubeClient.Core().ConfigMaps(b.pod.Namespace).Get(b.source.Name, metav1.GetOptions{})
+	configMap, err := b.getConfigMap(b.pod.Namespace, b.source.Name)
 	if err != nil {
 		if !(errors.IsNotFound(err) && optional) {
 			glog.Errorf("Couldn't get configMap %v/%v: %v", b.pod.Namespace, b.source.Name, err)

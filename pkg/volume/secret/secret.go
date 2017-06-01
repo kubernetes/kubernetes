@@ -198,7 +198,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) er
 	secret, err := b.getSecret(b.pod.Namespace, b.source.SecretName)
 	if err != nil {
 		if !(errors.IsNotFound(err) && optional) {
-			glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.source.SecretName)
+			glog.Errorf("Couldn't get secret %v/%v: %v", b.pod.Namespace, b.source.SecretName, err)
 			return err
 		}
 		secret = &v1.Secret{
