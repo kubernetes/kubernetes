@@ -326,7 +326,7 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 			if shouldRetryAPIRequest(resp, err) {
 				retryErr := az.CreateOrUpdateSGWithRetry(reconciledSg)
 				if retryErr != nil {
-					return retryErr
+					err = retryErr
 				}
 			}
 			if err != nil {
@@ -361,7 +361,7 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 				if shouldRetryAPIRequest(resp, err) {
 					retryErr := az.CreateOrUpdateLBWithRetry(lb)
 					if retryErr != nil {
-						return retryErr
+						err = retryErr
 					}
 				}
 				if err != nil {
@@ -374,7 +374,7 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 				if shouldRetryAPIRequest(resp, err) {
 					retryErr := az.DeleteLBWithRetry(lbName)
 					if retryErr != nil {
-						return retryErr
+						err = retryErr
 					}
 				}
 				if err != nil {
@@ -891,7 +891,7 @@ func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, b
 		if shouldRetryAPIRequest(resp, err) {
 			retryErr := az.CreateOrUpdateInterfaceWithRetry(nic)
 			if retryErr != nil {
-				return retryErr
+				err = retryErr
 			}
 		}
 		if err != nil {
