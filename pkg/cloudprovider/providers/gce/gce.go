@@ -78,6 +78,8 @@ const (
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
+	// ClusterID contains functionality for getting (and initializing) the ingress-uid. Call GCECloud.Initialize()
+	// for the cloudprovider to start watching the configmap.
 	ClusterID ClusterID
 
 	service                  *compute.Service
