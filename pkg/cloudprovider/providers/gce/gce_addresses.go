@@ -22,21 +22,20 @@ import (
 	compute "google.golang.org/api/compute/v1"
 )
 
-func newStaticIPMetricContext(request string) *metricContext {
+func newAddressMetricContext(request, region string) *metricContext {
 	return &metricContext{
 		start:      time.Now(),
-		attributes: []string{"staticip_" + request, unusedMetricLabel, unusedMetricLabel},
+		attributes: []string{"address_" + request, region, unusedMetricLabel},
 	}
 }
 
-// ReserveGlobalStaticIP creates a global static IP.
+// ReserveGlobalAddress creates a global address.
 // Caller is allocated a random IP if they do not specify an ipAddress. If an
 // ipAddress is specified, it must belong to the current project, eg: an
 // ephemeral IP associated with a global forwarding rule.
-func (gce *GCECloud) ReserveGlobalStaticIP(name, ipAddress string) (address *compute.Address, err error) {
-	mc := newStaticIPMetricContext("reserve")
-	op, err := gce.service.GlobalAddresses.Insert(gce.projectID, &compute.Address{Name: name, Address: ipAddress}).Do()
-
+func (gce *GCECloud) ReserveGlobalAddress(addr *compute.Address) (*compute.Address, error) {
+	mc := newAddressMetricContext("reserve", "")
+	op, err := gce.service.GlobalAddresses.Insert(gce.projectID, addr).Do()
 	if err != nil {
 		return nil, mc.Observe(err)
 	}
@@ -45,12 +44,12 @@ func (gce *GCECloud) ReserveGlobalStaticIP(name, ipAddress string) (address *com
 		return nil, err
 	}
 
-	return gce.service.GlobalAddresses.Get(gce.projectID, name).Do()
+	return gce.GetGlobalAddress(addr.Name)
 }
 
-// DeleteGlobalStaticIP deletes a global static IP by name.
-func (gce *GCECloud) DeleteGlobalStaticIP(name string) error {
-	mc := newStaticIPMetricContext("delete")
+// DeleteGlobalAddress deletes a global address by name.
+func (gce *GCECloud) DeleteGlobalAddress(name string) error {
+	mc := newAddressMetricContext("delete", "")
 	op, err := gce.service.GlobalAddresses.Delete(gce.projectID, name).Do()
 	if err != nil {
 		return mc.Observe(err)
@@ -58,9 +57,40 @@ func (gce *GCECloud) DeleteGlobalStaticIP(name string) error {
 	return gce.waitForGlobalOp(op, mc)
 }
 
-// GetGlobalStaticIP returns the global static IP by name.
-func (gce *GCECloud) GetGlobalStaticIP(name string) (*compute.Address, error) {
-	mc := newStaticIPMetricContext("get")
+// GetGlobalAddress returns the global address by name.
+func (gce *GCECloud) GetGlobalAddress(name string) (*compute.Address, error) {
+	mc := newAddressMetricContext("get", "")
 	v, err := gce.service.GlobalAddresses.Get(gce.projectID, name).Do()
+	return v, mc.Observe(err)
+}
+
+// ReserveRegionAddress creates a region address
+func (gce *GCECloud) ReserveRegionAddress(addr *compute.Address, region string) (*compute.Address, error) {
+	mc := newAddressMetricContext("reserve", region)
+	op, err := gce.service.Addresses.Insert(gce.projectID, region, addr).Do()
+	if err != nil {
+		return nil, mc.Observe(err)
+	}
+	if err := gce.waitForRegionOp(op, region, mc); err != nil {
+		return nil, err
+	}
+
+	return gce.GetRegionAddress(addr.Name, region)
+}
+
+// DeleteRegionAddress deletes a region address by name.
+func (gce *GCECloud) DeleteRegionAddress(name, region string) error {
+	mc := newAddressMetricContext("delete", region)
+	op, err := gce.service.Addresses.Delete(gce.projectID, region, name).Do()
+	if err != nil {
+		return mc.Observe(err)
+	}
+	return gce.waitForRegionOp(op, region, mc)
+}
+
+// GetRegionAddress returns the region address by name
+func (gce *GCECloud) GetRegionAddress(name, region string) (*compute.Address, error) {
+	mc := newAddressMetricContext("get", region)
+	v, err := gce.service.Addresses.Get(gce.projectID, region, name).Do()
 	return v, mc.Observe(err)
 }

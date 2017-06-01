@@ -81,20 +81,16 @@ func (gce *GCECloud) ListInstancesInInstanceGroup(name string, zone string, stat
 
 // AddInstancesToInstanceGroup adds the given instances to the given
 // instance group.
-func (gce *GCECloud) AddInstancesToInstanceGroup(name string, zone string, instanceNames []string) error {
+func (gce *GCECloud) AddInstancesToInstanceGroup(name string, zone string, instanceRefs []*compute.InstanceReference) error {
 	mc := newInstanceGroupMetricContext("add_instances", zone)
-	if len(instanceNames) == 0 {
+	if len(instanceRefs) == 0 {
 		return nil
 	}
-	// Adding the same instance twice will result in a 4xx error
-	instances := []*compute.InstanceReference{}
-	for _, ins := range instanceNames {
-		instances = append(instances, &compute.InstanceReference{Instance: makeHostURL(gce.projectID, zone, ins)})
-	}
+
 	op, err := gce.service.InstanceGroups.AddInstances(
 		gce.projectID, zone, name,
 		&compute.InstanceGroupsAddInstancesRequest{
-			Instances: instances,
+			Instances: instanceRefs,
 		}).Do()
 	if err != nil {
 		return mc.Observe(err)
@@ -105,21 +101,16 @@ func (gce *GCECloud) AddInstancesToInstanceGroup(name string, zone string, insta
 
 // RemoveInstancesFromInstanceGroup removes the given instances from
 // the instance group.
-func (gce *GCECloud) RemoveInstancesFromInstanceGroup(name string, zone string, instanceNames []string) error {
+func (gce *GCECloud) RemoveInstancesFromInstanceGroup(name string, zone string, instanceRefs []*compute.InstanceReference) error {
 	mc := newInstanceGroupMetricContext("remove_instances", zone)
-	if len(instanceNames) == 0 {
+	if len(instanceRefs) == 0 {
 		return nil
 	}
 
-	instances := []*compute.InstanceReference{}
-	for _, ins := range instanceNames {
-		instanceLink := makeHostURL(gce.projectID, zone, ins)
-		instances = append(instances, &compute.InstanceReference{Instance: instanceLink})
-	}
 	op, err := gce.service.InstanceGroups.RemoveInstances(
 		gce.projectID, zone, name,
 		&compute.InstanceGroupsRemoveInstancesRequest{
-			Instances: instances,
+			Instances: instanceRefs,
 		}).Do()
 	if err != nil {
 		return mc.Observe(err)
