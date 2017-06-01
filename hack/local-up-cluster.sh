@@ -45,7 +45,7 @@ CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 USER=${USER:-$(whoami)}
 
 # enables testing eviction scenarios locally.
-EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi"}
+EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
 EVICTION_SOFT=${EVICTION_SOFT:-""}
 EVICTION_PRESSURE_TRANSITION_PERIOD=${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}
 
