@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "autoscaling_timer.go",
         "cluster_size_autoscaling.go",
         "dns_autoscaling.go",
         "horizontal_pod_autoscaling.go",
