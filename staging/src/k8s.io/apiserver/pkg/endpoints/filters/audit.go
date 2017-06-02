@@ -183,7 +183,7 @@ func (a *auditResponseWriter) processCode(code int) {
 }
 
 func (a *auditResponseWriter) Write(bs []byte) (int, error) {
-	a.processCode(200) // the Go library calls WriteHeader internally if no code was written yet. But this will go unnoticed for us
+	a.processCode(http.StatusOK) // the Go library calls WriteHeader internally if no code was written yet. But this will go unnoticed for us
 	return a.ResponseWriter.Write(bs)
 }
 
@@ -208,6 +208,8 @@ func (f *fancyResponseWriterDelegator) Flush() {
 }
 
 func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	// fake a response status before protocol switch happens
+	f.processCode(http.StatusSwitchingProtocols)
 	return f.ResponseWriter.(http.Hijacker).Hijack()
 }
 
