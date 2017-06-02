@@ -57,5 +57,6 @@ rules:
   - "certificates.k8s.io"
   resources:
   - certificatesigningrequests/selfnodeclient
+  - certificatesigningrequests/selfnodeserver
   verbs:
   - "create"
