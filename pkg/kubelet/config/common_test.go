@@ -160,3 +160,31 @@ func TestDecodePodList(t *testing.T) {
 		}
 	}
 }
+
+func TestGetSelfLink(t *testing.T) {
+	var testCases = []struct {
+		desc             string
+		name             string
+		namespace        string
+		expectedSelfLink string
+	}{
+		{
+			desc:             "No namespace specified",
+			name:             "foo",
+			namespace:        "",
+			expectedSelfLink: "/api/v1/namespaces/default/pods/foo",
+		},
+		{
+			desc:             "Namespace specified",
+			name:             "foo",
+			namespace:        "bar",
+			expectedSelfLink: "/api/v1/namespaces/bar/pods/foo",
+		},
+	}
+	for _, testCase := range testCases {
+		selfLink := getSelfLink(testCase.name, testCase.namespace)
+		if testCase.expectedSelfLink != selfLink {
+			t.Errorf("%s: getSelfLink error, expected: %s, got: %s", testCase.desc, testCase.expectedSelfLink, selfLink)
+		}
+	}
+}
