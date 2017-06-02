@@ -247,7 +247,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	if err := tokenphase.CreateBootstrapConfigMap(adminKubeConfigPath); err != nil {
+	if err := tokenphase.CreateBootstrapConfigMapIfNotExists(client, adminKubeConfigPath); err != nil {
 		return err
 	}
 
