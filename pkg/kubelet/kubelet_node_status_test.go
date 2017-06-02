@@ -1164,3 +1164,163 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable), "%s", diff.ObjectDiff(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable))
 }
+
+func TestUpdateDefaultLabels(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	cases := []struct {
+		name         string
+		initialNode  *v1.Node
+		existingNode *v1.Node
+		needsUpdate  bool
+		finalLabels  map[string]string
+	}{
+		{
+			name: "make sure default labels exist",
+			initialNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						metav1.LabelHostname:          "new-hostname",
+						metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						metav1.LabelZoneRegion:        "new-zone-region",
+						metav1.LabelInstanceType:      "new-instance-type",
+						metav1.LabelOS:                "new-os",
+						metav1.LabelArch:              "new-arch",
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{},
+				},
+			},
+			needsUpdate: true,
+			finalLabels: map[string]string{
+				metav1.LabelHostname:          "new-hostname",
+				metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
+				metav1.LabelZoneRegion:        "new-zone-region",
+				metav1.LabelInstanceType:      "new-instance-type",
+				metav1.LabelOS:                "new-os",
+				metav1.LabelArch:              "new-arch",
+			},
+		},
+		{
+			name: "make sure default labels are up to date",
+			initialNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						metav1.LabelHostname:          "new-hostname",
+						metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						metav1.LabelZoneRegion:        "new-zone-region",
+						metav1.LabelInstanceType:      "new-instance-type",
+						metav1.LabelOS:                "new-os",
+						metav1.LabelArch:              "new-arch",
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						metav1.LabelHostname:          "old-hostname",
+						metav1.LabelZoneFailureDomain: "old-zone-failure-domain",
+						metav1.LabelZoneRegion:        "old-zone-region",
+						metav1.LabelInstanceType:      "old-instance-type",
+						metav1.LabelOS:                "old-os",
+						metav1.LabelArch:              "old-arch",
+					},
+				},
+			},
+			needsUpdate: true,
+			finalLabels: map[string]string{
+				metav1.LabelHostname:          "new-hostname",
+				metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
+				metav1.LabelZoneRegion:        "new-zone-region",
+				metav1.LabelInstanceType:      "new-instance-type",
+				metav1.LabelOS:                "new-os",
+				metav1.LabelArch:              "new-arch",
+			},
+		},
+		{
+			name: "make sure existing labels do not get deleted",
+			initialNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						metav1.LabelHostname:          "new-hostname",
+						metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						metav1.LabelZoneRegion:        "new-zone-region",
+						metav1.LabelInstanceType:      "new-instance-type",
+						metav1.LabelOS:                "new-os",
+						metav1.LabelArch:              "new-arch",
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						metav1.LabelHostname:          "new-hostname",
+						metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						metav1.LabelZoneRegion:        "new-zone-region",
+						metav1.LabelInstanceType:      "new-instance-type",
+						metav1.LabelOS:                "new-os",
+						metav1.LabelArch:              "new-arch",
+						"please-persist":              "foo",
+					},
+				},
+			},
+			needsUpdate: false,
+			finalLabels: map[string]string{
+				metav1.LabelHostname:          "new-hostname",
+				metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
+				metav1.LabelZoneRegion:        "new-zone-region",
+				metav1.LabelInstanceType:      "new-instance-type",
+				metav1.LabelOS:                "new-os",
+				metav1.LabelArch:              "new-arch",
+				"please-persist":              "foo",
+			},
+		},
+		{
+			name: "no update needed",
+			initialNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						metav1.LabelHostname:          "new-hostname",
+						metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						metav1.LabelZoneRegion:        "new-zone-region",
+						metav1.LabelInstanceType:      "new-instance-type",
+						metav1.LabelOS:                "new-os",
+						metav1.LabelArch:              "new-arch",
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						metav1.LabelHostname:          "new-hostname",
+						metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						metav1.LabelZoneRegion:        "new-zone-region",
+						metav1.LabelInstanceType:      "new-instance-type",
+						metav1.LabelOS:                "new-os",
+						metav1.LabelArch:              "new-arch",
+					},
+				},
+			},
+			needsUpdate: false,
+			finalLabels: map[string]string{
+				metav1.LabelHostname:          "new-hostname",
+				metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
+				metav1.LabelZoneRegion:        "new-zone-region",
+				metav1.LabelInstanceType:      "new-instance-type",
+				metav1.LabelOS:                "new-os",
+				metav1.LabelArch:              "new-arch",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		needsUpdate := kubelet.updateDefaultLabels(tc.initialNode, tc.existingNode)
+		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
+		assert.Equal(t, tc.finalLabels, tc.existingNode.Labels, tc.name)
+	}
+}

@@ -132,6 +132,7 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 		// the value of the controller-managed attach-detach
 		// annotation.
 		requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(node, existingNode)
+		requiresUpdate = requiresUpdate || kl.updateDefaultLabels(node, existingNode)
 		if requiresUpdate {
 			if _, err := nodeutil.PatchNodeStatus(kl.kubeClient, types.NodeName(kl.nodeName),
 				originalNode, existingNode); err != nil {
@@ -154,6 +155,32 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 	}
 
 	return false
+}
+
+//updateDefaultLabels will set the default labels on the node
+func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) (needsUpdate bool) {
+	defaultLabels := []string{
+		metav1.LabelHostname,
+		metav1.LabelZoneFailureDomain,
+		metav1.LabelZoneRegion,
+		metav1.LabelInstanceType,
+		metav1.LabelOS,
+		metav1.LabelArch,
+	}
+
+	//Set default labels but make sure to not set labels with empty values
+	for _, label := range defaultLabels {
+		if existingNode.Labels[label] != initialNode.Labels[label] {
+			existingNode.Labels[label] = initialNode.Labels[label]
+			needsUpdate = true
+		}
+
+		if existingNode.Labels[label] == "" {
+			delete(existingNode.Labels, label)
+		}
+	}
+
+	return needsUpdate
 }
 
 // reconcileCMADAnnotationWithExistingNode reconciles the controller-managed
