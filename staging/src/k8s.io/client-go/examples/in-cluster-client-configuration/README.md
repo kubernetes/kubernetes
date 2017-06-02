@@ -1,7 +1,7 @@
 # Authenticating inside the cluster
 
-This example shows you how you can write an application that authenticates to
-the Kubernetes API while it is running on a Kubernetes cluster.
+This example shows you how to configure a client with client-go to authenticate
+to the Kubernetes API from an application running inside the Kubernetes cluster.
 
 client-go uses the [Service Account token][sa] mounted inside the Pod at the
 `/var/run/secrets/kubernetes.io/serviceaccount` path when the
@@ -11,7 +11,7 @@ client-go uses the [Service Account token][sa] mounted inside the Pod at the
 
 First compile the application for Linux:
 
-    cd in-cluster
+    cd in-cluster-client-configuration
     GOOS=linux go build -o ./app .
 
 Then package it to a docker image using the provided Dockerfile to run it on

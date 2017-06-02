@@ -9,7 +9,7 @@ load(
 )
 
 go_binary(
-    name = "out-of-cluster",
+    name = "out-of-cluster-client-configuration",
     library = ":go_default_library",
     tags = ["automanaged"],
 )
