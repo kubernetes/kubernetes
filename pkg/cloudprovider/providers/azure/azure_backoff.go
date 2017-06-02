@@ -24,6 +24,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/golang/glog"
 )
 
 const (
@@ -132,17 +133,16 @@ func (az *Cloud) CreateOrUpdateVMWithRetry(vmName string, newVM compute.VirtualM
 	})
 }
 
-// An in-progress convenience function to deal with common HTTP backoff response conditions
+// A wait.ConditionFunc function to deal with common HTTP backoff response conditions
 func processRetryResponse(resp autorest.Response, err error) (bool, error) {
 	if isSuccessHTTPResponse(resp) {
+		glog.V(2).Infof("backoff: success, HTTP response=%d", resp.StatusCode)
 		return true, nil
 	}
 	if shouldRetryAPIRequest(resp, err) {
-		return false, err
-	}
-	// TODO determine the complete set of short-circuit conditions
-	if err != nil {
-		return false, err
+		glog.Errorf("backoff: failure, will retry, HTTP response=%d, err=%v", resp.StatusCode, err)
+		// suppress the error object so that backoff process continues
+		return false, nil
 	}
 	// Fall-through: stop periodic backoff, return error object from most recent request
 	return true, err
@@ -150,7 +150,6 @@ func processRetryResponse(resp autorest.Response, err error) (bool, error) {
 
 // shouldRetryAPIRequest determines if the response from an HTTP request suggests periodic retry behavior
 func shouldRetryAPIRequest(resp autorest.Response, err error) bool {
-	// non-nil error from HTTP request suggests we should retry
 	if err != nil {
 		return true
 	}
