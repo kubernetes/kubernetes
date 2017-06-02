@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "azure.go",
+        "azure_backoff.go",
         "azure_blob.go",
         "azure_file.go",
         "azure_instances.go",
@@ -44,6 +45,8 @@ go_library(
         "//vendor/github.com/rubiojr/go-vhd/vhd:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )
 
