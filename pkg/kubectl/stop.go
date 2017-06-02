@@ -24,10 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	rest "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -71,68 +73,72 @@ func IsNoSuchReaperError(err error) bool {
 func ReaperFor(kind schema.GroupKind, c internalclientset.Interface) (Reaper, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
-		return &ReplicationControllerReaper{c.Core(), Interval, Timeout}, nil
+		return &ReplicationControllerReaper{c.Core(), c.Core().RESTClient(), Interval, Timeout}, nil
 
 	case extensions.Kind("ReplicaSet"):
-		return &ReplicaSetReaper{c.Extensions(), Interval, Timeout}, nil
+		return &ReplicaSetReaper{c.Extensions(), c.Extensions().RESTClient(), Interval, Timeout}, nil
 
 	case extensions.Kind("DaemonSet"):
-		return &DaemonSetReaper{c.Extensions(), Interval, Timeout}, nil
+		return &DaemonSetReaper{c.Extensions(), c.Extensions().RESTClient(), Interval, Timeout}, nil
 
 	case api.Kind("Pod"):
-		return &PodReaper{c.Core()}, nil
+		return &PodReaper{c.Core(), c.Core().RESTClient()}, nil
 
 	case api.Kind("Service"):
-		return &ServiceReaper{c.Core()}, nil
+		return &ServiceReaper{c.Core(), c.Core().RESTClient()}, nil
 
 	case batch.Kind("Job"):
-		return &JobReaper{c.Batch(), c.Core(), Interval, Timeout}, nil
+		return &JobReaper{c.Batch(), c.Core(), c.Batch().RESTClient(), Interval, Timeout}, nil
 
 	case apps.Kind("StatefulSet"):
-		return &StatefulSetReaper{c.Apps(), c.Core(), Interval, Timeout}, nil
+		return &StatefulSetReaper{c.Apps(), c.Core(), c.Apps().RESTClient(), Interval, Timeout}, nil
 
 	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
-		return &DeploymentReaper{c.Extensions(), c.Extensions(), Interval, Timeout}, nil
+		return &DeploymentReaper{c.Extensions(), c.Extensions(), c.Extensions().RESTClient(), Interval, Timeout}, nil
 
 	}
 	return nil, &NoSuchReaperError{kind}
 }
 
-func ReaperForReplicationController(rcClient coreclient.ReplicationControllersGetter, timeout time.Duration) (Reaper, error) {
-	return &ReplicationControllerReaper{rcClient, Interval, timeout}, nil
-}
-
 type ReplicationControllerReaper struct {
 	client                coreclient.ReplicationControllersGetter
+	RESTClient            rest.Interface
 	pollInterval, timeout time.Duration
 }
 type ReplicaSetReaper struct {
 	client                extensionsclient.ReplicaSetsGetter
+	RESTClient            rest.Interface
 	pollInterval, timeout time.Duration
 }
 type DaemonSetReaper struct {
 	client                extensionsclient.DaemonSetsGetter
+	RESTClient            rest.Interface
 	pollInterval, timeout time.Duration
 }
 type JobReaper struct {
 	client                batchclient.JobsGetter
 	podClient             coreclient.PodsGetter
+	RESTClient            rest.Interface
 	pollInterval, timeout time.Duration
 }
 type DeploymentReaper struct {
 	dClient               extensionsclient.DeploymentsGetter
 	rsClient              extensionsclient.ReplicaSetsGetter
+	RESTClient            rest.Interface
 	pollInterval, timeout time.Duration
 }
 type PodReaper struct {
-	client coreclient.PodsGetter
+	client     coreclient.PodsGetter
+	RESTClient rest.Interface
 }
 type ServiceReaper struct {
-	client coreclient.ServicesGetter
+	client     coreclient.ServicesGetter
+	RESTClient rest.Interface
 }
 type StatefulSetReaper struct {
 	client                appsclient.StatefulSetsGetter
 	podClient             coreclient.PodsGetter
+	RESTClient            rest.Interface
 	pollInterval, timeout time.Duration
 }
 
@@ -217,7 +223,11 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 	}
 	falseVar := false
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	return rc.Delete(name, deleteOptions)
+	deleteFunc := func(options *metav1.DeleteOptions) (runtime.Object, error) {
+		// TODO: Update the generated clientset to return the deleted object and then use that instead of using the rest client.
+		return DeleteWithRestClient(reaper.RESTClient, name, namespace, "replictioncontrollers", true, options)
+	}
+	return WaitForDeletion(deleteFunc, deleteOptions, timeout)
 }
 
 // TODO(madhusudancs): Implement it when controllerRef is implemented - https://github.com/kubernetes/kubernetes/issues/2210
@@ -288,7 +298,11 @@ func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Durati
 
 	falseVar := false
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	return rsc.Delete(name, deleteOptions)
+	deleteFunc := func(options *metav1.DeleteOptions) (runtime.Object, error) {
+		// TODO: Update the generated clientset to return the deleted object and then use that instead of using the rest client.
+		return DeleteWithRestClient(reaper.RESTClient, name, namespace, "replicasets", true, options)
+	}
+	return WaitForDeletion(deleteFunc, deleteOptions, timeout)
 }
 
 func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
@@ -325,7 +339,11 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 
 	falseVar := false
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	return reaper.client.DaemonSets(namespace).Delete(name, deleteOptions)
+	deleteFunc := func(options *metav1.DeleteOptions) (runtime.Object, error) {
+		// TODO: Update the generated clientset to return the deleted object and then use that instead of using the rest client.
+		return DeleteWithRestClient(reaper.RESTClient, name, namespace, "daemonsets", true, options)
+	}
+	return WaitForDeletion(deleteFunc, deleteOptions, timeout)
 }
 
 func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
@@ -377,7 +395,11 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	// stop, so just leave this up to the statefulset.
 	falseVar := false
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	return statefulsets.Delete(name, deleteOptions)
+	deleteFunc := func(options *metav1.DeleteOptions) (runtime.Object, error) {
+		// TODO: Update the generated clientset to return the deleted object and then use that instead of using the rest client.
+		return DeleteWithRestClient(reaper.RESTClient, name, namespace, "statefulsets", true, options)
+	}
+	return WaitForDeletion(deleteFunc, deleteOptions, timeout)
 }
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
@@ -422,12 +444,16 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	// once we have all the pods removed we can safely remove the job itself.
 	falseVar := false
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	return jobs.Delete(name, deleteOptions)
+	deleteFunc := func(options *metav1.DeleteOptions) (runtime.Object, error) {
+		// TODO: Update the generated clientset to return the deleted object and then use that instead of using the rest client.
+		return DeleteWithRestClient(reaper.RESTClient, name, namespace, "jobs", true, options)
+	}
+	return WaitForDeletion(deleteFunc, deleteOptions, timeout)
 }
 
 func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	deployments := reaper.dClient.Deployments(namespace)
-	rsReaper := &ReplicaSetReaper{reaper.rsClient, reaper.pollInterval, reaper.timeout}
+	rsReaper := &ReplicaSetReaper{reaper.rsClient, reaper.RESTClient, reaper.pollInterval, reaper.timeout}
 
 	deployment, err := reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
 		// set deployment's history and scale to 0
@@ -488,8 +514,12 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	// Delete deployment at the end.
 	// Note: We delete deployment at the end so that if removing RSs fails, we at least have the deployment to retry.
 	var falseVar = false
-	nonOrphanOption := metav1.DeleteOptions{OrphanDependents: &falseVar}
-	return deployments.Delete(name, &nonOrphanOption)
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	deleteFunc := func(options *metav1.DeleteOptions) (runtime.Object, error) {
+		// TODO: Update the generated clientset to return the deleted object and then use that instead of using the rest client.
+		return DeleteWithRestClient(reaper.RESTClient, name, namespace, "deployments", true, options)
+	}
+	return WaitForDeletion(deleteFunc, deleteOptions, timeout)
 }
 
 type updateDeploymentFunc func(d *extensions.Deployment)
@@ -520,7 +550,11 @@ func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gra
 	if err != nil {
 		return err
 	}
-	return pods.Delete(name, gracePeriod)
+	deleteFunc := func(options *metav1.DeleteOptions) (runtime.Object, error) {
+		// TODO: Update the generated clientset to return the deleted object and then use that instead of using the rest client.
+		return DeleteWithRestClient(reaper.RESTClient, name, namespace, "pods", true, options)
+	}
+	return WaitForDeletion(deleteFunc, gracePeriod, timeout)
 }
 
 func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
@@ -531,5 +565,9 @@ func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration,
 	}
 	falseVar := false
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	return services.Delete(name, deleteOptions)
+	deleteFunc := func(options *metav1.DeleteOptions) (runtime.Object, error) {
+		// TODO: Update the generated clientset to return the deleted object and then use that instead of using the rest client.
+		return DeleteWithRestClient(reaper.RESTClient, name, namespace, "services", true, options)
+	}
+	return WaitForDeletion(deleteFunc, deleteOptions, timeout)
 }

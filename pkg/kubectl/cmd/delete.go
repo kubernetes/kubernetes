@@ -332,10 +332,6 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 func deleteResourceAndWait(info *resource.Info, out io.Writer, shortOutput bool, mapper meta.RESTMapper, orphanDependents bool, waitForDeletion *bool, timeout time.Duration) error {
 	// TODO: Use PropagationPolicy instead of OrphanDependents as per https://github.com/kubernetes/kubernetes/issues/46659.
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &orphanDependents}
-	obj, err := deleteResource(info, out, shortOutput, mapper, deleteOptions)
-	if err != nil {
-		return err
-	}
 	// WaitForDeletion is true by default except for namespace deletion.
 	if waitForDeletion == nil {
 		if info.Mapping.Resource == "namespaces" {
@@ -347,59 +343,20 @@ func deleteResourceAndWait(info *resource.Info, out io.Writer, shortOutput bool,
 		}
 	}
 
+	var err error
 	if *waitForDeletion == false {
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
-		return nil
-	}
-	// Keep deleting the resource with uid precondition until we get a
-	// resource not found error.
-	// We use DELETE here instead of using GET to ensure that DELETE
-	// works without requiring GET permissions.
-	uid, err := getUID(obj)
-	if err != nil {
-		return fmt.Errorf("unexpected error in extracting uid: %s", err)
-	}
-	if uid == "" {
-		// For backwards compatibility, we just return when we are unable to get the UID.
-		// TODO: Remove this in 1.8.
-		return nil
-	}
-	deleteOptions = &metav1.DeleteOptions{OrphanDependents: &orphanDependents, Preconditions: metav1.NewUIDPreconditions(uid)}
-	err = wait.PollImmediate(objectDeletionWaitInterval, timeout, func() (bool, error) {
-		_, err := deleteResource(info, out, shortOutput, mapper, deleteOptions)
-		if errors.IsNotFound(err) || errors.IsConflict(err) {
-			// Resource successfully deleted.
-			return true, nil
+		_, err = deleteResource(info, out, shortOutput, mapper, deleteOptions)
+	} else {
+		deleteFunc := func(options *metav1.DeleteOptions) (runtime.Object, error) {
+			return resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, options)
 		}
-		return false, err
-	})
+		err = kubectl.WaitForDeletion(deleteFunc, deleteOptions, timeout)
+	}
 	if err != nil {
 		return err
 	}
 	cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
 	return nil
-}
-
-func getUID(obj runtime.Object) (string, error) {
-	// Check if the object is of type Status.
-	status, isStatus := obj.(*metav1.Status)
-	if isStatus {
-		if status.Details == nil || status.Details.UID == "" {
-			// This can happen for an older apiserver (before 1.7)
-			// which does not set Details.
-			// For now, we do not generate an error in this case to ensure
-			// kubectl can work with 1.6 apiserver.
-			// TODO: In 1.8, update this to generate an error.
-			return "", nil
-		}
-		return string(status.Details.UID), nil
-	}
-	// The resource is itself returned.
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return "", err
-	}
-	return string(accessor.GetUID()), nil
 }
 
 func deleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper meta.RESTMapper, deleteOptions *metav1.DeleteOptions) (runtime.Object, error) {
