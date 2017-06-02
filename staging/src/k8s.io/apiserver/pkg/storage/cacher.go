@@ -639,6 +639,11 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 		if lock {
 			c.Lock()
 			defer c.Unlock()
+		} else {
+			// false is currently passed only if we are forcing watcher to close due
+			// to its unresponsiveness and blocking other watchers.
+			// TODO: Get this information in cleaner way.
+			glog.V(1).Infof("Forcing watcher close due to unresponsiveness: %v", c.objectType.String())
 		}
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simulaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
