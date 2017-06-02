@@ -26,7 +26,6 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
@@ -87,15 +86,11 @@ func UpdateOrCreateToken(client *clientset.Clientset, token string, failIfExists
 	)
 }
 
-// CreateBootstrapConfigMap creates the public cluster-info ConfigMap
-func CreateBootstrapConfigMap(file string) error {
+// CreateBootstrapConfigMapIfNotExists creates the public cluster-info ConfigMap (if it doesn't already exist)
+func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string) error {
 	adminConfig, err := clientcmd.LoadFromFile(file)
 	if err != nil {
 		return fmt.Errorf("failed to load admin kubeconfig [%v]", err)
-	}
-	client, err := kubeconfigutil.KubeConfigToClientSet(adminConfig)
-	if err != nil {
-		return err
 	}
 
 	adminCluster := adminConfig.Contexts[adminConfig.CurrentContext].Cluster
@@ -118,6 +113,9 @@ func CreateBootstrapConfigMap(file string) error {
 	}
 
 	if _, err := client.CoreV1().ConfigMaps(metav1.NamespacePublic).Create(&bootstrapConfigMap); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return nil
+		}
 		return err
 	}
 	return nil
