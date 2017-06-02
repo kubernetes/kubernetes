@@ -14,6 +14,7 @@ cmd/kube-apiserver
 cmd/kube-apiserver/app
 cmd/kube-apiserver/app/options
 cmd/kube-apiserver/app/preflight
+cmd/kube-apiserver/app/testing
 cmd/kube-controller-manager
 cmd/kube-controller-manager/app/options
 cmd/kube-proxy

@@ -110,7 +110,7 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	glog.Infof("Version: %+v", version.Get())
 
-	server, err := createServerChain(runOptions, stopCh)
+	server, err := CreateServerChain(runOptions, stopCh)
 	if err != nil {
 		return err
 	}
@@ -118,8 +118,8 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	return server.PrepareRun().Run(stopCh)
 }
 
-// createServerChain creates the apiservers connected via delegation.
-func createServerChain(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) (*genericapiserver.GenericAPIServer, error) {
+// CreateServerChain creates the apiservers connected via delegation.
+func CreateServerChain(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) (*genericapiserver.GenericAPIServer, error) {
 	nodeTunneler, proxyTransport, err := CreateNodeDialer(runOptions)
 	if err != nil {
 		return nil, err
@@ -264,8 +264,10 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 		return nil, nil, nil, nil, nil, err
 	}
 
-	if err := utilwait.PollImmediate(etcdRetryInterval, etcdRetryLimit*etcdRetryInterval, preflight.EtcdConnection{ServerList: s.Etcd.StorageConfig.ServerList}.CheckEtcdServers); err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("error waiting for etcd connection: %v", err)
+	if _, port, err := net.SplitHostPort(s.Etcd.StorageConfig.ServerList[0]); err == nil && port != "0" && len(port) != 0 {
+		if err := utilwait.PollImmediate(etcdRetryInterval, etcdRetryLimit*etcdRetryInterval, preflight.EtcdConnection{ServerList: s.Etcd.StorageConfig.ServerList}.CheckEtcdServers); err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("error waiting for etcd connection: %v", err)
+		}
 	}
 
 	capabilities.Initialize(capabilities.Capabilities{
