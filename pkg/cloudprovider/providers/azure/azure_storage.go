@@ -64,11 +64,14 @@ func (az *Cloud) AttachDisk(diskName, diskURI string, nodeName types.NodeName, l
 		},
 	}
 	vmName := mapNodeNameToVMName(nodeName)
+	glog.V(2).Infof("create(%s): vm(%s)", az.ResourceGroup, vmName)
 	resp, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
 	if shouldRetryAPIRequest(resp, err) {
+		glog.V(2).Infof("create(%s) backing off: vm(%s)", az.ResourceGroup, vmName)
 		retryErr := az.CreateOrUpdateVMWithRetry(vmName, newVM)
 		if retryErr != nil {
 			err = retryErr
+			glog.V(2).Infof("create(%s) abort backoff: vm(%s)", az.ResourceGroup, vmName)
 		}
 	}
 	if err != nil {
@@ -141,11 +144,14 @@ func (az *Cloud) DetachDiskByName(diskName, diskURI string, nodeName types.NodeN
 		},
 	}
 	vmName := mapNodeNameToVMName(nodeName)
+	glog.V(2).Infof("create(%s): vm(%s)", az.ResourceGroup, vmName)
 	resp, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
 	if shouldRetryAPIRequest(resp, err) {
+		glog.V(2).Infof("create(%s) backing off: vm(%s)", az.ResourceGroup, vmName)
 		retryErr := az.CreateOrUpdateVMWithRetry(vmName, newVM)
 		if retryErr != nil {
 			err = retryErr
+			glog.V(2).Infof("create(%s) abort backoff: vm(%s)", az.ResourceGroup, vmName)
 		}
 	}
 	if err != nil {
