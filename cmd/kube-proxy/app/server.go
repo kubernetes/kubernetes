@@ -401,10 +401,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		glog.V(0).Info("Using iptables Proxier.")
 		var nodeIP net.IP
 		if config.BindAddress != "0.0.0.0" {
-			nodeIP := net.ParseIP(config.BindAddress)
-			if local := isLocalIP(nodeIP); !local {
-				return nil, fmt.Errorf("invalid bind-address: %v, it must be a local IP", config.BindAddress)
-			}
+			nodeIP = net.ParseIP(config.BindAddress)
 		} else {
 			nodeIP = getNodeIP(client, hostname)
 		}
@@ -707,21 +704,4 @@ func getNodeIP(client clientset.Interface, hostname string) net.IP {
 		return nil
 	}
 	return nodeIP
-}
-
-func isLocalIP(ip net.IP) bool {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return false
-	}
-	for i := range addrs {
-		intfIP, _, err := net.ParseCIDR(addrs[i].String())
-		if err != nil {
-			return false
-		}
-		if ip.Equal(intfIP) {
-			return true
-		}
-	}
-	return false
 }
