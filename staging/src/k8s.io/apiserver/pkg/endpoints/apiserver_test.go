@@ -43,11 +43,14 @@ import (
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
@@ -754,6 +757,15 @@ func (storage *SimpleTypedStorage) checkContext(ctx request.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
+func bodyOrDie(response *http.Response) string {
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		panic(err)
+	}
+	return string(body)
+}
+
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
 	return extractBodyDecoder(response, object, codec)
 }
@@ -765,6 +777,16 @@ func extractBodyDecoder(response *http.Response, object runtime.Object, decoder 
 		return string(body), err
 	}
 	return string(body), runtime.DecodeInto(decoder, body, object)
+}
+
+func extractBodyObject(response *http.Response, decoder runtime.Decoder) (runtime.Object, string, error) {
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, string(body), err
+	}
+	obj, err := runtime.Decode(decoder, body)
+	return obj, string(body), err
 }
 
 func TestNotFound(t *testing.T) {
@@ -1527,6 +1549,222 @@ func TestGetPretty(t *testing.T) {
 		}
 		if expect != body {
 			t.Errorf("%d: body did not match expected:\n%s\n%s", i, body, expect)
+		}
+	}
+}
+
+func TestGetTable(t *testing.T) {
+	now := metav1.Now()
+	storage := map[string]rest.Storage{}
+	obj := genericapitesting.Simple{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("abcdef0123")},
+		Other:      "foo",
+	}
+	simpleStorage := SimpleRESTStorage{
+		item: obj,
+	}
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		name:        "id",
+		namespace:   "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	m, err := meta.Accessor(&obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	partial := meta.AsPartialObjectMetadata(m)
+	partial.GetObjectKind().SetGroupVersionKind(metav1alpha1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
+	encodedBody, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1alpha1.SchemeGroupVersion), partial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the codec includes a trailing newline that is not present during decode
+	encodedBody = bytes.TrimSpace(encodedBody)
+
+	metaDoc := metav1.ObjectMeta{}.SwaggerDoc()
+
+	tests := []struct {
+		accept     string
+		params     url.Values
+		pretty     bool
+		expected   *metav1alpha1.Table
+		statusCode int
+	}{
+		{
+			accept:     runtime.ContentTypeJSON + ";as=Table;v=v1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			accept: runtime.ContentTypeJSON + ";as=Table;v=v1alpha1;g=meta.k8s.io",
+			expected: &metav1alpha1.Table{
+				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
+				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
+					{Name: "Namespace", Type: "string", Description: metaDoc["namespace"]},
+					{Name: "Name", Type: "string", Description: metaDoc["name"]},
+					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+				},
+				Rows: []metav1alpha1.TableRow{
+					{Cells: []interface{}{"ns1", "foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+				},
+			},
+		},
+	}
+	for i, test := range tests {
+		u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		u.RawQuery = test.params.Encode()
+		req := &http.Request{Method: "GET", URL: u}
+		req.Header = http.Header{}
+		req.Header.Set("Accept", test.accept)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if test.statusCode != 0 {
+			if resp.StatusCode != test.statusCode {
+				t.Errorf("%d: unexpected response: %#v", resp)
+			}
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatal(err)
+		}
+		var itemOut metav1alpha1.Table
+		if _, err = extractBody(resp, &itemOut); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(test.expected, &itemOut) {
+			t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, &itemOut))
+		}
+	}
+}
+
+func TestGetPartialObjectMetadata(t *testing.T) {
+	now := metav1.Time{metav1.Now().Rfc3339Copy().Local()}
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		item: genericapitesting.Simple{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("abcdef0123")},
+			Other:      "foo",
+		},
+		list: []genericapitesting.Simple{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("newer")},
+				Other:      "foo",
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "ns2", CreationTimestamp: now, UID: types.UID("older")},
+				Other:      "bar",
+			},
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		t:              t,
+		expectedSet:    "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		alternativeSet: sets.NewString("/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"),
+		name:           "id",
+		namespace:      "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	tests := []struct {
+		accept     string
+		params     url.Values
+		pretty     bool
+		list       bool
+		expected   runtime.Object
+		expectKind schema.GroupVersionKind
+		statusCode int
+	}{
+		{
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			list:       true,
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1alpha1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			accept: runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1alpha1;g=meta.k8s.io",
+			expected: &metav1alpha1.PartialObjectMetadata{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("abcdef0123")},
+			},
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1alpha1"},
+		},
+		{
+			list:   true,
+			accept: runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io",
+			expected: &metav1alpha1.PartialObjectMetadataList{
+				Items: []*metav1alpha1.PartialObjectMetadata{
+					{
+						TypeMeta:   metav1.TypeMeta{APIVersion: "meta.k8s.io/v1alpha1", Kind: "PartialObjectMetadata"},
+						ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("newer")},
+					},
+					{
+						TypeMeta:   metav1.TypeMeta{APIVersion: "meta.k8s.io/v1alpha1", Kind: "PartialObjectMetadata"},
+						ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "ns2", CreationTimestamp: now, UID: types.UID("older")},
+					},
+				},
+			},
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadataList", Group: "meta.k8s.io", Version: "v1alpha1"},
+		},
+	}
+	for i, test := range tests {
+		suffix := "/namespaces/default/simple/id"
+		if test.list {
+			suffix = "/namespaces/default/simple"
+		}
+		u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + suffix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		u.RawQuery = test.params.Encode()
+		req := &http.Request{Method: "GET", URL: u}
+		req.Header = http.Header{}
+		req.Header.Set("Accept", test.accept)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if test.statusCode != 0 {
+			if resp.StatusCode != test.statusCode {
+				t.Errorf("%d: unexpected response: %#v", i, resp)
+			}
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("%d: invalid status: %#v\n%s", i, resp, bodyOrDie(resp))
+			continue
+		}
+		itemOut, body, err := extractBodyObject(resp, metainternalversion.Codecs.LegacyCodec(metav1alpha1.SchemeGroupVersion))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(test.expected, itemOut) {
+			t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, itemOut))
+		}
+		obj := &unstructured.Unstructured{}
+		if err := json.Unmarshal([]byte(body), obj); err != nil {
+			t.Fatal(err)
+		}
+		if obj.GetObjectKind().GroupVersionKind() != test.expectKind {
+			t.Errorf("%d: unexpected kind: %#v", i, obj.GetObjectKind().GroupVersionKind())
 		}
 	}
 }
@@ -2952,12 +3190,13 @@ func TestUpdateChecksDecode(t *testing.T) {
 }
 
 type setTestSelfLinker struct {
-	t           *testing.T
-	expectedSet string
-	name        string
-	namespace   string
-	called      bool
-	err         error
+	t              *testing.T
+	expectedSet    string
+	alternativeSet sets.String
+	name           string
+	namespace      string
+	called         bool
+	err            error
 }
 
 func (s *setTestSelfLinker) Namespace(runtime.Object) (string, error) { return s.namespace, s.err }
@@ -2965,7 +3204,9 @@ func (s *setTestSelfLinker) Name(runtime.Object) (string, error)      { return s
 func (s *setTestSelfLinker) SelfLink(runtime.Object) (string, error)  { return "", s.err }
 func (s *setTestSelfLinker) SetSelfLink(obj runtime.Object, selfLink string) error {
 	if e, a := s.expectedSet, selfLink; e != a {
-		s.t.Errorf("expected '%v', got '%v'", e, a)
+		if !s.alternativeSet.Has(a) {
+			s.t.Errorf("expected '%v', got '%v'", e, a)
+		}
 	}
 	s.called = true
 	return s.err

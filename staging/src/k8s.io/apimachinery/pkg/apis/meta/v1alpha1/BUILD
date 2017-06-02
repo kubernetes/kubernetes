@@ -14,6 +14,7 @@ go_library(
         "generated.pb.go",
         "register.go",
         "types.go",
+        "types_swagger_doc_generated.go",
         "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
