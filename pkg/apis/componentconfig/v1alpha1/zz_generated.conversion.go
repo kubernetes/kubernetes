@@ -406,7 +406,9 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := v1.Convert_Pointer_int32_To_int32(&in.MaxContainerCount, &out.MaxContainerCount, s); err != nil {
 		return err
 	}
-	out.CAdvisorPort = in.CAdvisorPort
+	if err := v1.Convert_Pointer_int32_To_int32(&in.CAdvisorPort, &out.CAdvisorPort, s); err != nil {
+		return err
+	}
 	out.HealthzPort = in.HealthzPort
 	out.HealthzBindAddress = in.HealthzBindAddress
 	if err := v1.Convert_Pointer_int32_To_int32(&in.OOMScoreAdj, &out.OOMScoreAdj, s); err != nil {
@@ -580,7 +582,9 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := v1.Convert_int32_To_Pointer_int32(&in.MaxContainerCount, &out.MaxContainerCount, s); err != nil {
 		return err
 	}
-	out.CAdvisorPort = in.CAdvisorPort
+	if err := v1.Convert_int32_To_Pointer_int32(&in.CAdvisorPort, &out.CAdvisorPort, s); err != nil {
+		return err
+	}
 	out.HealthzPort = in.HealthzPort
 	out.HealthzBindAddress = in.HealthzBindAddress
 	if err := v1.Convert_int32_To_Pointer_int32(&in.OOMScoreAdj, &out.OOMScoreAdj, s); err != nil {
