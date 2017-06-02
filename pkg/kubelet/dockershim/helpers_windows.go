@@ -24,6 +24,7 @@ import (
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
+	dockerfilters "github.com/docker/engine-api/types/filters"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
@@ -59,4 +60,42 @@ func (ds *dockerService) updateCreateConfig(
 	}
 
 	return nil
+}
+
+func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
+	opts := dockertypes.ContainerListOptions{
+		All:    true,
+		Filter: dockerfilters.NewArgs(),
+	}
+
+	f := newDockerFilter(&opts.Filter)
+	f.AddLabel(containerTypeLabelKey, containerTypeLabelContainer)
+	f.AddLabel(sandboxIDLabelKey, sandboxID)
+	containers, err := ds.client.ListContainers(opts)
+	if err != nil {
+		return ""
+	}
+
+	for _, c := range containers {
+		r, err := ds.client.InspectContainer(c.ID)
+		if err != nil {
+			continue
+		}
+		if containerIP := getContainerIP(r); containerIP != "" {
+			return containerIP
+		}
+	}
+
+	return ""
+}
+
+func getContainerIP(container *dockertypes.ContainerJSON) string {
+	if container.NetworkSettings != nil {
+		for _, network := range container.NetworkSettings.Networks {
+			if network.IPAddress != "" {
+				return network.IPAddress
+			}
+		}
+	}
+	return ""
 }

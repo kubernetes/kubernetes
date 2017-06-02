@@ -82,3 +82,7 @@ func (ds *dockerService) updateCreateConfig(
 
 	return nil
 }
+
+func (ds *dockerService) determinePodIPBySandboxID(uid string) string {
+	return ""
+}

@@ -42,3 +42,8 @@ func (ds *dockerService) updateCreateConfig(
 	glog.Warningf("updateCreateConfig is unsupported in this build")
 	return nil
 }
+
+func (ds *dockerService) determinePodIPBySandboxID(uid string) string {
+	glog.Warningf("determinePodIPBySandboxID is unsupported in this build")
+	return ""
+}
