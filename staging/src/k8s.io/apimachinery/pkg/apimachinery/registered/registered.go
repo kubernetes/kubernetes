@@ -282,7 +282,11 @@ func (m *APIRegistrationManager) RESTMapper(versionPatterns ...schema.GroupVersi
 	for enabledVersion := range m.enabledVersions {
 		if !unionedGroups.Has(enabledVersion.Group) {
 			unionedGroups.Insert(enabledVersion.Group)
-			groupMeta := m.groupMetaMap[enabledVersion.Group]
+			groupMeta, ok := m.groupMetaMap[enabledVersion.Group]
+			if !ok {
+				glog.Warningf("Could not find Group Metadata for %s, skipping REST Mapping", enabledVersion.Group)
+				continue
+			}
 			unionMapper = append(unionMapper, groupMeta.RESTMapper)
 		}
 	}
