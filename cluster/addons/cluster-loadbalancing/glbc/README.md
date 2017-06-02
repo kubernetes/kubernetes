@@ -4,13 +4,13 @@ This cluster addon is composed of:
 * A [Google L7 LoadBalancer Controller](https://github.com/kubernetes/contrib/tree/master/ingress/controllers/gce)
 * A [404 default backend](https://github.com/kubernetes/contrib/tree/master/404-server) Service + RC
 
-It relies on the [Ingress resource](../../../../docs/user-guide/ingress.md) only available in Kubernetes version 1.1 and beyond.
+It relies on the [Ingress resource](https://kubernetes.io/docs/user-guide/ingress.md) only available in Kubernetes version 1.1 and beyond.
 
 ## Prerequisites
 
 Before you can receive traffic through the GCE L7 Loadbalancer Controller you need:
 * A Working Kubernetes 1.1 cluster
-* At least 1 Kubernetes [NodePort Service](../../../../docs/user-guide/services.md#type-nodeport) (this is the endpoint for your Ingress)
+* At least 1 Kubernetes [NodePort Service](https://kubernetes.io/docs/user-guide/services.md#type-nodeport) (this is the endpoint for your Ingress)
 * Firewall-rules that allow traffic to the NodePort service, as indicated by `kubectl` at Service creation time
 * Adequate quota, as mentioned in the next section
 * A single instance of the L7 Loadbalancer Controller pod (if you're using the default GCE setup, this should already be running in the `kube-system` namespace)

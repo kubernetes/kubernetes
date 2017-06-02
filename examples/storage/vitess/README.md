@@ -20,17 +20,17 @@ You'll need to install [Go 1.4+](https://golang.org/doc/install) to build
 `vtctlclient`, the command-line admin tool for Vitess.
 
 We also assume you have a running Kubernetes cluster with `kubectl` pointing to
-it by default. See the [Getting Started guides](../../../docs/getting-started-guides/)
+it by default. See the [Getting Started guides](https://kubernetes.io/docs/getting-started-guides/)
 for how to get to that point. Note that your Kubernetes cluster needs to have
 enough resources (CPU+RAM) to schedule all the pods. By default, this example
 requires a cluster-wide total of at least 6 virtual CPUs and 10GiB RAM. You can
 tune these requirements in the
-[resource limits](../../../docs/user-guide/compute-resources.md)
+[resource limits](https://kubernetes.io/docs/user-guide/compute-resources.md)
 section of each YAML file.
 
 Lastly, you need to open ports 30000-30001 (for the Vitess admin daemon) and 80 (for
 the guestbook app) in your firewall. See the
-[Services and Firewalls](../../../docs/user-guide/services-firewalls.md)
+[Services and Firewalls](https://kubernetes.io/docs/user-guide/services-firewalls.md)
 guide for examples of how to do that.
 
 ### Configure site-local settings

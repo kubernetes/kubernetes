@@ -44,7 +44,7 @@ type NodeMetrics struct {
 type NodeMetricsList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	metav1.ListMeta
 
 	// List of node metrics.
@@ -73,7 +73,7 @@ type PodMetrics struct {
 type PodMetricsList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	metav1.ListMeta
 
 	// List of pod metrics.

@@ -142,7 +142,7 @@ message AzureFileVolumeSource {
 // For example, a pod is bound to a node by a scheduler.
 message Binding {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -241,7 +241,7 @@ message ComponentCondition {
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
 message ComponentStatus {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -255,7 +255,7 @@ message ComponentStatus {
 // Status of all the conditions for the component as a list of ComponentStatus objects.
 message ComponentStatusList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -266,7 +266,7 @@ message ComponentStatusList {
 // ConfigMap holds configuration data for pods to consume.
 message ConfigMap {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -305,7 +305,7 @@ message ConfigMapKeySelector {
 
 // ConfigMapList is a resource containing a list of ConfigMap objects.
 message ConfigMapList {
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -501,7 +501,7 @@ message Container {
 
   // Security options the pod should run with.
   // More info: https://kubernetes.io/docs/concepts/policy/security-context/
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/security_context.md
+  // More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md
   // +optional
   optional SecurityContext securityContext = 15;
 
@@ -854,7 +854,7 @@ message EndpointSubset {
 //  ]
 message Endpoints {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -871,7 +871,7 @@ message Endpoints {
 // EndpointsList is a list of endpoints.
 message EndpointsList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -940,7 +940,7 @@ message EnvVarSource {
 // TODO: Decide whether to store these separately or with the object they apply to.
 message Event {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The object that this event is about.
@@ -981,7 +981,7 @@ message Event {
 // EventList is a list of events.
 message EventList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -1313,12 +1313,12 @@ message Lifecycle {
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
 message LimitRange {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the limits enforced.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional LimitRangeSpec spec = 2;
 }
@@ -1353,12 +1353,12 @@ message LimitRangeItem {
 // LimitRangeList is a list of LimitRange items.
 message LimitRangeList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of LimitRange objects.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/admission_control_limit_range.md
+  // More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_limit_range.md
   repeated LimitRange items = 2;
 }
 
@@ -1371,7 +1371,7 @@ message LimitRangeSpec {
 // List holds a list of objects, which may not be known by the server.
 message List {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -1479,17 +1479,17 @@ message NFSVolumeSource {
 // Use of multiple namespaces is optional.
 message Namespace {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the behavior of the Namespace.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional NamespaceSpec spec = 2;
 
   // Status describes the current status of a Namespace.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional NamespaceStatus status = 3;
 }
@@ -1497,7 +1497,7 @@ message Namespace {
 // NamespaceList is a list of Namespaces.
 message NamespaceList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -1509,7 +1509,7 @@ message NamespaceList {
 // NamespaceSpec describes the attributes on a Namespace.
 message NamespaceSpec {
   // Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/namespaces.md#finalizers
+  // More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#finalizers
   // +optional
   repeated string finalizers = 1;
 }
@@ -1517,7 +1517,7 @@ message NamespaceSpec {
 // NamespaceStatus is information about the current status of a Namespace.
 message NamespaceStatus {
   // Phase is the current lifecycle phase of the namespace.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/namespaces.md#phases
+  // More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#phases
   // +optional
   optional string phase = 1;
 }
@@ -1526,19 +1526,19 @@ message NamespaceStatus {
 // Each node will have a unique identifier in the cache (i.e. in etcd).
 message Node {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the behavior of a node.
-  // https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional NodeSpec spec = 2;
 
   // Most recently observed status of the node.
   // Populated by the system.
   // Read-only.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional NodeStatus status = 3;
 }
@@ -1610,7 +1610,7 @@ message NodeDaemonEndpoints {
 // NodeList is the whole list of all Nodes which have been registered with master.
 message NodeList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -1822,7 +1822,7 @@ message ObjectMeta {
   // should retry (optionally after the time indicated in the Retry-After header).
   // 
   // Applied only if Name is not specified.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#idempotency
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#idempotency
   // +optional
   optional string generateName = 2;
 
@@ -1862,7 +1862,7 @@ message ObjectMeta {
   // Populated by the system.
   // Read-only.
   // Value must be treated as opaque by clients and .
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency
   // +optional
   optional string resourceVersion = 6;
 
@@ -1878,7 +1878,7 @@ message ObjectMeta {
   // Populated by the system.
   // Read-only.
   // Null for lists.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time creationTimestamp = 8;
 
@@ -1898,7 +1898,7 @@ message ObjectMeta {
   // 
   // Populated by the system when a graceful deletion is requested.
   // Read-only.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time deletionTimestamp = 9;
 
@@ -1961,7 +1961,7 @@ message ObjectMeta {
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 message ObjectReference {
   // Kind of the referent.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional string kind = 1;
 
@@ -1985,7 +1985,7 @@ message ObjectReference {
   optional string apiVersion = 5;
 
   // Specific resourceVersion to which this reference is made, if any.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency
   // +optional
   optional string resourceVersion = 6;
 
@@ -2006,7 +2006,7 @@ message ObjectReference {
 // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 message PersistentVolume {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -2027,7 +2027,7 @@ message PersistentVolume {
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
 message PersistentVolumeClaim {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -2046,7 +2046,7 @@ message PersistentVolumeClaim {
 // PersistentVolumeClaimList is a list of PersistentVolumeClaim items.
 message PersistentVolumeClaimList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -2116,7 +2116,7 @@ message PersistentVolumeClaimVolumeSource {
 // PersistentVolumeList is a list of PersistentVolume items.
 message PersistentVolumeList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -2291,12 +2291,12 @@ message PhotonPersistentDiskVolumeSource {
 // by clients and scheduled onto hosts.
 message Pod {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the pod.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional PodSpec spec = 2;
 
@@ -2304,7 +2304,7 @@ message Pod {
   // This data may not be up to date.
   // Populated by the system.
   // Read-only.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional PodStatus status = 3;
 }
@@ -2504,12 +2504,12 @@ message PodExecOptions {
 // PodList is a list of Pods.
 message PodList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of pods.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md
   repeated Pod items = 2;
 }
 
@@ -2849,7 +2849,7 @@ message PodStatus {
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
 message PodStatusResult {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -2857,7 +2857,7 @@ message PodStatusResult {
   // This data may not be up to date.
   // Populated by the system.
   // Read-only.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional PodStatus status = 2;
 }
@@ -2865,12 +2865,12 @@ message PodStatusResult {
 // PodTemplate describes a template for creating copies of a predefined pod.
 message PodTemplate {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Template defines the pods that will be created from this pod template.
-  // https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional PodTemplateSpec template = 2;
 }
@@ -2878,7 +2878,7 @@ message PodTemplate {
 // PodTemplateList is a list of PodTemplates.
 message PodTemplateList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -2889,12 +2889,12 @@ message PodTemplateList {
 // PodTemplateSpec describes the data a pod should have when created from a template
 message PodTemplateSpec {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the pod.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional PodSpec spec = 2;
 }
@@ -3079,7 +3079,7 @@ message RBDVolumeSource {
 // RangeAllocation is not a public type.
 message RangeAllocation {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -3094,12 +3094,12 @@ message RangeAllocation {
 message ReplicationController {
   // If the Labels of a ReplicationController are empty, they are defaulted to
   // be the same as the Pod(s) that the replication controller manages.
-  // Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the specification of the desired behavior of the replication controller.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional ReplicationControllerSpec spec = 2;
 
@@ -3107,7 +3107,7 @@ message ReplicationController {
   // This data may be out of date by some window of time.
   // Populated by the system.
   // Read-only.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional ReplicationControllerStatus status = 3;
 }
@@ -3136,7 +3136,7 @@ message ReplicationControllerCondition {
 // ReplicationControllerList is a collection of replication controllers.
 message ReplicationControllerList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -3222,17 +3222,17 @@ message ResourceFieldSelector {
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 message ResourceQuota {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the desired quota.
-  // https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional ResourceQuotaSpec spec = 2;
 
   // Status defines the actual enforced quota and its current usage.
-  // https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional ResourceQuotaStatus status = 3;
 }
@@ -3240,19 +3240,19 @@ message ResourceQuota {
 // ResourceQuotaList is a list of ResourceQuota items.
 message ResourceQuotaList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ResourceQuota objects.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/admission_control_resource_quota.md
+  // More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
   repeated ResourceQuota items = 2;
 }
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
 message ResourceQuotaSpec {
   // Hard is the set of desired hard limits for each named resource.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/admission_control_resource_quota.md
+  // More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
 
@@ -3265,7 +3265,7 @@ message ResourceQuotaSpec {
 // ResourceQuotaStatus defines the enforced hard limits and observed use.
 message ResourceQuotaStatus {
   // Hard is the set of enforced hard limits for each named resource.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/admission_control_resource_quota.md
+  // More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
 
@@ -3356,7 +3356,7 @@ message ScaleIOVolumeSource {
 // the Data field must be less than MaxSecretSize bytes.
 message Secret {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -3410,7 +3410,7 @@ message SecretKeySelector {
 // SecretList is a list of Secret.
 message SecretList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -3533,19 +3533,19 @@ message SerializedReference {
 // will answer requests sent through the proxy.
 message Service {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the behavior of a service.
-  // https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional ServiceSpec spec = 2;
 
   // Most recently observed status of the service.
   // Populated by the system.
   // Read-only.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional ServiceStatus status = 3;
 }
@@ -3556,7 +3556,7 @@ message Service {
 // * a set of secrets
 message ServiceAccount {
   // Standard object's metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -3583,7 +3583,7 @@ message ServiceAccount {
 // ServiceAccountList is a list of ServiceAccount objects
 message ServiceAccountList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -3595,7 +3595,7 @@ message ServiceAccountList {
 // ServiceList holds a list of services.
 message ServiceList {
   // Standard list metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

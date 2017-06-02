@@ -29,7 +29,7 @@ package v1beta1
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_Cluster = map[string]string{
 	"":         "Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.",
-	"metadata": "Standard object's metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"spec":     "Spec defines the behavior of the Cluster.",
 	"status":   "Status describes the current status of a Cluster",
 }
@@ -54,7 +54,7 @@ func (ClusterCondition) SwaggerDoc() map[string]string {
 
 var map_ClusterList = map[string]string{
 	"":         "A list of all the kubernetes clusters registered to the federation",
-	"metadata": "Standard list metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
 	"items":    "List of Cluster objects.",
 }
 

@@ -69,7 +69,7 @@ message ExternalAdmissionHook {
 
 // ExternalAdmissionHookConfiguration describes the configuration of initializers.
 message ExternalAdmissionHookConfiguration {
-  // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -84,7 +84,7 @@ message ExternalAdmissionHookConfiguration {
 // ExternalAdmissionHookConfigurationList is a list of ExternalAdmissionHookConfiguration.
 message ExternalAdmissionHookConfigurationList {
   // Standard list metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -118,7 +118,7 @@ message Initializer {
 
 // InitializerConfiguration describes the configuration of initializers.
 message InitializerConfiguration {
-  // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -137,7 +137,7 @@ message InitializerConfiguration {
 // InitializerConfigurationList is a list of InitializerConfiguration.
 message InitializerConfigurationList {
   // Standard list metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

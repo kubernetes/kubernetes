@@ -51,7 +51,7 @@ func (ExternalAdmissionHook) SwaggerDoc() map[string]string {
 
 var map_ExternalAdmissionHookConfiguration = map[string]string{
 	"":                       "ExternalAdmissionHookConfiguration describes the configuration of initializers.",
-	"metadata":               "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.",
+	"metadata":               "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
 	"externalAdmissionHooks": "ExternalAdmissionHooks is a list of external admission webhooks and the affected resources and operations.",
 }
 
@@ -61,7 +61,7 @@ func (ExternalAdmissionHookConfiguration) SwaggerDoc() map[string]string {
 
 var map_ExternalAdmissionHookConfigurationList = map[string]string{
 	"":         "ExternalAdmissionHookConfigurationList is a list of ExternalAdmissionHookConfiguration.",
-	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
 	"items":    "List of ExternalAdmissionHookConfiguration.",
 }
 
@@ -82,7 +82,7 @@ func (Initializer) SwaggerDoc() map[string]string {
 
 var map_InitializerConfiguration = map[string]string{
 	"":             "InitializerConfiguration describes the configuration of initializers.",
-	"metadata":     "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.",
+	"metadata":     "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
 	"initializers": "Initializers is a list of resources and their default initializers Order-sensitive. When merging multiple InitializerConfigurations, we sort the initializers from different InitializerConfigurations by the name of the InitializerConfigurations; the order of the initializers from the same InitializerConfiguration is preserved.",
 }
 
@@ -92,7 +92,7 @@ func (InitializerConfiguration) SwaggerDoc() map[string]string {
 
 var map_InitializerConfigurationList = map[string]string{
 	"":         "InitializerConfigurationList is a list of InitializerConfiguration.",
-	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
 	"items":    "List of InitializerConfiguration.",
 }
 
