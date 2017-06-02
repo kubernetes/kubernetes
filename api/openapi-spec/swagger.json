@@ -45699,7 +45699,44 @@
     }
    },
    "io.k8s.apimachinery.pkg.apis.meta.v1.Patch": {
-    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body."
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
+    "type": "array",
+    "items": {
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.PatchDocument"
+      }
+   },
+    "io.k8s.apimachinery.pkg.apis.meta.v1.PatchDocument": {
+    "description": "A JSONPatch document as defined by RFC 6902.",
+    "required": [
+     "op",
+     "path"
+    ],
+    "properties": {
+      "op": {
+        "description": "The operation to be performed.",
+        "type": "string",
+        "enum": [
+          "add",
+          "remove",
+          "replace",
+          "move",
+          "copy",
+          "test"
+        ]
+      },
+      "path": {
+        "description": "A JSON-Pointer.",
+        "type": "string"
+      },
+      "value": {
+        "description": "The value to be used within the operations.",
+        "type": "object"
+      },
+      "from": {
+        "description": "A string containing a JSON Pointer value.",
+        "type": "string"
+      }
+    }
    },
    "io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions": {
     "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
