@@ -2335,3 +2335,59 @@ func TestPrintControllerRevision(t *testing.T) {
 func boolP(b bool) *bool {
 	return &b
 }
+
+func TestPrintReplicaSet(t *testing.T) {
+	tests := []struct {
+		replicaSet extensions.ReplicaSet
+		expect     string
+		wideExpect string
+	}{
+		{
+			extensions.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: extensions.ReplicaSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
+					},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				},
+				Status: extensions.ReplicaSetStatus{
+					Replicas:      5,
+					ReadyReplicas: 2,
+				},
+			},
+			"test1\t5\t5\t2\t0s\n",
+			"test1\t5\t5\t2\t0s\tfake-container1,fake-container2\tfake-image1,fake-image2\tfoo=bar\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printReplicaSet(&test.replicaSet, buf, printers.PrintOptions{})
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+
+		printReplicaSet(&test.replicaSet, buf, printers.PrintOptions{Wide: true})
+		if buf.String() != test.wideExpect {
+			t.Fatalf("Expected: %s, got: %s", test.wideExpect, buf.String())
+		}
+		buf.Reset()
+	}
+}
