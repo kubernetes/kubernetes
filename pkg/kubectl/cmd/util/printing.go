@@ -128,13 +128,17 @@ func PrinterForCommand(cmd *cobra.Command, mapper meta.RESTMapper, typer runtime
 	}
 
 	// this function may be invoked by a command that did not call AddPrinterFlags first, so we need
-	// to be safe about how we access the allow-missing-template-keys flag
+	// to be safe about how we access the allow-missing-template-keys and no-headers flag
 	allowMissingTemplateKeys := false
 	if cmd.Flags().Lookup("allow-missing-template-keys") != nil {
 		allowMissingTemplateKeys = GetFlagBool(cmd, "allow-missing-template-keys")
 	}
+	noHeaders := false
+	if cmd.Flags().Lookup("no-headers") != nil {
+		noHeaders = GetFlagBool(cmd, "no-headers")
+	}
 	printer, generic, err := printers.GetStandardPrinter(
-		outputFormat, templateFile, GetFlagBool(cmd, "no-headers"), allowMissingTemplateKeys,
+		outputFormat, templateFile, noHeaders, allowMissingTemplateKeys,
 		mapper, typer, decoders,
 	)
 	if err != nil {
