@@ -218,7 +218,7 @@ func handleConfigMapFromEnvFileSource(configMap *api.ConfigMap, envFileSource st
 		}
 	}
 	if info.IsDir() {
-		return fmt.Errorf("must be a file")
+		return fmt.Errorf("env config file cannot be a directory")
 	}
 
 	return addFromEnvFile(envFileSource, func(key, value string) error {
