@@ -53,7 +53,7 @@ const (
 var _ = SIGDescribe("EmptyDir wrapper volumes", func() {
 	f := framework.NewDefaultFramework("emptydir-wrapper")
 
-	It("should not conflict [Volume]", func() {
+	It("should not conflict", func() {
 		name := "emptydir-wrapper-test-" + string(uuid.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
@@ -152,7 +152,7 @@ var _ = SIGDescribe("EmptyDir wrapper volumes", func() {
 	// but these cases are harder because tmpfs-based emptyDir
 	// appears to be less prone to the race problem.
 
-	It("should not cause race condition when used for configmaps [Serial] [Slow] [Volume]", func() {
+	It("should not cause race condition when used for configmaps [Serial] [Slow]", func() {
 		configMapNames := createConfigmapsForRace(f)
 		defer deleteConfigMaps(f, configMapNames)
 		volumes, volumeMounts := makeConfigMapVolumes(configMapNames)
@@ -161,7 +161,7 @@ var _ = SIGDescribe("EmptyDir wrapper volumes", func() {
 		}
 	})
 
-	It("should not cause race condition when used for git_repo [Serial] [Slow] [Volume]", func() {
+	It("should not cause race condition when used for git_repo [Serial] [Slow]", func() {
 		gitURL, gitRepo, cleanup := createGitServer(f)
 		defer cleanup()
 		volumes, volumeMounts := makeGitRepoVolumes(gitURL, gitRepo)

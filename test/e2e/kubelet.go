@@ -130,19 +130,6 @@ func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRem
 	}
 }
 
-// Calls startVolumeServer to create and run a nfs-server pod. Returns server pod and its
-// ip address.
-// Note: startVolumeServer() waits for the nfs-server pod to be Running and sleeps some
-//   so that the nfs server can start up.
-func createNfsServerPod(c clientset.Interface, config framework.VolumeTestConfig) (*v1.Pod, string) {
-	pod := framework.StartVolumeServer(c, config)
-	Expect(pod).NotTo(BeNil())
-	ip := pod.Status.PodIP
-	Expect(len(ip)).NotTo(BeZero())
-	framework.Logf("NFS server IP address: %v", ip)
-	return pod, ip
-}
-
 // Restart the passed-in nfs-server by issuing a `/usr/sbin/rpc.nfsd 1` command in the
 // pod's (only) container. This command changes the number of nfs server threads from
 // (presumably) zero back to 1, and therefore allows nfs to open connections again.
@@ -431,14 +418,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 
 			BeforeEach(func() {
 				framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-				NFSconfig = framework.VolumeTestConfig{
-					Namespace:   ns,
-					Prefix:      "nfs",
-					ServerImage: framework.NfsServerImage,
-					ServerPorts: []int{2049},
-					ServerArgs:  []string{"-G", "777", "/exports"},
-				}
-				nfsServerPod, nfsIP = createNfsServerPod(c, NFSconfig)
+				NFSconfig, nfsServerPod, nfsIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			})
 
 			AfterEach(func() {

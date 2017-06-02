@@ -85,18 +85,6 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 	return nil
 }
 
-// initNFSserverPod wraps volumes.go's startVolumeServer to return a running nfs host pod
-// commonly used by persistent volume testing
-func initNFSserverPod(c clientset.Interface, ns string) *v1.Pod {
-	return framework.StartVolumeServer(c, framework.VolumeTestConfig{
-		Namespace:   ns,
-		Prefix:      "nfs",
-		ServerImage: framework.NfsServerImage,
-		ServerPorts: []int{2049},
-		ServerArgs:  []string{"-G", "777", "/exports"},
-	})
-}
-
 var _ = SIGDescribe("PersistentVolumes", func() {
 
 	// global vars for the Context()s and It()'s below
@@ -131,10 +119,7 @@ var _ = SIGDescribe("PersistentVolumes", func() {
 		)
 
 		BeforeEach(func() {
-			framework.Logf("[BeforeEach] Creating NFS Server Pod")
-			nfsServerPod = initNFSserverPod(c, ns)
-			serverIP = nfsServerPod.Status.PodIP
-			framework.Logf("[BeforeEach] Configuring PersistentVolume")
+			_, nfsServerPod, serverIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			pvConfig = framework.PersistentVolumeConfig{
 				NamePrefix: "nfs-",
 				Labels:     volLabel,
@@ -218,6 +203,10 @@ var _ = SIGDescribe("PersistentVolumes", func() {
 		//   a) pre-binding, b) create pvcs before pvs, c) create pvcs and pods
 		//   in different namespaces.
 		Context("with multiple PVs and PVCs all in same ns", func() {
+
+			// define the maximum number of PVs and PVCs supported by these tests
+			const maxNumPVs = 10
+			const maxNumPVCs = 10
 			// scope the pv and pvc maps to be available in the AfterEach
 			// note: these maps are created fresh in CreatePVsPVCs()
 			var pvols framework.PVMap
