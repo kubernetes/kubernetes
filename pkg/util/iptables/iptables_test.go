@@ -187,6 +187,44 @@ func TestDeleteChain(t *testing.T) {
 	}
 }
 
+func TestRenameChain(t *testing.T) {
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			// Success.
+			func() ([]byte, error) { return []byte{}, nil },
+			// Failure.
+			func() ([]byte, error) { return nil, &exec.FakeExitError{Status: 1} },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
+	// Success.
+	err := runner.RenameChain(TableFilter, Chain("FOO"), Chain("BAR"))
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	if fcmd.CombinedOutputCalls != 2 {
+		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-E", "FOO", "BAR", "-t", "filter") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+	// Failure.
+	err = runner.RenameChain(TableFilter, Chain("BAR"), Chain("BAR"))
+	if err == nil {
+		t.Errorf("expected failure")
+	}
+}
+
 func TestEnsureRuleAlreadyExists(t *testing.T) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
@@ -403,6 +441,62 @@ func TestDeleteRuleNew(t *testing.T) {
 	}
 	if !sets.NewString(fcmd.CombinedOutputLog[3]...).HasAll("iptables", "-t", "nat", "-D", "OUTPUT", "abc", "123") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
+	}
+}
+
+func TestListRules(t *testing.T) {
+	iptables_list_all := `-P INPUT ACCEPT
+-P FORWARD ACCEPT
+-P OUTPUT ACCEPT
+-A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT`
+
+	iptables_list_input_chain := `-P INPUT ACCEPT
+-A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT`
+
+	fcmd := exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			// Success on the first call.
+			func() ([]byte, error) { return []byte(iptables_list_all), nil },
+			// Success on the second call.
+			func() ([]byte, error) { return []byte(iptables_list_input_chain), nil },
+			// Status 1 on the third call.
+			func() ([]byte, error) { return []byte{}, &exec.FakeExitError{Status: 1} },
+		},
+	}
+	fexec := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			// iptables version check
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			// following Command() call is listing the rules.
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec, dbus.NewFake(nil, nil), ProtocolIpv4)
+	defer runner.Destroy()
+	_, err := runner.ListRules(TableFilter, "") // list all rules
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	_, err = runner.ListRules(TableFilter, ChainInput) // list all rules in INPUT chain
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	_, err = runner.ListRules(TableFilter, "FOO", "abc", "123")
+	if err == nil {
+		t.Errorf("expected failure")
+	}
+	if fcmd.CombinedOutputCalls != 4 {
+		t.Errorf("expected 4 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-S", "-t", "filter") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-S", "INPUT", "-t", "filter") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 }
 
