@@ -18,21 +18,21 @@ import (
 	"expvar"
 )
 
-// ExpvarCollector collects metrics from the expvar interface. It provides a
-// quick way to expose numeric values that are already exported via expvar as
-// Prometheus metrics. Note that the data models of expvar and Prometheus are
-// fundamentally different, and that the ExpvarCollector is inherently
-// slow. Thus, the ExpvarCollector is probably great for experiments and
-// prototying, but you should seriously consider a more direct implementation of
-// Prometheus metrics for monitoring production systems.
-//
-// Use NewExpvarCollector to create new instances.
-type ExpvarCollector struct {
+type expvarCollector struct {
 	exports map[string]*Desc
 }
 
-// NewExpvarCollector returns a newly allocated ExpvarCollector that still has
-// to be registered with the Prometheus registry.
+// NewExpvarCollector returns a newly allocated expvar Collector that still has
+// to be registered with a Prometheus registry.
+//
+// An expvar Collector collects metrics from the expvar interface. It provides a
+// quick way to expose numeric values that are already exported via expvar as
+// Prometheus metrics. Note that the data models of expvar and Prometheus are
+// fundamentally different, and that the expvar Collector is inherently slower
+// than native Prometheus metrics. Thus, the expvar Collector is probably great
+// for experiments and prototying, but you should seriously consider a more
+// direct implementation of Prometheus metrics for monitoring production
+// systems.
 //
 // The exports map has the following meaning:
 //
@@ -59,21 +59,21 @@ type ExpvarCollector struct {
 // sample values.
 //
 // Anything that does not fit into the scheme above is silently ignored.
-func NewExpvarCollector(exports map[string]*Desc) *ExpvarCollector {
-	return &ExpvarCollector{
+func NewExpvarCollector(exports map[string]*Desc) Collector {
+	return &expvarCollector{
 		exports: exports,
 	}
 }
 
 // Describe implements Collector.
-func (e *ExpvarCollector) Describe(ch chan<- *Desc) {
+func (e *expvarCollector) Describe(ch chan<- *Desc) {
 	for _, desc := range e.exports {
 		ch <- desc
 	}
 }
 
 // Collect implements Collector.
-func (e *ExpvarCollector) Collect(ch chan<- Metric) {
+func (e *expvarCollector) Collect(ch chan<- Metric) {
 	for name, desc := range e.exports {
 		var m Metric
 		expVar := expvar.Get(name)
