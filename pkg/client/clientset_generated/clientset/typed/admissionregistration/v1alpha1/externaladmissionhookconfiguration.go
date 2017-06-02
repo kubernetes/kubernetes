@@ -28,7 +28,7 @@ import (
 // ExternalAdmissionHookConfigurationsGetter has a method to return a ExternalAdmissionHookConfigurationInterface.
 // A group's client should implement this interface.
 type ExternalAdmissionHookConfigurationsGetter interface {
-	ExternalAdmissionHookConfigurations(namespace string) ExternalAdmissionHookConfigurationInterface
+	ExternalAdmissionHookConfigurations() ExternalAdmissionHookConfigurationInterface
 }
 
 // ExternalAdmissionHookConfigurationInterface has methods to work with ExternalAdmissionHookConfiguration resources.
@@ -47,14 +47,12 @@ type ExternalAdmissionHookConfigurationInterface interface {
 // externalAdmissionHookConfigurations implements ExternalAdmissionHookConfigurationInterface
 type externalAdmissionHookConfigurations struct {
 	client rest.Interface
-	ns     string
 }
 
 // newExternalAdmissionHookConfigurations returns a ExternalAdmissionHookConfigurations
-func newExternalAdmissionHookConfigurations(c *AdmissionregistrationV1alpha1Client, namespace string) *externalAdmissionHookConfigurations {
+func newExternalAdmissionHookConfigurations(c *AdmissionregistrationV1alpha1Client) *externalAdmissionHookConfigurations {
 	return &externalAdmissionHookConfigurations{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -62,7 +60,6 @@ func newExternalAdmissionHookConfigurations(c *AdmissionregistrationV1alpha1Clie
 func (c *externalAdmissionHookConfigurations) Create(externalAdmissionHookConfiguration *v1alpha1.ExternalAdmissionHookConfiguration) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
 	result = &v1alpha1.ExternalAdmissionHookConfiguration{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("externaladmissionhookconfigurations").
 		Body(externalAdmissionHookConfiguration).
 		Do().
@@ -74,7 +71,6 @@ func (c *externalAdmissionHookConfigurations) Create(externalAdmissionHookConfig
 func (c *externalAdmissionHookConfigurations) Update(externalAdmissionHookConfiguration *v1alpha1.ExternalAdmissionHookConfiguration) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
 	result = &v1alpha1.ExternalAdmissionHookConfiguration{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("externaladmissionhookconfigurations").
 		Name(externalAdmissionHookConfiguration.Name).
 		Body(externalAdmissionHookConfiguration).
@@ -86,7 +82,6 @@ func (c *externalAdmissionHookConfigurations) Update(externalAdmissionHookConfig
 // Delete takes name of the externalAdmissionHookConfiguration and deletes it. Returns an error if one occurs.
 func (c *externalAdmissionHookConfigurations) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("externaladmissionhookconfigurations").
 		Name(name).
 		Body(options).
@@ -97,7 +92,6 @@ func (c *externalAdmissionHookConfigurations) Delete(name string, options *v1.De
 // DeleteCollection deletes a collection of objects.
 func (c *externalAdmissionHookConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("externaladmissionhookconfigurations").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
@@ -109,7 +103,6 @@ func (c *externalAdmissionHookConfigurations) DeleteCollection(options *v1.Delet
 func (c *externalAdmissionHookConfigurations) Get(name string, options v1.GetOptions) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
 	result = &v1alpha1.ExternalAdmissionHookConfiguration{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("externaladmissionhookconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -122,7 +115,6 @@ func (c *externalAdmissionHookConfigurations) Get(name string, options v1.GetOpt
 func (c *externalAdmissionHookConfigurations) List(opts v1.ListOptions) (result *v1alpha1.ExternalAdmissionHookConfigurationList, err error) {
 	result = &v1alpha1.ExternalAdmissionHookConfigurationList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("externaladmissionhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
@@ -134,7 +126,6 @@ func (c *externalAdmissionHookConfigurations) List(opts v1.ListOptions) (result 
 func (c *externalAdmissionHookConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("externaladmissionhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
@@ -144,7 +135,6 @@ func (c *externalAdmissionHookConfigurations) Watch(opts v1.ListOptions) (watch.
 func (c *externalAdmissionHookConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
 	result = &v1alpha1.ExternalAdmissionHookConfiguration{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("externaladmissionhookconfigurations").
 		SubResource(subresources...).
 		Name(name).

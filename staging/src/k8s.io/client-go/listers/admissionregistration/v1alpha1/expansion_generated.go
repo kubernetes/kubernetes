@@ -22,14 +22,6 @@ package v1alpha1
 // ExternalAdmissionHookConfigurationLister.
 type ExternalAdmissionHookConfigurationListerExpansion interface{}
 
-// ExternalAdmissionHookConfigurationNamespaceListerExpansion allows custom methods to be added to
-// ExternalAdmissionHookConfigurationNamespaceLister.
-type ExternalAdmissionHookConfigurationNamespaceListerExpansion interface{}
-
 // InitializerConfigurationListerExpansion allows custom methods to be added to
 // InitializerConfigurationLister.
 type InitializerConfigurationListerExpansion interface{}
-
-// InitializerConfigurationNamespaceListerExpansion allows custom methods to be added to
-// InitializerConfigurationNamespaceLister.
-type InitializerConfigurationNamespaceListerExpansion interface{}
