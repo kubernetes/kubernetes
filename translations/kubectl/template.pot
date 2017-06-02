@@ -145,7 +145,7 @@ msgid ""
 "resource=pods\n"
 "\n"
 "\t\t# Create a Role named \"pod-reader\" with ResourceName specified\n"
-"\t\tkubectl create role pod-reader --verb=get --verg=list --verb=watch --"
+"\t\tkubectl create role pod-reader --verb=get --verb=list --verb=watch --"
 "resource=pods --resource-name=readablepod"
 msgstr ""
 
