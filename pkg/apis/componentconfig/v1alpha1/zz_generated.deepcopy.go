@@ -217,6 +217,11 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			*out = new(int32)
 			**out = **in
 		}
+		if in.CAdvisorPort != nil {
+			in, out := &in.CAdvisorPort, &out.CAdvisorPort
+			*out = new(int32)
+			**out = **in
+		}
 		if in.OOMScoreAdj != nil {
 			in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
 			*out = new(int32)

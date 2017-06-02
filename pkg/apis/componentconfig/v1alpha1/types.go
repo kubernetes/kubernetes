@@ -340,7 +340,7 @@ type KubeletConfiguration struct {
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount *int32 `json:"maxContainerCount"`
 	// cAdvisorPort is the port of the localhost cAdvisor endpoint
-	CAdvisorPort int32 `json:"cAdvisorPort"`
+	CAdvisorPort *int32 `json:"cAdvisorPort"`
 	// healthzPort is the port of the localhost healthz endpoint
 	HealthzPort int32 `json:"healthzPort"`
 	// healthzBindAddress is the IP address for the healthz server to serve

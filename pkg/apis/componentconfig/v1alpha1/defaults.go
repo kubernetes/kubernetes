@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -215,8 +216,8 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.CloudProvider == "" {
 		obj.CloudProvider = AutoDetectCloudProvider
 	}
-	if obj.CAdvisorPort == 0 {
-		obj.CAdvisorPort = 4194
+	if obj.CAdvisorPort == nil {
+		obj.CAdvisorPort = util.Int32Ptr(4194)
 	}
 	if obj.VolumeStatsAggPeriod == zeroDuration {
 		obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
