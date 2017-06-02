@@ -112,11 +112,7 @@ func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.Delet
 func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runtime.Object, error) {
 	if modify {
 		// Attempt to version the object based on client logic.
-		version, err := m.Versioner.ResourceVersion(obj)
-		if err != nil {
-			// We don't know how to clear the version on this object, so send it to the server as is
-			return m.createResource(m.RESTClient, m.Resource, namespace, obj)
-		}
+		version, _ := m.Versioner.ResourceVersion(obj)
 		if version != "" {
 			if err := m.Versioner.SetResourceVersion(obj, ""); err != nil {
 				return nil, err
