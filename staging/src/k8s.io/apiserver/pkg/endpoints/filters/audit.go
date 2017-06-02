@@ -34,21 +34,9 @@ import (
 )
 
 // WithAudit decorates a http.Handler with audit logging information for all the
-// requests coming to the server. If out is nil, no decoration takes place.
-// Each audit log contains two entries:
-// 1. the request line containing:
-//    - unique id allowing to match the response line (see 2)
-//    - source ip of the request
-//    - HTTP method being invoked
-//    - original user invoking the operation
-//    - original user's groups info
-//    - impersonated user for the operation
-//    - impersonated groups info
-//    - namespace of the request or <none>
-//    - uri is the full URI as requested
-// 2. the response line containing:
-//    - the unique id from 1
-//    - response code
+// requests coming to the server. Audit level is decided according to requests'
+// attributes and audit policy. Logs are emitted to the audit sink to
+// process events. If sink or audit policy is nil, no decoration takes place.
 func WithAudit(handler http.Handler, requestContextMapper request.RequestContextMapper, sink audit.Sink, policy policy.Checker, longRunningCheck request.LongRunningRequestCheck) http.Handler {
 	if sink == nil || policy == nil {
 		return handler
