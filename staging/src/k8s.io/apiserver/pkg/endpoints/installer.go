@@ -374,10 +374,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		shortNames = shortNamesProvider.ShortNames()
 	}
 
-	tableProvider, ok := storage.(rest.TableConvertor)
-	if !ok {
-		tableProvider = rest.DefaultTableConvertor
-	}
+	tableProvider, _ := storage.(rest.TableConvertor)
 
 	var apiResource metav1.APIResource
 	// Get the list of actions for the given scope.

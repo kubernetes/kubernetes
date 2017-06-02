@@ -1351,5 +1351,5 @@ func (e *Store) ConvertToTable(ctx genericapirequest.Context, object runtime.Obj
 	if e.TableConvertor != nil {
 		return e.TableConvertor.ConvertToTable(ctx, object, tableOptions)
 	}
-	return rest.DefaultTableConvertor.ConvertToTable(ctx, object, tableOptions)
+	return rest.NewDefaultTableConvertor(e.QualifiedResource).ConvertToTable(ctx, object, tableOptions)
 }
