@@ -128,14 +128,14 @@ func NewFactory() (*Factory, error) {
 }
 
 func TestLoad(t *testing.T) {
-	_, err := loadSchemaForTest()
+	_, err := loadSwaggerSchemaForTest()
 	if err != nil {
 		t.Errorf("Failed to load: %v", err)
 	}
 }
 
-func TestValidateOk(t *testing.T) {
-	schema, err := loadSchemaForTest()
+func TestValidateSwaggerSpefication(t *testing.T) {
+	schema, err := loadSwaggerSchemaForTest()
 	if err != nil {
 		t.Fatalf("Failed to load: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestValidateOk(t *testing.T) {
 }
 
 func TestValidateDifferentApiVersions(t *testing.T) {
-	schema, err := loadSchemaForTest()
+	schema, err := loadSwaggerSchemaForTest()
 	if err != nil {
 		t.Fatalf("Failed to load: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestValidateDifferentApiVersions(t *testing.T) {
 }
 
 func TestInvalid(t *testing.T) {
-	schema, err := loadSchemaForTest()
+	schema, err := loadSwaggerSchemaForTest()
 	if err != nil {
 		t.Fatalf("Failed to load: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestInvalid(t *testing.T) {
 }
 
 func TestValid(t *testing.T) {
-	schema, err := loadSchemaForTest()
+	schema, err := loadSwaggerSchemaForTest()
 	if err != nil {
 		t.Fatalf("Failed to load: %v", err)
 	}
