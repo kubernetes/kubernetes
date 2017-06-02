@@ -269,7 +269,53 @@ func TestComputeReconciledRole(t *testing.T) {
 			continue
 		}
 		if reconciliationNeeded && !helper.Semantic.DeepEqual(result.Role.(ClusterRoleRuleOwner).ClusterRole, tc.expectedReconciledRole) {
-			t.Errorf("%s: Expected\n\t%#v\ngot\n\t%#v", k, tc.expectedReconciledRole, result.Role)
+			t.Errorf("%s: Expected\n\t%#v\ngot\n\t%#v", k, tc.expectedReconciledRole, result.Role.(ClusterRoleRuleOwner).ClusterRole)
+		}
+	}
+}
+
+func TestUpdateRoleLastAppliedAnnotation(t *testing.T) {
+	tests := map[string]struct {
+		expectedRole        *rbac.ClusterRole
+		computedRole        *rbac.ClusterRole
+		expectedUpdatedRole *rbac.ClusterRole
+	}{
+		"different rules": {
+			expectedRole: role(rules("a"), nil, nil),
+			computedRole: role(rules("b"), nil, nil),
+
+			expectedUpdatedRole: role(
+				rules("b"),
+				nil,
+				ss{"kubectl.kubernetes.io/last-applied-configuration": "{\"creationTimestamp\":null,\"Rules\":[{\"Verbs\":[\"get\"],\"APIGroups\":[\"\"],\"Resources\":[\"a\"],\"ResourceNames\":null,\"NonResourceURLs\":null}]}\n"}),
+		},
+		"complex labels/annotations and rules": {
+			expectedRole: role(rules("pods"), ss{"env": "prod", "color": "blue"}, ss{"description": "fancy", "system": "true"}),
+			computedRole: role(rules("nodes"), ss{"color": "red", "team": "pm"}, ss{"system": "false", "owner": "admin", "vip": "yes"}),
+
+			expectedUpdatedRole: role(
+				rules("nodes"),
+				ss{"color": "red", "team": "pm"},
+				ss{
+					"system": "false",
+					"owner":  "admin",
+					"vip":    "yes",
+					"kubectl.kubernetes.io/last-applied-configuration": "{\"creationTimestamp\":null,\"labels\":{\"color\":\"blue\",\"env\":\"prod\"},\"annotations\":{\"description\":\"fancy\",\"system\":\"true\"},\"Rules\":[{\"Verbs\":[\"get\"],\"APIGroups\":[\"\"],\"Resources\":[\"pods\"],\"ResourceNames\":null,\"NonResourceURLs\":null}]}\n",
+				}),
+		},
+	}
+
+	for k, tc := range tests {
+		computedRole := ClusterRoleRuleOwner{ClusterRole: tc.computedRole}
+		expectedRole := ClusterRoleRuleOwner{ClusterRole: tc.expectedRole}
+		result, err := updateRoleLastAppliedAnnotation(expectedRole, computedRole)
+		if err != nil {
+			t.Errorf("%s: %v", k, err)
+			continue
+		}
+		got := result.(ClusterRoleRuleOwner).ClusterRole
+		if !helper.Semantic.DeepEqual(got, tc.expectedUpdatedRole) {
+			t.Errorf("%s: Expected\n\t%#v\ngot\n\t%#v", k, tc.expectedUpdatedRole, got)
 		}
 	}
 }

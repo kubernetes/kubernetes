@@ -18,12 +18,17 @@ package reconciliation
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 )
 
 type RoleRuleOwner struct {
 	Role *rbac.Role
+}
+
+func (o RoleRuleOwner) GetObject() runtime.Object {
+	return o.Role
 }
 
 func (o RoleRuleOwner) GetNamespace() string {
