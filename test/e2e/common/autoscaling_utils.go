@@ -475,7 +475,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalCli
 		c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
 }
 
-func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) {
+func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) *autoscalingv1.HorizontalPodAutoscaler {
 	hpa := &autoscalingv1.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rc.name,
@@ -491,6 +491,11 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 			TargetCPUUtilizationPercentage: &cpu,
 		},
 	}
-	_, errHPA := rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
+	hpa, errHPA := rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
 	framework.ExpectNoError(errHPA)
+	return hpa
+}
+
+func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) {
+	rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Delete(autoscalerName, nil)
 }
