@@ -46,6 +46,8 @@ type poller struct {
 	// if the number of consecutive read failure equals or exceeds the failureThreshold , the
 	// configuration is regarded as not ready.
 	failureThreshold int
+	// number of consecutive failures so far.
+	failures int
 	// if the configuration is regarded as ready.
 	ready               bool
 	mergedConfiguration runtime.Object
@@ -84,17 +86,18 @@ func (a *poller) setConfigurationAndReady(value runtime.Object) {
 }
 
 func (a *poller) Run(stopCh <-chan struct{}) {
-	var failure int
-	go wait.Until(func() {
-		configuration, err := a.get()
-		if err != nil {
-			failure++
-			if failure >= a.failureThreshold {
-				a.notReady()
-			}
-			return
+	go wait.Until(a.sync, a.interval, stopCh)
+}
+
+func (a *poller) sync() {
+	configuration, err := a.get()
+	if err != nil {
+		a.failures++
+		if a.failures >= a.failureThreshold {
+			a.notReady()
 		}
-		failure = 0
-		a.setConfigurationAndReady(configuration)
-	}, a.interval, stopCh)
+		return
+	}
+	a.failures = 0
+	a.setConfigurationAndReady(configuration)
 }
