@@ -192,6 +192,11 @@ func init() {
 			// recyclerClient.WatchPod
 			rbac.NewRule("watch").Groups(legacyGroup).Resources("events").RuleOrDie(),
 
+			// Cinder, AWS and GCE provisioners need to get list of nodes in order
+			// to get list of available zones in the cluster in order to choose a zone
+			// in case it's not configured in corresponding Storage Class
+			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+
 			eventsRule(),
 		},
 	})
