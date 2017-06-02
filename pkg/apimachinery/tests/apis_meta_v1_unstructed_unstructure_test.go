@@ -19,6 +19,7 @@ package tests
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -270,20 +271,18 @@ func TestUnstructuredSetters(t *testing.T) {
 				},
 				"ownerReferences": []map[string]interface{}{
 					{
-						"kind":               "Pod",
-						"name":               "poda",
-						"apiVersion":         "v1",
-						"uid":                "1",
-						"controller":         (*bool)(nil),
-						"blockOwnerDeletion": (*bool)(nil),
+						"kind":       "Pod",
+						"name":       "poda",
+						"apiVersion": "v1",
+						"uid":        "1",
 					},
 					{
 						"kind":               "Pod",
 						"name":               "podb",
 						"apiVersion":         "v1",
 						"uid":                "2",
-						"controller":         &trueVar,
-						"blockOwnerDeletion": &trueVar,
+						"controller":         true,
+						"blockOwnerDeletion": true,
 					},
 				},
 				"finalizers": []interface{}{
@@ -330,6 +329,52 @@ func TestUnstructuredSetters(t *testing.T) {
 
 	if !reflect.DeepEqual(unstruct, want) {
 		t.Errorf("Wanted: \n%s\n Got:\n%s", want, unstruct)
+	}
+}
+
+func TestOwnerReferences(t *testing.T) {
+	t.Parallel()
+	trueVar := true
+	falseVar := false
+	refs := []metav1.OwnerReference{
+		{
+			APIVersion: "v2",
+			Kind:       "K2",
+			Name:       "n2",
+			UID:        types.UID("abc1"),
+		},
+		{
+			APIVersion:         "v1",
+			Kind:               "K1",
+			Name:               "n1",
+			UID:                types.UID("abc2"),
+			Controller:         &trueVar,
+			BlockOwnerDeletion: &falseVar,
+		},
+		{
+			APIVersion:         "v3",
+			Kind:               "K3",
+			Name:               "n3",
+			UID:                types.UID("abc3"),
+			Controller:         &falseVar,
+			BlockOwnerDeletion: &trueVar,
+		},
+	}
+	for i, ref := range refs {
+		ref := ref
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
+			u1 := unstructured.Unstructured{
+				Object: make(map[string]interface{}),
+			}
+			refsX := []metav1.OwnerReference{ref}
+			u1.SetOwnerReferences(refsX)
+
+			have := u1.GetOwnerReferences()
+			if !reflect.DeepEqual(have, refsX) {
+				t.Errorf("Object references are not the same: %#v != %#v", have, refsX)
+			}
+		})
 	}
 }
 
