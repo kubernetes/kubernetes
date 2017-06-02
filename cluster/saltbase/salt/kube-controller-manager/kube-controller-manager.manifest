@@ -149,6 +149,12 @@
         { "name": "etcpki",
         "mountPath": "/etc/pki",
         "readOnly": true}
+{% if grains['os_family'] == 'RedHat' %}
+        ,{ "name": "etcpkica-trustextractedpem",
+        "mountPath": "/etc/pki/ca-trust/extracted/pem",
+        "readOnly": true}
+{% endif %}
+
       ]
     }
 ],
@@ -183,5 +189,11 @@
     "hostPath": {
         "path": "/etc/pki"}
   }
+{% if grains['os_family'] == 'RedHat' %}
+  ,{ "name": "etcpkica-trustextractedpem",
+    "hostPath": {
+        "path": "/etc/pki/ca-trust/extracted/pem"}
+  }
+{% endif %}
 ]
 }}
