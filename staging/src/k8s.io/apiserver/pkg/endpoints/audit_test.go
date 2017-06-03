@@ -127,7 +127,7 @@ func TestAudit(t *testing.T) {
 			},
 			selfLinker,
 			200,
-			2,
+			1,
 			[]eventCheck{
 				noRequestBody(0),
 				responseBodyMatches(0, `{.*"name":"c".*}`),
@@ -144,7 +144,7 @@ func TestAudit(t *testing.T) {
 				namespace:   "other",
 			},
 			200,
-			2,
+			1,
 			[]eventCheck{
 				noRequestBody(0),
 				responseBodyMatches(0, `{.*"name":"a".*"name":"b".*}`),
@@ -259,7 +259,7 @@ func TestAudit(t *testing.T) {
 				namespace:   "other",
 			},
 			200,
-			3,
+			2,
 			[]eventCheck{
 				noRequestBody(0),
 				noResponseBody(0),

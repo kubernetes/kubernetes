@@ -207,7 +207,6 @@ func TestAudit(t *testing.T) {
 			"GET",
 			func(http.ResponseWriter, *http.Request) {},
 			[]string{
-				readOnlyShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
 				readOnlyShortRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
 			},
 		},
@@ -219,7 +218,6 @@ func TestAudit(t *testing.T) {
 				panic("kaboom")
 			},
 			[]string{
-				readOnlyShortRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
 				readOnlyShortRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
 			},
 		},
@@ -293,7 +291,6 @@ func TestAudit(t *testing.T) {
 			"GET",
 			func(http.ResponseWriter, *http.Request) {},
 			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
 				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="200"`,
 				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
 			},
@@ -306,7 +303,6 @@ func TestAudit(t *testing.T) {
 				time.Sleep(delay)
 			},
 			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
 				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="200"`,
 				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
 			},
@@ -320,7 +316,6 @@ func TestAudit(t *testing.T) {
 				w.WriteHeader(403)
 			},
 			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
 				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="403"`,
 				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="403"`,
 			},
@@ -333,7 +328,6 @@ func TestAudit(t *testing.T) {
 				w.Write([]byte("foo"))
 			},
 			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
 				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="200"`,
 				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="200"`,
 			},
@@ -347,7 +341,6 @@ func TestAudit(t *testing.T) {
 				w.Write([]byte("foo"))
 			},
 			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
 				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="403"`,
 				longRunningPrefix(auditinternal.StageResponseComplete) + ` response="403"`,
 			},
@@ -360,7 +353,6 @@ func TestAudit(t *testing.T) {
 				panic("kaboom")
 			},
 			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
 				longRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
 			},
 		},
@@ -373,7 +365,6 @@ func TestAudit(t *testing.T) {
 				panic("kaboom")
 			},
 			[]string{
-				longRunningPrefix(auditinternal.StageRequestReceived) + ` response="<deferred>"`,
 				longRunningPrefix(auditinternal.StageResponseStarted) + ` response="200"`,
 				longRunningPrefix(auditinternal.StagePanic) + ` response="500"`,
 			},

@@ -21,12 +21,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 var (
-	ReadWrite = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
-	Read      = []string{"get", "list", "watch"}
+	ReadWrite = request.ReadWriteVerbs
+	Read      = request.ReadVerbs
 
 	Label      = map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}
 	Annotation = map[string]string{rbac.AutoUpdateAnnotationKey: "true"}
