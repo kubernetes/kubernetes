@@ -57,7 +57,7 @@ write_files:
       dns_domain: cluster.local
       enable_dns_horizontal_autoscaler: "false"
       instance_prefix: kubernetes
-      admission_control: NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota
+      admission_control: Initializers,NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota
       enable_cpu_cfs_quota: "true"
       network_provider: none
       cluster_cidr: "$cluster_cidr"

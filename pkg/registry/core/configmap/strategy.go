@@ -91,12 +91,12 @@ func ConfigMapToSelectableFields(cfg *api.ConfigMap) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	cfg, ok := obj.(*api.ConfigMap)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a ConfigMap")
+		return nil, nil, false, fmt.Errorf("given object is not a ConfigMap")
 	}
-	return labels.Set(cfg.ObjectMeta.Labels), ConfigMapToSelectableFields(cfg), nil
+	return labels.Set(cfg.ObjectMeta.Labels), ConfigMapToSelectableFields(cfg), cfg.Initializers != nil, nil
 }
 
 // MatchConfigMap returns a generic matcher for a given label and field selector.

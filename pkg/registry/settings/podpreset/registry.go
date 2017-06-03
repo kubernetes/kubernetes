@@ -57,7 +57,7 @@ func (s *storage) ListPodPresets(ctx genericapirequest.Context, options *metaint
 }
 
 func (s *storage) CreatePodPreset(ctx genericapirequest.Context, pp *settings.PodPreset) error {
-	_, err := s.Create(ctx, pp)
+	_, err := s.Create(ctx, pp, false)
 	return err
 }
 

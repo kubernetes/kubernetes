@@ -55,7 +55,7 @@ func newStorage(t *testing.T) (ControllerStorage, *etcdtesting.EtcdTestServer) {
 // createController is a helper function that returns a controller with the updated resource version.
 func createController(storage *REST, rc api.ReplicationController, t *testing.T) (api.ReplicationController, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), rc.Namespace)
-	obj, err := storage.Create(ctx, &rc)
+	obj, err := storage.Create(ctx, &rc, false)
 	if err != nil {
 		t.Errorf("Failed to create controller, %v", err)
 	}

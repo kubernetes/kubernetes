@@ -126,12 +126,12 @@ func DeploymentToSelectableFields(deployment *extensions.Deployment) fields.Set 
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	deployment, ok := obj.(*extensions.Deployment)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a deployment.")
+		return nil, nil, false, fmt.Errorf("given object is not a deployment.")
 	}
-	return labels.Set(deployment.ObjectMeta.Labels), DeploymentToSelectableFields(deployment), nil
+	return labels.Set(deployment.ObjectMeta.Labels), DeploymentToSelectableFields(deployment), deployment.Initializers != nil, nil
 }
 
 // MatchDeployment is the filter used by the generic etcd backend to route

@@ -104,12 +104,12 @@ func (s strategy) Export(ctx genericapirequest.Context, obj runtime.Object, exac
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	role, ok := obj.(*rbac.Role)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a Role")
+		return nil, nil, false, fmt.Errorf("not a Role")
 	}
-	return labels.Set(role.Labels), SelectableFields(role), nil
+	return labels.Set(role.Labels), SelectableFields(role), role.Initializers != nil, nil
 }
 
 // Matcher returns a generic matcher for a given label and field selector.

@@ -106,15 +106,15 @@ func MatchInitializerConfiguration(label labels.Selector, field fields.Selector)
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	ic, ok := obj.(*admissionregistration.InitializerConfiguration)
 	if !ok {
-		return nil, nil, fmt.Errorf("Given object is not a InitializerConfiguration.")
+		return nil, nil, false, fmt.Errorf("Given object is not a InitializerConfiguration.")
 	}
-	return labels.Set(ic.ObjectMeta.Labels), InitializerConfigurationToSelectableFields(ic), nil
+	return labels.Set(ic.ObjectMeta.Labels), InitializerConfigurationToSelectableFields(ic), ic.ObjectMeta.Initializers != nil, nil
 }
 
 // InitializerConfigurationToSelectableFields returns a field set that represents the object.
 func InitializerConfigurationToSelectableFields(ic *admissionregistration.InitializerConfiguration) fields.Set {
-	return generic.ObjectMetaFieldsSet(&ic.ObjectMeta, true)
+	return generic.ObjectMetaFieldsSet(&ic.ObjectMeta, false)
 }

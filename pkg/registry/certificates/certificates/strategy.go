@@ -178,12 +178,12 @@ func (csrApprovalStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, ol
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	sa, ok := obj.(*certificates.CertificateSigningRequest)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a CertificateSigningRequest")
+		return nil, nil, false, fmt.Errorf("not a CertificateSigningRequest")
 	}
-	return labels.Set(sa.Labels), SelectableFields(sa), nil
+	return labels.Set(sa.Labels), SelectableFields(sa), sa.Initializers != nil, nil
 }
 
 // Matcher returns a generic matcher for a given label and field selector.

@@ -123,7 +123,7 @@ func (r *RollbackREST) New() runtime.Object {
 
 var _ = rest.Creater(&RollbackREST{})
 
-func (r *RollbackREST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+func (r *RollbackREST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	rollback, ok := obj.(*extensions.DeploymentRollback)
 	if !ok {
 		return nil, errors.NewBadRequest(fmt.Sprintf("not a DeploymentRollback: %#v", obj))

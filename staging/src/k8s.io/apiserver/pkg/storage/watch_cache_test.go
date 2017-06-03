@@ -50,8 +50,8 @@ func newTestWatchCache(capacity int) *watchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
 		return NamespaceKeyFunc("prefix", obj)
 	}
-	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, error) {
-		return nil, nil, nil
+	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+		return nil, nil, false, nil
 	}
 	wc := newWatchCache(capacity, keyFunc, getAttrsFunc)
 	wc.clock = clock.NewFakeClock(time.Now())
