@@ -22,9 +22,14 @@ import (
 	"io"
 	"sync"
 
+	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -44,7 +49,8 @@ var _ = admission.Interface(&persistentVolumeLabel{})
 
 type persistentVolumeLabel struct {
 	*admission.Handler
-
+	client           internalclientset.Interface
+	podLister        corelisters.PodLister
 	mutex            sync.Mutex
 	ebsVolumes       aws.Volumes
 	cloudConfig      []byte
@@ -59,7 +65,7 @@ var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
 // As a side effect, the cloud provider may block invalid or non-existent volumes.
 func NewPersistentVolumeLabel() *persistentVolumeLabel {
 	return &persistentVolumeLabel{
-		Handler: admission.NewHandler(admission.Create),
+		Handler: admission.NewHandler(admission.Create, admission.Delete),
 	}
 }
 
@@ -67,8 +73,55 @@ func (l *persistentVolumeLabel) SetCloudConfig(cloudConfig []byte) {
 	l.cloudConfig = cloudConfig
 }
 
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&persistentVolumeLabel{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&persistentVolumeLabel{})
+
+func (l *persistentVolumeLabel) SetInternalKubeClientSet(client internalclientset.Interface) {
+	l.client = client
+}
+
+func (l *persistentVolumeLabel) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	podInformer := f.Core().InternalVersion().Pods()
+	l.SetReadyFunc(podInformer.Informer().HasSynced)
+	l.podLister = podInformer.Lister()
+}
+
+func (l *persistentVolumeLabel) Validate() error {
+	if l.podLister == nil {
+		return fmt.Errorf("missing podLister")
+	}
+	if l.client == nil {
+		return fmt.Errorf("missing client")
+	}
+	return nil
+}
+
 func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
-	if a.GetResource().GroupResource() != api.Resource("persistentvolumes") {
+	glog.V(1).Infof("IDC - Admit")
+	if a.GetOperation() == admission.Delete && a.GetKind().GroupKind() == api.Kind("PersistentVolumeClaim") {
+		glog.V(1).Infof("IDC - pvc delete!")
+		glog.V(1).Infof("IDC - a.GetName() type %s", a.GetName())
+
+		pvc, pvcErr := l.client.Core().PersistentVolumeClaims(a.GetNamespace()).Get(a.GetName(), metav1.GetOptions{})
+		// if we can't convert then we don't handle this object so just return
+		if pvcErr != nil {
+			glog.V(1).Infof("IDC - pvcErr")
+			//TODO log error since we didnt find this object, but allow delete to proceed
+			return nil
+		}
+
+		glog.V(1).Infof("IDC - pvc.Name %s", pvc.Name)
+		glog.V(1).Infof("IDC - pvc.Namespace %s", pvc.Namespace)
+
+		val := l.isPVCOkToDelete(pvc)
+		if val == false {
+			glog.V(1).Infof("IDC - l.isPVCOkToDelete == false")
+			return admission.NewForbidden(a, fmt.Errorf("IDC - pvc %s is referenced by an active pod", pvc.Name))
+		}
+		glog.V(1).Infof("IDC - l.isPVCOkToDelete == true")
+		return nil
+	}
+	if a.GetOperation() != admission.Create && a.GetResource().GroupResource() != api.Resource("persistentvolumes") {
 		return nil
 	}
 	obj := a.GetObject()
@@ -109,6 +162,51 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 	}
 
 	return nil
+}
+
+func (l *persistentVolumeLabel) isPVCOkToDelete(pvc *api.PersistentVolumeClaim) bool {
+	// prevent deletion of a pvc that is bound to a pv
+	// if the pv is used by an active pod
+	// issue #45143
+
+	glog.Infof("IDC isPVCOkToDelete entered")
+
+	//check if pvc is bound to pv and associated pv name exists
+	if pvc != nil && pvc.Status.Phase == api.ClaimBound && pvc.Spec.VolumeName != "" {
+		glog.Infof("IDC isPVCOkToDelete pvc is bound")
+		//find the associated pv and check
+		volume, volumeErr := l.client.Core().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+		if volumeErr == nil {
+			glog.Infof("IDC isPVCOkToDelete found bound volume %s", volume.Name)
+			//check all running and pending pods for this volume
+			pods, podErr := l.podLister.Pods(pvc.Namespace).List(labels.Everything())
+			if podErr == nil {
+				glog.Infof("IDC isPVCOkToDelete got pods")
+				for _, pod := range pods {
+					glog.Infof("IDC isPVCOkToDelete checking pod %q", pod.Name)
+					if pod.Status.Phase == api.PodRunning || pod.Status.Phase == api.PodPending {
+						glog.Infof("IDC isPVCOkToDelete pod %q running or pending", pod.Name)
+						for _, podVolume := range pod.Spec.Volumes {
+							glog.Infof("IDC isPVCOkToDelete pod check volume %s", podVolume.Name)
+							if podVolume.VolumeSource.PersistentVolumeClaim != nil {
+								glog.Infof("IDC isPVCOkToDelete pod check volume %s is pvc", podVolume.Name)
+								glog.Infof("IDC isPVCOkToDelete podVolume.VolumeSource.PersistentVolumeClaim.ClaimName is <%s>", podVolume.VolumeSource.PersistentVolumeClaim.ClaimName)
+								glog.Infof("IDC isPVCOkToDelete pvc.Spec.VolumeName is <%s>", pvc.Spec.VolumeName)
+								glog.Infof("IDC isPVCOkToDelete pvc.Name is <%s>", pvc.Name)
+								if podVolume.VolumeSource.PersistentVolumeClaim.ClaimName == pvc.Name {
+									glog.Infof("IDC isPVCOkToDelete found matching active volume")
+									//found that this pvc uses a pv that is used by an running or pending pod
+									glog.Infof("pvc %q was not deleted because it is associated with pv %q used by active pod %q:%q", pvc.Name, pvc.Spec.VolumeName, volume.Name, pod.Namespace, pod.Name)
+									return false
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return true
 }
 
 func (l *persistentVolumeLabel) findAWSEBSLabels(volume *api.PersistentVolume) (map[string]string, error) {
