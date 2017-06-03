@@ -11,6 +11,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "config_selfclient_test.go",
         "config_test.go",
         "genericapiserver_test.go",
     ],
