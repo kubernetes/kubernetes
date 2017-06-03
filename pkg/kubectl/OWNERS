@@ -1,4 +1,4 @@
 approvers:
-- sig-cli-maintainers
+- sig-cli-api-reviews
 reviewers:
-- sig-cli
+- sig-cli-pr-reviews
