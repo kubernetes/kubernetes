@@ -29,7 +29,6 @@ import (
 // FakeInitializerConfigurations implements InitializerConfigurationInterface
 type FakeInitializerConfigurations struct {
 	Fake *FakeAdmissionregistration
-	ns   string
 }
 
 var initializerconfigurationsResource = schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "", Resource: "initializerconfigurations"}
@@ -38,8 +37,7 @@ var initializerconfigurationsKind = schema.GroupVersionKind{Group: "admissionreg
 
 func (c *FakeInitializerConfigurations) Create(initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(initializerconfigurationsResource, c.ns, initializerConfiguration), &admissionregistration.InitializerConfiguration{})
-
+		Invokes(testing.NewRootCreateAction(initializerconfigurationsResource, initializerConfiguration), &admissionregistration.InitializerConfiguration{})
 	if obj == nil {
 		return nil, err
 	}
@@ -48,8 +46,7 @@ func (c *FakeInitializerConfigurations) Create(initializerConfiguration *admissi
 
 func (c *FakeInitializerConfigurations) Update(initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(initializerconfigurationsResource, c.ns, initializerConfiguration), &admissionregistration.InitializerConfiguration{})
-
+		Invokes(testing.NewRootUpdateAction(initializerconfigurationsResource, initializerConfiguration), &admissionregistration.InitializerConfiguration{})
 	if obj == nil {
 		return nil, err
 	}
@@ -58,13 +55,12 @@ func (c *FakeInitializerConfigurations) Update(initializerConfiguration *admissi
 
 func (c *FakeInitializerConfigurations) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(initializerconfigurationsResource, c.ns, name), &admissionregistration.InitializerConfiguration{})
-
+		Invokes(testing.NewRootDeleteAction(initializerconfigurationsResource, name), &admissionregistration.InitializerConfiguration{})
 	return err
 }
 
 func (c *FakeInitializerConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(initializerconfigurationsResource, c.ns, listOptions)
+	action := testing.NewRootDeleteCollectionAction(initializerconfigurationsResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &admissionregistration.InitializerConfigurationList{})
 	return err
@@ -72,8 +68,7 @@ func (c *FakeInitializerConfigurations) DeleteCollection(options *v1.DeleteOptio
 
 func (c *FakeInitializerConfigurations) Get(name string, options v1.GetOptions) (result *admissionregistration.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(initializerconfigurationsResource, c.ns, name), &admissionregistration.InitializerConfiguration{})
-
+		Invokes(testing.NewRootGetAction(initializerconfigurationsResource, name), &admissionregistration.InitializerConfiguration{})
 	if obj == nil {
 		return nil, err
 	}
@@ -82,8 +77,7 @@ func (c *FakeInitializerConfigurations) Get(name string, options v1.GetOptions) 
 
 func (c *FakeInitializerConfigurations) List(opts v1.ListOptions) (result *admissionregistration.InitializerConfigurationList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(initializerconfigurationsResource, initializerconfigurationsKind, c.ns, opts), &admissionregistration.InitializerConfigurationList{})
-
+		Invokes(testing.NewRootListAction(initializerconfigurationsResource, initializerconfigurationsKind, opts), &admissionregistration.InitializerConfigurationList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -104,15 +98,13 @@ func (c *FakeInitializerConfigurations) List(opts v1.ListOptions) (result *admis
 // Watch returns a watch.Interface that watches the requested initializerConfigurations.
 func (c *FakeInitializerConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(initializerconfigurationsResource, c.ns, opts))
-
+		InvokesWatch(testing.NewRootWatchAction(initializerconfigurationsResource, opts))
 }
 
 // Patch applies the patch and returns the patched initializerConfiguration.
 func (c *FakeInitializerConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *admissionregistration.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(initializerconfigurationsResource, c.ns, name, data, subresources...), &admissionregistration.InitializerConfiguration{})
-
+		Invokes(testing.NewRootPatchSubresourceAction(initializerconfigurationsResource, name, data, subresources...), &admissionregistration.InitializerConfiguration{})
 	if obj == nil {
 		return nil, err
 	}
