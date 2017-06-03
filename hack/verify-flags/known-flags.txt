@@ -673,6 +673,8 @@ system-cgroups
 system-pods-startup-timeout
 system-reserved
 system-reserved-cgroup
+system-spec-file
+system-spec-name
 system-validate-mode
 target-port
 target-ram-mb
