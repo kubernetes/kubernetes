@@ -89,7 +89,7 @@ func init() {
 
 func newOVirtCloud(config io.Reader) (*OVirtCloud, error) {
 	if config == nil {
-		return nil, fmt.Errorf("missing configuration file for ovirt cloud provider")
+		return nil, cloudprovider.ErrNoConfig
 	}
 
 	oVirtConfig := OVirtApiConfig{}

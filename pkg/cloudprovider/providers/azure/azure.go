@@ -26,6 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
 
+	"time"
+
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/azure-sdk-for-go/arm/storage"
@@ -92,6 +94,10 @@ func init() {
 
 // NewCloud returns a Cloud with initialized clients
 func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
+	if configReader == nil {
+		return nil, cloudprovider.ErrNoConfig
+	}
+
 	var az Cloud
 
 	configContents, err := ioutil.ReadAll(configReader)

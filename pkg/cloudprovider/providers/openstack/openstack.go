@@ -134,6 +134,7 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
+
 		return newOpenStack(cfg)
 	})
 }
@@ -167,12 +168,11 @@ func (cfg Config) toAuth3Options() tokens3.AuthOptions {
 }
 
 func readConfig(config io.Reader) (Config, error) {
-	if config == nil {
-		err := fmt.Errorf("no OpenStack cloud provider config file given")
-		return Config{}, err
-	}
-
 	var cfg Config
+
+	if config == nil {
+		return cfg, cloudprovider.ErrNoConfig
+	}
 
 	// Set default values for config params
 	cfg.BlockStorage.BSVersion = "auto"
