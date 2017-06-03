@@ -104,3 +104,4 @@ ${informergen} \
 vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
 vendor/k8s.io/sample-apiserver/hack/update-codegen.sh
 vendor/k8s.io/kube-apiextensions-server/hack/update-codegen.sh
+vendor/k8s.io/metrics/hack/update-codegen.sh
