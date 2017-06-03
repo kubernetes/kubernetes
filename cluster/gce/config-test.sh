@@ -173,6 +173,12 @@ if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
 	NODE_LABELS="$NODE_LABELS,projectcalico.org/ds-ready=true"
 fi
 
+# Turn the simple metadata proxy on by default.
+ENABLE_METADATA_PROXY="${ENABLE_METADATA_PROXY:-simple}"
+if [[ ${ENABLE_METADATA_PROXY} != "false" ]]; then
+        NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
+fi
+
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
 LOGGING_DESTINATION="${KUBE_LOGGING_DESTINATION:-gcp}" # options: elasticsearch, gcp
