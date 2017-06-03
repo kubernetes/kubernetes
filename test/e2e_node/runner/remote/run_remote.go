@@ -58,6 +58,7 @@ var buildOnly = flag.Bool("build-only", false, "If true, build e2e_node_test.tar
 var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2")
 var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link to view logs")
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
+var systemSpecName = flag.String("system-spec-name", "", "The name of the system spec used for validating the image in the node conformance test. The specs are at test/e2e_node/system/specs/. If unspecified, the default built-in spec (system.DefaultSpec) will be used.")
 
 const (
 	defaultMachine                = "n1-standard-1"
@@ -163,7 +164,7 @@ func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 	if *buildOnly {
 		// Build the archive and exit
-		remote.CreateTestArchive(suite)
+		remote.CreateTestArchive(suite, *systemSpecName)
 		return
 	}
 
@@ -336,7 +337,7 @@ func callGubernator(gubernator bool) {
 }
 
 func (a *Archive) getArchive() (string, error) {
-	a.Do(func() { a.path, a.err = remote.CreateTestArchive(suite) })
+	a.Do(func() { a.path, a.err = remote.CreateTestArchive(suite, *systemSpecName) })
 	return a.path, a.err
 }
 
@@ -394,11 +395,11 @@ func testHost(host string, deleteFiles bool, junitFilePrefix string, ginkgoFlags
 	if err != nil {
 		// Don't log fatal because we need to do any needed cleanup contained in "defer" statements
 		return &TestResult{
-			err: fmt.Errorf("unable to create test archive %v.", err),
+			err: fmt.Errorf("unable to create test archive: %v.", err),
 		}
 	}
 
-	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, junitFilePrefix, *testArgs, ginkgoFlagsStr)
+	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, junitFilePrefix, *testArgs, ginkgoFlagsStr, *systemSpecName)
 	return &TestResult{
 		output: output,
 		err:    err,
