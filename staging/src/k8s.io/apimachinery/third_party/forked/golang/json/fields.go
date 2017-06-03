@@ -27,7 +27,7 @@ const (
 // It returns field type, a slice of patch strategies, merge key and error.
 // TODO: fix the returned errors to be introspectable.
 func LookupPatchMetadata(t reflect.Type, jsonField string) (
-	elemType reflect.Type, patchStrategies []string, patchMergeKey string, e error) {
+	elemType reflect.Type, patchStrategies []string, patchMergeKeys []string, e error) {
 	if t.Kind() == reflect.Map {
 		elemType = t.Elem()
 		return
@@ -60,8 +60,13 @@ func LookupPatchMetadata(t reflect.Type, jsonField string) (
 			tjf = tjf.Type.Field(f.index[i])
 		}
 		patchStrategy := tjf.Tag.Get(patchStrategyTagKey)
-		patchMergeKey = tjf.Tag.Get(patchMergeKeyTagKey)
+		patchMergeKey := tjf.Tag.Get(patchMergeKeyTagKey)
 		patchStrategies = strings.Split(patchStrategy, ",")
+		if len(patchMergeKey) == 0 {
+			patchMergeKeys = nil
+		} else {
+			patchMergeKeys = strings.Split(patchMergeKey, ",")
+		}
 		elemType = tjf.Type
 		return
 	}

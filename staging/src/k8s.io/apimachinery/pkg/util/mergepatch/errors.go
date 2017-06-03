@@ -31,8 +31,12 @@ var (
 	ErrPatchContentNotMatchRetainKeys       = errors.New("patch content doesn't match retainKeys list")
 )
 
-func ErrNoMergeKey(m map[string]interface{}, k string) error {
-	return fmt.Errorf("map: %v does not contain declared merge key: %s", m, k)
+func ErrNoMergeKey(m1, m2 map[string]interface{}, k ...string) error {
+	if m2 == nil {
+		return fmt.Errorf("map: %v does not contain declared merge keys: %v", m1, k)
+	} else {
+		return fmt.Errorf("at least one of maps: %v and %v does not contain declared merge keys: %v", m1, m2, k)
+	}
 }
 
 func ErrBadArgType(expected, actual interface{}) error {
