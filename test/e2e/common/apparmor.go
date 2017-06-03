@@ -58,8 +58,9 @@ if touch %[1]s; then
 elif ! touch %[2]s; then
   echo "FAILURE: write to %[2]s should be allowed"
   exit 2
-elif ! grep "%[3]s" /proc/1/attr/current; then
+elif ! grep "%[3]s" /proc/self/attr/current; then
   echo "FAILURE: not running with expected profile %[3]s"
+  echo "found: $(cat /proc/self/attr/current)"
   exit 3
 fi`, appArmorDeniedPath, appArmorAllowedPath, appArmorProfilePrefix+f.Namespace.Name)
 
