@@ -312,7 +312,7 @@ func getRestartingContainerCommand(path string, containerNum int, restarts int32
 			if [ $count -lt %d ]; then
 				exit 0
 			fi
-			while true; do %s sleep 10; done`,
+			while true; do %s sleep 1; done`,
 			path, strconv.Itoa(containerNum), restarts+1, loopingCommand),
 	}
 }
