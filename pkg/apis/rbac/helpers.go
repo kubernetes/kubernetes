@@ -222,6 +222,22 @@ func (r *PolicyRuleBuilder) Rule() (PolicyRule, error) {
 			// this a common bug
 			return PolicyRule{}, fmt.Errorf("resource rule must have apiGroups: %#v", r.PolicyRule)
 		}
+		// if resource names are set, then the verb must not be list, watch, create, or deletecollection
+		// since verbs are largely opaque, we don't want to accidentally prevent things like "impersonate", so
+		// we will backlist common mistakes, not whitelist acceptable options.
+		if len(r.PolicyRule.ResourceNames) != 0 {
+			illegalVerbs := []string{}
+			for _, verb := range r.PolicyRule.Verbs {
+				switch verb {
+				case "list", "watch", "create", "deletecollection":
+					illegalVerbs = append(illegalVerbs, verb)
+				}
+			}
+			if len(illegalVerbs) > 0 {
+				return PolicyRule{}, fmt.Errorf("verbs %v do not have names available: %#v", illegalVerbs, r.PolicyRule)
+			}
+		}
+
 	default:
 		return PolicyRule{}, fmt.Errorf("a rule must have either nonResourceURLs or resources: %#v", r.PolicyRule)
 	}
