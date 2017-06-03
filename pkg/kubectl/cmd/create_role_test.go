@@ -46,6 +46,10 @@ func (t *testRolePrinter) HandledResources() []string {
 	return []string{}
 }
 
+func (t *testRolePrinter) IsGeneric() bool {
+	return true
+}
+
 func TestCreateRole(t *testing.T) {
 	roleName := "my-role"
 

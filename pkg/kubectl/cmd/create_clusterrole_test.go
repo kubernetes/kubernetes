@@ -46,6 +46,10 @@ func (t *testClusterRolePrinter) HandledResources() []string {
 	return []string{}
 }
 
+func (t *testClusterRolePrinter) IsGeneric() bool {
+	return true
+}
+
 func TestCreateClusterRole(t *testing.T) {
 	clusterRoleName := "my-cluster-role"
 

@@ -230,10 +230,10 @@ type ObjectMappingFactory interface {
 // Generally they depend upon client mapper functions
 type BuilderFactory interface {
 	// PrinterForCommand returns the default printer for the command. It requires that certain options
-	// are declared on the command (see AddPrinterFlags). Returns a printer, true if the printer is
-	// generic (is not internal), or an error if a printer could not be found.
+	// are declared on the command (see AddPrinterFlags). Returns a printer, or an error if a printer
+	// could not be found.
 	// TODO: Break the dependency on cmd here.
-	PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error)
+	PrinterForCommand(cmd *cobra.Command, options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
 	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
 	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)

@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 type ring2Factory struct {
@@ -47,24 +48,41 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	return f
 }
 
-func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error) {
+func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	mapper, typer, err := f.objectMappingFactory.UnstructuredObject()
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
-	return PrinterForCommand(cmd, mapper, typer, decoders)
+	encoder := f.clientAccessFactory.JSONEncoder()
+	return PrinterForCommand(cmd, mapper, typer, encoder, decoders, options)
 }
 
 func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
-	printer, generic, err := f.PrinterForCommand(cmd)
+	// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
+	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
+	if err != nil {
+		columnLabel = []string{}
+	}
+
+	options := printers.PrintOptions{
+		NoHeaders:          GetFlagBool(cmd, "no-headers"),
+		WithNamespace:      withNamespace,
+		Wide:               GetWideFlag(cmd),
+		ShowAll:            GetFlagBool(cmd, "show-all"),
+		ShowLabels:         GetFlagBool(cmd, "show-labels"),
+		AbsoluteTimestamps: isWatch(cmd),
+		ColumnLabels:       columnLabel,
+	}
+
+	printer, err := f.PrinterForCommand(cmd, options)
 	if err != nil {
 		return nil, err
 	}
 
 	// Make sure we output versioned data for generic printers
-	if generic {
+	if printer.IsGeneric() {
 		if mapping == nil {
 			return nil, fmt.Errorf("no serialization format found")
 		}
@@ -74,25 +92,17 @@ func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTM
 		}
 
 		printer = printers.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion())
+
 	} else {
-		// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
-		columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
-		if err != nil {
-			columnLabel = []string{}
+		// We add handlers to the printer in case it is printers.HumanReadablePrinter.
+		// printers.AddHandlers expects concrete type of printers.HumanReadablePrinter
+		// as its parameter because of this we have to do a type check on printer and
+		// extract out concrete HumanReadablePrinter from it. We are then able to attach
+		// handlers on it.
+		if humanReadablePrinter, ok := printer.(*printers.HumanReadablePrinter); ok {
+			printersinternal.AddHandlers(humanReadablePrinter)
+			printer = humanReadablePrinter
 		}
-		printer, err = f.clientAccessFactory.Printer(mapping, printers.PrintOptions{
-			NoHeaders:          GetFlagBool(cmd, "no-headers"),
-			WithNamespace:      withNamespace,
-			Wide:               GetWideFlag(cmd),
-			ShowAll:            GetFlagBool(cmd, "show-all"),
-			ShowLabels:         GetFlagBool(cmd, "show-labels"),
-			AbsoluteTimestamps: isWatch(cmd),
-			ColumnLabels:       columnLabel,
-		})
-		if err != nil {
-			return nil, err
-		}
-		printer = maybeWrapSortingPrinter(cmd, printer)
 	}
 
 	return printer, nil
