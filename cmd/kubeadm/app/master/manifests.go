@@ -73,7 +73,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		volumeMounts = append(volumeMounts, pkiVolumeMount())
 	}
 
-	if cfg.CertificatesDir != kubeadmapiext.DefaultCertificatesDir {
+	if !strings.HasPrefix(cfg.CertificatesDir, kubeadmapiext.DefaultCertificatesDir) {
 		volumes = append(volumes, newVolume("certdir", cfg.CertificatesDir))
 		volumeMounts = append(volumeMounts, newVolumeMount("certdir", cfg.CertificatesDir))
 	}
@@ -134,7 +134,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		staticPodSpecs[etcd] = etcdPod
 	}
 
-	manifestsPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")
+	manifestsPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
 	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
 		return fmt.Errorf("failed to create directory %q [%v]", manifestsPath, err)
 	}
