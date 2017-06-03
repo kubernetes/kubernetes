@@ -1,0 +1,16 @@
+sudo: false
+language: go
+go:
+- 1.6
+script:
+- go get golang.org/x/tools/cmd/cover
+- go get github.com/mattn/goveralls
+- go get github.com/kisielk/errcheck
+- go test -v -race
+- go vet
+- errcheck ./...
+- go test -coverprofile=profile.out -covermode=count
+- goveralls -service=travis-ci -coverprofile=profile.out -repotoken $COVERALLS
+notifications:
+  email:
+  - marty.schoch@gmail.com

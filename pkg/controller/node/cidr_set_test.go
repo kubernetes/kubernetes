@@ -17,11 +17,11 @@ limitations under the License.
 package node
 
 import (
-	"math/big"
 	"net"
 	"reflect"
 	"testing"
 
+	"github.com/RoaringBitmap/roaring"
 	"github.com/golang/glog"
 )
 
@@ -325,12 +325,13 @@ func TestOccupy(t *testing.T) {
 			continue
 		}
 
-		expectedUsed := big.Int{}
+		expectedUsed := roaring.NewBitmap()
 		for i := tc.expectedUsedBegin; i <= tc.expectedUsedEnd; i++ {
-			expectedUsed.SetBit(&expectedUsed, i, 1)
+			expectedUsed.AddInt(i)
 		}
-		if expectedUsed.Cmp(&cs.used) != 0 {
+		if expectedUsed.Equals(cs.used) != true {
 			t.Errorf("error")
 		}
+
 	}
 }

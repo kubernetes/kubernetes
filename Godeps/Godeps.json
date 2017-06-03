@@ -105,6 +105,11 @@
 			"Rev": "5bd2802263f21d8788851d5305584c82a5c75d7e"
 		},
 		{
+			"ImportPath": "github.com/RoaringBitmap/roaring",
+			"Comment": "v0.3.7-7-g6dacb3b",
+			"Rev": "6dacb3b11b80b593f3718e4599c7354711f4f117"
+		},
+		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.6.2-10-g51fe59a",
 			"Rev": "51fe59aca108dc5680109e7b2051cbdcfa5a253c"
@@ -1025,6 +1030,10 @@
 			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 		},
 		{
+			"ImportPath": "github.com/glycerine/go-unsnap-stream",
+			"Rev": "87275cecd8e984c5875577d22da7ce8945df780e"
+		},
+		{
 			"ImportPath": "github.com/go-ini/ini",
 			"Comment": "v0-54-g2e44421",
 			"Rev": "2e44421e256d82ebbf3d4d4fcabe8930b905eff3"
@@ -1234,6 +1243,10 @@
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/timestamp",
 			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+		},
+		{
+			"ImportPath": "github.com/golang/snappy",
+			"Rev": "553a641470496b2327abcac10b36396bd98e45c9"
 		},
 		{
 			"ImportPath": "github.com/google/btree",
@@ -1872,6 +1885,10 @@
 			"Rev": "31f0106b4474f14bc441575c19d3a5fa21aa1f6c"
 		},
 		{
+			"ImportPath": "github.com/mschoch/smat",
+			"Rev": "90eadee771aeab36e8bf796039b8c261bebebe4f"
+		},
+		{
 			"ImportPath": "github.com/mvdan/xurls",
 			"Comment": "v0.8.0-14-g1b768d7",
 			"Rev": "1b768d7c393abd8e8dda1458385a57becd4b2d4e"
@@ -2170,6 +2187,10 @@
 			"Rev": "0049ab3dc4c4c70a9eee23087437b69c0dde2130"
 		},
 		{
+			"ImportPath": "github.com/philhofer/fwd",
+			"Rev": "98c11a7a6ec829d672b03833c3d69a7fae1ca972"
+		},
+		{
 			"ImportPath": "github.com/pkg/errors",
 			"Comment": "v0.7.0-13-ga221380",
 			"Rev": "a22138067af1c4942683050411a841ade67fe1eb"
@@ -2421,6 +2442,11 @@
 			"Rev": "e7cb7fa329f456b3855136a2642b197bad7366ba"
 		},
 		{
+			"ImportPath": "github.com/tinylib/msgp/msgp",
+			"Comment": "v1.0.1",
+			"Rev": "1cce05a45012c07001dbfb1679c2f25ac0c189e6"
+		},
+		{
 			"ImportPath": "github.com/ugorji/go/codec",
 			"Rev": "ded73eae5db7e7a0ef6f55aace87a2873c5d2b74"
 		},
@@ -2540,6 +2566,11 @@
 			"ImportPath": "github.com/vmware/photon-controller-go-sdk/photon/lightwave",
 			"Comment": "PROMOTED-488",
 			"Rev": "4a435daef6ccd3d0edaac1161e76f51a70c2589a"
+		},
+		{
+			"ImportPath": "github.com/willf/bitset",
+			"Comment": "v1.1.2",
+			"Rev": "988f4f24992fc745de53c42df0da6581e42a6686"
 		},
 		{
 			"ImportPath": "github.com/xanzy/go-cloudstack/cloudstack",
@@ -2906,6 +2937,50 @@
 			"ImportPath": "k8s.io/heapster/metrics/api/v1/types",
 			"Comment": "v1.2.0-beta.1",
 			"Rev": "c2ac40f1adf8c42a79badddb2a2acd673cae3bcb"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/custom_metrics",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/metrics",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/metrics/v1alpha1",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1/fake",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/custom_metrics",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/client/custom_metrics/fake",
+			"Rev": "fd2415bb9381a6731027b48a8c6b78f28e13f876"
 		},
 		{
 			"ImportPath": "vbom.ml/util/sortorder",
