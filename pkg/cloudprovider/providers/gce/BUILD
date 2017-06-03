@@ -41,6 +41,7 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/util/net/sets:go_default_library",
         "//pkg/util/version:go_default_library",
@@ -80,9 +81,9 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )
 

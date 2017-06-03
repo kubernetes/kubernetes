@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -149,7 +150,7 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 		return zones, err
 	}
 	for _, node := range nodes.Items {
-		if zone, ok := node.Labels[metav1.LabelZoneFailureDomain]; ok {
+		if zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]; ok {
 			zones.Insert(zone)
 		}
 	}
@@ -210,7 +211,7 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 
 	// these are needed that pod is spawning to same AZ
 	volumeLabels = make(map[string]string)
-	volumeLabels[metav1.LabelZoneFailureDomain] = volumeAZ
+	volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
 
 	return volumeID, volSizeGB, volumeLabels, nil
 }

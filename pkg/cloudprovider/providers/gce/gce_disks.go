@@ -24,9 +24,9 @@ import (
 	"strings"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -313,8 +313,8 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 	}
 
 	labels := make(map[string]string)
-	labels[metav1.LabelZoneFailureDomain] = zone
-	labels[metav1.LabelZoneRegion] = region
+	labels[kubeletapis.LabelZoneFailureDomain] = zone
+	labels[kubeletapis.LabelZoneRegion] = region
 
 	return labels, nil
 }

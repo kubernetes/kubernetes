@@ -43,6 +43,7 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	storagebeta "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -935,7 +936,7 @@ func getRandomCloudZone(c clientset.Interface) string {
 	// collect values of zone label from all nodes
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
-		if zone, found := node.Labels[metav1.LabelZoneFailureDomain]; found {
+		if zone, found := node.Labels[kubeletapis.LabelZoneFailureDomain]; found {
 			zones.Insert(zone)
 		}
 	}
