@@ -74,11 +74,11 @@ func ComputeTaintTolerationPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *
 }
 
 // ComputeTaintTolerationPriorityReduce calculates the source of each node based on the number of intolerable taints on the node
-func ComputeTaintTolerationPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error {
+func ComputeTaintTolerationPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, results schedulerapi.HostPriorityList) error {
 	var maxCount int
-	for i := range result {
-		if result[i].Score > maxCount {
-			maxCount = result[i].Score
+	for _, result := range results {
+		if result.Score > maxCount {
+			maxCount = result.Score
 		}
 	}
 	maxCountFloat := float64(maxCount)
@@ -86,17 +86,17 @@ func ComputeTaintTolerationPriorityReduce(pod *v1.Pod, meta interface{}, nodeNam
 	// The maximum priority value to give to a node
 	// Priority values range from 0 - maxPriority
 	const maxPriority = float64(10)
-	for i := range result {
+	for _, result := range results {
 		fScore := maxPriority
 		if maxCountFloat > 0 {
-			fScore = (1.0 - float64(result[i].Score)/maxCountFloat) * 10
+			fScore = (1.0 - float64(result.Score)/maxCountFloat) * 10
 		}
 		if glog.V(10) {
 			// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
 			// not logged. There is visible performance gain from it.
-			glog.Infof("%v -> %v: Taint Toleration Priority, Score: (%d)", pod.Name, result[i].Host, int(fScore))
+			glog.Infof("%v -> %v: Taint Toleration Priority, Score: (%d)", pod.Name, result.Host, int(fScore))
 		}
-		result[i].Score = int(fScore)
+		result.Score = int(fScore)
 	}
 	return nil
 }
