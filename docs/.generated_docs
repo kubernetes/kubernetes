@@ -109,7 +109,6 @@ docs/man/man1/kubectl-set-selector.1
 docs/man/man1/kubectl-set-serviceaccount.1
 docs/man/man1/kubectl-set-subject.1
 docs/man/man1/kubectl-set.1
-docs/man/man1/kubectl-stop.1
 docs/man/man1/kubectl-taint.1
 docs/man/man1/kubectl-top-node.1
 docs/man/man1/kubectl-top-pod.1
@@ -252,7 +251,6 @@ docs/yaml/kubectl/kubectl_run-container.yaml
 docs/yaml/kubectl/kubectl_run.yaml
 docs/yaml/kubectl/kubectl_scale.yaml
 docs/yaml/kubectl/kubectl_set.yaml
-docs/yaml/kubectl/kubectl_stop.yaml
 docs/yaml/kubectl/kubectl_taint.yaml
 docs/yaml/kubectl/kubectl_top.yaml
 docs/yaml/kubectl/kubectl_uncordon.yaml
