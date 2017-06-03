@@ -71,6 +71,12 @@ var parserTests = []parserTest{
 		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("Linux")}, false},
 	{"test filter suffix", `{[?(@.status.nodeInfo.osImage == "{[()]}")]}`,
 		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("{[()]}")}, false},
+	{"double inside single", `{[?(@.status.nodeInfo.osImage == "''")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("''")}, false},
+	{"single inside double", `{[?(@.status.nodeInfo.osImage == '""')]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("\"\"")}, false},
+	{"single containing escaped single", `{[?(@.status.nodeInfo.osImage == '\\\'')]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("\\'")}, false},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {
