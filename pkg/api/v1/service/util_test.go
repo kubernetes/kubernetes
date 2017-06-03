@@ -157,7 +157,7 @@ func TestRequestsOnlyLocalTraffic(t *testing.T) {
 	checkRequestsOnlyLocalTraffic(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeNodePort,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeGlobal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	})
 	checkRequestsOnlyLocalTraffic(true, &v1.Service{
@@ -169,7 +169,7 @@ func TestRequestsOnlyLocalTraffic(t *testing.T) {
 	checkRequestsOnlyLocalTraffic(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeGlobal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	})
 	checkRequestsOnlyLocalTraffic(true, &v1.Service{
@@ -197,7 +197,7 @@ func TestNeedsHealthCheck(t *testing.T) {
 	checkNeedsHealthCheck(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeNodePort,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeGlobal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	})
 	checkNeedsHealthCheck(false, &v1.Service{
@@ -209,7 +209,7 @@ func TestNeedsHealthCheck(t *testing.T) {
 	checkNeedsHealthCheck(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeGlobal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	})
 	checkNeedsHealthCheck(true, &v1.Service{
@@ -268,13 +268,13 @@ func TestGetServiceHealthCheckNodePort(t *testing.T) {
 	checkGetServiceHealthCheckNodePort(0, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeNodePort,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeGlobal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	})
 	checkGetServiceHealthCheckNodePort(0, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeGlobal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	})
 	checkGetServiceHealthCheckNodePort(34567, &v1.Service{
@@ -306,7 +306,7 @@ func TestClearExternalTrafficPolicy(t *testing.T) {
 			&v1.Service{
 				Spec: v1.ServiceSpec{
 					Type: v1.ServiceTypeClusterIP,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeGlobal,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 				},
 			},
 		},
@@ -346,7 +346,7 @@ func TestSetServiceHealthCheckNodePort(t *testing.T) {
 			&v1.Service{
 				Spec: v1.ServiceSpec{
 					Type: v1.ServiceTypeClusterIP,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeGlobal,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 				},
 			},
 			30012,
@@ -356,7 +356,7 @@ func TestSetServiceHealthCheckNodePort(t *testing.T) {
 			&v1.Service{
 				Spec: v1.ServiceSpec{
 					Type: v1.ServiceTypeClusterIP,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeGlobal,
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 				},
 			},
 			0,

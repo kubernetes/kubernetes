@@ -1175,8 +1175,12 @@ func (proxier *Proxier) syncProxyRules() {
 		)
 		if proxier.masqueradeAll {
 			writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
-		}
-		if len(proxier.clusterCIDR) > 0 {
+		} else if len(proxier.clusterCIDR) > 0 {
+			// This masquerades off-cluster traffic to a service VIP.  The idea
+			// is that you can establish a static route for your Service range,
+			// routing to any node, and that node will bridge into the Service
+			// for you.  Since that might bounce off-node, we masquerade here.
+			// If/when we support "Local" policy for VIPs, we should update this.
 			writeLine(proxier.natRules, append(args, "! -s", proxier.clusterCIDR, "-j", string(KubeMarkMasqChain))...)
 		}
 		writeLine(proxier.natRules, append(args, "-j", string(svcChain))...)
@@ -1480,7 +1484,7 @@ func (proxier *Proxier) syncProxyRules() {
 				localEndpointChains = append(localEndpointChains, endpointChains[i])
 			}
 		}
-		// First rule in the chain redirects all pod -> external vip traffic to the
+		// First rule in the chain redirects all pod -> external VIP traffic to the
 		// Service's ClusterIP instead. This happens whether or not we have local
 		// endpoints; only if clusterCIDR is specified
 		if len(proxier.clusterCIDR) > 0 {
