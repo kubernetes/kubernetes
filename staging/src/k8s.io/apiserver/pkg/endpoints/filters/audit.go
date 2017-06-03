@@ -68,6 +68,7 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 		}
 
 		level := policy.Level(attribs)
+		audit.ObservePolicyLevel(level)
 		if level == auditinternal.LevelNone {
 			// Don't audit.
 			handler.ServeHTTP(w, req)
@@ -89,7 +90,7 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 		}
 
 		ev.Stage = auditinternal.StageRequestReceived
-		sink.ProcessEvents(ev)
+		processEvent(sink, ev)
 
 		// intercept the status code
 		var longRunningSink audit.Sink
@@ -113,7 +114,7 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 					Reason:  metav1.StatusReasonInternalError,
 					Message: fmt.Sprintf("APIServer panic'd: %v", r),
 				}
-				sink.ProcessEvents(ev)
+				processEvent(sink, ev)
 				return
 			}
 
@@ -126,17 +127,22 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 			if ev.ResponseStatus == nil && longRunningSink != nil {
 				ev.ResponseStatus = fakedSuccessStatus
 				ev.Stage = auditinternal.StageResponseStarted
-				longRunningSink.ProcessEvents(ev)
+				processEvent(longRunningSink, ev)
 			}
 
 			ev.Stage = auditinternal.StageResponseComplete
 			if ev.ResponseStatus == nil {
 				ev.ResponseStatus = fakedSuccessStatus
 			}
-			sink.ProcessEvents(ev)
+			processEvent(sink, ev)
 		}()
 		handler.ServeHTTP(respWriter, req)
 	})
+}
+
+func processEvent(sink audit.Sink, ev *auditinternal.Event) {
+	audit.ObserveEvent()
+	sink.ProcessEvents(ev)
 }
 
 func decorateResponseWriter(responseWriter http.ResponseWriter, ev *auditinternal.Event, sink audit.Sink) http.ResponseWriter {
@@ -177,7 +183,7 @@ func (a *auditResponseWriter) processCode(code int) {
 		a.event.Stage = auditinternal.StageResponseStarted
 
 		if a.sink != nil {
-			a.sink.ProcessEvents(a.event)
+			processEvent(a.sink, a.event)
 		}
 	})
 }
