@@ -85,6 +85,7 @@ var typesAllowedTags = map[reflect.Type]bool{
 	reflect.TypeOf(metav1.DeleteOptions{}):        true,
 	reflect.TypeOf(metav1.GroupVersionKind{}):     true,
 	reflect.TypeOf(metav1.GroupVersionResource{}): true,
+	reflect.TypeOf(metav1.Status{}):               true,
 }
 
 func ensureNoTags(t *testing.T, gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.Type) {

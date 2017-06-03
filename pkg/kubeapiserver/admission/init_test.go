@@ -17,10 +17,12 @@ limitations under the License.
 package admission
 
 import (
+	"net/url"
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
 // TestAuthorizer is a testing struct for testing that fulfills the authorizer interface.
@@ -32,18 +34,22 @@ func (t *TestAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, re
 
 var _ authorizer.Authorizer = &TestAuthorizer{}
 
+type doNothingAdmission struct{}
+
+func (doNothingAdmission) Admit(a admission.Attributes) error { return nil }
+func (doNothingAdmission) Handles(o admission.Operation) bool { return false }
+func (doNothingAdmission) Validate() error                    { return nil }
+
 // WantAuthorizerAdmission is a testing struct that fulfills the WantsAuthorizer
 // interface.
 type WantAuthorizerAdmission struct {
+	doNothingAdmission
 	auth authorizer.Authorizer
 }
 
 func (self *WantAuthorizerAdmission) SetAuthorizer(a authorizer.Authorizer) {
 	self.auth = a
 }
-func (self *WantAuthorizerAdmission) Admit(a admission.Attributes) error { return nil }
-func (self *WantAuthorizerAdmission) Handles(o admission.Operation) bool { return false }
-func (self *WantAuthorizerAdmission) Validate() error                    { return nil }
 
 var _ admission.Interface = &WantAuthorizerAdmission{}
 var _ WantsAuthorizer = &WantAuthorizerAdmission{}
@@ -60,16 +66,13 @@ func TestWantsAuthorizer(t *testing.T) {
 }
 
 type WantsCloudConfigAdmissionPlugin struct {
+	doNothingAdmission
 	cloudConfig []byte
 }
 
 func (self *WantsCloudConfigAdmissionPlugin) SetCloudConfig(cloudConfig []byte) {
 	self.cloudConfig = cloudConfig
 }
-
-func (self *WantsCloudConfigAdmissionPlugin) Admit(a admission.Attributes) error { return nil }
-func (self *WantsCloudConfigAdmissionPlugin) Handles(o admission.Operation) bool { return false }
-func (self *WantsCloudConfigAdmissionPlugin) Validate() error                    { return nil }
 
 func TestCloudConfigAdmissionPlugin(t *testing.T) {
 	cloudConfig := []byte("cloud-configuration")
@@ -79,5 +82,67 @@ func TestCloudConfigAdmissionPlugin(t *testing.T) {
 
 	if wantsCloudConfigAdmission.cloudConfig == nil {
 		t.Errorf("Expected cloud config to be initialized but found nil")
+	}
+}
+
+type fakeServiceResolver struct{}
+
+func (f *fakeServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+	return nil, nil
+}
+
+type serviceWanter struct {
+	doNothingAdmission
+	got ServiceResolver
+}
+
+func (s *serviceWanter) SetServiceResolver(sr ServiceResolver) { s.got = sr }
+
+func TestWantsServiceResolver(t *testing.T) {
+	sw := &serviceWanter{}
+	fsr := &fakeServiceResolver{}
+	i := &PluginInitializer{}
+	i.SetServiceResolver(fsr).Initialize(sw)
+	if got, ok := sw.got.(*fakeServiceResolver); !ok || got != fsr {
+		t.Errorf("plumbing fail - %v %v#", ok, got)
+	}
+}
+
+type clientCertWanter struct {
+	doNothingAdmission
+	gotCert, gotKey []byte
+}
+
+func (s *clientCertWanter) SetClientCert(cert, key []byte) { s.gotCert, s.gotKey = cert, key }
+
+func TestWantsClientCert(t *testing.T) {
+	i := &PluginInitializer{}
+	ccw := &clientCertWanter{}
+	i.SetClientCert([]byte("cert"), []byte("key")).Initialize(ccw)
+	if string(ccw.gotCert) != "cert" || string(ccw.gotKey) != "key" {
+		t.Errorf("plumbing fail - %v %v", ccw.gotCert, ccw.gotKey)
+	}
+}
+
+type fakeHookSource struct{}
+
+func (f *fakeHookSource) List() ([]admissionregistration.ExternalAdmissionHook, error) {
+	return nil, nil
+}
+
+type hookSourceWanter struct {
+	doNothingAdmission
+	got WebhookSource
+}
+
+func (s *hookSourceWanter) SetWebhookSource(w WebhookSource) { s.got = w }
+
+func TestWantsWebhookSource(t *testing.T) {
+	hsw := &hookSourceWanter{}
+	fhs := &fakeHookSource{}
+	i := &PluginInitializer{}
+	i.SetWebhookSource(fhs).Initialize(hsw)
+	if got, ok := hsw.got.(*fakeHookSource); !ok || got != fhs {
+		t.Errorf("plumbing fail - %v %v#", ok, got)
 	}
 }

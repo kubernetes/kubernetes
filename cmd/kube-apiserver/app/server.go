@@ -425,6 +425,20 @@ func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client interna
 	quotaRegistry := quotainstall.NewRegistry(nil, nil)
 
 	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig, restMapper, quotaRegistry)
+
+	// Read client cert/key for plugins that need to make calls out
+	if len(s.ProxyClientCertFile) > 0 && len(s.ProxyClientKeyFile) > 0 {
+		certBytes, err := ioutil.ReadFile(s.ProxyClientCertFile)
+		if err != nil {
+			return nil, err
+		}
+		keyBytes, err := ioutil.ReadFile(s.ProxyClientKeyFile)
+		if err != nil {
+			return nil, err
+		}
+		pluginInitializer = pluginInitializer.SetClientCert(certBytes, keyBytes)
+	}
+
 	return pluginInitializer, nil
 }
 
