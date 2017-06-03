@@ -86,6 +86,7 @@ type DaemonSetsController struct {
 	kubeClient    clientset.Interface
 	eventRecorder record.EventRecorder
 	podControl    controller.PodControlInterface
+	crControl     controller.ControllerRevisionControlInterface
 
 	// An dsc is temporarily suspended after creating/deleting these many replicas.
 	// It resumes normal action after observing the watch events for them.
@@ -137,6 +138,9 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "daemon-set"}),
+		},
+		crControl: controller.RealControllerRevisionControl{
+			KubeClient: kubeClient,
 		},
 		burstReplicas: BurstReplicas,
 		expectations:  controller.NewControllerExpectations(),

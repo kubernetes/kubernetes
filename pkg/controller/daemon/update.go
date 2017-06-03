@@ -81,6 +81,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *extensions.DaemonSet, hash st
 	return dsc.syncNodes(ds, oldPodsToDelete, []string{}, hash)
 }
 
+// constructHistory returns current history and a list of old histories of a given DaemonSet.
 func (dsc *DaemonSetsController) constructHistory(ds *extensions.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
 	var histories []*apps.ControllerRevision
 	var currentHistories []*apps.ControllerRevision
@@ -274,27 +275,37 @@ func (dsc *DaemonSetsController) dedupCurHistories(ds *extensions.DaemonSet, cur
 	return keepCur, nil
 }
 
-// controlledHistories returns all ControllerRevisions controlled by the given DaemonSet
+// controlledHistories returns all ControllerRevisions controlled by the given DaemonSet.
+// This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned histories are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
 func (dsc *DaemonSetsController) controlledHistories(ds *extensions.DaemonSet) ([]*apps.ControllerRevision, error) {
-	var result []*apps.ControllerRevision
 	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
-	histories, err := dsc.historyLister.List(selector)
+
+	// List all histories to include those that don't match the selector anymore
+	// but have a ControllerRef pointing to the controller.
+	histories, err := dsc.historyLister.List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
-	for _, history := range histories {
-		// Skip history that doesn't belong to the DaemonSet
-		if controllerRef := controller.GetControllerOf(history); controllerRef == nil || controllerRef.UID != ds.UID {
-			continue
+	// If any adoptions are attempted, we should first recheck for deletion with
+	// an uncached quorum read sometime after listing Pods (see #42639).
+	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
+		fresh, err := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
 		}
-		result = append(result, history)
-	}
-	return result, nil
+		if fresh.UID != ds.UID {
+			return nil, fmt.Errorf("original DaemonSet %v/%v is gone: got uid %v, wanted %v", ds.Namespace, ds.Name, fresh.UID, ds.UID)
+		}
+		return fresh, nil
+	})
+	// Use ControllerRefManager to adopt/orphan as needed.
+	cm := controller.NewControllerRevisionControllerRefManager(dsc.crControl, ds, selector, controllerKind, canAdoptFunc)
+	return cm.ClaimControllerRevisions(histories)
 }
 
 // Match check if the given DaemonSet's template matches the template stored in the given history.
