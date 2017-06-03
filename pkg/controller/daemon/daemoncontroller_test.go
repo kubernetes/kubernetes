@@ -456,7 +456,7 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 }
 
 // DaemonSets should not unschedule a daemonset pod from a node with insufficient free resource
-func TestInsufficentCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T) {
+func TestInsufficientCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T) {
 	podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
 	podSpec.NodeName = "too-much-mem"
 	ds := newDaemonSet("foo")
@@ -1348,6 +1348,29 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 	}
 	for podName := range gotPods {
 		t.Errorf("unexpected pod %v was returned", podName)
+	}
+}
+
+func TestAddNode(t *testing.T) {
+	manager, _, _ := newTestController()
+	node1 := newNode("node1", nil)
+	ds := newDaemonSet("ds")
+	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+	manager.dsStore.Add(ds)
+
+	manager.addNode(node1)
+	if got, want := manager.queue.Len(), 0; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+
+	node2 := newNode("node2", simpleNodeLabel)
+	manager.addNode(node2)
+	if got, want := manager.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %v, want %v", got, want)
+	}
+	key, done := manager.queue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to enqueue controller for node %v", node2.Name)
 	}
 }
 
