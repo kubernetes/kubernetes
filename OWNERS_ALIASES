@@ -79,3 +79,5 @@ aliases:
   sig-apps-api-approvers:
     - erictune
     - smarterclayton
+  sig-leads:
+    - spiffxp
