@@ -47,9 +47,6 @@ type NodeInfo struct {
 	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
 	// as int64, to avoid conversions and accessing map.
 	allocatableResource *Resource
-	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
-	// explicitly as int, to avoid conversions and improve performance.
-	allowedPodNumber int
 
 	// Cached tains of the node for faster lookup.
 	taints    []v1.Taint
@@ -66,12 +63,50 @@ type NodeInfo struct {
 
 // Resource is a collection of compute resource.
 type Resource struct {
-	MilliCPU           int64
-	Memory             int64
-	NvidiaGPU          int64
-	StorageScratch     int64
-	StorageOverlay     int64
+	MilliCPU       int64
+	Memory         int64
+	NvidiaGPU      int64
+	StorageScratch int64
+	StorageOverlay int64
+	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
+	// explicitly as int, to avoid conversions and improve performance.
+	AllowedPodNumber   int
 	OpaqueIntResources map[v1.ResourceName]int64
+}
+
+// New creates a Resource from ResourceList
+func NewResource(rl v1.ResourceList) *Resource {
+	r := &Resource{}
+	r.Add(rl)
+	return r
+}
+
+// Add adds ResourceList into Resource.
+func (r *Resource) Add(rl v1.ResourceList) {
+	if r == nil {
+		return
+	}
+
+	for rName, rQuant := range rl {
+		switch rName {
+		case v1.ResourceCPU:
+			r.MilliCPU += rQuant.MilliValue()
+		case v1.ResourceMemory:
+			r.Memory += rQuant.Value()
+		case v1.ResourceNvidiaGPU:
+			r.NvidiaGPU += rQuant.Value()
+		case v1.ResourcePods:
+			r.AllowedPodNumber += int(rQuant.Value())
+		case v1.ResourceStorage:
+			r.StorageScratch += rQuant.Value()
+		case v1.ResourceStorageOverlay:
+			r.StorageOverlay += rQuant.Value()
+		default:
+			if v1helper.IsOpaqueIntResourceName(rName) {
+				r.AddOpaque(rName, rQuant.Value())
+			}
+		}
+	}
 }
 
 func (r *Resource) ResourceList() v1.ResourceList {
@@ -79,7 +114,9 @@ func (r *Resource) ResourceList() v1.ResourceList {
 		v1.ResourceCPU:            *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
 		v1.ResourceMemory:         *resource.NewQuantity(r.Memory, resource.BinarySI),
 		v1.ResourceNvidiaGPU:      *resource.NewQuantity(r.NvidiaGPU, resource.DecimalSI),
+		v1.ResourcePods:           *resource.NewQuantity(int64(r.AllowedPodNumber), resource.BinarySI),
 		v1.ResourceStorageOverlay: *resource.NewQuantity(r.StorageOverlay, resource.BinarySI),
+		v1.ResourceStorage:        *resource.NewQuantity(r.StorageScratch, resource.BinarySI),
 	}
 	for rName, rQuant := range r.OpaqueIntResources {
 		result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
@@ -89,11 +126,12 @@ func (r *Resource) ResourceList() v1.ResourceList {
 
 func (r *Resource) Clone() *Resource {
 	res := &Resource{
-		MilliCPU:       r.MilliCPU,
-		Memory:         r.Memory,
-		NvidiaGPU:      r.NvidiaGPU,
-		StorageOverlay: r.StorageOverlay,
-		StorageScratch: r.StorageScratch,
+		MilliCPU:         r.MilliCPU,
+		Memory:           r.Memory,
+		NvidiaGPU:        r.NvidiaGPU,
+		AllowedPodNumber: r.AllowedPodNumber,
+		StorageOverlay:   r.StorageOverlay,
+		StorageScratch:   r.StorageScratch,
 	}
 	if r.OpaqueIntResources != nil {
 		res.OpaqueIntResources = make(map[v1.ResourceName]int64)
@@ -124,7 +162,6 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		requestedResource:   &Resource{},
 		nonzeroRequest:      &Resource{},
 		allocatableResource: &Resource{},
-		allowedPodNumber:    0,
 		generation:          0,
 		usedPorts:           make(map[int]bool),
 	}
@@ -166,10 +203,10 @@ func (n *NodeInfo) PodsWithAffinity() []*v1.Pod {
 }
 
 func (n *NodeInfo) AllowedPodNumber() int {
-	if n == nil {
+	if n == nil || n.allocatableResource == nil {
 		return 0
 	}
-	return n.allowedPodNumber
+	return n.allocatableResource.AllowedPodNumber
 }
 
 func (n *NodeInfo) Taints() ([]v1.Taint, error) {
@@ -223,7 +260,6 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		requestedResource:       n.requestedResource.Clone(),
 		nonzeroRequest:          n.nonzeroRequest.Clone(),
 		allocatableResource:     n.allocatableResource.Clone(),
-		allowedPodNumber:        n.allowedPodNumber,
 		taintsErr:               n.taintsErr,
 		memoryPressureCondition: n.memoryPressureCondition,
 		diskPressureCondition:   n.diskPressureCondition,
@@ -253,7 +289,8 @@ func (n *NodeInfo) String() string {
 	for i, pod := range n.pods {
 		podKeys[i] = pod.Name
 	}
-	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v}", podKeys, n.requestedResource, n.nonzeroRequest, n.usedPorts)
+	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v, AllocatableResource:%#v}",
+		podKeys, n.requestedResource, n.nonzeroRequest, n.usedPorts, n.allocatableResource)
 }
 
 func hasPodAffinityConstraints(pod *v1.Pod) bool {
@@ -345,23 +382,9 @@ func (n *NodeInfo) removePod(pod *v1.Pod) error {
 }
 
 func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int64) {
+	resPtr := &res
 	for _, c := range pod.Spec.Containers {
-		for rName, rQuant := range c.Resources.Requests {
-			switch rName {
-			case v1.ResourceCPU:
-				res.MilliCPU += rQuant.MilliValue()
-			case v1.ResourceMemory:
-				res.Memory += rQuant.Value()
-			case v1.ResourceNvidiaGPU:
-				res.NvidiaGPU += rQuant.Value()
-			case v1.ResourceStorageOverlay:
-				res.StorageOverlay += rQuant.Value()
-			default:
-				if v1helper.IsOpaqueIntResourceName(rName) {
-					res.AddOpaque(rName, rQuant.Value())
-				}
-			}
-		}
+		resPtr.Add(c.Resources.Requests)
 
 		non0_cpu_req, non0_mem_req := priorityutil.GetNonzeroRequests(&c.Resources.Requests)
 		non0_cpu += non0_cpu_req
@@ -397,26 +420,9 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, used bool) {
 // Sets the overall node information.
 func (n *NodeInfo) SetNode(node *v1.Node) error {
 	n.node = node
-	for rName, rQuant := range node.Status.Allocatable {
-		switch rName {
-		case v1.ResourceCPU:
-			n.allocatableResource.MilliCPU = rQuant.MilliValue()
-		case v1.ResourceMemory:
-			n.allocatableResource.Memory = rQuant.Value()
-		case v1.ResourceNvidiaGPU:
-			n.allocatableResource.NvidiaGPU = rQuant.Value()
-		case v1.ResourcePods:
-			n.allowedPodNumber = int(rQuant.Value())
-		case v1.ResourceStorage:
-			n.allocatableResource.StorageScratch = rQuant.Value()
-		case v1.ResourceStorageOverlay:
-			n.allocatableResource.StorageOverlay = rQuant.Value()
-		default:
-			if v1helper.IsOpaqueIntResourceName(rName) {
-				n.allocatableResource.SetOpaque(rName, rQuant.Value())
-			}
-		}
-	}
+
+	n.allocatableResource = NewResource(node.Status.Allocatable)
+
 	n.taints = node.Spec.Taints
 	for i := range node.Status.Conditions {
 		cond := &node.Status.Conditions[i]
@@ -441,7 +447,6 @@ func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 	// node removal. This is handled correctly in cache.go file.
 	n.node = nil
 	n.allocatableResource = &Resource{}
-	n.allowedPodNumber = 0
 	n.taints, n.taintsErr = nil, nil
 	n.memoryPressureCondition = v1.ConditionUnknown
 	n.diskPressureCondition = v1.ConditionUnknown
