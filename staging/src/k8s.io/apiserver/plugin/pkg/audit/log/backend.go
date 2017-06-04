@@ -19,23 +19,20 @@ package log
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 )
 
 type backend struct {
-	out  io.Writer
-	sink chan *auditinternal.Event
+	out io.Writer
 }
 
 var _ audit.Backend = &backend{}
 
 func NewBackend(out io.Writer) *backend {
 	return &backend{
-		out:  out,
-		sink: make(chan *auditinternal.Event, 100),
+		out: out,
 	}
 }
 
@@ -54,12 +51,4 @@ func (b *backend) logEvent(ev *auditinternal.Event) {
 
 func (b *backend) Run(stopCh <-chan struct{}) error {
 	return nil
-}
-
-func auditStringSlice(inList []string) string {
-	quotedElements := make([]string, len(inList))
-	for i, in := range inList {
-		quotedElements[i] = fmt.Sprintf("%q", in)
-	}
-	return strings.Join(quotedElements, ",")
 }
