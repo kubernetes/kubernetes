@@ -24,7 +24,6 @@ function run-gcloud-compute-with-retries {
     # We don't use 'local' to declare gcloud_result as then ret_val always gets value 0.
     # We use tee to output to &5 (redirected to stdout) while also storing it in the variable.
     gcloud_result=$(gcloud compute "$@" 2>&1 | tee >(cat - >&5)) || local ret_val="$?"
-    echo "${gcloud_result}"
     if [[ "${ret_val:-0}" -ne "0" ]]; then
       if [[ $(echo "${gcloud_result}" | grep -c "already exists") -gt 0 ]]; then
         if [[ "${attempt}" == 1 ]]; then
