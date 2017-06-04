@@ -28,12 +28,12 @@ import (
 	computealpha "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -59,7 +59,7 @@ func splitNodesByZone(nodes []*v1.Node) map[string][]*v1.Node {
 }
 
 func getZone(n *v1.Node) string {
-	zone, ok := n.Labels[metav1.LabelZoneFailureDomain]
+	zone, ok := n.Labels[kubeletapis.LabelZoneFailureDomain]
 	if !ok {
 		return defaultZone
 	}
