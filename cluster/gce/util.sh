@@ -735,12 +735,13 @@ function create-network() {
       --target-tags "${NODE_TAG}"&
   fi
 
-  if ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NETWORK}-default-ssh" &>/dev/null; then
-    gcloud compute firewall-rules create "${NETWORK}-default-ssh" \
+  if ! gcloud compute firewall-rules describe --project "${PROJECT}" "${CLUSTER_NAME}-default-ssh" &>/dev/null; then
+    gcloud compute firewall-rules create "${CLUSTER_NAME}-default-ssh" \
       --project "${PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "0.0.0.0/0" \
-      --allow "tcp:22" &
+      --allow "tcp:22" \
+      --target-tags "${MASTER_TAG},${NODE_TAG}" &
   fi
 }
 
@@ -1578,7 +1579,7 @@ function kube-down() {
     delete-firewall-rules \
       "${CLUSTER_NAME}-default-internal-master" \
       "${CLUSTER_NAME}-default-internal-node" \
-      "${NETWORK}-default-ssh" \
+      "${CLUSTER_NAME}-default-ssh" \
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
 
     delete-subnetworks
