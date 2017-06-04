@@ -616,7 +616,7 @@ function convert-bytes-gce-kube() {
 #    connect to the apiserver.
 
 function create-salt-kubelet-auth() {
-  local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+  local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/bootstrap-kubeconfig"
   if [ ! -e "${kubelet_kubeconfig_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kubelet
     (umask 077;
@@ -631,7 +631,7 @@ users:
 clusters:
 - name: local
   cluster:
-    server: https://kubernetes-master
+    server: https://${KUBERNETES_MASTER_NAME}
     certificate-authority: ${CA_CERT_BUNDLE_PATH}
 contexts:
 - context:
