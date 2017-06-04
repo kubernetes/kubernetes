@@ -29,9 +29,7 @@ import (
 	"k8s.io/client-go/tools/record"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 )
 
@@ -458,116 +456,6 @@ func TestStatefulPodControlDeleteFailure(t *testing.T) {
 		t.Errorf("Expected 1 events for failed delete found %d", eventCount)
 	} else if !strings.Contains(events[0], v1.EventTypeWarning) {
 		t.Errorf("Expected warning event found %s", events[0])
-	}
-}
-
-func TestStatefulPodControlUpdatesSetStatus(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), nil
-	})
-	if err := control.UpdateStatefulSetStatus(set, 2, 1); err != nil {
-		t.Errorf("Error returned on successful status update: %s", err)
-	}
-	if set.Status.Replicas != 2 {
-		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.Replicas)
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %d", eventCount)
-	}
-}
-
-func TestStatefulPodControlUpdatesObservedGeneration(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	fakeClient := &fake.Clientset{}
-	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		sts := update.GetObject().(*apps.StatefulSet)
-		if sts.Status.ObservedGeneration == nil || *sts.Status.ObservedGeneration != int64(3) {
-			t.Errorf("expected observedGeneration to be synced with generation for statefulset %q", sts.Name)
-		}
-		return true, sts, nil
-	})
-	if err := control.UpdateStatefulSetStatus(set, 2, 3); err != nil {
-		t.Errorf("Error returned on successful status update: %s", err)
-	}
-}
-
-func TestStatefulPodControlUpdateReplicasFailure(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	fakeClient := &fake.Clientset{}
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	indexer.Add(set)
-	setLister := appslisters.NewStatefulSetLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, setLister, nil, nil, recorder)
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
-	})
-	if err := control.UpdateStatefulSetStatus(set, 2, 1); err == nil {
-		t.Error("Failed update did not return error")
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %d", eventCount)
-	}
-}
-
-func TestStatefulPodControlUpdateReplicasConflict(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	conflict := false
-	fakeClient := &fake.Clientset{}
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	indexer.Add(set)
-	setLister := appslisters.NewStatefulSetLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, setLister, nil, nil, recorder)
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		if !conflict {
-			conflict = true
-			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("Object already exists"))
-		} else {
-			return true, update.GetObject(), nil
-		}
-	})
-	if err := control.UpdateStatefulSetStatus(set, 2, 1); err != nil {
-		t.Errorf("UpdateStatefulSetStatus returned an error: %s", err)
-	}
-	if set.Status.Replicas != 2 {
-		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.Replicas)
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %d", eventCount)
-	}
-}
-
-func TestStatefulPodControlUpdateReplicasConflictFailure(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	fakeClient := &fake.Clientset{}
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	indexer.Add(set)
-	setLister := appslisters.NewStatefulSetLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, setLister, nil, nil, recorder)
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("Object already exists"))
-	})
-	if err := control.UpdateStatefulSetStatus(set, 2, 1); err == nil {
-		t.Error("UpdateStatefulSetStatus failed to return an error on get failure")
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("Expected 0 events for successful status update %d", eventCount)
 	}
 }
 

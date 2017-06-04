@@ -49,10 +49,6 @@ type StatefulPodControlInterface interface {
 	// DeleteStatefulPod deletes a Pod in a StatefulSet. The pods PVCs are not deleted. If the delete is successful,
 	// the returned error is nil.
 	DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
-	// UpdateStatefulSetStatus updates the status of a StatefulSet. set is an in-out parameter, and any
-	// updates made to the set are made visible as mutations to the parameter. If the method is successful, the
-	// returned error is nil, and set has its status updated.
-	UpdateStatefulSetStatus(set *apps.StatefulSet, replicas int32, generation int64) error
 }
 
 func NewRealStatefulPodControl(
@@ -93,7 +89,6 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 
 func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
 	attemptedUpdate := false
-
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// assume the Pod is consistent
 		consistent := true
@@ -147,30 +142,6 @@ func (spc *realStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod 
 	err := spc.client.Core().Pods(set.Namespace).Delete(pod.Name, nil)
 	spc.recordPodEvent("delete", set, pod, err)
 	return err
-}
-
-func (spc *realStatefulPodControl) UpdateStatefulSetStatus(set *apps.StatefulSet, replicas int32, generation int64) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		set.Status.Replicas = replicas
-		set.Status.ObservedGeneration = &generation
-		_, updateErr := spc.client.Apps().StatefulSets(set.Namespace).UpdateStatus(set)
-		if updateErr == nil {
-			return nil
-		}
-
-		if updated, err := spc.setLister.StatefulSets(set.Namespace).Get(set.Name); err == nil {
-			// make a copy so we don't mutate the shared cache
-			if copy, err := scheme.Scheme.DeepCopy(updated); err == nil {
-				set = copy.(*apps.StatefulSet)
-			} else {
-				utilruntime.HandleError(fmt.Errorf("error copying updated StatefulSet: %v", err))
-			}
-		} else {
-			utilruntime.HandleError(fmt.Errorf("error getting updated StatefulSet %s/%s from lister: %v", set.Namespace, set.Name, err))
-		}
-
-		return updateErr
-	})
 }
 
 // recordPodEvent records an event for verb applied to a Pod in a StatefulSet. If err is nil the generated event will
