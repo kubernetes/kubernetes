@@ -46,12 +46,15 @@ GENERATED_FILE_PREFIX := zz_generated.
 # Metadata for driving the build lives here.
 META_DIR := .make
 
-# Our build flags.
-# TODO(thockin): it would be nice to just use the native flags.  Can we EOL
-#                these "wrapper" flags?
-KUBE_GOFLAGS := $(GOFLAGS)
-KUBE_GOLDFLAGS := $(GOLDFLAGS)
-KUBE_GOGCFLAGS = $(GOGCFLAGS)
+ifdef KUBE_GOFLAGS
+$(info KUBE_GOFLAGS is now deprecated. Please use GOFLAGS instead.)
+ifndef GOFLAGS
+GOFLAGS := $(KUBE_GOFLAGS)
+unexport KUBE_GOFLAGS
+else
+$(error Both KUBE_GOFLAGS and GOFLAGS are set. Please use just GOFLAGS)
+endif
+endif
 
 # Extra options for the release or quick-release options:
 KUBE_RELEASE_RUN_TESTS := $(KUBE_RELEASE_RUN_TESTS) 

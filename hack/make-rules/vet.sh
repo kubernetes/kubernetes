@@ -29,7 +29,7 @@ make generated_files
 go install ./cmd/...
 
 # Use eval to preserve embedded quoted strings.
-eval "goflags=(${KUBE_GOFLAGS:-})"
+eval "goflags=(${GOFLAGS:-})"
 
 # Filter out arguments that start with "-" and move them to goflags.
 targets=()
