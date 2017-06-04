@@ -316,6 +316,9 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
 	// +optional
 	StorageOS *StorageOSVolumeSource
+	// Rook represents a rook persistent volume attached and mounted on Kubernetes nodes.
+	// +optional
+	Rook *RookVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -391,6 +394,9 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource
+	// Rook represents a Rook persistent volume attached and mounted on Kubernetes nodes.
+	// +optional
+	Rook *RookVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -1210,6 +1216,32 @@ type StorageOSPersistentVolumeSource struct {
 	// credentials.  If not specified, default values will be attempted.
 	// +optional
 	SecretRef *ObjectReference
+}
+
+// RookVolumeSource represents a Rook persisted volume.
+type RookVolumeSource struct {
+	// Required: Unique ID of the Rook volume
+	VolumeID string
+	// Optional: VolumeGroup is the group that contains this volume.
+	// +optional
+	VolumeGroup string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	// +optional
+	FSType string
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+	// Optional: Cluster is the namespace where the Rook cluster is deployed. This is used to discover
+	// the rook-api. Default is rook.
+	// +optional
+	Cluster string
+	// Optional: Extra Rook metadata if any.
+	// +optional
+	VolumeMetadata map[string]string
 }
 
 // Adapts a ConfigMap into a volume.
