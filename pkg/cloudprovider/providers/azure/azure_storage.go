@@ -197,7 +197,7 @@ func (az *Cloud) CreateVolume(name, storageAccount, storageType, location string
 		accounts = append(accounts, accountWithLocation{Name: storageAccount})
 	} else {
 		// find a storage account
-		accounts, err = az.getStorageAccounts()
+		accounts, err = az.GetStorageAccounts()
 		if err != nil {
 			// TODO: create a storage account and container
 			return "", "", 0, err
@@ -207,7 +207,7 @@ func (az *Cloud) CreateVolume(name, storageAccount, storageType, location string
 		glog.V(4).Infof("account %s type %s location %s", account.Name, account.StorageType, account.Location)
 		if ((storageType == "" || account.StorageType == storageType) && (location == "" || account.Location == location)) || len(storageAccount) > 0 {
 			// find the access key with this account
-			key, err := az.getStorageAccesskey(account.Name)
+			key, err := az.GetStorageAccesskey(account.Name)
 			if err != nil {
 				glog.V(2).Infof("no key found for storage account %s", account.Name)
 				continue
@@ -232,7 +232,7 @@ func (az *Cloud) DeleteVolume(name, uri string) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse vhd URI %v", err)
 	}
-	key, err := az.getStorageAccesskey(accountName)
+	key, err := az.GetStorageAccesskey(accountName)
 	if err != nil {
 		return fmt.Errorf("no key for storage account %s, err %v", accountName, err)
 	}
