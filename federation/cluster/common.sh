@@ -414,8 +414,15 @@ function cleanup-federation-api-objects {
   echo "Cleaning Federation control plane objects"
   # Delete all resources with the federated-cluster label.
   $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
+
+  # Delete all PVs bound to PVCs in FEDERATION_NAMESPACE
+  pvs=$($host_kubectl get pvc --namespace=${FEDERATION_NAMESPACE} -o jsonpath='{.items[*].spec.volumeName}')
+  while $host_kubectl delete pv ${pvs} >/dev/null 2>&1; do
+    sleep 2
+  done
+
   # Delete all resources in FEDERATION_NAMESPACE.
-  $host_kubectl delete pvc,pv,pods,svc,rc,deployment,secret --namespace=${FEDERATION_NAMESPACE} --all
+  $host_kubectl delete pvc,pods,svc,rc,deployment,secret --namespace=${FEDERATION_NAMESPACE} --all
   $host_kubectl delete ns ${FEDERATION_NAMESPACE}
 
   # Poll until the namespace is completely gone.
