@@ -102,7 +102,11 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
-	kubeAPIServerConfig, sharedInformers, insecureServingOptions, err := CreateKubeAPIServerConfig(runOptions)
+	tunneler, proxyTransport, err := CreateDialer(runOptions)
+	if err != nil {
+		return err
+	}
+	kubeAPIServerConfig, sharedInformers, insecureServingOptions, err := CreateKubeAPIServerConfig(runOptions, tunneler, proxyTransport)
 	if err != nil {
 		return err
 	}
@@ -145,7 +149,7 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers, apiExtensionsServer.Informers)
+	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers, apiExtensionsServer.Informers, proxyTransport)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return err
@@ -175,8 +179,55 @@ func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, delegateAPIServer g
 	return kubeAPIServer, nil
 }
 
+// CreateDialer creates the dialer infrastructure and makes it available to APIServer and Aggregator
+func CreateDialer(s *options.ServerRunOptions) (tunneler.Tunneler, *http.Transport, error) {
+	// Setup nodeTunneler if needed
+	var nodeTunneler tunneler.Tunneler
+	var proxyDialerFn utilnet.DialFunc
+	if len(s.SSHUser) > 0 {
+		// Get ssh key distribution func, if supported
+		var installSSHKey tunneler.InstallSSHKey
+		cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider.CloudProvider, s.CloudProvider.CloudConfigFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("cloud provider could not be initialized: %v", err)
+		}
+		if cloud != nil {
+			if instances, supported := cloud.Instances(); supported {
+				installSSHKey = instances.AddSSHKeyToAllInstances
+			}
+		}
+		if s.KubeletConfig.Port == 0 {
+			return nil, nil, fmt.Errorf("must enable kubelet port if proxy ssh-tunneling is specified")
+		}
+		if s.KubeletConfig.ReadOnlyPort == 0 {
+			return nil, nil, fmt.Errorf("must enable kubelet readonly port if proxy ssh-tunneling is specified")
+		}
+		// Set up the nodeTunneler
+		// TODO(cjcullen): If we want this to handle per-kubelet ports or other
+		// kubelet listen-addresses, we need to plumb through options.
+		healthCheckPath := &url.URL{
+			Scheme: "http",
+			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.ReadOnlyPort), 10)),
+			Path:   "healthz",
+		}
+		nodeTunneler = tunneler.New(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSHKey)
+
+		// Use the nodeTunneler's dialer to connect to the kubelet
+		s.KubeletConfig.Dial = nodeTunneler.Dial
+		// Use the nodeTunneler's dialer when proxying to pods, services, and nodes
+		proxyDialerFn = nodeTunneler.Dial
+	}
+	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
+	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
+	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
+		Dial:            proxyDialerFn,
+		TLSClientConfig: proxyTLSClientConfig,
+	})
+	return nodeTunneler, proxyTransport, nil
+}
+
 // CreateKubeAPIServerConfig creates all the resources for running the API server, but runs none of them
-func CreateKubeAPIServerConfig(s *options.ServerRunOptions) (*master.Config, informers.SharedInformerFactory, *kubeserver.InsecureServingInfo, error) {
+func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunneler.Tunneler, proxyTransport http.RoundTripper) (*master.Config, informers.SharedInformerFactory, *kubeserver.InsecureServingInfo, error) {
 	// register all admission plugins
 	registerAllAdmissionPlugins(s.Admission.Plugins)
 
@@ -208,49 +259,6 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions) (*master.Config, inf
 			HostIPCSources:     []string{},
 		},
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
-	})
-
-	// Setup nodeTunneler if needed
-	var nodeTunneler tunneler.Tunneler
-	var proxyDialerFn utilnet.DialFunc
-	if len(s.SSHUser) > 0 {
-		// Get ssh key distribution func, if supported
-		var installSSHKey tunneler.InstallSSHKey
-		cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider.CloudProvider, s.CloudProvider.CloudConfigFile)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("cloud provider could not be initialized: %v", err)
-		}
-		if cloud != nil {
-			if instances, supported := cloud.Instances(); supported {
-				installSSHKey = instances.AddSSHKeyToAllInstances
-			}
-		}
-		if s.KubeletConfig.Port == 0 {
-			return nil, nil, nil, fmt.Errorf("must enable kubelet port if proxy ssh-tunneling is specified")
-		}
-		if s.KubeletConfig.ReadOnlyPort == 0 {
-			return nil, nil, nil, fmt.Errorf("must enable kubelet readonly port if proxy ssh-tunneling is specified")
-		}
-		// Set up the nodeTunneler
-		// TODO(cjcullen): If we want this to handle per-kubelet ports or other
-		// kubelet listen-addresses, we need to plumb through options.
-		healthCheckPath := &url.URL{
-			Scheme: "http",
-			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.ReadOnlyPort), 10)),
-			Path:   "healthz",
-		}
-		nodeTunneler = tunneler.New(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSHKey)
-
-		// Use the nodeTunneler's dialer to connect to the kubelet
-		s.KubeletConfig.Dial = nodeTunneler.Dial
-		// Use the nodeTunneler's dialer when proxying to pods, services, and nodes
-		proxyDialerFn = nodeTunneler.Dial
-	}
-	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
-	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
-	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
-		Dial:            proxyDialerFn,
-		TLSClientConfig: proxyTLSClientConfig,
 	})
 
 	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.ServiceClusterIPRange)

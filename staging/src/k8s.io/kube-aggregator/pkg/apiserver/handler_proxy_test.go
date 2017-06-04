@@ -170,8 +170,9 @@ func TestProxyHandler(t *testing.T) {
 
 		func() {
 			handler := &proxyHandler{
-				localDelegate: http.NewServeMux(),
-				routing:       &mockedRouter{destinationHost: targetServer.Listener.Addr().String()},
+				localDelegate:  http.NewServeMux(),
+				routing:        &mockedRouter{destinationHost: targetServer.Listener.Addr().String()},
+				proxyTransport: &http.Transport{},
 			}
 			handler.contextMapper = &fakeRequestContextMapper{user: tc.user}
 			server := httptest.NewServer(handler)
