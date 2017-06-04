@@ -431,13 +431,28 @@ function cleanup-federation-api-objects {
   # This is a big hammer. We get rid of federation-system namespace from
   # all the clusters
   for context in $(federation_cluster_contexts); do
-    kube::log::status "Removing namespace \"${FEDERATION_NAMESPACE}\" from \"${context}\""
     (
+      local -r role="federation-controller-manager:${FEDERATION_NAME}-${context}-${HOST_CLUSTER_CONTEXT}"
+      kube::log::status "Removing namespace \"${FEDERATION_NAMESPACE}\", cluster role \"${role}\" and cluster role binding \"${role}\" from \"${context}\""
       # Try deleting until the namespace is completely gone.
-      while $host_kubectl --context="${context}" delete namespace ${FEDERATION_NAMESPACE} >/dev/null 2>&1; do
+      while $host_kubectl --context="${context}" delete namespace "${FEDERATION_NAMESPACE}" >/dev/null 2>&1; do
+        # It is usually slower to remove a namespace because it involves
+        # performing a cascading deletion of all the resources in the
+        # namespace. So we sleep a little longer than other resources
+        # before retrying
         sleep 5
       done
       kube::log::status "Removed namespace \"${FEDERATION_NAMESPACE}\" from \"${context}\""
+
+      while $host_kubectl --context="${context}" delete clusterrole "${role}" >/dev/null 2>&1; do
+        sleep 2
+      done
+      kube::log::status "Removed cluster role \"${role}\" from \"${context}\""
+
+      while $host_kubectl --context="${context}" delete clusterrolebinding "${role}" >/dev/null 2>&1; do
+        sleep 2
+      done
+      kube::log::status "Removed cluster role binding \"${role}\" from \"${context}\""
     ) &
   done
   wait
