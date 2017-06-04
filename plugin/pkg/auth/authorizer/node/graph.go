@@ -17,8 +17,11 @@ limitations under the License.
 package node
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/kubernetes/pkg/api"
 	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
@@ -203,6 +206,9 @@ func (g *Graph) deleteVertex_locked(vertexType vertexType, namespace, name strin
 //   configmap -> pod
 //   pvc       -> pod
 func (g *Graph) AddPod(pod *api.Pod) {
+	trace := utiltrace.New(fmt.Sprintf("Graph.AddPod: namespace=%s,name=%s", pod.Namespace, pod.Name))
+	defer trace.LogIfLong(100 * time.Millisecond)
+
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -228,6 +234,9 @@ func (g *Graph) AddPod(pod *api.Pod) {
 	}
 }
 func (g *Graph) DeletePod(name, namespace string) {
+	trace := utiltrace.New(fmt.Sprintf("Graph.DeletePod: namespace=%s,name=%s", namespace, name))
+	defer trace.LogIfLong(100 * time.Millisecond)
+
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertex_locked(podVertexType, namespace, name)
@@ -239,6 +248,9 @@ func (g *Graph) DeletePod(name, namespace string) {
 //
 //   pv -> pvc
 func (g *Graph) AddPV(pv *api.PersistentVolume) {
+	trace := utiltrace.New(fmt.Sprintf("Graph.AddPV: name=%s", pv.Name))
+	defer trace.LogIfLong(100 * time.Millisecond)
+
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -259,6 +271,9 @@ func (g *Graph) AddPV(pv *api.PersistentVolume) {
 	}
 }
 func (g *Graph) DeletePV(name string) {
+	trace := utiltrace.New(fmt.Sprintf("Graph.DeletePV: name=%s", name))
+	defer trace.LogIfLong(100 * time.Millisecond)
+
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertex_locked(pvVertexType, "", name)
