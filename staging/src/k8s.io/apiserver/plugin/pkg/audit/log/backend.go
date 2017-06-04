@@ -47,7 +47,7 @@ func (b *backend) ProcessEvents(events ...*auditinternal.Event) {
 
 func (b *backend) logEvent(ev *auditinternal.Event) {
 	line := audit.EventString(ev)
-	if _, err := fmt.Fprint(b.out, line); err != nil {
+	if _, err := fmt.Fprintln(b.out, line); err != nil {
 		audit.HandlePluginError("log", err, ev)
 	}
 }
