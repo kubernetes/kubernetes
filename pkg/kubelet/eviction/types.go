@@ -81,6 +81,13 @@ type ImageGC interface {
 	DeleteUnusedImages() (int64, error)
 }
 
+// ContainerGC is responsible for performing garbage collection of unused containers.
+type ContainerGC interface {
+	// DeleteAllUnusedContainers deletes all unused containers, even those that belong to pods that are terminated, but not deleted.
+	// It returns an error if it is unsuccessful.
+	DeleteAllUnusedContainers() error
+}
+
 // KillPodFunc kills a pod.
 // The pod status is updated, and then it is killed with the specified grace period.
 // This function must block until either the pod is killed or an error is encountered.
