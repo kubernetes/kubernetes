@@ -2013,6 +2013,7 @@ func newStreamingUpload(filePath string) (*io.PipeReader, *multipart.Writer, err
 	if err != nil {
 		return nil, nil, err
 	}
+	defer file.Close()
 
 	r, w := io.Pipe()
 

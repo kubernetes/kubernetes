@@ -36,10 +36,12 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 	"k8s.io/metrics/pkg/client/clientset_generated/clientset"
 )
 
@@ -412,7 +414,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 
 	nodeConstraints := make(map[string]string)
 	for k, v := range node.ObjectMeta.Labels {
-		if k != metav1.LabelZoneFailureDomain && k != metav1.LabelZoneRegion {
+		if k != kubeletapis.LabelZoneFailureDomain && k != kubeletapis.LabelZoneRegion {
 			continue
 		}
 		nodeConstraints[k] = v
@@ -458,7 +460,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 			}
 
 			for k, v := range pv.ObjectMeta.Labels {
-				if k != metav1.LabelZoneFailureDomain && k != metav1.LabelZoneRegion {
+				if k != kubeletapis.LabelZoneFailureDomain && k != kubeletapis.LabelZoneRegion {
 					continue
 				}
 				nodeV, _ := nodeConstraints[k]
@@ -508,6 +510,8 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 				result.MilliCPU += rQuantity.MilliValue()
 			case v1.ResourceNvidiaGPU:
 				result.NvidiaGPU += rQuantity.Value()
+			case v1.ResourceStorageOverlay:
+				result.StorageOverlay += rQuantity.Value()
 			default:
 				if v1helper.IsOpaqueIntResourceName(rName) {
 					result.AddOpaque(rName, rQuantity.Value())
@@ -515,6 +519,15 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 			}
 		}
 	}
+	// Account for storage requested by emptydir volumes
+	// If the storage medium is memory, should exclude the size
+	for _, vol := range pod.Spec.Volumes {
+		if vol.EmptyDir != nil && vol.EmptyDir.Medium != v1.StorageMediumMemory {
+
+			result.StorageScratch += vol.EmptyDir.SizeLimit.Value()
+		}
+	}
+
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
 		for rName, rQuantity := range container.Resources.Requests {
@@ -530,6 +543,10 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 			case v1.ResourceNvidiaGPU:
 				if gpu := rQuantity.Value(); gpu > result.NvidiaGPU {
 					result.NvidiaGPU = gpu
+				}
+			case v1.ResourceStorageOverlay:
+				if overlay := rQuantity.Value(); overlay > result.StorageOverlay {
+					result.StorageOverlay = overlay
 				}
 			default:
 				if v1helper.IsOpaqueIntResourceName(rName) {
@@ -581,6 +598,23 @@ func PodFitsResources(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 	if allocatable.NvidiaGPU < podRequest.NvidiaGPU+nodeInfo.RequestedResource().NvidiaGPU {
 		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceNvidiaGPU, podRequest.NvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, allocatable.NvidiaGPU))
 	}
+
+	scratchSpaceRequest := podRequest.StorageScratch
+	if allocatable.StorageOverlay == 0 {
+		scratchSpaceRequest += podRequest.StorageOverlay
+		//scratchSpaceRequest += nodeInfo.RequestedResource().StorageOverlay
+		nodeScratchRequest := nodeInfo.RequestedResource().StorageOverlay + nodeInfo.RequestedResource().StorageScratch
+		if allocatable.StorageScratch < scratchSpaceRequest+nodeScratchRequest {
+			predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceStorageScratch, scratchSpaceRequest, nodeScratchRequest, allocatable.StorageScratch))
+		}
+
+	} else if allocatable.StorageScratch < scratchSpaceRequest+nodeInfo.RequestedResource().StorageScratch {
+		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceStorageScratch, scratchSpaceRequest, nodeInfo.RequestedResource().StorageScratch, allocatable.StorageScratch))
+	}
+	if allocatable.StorageOverlay > 0 && allocatable.StorageOverlay < podRequest.StorageOverlay+nodeInfo.RequestedResource().StorageOverlay {
+		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceStorageOverlay, podRequest.StorageOverlay, nodeInfo.RequestedResource().StorageOverlay, allocatable.StorageOverlay))
+	}
+
 	for rName, rQuant := range podRequest.OpaqueIntResources {
 		if allocatable.OpaqueIntResources[rName] < rQuant+nodeInfo.RequestedResource().OpaqueIntResources[rName] {
 			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.OpaqueIntResources[rName], nodeInfo.RequestedResource().OpaqueIntResources[rName], allocatable.OpaqueIntResources[rName]))
@@ -835,7 +869,7 @@ func PodFitsHostPorts(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 		wantPorts = predicateMeta.podPorts
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
-		wantPorts = GetUsedPorts(pod)
+		wantPorts = schedutil.GetUsedPorts(pod)
 	}
 	if len(wantPorts) == 0 {
 		return true, nil, nil
@@ -848,24 +882,6 @@ func PodFitsHostPorts(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 		}
 	}
 	return true, nil, nil
-}
-
-func GetUsedPorts(pods ...*v1.Pod) map[int]bool {
-	ports := make(map[int]bool)
-	for _, pod := range pods {
-		for j := range pod.Spec.Containers {
-			container := &pod.Spec.Containers[j]
-			for k := range container.Ports {
-				podPort := &container.Ports[k]
-				// "0" is explicitly ignored in PodFitsHostPorts,
-				// which is the only function that uses this value.
-				if podPort.HostPort != 0 {
-					ports[int(podPort.HostPort)] = true
-				}
-			}
-		}
-	}
-	return ports
 }
 
 // search two arrays and return true if they have at least one common element; return false otherwise

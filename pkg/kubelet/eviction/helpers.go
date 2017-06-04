@@ -54,6 +54,8 @@ const (
 	resourceNodeFs v1.ResourceName = "nodefs"
 	// nodefs inodes, number.  internal to this module, used to account for local node root filesystem inodes.
 	resourceNodeFsInodes v1.ResourceName = "nodefsInodes"
+	// container overlay storage, in bytes.  internal to this module, used to account for local disk usage for container overlay.
+	resourceOverlay v1.ResourceName = "overlay"
 )
 
 var (
@@ -74,19 +76,25 @@ func init() {
 	signalToNodeCondition[evictionapi.SignalNodeFsAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalImageFsInodesFree] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalNodeFsInodesFree] = v1.NodeDiskPressure
+	signalToNodeCondition[evictionapi.SignalAllocatableNodeFsAvailable] = v1.NodeDiskPressure
 
 	// map signals to resources (and vice-versa)
 	signalToResource = map[evictionapi.Signal]v1.ResourceName{}
 	signalToResource[evictionapi.SignalMemoryAvailable] = v1.ResourceMemory
 	signalToResource[evictionapi.SignalAllocatableMemoryAvailable] = v1.ResourceMemory
+	signalToResource[evictionapi.SignalAllocatableNodeFsAvailable] = resourceNodeFs
 	signalToResource[evictionapi.SignalImageFsAvailable] = resourceImageFs
 	signalToResource[evictionapi.SignalImageFsInodesFree] = resourceImageFsInodes
 	signalToResource[evictionapi.SignalNodeFsAvailable] = resourceNodeFs
 	signalToResource[evictionapi.SignalNodeFsInodesFree] = resourceNodeFsInodes
+
 	resourceToSignal = map[v1.ResourceName]evictionapi.Signal{}
 	for key, value := range signalToResource {
 		resourceToSignal[value] = key
 	}
+	// Hard-code here to make sure resourceNodeFs maps to evictionapi.SignalNodeFsAvailable
+	// (TODO) resourceToSignal is a map from resource name to a list of signals
+	resourceToSignal[resourceNodeFs] = evictionapi.SignalNodeFsAvailable
 }
 
 // validSignal returns true if the signal is supported.
@@ -226,6 +234,16 @@ func getAllocatableThreshold(allocatableConfig []string) []evictionapi.Threshold
 			return []evictionapi.Threshold{
 				{
 					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalAllocatableNodeFsAvailable,
 					Operator: evictionapi.OpLessThan,
 					Value: evictionapi.ThresholdValue{
 						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
@@ -382,10 +400,12 @@ func localVolumeNames(pod *v1.Pod) []string {
 func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
 	disk := resource.Quantity{Format: resource.BinarySI}
 	inodes := resource.Quantity{Format: resource.BinarySI}
+	overlay := resource.Quantity{Format: resource.BinarySI}
 	for _, container := range podStats.Containers {
 		if hasFsStatsType(statsToMeasure, fsStatsRoot) {
 			disk.Add(*diskUsage(container.Rootfs))
 			inodes.Add(*inodeUsage(container.Rootfs))
+			overlay.Add(*diskUsage(container.Rootfs))
 		}
 		if hasFsStatsType(statsToMeasure, fsStatsLogs) {
 			disk.Add(*diskUsage(container.Logs))
@@ -405,8 +425,9 @@ func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsSt
 		}
 	}
 	return v1.ResourceList{
-		resourceDisk:   disk,
-		resourceInodes: inodes,
+		resourceDisk:    disk,
+		resourceInodes:  inodes,
+		resourceOverlay: overlay,
 	}, nil
 }
 
@@ -637,7 +658,7 @@ func (a byEvictionPriority) Less(i, j int) bool {
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
-func makeSignalObservations(summaryProvider stats.SummaryProvider, nodeProvider NodeProvider) (signalObservations, statsFunc, error) {
+func makeSignalObservations(summaryProvider stats.SummaryProvider, nodeProvider NodeProvider, pods []*v1.Pod, withImageFs bool) (signalObservations, statsFunc, error) {
 	summary, err := summaryProvider.Get()
 	if err != nil {
 		return nil, nil, err
@@ -706,6 +727,37 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, nodeProvider 
 			capacity:  memoryAllocatableCapacity.Copy(),
 		}
 	}
+
+	if storageScratchAllocatableCapacity, ok := node.Status.Allocatable[v1.ResourceStorage]; ok {
+		storageScratchAllocatable := storageScratchAllocatableCapacity.Copy()
+		for _, pod := range pods {
+			podStat, ok := statsFunc(pod)
+			if !ok {
+				continue
+			}
+
+			usage, err := podDiskUsage(podStat, pod, []fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource, fsStatsRoot})
+			if err != nil {
+				glog.Warningf("eviction manager: error getting pod disk usage %v", err)
+				continue
+			}
+			// If there is a seperate imagefs set up for container runtimes, the scratch disk usage from nodefs should exclude the overlay usage
+			if withImageFs {
+				diskUsage := usage[resourceDisk]
+				diskUsageP := &diskUsage
+				diskUsagep := diskUsageP.Copy()
+				diskUsagep.Sub(usage[resourceOverlay])
+				storageScratchAllocatable.Sub(*diskUsagep)
+			} else {
+				storageScratchAllocatable.Sub(usage[resourceDisk])
+			}
+		}
+		result[evictionapi.SignalAllocatableNodeFsAvailable] = signalObservation{
+			available: storageScratchAllocatable,
+			capacity:  storageScratchAllocatableCapacity.Copy(),
+		}
+	}
+
 	return result, statsFunc, nil
 }
 

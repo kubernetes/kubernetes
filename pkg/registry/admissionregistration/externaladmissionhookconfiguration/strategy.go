@@ -106,15 +106,15 @@ func MatchExternalAdmissionHookConfiguration(label labels.Selector, field fields
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	ic, ok := obj.(*admissionregistration.ExternalAdmissionHookConfiguration)
 	if !ok {
-		return nil, nil, fmt.Errorf("Given object is not a ExternalAdmissionHookConfiguration.")
+		return nil, nil, false, fmt.Errorf("Given object is not a ExternalAdmissionHookConfiguration.")
 	}
-	return labels.Set(ic.ObjectMeta.Labels), ExternalAdmissionHookConfigurationToSelectableFields(ic), nil
+	return labels.Set(ic.ObjectMeta.Labels), ExternalAdmissionHookConfigurationToSelectableFields(ic), ic.Initializers != nil, nil
 }
 
 // ExternalAdmissionHookConfigurationToSelectableFields returns a field set that represents the object.
 func ExternalAdmissionHookConfigurationToSelectableFields(ic *admissionregistration.ExternalAdmissionHookConfiguration) fields.Set {
-	return generic.ObjectMetaFieldsSet(&ic.ObjectMeta, true)
+	return generic.ObjectMetaFieldsSet(&ic.ObjectMeta, false)
 }

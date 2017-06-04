@@ -33,7 +33,7 @@ type ListOptions struct {
 	FieldSelector fields.Selector
 	// If true, partially initialized resources are included in the response.
 	// +optional
-	IncludeUninitialized bool `json:"includeUninitialized,omitempty"`
+	IncludeUninitialized bool
 	// If true, watch for changes to this list
 	Watch bool
 	// When specified with a watch call, shows changes that occur after that particular version of a resource.

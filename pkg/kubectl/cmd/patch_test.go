@@ -161,8 +161,7 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 	svcCopy.Labels["post-patch"] = "post-patch-value"
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.CommandPrinter = &printers.YAMLPrinter{}
-	tf.GenericPrinter = true
+	tf.Printer = &printers.YAMLPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,

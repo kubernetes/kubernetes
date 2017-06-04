@@ -285,9 +285,9 @@ func TestGetToList(t *testing.T) {
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
 			Field: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
+				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
 			},
 		},
 		expectedOut: nil,
@@ -644,9 +644,9 @@ func TestList(t *testing.T) {
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
 			Field: fields.ParseSelectorOrDie("metadata.name!=" + preset[0].storedObj.Name),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
+				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
 			},
 		},
 		expectedOut: nil,

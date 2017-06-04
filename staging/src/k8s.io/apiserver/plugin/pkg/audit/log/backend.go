@@ -19,11 +19,7 @@ package log
 import (
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
-	"time"
-
-	"github.com/golang/glog"
 
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
@@ -50,42 +46,9 @@ func (b *backend) ProcessEvents(events ...*auditinternal.Event) {
 }
 
 func (b *backend) logEvent(ev *auditinternal.Event) {
-	username := "<none>"
-	groups := "<none>"
-	if len(ev.User.Username) > 0 {
-		username = ev.User.Username
-		if len(ev.User.Groups) > 0 {
-			groups = auditStringSlice(ev.User.Groups)
-		}
-	}
-	asuser := "<self>"
-	asgroups := "<lookup>"
-	if ev.ImpersonatedUser != nil {
-		asuser = ev.ImpersonatedUser.Username
-		if ev.ImpersonatedUser.Groups != nil {
-			asgroups = auditStringSlice(ev.ImpersonatedUser.Groups)
-		}
-	}
-
-	namespace := "<none>"
-	if ev.ObjectRef != nil && len(ev.ObjectRef.Namespace) != 0 {
-		namespace = ev.ObjectRef.Namespace
-	}
-
-	response := "<deferred>"
-	if ev.ResponseStatus != nil {
-		response = strconv.Itoa(int(ev.ResponseStatus.Code))
-	}
-
-	ip := "<unknown>"
-	if len(ev.SourceIPs) > 0 {
-		ip = ev.SourceIPs[0]
-	}
-
-	line := fmt.Sprintf("%s AUDIT: id=%q stage=%q ip=%q method=%q user=%q groups=%q as=%q asgroups=%q namespace=%q uri=%q response=\"%s\"\n",
-		ev.Timestamp.Format(time.RFC3339Nano), ev.AuditID, ev.Stage, ip, ev.Verb, username, groups, asuser, asgroups, namespace, ev.RequestURI, response)
+	line := audit.EventString(ev)
 	if _, err := fmt.Fprint(b.out, line); err != nil {
-		glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
+		audit.HandlePluginError("log", err, ev)
 	}
 }
 

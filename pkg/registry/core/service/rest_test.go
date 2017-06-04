@@ -101,7 +101,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 		},
 	}
 	ctx := genericapirequest.NewDefaultContext()
-	created_svc, err := storage.Create(ctx, svc)
+	created_svc, err := storage.Create(ctx, svc, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 
 	ctx := genericapirequest.NewDefaultContext()
 	for _, test := range testCases {
-		created_svc, err := storage.Create(ctx, test.svc)
+		created_svc, err := storage.Create(ctx, test.svc, false)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -296,7 +296,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 	}
 	ctx := genericapirequest.NewDefaultContext()
 	for _, failureCase := range failureCases {
-		c, err := storage.Create(ctx, &failureCase)
+		c, err := storage.Create(ctx, &failureCase, false)
 		if c != nil {
 			t.Errorf("Expected nil object")
 		}
@@ -425,7 +425,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 			}},
 		},
 	}
-	_, err := storage.Create(ctx, svc)
+	_, err := storage.Create(ctx, svc, false)
 	if err != nil {
 		t.Errorf("Failed to create service: %#v", err)
 	}
@@ -500,7 +500,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 			}},
 		},
 	}
-	if _, err := storage.Create(ctx, svc1); err != nil {
+	if _, err := storage.Create(ctx, svc1, false); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
@@ -543,7 +543,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 			}},
 		},
 	}
-	if _, err := storage.Create(ctx, svc1); err != nil {
+	if _, err := storage.Create(ctx, svc1, false); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
@@ -740,7 +740,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		},
 	}
 	ctx := genericapirequest.NewDefaultContext()
-	created_svc1, _ := storage.Create(ctx, svc1)
+	created_svc1, _ := storage.Create(ctx, svc1, false)
 	created_service_1 := created_svc1.(*api.Service)
 	if created_service_1.Name != "foo" {
 		t.Errorf("Expected foo, but got %v", created_service_1.Name)
@@ -762,7 +762,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 			}},
 		}}
 	ctx = genericapirequest.NewDefaultContext()
-	created_svc2, _ := storage.Create(ctx, svc2)
+	created_svc2, _ := storage.Create(ctx, svc2, false)
 	created_service_2 := created_svc2.(*api.Service)
 	if created_service_2.Name != "bar" {
 		t.Errorf("Expected bar, but got %v", created_service_2.Name)
@@ -795,7 +795,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		},
 	}
 	ctx = genericapirequest.NewDefaultContext()
-	created_svc3, err := storage.Create(ctx, svc3)
+	created_svc3, err := storage.Create(ctx, svc3, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -822,7 +822,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		},
 	}
 	ctx := genericapirequest.NewDefaultContext()
-	created_svc1, _ := storage.Create(ctx, svc1)
+	created_svc1, _ := storage.Create(ctx, svc1, false)
 	created_service_1 := created_svc1.(*api.Service)
 	if created_service_1.Name != "foo" {
 		t.Errorf("Expected foo, but got %v", created_service_1.Name)
@@ -850,7 +850,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		},
 	}
 	ctx = genericapirequest.NewDefaultContext()
-	created_svc2, _ := storage.Create(ctx, svc2)
+	created_svc2, _ := storage.Create(ctx, svc2, false)
 	created_service_2 := created_svc2.(*api.Service)
 	if created_service_2.Name != "bar" {
 		t.Errorf("Expected bar, but got %v", created_service_2.Name)
@@ -877,7 +877,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 		},
 	}
 	ctx := genericapirequest.NewDefaultContext()
-	created_svc, _ := storage.Create(ctx, svc)
+	created_svc, _ := storage.Create(ctx, svc, false)
 	created_service := created_svc.(*api.Service)
 	if created_service.Spec.Ports[0].Port != 6502 {
 		t.Errorf("Expected port 6502, but got %v", created_service.Spec.Ports[0].Port)
@@ -931,7 +931,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 		},
 	}
 	ctx := genericapirequest.NewDefaultContext()
-	created_svc, _ := storage.Create(ctx, svc)
+	created_svc, _ := storage.Create(ctx, svc, false)
 	created_service := created_svc.(*api.Service)
 	if created_service.Spec.Ports[0].Port != 6502 {
 		t.Errorf("Expected port 6502, but got %v", created_service.Spec.Ports[0].Port)
@@ -985,7 +985,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc)
+	created_svc, err := storage.Create(ctx, svc, false)
 	if created_svc == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
@@ -1023,7 +1023,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocationBeta(t *test
 			}},
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc)
+	created_svc, err := storage.Create(ctx, svc, false)
 	if created_svc == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
@@ -1059,7 +1059,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 			HealthCheckNodePort:   randomNodePort,
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc)
+	created_svc, err := storage.Create(ctx, svc, false)
 	if created_svc == nil || err != nil {
 		t.Fatalf("Unexpected failure creating service :%v", err)
 	}
@@ -1101,7 +1101,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocationBeta(t *
 			}},
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc)
+	created_svc, err := storage.Create(ctx, svc, false)
 	if created_svc == nil || err != nil {
 		t.Fatalf("Unexpected failure creating service :%v", err)
 	}
@@ -1137,7 +1137,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortNegative(t *testing.T)
 			HealthCheckNodePort:   int32(-1),
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc)
+	created_svc, err := storage.Create(ctx, svc, false)
 	if created_svc == nil || err != nil {
 		return
 	}
@@ -1167,7 +1167,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortNegativeBeta(t *testin
 			}},
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc)
+	created_svc, err := storage.Create(ctx, svc, false)
 	if created_svc == nil || err != nil {
 		return
 	}
@@ -1189,10 +1189,10 @@ func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 				Protocol:   api.ProtocolTCP,
 				TargetPort: intstr.FromInt(6502),
 			}},
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeGlobal,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc)
+	created_svc, err := storage.Create(ctx, svc, false)
 	if created_svc == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
@@ -1229,7 +1229,7 @@ func TestServiceRegistryExternalTrafficGlobalBeta(t *testing.T) {
 			}},
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc)
+	created_svc, err := storage.Create(ctx, svc, false)
 	if created_svc == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
@@ -1265,7 +1265,7 @@ func TestServiceRegistryExternalTrafficAnnotationClusterIP(t *testing.T) {
 			}},
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc)
+	created_svc, err := storage.Create(ctx, svc, false)
 	if created_svc == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}

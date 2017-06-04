@@ -56,6 +56,10 @@ func SetDefaults_DaemonSet(obj *DaemonSet) {
 			updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 		}
 	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = new(int32)
+		*obj.Spec.RevisionHistoryLimit = 10
+	}
 }
 
 func SetDefaults_Deployment(obj *Deployment) {

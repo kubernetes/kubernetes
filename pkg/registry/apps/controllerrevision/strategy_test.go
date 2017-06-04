@@ -140,9 +140,12 @@ func TestControllerRevisionToSelectableFields(t *testing.T) {
 
 func TestGetAttrs(t *testing.T) {
 	rev := newControllerRevision("validname", "validns", newObject(), 0)
-	labelSet, fieldSet, err := GetAttrs(rev)
+	labelSet, fieldSet, uninitialized, err := GetAttrs(rev)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if uninitialized {
+		t.Errorf("unexpected attrs")
 	}
 	if fieldSet.Get("metadata.name") != rev.Name {
 		t.Errorf("expeted %s found %s", rev.Name, fieldSet.Get("metadata.name"))

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package apis
 
 const (
 	// When kubelet is started with the "external" cloud provider, then

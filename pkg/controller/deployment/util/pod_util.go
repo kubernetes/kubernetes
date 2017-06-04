@@ -17,9 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"encoding/binary"
-	"hash/fnv"
-
 	"github.com/golang/glog"
 
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
@@ -28,22 +25,7 @@ import (
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/client/retry"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
-
-func GetPodTemplateSpecHash(template *v1.PodTemplateSpec, uniquifier *int64) uint32 {
-	podTemplateSpecHasher := fnv.New32a()
-	hashutil.DeepHashObject(podTemplateSpecHasher, *template)
-
-	// Add uniquifier in the hash if it exists.
-	if uniquifier != nil {
-		uniquifierBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(uniquifierBytes, uint64(*uniquifier))
-		podTemplateSpecHasher.Write(uniquifierBytes)
-	}
-
-	return podTemplateSpecHasher.Sum32()
-}
 
 // TODO: use client library instead when it starts to support update retries
 //       see https://github.com/kubernetes/kubernetes/issues/21479

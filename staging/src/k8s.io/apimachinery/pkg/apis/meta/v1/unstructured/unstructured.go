@@ -27,10 +27,12 @@ import (
 	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // Unstructured allows objects that do not have Golang structs registered to be manipulated
@@ -452,12 +454,34 @@ func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
 	return gvk
 }
 
+var converter = unstructured.NewConverter(false)
+
 func (u *Unstructured) GetInitializers() *metav1.Initializers {
-	panic("not implemented")
+	field := getNestedField(u.Object, "metadata", "initializers")
+	if field == nil {
+		return nil
+	}
+	obj, ok := field.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	out := &metav1.Initializers{}
+	if err := converter.FromUnstructured(obj, out); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
+	}
+	return out
 }
 
 func (u *Unstructured) SetInitializers(initializers *metav1.Initializers) {
-	panic("not implemented")
+	if initializers == nil {
+		setNestedField(u.Object, nil, "metadata", "initializers")
+		return
+	}
+	out := make(map[string]interface{})
+	if err := converter.ToUnstructured(initializers, &out); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
+	}
+	setNestedField(u.Object, out, "metadata", "initializers")
 }
 
 func (u *Unstructured) GetFinalizers() []string {

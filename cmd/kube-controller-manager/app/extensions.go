@@ -33,6 +33,7 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 	}
 	go daemon.NewDaemonSetsController(
 		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
+		ctx.InformerFactory.Apps().V1beta1().ControllerRevisions(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),

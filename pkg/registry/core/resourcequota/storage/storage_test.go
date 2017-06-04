@@ -87,7 +87,7 @@ func TestCreateSetsFields(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
 	resourcequota := validNewResourceQuota()
-	_, err := storage.Create(genericapirequest.NewDefaultContext(), resourcequota)
+	_, err := storage.Create(genericapirequest.NewDefaultContext(), resourcequota, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

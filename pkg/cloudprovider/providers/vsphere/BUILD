@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "vsphere.go",
+        "vsphere_metrics.go",
         "vsphere_util.go",
     ],
     tags = ["automanaged"],
@@ -21,6 +22,7 @@ go_library(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/vmware/govmomi:go_default_library",
         "//vendor/github.com/vmware/govmomi/find:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",

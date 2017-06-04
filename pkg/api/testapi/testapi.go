@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/admission"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/authorization"
@@ -52,6 +53,7 @@ import (
 
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	_ "k8s.io/kubernetes/pkg/api/install"
+	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
@@ -84,6 +86,7 @@ var (
 	Settings      TestGroup
 	Storage       TestGroup
 	ImagePolicy   TestGroup
+	Admission     TestGroup
 	Networking    TestGroup
 
 	serializer        runtime.SerializerInfo
@@ -292,6 +295,15 @@ func init() {
 			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}
+	if _, ok := Groups[admission.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: admission.GroupName, Version: api.Registry.GroupOrDie(admission.GroupName).GroupVersion.Version}
+		Groups[admission.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+			internalGroupVersion: admission.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(admission.SchemeGroupVersion),
+			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
+		}
+	}
 	if _, ok := Groups[networking.GroupName]; !ok {
 		externalGroupVersion := schema.GroupVersion{Group: networking.GroupName, Version: api.Registry.GroupOrDie(networking.GroupName).GroupVersion.Version}
 		Groups[networking.GroupName] = TestGroup{
@@ -315,6 +327,7 @@ func init() {
 	Storage = Groups[storage.GroupName]
 	ImagePolicy = Groups[imagepolicy.GroupName]
 	Authorization = Groups[authorization.GroupName]
+	Admission = Groups[admission.GroupName]
 	Networking = Groups[networking.GroupName]
 }
 

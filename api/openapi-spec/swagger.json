@@ -49749,7 +49749,7 @@
       "type": "string"
      },
      "externalTrafficPolicy": {
-      "description": "externalTrafficPolicy denotes if this Service desires to route external traffic to local endpoints only. This preserves Source IP and avoids a second hop for LoadBalancer and Nodeport type services.",
+      "description": "externalTrafficPolicy denotes if this Service desires to route external traffic to node-local or cluster-wide endpoints. \"Local\" preserves the client source IP and avoids a second hop for LoadBalancer and Nodeport type services, but risks potentially imbalanced traffic spreading. \"Cluster\" obscures the client source IP and may cause a second hop to another node, but should have good overall load-spreading.",
       "type": "string"
      },
      "healthCheckNodePort": {
@@ -50202,7 +50202,7 @@
       "type": "string"
      },
      "rules": {
-      "description": "Rules describes what resources/subresources the initializer cares about. The initializer cares about an operation if it matches _any_ Rule.",
+      "description": "Rules describes what resources/subresources the initializer cares about. The initializer cares about an operation if it matches _any_ Rule. Rule.Resources must not include subresources.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.Rule"
@@ -50295,7 +50295,7 @@
       }
      },
      "resources": {
-      "description": "Resources is a list of resources this rule applies to.\n\nFor example: 'pods' means pods. 'pods/log' means the log subresource of pods. '*' means all resources, but not subresources. 'pods/*' means all subresources of pods. '*/scale' means all scale subresources. '*/*' means all resources and their subresources.\n\nIf '*' or '*/*' is present, the length of the slice must be one. Required.",
+      "description": "Resources is a list of resources this rule applies to.\n\nFor example: 'pods' means pods. 'pods/log' means the log subresource of pods. '*' means all resources, but not subresources. 'pods/*' means all subresources of pods. '*/scale' means all scale subresources. '*/*' means all resources and their subresources.\n\nIf wildcard is present, the validation rule will ensure resources do not overlap with each other.\n\nDepending on the enclosing object, subresources might not be allowed. Required.",
       "type": "array",
       "items": {
        "type": "string"
@@ -50328,7 +50328,7 @@
       }
      },
      "resources": {
-      "description": "Resources is a list of resources this rule applies to.\n\nFor example: 'pods' means pods. 'pods/log' means the log subresource of pods. '*' means all resources, but not subresources. 'pods/*' means all subresources of pods. '*/scale' means all scale subresources. '*/*' means all resources and their subresources.\n\nIf '*' or '*/*' is present, the length of the slice must be one. Required.",
+      "description": "Resources is a list of resources this rule applies to.\n\nFor example: 'pods' means pods. 'pods/log' means the log subresource of pods. '*' means all resources, but not subresources. 'pods/*' means all subresources of pods. '*/scale' means all scale subresources. '*/*' means all resources and their subresources.\n\nIf wildcard is present, the validation rule will ensure resources do not overlap with each other.\n\nDepending on the enclosing object, subresources might not be allowed. Required.",
       "type": "array",
       "items": {
        "type": "string"
@@ -52564,6 +52564,11 @@
       "type": "integer",
       "format": "int32"
      },
+     "revisionHistoryLimit": {
+      "description": "The number of old history to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
+      "type": "integer",
+      "format": "int32"
+     },
      "selector": {
       "description": "A label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
@@ -52573,7 +52578,7 @@
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec"
      },
      "templateGeneration": {
-      "description": "A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation.",
+      "description": "DEPRECATED. A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation.",
       "type": "integer",
       "format": "int64"
      },
@@ -52592,6 +52597,11 @@
      "numberReady"
     ],
     "properties": {
+     "collisionCount": {
+      "description": "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+      "type": "integer",
+      "format": "int64"
+     },
      "currentNumberScheduled": {
       "description": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
       "type": "integer",

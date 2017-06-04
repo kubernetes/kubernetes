@@ -19,6 +19,7 @@ package iscsi
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -88,6 +89,15 @@ func TestExtractPortalAndIqn(t *testing.T) {
 	portal, iqn, err = extractPortalAndIqn(devicePath)
 	if err != nil || portal != "127.0.0.1:3260" || iqn != "eui.02004567A425678D" {
 		t.Errorf("extractPortalAndIqn: got %v %s %s", err, portal, iqn)
+	}
+}
+
+func TestRemoveDuplicate(t *testing.T) {
+	dupPortals := []string{"127.0.0.1:3260", "127.0.0.1:3260", "127.0.0.100:3260"}
+	portals := removeDuplicate(dupPortals)
+	want := []string{"127.0.0.1:3260", "127.0.0.100:3260"}
+	if reflect.DeepEqual(portals, want) == false {
+		t.Errorf("removeDuplicate: want: %s, got: %s", want, portals)
 	}
 }
 

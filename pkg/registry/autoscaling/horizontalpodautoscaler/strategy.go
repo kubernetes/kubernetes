@@ -91,12 +91,12 @@ func AutoscalerToSelectableFields(hpa *autoscaling.HorizontalPodAutoscaler) fiel
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	hpa, ok := obj.(*autoscaling.HorizontalPodAutoscaler)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a horizontal pod autoscaler.")
+		return nil, nil, false, fmt.Errorf("given object is not a horizontal pod autoscaler.")
 	}
-	return labels.Set(hpa.ObjectMeta.Labels), AutoscalerToSelectableFields(hpa), nil
+	return labels.Set(hpa.ObjectMeta.Labels), AutoscalerToSelectableFields(hpa), hpa.Initializers != nil, nil
 }
 
 func MatchAutoscaler(label labels.Selector, field fields.Selector) storage.SelectionPredicate {

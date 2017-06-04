@@ -30,7 +30,7 @@ type AdmissionReview struct {
 	// Since this admission controller is non-mutating the webhook should avoid setting this in its response to avoid the
 	// cost of deserializing it.
 	// +optional
-	Spec AdmissionReviewSpec `json:"spec" protobuf:"bytes,1,opt,name=spec"`
+	Spec AdmissionReviewSpec `json:"spec,omitempty" protobuf:"bytes,1,opt,name=spec"`
 	// Status is filled in by the webhook and indicates whether the admission request should be permitted.
 	// +optional
 	Status AdmissionReviewStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`

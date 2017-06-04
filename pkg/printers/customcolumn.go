@@ -239,3 +239,7 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 func (s *CustomColumnsPrinter) HandledResources() []string {
 	return []string{}
 }
+
+func (s *CustomColumnsPrinter) IsGeneric() bool {
+	return true
+}

@@ -1148,6 +1148,9 @@ func (r Result) Into(obj runtime.Object) error {
 	if r.decoder == nil {
 		return fmt.Errorf("serializer for %s doesn't exist", r.contentType)
 	}
+	if len(r.body) == 0 {
+		return fmt.Errorf("0-length response")
+	}
 
 	out, _, err := r.decoder.Decode(r.body, nil, obj)
 	if err != nil || out == obj {

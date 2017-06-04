@@ -181,7 +181,7 @@ func TestValidateInitializerConfiguration(t *testing.T) {
 			expectedError: "resources[1]: Required value",
 		},
 		{
-			name: "wildcard cannot be mixed with other strings",
+			name: "wildcard cannot be mixed with other strings for APIGroups or APIVersions or Resources",
 			config: getInitializerConfiguration(
 				[]admissionregistration.Initializer{
 					{
@@ -195,7 +195,24 @@ func TestValidateInitializerConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `initializers[0].rules[0].apiGroups: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other API groups, initializers[0].rules[0].apiVersions: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other API versions, initializers[0].rules[0].Resources: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other resources`,
+			expectedError: `[initializers[0].rules[0].apiGroups: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other API groups, initializers[0].rules[0].apiVersions: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other API versions, initializers[0].rules[0].resources: Invalid value: []string{"a", "*"}: if '*' is present, must not specify other resources]`,
+		},
+		{
+			name: "Subresource not allowed",
+			config: getInitializerConfiguration(
+				[]admissionregistration.Initializer{
+					{
+						Name: "initializer.k8s.io",
+						Rules: []admissionregistration.Rule{
+							{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a/b"},
+							},
+						},
+					},
+				}),
+			expectedError: ` "a/b": must not specify subresources`,
 		},
 		{
 			name: "FailurePolicy can only be \"Ignore\"",
@@ -257,7 +274,7 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 						Name: "",
 					},
 				}),
-			expectedError: `externalAdmissionHook[1].name: Invalid value: "k8s.io": should be a domain with at least two dots, externalAdmissionHook[2].name: Required value`,
+			expectedError: `externalAdmissionHooks[1].name: Invalid value: "k8s.io": should be a domain with at least two dots, externalAdmissionHooks[2].name: Required value`,
 		},
 		{
 			name: "Operations must not be empty or nil",
@@ -285,7 +302,7 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `externalAdmissionHook[0].rules[0].operations: Required value, externalAdmissionHook[0].rules[1].operations: Required value`,
+			expectedError: `externalAdmissionHooks[0].rules[0].operations: Required value, externalAdmissionHooks[0].rules[1].operations: Required value`,
 		},
 		{
 			name: "\"\" is NOT a valid operation",
@@ -328,7 +345,7 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 			expectedError: `Unsupported value: "PATCH"`,
 		},
 		{
-			name: "wildcard cannot be mixed with other strings",
+			name: "wildcard operation cannot be mixed with other strings",
 			config: getExternalAdmissionHookConfiguration(
 				[]admissionregistration.ExternalAdmissionHook{
 					{
@@ -348,11 +365,129 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 			expectedError: `if '*' is present, must not specify other operations`,
 		},
 		{
+			name: `resource "*" can co-exist with resources that have subresources`,
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						Rules: []admissionregistration.RuleWithOperations{
+							{
+								Operations: []admissionregistration.OperationType{"CREATE"},
+								Rule: admissionregistration.Rule{
+									APIGroups:   []string{"a"},
+									APIVersions: []string{"a"},
+									Resources:   []string{"*", "a/b", "a/*", "*/b"},
+								},
+							},
+						},
+					},
+				}),
+		},
+		{
+			name: `resource "*" cannot mix with resources that don't have subresources`,
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						Rules: []admissionregistration.RuleWithOperations{
+							{
+								Operations: []admissionregistration.OperationType{"CREATE"},
+								Rule: admissionregistration.Rule{
+									APIGroups:   []string{"a"},
+									APIVersions: []string{"a"},
+									Resources:   []string{"*", "a"},
+								},
+							},
+						},
+					},
+				}),
+			expectedError: `if '*' is present, must not specify other resources without subresources`,
+		},
+		{
+			name: "resource a/* cannot mix with a/x",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						Rules: []admissionregistration.RuleWithOperations{
+							{
+								Operations: []admissionregistration.OperationType{"CREATE"},
+								Rule: admissionregistration.Rule{
+									APIGroups:   []string{"a"},
+									APIVersions: []string{"a"},
+									Resources:   []string{"a/*", "a/x"},
+								},
+							},
+						},
+					},
+				}),
+			expectedError: `externalAdmissionHooks[0].rules[0].resources[1]: Invalid value: "a/x": if 'a/*' is present, must not specify a/x`,
+		},
+		{
+			name: "resource a/* can mix with a",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						Rules: []admissionregistration.RuleWithOperations{
+							{
+								Operations: []admissionregistration.OperationType{"CREATE"},
+								Rule: admissionregistration.Rule{
+									APIGroups:   []string{"a"},
+									APIVersions: []string{"a"},
+									Resources:   []string{"a/*", "a"},
+								},
+							},
+						},
+					},
+				}),
+		},
+		{
+			name: "resource */a cannot mix with x/a",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						Rules: []admissionregistration.RuleWithOperations{
+							{
+								Operations: []admissionregistration.OperationType{"CREATE"},
+								Rule: admissionregistration.Rule{
+									APIGroups:   []string{"a"},
+									APIVersions: []string{"a"},
+									Resources:   []string{"*/a", "x/a"},
+								},
+							},
+						},
+					},
+				}),
+			expectedError: `externalAdmissionHooks[0].rules[0].resources[1]: Invalid value: "x/a": if '*/a' is present, must not specify x/a`,
+		},
+		{
+			name: "resource */* cannot mix with other resources",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						Rules: []admissionregistration.RuleWithOperations{
+							{
+								Operations: []admissionregistration.OperationType{"CREATE"},
+								Rule: admissionregistration.Rule{
+									APIGroups:   []string{"a"},
+									APIVersions: []string{"a"},
+									Resources:   []string{"*/*", "a"},
+								},
+							},
+						},
+					},
+				}),
+			expectedError: `externalAdmissionHooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		},
+		{
 			name: "FailurePolicy can only be \"Ignore\"",
 			config: getExternalAdmissionHookConfiguration(
 				[]admissionregistration.ExternalAdmissionHook{
 					{
-						Name: "initializer.k8s.io",
+						Name: "webhook.k8s.io",
 						FailurePolicy: func() *admissionregistration.FailurePolicyType {
 							r := admissionregistration.Fail
 							return &r

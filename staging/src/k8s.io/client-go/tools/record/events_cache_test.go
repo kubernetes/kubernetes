@@ -157,10 +157,11 @@ func TestEventAggregatorByReasonFunc(t *testing.T) {
 
 // TestEventAggregatorByReasonMessageFunc validates the proper output for an aggregate message
 func TestEventAggregatorByReasonMessageFunc(t *testing.T) {
-	expected := "(events with common reason combined)"
+	expectedPrefix := "(combined from similar events): "
 	event1 := makeEvent("end-of-world", "it was fun", makeObjectReference("Pod", "pod1", "other"))
-	if actual := EventAggregatorByReasonMessageFunc(&event1); expected != actual {
-		t.Errorf("Expected %v got %v", expected, actual)
+	actual := EventAggregatorByReasonMessageFunc(&event1)
+	if !strings.HasPrefix(actual, expectedPrefix) {
+		t.Errorf("Expected %v to begin with prefix %v", actual, expectedPrefix)
 	}
 }
 

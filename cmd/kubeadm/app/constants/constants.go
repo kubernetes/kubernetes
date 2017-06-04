@@ -27,6 +27,8 @@ const (
 	// KubernetesDir is the directory kubernetes owns for storing various configuration files
 	KubernetesDir = "/etc/kubernetes"
 
+	ManifestsSubDirName = "manifests"
+
 	CACertAndKeyBaseName = "ca"
 	CACertName           = "ca.crt"
 	CAKeyName            = "ca.key"
@@ -91,7 +93,7 @@ const (
 	MinExternalEtcdVersion = "3.0.14"
 
 	// DefaultAdmissionControl specifies the default admission control options that will be used
-	DefaultAdmissionControl = "NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds"
+	DefaultAdmissionControl = "Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds"
 )
 
 var (

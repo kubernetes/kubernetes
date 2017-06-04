@@ -492,9 +492,11 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">resources</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Resources is a list of resources this rule applies to.<br>
 <br>
-For example: <em>pods</em> means pods. <em>pods/log</em> means the log subresource of pods. <em><strong></em> means all resources, but not subresources. <em>pods/</strong></em> means all subresources of pods. <em><strong>/scale</em> means all scale subresources. <em></strong>/<strong></em> means all resources and their subresources.<br>
+For example: <em>pods</em> means pods. <em>pods/log</em> means the log subresource of pods. <em><strong></em> means all resources, but not subresources. <em>pods/</strong></em> means all subresources of pods. <em><strong>/scale</em> means all scale subresources. <em></strong>/*</em> means all resources and their subresources.<br>
 <br>
-If <em></strong></em> or <em><strong>/</strong></em> is present, the length of the slice must be one. Required.</p></td>
+If wildcard is present, the validation rule will ensure resources do not overlap with each other.<br>
+<br>
+Depending on the enclosing object, subresources might not be allowed. Required.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -551,9 +553,11 @@ If <em></strong></em> or <em><strong>/</strong></em> is present, the length of t
 <td class="tableblock halign-left valign-top"><p class="tableblock">resources</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Resources is a list of resources this rule applies to.<br>
 <br>
-For example: <em>pods</em> means pods. <em>pods/log</em> means the log subresource of pods. <em><strong></em> means all resources, but not subresources. <em>pods/</strong></em> means all subresources of pods. <em><strong>/scale</em> means all scale subresources. <em></strong>/<strong></em> means all resources and their subresources.<br>
+For example: <em>pods</em> means pods. <em>pods/log</em> means the log subresource of pods. <em><strong></em> means all resources, but not subresources. <em>pods/</strong></em> means all subresources of pods. <em><strong>/scale</em> means all scale subresources. <em></strong>/*</em> means all resources and their subresources.<br>
 <br>
-If <em></strong></em> or <em><strong>/</strong></em> is present, the length of the slice must be one. Required.</p></td>
+If wildcard is present, the validation rule will ensure resources do not overlap with each other.<br>
+<br>
+Depending on the enclosing object, subresources might not be allowed. Required.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -968,7 +972,7 @@ If <em></strong></em> or <em><strong>/</strong></em> is present, the length of t
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rules</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Rules describes what resources/subresources the initializer cares about. The initializer cares about an operation if it matches <em>any</em> Rule.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rules describes what resources/subresources the initializer cares about. The initializer cares about an operation if it matches <em>any</em> Rule. Rule.Resources must not include subresources.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1alpha1_rule">v1alpha1.Rule</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1746,7 +1750,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-05-25 18:54:30 UTC
+Last updated 2017-05-31 22:29:50 UTC
 </div>
 </div>
 </body>

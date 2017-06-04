@@ -19,6 +19,8 @@ package app
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -41,6 +43,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -58,6 +61,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -68,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -446,10 +451,30 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		}
 
 		clientConfig, err := CreateAPIServerClientConfig(s)
+
+		var clientCertificateManager certificate.Manager
 		if err == nil {
+			if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
+				nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+				if err != nil {
+					return err
+				}
+				clientCertificateManager, err = initializeClientCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData)
+				if err != nil {
+					return err
+				}
+				if err := updateTransport(clientConfig, clientCertificateManager); err != nil {
+					return err
+				}
+			}
+
 			kubeClient, err = clientset.NewForConfig(clientConfig)
 			if err != nil {
 				glog.Warningf("New kubeClient from clientConfig error: %v", err)
+			} else if kubeClient.Certificates() != nil && clientCertificateManager != nil {
+				glog.V(2).Info("Starting client certificate rotation.")
+				clientCertificateManager.SetCertificateSigningRequestClient(kubeClient.Certificates().CertificateSigningRequests())
+				clientCertificateManager.Start()
 			}
 			externalKubeClient, err = clientgoclientset.NewForConfig(clientConfig)
 			if err != nil {
@@ -466,6 +491,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		} else {
 			if s.RequireKubeConfig {
 				return fmt.Errorf("invalid kubeconfig: %v", err)
+			} else if s.KubeConfig.Provided() && !standaloneMode {
+				glog.Warningf("Invalid kubeconfig: %v", err)
 			}
 			if standaloneMode {
 				glog.Warningf("No API client: %v", err)
@@ -595,6 +622,90 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 	<-done
 	return nil
+}
+
+func updateTransport(clientConfig *restclient.Config, clientCertificateManager certificate.Manager) error {
+	if clientConfig.Transport != nil {
+		return fmt.Errorf("there is already a transport configured")
+	}
+	tlsConfig, err := restclient.TLSConfigFor(clientConfig)
+	if err != nil {
+		return fmt.Errorf("unable to configure TLS for the rest client: %v", err)
+	}
+	if tlsConfig == nil {
+		tlsConfig = &tls.Config{}
+	}
+	tlsConfig.Certificates = nil
+	tlsConfig.GetClientCertificate = func(requestInfo *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		cert := clientCertificateManager.Current()
+		if cert == nil {
+			return &tls.Certificate{Certificate: nil}, nil
+		}
+		return cert, nil
+	}
+	clientConfig.Transport = utilnet.SetTransportDefaults(&http.Transport{
+		Proxy:               http.ProxyFromEnvironment,
+		TLSHandshakeTimeout: 10 * time.Second,
+		TLSClientConfig:     tlsConfig,
+		MaxIdleConnsPerHost: 25,
+		Dial: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial,
+	})
+	clientConfig.CertData = nil
+	clientConfig.KeyData = nil
+	clientConfig.CertFile = ""
+	clientConfig.KeyFile = ""
+	clientConfig.CAData = nil
+	clientConfig.CAFile = ""
+	return nil
+}
+
+// initializeClientCertificateManager sets up a certificate manager without a
+// client that can be used to sign new certificates (or rotate). It answers with
+// whatever certificate it is initialized with. If a CSR client is set later, it
+// may begin rotating/renewing the client cert
+func initializeClientCertificateManager(certDirectory string, nodeName types.NodeName, certData []byte, keyData []byte) (certificate.Manager, error) {
+	certificateStore, err := certificate.NewFileStore(
+		"kubelet-client",
+		certDirectory,
+		certDirectory,
+		"",
+		"")
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize certificate store: %v", err)
+	}
+	clientCertificateManager, err := certificate.NewManager(&certificate.Config{
+		Template: &x509.CertificateRequest{
+			Subject: pkix.Name{
+				Organization: []string{"system:nodes"},
+				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
+			},
+		},
+		Usages: []certificates.KeyUsage{
+			// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+			//
+			// DigitalSignature allows the certificate to be used to verify
+			// digital signatures including signatures used during TLS
+			// negotiation.
+			certificates.UsageDigitalSignature,
+			// KeyEncipherment allows the cert/key pair to be used to encrypt
+			// keys, including the symetric keys negotiated during TLS setup
+			// and used for data transfer..
+			certificates.UsageKeyEncipherment,
+			// ClientAuth allows the cert to be used by a TLS client to
+			// authenticate itself to the TLS server.
+			certificates.UsageClientAuth,
+		},
+		CertificateStore:        certificateStore,
+		BootstrapCertificatePEM: certData,
+		BootstrapKeyPEM:         keyData,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
+	}
+	return clientCertificateManager, nil
 }
 
 // getNodeName returns the node name according to the cloud provider
@@ -914,8 +1025,8 @@ func parseResourceList(m componentconfig.ConfigurationMap) (v1.ResourceList, err
 	rl := make(v1.ResourceList)
 	for k, v := range m {
 		switch v1.ResourceName(k) {
-		// Only CPU and memory resources are supported.
-		case v1.ResourceCPU, v1.ResourceMemory:
+		// CPU, memory and local storage resources are supported.
+		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceStorage:
 			q, err := resource.ParseQuantity(v)
 			if err != nil {
 				return nil, err
