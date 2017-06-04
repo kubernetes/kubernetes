@@ -237,14 +237,14 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
 	assert.NoError(t, err)
 	for i, cond := range updatedNode.Status.Conditions {
-		assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
-		assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition  is zero", cond.Type)
+		assert.False(t, cond.LastHeartbeatTime.IsZero(), "did not expect LastHeartbeatTime for %v condition is zero", cond.Type)
+		assert.False(t, cond.LastTransitionTime.IsZero(), "did not expect LastTransitionTime for %v condition  is zero", cond.Type)
 		updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
 		updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 	}
 
 	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
-	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type, "NotReady should be last")
+	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type, "NodeReady should be last")
 	assert.Len(t, updatedNode.Status.Images, maxImagesInNodeStatus)
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
 }
@@ -300,8 +300,8 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 
 	var oodCondition v1.NodeCondition
 	for i, cond := range updatedNode.Status.Conditions {
-		assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
-		assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition  is zero", cond.Type)
+		assert.False(t, cond.LastHeartbeatTime.IsZero(), "did not expect LastHeartbeatTime for %v condition is zero", cond.Type)
+		assert.False(t, cond.LastTransitionTime.IsZero(), "did not expect LastTransitionTime for %v condition  is zero", cond.Type)
 		updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
 		updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 		if cond.Type == v1.NodeOutOfDisk {
@@ -774,8 +774,8 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		require.NoError(t, err, "can't apply node status patch")
 
 		for i, cond := range updatedNode.Status.Conditions {
-			assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
-			assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition  is zero", cond.Type)
+			assert.False(t, cond.LastHeartbeatTime.IsZero(), "did not expect LastHeartbeatTime for %v condition is zero", cond.Type)
+			assert.False(t, cond.LastTransitionTime.IsZero(), "did not expect LastTransitionTime for %v condition  is zero", cond.Type)
 			updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
 			updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 		}
