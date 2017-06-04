@@ -82,6 +82,9 @@ func SetObjectDefaults_CronJob(in *CronJob) {
 		if a.VolumeSource.ScaleIO != nil {
 			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
+		if a.VolumeSource.Rook != nil {
+			v1.SetDefaults_RookVolumeSource(a.VolumeSource.Rook)
+		}
 	}
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.InitContainers[i]
@@ -221,6 +224,9 @@ func SetObjectDefaults_JobTemplate(in *JobTemplate) {
 		}
 		if a.VolumeSource.ScaleIO != nil {
 			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
+		if a.VolumeSource.Rook != nil {
+			v1.SetDefaults_RookVolumeSource(a.VolumeSource.Rook)
 		}
 	}
 	for i := range in.Template.Spec.Template.Spec.InitContainers {

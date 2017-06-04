@@ -1161,6 +1161,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
 	"local":                "Local represents directly-attached storage with node affinity",
+	"rook":                 "Rook represents a Rook volume that is attached and mounted on Kubernetes nodes.",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1666,6 +1667,20 @@ func (ResourceRequirements) SwaggerDoc() map[string]string {
 	return map_ResourceRequirements
 }
 
+var map_RookVolumeSource = map[string]string{
+	"":            "RookVolumeSource represents a Rook volume that is persistend and attached to Kubernetes nodes.",
+	"volumeID":    "VolumeID uniquely identifies a Rook volume.",
+	"volumeGroup": "The group containing this volume.",
+	"fsType":      "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#rbd",
+	"readOnly":    "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+	"cluster":     "Cluster is the name of the rook cluster. Default is rook.",
+	"options":     "Extra Rook metadata if any.",
+}
+
+func (RookVolumeSource) SwaggerDoc() map[string]string {
+	return map_RookVolumeSource
+}
+
 var map_SELinuxOptions = map[string]string{
 	"":      "SELinuxOptions are the labels to be applied to the container",
 	"user":  "User is a SELinux user label that applies to the container.",
@@ -1980,6 +1995,7 @@ var map_VolumeSource = map[string]string{
 	"projected":            "Items for all in one resources secrets, configmaps, and downward API",
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+	"rook":                 "Rook represents a rook volume attached and mounted on Kubernetes nodes.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

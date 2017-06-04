@@ -48322,6 +48322,10 @@
       "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.RBDVolumeSource"
      },
+     "rook": {
+      "description": "Rook represents a Rook volume that is attached and mounted on Kubernetes nodes.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.RookVolumeSource"
+     },
      "scaleIO": {
       "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.ScaleIOVolumeSource"
@@ -49300,6 +49304,41 @@
      }
     }
    },
+   "io.k8s.kubernetes.pkg.api.v1.RookVolumeSource": {
+    "description": "RookVolumeSource represents a Rook volume that is persistend and attached to Kubernetes nodes.",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "cluster": {
+      "description": "Cluster is the name of the rook cluster. Default is rook.",
+      "type": "string"
+     },
+     "fsType": {
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#rbd",
+      "type": "string"
+     },
+     "options": {
+      "description": "Extra Rook metadata if any.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "readOnly": {
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+      "type": "boolean"
+     },
+     "volumeGroup": {
+      "description": "The group containing this volume.",
+      "type": "string"
+     },
+     "volumeID": {
+      "description": "VolumeID uniquely identifies a Rook volume.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.kubernetes.pkg.api.v1.SELinuxOptions": {
     "description": "SELinuxOptions are the labels to be applied to the container",
     "properties": {
@@ -49975,6 +50014,10 @@
      "rbd": {
       "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
       "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.RBDVolumeSource"
+     },
+     "rook": {
+      "description": "Rook represents a rook volume attached and mounted on Kubernetes nodes.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.RookVolumeSource"
      },
      "scaleIO": {
       "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
