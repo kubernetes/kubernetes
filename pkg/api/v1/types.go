@@ -348,6 +348,9 @@ type VolumeSource struct {
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,25,opt,name=scaleIO"`
+	// Rook represents a rook volume attached and mounted on Kubernetes nodes.
+	// +optional
+	Rook *RookVolumeSource `json:"rook,omitempty" protobuf:"bytes,27,opt,name=rook"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -442,6 +445,9 @@ type PersistentVolumeSource struct {
 	// Local represents directly-attached storage with node affinity
 	// +optional
 	Local *LocalVolumeSource `json:"local,omitempty" protobuf:"bytes,20,opt,name=local"`
+	// Rook represents a Rook volume that is attached and mounted on Kubernetes nodes.
+	// +optional
+	Rook *RookVolumeSource `json:"rook,omitempty" protobuf:"bytes,21,opt,name=rook"`
 }
 
 const (
@@ -1226,6 +1232,32 @@ type ScaleIOVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,10,opt,name=readOnly"`
+}
+
+// RookVolumeSource represents a Rook volume that is persistend and attached to Kubernetes nodes.
+type RookVolumeSource struct {
+	// VolumeID uniquely identifies a Rook volume.
+	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
+	// The group containing this volume.
+	// +optional
+	VolumeGroup string `json:"volumeGroup,omitempty" protobuf:"bytes,2,opt,name=volumeGroup"`
+	// Filesystem type of the volume that you want to mount.
+	// Tip: Ensure that the filesystem type is supported by the host operating system.
+	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// More info: http://kubernetes.io/docs/user-guide/volumes#rbd
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,3,opt,name=fsType"`
+	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
+	// Defaults to false.
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
+	// Cluster is the name of the rook cluster. Default is rook.
+	// +optional
+	Cluster string `json:"cluster,omitempty" protobuf:"varint,5,opt,name=cluster"`
+	// Extra Rook metadata if any.
+	// +optional
+	VolumeMetadata map[string]string `json:"options,omitempty" protobuf:"bytes,10,rep,name=volumeMetadata"`
 }
 
 // Adapts a ConfigMap into a volume.
