@@ -411,6 +411,10 @@ function push-federation-images {
 }
 
 function cleanup-federation-api-objects {
+  # This is a cleanup function. We cannot stop on errors here. So disable
+  # errexit in this function.
+  set +o errexit
+
   echo "Cleaning Federation control plane objects"
   # Delete all resources with the federated-cluster label.
   $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
@@ -423,10 +427,19 @@ function cleanup-federation-api-objects {
 
   # Delete all resources in FEDERATION_NAMESPACE.
   $host_kubectl delete pvc,pods,svc,rc,deployment,secret --namespace=${FEDERATION_NAMESPACE} --all
-  $host_kubectl delete ns ${FEDERATION_NAMESPACE}
 
-  # Poll until the namespace is completely gone.
-  while $host_kubectl get namespace ${FEDERATION_NAMESPACE} >/dev/null 2>&1; do
-    sleep 5
+  # This is a big hammer. We get rid of federation-system namespace from
+  # all the clusters
+  for context in $(federation_cluster_contexts); do
+    kube::log::status "Removing namespace \"${FEDERATION_NAMESPACE}\" from \"${context}\""
+    (
+      # Try deleting until the namespace is completely gone.
+      while $host_kubectl --context="${context}" delete namespace ${FEDERATION_NAMESPACE} >/dev/null 2>&1; do
+        sleep 5
+      done
+      kube::log::status "Removed namespace \"${FEDERATION_NAMESPACE}\" from \"${context}\""
+    ) &
   done
+  wait
+  set -o errexit
 }
