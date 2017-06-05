@@ -802,6 +802,9 @@ def configure_master_services():
     if get_version('kube-apiserver') < (1, 6):
         hookenv.log('Removing DefaultTolerationSeconds from admission-control')
         admission_control.remove('DefaultTolerationSeconds')
+    if get_version('kube-apiserver') < (1, 7):
+        hookenv.log('Removing Initializers from admission-control')
+        admission_control.remove('Initializers')
     api_opts.add('admission-control', ','.join(admission_control), strict=True)
 
     # Default to 3 minute resync. TODO: Make this configureable?
