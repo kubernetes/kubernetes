@@ -624,7 +624,7 @@ func PodFitsResources(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 // terms are ORed, and an empty list of terms will match nothing.
 func nodeMatchesNodeSelectorTerms(node *v1.Node, nodeSelectorTerms []v1.NodeSelectorTerm) bool {
 	for _, req := range nodeSelectorTerms {
-		nodeSelector, err := v1helper.NodeSelectorRequirementsAsSelector(req.MatchExpressions)
+		nodeSelector, err := v1helper.NodeSelectorRequirementsAsSelectorWithoutValidation(req.MatchExpressions)
 		if err != nil {
 			glog.V(10).Infof("Failed to parse MatchExpressions: %+v, regarding as not match.", req.MatchExpressions)
 			return false

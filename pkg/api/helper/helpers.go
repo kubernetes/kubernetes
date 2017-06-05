@@ -352,9 +352,11 @@ func containsAccessMode(modes []api.PersistentVolumeAccessMode, mode api.Persist
 	return false
 }
 
-// NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
-// labels.Selector.
-func NodeSelectorRequirementsAsSelector(nsm []api.NodeSelectorRequirement) (labels.Selector, error) {
+type requirementBuilder func(key string, op selection.Operator, vals []string) (*labels.Requirement, error)
+
+// nodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
+// labels.Selector based on requirement builder.
+func nodeSelectorRequirementsAsSelector(nsm []api.NodeSelectorRequirement, reqBuilder requirementBuilder) (labels.Selector, error) {
 	if len(nsm) == 0 {
 		return labels.Nothing(), nil
 	}
@@ -377,13 +379,25 @@ func NodeSelectorRequirementsAsSelector(nsm []api.NodeSelectorRequirement) (labe
 		default:
 			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
 		}
-		r, err := labels.NewRequirement(expr.Key, op, expr.Values)
+		r, err := reqBuilder(expr.Key, op, expr.Values)
 		if err != nil {
 			return nil, err
 		}
 		selector = selector.Add(*r)
 	}
 	return selector, nil
+}
+
+// NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
+// labels.Selector.
+func NodeSelectorRequirementsAsSelector(nsm []api.NodeSelectorRequirement) (labels.Selector, error) {
+	return nodeSelectorRequirementsAsSelector(nsm, labels.NewRequirement)
+}
+
+// NodeSelectorRequirementsAsSelectorWithougValidation converts the []NodeSelectorRequirement api type into a struct that implements
+// labels.Selector; it will NOT validate the key & values in the Requirement to improve performance.
+func NodeSelectorRequirementsAsSelectorWithoutValidation(nsm []api.NodeSelectorRequirement) (labels.Selector, error) {
+	return nodeSelectorRequirementsAsSelector(nsm, labels.NewRequirementWithoutValidation)
 }
 
 // GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations

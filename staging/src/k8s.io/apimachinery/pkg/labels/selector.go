@@ -115,6 +115,7 @@ func NewRequirement(key string, op selection.Operator, vals []string) (*Requirem
 	if err := validateLabelKey(key); err != nil {
 		return nil, err
 	}
+
 	switch op {
 	case selection.In, selection.NotIn:
 		if len(vals) == 0 {
@@ -146,6 +147,13 @@ func NewRequirement(key string, op selection.Operator, vals []string) (*Requirem
 			return nil, err
 		}
 	}
+
+	return NewRequirementWithoutValidation(key, op, vals)
+}
+
+// NewRequirementWithoutValidation has the same behavior with `NewRequirement`, but without validation of
+// selector's key and value.
+func NewRequirementWithoutValidation(key string, op selection.Operator, vals []string) (*Requirement, error) {
 	sort.Strings(vals)
 	return &Requirement{key: key, operator: op, strValues: vals}, nil
 }
