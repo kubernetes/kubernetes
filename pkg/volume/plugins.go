@@ -362,7 +362,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) 
 		}
 		err := plugin.Init(host)
 		if err != nil {
-			glog.Errorf("Failed to load volume plugin %s, error: %s", plugin, err.Error())
+			glog.Errorf("Failed to load volume plugin %s, error: %s", name, err.Error())
 			allErrs = append(allErrs, err)
 			continue
 		}
