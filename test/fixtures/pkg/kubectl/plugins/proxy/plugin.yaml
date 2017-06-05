@@ -1,0 +1,11 @@
+name: proxy
+shortDesc: "The API aware proxy overlord"
+tree: 
+  - name: authorized
+    shortDesc: "Authorized proxy plugin"
+    command: "./authorized.sh"
+    proxyAPI: true
+  - name: unauthorized
+    shortDesc: "Unauthorized proxy plugin"
+    command: "./unauthorized.sh"
+    proxyAPI: true

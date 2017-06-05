@@ -4552,6 +4552,14 @@ runTests() {
 
   record_command run_plugins_tests
 
+  # plugin proxy
+  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin proxy unauthorized -v 8 2>&1)
+  kube::test::if_has_string "${output_message}" 'Proxy\-Authorization required'
+   output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin proxy authorized -v 8 2>&1)
+  kube::test::if_has_string "${output_message}" 'Starting to serve API proxy for plugin'
+  kube::test::if_has_string "${output_message}" '"kind":\s\+"APIGroupList"'
+  kube::test::if_has_string "${output_message}" 'Closing API proxy for plugin'
+
   #################
   # Impersonation #
   #################

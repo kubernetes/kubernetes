@@ -120,6 +120,7 @@ package_group(
         "//pkg/kubectl/cmd/testing",
         "//pkg/kubectl/cmd/util",
         "//pkg/kubectl/cmd/util/editor",
+        "//pkg/kubectl/plugins",
     ],
 )
 

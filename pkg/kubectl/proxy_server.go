@@ -225,6 +225,15 @@ func (s *ProxyServer) ServeOnListener(l net.Listener) error {
 	return server.Serve(l)
 }
 
+// Serve starts the server using given listener, loops forever.
+func (s *ProxyServer) ServeOnListenerState(l net.Listener, state func(net.Conn, http.ConnState)) error {
+	server := http.Server{
+		Handler:   s.handler,
+		ConnState: state,
+	}
+	return server.Serve(l)
+}
+
 func newProxy(target *url.URL) *httputil.ReverseProxy {
 	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme

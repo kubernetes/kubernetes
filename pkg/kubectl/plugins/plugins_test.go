@@ -17,8 +17,11 @@ limitations under the License.
 package plugins
 
 import (
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/ghodss/yaml"
 )
 
 func TestPlugin(t *testing.T) {
@@ -65,6 +68,62 @@ func TestPlugin(t *testing.T) {
 			}
 		} else if err != nil {
 			t.Errorf("%s: expected no error, got %v", test.plugin.Name, err)
+		}
+	}
+}
+
+func TestUnmarshalPlugin(t *testing.T) { // just in case
+	tests := []struct {
+		src      string
+		expected *Plugin
+	}{
+		{
+			src: `name: "test"
+shortDesc: "A test"
+command: "echo 1"
+proxyAPI: false`,
+			expected: &Plugin{
+				Description: Description{
+					Name:      "test",
+					ShortDesc: "A test",
+					Command:   "echo 1",
+				},
+			},
+		},
+		{
+			src: `name: "test"
+shortDesc: "A test"
+command: "echo 2"`,
+			expected: &Plugin{
+				Description: Description{
+					Name:      "test",
+					ShortDesc: "A test",
+					Command:   "echo 2",
+				},
+			},
+		},
+		{
+			src: `name: "test"
+shortDesc: "A test"
+command: "echo 3"
+proxyAPI: true`,
+			expected: &Plugin{
+				Description: Description{
+					Name:      "test",
+					ShortDesc: "A test",
+					Command:   "echo 3",
+					ProxyAPI:  true,
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		plugin := &Plugin{}
+		if err := yaml.Unmarshal([]byte(test.src), plugin); err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(test.expected, plugin) {
+			t.Errorf("Expected %v, got %v", test.expected, plugin)
 		}
 	}
 }
