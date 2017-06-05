@@ -17,6 +17,10 @@ package v1
 type FsInfo struct {
 	// Block device associated with the filesystem.
 	Device string `json:"device"`
+	// DeviceMajor is the major identifier of the device, used for correlation with blkio stats
+	DeviceMajor uint64 `json:"-"`
+	// DeviceMinor is the minor identifier of the device, used for correlation with blkio stats
+	DeviceMinor uint64 `json:"-"`
 
 	// Total number of bytes available on the filesystem.
 	Capacity uint64 `json:"capacity"`
