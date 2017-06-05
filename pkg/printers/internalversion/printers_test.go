@@ -1459,6 +1459,57 @@ func TestPrintPod(t *testing.T) {
 	}
 }
 
+func TestPrintPodList(t *testing.T) {
+	tests := []struct {
+		pods   api.PodList
+		expect []metav1alpha1.TableRow
+	}{
+		// Test podList's pod: name, num of containers, restarts, container ready status
+		{
+			api.PodList{
+				Items: []api.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+						Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+						Status: api.PodStatus{
+							Phase: "podPhase",
+							ContainerStatuses: []api.ContainerStatus{
+								{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+								{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "test2"},
+						Spec:       api.PodSpec{Containers: make([]api.Container, 1)},
+						Status: api.PodStatus{
+							Phase: "podPhase",
+							ContainerStatuses: []api.ContainerStatus{
+								{Ready: true, RestartCount: 1, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+							},
+						},
+					},
+				},
+			},
+			[]metav1alpha1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", 6, "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", 1, "<unknown>"}}},
+		},
+	}
+
+	for _, test := range tests {
+		rows, err := printPodList(&test.pods, printers.PrintOptions{ShowAll: true})
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expect, rows) {
+			t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expect, rows))
+		}
+	}
+}
+
 func TestPrintNonTerminatedPod(t *testing.T) {
 	tests := []struct {
 		pod    api.Pod
