@@ -17,7 +17,6 @@ limitations under the License.
 package gce
 
 import (
-	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -208,26 +207,10 @@ func GetNodesHealthCheckPort() int32 {
 	return lbNodesHealthCheckPort
 }
 
-// getNodesHealthCheckPath returns the health check path used by the GCE load
+// GetNodesHealthCheckPath returns the health check path used by the GCE load
 // balancers (l4) for performing health checks on nodes.
-func getNodesHealthCheckPath() string {
+func GetNodesHealthCheckPath() string {
 	return nodesHealthCheckPath
-}
-
-// makeNodesHealthCheckName returns name of the health check resource used by
-// the GCE load balancers (l4) for performing health checks on nodes.
-func makeNodesHealthCheckName(clusterID string) string {
-	return fmt.Sprintf("k8s-%v-node", clusterID)
-}
-
-// MakeHealthCheckFirewallName returns the firewall name used by the GCE load
-// balancers (l4) for performing health checks.
-func MakeHealthCheckFirewallName(clusterID, hcName string, isNodesHealthCheck bool) string {
-	if isNodesHealthCheck {
-		// TODO: Change below fwName to match the proposed schema: k8s-{clusteriD}-{namespace}-{name}-{shortid}-hc.
-		return makeNodesHealthCheckName(clusterID) + "-http-hc"
-	}
-	return "k8s-" + hcName + "-http-hc"
 }
 
 // isAtLeastMinNodesHealthCheckVersion checks if a version is higher than
