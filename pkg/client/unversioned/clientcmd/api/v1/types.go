@@ -69,6 +69,8 @@ type Cluster struct {
 	// InsecureSkipTLSVerify skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
 	// +optional
 	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`
+
+	ClusterUUID string `json:"cluster-uuid,omitempty"`
 	// CertificateAuthority is the path to a cert file for the certificate authority.
 	// +optional
 	CertificateAuthority string `json:"certificate-authority,omitempty"`
@@ -112,6 +114,9 @@ type AuthInfo struct {
 	// AuthProvider specifies a custom authentication plugin for the kubernetes cluster.
 	// +optional
 	AuthProvider *AuthProviderConfig `json:"auth-provider,omitempty"`
+	AccessKey string `json:"access-key,omitempty"`
+	SecretKey string `json:"secret-key,omitempty"`
+	RegionID  string `json:"region-id,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
 	Extensions []NamedExtension `json:"extensions,omitempty"`

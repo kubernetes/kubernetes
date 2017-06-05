@@ -65,6 +65,11 @@ type Config struct {
 	Username string
 	Password string
 
+	AccessKey   string
+	SecretKey   string
+	RegionID    string
+	ClusterUUID string
+
 	// Server requires Bearer authentication. This client will not attempt to use
 	// refresh tokens for an OAuth2 flow.
 	// TODO: demonstrate an OAuth2 compatible client.

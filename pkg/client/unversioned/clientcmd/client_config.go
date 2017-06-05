@@ -189,6 +189,7 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 	configClientConfig.CAFile = configClusterInfo.CertificateAuthority
 	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
 	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
+	configClientConfig.ClusterUUID = configClusterInfo.ClusterUUID
 	mergo.Merge(mergedConfig, configClientConfig)
 
 	return mergedConfig, nil
@@ -226,6 +227,11 @@ func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fa
 	if len(configAuthInfo.Username) > 0 || len(configAuthInfo.Password) > 0 {
 		mergedConfig.Username = configAuthInfo.Username
 		mergedConfig.Password = configAuthInfo.Password
+	}
+	if len(configAuthInfo.AccessKey) > 0 || len(configAuthInfo.SecretKey) > 0 || len(configAuthInfo.RegionID) > 0 {
+		mergedConfig.AccessKey = configAuthInfo.AccessKey
+		mergedConfig.SecretKey = configAuthInfo.SecretKey
+		mergedConfig.RegionID = configAuthInfo.RegionID
 	}
 	if configAuthInfo.AuthProvider != nil {
 		mergedConfig.AuthProvider = configAuthInfo.AuthProvider
@@ -272,7 +278,7 @@ func makeServerIdentificationConfig(info clientauth.Info) restclient.Config {
 
 func canIdentifyUser(config restclient.Config) bool {
 	return len(config.Username) > 0 ||
-		(len(config.CertFile) > 0 || len(config.CertData) > 0) ||
+		(len(config.CertFile) > 0 || len(config.CertData) > 0) ||len(config.AccessKey) > 0 || len(config.SecretKey) > 0 || len(config.RegionID) > 0 ||
 		len(config.BearerToken) > 0 ||
 		config.AuthProvider != nil
 }

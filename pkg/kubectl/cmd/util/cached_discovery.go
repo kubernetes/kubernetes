@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -128,26 +129,31 @@ func (d *CachedDiscoveryClient) ServerGroups() (*unversioned.APIGroupList, error
 
 func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 	// after invalidation ignore cache files not created by this process
-	d.mutex.Lock()
-	_, ourFile := d.ourFiles[filename]
-	if d.invalidated && !ourFile {
+	ourFile := true
+	if !strings.Contains(filename, "/discovery/demo") {
+		d.mutex.Lock()
+		_, ourFile = d.ourFiles[filename]
+		if d.invalidated && !ourFile {
+			d.mutex.Unlock()
+			return nil, errors.New("cache invalidated")
+		}
 		d.mutex.Unlock()
-		return nil, errors.New("cache invalidated")
 	}
-	d.mutex.Unlock()
 
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
+	if !strings.Contains(filename, "/discovery/demo") {
+		fileInfo, err := file.Stat()
+		if err != nil {
+			return nil, err
+		}
 
-	if time.Now().After(fileInfo.ModTime().Add(d.ttl)) {
-		return nil, errors.New("cache expired")
+		if time.Now().After(fileInfo.ModTime().Add(d.ttl)) {
+			return nil, errors.New("cache expired")
+		}
 	}
 
 	// the cache is present and its valid.  Try to read and use it.
