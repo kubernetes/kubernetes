@@ -54,7 +54,8 @@ var _ volume.DeletableVolumePlugin = &hostPathPlugin{}
 var _ volume.ProvisionableVolumePlugin = &hostPathPlugin{}
 
 const (
-	hostPathPluginName = "kubernetes.io/host-path"
+	hostPathPluginName             = "kubernetes.io/host-path"
+	perm               os.FileMode = 0777
 )
 
 func (plugin *hostPathPlugin) Init(host volume.VolumeHost) error {
@@ -271,7 +272,7 @@ func (r *hostPathProvisioner) Provision() (*v1.PersistentVolume, error) {
 		pv.Spec.AccessModes = r.plugin.GetAccessModes()
 	}
 
-	return pv, os.MkdirAll(pv.Spec.HostPath.Path, 0750)
+	return pv, os.MkdirAll(pv.Spec.HostPath.Path, perm)
 }
 
 // hostPathDeleter deletes a hostPath PV from the cluster.
