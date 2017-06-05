@@ -130,6 +130,8 @@ type KubeProxyConfiguration struct {
 	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
 	// than 0.
 	ConfigSyncPeriod metav1.Duration `json:"configSyncPeriod"`
+	// scheduler is the ipvs schedule policy
+	Scheduler string `json:"scheduler"`
 }
 
 // Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
