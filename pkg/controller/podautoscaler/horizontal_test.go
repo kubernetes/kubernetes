@@ -159,6 +159,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 					Status: autoscalingv2.HorizontalPodAutoscalerStatus{
 						CurrentReplicas: tc.initialReplicas,
 						DesiredReplicas: tc.initialReplicas,
+						LastScaleTime:   tc.lastScaleTime,
 					},
 				},
 			},
@@ -1153,6 +1154,39 @@ func TestScaleDownRCImmediately(t *testing.T) {
 		CPUTarget:           50,
 		reportedLevels:      []uint64{8000, 9500, 1000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+		useMetricsApi:       true,
+		lastScaleTime:       &time,
+	}
+	tc.runTest(t)
+}
+
+func TestScaleUpInForbiddenWindow(t *testing.T) {
+	time := metav1.Time{Time: time.Now()}
+	tc := testCase{
+		minReplicas:         2,
+		maxReplicas:         6,
+		initialReplicas:     4,
+		desiredReplicas:     4,
+		verifyCPUCurrent:    true,
+		reportedLevels:      []uint64{900, 950, 950, 1000},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsApi:       true,
+		lastScaleTime:       &time,
+	}
+	tc.runTest(t)
+}
+
+func TestScaleDownInForbiddenWindow(t *testing.T) {
+	time := metav1.Time{Time: time.Now()}
+	tc := testCase{
+		minReplicas:         2,
+		maxReplicas:         6,
+		initialReplicas:     3,
+		desiredReplicas:     3,
+		CPUTarget:           50,
+		verifyCPUCurrent:    true,
+		reportedLevels:      []uint64{100, 300, 500, 250, 250},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsApi:       true,
 		lastScaleTime:       &time,
 	}
