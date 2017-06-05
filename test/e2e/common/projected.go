@@ -36,11 +36,11 @@ var _ = framework.KubeDescribe("Projected", func() {
 	// Part 1/3 - Secrets
 	f := framework.NewDefaultFramework("projected")
 
-	It("should be consumable from pods in volume [Conformance] [Volume]", func() {
+	It("secret should be consumable from pods in volume [Conformance] [Volume]", func() {
 		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
-	It("should be consumable from pods in volume with defaultMode set [Conformance] [Volume]", func() {
+	It("secret should be consumable from pods in volume with defaultMode set [Conformance] [Volume]", func() {
 		defaultMode := int32(0400)
 		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
-	It("optional updates should be reflected in volume [Conformance] [Volume]", func() {
+	It("secret optional updates should be reflected in volume [Conformance] [Volume]", func() {
 
 		// With SecretManager, we may have to wait up to full sync period + TTL of
 		// a secret to elapse before the Kubelet projects the update into the volume
@@ -383,11 +383,11 @@ var _ = framework.KubeDescribe("Projected", func() {
 	})
 
 	// Part 2/3 - ConfigMaps
-	It("should be consumable from pods in volume [Conformance] [Volume]", func() {
+	It("configmaps should be consumable from pods in volume [Conformance] [Volume]", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with defaultMode set [Conformance] [Volume]", func() {
+	It("configmaps should be consumable from pods in volume with defaultMode set [Conformance] [Volume]", func() {
 		defaultMode := int32(0400)
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
@@ -509,7 +509,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-2"))
 	})
 
-	It("optional updates should be reflected in volume [Conformance] [Volume]", func() {
+	It("configmap optional updates should be reflected in volume [Conformance] [Volume]", func() {
 
 		// We may have to wait or a full sync period to elapse before the
 		// Kubelet projects the update into the volume and the container picks
