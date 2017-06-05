@@ -222,7 +222,7 @@ func TestValidateInitializerConfiguration(t *testing.T) {
 			}
 		} else {
 			if test.expectedError != "" {
-				t.Errorf("test case %s, unexpected no error, expected to contain %s", test.name, test.expectedError)
+				t.Errorf("test case %s, expected error contains %s", test.name, test.expectedError)
 			}
 		}
 	}
@@ -371,7 +371,7 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 			}
 		} else {
 			if test.expectedError != "" {
-				t.Errorf("test case %s, unexpected no error, expected to contain %s", test.name, test.expectedError)
+				t.Errorf("test case %s, expected error contains %s", test.name, test.expectedError)
 			}
 		}
 	}
