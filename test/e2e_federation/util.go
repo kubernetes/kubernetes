@@ -18,6 +18,7 @@ package e2e_federation
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/common"
@@ -205,13 +205,20 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 			continue
 		}
 
+		if cSvc.Spec.Type == v1.ServiceTypeLoadBalancer && len(cSvc.Status.LoadBalancer.Ingress) != 0 {
+			// In federation tests, e2e zone names are used as federation member cluster names
+			framework.TestContext.CloudConfig.Zone = name
+			ip := framework.GetIngressPoint(&service.Status.LoadBalancer.Ingress[0])
+			port := int(service.Spec.Ports[0].Port)
+			err := framework.EnsureLoadBalancerResourcesDeleted(ip, strconv.Itoa(port))
+			if err != nil {
+				framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", service.Name, namespace, name)
+			}
+		}
+
 		err = cleanupServiceShard(c.Clientset, name, namespace, cSvc, fedframework.FederatedDefaultTestTimeout)
 		if err != nil {
 			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q: %v", service.Name, namespace, name, err)
-		}
-		err = cleanupServiceShardLoadBalancer(name, cSvc, fedframework.FederatedDefaultTestTimeout)
-		if err != nil {
-			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", service.Name, namespace, name)
 		}
 	}
 }
@@ -225,35 +232,6 @@ func cleanupServiceShard(clientset *kubeclientset.Clientset, clusterName, namesp
 			return false, nil
 		}
 		By(fmt.Sprintf("Service %q in namespace %q in cluster %q deleted", service.Name, namespace, clusterName))
-		return true, nil
-	})
-	return err
-}
-
-func cleanupServiceShardLoadBalancer(clusterName string, service *v1.Service, timeout time.Duration) error {
-	provider := framework.TestContext.CloudConfig.Provider
-	if provider == nil {
-		return fmt.Errorf("cloud provider undefined")
-	}
-
-	internalSvc := &v1.Service{}
-	err := api.Scheme.Convert(service, internalSvc, nil)
-	if err != nil {
-		return fmt.Errorf("failed to convert versioned service object to internal type: %v", err)
-	}
-
-	err = wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		lbi, supported := provider.LoadBalancer()
-		if !supported {
-			return false, fmt.Errorf("%q doesn't support load balancers", provider.ProviderName())
-		}
-		err := lbi.EnsureLoadBalancerDeleted(clusterName, internalSvc)
-		if err != nil {
-			// Deletion failed with an error, try again.
-			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q: %v", service.Name, service.Namespace, clusterName, err)
-			return false, nil
-		}
-		By(fmt.Sprintf("Cloud provider resources for Service %q in namespace %q in cluster %q deleted", service.Name, service.Namespace, clusterName))
 		return true, nil
 	})
 	return err
