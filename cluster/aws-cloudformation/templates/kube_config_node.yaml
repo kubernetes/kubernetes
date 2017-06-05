@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Config
+clusters:
+- name: local
+  cluster:
+    certificate-authority: /etc/kubernetes/ssl/ca.crt
+users:
+- name: kubelet
+  user:
+    client-certificate: /etc/kubernetes/ssl/kube-kubelet.crt
+    client-key: /etc/kubernetes/ssl/kube-kubelet.key
+contexts:
+- context:
+    cluster: local
+    user: kubelet
+  name: kubelet-context
+current-context: kubelet-context

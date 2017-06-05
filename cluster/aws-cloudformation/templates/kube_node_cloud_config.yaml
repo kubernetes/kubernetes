@@ -1,0 +1,137 @@
+#cloud-config
+coreos:
+  update:
+    group: "stable"
+    reboot-strategy: "reboot"
+  flannel:
+    interface: $private_ipv4
+    etcd_endpoints: "%(etcd_endpoints)s"
+  units:
+  - name: flanneld.service
+    command: restart
+    drop-ins:
+    - name: 50-network-config.conf
+      content: |
+        [Unit]
+        Description=flannel is an etcd backed overlay network for containers
+        [Service]
+        ExecStartPost=/bin/bash -c "until [ -e /run/flannel/subnet.env ]; do /usr/bin/sleep 1; done"
+  - name: docker.service
+    command: start
+    drop-ins:
+    - name: 40-flannel.conf
+      content: |
+        [Unit]
+        After=flanneld.service
+        Wants=flanneld.service
+  - name: logrotate.timer
+    command: start
+    content: |
+      [Unit]
+      Description=Periodic Log Rotation
+      [Timer]
+      OnUnitActiveSec=30m
+      AccuracySec=1m
+      Persistent=true
+  - name: logrotate.service
+    command: start
+    content: |
+      [Unit]
+      Description=Rotate and Compress System Logs
+      [Service]
+      ExecStart=/usr/sbin/logrotate /etc/logrotate.d/logrotate.conf
+  - name: setup-aws-environment.service
+    command: start
+    content: |
+      [Unit]
+      Description=Store AWS context variables in a common environment.
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/bin/bash -c "echo -n \"INSTANCE_ID=\" > /etc/aws-env; \
+        echo `/usr/bin/wget -q -O - http://169.254.169.254/latest/meta-data/instance-id` >> /etc/aws-env; \
+        echo -n \"REGION=\" >> /etc/aws-env; \
+        echo `/usr/bin/wget -q -O - http://169.254.169.254/latest/dynamic/instance-identity/document | /usr/bin/grep region | /usr/bin/awk -F\\\" '{print $4}'` >> /etc/aws-env"
+  - name: enable-aws-ip-spoofing.service
+    command: start
+    content: |
+      [Unit]
+      Description=Enable IP spoofing so we can accept traffic for the overlay network.
+      Requires=setup-aws-environment.service
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      EnvironmentFile=/etc/aws-env
+      # TODO: Build our own awscli-enabled docker image
+      ExecStartPre=/usr/bin/docker pull xueshanf/awscli:latest
+      ExecStart=/usr/bin/docker run --rm xueshanf/awscli aws ec2 modify-instance-attribute --region ${REGION} --instance-id ${INSTANCE_ID} --no-source-dest-check
+  - name: cert-sync.service
+    command: start
+    content: |
+      [Unit]
+      Description=Copy SSL certificates and keys out of S3.
+      Requires=docker.service
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=-/bin/bash -c "mkdir /etc/kubernetes; mkdir /etc/kubernetes/ssl"
+      # TODO: Build our own awscli-enabled docker image
+      ExecStartPre=/usr/bin/docker pull xueshanf/awscli:latest
+      ExecStart=/usr/bin/docker run -v /etc/kubernetes/ssl:/certs --rm xueshanf/awscli aws s3 sync s3://%(cert_bucket)s/kubelet /certs
+  - name: kube-kubelet.service
+    command: start
+    content: |
+      [Unit]
+      Description=Kubernetes Kubelet
+      Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+      Requires=docker.service enable-aws-ip-spoofing.service
+      After=docker.service enable-aws-ip-spoofing.service
+      [Service]
+      ExecStartPre=-/usr/bin/mkdir /etc/kubernetes/manifests
+      ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/%(kube_version)s/bin/linux/amd64/kubelet
+      ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet
+      ExecStart=/opt/bin/kubelet \
+        --allow-privileged=true \
+        --api_servers=https://%(kube_master_address)s \
+        --cloud-provider=aws \
+        --cluster_dns=%(kube_dns_ip)s \
+        --cluster_domain=cluster.local \
+        --config=/etc/kubernetes/manifests/ \
+        --hostname_override=$private_ipv4 \
+        --kubeconfig=/etc/kubernetes/kubeconfig.yaml \
+        --register-node=true \
+        --tls-cert-file=/etc/kubernetes/ssl/kube-kubelet.crt \
+        --tls-private-key-file=/etc/kubernetes/ssl/kube-kubelet.key \
+        --logtostderr=true
+      Restart=always
+      RestartSec=10
+      [Install]
+      WantedBy=multi-user.target
+write_files:
+- path: /etc/systemd/system/docker.service.d/increase-ulimit.conf
+  permissions: "0644"
+  owner: "core"
+  content: |
+    [Service]
+    LimitNOFILE=65535
+- path: /etc/systemd/system/docker.service.d/50-docker-log-sizing.conf
+  permissions: "0644"
+  owner: "core"
+  content: |
+    [Service]
+    Environment=DOCKER_OPTS='--log-driver=json-file --log-opt max-size=5m --log-opt max-file=10'
+- path: "/etc/logrotate.d/logrotate.conf"
+  permissins: "0644"
+  owner: "core"
+  content: |
+%(log_rotate_content)s
+- path: "/etc/kubernetes/manifests/kube_proxy.yaml"
+  permissions: "0644"
+  owner: "core"
+  content: |
+%(kube_proxy_content)s
+- path: "/etc/kubernetes/kubeconfig.yaml"
+  permissions: "0644"
+  owner: "core"
+  content: |
+%(kube_config_content)s
