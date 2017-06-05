@@ -681,6 +681,13 @@ items:
   - apiGroups:
     - ""
     resources:
+    - nodes
+    verbs:
+    - get
+    - list
+  - apiGroups:
+    - ""
+    resources:
     - events
     verbs:
     - watch
