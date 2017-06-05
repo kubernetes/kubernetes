@@ -2450,6 +2450,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidSupGroupStratType := validPSP()
 	invalidSupGroupStratType.Spec.SupplementalGroups.Rule = "invalid"
 
+	invalidHostPaths := validPSP()
+	invalidHostPaths.Spec.AllowedHostPaths = []string{"invalid"}
+
 	invalidRangeMinGreaterThanMax := validPSP()
 	invalidRangeMinGreaterThanMax.Spec.FSGroup.Ranges = []extensions.GroupIDRange{
 		{Min: 2, Max: 1},
@@ -2539,6 +2542,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			psp:         invalidFSGroupStratType,
 			errorType:   field.ErrorTypeNotSupported,
 			errorDetail: "supported values: MustRunAs, RunAsAny",
+		},
+		"invalid allowed host paths": {
+			psp:         invalidHostPaths,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must specify an absolute path",
 		},
 		"invalid uid": {
 			psp:         invalidUIDPSP,

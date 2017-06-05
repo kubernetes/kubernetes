@@ -19,6 +19,7 @@ package validation
 import (
 	"fmt"
 	"net"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -715,6 +716,7 @@ func ValidatePodSecurityPolicySpec(spec *extensions.PodSecurityPolicySpec, fldPa
 	allErrs = append(allErrs, validatePSPSELinux(fldPath.Child("seLinux"), &spec.SELinux)...)
 	allErrs = append(allErrs, validatePSPSupplementalGroup(fldPath.Child("supplementalGroups"), &spec.SupplementalGroups)...)
 	allErrs = append(allErrs, validatePSPFSGroup(fldPath.Child("fsGroup"), &spec.FSGroup)...)
+	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
 	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(fldPath, spec.Volumes)...)
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.DefaultAddCapabilities, field.NewPath("defaultAddCapabilities"))...)
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.AllowedCapabilities, field.NewPath("allowedCapabilities"))...)
@@ -806,6 +808,18 @@ func validatePSPFSGroup(fldPath *field.Path, groupOptions *extensions.FSGroupStr
 
 	for idx, rng := range groupOptions.Ranges {
 		allErrs = append(allErrs, validateGroupIDRange(fldPath.Child("ranges").Index(idx), rng)...)
+	}
+	return allErrs
+}
+
+// validatePSPAllowedHostPaths validates the allowed host paths of the PodSecurityPolicy.
+func validatePSPAllowedHostPaths(fldPath *field.Path, paths []string) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for i, path := range paths {
+		if !filepath.IsAbs(path) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), path, "must specify an absolute path"))
+		}
 	}
 	return allErrs
 }
