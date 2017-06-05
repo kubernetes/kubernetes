@@ -258,7 +258,7 @@ function create-federation-api-objects {
     export FEDERATION_APISERVER_KEY_BASE64="${FEDERATION_APISERVER_KEY_BASE64}"
 
     # Enable the NamespaceLifecycle admission control by default.
-    export FEDERATION_ADMISSION_CONTROL="${FEDERATION_ADMISSION_CONTROL:-Initializers,NamespaceLifecycle}"
+    export FEDERATION_ADMISSION_CONTROL="${FEDERATION_ADMISSION_CONTROL:-NamespaceLifecycle}"
 
     for file in federation-etcd-pvc.yaml federation-apiserver-{deployment,secrets}.yaml federation-controller-manager-deployment.yaml; do
       echo "Creating manifest: ${file}"
