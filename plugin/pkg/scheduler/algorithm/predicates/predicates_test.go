@@ -4886,3 +4886,100 @@ func TestInterPodAffinityAnnotationsWithMultipleNodes(t *testing.T) {
 		}
 	}
 }
+
+func benchmarkPodMatchesNodeLabels(pods []*v1.Pod, nodes []*v1.Node, b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for _, pod := range pods {
+			for _, node := range nodes {
+				podMatchesNodeLabels(pod, node)
+			}
+		}
+	}
+}
+
+func buildPodsAndNodes(podNum, nodeNum int) ([]*v1.Pod, []*v1.Node) {
+	hostNameGenFunc := func(i int) string {
+		return fmt.Sprintf("node_%d", i)
+	}
+	podNameGenFunc := func(i int) string {
+		return fmt.Sprintf("pod_%d", i)
+	}
+
+	pods := []*v1.Pod{}
+	nodes := []*v1.Node{}
+
+	for i := 0; i < podNum; i++ {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podNameGenFunc(i),
+			},
+			Spec: v1.PodSpec{
+				Affinity: &v1.Affinity{
+					NodeAffinity: &v1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchExpressions: []v1.NodeSelectorRequirement{
+										{
+											Key:      v1.HostNameAnnotationKey,
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{hostNameGenFunc(i % nodeNum)},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		pods = append(pods, pod)
+	}
+
+	for i := 0; i < nodeNum; i++ {
+		hostName := hostNameGenFunc(i)
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: hostName,
+				Labels: map[string]string{
+					v1.HostNameAnnotationKey: hostName,
+				},
+			},
+		}
+		nodes = append(nodes, node)
+	}
+
+	return pods, nodes
+}
+
+func BenchmarkPodMatchesNodeLabels500Pods50Nodes(b *testing.B) {
+	pods, nodes := buildPodsAndNodes(500, 50)
+
+	b.ResetTimer()
+
+	benchmarkPodMatchesNodeLabels(pods, nodes, b)
+}
+
+func BenchmarkPodMatchesNodeLabels5000Pods500Nodes(b *testing.B) {
+	pods, nodes := buildPodsAndNodes(5000, 500)
+
+	b.ResetTimer()
+
+	benchmarkPodMatchesNodeLabels(pods, nodes, b)
+}
+
+func BenchmarkPodMatchesNodeLabels50000Pods5000Nodes(b *testing.B) {
+	pods, nodes := buildPodsAndNodes(50000, 5000)
+
+	b.ResetTimer()
+
+	benchmarkPodMatchesNodeLabels(pods, nodes, b)
+}
+
+func BenchmarkPodMatchesNodeLabels5000Pods5000Nodes(b *testing.B) {
+	pods, nodes := buildPodsAndNodes(5000, 5000)
+
+	b.ResetTimer()
+
+	benchmarkPodMatchesNodeLabels(pods, nodes, b)
+}

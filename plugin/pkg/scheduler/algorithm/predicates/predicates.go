@@ -687,8 +687,8 @@ func podMatchesNodeLabels(pod *v1.Pod, node *v1.Node) bool {
 			glog.V(10).Infof("Match for RequiredDuringSchedulingIgnoredDuringExecution node selector terms %+v", nodeSelectorTerms)
 			nodeAffinityMatches = nodeAffinityMatches && nodeMatchesNodeSelectorTerms(node, nodeSelectorTerms)
 		}
-
 	}
+
 	return nodeAffinityMatches
 }
 

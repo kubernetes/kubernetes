@@ -14,6 +14,7 @@ go_library(
         "well_known_labels.go",
     ],
     tags = ["automanaged"],
+    deps = ["//pkg/api:go_default_library"],
 )
 
 filegroup(
