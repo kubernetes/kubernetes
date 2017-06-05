@@ -59,6 +59,30 @@ message HorizontalPodAutoscaler {
   optional HorizontalPodAutoscalerStatus status = 3;
 }
 
+// HorizontalPodAutoscalerCondition describes the state of
+// a HorizontalPodAutoscaler at a certain point.
+message HorizontalPodAutoscalerCondition {
+  // type describes the current condition
+  optional string type = 1;
+
+  // status is the status of the condition (True, False, Unknown)
+  optional string status = 2;
+
+  // lastTransitionTime is the last time the condition transitioned from
+  // one status to another
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+
+  // reason is the reason for the condition's last transition.
+  // +optional
+  optional string reason = 4;
+
+  // message is a human-readable explanation containing details about
+  // the transition
+  // +optional
+  optional string message = 5;
+}
+
 // list of horizontal pod autoscaler objects.
 message HorizontalPodAutoscalerList {
   // Standard list metadata.

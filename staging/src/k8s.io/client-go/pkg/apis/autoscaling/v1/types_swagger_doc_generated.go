@@ -49,6 +49,19 @@ func (HorizontalPodAutoscaler) SwaggerDoc() map[string]string {
 	return map_HorizontalPodAutoscaler
 }
 
+var map_HorizontalPodAutoscalerCondition = map[string]string{
+	"":                   "HorizontalPodAutoscalerCondition describes the state of a HorizontalPodAutoscaler at a certain point.",
+	"type":               "type describes the current condition",
+	"status":             "status is the status of the condition (True, False, Unknown)",
+	"lastTransitionTime": "lastTransitionTime is the last time the condition transitioned from one status to another",
+	"reason":             "reason is the reason for the condition's last transition.",
+	"message":            "message is a human-readable explanation containing details about the transition",
+}
+
+func (HorizontalPodAutoscalerCondition) SwaggerDoc() map[string]string {
+	return map_HorizontalPodAutoscalerCondition
+}
+
 var map_HorizontalPodAutoscalerList = map[string]string{
 	"":         "list of horizontal pod autoscaler objects.",
 	"metadata": "Standard list metadata.",
