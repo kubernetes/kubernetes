@@ -591,7 +591,15 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"securityGroupName": "--security-group-name--",
 		"vnetName": "--vnet-name--",
 		"routeTableName": "--route-table-name--",
-		"primaryAvailabilitySetName": "--primary-availability-set-name--"
+		"primaryAvailabilitySetName": "--primary-availability-set-name--",
+		"cloudProviderBackoff": true,
+		"cloudProviderBackoffRetries": 6,
+		"cloudProviderBackoffExponent": 1.5,
+		"cloudProviderBackoffDuration": 5,
+		"cloudProviderBackoffJitter": 1.0,
+		"cloudProviderRatelimit": true,
+		"cloudProviderRateLimitQPS": 1,
+		"cloudProviderRateLimitBucket": 5
 	}`
 	validateConfig(t, config)
 }
@@ -610,6 +618,14 @@ securityGroupName: --security-group-name--
 vnetName: --vnet-name--
 routeTableName: --route-table-name--
 primaryAvailabilitySetName: --primary-availability-set-name--
+cloudProviderBackoff: true
+cloudProviderBackoffRetries: 6
+cloudProviderBackoffExponent: 1.5
+cloudProviderBackoffDuration: 5
+cloudProviderBackoffJitter: 1.0
+cloudProviderRatelimit: true
+cloudProviderRateLimitQPS: 1
+cloudProviderRateLimitBucket: 5
 `
 	validateConfig(t, config)
 }
@@ -658,6 +674,30 @@ func validateConfig(t *testing.T, config string) {
 	}
 	if azureCloud.PrimaryAvailabilitySetName != "--primary-availability-set-name--" {
 		t.Errorf("got incorrect value for PrimaryAvailabilitySetName")
+	}
+	if azureCloud.CloudProviderBackoff != true {
+		t.Errorf("got incorrect value for CloudProviderBackoff")
+	}
+	if azureCloud.CloudProviderBackoffRetries != 6 {
+		t.Errorf("got incorrect value for CloudProviderBackoffRetries")
+	}
+	if azureCloud.CloudProviderBackoffExponent != 1.5 {
+		t.Errorf("got incorrect value for CloudProviderBackoffExponent")
+	}
+	if azureCloud.CloudProviderBackoffDuration != 5 {
+		t.Errorf("got incorrect value for CloudProviderBackoffDuration")
+	}
+	if azureCloud.CloudProviderBackoffJitter != 1.0 {
+		t.Errorf("got incorrect value for CloudProviderBackoffJitter")
+	}
+	if azureCloud.CloudProviderRateLimit != true {
+		t.Errorf("got incorrect value for CloudProviderRateLimit")
+	}
+	if azureCloud.CloudProviderRateLimitQPS != 1 {
+		t.Errorf("got incorrect value for CloudProviderRateLimitQPS")
+	}
+	if azureCloud.CloudProviderRateLimitBucket != 5 {
+		t.Errorf("got incorrect value for CloudProviderRateLimitBucket")
 	}
 }
 
