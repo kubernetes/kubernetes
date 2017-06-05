@@ -670,6 +670,10 @@ function load-docker-images {
 # using systemctl.
 function start-kubelet {
   echo "Start kubelet"
+
+  local -r kubelet_cert_dir="/var/lib/kubelet/pki/"
+  mkdir -p "${kubelet_cert_dir}"
+
   local kubelet_bin="${KUBE_HOME}/bin/kubelet"
   local -r version="$("${kubelet_bin}" --version=true | cut -f2 -d " ")"
   local -r builtin_kubelet="/usr/bin/kubelet"
@@ -695,6 +699,7 @@ function start-kubelet {
   flags+=" --pod-manifest-path=/etc/kubernetes/manifests"
   flags+=" --experimental-mounter-path=${CONTAINERIZED_MOUNTER_HOME}/mounter"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
+  flags+=" --cert-dir=${kubelet_cert_dir}"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
