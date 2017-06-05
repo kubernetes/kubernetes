@@ -51,6 +51,7 @@ func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, fldPat
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), sr.Operator, "not a valid selector operator"))
 	}
 	allErrs = append(allErrs, ValidateLabelName(sr.Key, fldPath.Child("key"))...)
+	allErrs = append(allErrs, ValidateLabelValues(sr.Values, fldPath.Child("values"))...)
 	return allErrs
 }
 
@@ -59,6 +60,17 @@ func ValidateLabelName(labelName string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(labelName) {
 		allErrs = append(allErrs, field.Invalid(fldPath, labelName, msg))
+	}
+	return allErrs
+}
+
+// ValidateLabelValues validates that the label values are correctly defined.
+func ValidateLabelValues(labelVals []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, v := range labelVals {
+		for _, msg := range validation.IsValidLabelValue(v) {
+			allErrs = append(allErrs, field.Invalid(fldPath, v, msg))
+		}
 	}
 	return allErrs
 }
