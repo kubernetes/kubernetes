@@ -1,0 +1,2 @@
+#!/bin/bash
+mysql -u$MYSQL_USER -p$MYSQL_PASSWORD -e 'select version();' &>/dev/null

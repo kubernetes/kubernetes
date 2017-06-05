@@ -36,6 +36,11 @@ spec:
               cpu: 0.3
           image: capttofu/percona_xtradb_cluster_5_6:beta
           name: pxc-node3
+          readinessProbe:
+            exec:
+              command: ["healthz"]
+            initialDelaySeconds: 20
+            timeoutSeconds: 5
           ports:
             - containerPort: 3306
             - containerPort: 4444
