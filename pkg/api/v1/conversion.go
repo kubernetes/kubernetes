@@ -493,6 +493,12 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out 
 		// taking responsibility to ensure mutation of in is not exposed
 		// back to the caller.
 		in.Spec.InitContainers = values
+		// Call defaulters explicitly until annotations are removed
+		tmpPod := &Pod{Spec: PodSpec{InitContainers: values}}
+		// Call `SetObjectDefaults_Pod` to fulfil all default values of init containers,
+		// e.g. ImagePullPolicy by `SetDefaults_Container`, ReadinessProbe by `SetDefaults_HTTPGetAction`.
+		SetObjectDefaults_Pod(tmpPod)
+		in.Spec.InitContainers = tmpPod.Spec.InitContainers
 	}
 
 	if err := autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s); err != nil {
@@ -623,10 +629,11 @@ func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 		// back to the caller.
 		in.Spec.InitContainers = values
 		// Call defaulters explicitly until annotations are removed
-		for i := range in.Spec.InitContainers {
-			c := &in.Spec.InitContainers[i]
-			SetDefaults_Container(c)
-		}
+		tmpPod := &Pod{Spec: PodSpec{InitContainers: values}}
+		// Call `SetObjectDefaults_Pod` to fulfil all default values of init containers,
+		// e.g. ImagePullPolicy by `SetDefaults_Container`, ReadinessProbe by `SetDefaults_HTTPGetAction`.
+		SetObjectDefaults_Pod(tmpPod)
+		in.Spec.InitContainers = tmpPod.Spec.InitContainers
 	}
 	// If there is a beta annotation, copy to alpha key.
 	// See commit log for PR #31026 for why we do this.
