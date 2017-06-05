@@ -119,7 +119,10 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		for _, apiService := range apiServices {
 			found := false
 			for _, item := range items {
-				if item.Name == apiService.Name {
+				if item.Name != apiService.Name {
+					continue
+				}
+				if apiregistration.IsAPIServiceConditionTrue(item, apiregistration.Available) {
 					found = true
 					break
 				}
