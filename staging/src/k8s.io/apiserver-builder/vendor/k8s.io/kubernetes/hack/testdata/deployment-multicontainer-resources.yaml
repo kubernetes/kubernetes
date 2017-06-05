@@ -1,0 +1,24 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-deployment-resources
+  labels:
+    name: nginx-deployment-resources
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      name: nginx
+  template:
+    metadata:
+      labels:
+        name: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: gcr.io/google-containers/nginx:test-cmd
+        ports:
+        - containerPort: 80
+      - name: perl
+        image: gcr.io/google-containers/perl
+      terminationGracePeriodSeconds: 0

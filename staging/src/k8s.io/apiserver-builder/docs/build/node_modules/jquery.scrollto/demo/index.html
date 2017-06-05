@@ -1,0 +1,252 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+	<title>jQuery.scrollTo</title>
+	<meta name="keywords" content="javascript, jquery, plugins, scroll, scrollTo, smooth, animation, to, effect, ariel, flesler, window, overflow, element, navigation, customizable" />
+	<meta name="description" content="Demo of jQuery.scrollTo. Lightweight, cross-browser and highly customizable animated scrolling with jQuery, made by Ariel Flesler." />
+	<meta name="robots" content="index,follow" />
+	<link type="text/css" rel="stylesheet" href="css/style.css" />
+	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
+	<script type="text/javascript" src="../jquery.scrollTo.min.js"></script>
+	<script type="text/javascript">
+		jQuery(function( $ ){
+			/**
+			 * Demo binding and preparation, no need to read this part
+			 */
+				//borrowed from jQuery easing plugin
+				//http://gsgd.co.uk/sandbox/jquery.easing.php
+				$.easing.elasout = function(x, t, b, c, d) {
+					var s=1.70158;var p=0;var a=c;
+					if (t==0) return b;  if ((t/=d)==1) return b+c;  if (!p) p=d*.3;
+					if (a < Math.abs(c)) { a=c; var s=p/4; }
+					else var s = p/(2*Math.PI) * Math.asin (c/a);
+					return a*Math.pow(2,-10*t) * Math.sin( (t*d-s)*(2*Math.PI)/p ) + c + b;
+				};
+				$('a.back').click(function() {
+					$(this).parents('div.pane').scrollTo(0, 800, { queue:true });
+					$(this).parents('div.section').find('span.message').text( this.title);
+					return false;
+				});
+				//just for the example, to stop the click on the links.
+				$('ul.links').click(function(e){
+					var link = e.target;
+					if (link.target === '_blank') {
+						return;
+					}
+					e.preventDefault();
+					link.blur();
+					if (link.title) {
+						$(this).parent().find('span.message').text(link.title);
+					}
+				});
+			
+			// This one is important, many browsers don't reset scroll on refreshes
+			// Reset all scrollable panes to (0,0)
+			$('div.pane').scrollTo(0);
+			// Reset the screen to (0,0)
+			$.scrollTo(0);
+			
+			// TOC, shows how to scroll the whole window
+			$('#toc a').click(function() {//$.scrollTo works EXACTLY the same way, but scrolls the whole screen
+				$.scrollTo(this.hash, 1500, { easing:'elasout' });
+				$(this.hash).find('span.message').text(this.title);
+				return false;
+			});
+			
+			// Target examples bindings
+			var $target = $('#pane-target');
+			$('#target-examples a').click(function() {
+				$target.stop(true);
+			});
+
+			$('#relative-selector').click(function() {
+				$target.scrollTo('li:eq(7)', 800);
+			});
+			$('#jquery-object').click(function() {
+				$target.scrollTo($('#pane-target li:eq(14)') , 800);
+			});
+			$('#dom-element').click(function() {
+				$target.scrollTo(document.getElementById('twenty'), 800);
+			});
+			$('#absolute-number').click(function() {
+				$target.scrollTo(150, 800);
+			});
+			$('#absolute-number-hash').click(function() {
+				$target.scrollTo({ top:800, left:700}, 800);
+			});
+			$('#absolute-px').click(function() {
+				$target.scrollTo('520px', 800);
+			});
+			$('#absolute-px-hash').click(function() {
+				$target.scrollTo({top:'110px', left:'290px'}, 800);
+			});
+			$('#relative-px').click(function() {
+				$target.scrollTo('+=100', 500);
+			});
+			$('#relative-px-hash').click(function() {				
+				$target.scrollTo({top:'-=100px', left:'+=100'}, 500);
+			});
+			$('#percentage-px').click(function() {				
+				$target.scrollTo('50%', 800);
+			});
+			$('#percentage-px-hash').click(function() {				
+				$target.scrollTo({top:'50%', left:'20%'}, 800);
+			});
+			
+			// Settings examples bindings, they will all scroll to the same place, with different settings
+			var $settings = $('#pane-settings');
+			$('#settings-examples a').click(function() {
+				// before each animation, reset to (0,0), skip this.
+				$settings.stop(true).scrollTo(0);
+			});
+			
+			$('#settings-no').click(function() {
+				$settings.scrollTo('li:eq(15)', 1000);
+			});
+			$('#settings-axis').click(function() {// only scroll horizontally
+				$settings.scrollTo('li:eq(15)', 1000, { axis:'x' });
+			});
+			$('#settings-duration').click(function() {// it's the same as specifying it in the 2nd argument
+				$settings.scrollTo('li:eq(15)', { duration: 3000 });
+			});
+			$('#settings-easing').click(function() {
+				$settings.scrollTo('li:eq(15)', 2500, { easing:'elasout' });
+			});
+			$('#settings-margin').click(function() {//scroll to the "outer" position of the element
+				$settings.scrollTo('li:eq(15)', 1000, { margin:true });
+			});
+			$('#settings-offset').click(function() {//same as { top:-50, left:-50 }
+				$settings.scrollTo('li:eq(15)', 1000, { offset:-50 });
+			});
+			$('#settings-offset-hash').click(function() {
+				$settings.scrollTo('li:eq(15)', 1000, { offset:{ top:-5, left:-30 } });
+			});
+			$('#settings-offset-function').click(function() {
+				$settings.scrollTo('li:eq(15)', 1000, {offset: function() { return {top:-30, left:-5}; }});
+			});
+			$('#settings-over').click(function() {//same as { top:-50, left:-50 }
+				$settings.scrollTo('li:eq(15)', 1000, { over:0.5 });
+			});
+			$('#settings-over-hash').click(function() {
+				$settings.scrollTo('li:eq(15)', 1000, { over:{ top:0.2, left:-0.5 } });
+			});
+			$('#settings-interrupt').click(function() {
+				$settings.scrollTo('li:eq(15)', 10000, { interrupt:true });
+			});
+			$('#settings-queue').click(function() {//in this case, having 'axis' as 'xy' or 'yx' matters.
+				$settings.scrollTo('li:eq(15)', 2000, { queue:true });
+			});
+			$('#settings-onAfter').click(function() {
+				$settings.scrollTo('li:eq(15)', 2000, { 
+					onAfter:function() {
+						$('#settings-message').text('Got there!');
+					}
+				});
+			});
+			$('#settings-onAfterFirst').click(function() {//onAfterFirst exists only when queuing
+				$settings.scrollTo('li:eq(15)', 1600, { 
+					queue:true,
+					onAfterFirst:function() {
+						$('#settings-message').text('Got there horizontally!');
+					},
+					onAfter:function() {
+						$('#settings-message').text('Got there vertically!');
+					}
+				});
+			});
+			$('#settings-step').click(function() {
+				$settings.scrollTo('li:eq(15)', 2000, {step:function(now) {
+					$('#settings-message').text(now.toFixed(2));
+				}});
+			});
+			$('#settings-progress').click(function() {
+				$settings.scrollTo('li:eq(15)', 2000, {progress:function(_, now) {
+					$('#settings-message').text(Math.round(now*100) + '%');
+				}});
+			});
+			$('#settings-fail').click(function() {
+				$settings.scrollTo('li:eq(15)', 10000, {interrupt:true, fail:function() {
+					$('#settings-message').text('Scroll interrupted!');
+				}});
+			});
+		});
+	</script>
+</head>
+<body>
+	<h1>jQuery.scrollTo&nbsp;<strong>by Ariel Flesler</strong></h1>
+	
+	<div id="toc" class="part">
+		<h3>Table of contents&nbsp;<strong>(try these)</strong></h3>
+		<ul>
+			<li><a title="$.scrollTo('#target-examples', 800, {easing:'elasout'});" href="#target-examples">Ways to specify the target</a></li>
+			<li><a title="$.scrollTo('#settings-examples', 800, {easing:'elasout'});" href="#settings-examples">Settings</a></li>
+		</ul>
+	</div>
+	
+	<div id="links" class="part">
+		<h3>Links</h3>
+		<ul>
+			<li><a target="_blank" href="https://github.com/flesler/jquery.scrollTo">Github</a></li>
+			<li><a target="_blank" href="http://flesler.blogspot.com/2007/10/jqueryscrollto.html">Main blog article</a></li>
+			<li><a target="_blank" href="http://demos.flesler.com/jquery/localScroll/">LocalScroll Demo</a></li>
+			<li><a target="_blank" href="http://demos.flesler.com/jquery/serialScroll/">SerialScroll Demo</a></li>
+			<li><a target="_blank" href="index.old.html">Old Demo</a></li>
+		</ul>
+	</div>
+	<div id="target-examples" class="section part">
+		<h3>Ways to specify the target&nbsp;<span id="target-message" class="message">Click an option, to see it in action</span></h3>
+		<ul class="links">
+			<li><a title="$(...).scrollTo('li:eq(7)', 800);" id="relative-selector" href="#">Relative selector</a></li>
+			<li><a title="$(...).scrollTo($('div li:eq(14)'), 800);" id="jquery-object" href="#">jQuery object</a></li>
+			<li><a title="$(...).scrollTo(document.getElementById('twenty'), 800);" id="dom-element" href="#">DOM Element</a></li>
+			<li><a title="$(...).scrollTo(150, 800);" id="absolute-number" href="#">Absolute number</a></li>
+			<li><a title="$(...).scrollTo({ top:800, left:700}, 800);" id="absolute-number-hash" href="#">Absolute number(hash)</a></li>
+		</ul>
+		<ul class="links">
+			<li><a title="$(...).scrollTo('520px', 800);" id="absolute-px" href="#">Absolute px</a></li>
+			<li><a title="$(...).scrollTo({top:'110px', left:'290px'}, 800);" id="absolute-px-hash" href="#">Absolute px(hash)</a></li>
+			<li><a title="$(...).scrollTo('+=100px', 800);" id="relative-px" href="#">Relative px</a></li>
+			<li><a title="$(...).scrollTo({top:'-=100px', left:'+=100'}, 800);" id="relative-px-hash" href="#">Relative px(hash)</a></li>
+			<li><a title="$(...).scrollTo('50%', 800);" id="percentage-px" href="#">Percent</a></li>
+			<li><a title="$(...).scrollTo({top:'50%', left:'20%'}, 800);" id="percentage-px-hash" href="#">Percent(hash)</a></li>
+		</ul>
+		<div id="pane-target" class="pane">
+			<ul class="elements" style="height:1011px; width:1820px;">
+				<li><p>0</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>1</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>2</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>3</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>4</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>5</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>6</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>7</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>8</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>9</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>10</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>11</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>12</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>13</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>14</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>15</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>16</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>17</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>18</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>19</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li id="twenty"><p>20</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>21</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>22</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>23</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>24</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>25</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>26</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>27</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>28</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>29</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li>
+			</ul>
+		</div>
+	</div>
+	<div id="settings-examples" class="section part">
+		<h3>Settings&nbsp;<span id="settings-message" class="message">The examples shown here, are summarized for brevity</span></h3>
+		<ul class="links">
+			<li><a title="$(...).scrollTo('li:eq(15)', 1000);" id="settings-no" href="#">no settings</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 1000, {axis:'x'});//only scroll on this axis (can be x, y, xy or yx)" id="settings-axis" href="#">axis</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 1000, {margin:true});//deduct the margin and border from the final position" id="settings-margin" href="#">margin</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 1000, {offset:-50});//add or deduct from the final position" id="settings-offset" href="#">offset</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 1000, {offset: {top:-5, left:-30} });" id="settings-offset-hash" href="#">offset(hash)</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 1000, {offset: function() { return {top:-30, left:-5}; }});" id="settings-offset-function" href="#">offset(function)</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 1000, {over:0.5});//add or deduct a fraction of its height/width" id="settings-over" href="#">over</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 1000, {over:{top:0.2, left:-0.5});" id="settings-over-hash" href="#">over(hash)</a></li>
+			<li><a title="Scroll manually to interrupt the animation" id="settings-interrupt" href="#">interrupt</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 1600, {onAfter:function() { } });//called after the scrolling ends" id="settings-onAfter" href="#">onAfter</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 1600, {queue:true, onAfterFirst:function() { } });//called after the first axis scrolled" id="settings-onAfterFirst" href="#">onAfterFirst</a></li>
+		</ul>
+		<h4>Settings inherited from <a href="http://api.jquery.com/animate/#animate-properties-options" target="_blank">$().animate()</a></h4>
+		<ul class="links">
+			<li><a title="$(...).scrollTo('li:eq(15)', {duration:3000});//another way of calling the plugin" id="settings-duration" href="#">duration</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 2500, {easing:'elasout'});//specify an easing equation" id="settings-easing" href="#">easing</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 1600, {queue:true});//scroll one axis, then the other" id="settings-queue" href="#">queue</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 2500, {step:function() { }'});//specify a step function" id="settings-step" href="#">step</a></li>
+			<li><a title="$(...).scrollTo('li:eq(15)', 2500, {progress:function() { }'});//specify a progress function" id="settings-progress" href="#">progress</a></li>
+			<li><a title="Scroll manually to interrupt and trigger the callback" id="settings-fail" href="#">fail</a></li>
+			<li><a href="http://api.jquery.com/animate/#animate-properties-options" target="_blank">more</a></li>
+		</ul>
+		<div id="pane-settings" class="pane">
+			<ul class="elements" style="height:1062px;width:1877px;">
+				<li><p>0</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>1</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>2</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>3</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>4</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>5</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>6</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>7</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>8</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>9</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>10</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>11</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>12</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>13</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>14</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>15</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>16</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>17</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>18</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>19</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>20</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>21</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>22</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>23</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>24</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>25</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>26</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>27</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>28</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li><li><p>29</p><a href="#" title="$(...).scrollTo(0, 800, {queue:true});" class="back">go back</a></li>
+			</ul>
+		</div>
+	</div>
+</body>
+</html>

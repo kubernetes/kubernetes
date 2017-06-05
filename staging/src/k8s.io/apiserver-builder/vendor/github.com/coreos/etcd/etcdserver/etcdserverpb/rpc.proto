@@ -1,0 +1,908 @@
+syntax = "proto3";
+package etcdserverpb;
+
+import "gogoproto/gogo.proto";
+import "etcd/mvcc/mvccpb/kv.proto";
+import "etcd/auth/authpb/auth.proto";
+
+// for grpc-gateway
+import "google/api/annotations.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+
+service KV {
+  // Range gets the keys in the range from the key-value store.
+  rpc Range(RangeRequest) returns (RangeResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/kv/range"
+        body: "*"
+    };
+  }
+
+  // Put puts the given key into the key-value store.
+  // A put request increments the revision of the key-value store
+  // and generates one event in the event history.
+  rpc Put(PutRequest) returns (PutResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/kv/put"
+        body: "*"
+    };
+  }
+
+  // DeleteRange deletes the given range from the key-value store.
+  // A delete request increments the revision of the key-value store
+  // and generates a delete event in the event history for every deleted key.
+  rpc DeleteRange(DeleteRangeRequest) returns (DeleteRangeResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/kv/deleterange"
+        body: "*"
+    };
+  }
+
+  // Txn processes multiple requests in a single transaction.
+  // A txn request increments the revision of the key-value store
+  // and generates events with the same revision for every completed request.
+  // It is not allowed to modify the same key several times within one txn.
+  rpc Txn(TxnRequest) returns (TxnResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/kv/txn"
+        body: "*"
+    };
+  }
+
+  // Compact compacts the event history in the etcd key-value store. The key-value
+  // store should be periodically compacted or the event history will continue to grow
+  // indefinitely.
+  rpc Compact(CompactionRequest) returns (CompactionResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/kv/compaction"
+        body: "*"
+    };
+  }
+}
+
+service Watch {
+  // Watch watches for events happening or that have happened. Both input and output
+  // are streams; the input stream is for creating and canceling watchers and the output
+  // stream sends events. One watch RPC can watch on multiple key ranges, streaming events
+  // for several watches at once. The entire event history can be watched starting from the
+  // last compaction revision.
+  rpc Watch(stream WatchRequest) returns (stream WatchResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/watch"
+        body: "*"
+    };
+  }
+}
+
+service Lease {
+  // LeaseGrant creates a lease which expires if the server does not receive a keepAlive
+  // within a given time to live period. All keys attached to the lease will be expired and
+  // deleted if the lease expires. Each expired key generates a delete event in the event history.
+  rpc LeaseGrant(LeaseGrantRequest) returns (LeaseGrantResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/lease/grant"
+        body: "*"
+    };
+  }
+
+  // LeaseRevoke revokes a lease. All keys attached to the lease will expire and be deleted.
+  rpc LeaseRevoke(LeaseRevokeRequest) returns (LeaseRevokeResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/kv/lease/revoke"
+        body: "*"
+    };
+  }
+
+  // LeaseKeepAlive keeps the lease alive by streaming keep alive requests from the client
+  // to the server and streaming keep alive responses from the server to the client.
+  rpc LeaseKeepAlive(stream LeaseKeepAliveRequest) returns (stream LeaseKeepAliveResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/lease/keepalive"
+        body: "*"
+    };
+  }
+
+  // TODO(xiangli) List all existing Leases?
+  // TODO(xiangli) Get details information (expirations, leased keys, etc.) of a lease?
+}
+
+service Cluster {
+  // MemberAdd adds a member into the cluster.
+  rpc MemberAdd(MemberAddRequest) returns (MemberAddResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/cluster/member/add"
+        body: "*"
+    };
+  }
+
+  // MemberRemove removes an existing member from the cluster.
+  rpc MemberRemove(MemberRemoveRequest) returns (MemberRemoveResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/cluster/member/remove"
+        body: "*"
+    };
+  }
+
+  // MemberUpdate updates the member configuration.
+  rpc MemberUpdate(MemberUpdateRequest) returns (MemberUpdateResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/cluster/member/update"
+        body: "*"
+    };
+  }
+
+  // MemberList lists all the members in the cluster.
+  rpc MemberList(MemberListRequest) returns (MemberListResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/cluster/member/list"
+        body: "*"
+    };
+  }
+}
+
+service Maintenance {
+  // Alarm activates, deactivates, and queries alarms regarding cluster health.
+  rpc Alarm(AlarmRequest) returns (AlarmResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/maintenance/alarm"
+        body: "*"
+    };
+  }
+
+  // Status gets the status of the member.
+  rpc Status(StatusRequest) returns (StatusResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/maintenance/status"
+        body: "*"
+    };
+  }
+
+  // Defragment defragments a member's backend database to recover storage space.
+  rpc Defragment(DefragmentRequest) returns (DefragmentResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/maintenance/defragment"
+        body: "*"
+    };
+  }
+
+  // Hash returns the hash of the local KV state for consistency checking purpose.
+  // This is designed for testing; do not use this in production when there
+  // are ongoing transactions.
+  rpc Hash(HashRequest) returns (HashResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/maintenance/hash"
+        body: "*"
+    };
+  }
+
+  // Snapshot sends a snapshot of the entire backend from a member over a stream to a client.
+  rpc Snapshot(SnapshotRequest) returns (stream SnapshotResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/maintenance/snapshot"
+        body: "*"
+    };
+  }
+}
+
+service Auth {
+  // AuthEnable enables authentication.
+  rpc AuthEnable(AuthEnableRequest) returns (AuthEnableResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/enable"
+        body: "*"
+    };
+  }
+
+  // AuthDisable disables authentication.
+  rpc AuthDisable(AuthDisableRequest) returns (AuthDisableResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/disable"
+        body: "*"
+    };
+  }
+
+  // Authenticate processes an authenticate request.
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/authenticate"
+        body: "*"
+    };
+  }
+
+  // UserAdd adds a new user.
+  rpc UserAdd(AuthUserAddRequest) returns (AuthUserAddResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/user/add"
+        body: "*"
+    };
+  }
+
+  // UserGet gets detailed user information.
+  rpc UserGet(AuthUserGetRequest) returns (AuthUserGetResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/user/get"
+        body: "*"
+    };
+  }
+
+  // UserList gets a list of all users.
+  rpc UserList(AuthUserListRequest) returns (AuthUserListResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/user/list"
+        body: "*"
+    };
+  }
+
+  // UserDelete deletes a specified user.
+  rpc UserDelete(AuthUserDeleteRequest) returns (AuthUserDeleteResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/user/delete"
+        body: "*"
+    };
+  }
+
+  // UserChangePassword changes the password of a specified user.
+  rpc UserChangePassword(AuthUserChangePasswordRequest) returns (AuthUserChangePasswordResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/user/changepw"
+        body: "*"
+    };
+  }
+
+  // UserGrant grants a role to a specified user.
+  rpc UserGrantRole(AuthUserGrantRoleRequest) returns (AuthUserGrantRoleResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/user/grant"
+        body: "*"
+    };
+  }
+
+  // UserRevokeRole revokes a role of specified user.
+  rpc UserRevokeRole(AuthUserRevokeRoleRequest) returns (AuthUserRevokeRoleResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/user/revoke"
+        body: "*"
+    };
+  }
+
+  // RoleAdd adds a new role.
+  rpc RoleAdd(AuthRoleAddRequest) returns (AuthRoleAddResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/role/add"
+        body: "*"
+    };
+  }
+
+  // RoleGet gets detailed role information.
+  rpc RoleGet(AuthRoleGetRequest) returns (AuthRoleGetResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/role/get"
+        body: "*"
+    };
+  }
+
+  // RoleList gets lists of all roles.
+  rpc RoleList(AuthRoleListRequest) returns (AuthRoleListResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/role/list"
+        body: "*"
+    };
+  }
+
+  // RoleDelete deletes a specified role.
+  rpc RoleDelete(AuthRoleDeleteRequest) returns (AuthRoleDeleteResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/role/delete"
+        body: "*"
+    };
+  }
+
+  // RoleGrantPermission grants a permission of a specified key or range to a specified role.
+  rpc RoleGrantPermission(AuthRoleGrantPermissionRequest) returns (AuthRoleGrantPermissionResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/role/grant"
+        body: "*"
+    };
+  }
+
+  // RoleRevokePermission revokes a key or range permission of a specified role.
+  rpc RoleRevokePermission(AuthRoleRevokePermissionRequest) returns (AuthRoleRevokePermissionResponse) {
+      option (google.api.http) = {
+        post: "/v3alpha/auth/role/revoke"
+        body: "*"
+    };
+  }
+}
+
+message ResponseHeader {
+  // cluster_id is the ID of the cluster which sent the response.
+  uint64 cluster_id = 1;
+  // member_id is the ID of the member which sent the response.
+  uint64 member_id = 2;
+  // revision is the key-value store revision when the request was applied.
+  int64 revision = 3;
+  // raft_term is the raft term when the request was applied.
+  uint64 raft_term = 4;
+}
+
+message RangeRequest {
+  enum SortOrder {
+	NONE = 0; // default, no sorting
+	ASCEND = 1; // lowest target value first
+	DESCEND = 2; // highest target value first
+  }
+  enum SortTarget {
+	KEY = 0;
+	VERSION = 1;
+	CREATE = 2;
+	MOD = 3;
+	VALUE = 4;
+  }
+
+  // key is the first key for the range. If range_end is not given, the request only looks up key.
+  bytes key = 1;
+  // range_end is the upper bound on the requested range [key, range_end).
+  // If range_end is '\0', the range is all keys >= key.
+  // If the range_end is one bit larger than the given key,
+  // then the range requests get the all keys with the prefix (the given key).
+  // If both key and range_end are '\0', then range requests returns all keys.
+  bytes range_end = 2;
+  // limit is a limit on the number of keys returned for the request.
+  int64 limit = 3;
+  // revision is the point-in-time of the key-value store to use for the range.
+  // If revision is less or equal to zero, the range is over the newest key-value store.
+  // If the revision has been compacted, ErrCompacted is returned as a response.
+  int64 revision = 4;
+
+  // sort_order is the order for returned sorted results.
+  SortOrder sort_order = 5;
+
+  // sort_target is the key-value field to use for sorting.
+  SortTarget sort_target = 6;
+
+  // serializable sets the range request to use serializable member-local reads.
+  // Range requests are linearizable by default; linearizable requests have higher
+  // latency and lower throughput than serializable requests but reflect the current
+  // consensus of the cluster. For better performance, in exchange for possible stale reads,
+  // a serializable range request is served locally without needing to reach consensus
+  // with other nodes in the cluster.
+  bool serializable = 7;
+
+  // keys_only when set returns only the keys and not the values.
+  bool keys_only = 8;
+ 
+  // count_only when set returns only the count of the keys in the range.
+  bool count_only = 9;
+}
+
+message RangeResponse {
+  ResponseHeader header = 1;
+  // kvs is the list of key-value pairs matched by the range request.
+  // kvs is empty when count is requested.
+  repeated mvccpb.KeyValue kvs = 2;
+  // more indicates if there are more keys to return in the requested range.
+  bool more = 3;
+  // count is set to the number of keys within the range when requested.
+  int64 count = 4;
+}
+
+message PutRequest {
+  // key is the key, in bytes, to put into the key-value store.
+  bytes key = 1;
+  // value is the value, in bytes, to associate with the key in the key-value store.
+  bytes value = 2;
+  // lease is the lease ID to associate with the key in the key-value store. A lease
+  // value of 0 indicates no lease.
+  int64 lease = 3;
+
+  // If prev_kv is set, etcd gets the previous key-value pair before changing it.
+  // The previous key-value pair will be returned in the put response.
+  bool prev_kv = 4;
+}
+
+message PutResponse {
+  ResponseHeader header = 1;
+  // if prev_kv is set in the request, the previous key-value pair will be returned.
+  mvccpb.KeyValue prev_kv = 2;
+}
+
+message DeleteRangeRequest {
+  // key is the first key to delete in the range.
+  bytes key = 1;
+  // range_end is the key following the last key to delete for the range [key, range_end).
+  // If range_end is not given, the range is defined to contain only the key argument.
+  // If range_end is '\0', the range is all keys greater than or equal to the key argument.
+  bytes range_end = 2;
+  // If prev_kv is set, etcd gets the previous key-value pairs before deleting it.
+  // The previous key-value pairs will be returned in the delte response.
+  bool prev_kv = 3;
+}
+
+message DeleteRangeResponse {
+  ResponseHeader header = 1;
+  // deleted is the number of keys deleted by the delete range request.
+  int64 deleted = 2;
+  // if prev_kv is set in the request, the previous key-value pairs will be returned.
+  repeated mvccpb.KeyValue prev_kvs = 3;
+}
+
+message RequestOp {
+  // request is a union of request types accepted by a transaction.
+  oneof request {
+    RangeRequest request_range = 1;
+    PutRequest request_put = 2;
+    DeleteRangeRequest request_delete_range = 3;
+  }
+}
+
+message ResponseOp {
+  // response is a union of response types returned by a transaction.
+  oneof response {
+    RangeResponse response_range = 1;
+    PutResponse response_put = 2;
+    DeleteRangeResponse response_delete_range = 3;
+  }
+}
+
+message Compare {
+  enum CompareResult {
+    EQUAL = 0;
+    GREATER = 1;
+    LESS = 2;
+  }
+  enum CompareTarget {
+    VERSION = 0;
+    CREATE = 1;
+    MOD = 2;
+    VALUE= 3;
+  }
+  // result is logical comparison operation for this comparison.
+  CompareResult result = 1;
+  // target is the key-value field to inspect for the comparison.
+  CompareTarget target = 2;
+  // key is the subject key for the comparison operation.
+  bytes key = 3;
+  oneof target_union {
+    // version is the version of the given key
+    int64 version = 4;
+    // create_revision is the creation revision of the given key
+    int64 create_revision = 5;
+    // mod_revision is the last modified revision of the given key.
+    int64 mod_revision = 6;
+    // value is the value of the given key, in bytes.
+    bytes value = 7;
+  }
+}
+
+// From google paxosdb paper:
+// Our implementation hinges around a powerful primitive which we call MultiOp. All other database
+// operations except for iteration are implemented as a single call to MultiOp. A MultiOp is applied atomically
+// and consists of three components:
+// 1. A list of tests called guard. Each test in guard checks a single entry in the database. It may check
+// for the absence or presence of a value, or compare with a given value. Two different tests in the guard
+// may apply to the same or different entries in the database. All tests in the guard are applied and
+// MultiOp returns the results. If all tests are true, MultiOp executes t op (see item 2 below), otherwise
+// it executes f op (see item 3 below).
+// 2. A list of database operations called t op. Each operation in the list is either an insert, delete, or
+// lookup operation, and applies to a single database entry. Two different operations in the list may apply
+// to the same or different entries in the database. These operations are executed
+// if guard evaluates to
+// true.
+// 3. A list of database operations called f op. Like t op, but executed if guard evaluates to false.
+message TxnRequest {
+  // compare is a list of predicates representing a conjunction of terms.
+  // If the comparisons succeed, then the success requests will be processed in order,
+  // and the response will contain their respective responses in order.
+  // If the comparisons fail, then the failure requests will be processed in order,
+  // and the response will contain their respective responses in order.
+  repeated Compare compare = 1;
+  // success is a list of requests which will be applied when compare evaluates to true.
+  repeated RequestOp success = 2;
+  // failure is a list of requests which will be applied when compare evaluates to false.
+  repeated RequestOp failure = 3;
+}
+
+message TxnResponse {
+  ResponseHeader header = 1;
+  // succeeded is set to true if the compare evaluated to true or false otherwise.
+  bool succeeded = 2;
+  // responses is a list of responses corresponding to the results from applying
+  // success if succeeded is true or failure if succeeded is false.
+  repeated ResponseOp responses = 3;
+}
+
+// CompactionRequest compacts the key-value store up to a given revision. All superseded keys
+// with a revision less than the compaction revision will be removed.
+message CompactionRequest {
+  // revision is the key-value store revision for the compaction operation. 
+  int64 revision = 1;
+  // physical is set so the RPC will wait until the compaction is physically
+  // applied to the local database such that compacted entries are totally
+  // removed from the backend database.
+  bool physical = 2;
+}
+
+message CompactionResponse {
+  ResponseHeader header = 1;
+}
+
+message HashRequest {
+}
+
+message HashResponse {
+  ResponseHeader header = 1;
+  // hash is the hash value computed from the responding member's key-value store.
+  uint32 hash = 2;
+}
+
+message SnapshotRequest {
+}
+
+message SnapshotResponse {
+  // header has the current key-value store information. The first header in the snapshot
+  // stream indicates the point in time of the snapshot.
+  ResponseHeader header = 1;
+
+  // remaining_bytes is the number of blob bytes to be sent after this message
+  uint64 remaining_bytes = 2;
+
+  // blob contains the next chunk of the snapshot in the snapshot stream.
+  bytes blob = 3;
+}
+
+message WatchRequest {
+  // request_union is a request to either create a new watcher or cancel an existing watcher.
+  oneof request_union {
+    WatchCreateRequest create_request = 1;
+    WatchCancelRequest cancel_request = 2;
+  }
+}
+
+message WatchCreateRequest {
+  // key is the key to register for watching.
+  bytes key = 1;
+  // range_end is the end of the range [key, range_end) to watch. If range_end is not given,
+  // only the key argument is watched. If range_end is equal to '\0', all keys greater than
+  // or equal to the key argument are watched.
+  bytes range_end = 2;
+  // start_revision is an optional revision to watch from (inclusive). No start_revision is "now".
+  int64 start_revision = 3;
+  // progress_notify is set so that the etcd server will periodically send a WatchResponse with
+  // no events to the new watcher if there are no recent events. It is useful when clients
+  // wish to recover a disconnected watcher starting from a recent known revision.
+  // The etcd server may decide how often it will send notifications based on current load.
+  bool progress_notify = 4;
+  // If prev_kv is set, created watcher gets the previous KV before the event happens.
+  // If the previous KV is already compacted, nothing will be returned.
+  bool prev_kv = 6;
+}
+
+message WatchCancelRequest {
+  // watch_id is the watcher id to cancel so that no more events are transmitted.
+  int64 watch_id = 1;
+}
+
+message WatchResponse {
+  ResponseHeader header = 1;
+  // watch_id is the ID of the watcher that corresponds to the response.
+  int64 watch_id = 2;
+  // created is set to true if the response is for a create watch request.
+  // The client should record the watch_id and expect to receive events for
+  // the created watcher from the same stream.
+  // All events sent to the created watcher will attach with the same watch_id.
+  bool created = 3;
+  // canceled is set to true if the response is for a cancel watch request.
+  // No further events will be sent to the canceled watcher.
+  bool canceled = 4;
+  // compact_revision is set to the minimum index if a watcher tries to watch
+  // at a compacted index.
+  //
+  // This happens when creating a watcher at a compacted revision or the watcher cannot
+  // catch up with the progress of the key-value store. 
+  //
+  // The client should treat the watcher as canceled and should not try to create any
+  // watcher with the same start_revision again.
+  int64 compact_revision  = 5;
+
+  repeated mvccpb.Event events = 11;
+}
+
+message LeaseGrantRequest {
+  // TTL is the advisory time-to-live in seconds.
+  int64 TTL = 1;
+  // ID is the requested ID for the lease. If ID is set to 0, the lessor chooses an ID.
+  int64 ID = 2;
+}
+
+message LeaseGrantResponse {
+  ResponseHeader header = 1;
+  // ID is the lease ID for the granted lease.
+  int64 ID = 2;
+  // TTL is the server chosen lease time-to-live in seconds.
+  int64 TTL = 3;
+  string error = 4;
+}
+
+message LeaseRevokeRequest {
+  // ID is the lease ID to revoke. When the ID is revoked, all associated keys will be deleted.
+  int64 ID = 1;
+}
+
+message LeaseRevokeResponse {
+  ResponseHeader header = 1;
+}
+
+message LeaseKeepAliveRequest {
+  // ID is the lease ID for the lease to keep alive.
+  int64 ID = 1;
+}
+
+message LeaseKeepAliveResponse {
+  ResponseHeader header = 1;
+  // ID is the lease ID from the keep alive request.
+  int64 ID = 2;
+  // TTL is the new time-to-live for the lease.
+  int64 TTL = 3;
+}
+
+message Member {
+  // ID is the member ID for this member.
+  uint64 ID = 1;
+  // name is the human-readable name of the member. If the member is not started, the name will be an empty string.
+  string name = 2;
+  // peerURLs is the list of URLs the member exposes to the cluster for communication.
+  repeated string peerURLs = 3;
+  // clientURLs is the list of URLs the member exposes to clients for communication. If the member is not started, clientURLs will be empty.
+  repeated string clientURLs = 4;
+}
+
+message MemberAddRequest {
+  // peerURLs is the list of URLs the added member will use to communicate with the cluster.
+  repeated string peerURLs = 1;
+}
+
+message MemberAddResponse {
+  ResponseHeader header = 1;
+  // member is the member information for the added member.
+  Member member = 2;
+}
+
+message MemberRemoveRequest {
+  // ID is the member ID of the member to remove.
+  uint64 ID = 1;
+}
+
+message MemberRemoveResponse {
+  ResponseHeader header = 1;
+}
+
+message MemberUpdateRequest {
+  // ID is the member ID of the member to update.
+  uint64 ID = 1;
+  // peerURLs is the new list of URLs the member will use to communicate with the cluster.
+  repeated string peerURLs = 2;
+}
+
+message MemberUpdateResponse{
+  ResponseHeader header = 1;
+}
+
+message MemberListRequest {
+}
+
+message MemberListResponse {
+  ResponseHeader header = 1;
+  // members is a list of all members associated with the cluster.
+  repeated Member members = 2;
+}
+
+message DefragmentRequest {
+}
+
+message DefragmentResponse {
+  ResponseHeader header = 1;
+}
+
+enum AlarmType {
+	NONE = 0; // default, used to query if any alarm is active
+	NOSPACE = 1; // space quota is exhausted
+}
+
+message AlarmRequest {
+  enum AlarmAction {
+	GET = 0;
+	ACTIVATE = 1;
+	DEACTIVATE = 2;
+  }
+  // action is the kind of alarm request to issue. The action
+  // may GET alarm statuses, ACTIVATE an alarm, or DEACTIVATE a
+  // raised alarm.
+  AlarmAction action = 1;
+  // memberID is the ID of the member associated with the alarm. If memberID is 0, the
+  // alarm request covers all members.
+  uint64 memberID = 2;
+  // alarm is the type of alarm to consider for this request.
+  AlarmType alarm = 3;
+}
+
+message AlarmMember {
+  // memberID is the ID of the member associated with the raised alarm.
+  uint64 memberID = 1;
+  // alarm is the type of alarm which has been raised.
+  AlarmType alarm = 2;
+}
+
+message AlarmResponse {
+  ResponseHeader header = 1;
+  // alarms is a list of alarms associated with the alarm request.
+  repeated AlarmMember alarms = 2;
+}
+
+message StatusRequest {
+}
+
+message StatusResponse {
+  ResponseHeader header = 1;
+  // version is the cluster protocol version used by the responding member.
+  string version = 2;
+  // dbSize is the size of the backend database, in bytes, of the responding member.
+  int64 dbSize = 3;
+  // leader is the member ID which the responding member believes is the current leader.
+  uint64 leader = 4;
+  // raftIndex is the current raft index of the responding member.
+  uint64 raftIndex = 5;
+  // raftTerm is the current raft term of the responding member.
+  uint64 raftTerm = 6;
+}
+
+message AuthEnableRequest {
+}
+
+message AuthDisableRequest {
+}
+
+message AuthenticateRequest {
+  string name = 1;
+  string password = 2;
+}
+
+message AuthUserAddRequest {
+  string name = 1;
+  string password = 2;
+}
+
+message AuthUserGetRequest {
+  string name = 1;
+}
+
+message AuthUserDeleteRequest {
+  // name is the name of the user to delete.
+  string name = 1;
+}
+
+message AuthUserChangePasswordRequest {
+  // name is the name of the user whose password is being changed.
+  string name = 1;
+  // password is the new password for the user.
+  string password = 2;
+}
+
+message AuthUserGrantRoleRequest {
+  // user is the name of the user which should be granted a given role.
+  string user = 1;
+  // role is the name of the role to grant to the user.
+  string role = 2;
+}
+
+message AuthUserRevokeRoleRequest {
+  string name = 1;
+  string role = 2;
+}
+
+message AuthRoleAddRequest {
+  // name is the name of the role to add to the authentication system.
+  string name = 1;
+}
+
+message AuthRoleGetRequest {
+  string role = 1;
+}
+
+message AuthUserListRequest {
+}
+
+message AuthRoleListRequest {
+}
+
+message AuthRoleDeleteRequest {
+  string role = 1;
+}
+
+message AuthRoleGrantPermissionRequest {
+  // name is the name of the role which will be granted the permission.
+  string name = 1;
+  // perm is the permission to grant to the role.
+  authpb.Permission perm = 2;
+}
+
+message AuthRoleRevokePermissionRequest {
+  string role = 1;
+  string key = 2;
+  string range_end = 3;
+}
+
+message AuthEnableResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthDisableResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthenticateResponse {
+  ResponseHeader header = 1;
+  // token is an authorized token that can be used in succeeding RPCs
+  string token = 2;
+}
+
+message AuthUserAddResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthUserGetResponse {
+  ResponseHeader header = 1;
+
+  repeated string roles = 2;
+}
+
+message AuthUserDeleteResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthUserChangePasswordResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthUserGrantRoleResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthUserRevokeRoleResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthRoleAddResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthRoleGetResponse {
+  ResponseHeader header = 1;
+
+  repeated authpb.Permission perm = 2;
+}
+
+message AuthRoleListResponse {
+  ResponseHeader header = 1;
+
+  repeated string roles = 2;
+}
+
+message AuthUserListResponse {
+  ResponseHeader header = 1;
+
+  repeated string users = 2;
+}
+
+message AuthRoleDeleteResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthRoleGrantPermissionResponse {
+  ResponseHeader header = 1;
+}
+
+message AuthRoleRevokePermissionResponse {
+  ResponseHeader header = 1;
+}

@@ -1,0 +1,15 @@
+nginx:
+  build: "nginx"
+  ports:
+    - "5000:5000"
+  links:
+    - registryv1:registryv1
+    - registryv2:registryv2
+registryv1:
+  image: registry
+  ports:
+    - "5000"
+registryv2:
+  build: "../../"
+  ports:
+    - "5000"

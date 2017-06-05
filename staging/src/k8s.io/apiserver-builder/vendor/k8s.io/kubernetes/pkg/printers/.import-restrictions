@@ -1,0 +1,10 @@
+{
+  "Rules": [
+    {
+      "SelectorRegexp": "k8s[.]io/kubernetes/pkg/(api$|apis/)",
+      "ForbiddenPrefixes": [
+        "k8s.io/kubernetes/pkg/printers"
+      ]
+    }
+  ]
+}

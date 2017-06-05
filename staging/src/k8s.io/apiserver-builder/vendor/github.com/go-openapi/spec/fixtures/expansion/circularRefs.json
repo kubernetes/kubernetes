@@ -1,0 +1,54 @@
+{
+  "definitions": {
+    "brand": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "category": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/category"
+          }
+        }
+      }
+    },
+    "car": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "make": {
+          "type": "string"
+        },
+        "similar": {
+          "items": {
+            "$ref": "#/definitions/car"
+          }
+        },
+        "notSimilar": {
+          "additionalProperties": {
+            "$ref": "#/definitions/car"
+          }
+        },
+        "oneCar": {
+          "$ref": "#/definitions/car"
+        },
+        "category": {
+          "$ref": "#/definitions/category"
+        },
+        "brand": {
+          "$ref": "#/definitions/brand"
+        }
+      }
+    }
+  }
+}

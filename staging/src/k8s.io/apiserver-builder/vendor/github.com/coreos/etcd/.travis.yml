@@ -1,0 +1,54 @@
+dist: trusty
+language: go
+go_import_path: github.com/coreos/etcd
+sudo: false
+
+go:
+  - 1.6.4
+
+env:
+  global:
+   - GO15VENDOREXPERIMENT=1
+  matrix:
+   - TARGET=amd64
+   - TARGET=arm64
+   - TARGET=arm
+   - TARGET=ppc64le
+
+matrix:
+  fast_finish: true
+  allow_failures:
+    - go: tip
+  exclude:
+  - go: 1.6
+    env: TARGET=arm64
+  - go: tip
+    env: TARGET=arm
+  - go: tip
+    env: TARGET=arm64
+  - go: tip
+    env: TARGET=ppc64le
+
+addons:
+  apt:
+    packages:
+    - libpcap-dev
+    - libaspell-dev
+    - libhunspell-dev
+
+before_install:
+ - go get -v github.com/chzchzchz/goword
+ - go get -v honnef.co/go/simple/cmd/gosimple
+ - go get -v honnef.co/go/unused/cmd/unused
+
+# disable godep restore override
+install:
+ - pushd cmd/ && go get -t -v ./... && popd
+
+script:
+ - >
+    if [ "${TARGET}" == "amd64" ]; then
+      GOARCH="${TARGET}" ./test;
+    else
+      GOARCH="${TARGET}" ./build;
+    fi

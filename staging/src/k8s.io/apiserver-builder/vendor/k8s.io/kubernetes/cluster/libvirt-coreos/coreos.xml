@@ -1,0 +1,71 @@
+<domain type='kvm'>
+  <name>${name}</name>
+  <memory unit='MiB'>512</memory>
+  <currentMemory unit='MiB'>512</currentMemory>
+  <vcpu placement='static'>2</vcpu>
+  <os>
+    <type arch='x86_64' machine='pc'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+  <features>
+    <acpi/>
+    <apic/>
+    <pae/>
+  </features>
+  <clock offset='utc'/>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>restart</on_crash>
+  <devices>
+    <emulator>$(which qemu-system-$(uname -m))</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='${POOL_PATH}/${image}'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+    <controller type='usb' index='0'>
+    </controller>
+    <filesystem type='mount' accessmode='squash'>
+      <source dir='${POOL_PATH}/${config}'/>
+      <target dir='config-2'/>
+      <readonly/>
+    </filesystem>
+    <filesystem type='mount' accessmode='squash'>
+      <source dir='${kubernetes_dir}'/>
+      <target dir='kubernetes'/>
+      <readonly/>
+    </filesystem>
+    <interface type='network'>
+       <mac address='52:54:00:00:00:${i}'/>
+       <source network='kubernetes_global'/>
+       <model type='virtio'/>
+    </interface>
+    <interface type='network'>
+       <mac address='52:54:00:00:01:${i}'/>
+       <source network='kubernetes_pods'/>
+       <model type='virtio'/>
+    </interface>
+    <serial type='pty'>
+      <target port='0'/>
+    </serial>
+    <console type='pty'>
+      <target type='serial' port='0'/>
+    </console>
+    <channel type='spicevmc'>
+      <target type='virtio' name='com.redhat.spice.0'/>
+    </channel>
+    <input type='tablet' bus='usb'/>
+    <input type='mouse' bus='ps2'/>
+    <input type='keyboard' bus='ps2'/>
+    <graphics type='spice' autoport='yes'/>
+    <sound model='ich6'>
+    </sound>
+    <video>
+      <model type='qxl' vram='9216' heads='1'/>
+    </video>
+    <redirdev bus='usb' type='spicevmc'>
+    </redirdev>
+    <memballoon model='virtio'>
+    </memballoon>
+  </devices>
+</domain>

@@ -1,0 +1,87 @@
+{
+  "swaggerVersion": "1.2",
+  "apiVersion": "",
+  "basePath": "https://10.10.10.10:6443",
+  "resourcePath": "/api",
+  "info": {
+   "title": "",
+   "description": ""
+  },
+  "apis": [
+   {
+    "path": "/api",
+    "description": "get available API versions",
+    "operations": [
+     {
+      "type": "v1.APIVersions",
+      "method": "GET",
+      "summary": "get available API versions",
+      "nickname": "getAPIVersions",
+      "parameters": [],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ]
+     }
+    ]
+   }
+  ],
+  "models": {
+   "v1.APIVersions": {
+    "id": "v1.APIVersions",
+    "description": "APIVersions lists the versions that are available, to allow clients to discover the API at /api, which is the root path of the legacy v1 API.",
+    "required": [
+     "versions",
+     "serverAddressByClientCIDRs"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "versions": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "versions are the api versions that are available."
+     },
+     "serverAddressByClientCIDRs": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ServerAddressByClientCIDR"
+      },
+      "description": "a map of client CIDR to server address that is serving this group. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR. The server returns only those CIDRs that it thinks that the client can match. For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP. Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP."
+     }
+    }
+   },
+   "v1.ServerAddressByClientCIDR": {
+    "id": "v1.ServerAddressByClientCIDR",
+    "description": "ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.",
+    "required": [
+     "clientCIDR",
+     "serverAddress"
+    ],
+    "properties": {
+     "clientCIDR": {
+      "type": "string",
+      "description": "The CIDR with which clients can match their IP to figure out the server address that they should use."
+     },
+     "serverAddress": {
+      "type": "string",
+      "description": "Address of this server, suitable for a client that matches the above CIDR. This can be a hostname, hostname:port, IP or IP:port."
+     }
+    }
+   }
+  }
+ }

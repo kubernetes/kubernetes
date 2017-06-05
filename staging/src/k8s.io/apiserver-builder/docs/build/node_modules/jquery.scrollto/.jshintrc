@@ -1,0 +1,23 @@
+{
+  "shadow": "inner",
+
+  "camelcase": true,
+  "eqeqeq": true,
+  "eqnull": true,
+  "freeze": true,
+  "funcscope": true,
+  "newcap": true,
+  "noarg": true,
+  "noempty": true,
+  "nonbsp": true,
+  "unused": true,
+  "undef": true,
+  "scripturl": true,
+  "strict": true,
+  "quotmark": "single",
+
+  "globals": {"define": true},
+  "browser": true,
+  "node": true,
+  "jquery": true
+}

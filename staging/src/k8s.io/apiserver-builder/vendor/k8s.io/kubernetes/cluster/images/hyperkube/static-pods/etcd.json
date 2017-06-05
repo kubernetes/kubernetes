@@ -1,0 +1,36 @@
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "k8s-etcd",
+    "namespace": "kube-system"
+  },
+  "spec": {
+    "hostNetwork": true,
+    "containers": [
+      {
+        "name": "etcd",
+        "image": "gcr.io/google_containers/etcd-ARCH:2.2.5",
+        "command": [
+          "/usr/local/bin/etcd",
+          "--listen-client-urls=http://127.0.0.1:2379,http://127.0.0.1:4001",
+          "--advertise-client-urls=http://127.0.0.1:2379,http://127.0.0.1:4001",
+          "--data-dir=/var/etcd/data"
+        ],
+        "volumeMounts": [
+          {
+            "name": "varetcd",
+            "mountPath": "/var/etcd",
+            "readOnly": false
+          }
+        ]
+      }
+    ],
+    "volumes":[
+      {
+        "name": "varetcd",
+        "emptyDir": {}
+      }
+    ]
+  }
+}

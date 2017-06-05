@@ -1,0 +1,5 @@
+syntax = "proto3";
+
+message M {
+  map<string, double> f = 1;
+}

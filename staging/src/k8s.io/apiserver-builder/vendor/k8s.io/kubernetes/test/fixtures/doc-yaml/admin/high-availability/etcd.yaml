@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: etcd-server
+spec:
+  hostNetwork: true
+  containers:
+  - image: gcr.io/google_containers/etcd:2.0.9
+    name: etcd-container
+    command:
+    - /usr/local/bin/etcd
+    - --name
+    - ${NODE_NAME}
+    - --initial-advertise-peer-urls
+    - http://${NODE_IP}:2380
+    - --listen-peer-urls
+    - http://${NODE_IP}:2380
+    - --advertise-client-urls
+    - http://${NODE_IP}:2379
+    - --listen-client-urls
+    - http://127.0.0.1:2379
+    - --data-dir
+    - /var/etcd/data
+    - --discovery
+    - ${DISCOVERY_TOKEN}
+    ports:
+    - containerPort: 2380
+      hostPort: 2380
+      name: serverport
+    - containerPort: 2379
+      hostPort: 2379
+      name: clientport
+    volumeMounts:
+    - mountPath: /var/etcd
+      name: varetcd
+    - mountPath: /etc/ssl
+      name: etcssl
+      readOnly: true
+    - mountPath: /usr/share/ssl
+      name: usrsharessl
+      readOnly: true
+    - mountPath: /var/ssl
+      name: varssl
+      readOnly: true
+    - mountPath: /usr/ssl
+      name: usrssl
+      readOnly: true
+    - mountPath: /usr/lib/ssl
+      name: usrlibssl
+      readOnly: true
+    - mountPath: /usr/local/openssl
+      name: usrlocalopenssl
+      readOnly: true
+    - mountPath: /etc/openssl
+      name: etcopenssl
+      readOnly: true
+    - mountPath: /etc/pki/tls
+      name: etcpkitls
+      readOnly: true
+  volumes:
+  - hostPath:
+      path: /var/etcd/data
+    name: varetcd
+  - hostPath:
+      path: /etc/ssl
+    name: etcssl
+  - hostPath:
+      path: /usr/share/ssl
+    name: usrsharessl
+  - hostPath:
+      path: /var/ssl
+    name: varssl
+  - hostPath:
+      path: /usr/ssl
+    name: usrssl
+  - hostPath:
+      path: /usr/lib/ssl
+    name: usrlibssl
+  - hostPath:
+      path: /usr/local/openssl
+    name: usrlocalopenssl
+  - hostPath:
+      path: /etc/openssl
+    name: etcopenssl
+  - hostPath:
+      path: /etc/pki/tls
+    name: etcpkitls

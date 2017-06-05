@@ -1,0 +1,20 @@
+# TODO remove this
+# currently, the kube-addon-manager is adding lots of pods which all share
+# the system:serviceaccount:kube-system:default identity.  We need to subdivide
+# those service accounts, figure out which ones we're going to make bootstrap roles for
+# and bind those particular roles in the addon yaml itself.  This just gets us started
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: todo-remove-grabbag-cluster-admin
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: kube-system

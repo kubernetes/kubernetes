@@ -1,0 +1,162 @@
+// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
+// http://github.com/gogo/protobuf/gogoproto
+//
+// Go support for Protocol Buffers - Google's data interchange format
+//
+// Copyright 2014 The Go Authors.  All rights reserved.
+// https://github.com/golang/protobuf
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//     * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto3";
+
+package theproto3;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+import "github.com/gogo/protobuf/test/combos/both/thetest.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.goproto_enum_prefix_all) = false;
+option (gogoproto.goproto_getters_all) = false;
+
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+option (gogoproto.stringer_all) = true;
+option (gogoproto.gostring_all) = true;
+option (gogoproto.face_all) = true;
+option (gogoproto.description_all) = true;
+
+option (gogoproto.testgen_all) = true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.benchgen_all) = true;
+option (gogoproto.unmarshaler_all) = false;
+option (gogoproto.marshaler_all) = false;
+option (gogoproto.sizer_all) = true;
+
+option (gogoproto.goproto_enum_stringer_all) = false;
+option (gogoproto.enum_stringer_all) = true;
+
+option (gogoproto.unsafe_marshaler_all) = false;
+option (gogoproto.unsafe_unmarshaler_all) = false;
+
+message Message {
+  enum Humour {
+    UNKNOWN = 0;
+    PUNS = 1;
+    SLAPSTICK = 2;
+    BILL_BAILEY = 3;
+  }
+
+  string name = 1;
+  Humour hilarity = 2;
+  uint32 height_in_cm = 3;
+  bytes data = 4;
+  int64 result_count = 7;
+  bool true_scotsman = 8;
+  float score = 9;
+
+  repeated uint64 key = 5;
+  Nested nested = 6;
+
+  map<int64, Nested> terrain = 10;
+  test.NinOptNative proto2_field = 11;
+  map<int64, test.NinOptEnum> proto2_value = 13;
+}
+
+message Nested {
+  string bunny = 1;
+}
+
+enum MapEnum {
+  MA = 0;
+  MB = 1;
+  MC = 2;
+}
+
+message AllMaps {
+  map<string, double> StringToDoubleMap = 1;
+  map<string, float> StringToFloatMap = 2;
+  map<int32, int32> Int32Map = 3;
+  map<int64, int64> Int64Map = 4;
+  map<uint32, uint32> Uint32Map = 5;
+  map<uint64, uint64> Uint64Map = 6;
+  map<sint32, sint32> Sint32Map = 7;
+  map<sint64, sint64> Sint64Map = 8;
+  map<fixed32, fixed32> Fixed32Map = 9;
+  map<sfixed32, sfixed32> Sfixed32Map = 10;
+  map<fixed64, fixed64> Fixed64Map = 11;
+  map<sfixed64, sfixed64> Sfixed64Map = 12;
+  map<bool, bool> BoolMap = 13;
+  map<string, string> StringMap = 14;
+  map<string, bytes> StringToBytesMap = 15;
+  map<string, MapEnum> StringToEnumMap = 16;
+  map<string, FloatingPoint> StringToMsgMap = 17;
+}
+
+message AllMapsOrdered {
+  option (gogoproto.stable_marshaler) = true;
+
+  map<string, double> StringToDoubleMap = 1;
+  map<string, float> StringToFloatMap = 2;
+  map<int32, int32> Int32Map = 3;
+  map<int64, int64> Int64Map = 4;
+  map<uint32, uint32> Uint32Map = 5;
+  map<uint64, uint64> Uint64Map = 6;
+  map<sint32, sint32> Sint32Map = 7;
+  map<sint64, sint64> Sint64Map = 8;
+  map<fixed32, fixed32> Fixed32Map = 9;
+  map<sfixed32, sfixed32> Sfixed32Map = 10;
+  map<fixed64, fixed64> Fixed64Map = 11;
+  map<sfixed64, sfixed64> Sfixed64Map = 12;
+  map<bool, bool> BoolMap = 13;
+  map<string, string> StringMap = 14;
+  map<string, bytes> StringToBytesMap = 15;
+  map<string, MapEnum> StringToEnumMap = 16;
+  map<string, FloatingPoint> StringToMsgMap = 17;
+}
+
+message MessageWithMap {
+  map<int32, string> name_mapping = 1;
+  map<sint64, FloatingPoint> msg_mapping = 2;
+  map<bool, bytes> byte_mapping = 3;
+}
+
+message FloatingPoint {
+  double f = 1;
+}
+
+message Uint128Pair {
+  bytes left = 1 [(gogoproto.nullable) = false, (gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
+  bytes right = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
+}
+
+message ContainsNestedMap {
+	message NestedMap {
+		map<string, double> NestedMapField = 1;
+	}
+}

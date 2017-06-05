@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-addon-manager
+  namespace: kube-system
+  labels:
+    component: kube-addon-manager
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-addon-manager
+    # When updating version also bump it in:
+    # - cluster/images/hyperkube/static-pods/addon-manager-singlenode.json
+    # - cluster/images/hyperkube/static-pods/addon-manager-multinode.json
+    # - test/kubemark/resources/manifests/kube-addon-manager.yaml
+    image: gcr.io/google-containers/kube-addon-manager:v6.4-beta.1
+    command:
+    - /bin/bash
+    - -c
+    - /opt/kube-addons.sh 1>>/var/log/kube-addon-manager.log 2>&1
+    resources:
+      requests:
+        cpu: 5m
+        memory: 50Mi
+    volumeMounts:
+    - mountPath: /etc/kubernetes/
+      name: addons
+      readOnly: true
+    - mountPath: /var/log
+      name: varlog
+      readOnly: false
+  volumes:
+  - hostPath:
+      path: /etc/kubernetes/
+    name: addons
+  - hostPath:
+      path: /var/log
+    name: varlog

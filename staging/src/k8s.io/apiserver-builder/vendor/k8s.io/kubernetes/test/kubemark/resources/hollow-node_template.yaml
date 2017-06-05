@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: hollow-node
+  labels:
+    name: hollow-node
+spec:
+  replicas: {{numreplicas}}
+  selector:
+    name: hollow-node
+  template:
+    metadata:
+      labels:
+        name: hollow-node
+      annotations:
+        pod.beta.kubernetes.io/init-containers: '[
+          {
+            "name": "init-inotify-limit",
+            "image": "busybox",
+            "command": ["sysctl", "-w", "fs.inotify.max_user_instances=200"],
+            "securityContext": {
+              "privileged": true
+            }
+          }
+        ]'
+    spec:
+      volumes:
+      - name: kubeconfig-volume
+        secret:
+          secretName: kubeconfig
+      - name: kernelmonitorconfig-volume
+        configMap:
+          name: node-configmap
+      - name: logs-volume
+        hostPath:
+          path: /var/log
+      - name: no-serviceaccount-access-to-real-master
+        emptyDir: {}
+      containers:
+      - name: hollow-kubelet
+        image: {{registry}}/{{project}}/kubemark:latest
+        ports:
+        - containerPort: 4194
+        - containerPort: 10250
+        - containerPort: 10255
+        env:
+        - name: CONTENT_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: node-configmap
+              key: content.type
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        command:
+        - /bin/sh
+        - -c
+        - ./kubemark.sh --morph=kubelet --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --alsologtostderr {{kubelet_verbosity_level}} 1>>/var/log/kubelet-$(NODE_NAME).log 2>&1
+        volumeMounts:
+        - name: kubeconfig-volume
+          mountPath: /kubeconfig
+          readOnly: true
+        - name: logs-volume
+          mountPath: /var/log
+        resources:
+          requests:
+            cpu: 50m
+            memory: 100M
+        securityContext:
+          privileged: true
+      - name: hollow-proxy
+        image: {{registry}}/{{project}}/kubemark:latest
+        env:
+        - name: CONTENT_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: node-configmap
+              key: content.type
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        command:
+        - /bin/sh
+        - -c
+        - ./kubemark.sh --morph=proxy --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --alsologtostderr {{kubeproxy_verbosity_level}} 1>>/var/log/kubeproxy-$(NODE_NAME).log 2>&1
+        volumeMounts:
+        - name: kubeconfig-volume
+          mountPath: /kubeconfig
+          readOnly: true
+        - name: logs-volume
+          mountPath: /var/log
+        resources:
+          requests:
+            cpu: {{HOLLOW_PROXY_CPU}}m
+            memory: {{HOLLOW_PROXY_MEM}}Ki
+      - name: hollow-node-problem-detector
+        image: gcr.io/google_containers/node-problem-detector:v0.3.0
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        command:
+        - /bin/sh
+        - -c
+        - /node-problem-detector --system-log-monitors=/config/kernel.monitor --apiserver-override="https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig" --alsologtostderr 1>>/var/log/npd-$(NODE_NAME).log 2>&1
+        volumeMounts:
+        - name: kubeconfig-volume
+          mountPath: /kubeconfig
+          readOnly: true
+        - name: kernelmonitorconfig-volume
+          mountPath: /config
+          readOnly: true
+        - name: no-serviceaccount-access-to-real-master
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+        - name: logs-volume
+          mountPath: /var/log
+        resources:
+          requests:
+            cpu: 20m
+            memory: 20Mi
+        securityContext:
+          privileged: true

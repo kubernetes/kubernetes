@@ -1,0 +1,14 @@
+images:
+  containervm:
+    image: e2e-node-containervm-v20161208-image # docker 1.11.2
+    project: kubernetes-node-e2e-images
+  gci:
+    image_regex: gci-beta-56-9000-80-0 # docker 1.11.2
+    project: google-containers
+    metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
+  ubuntu-docker12:
+    image: e2e-node-ubuntu-trusty-docker12-v2-image # docker 1.12.6
+    project: kubernetes-node-e2e-images
+  ubuntu-docker10:
+    image: e2e-node-ubuntu-trusty-docker10-v2-image # docker 1.10.3
+    project: kubernetes-node-e2e-images

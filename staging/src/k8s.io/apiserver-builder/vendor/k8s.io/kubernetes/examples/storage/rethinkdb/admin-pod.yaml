@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    db: rethinkdb
+    role: admin
+  name: rethinkdb-admin
+spec:
+  containers:
+  - image: gcr.io/google_containers/rethinkdb:1.16.0_1
+    name: rethinkdb
+    env:
+    - name: POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    ports:
+    - containerPort: 8080
+      name: admin-port
+    - containerPort: 28015
+      name: driver-port
+    - containerPort: 29015
+      name: cluster-port
+    volumeMounts:
+    - mountPath: /data/rethinkdb_data
+      name: rethinkdb-storage
+  volumes:
+  - name: rethinkdb-storage
+    emptyDir: {}

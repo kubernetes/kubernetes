@@ -1,0 +1,31 @@
+{
+  "name": "brodocs",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Documentation POC for Kubernetes md files",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/Birdrock/brodocs.git"
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "ejs": "^2.5.2",
+    "highlight.js": "^9.7.0",
+    "marked": "^0.3.6"
+  },
+  "dependencies": {
+    "bootstrap": "^3.3.7",
+    "font-awesome": "^4.7.0",
+    "jquery": "^3.1.1",
+    "jquery.scrollto": "^2.1.2",
+    "node-static": "^0.7.9"
+  },
+  "engines": {
+    "node": "4.2.3"
+  }
+}

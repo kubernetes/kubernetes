@@ -1,0 +1,13 @@
+# Generate OpenAPI definitions
+
+- To generate definition for a specific type or package add "+k8s:openapi-gen=true" tag to the type/package comment lines.
+- To exclude a type or a member from a tagged package/type, add "+k8s:openapi-gen=false" tag to the comment lines.
+
+# OpenAPI Extensions
+OpenAPI spec can have extensions on types. To define one or more extensions on a type or its member
+add "+k8s:openapi-gen=x-kubernetes-$NAME:$VALUE" to the comment lines before type/member. A type/member can
+have multiple extensions. The rest of the line in the comment will be used as $VALUE so there is no need to
+escape or quote the value string. Extensions can be use to pass more information to client generators or
+documentation generators. For example a type my have a friendly name to be displayed in documentation or
+being used in a client's fluent interface.
+

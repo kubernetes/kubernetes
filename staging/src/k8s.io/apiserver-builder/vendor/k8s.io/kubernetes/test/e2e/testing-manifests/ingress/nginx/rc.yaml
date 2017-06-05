@@ -1,0 +1,50 @@
+# nginx ingress controller RC
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: nginx-ingress-controller
+  labels:
+    k8s-app: nginx-ingress-lb
+spec:
+  replicas: 1
+  selector:
+    k8s-app: nginx-ingress-lb
+  template:
+    metadata:
+      labels:
+        k8s-app: nginx-ingress-lb
+        name: nginx-ingress-lb
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+      - image: gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.1
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 10254
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        name: nginx-ingress-lb
+        # use downward API
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        ports:
+        - containerPort: 80
+          hostPort: 80
+        - containerPort: 443
+          hostPort: 443
+        # we expose 18080 to access nginx stats in url /nginx-status
+        # this is optional
+        - containerPort: 18080
+          hostPort: 18080
+        args:
+        - /nginx-ingress-controller
+        - --default-backend-service=kube-system/default-http-backend

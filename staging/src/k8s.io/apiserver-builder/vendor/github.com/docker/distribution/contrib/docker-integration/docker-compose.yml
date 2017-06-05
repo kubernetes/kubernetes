@@ -1,0 +1,82 @@
+nginx:
+  build: "nginx"
+  ports:
+    - "5000:5000"
+    - "5002:5002"
+    - "5440:5440"
+    - "5441:5441"
+    - "5442:5442"
+    - "5443:5443"
+    - "5444:5444"
+    - "5445:5445"
+    - "5446:5446"
+    - "5447:5447"
+    - "5448:5448"
+    - "5554:5554"
+    - "5555:5555"
+    - "5556:5556"
+    - "5557:5557"
+    - "5558:5558"
+    - "5559:5559"
+    - "6666:6666"
+  links:
+    - registryv2:registryv2
+    - malevolent:malevolent
+    - registryv2token:registryv2token
+    - tokenserver:tokenserver
+    - registryv2tokenoauth:registryv2tokenoauth
+    - tokenserveroauth:tokenserveroauth
+registryv2:
+  image: golem-distribution:latest
+  ports:
+    - "5000"
+registryv2token:
+  image: golem-distribution:latest
+  ports:
+    - "5000"
+  volumes:
+    - ./tokenserver/registry-config.yml:/etc/docker/registry/config.yml
+    - ./tokenserver/certs/localregistry.cert:/etc/docker/registry/localregistry.cert
+    - ./tokenserver/certs/localregistry.key:/etc/docker/registry/localregistry.key
+    - ./tokenserver/certs/signing.cert:/etc/docker/registry/tokenbundle.pem
+tokenserver:
+  build: "tokenserver"
+  command: "--debug -addr 0.0.0.0:5556 -issuer registry-test -passwd .htpasswd -tlscert tls.cert -tlskey tls.key -key sign.key -realm http://auth.localregistry:5556"
+  ports:
+    - "5556"
+registryv2tokenoauth:
+  image: golem-distribution:latest
+  ports:
+    - "5000"
+  volumes:
+    - ./tokenserver-oauth/registry-config.yml:/etc/docker/registry/config.yml
+    - ./tokenserver-oauth/certs/localregistry.cert:/etc/docker/registry/localregistry.cert
+    - ./tokenserver-oauth/certs/localregistry.key:/etc/docker/registry/localregistry.key
+    - ./tokenserver-oauth/certs/signing.cert:/etc/docker/registry/tokenbundle.pem
+tokenserveroauth:
+  build: "tokenserver-oauth"
+  command: "--debug -addr 0.0.0.0:5559 -issuer registry-test -passwd .htpasswd -tlscert tls.cert -tlskey tls.key -key sign.key -realm http://auth.localregistry:5559"
+  ports:
+    - "5559"
+malevolent:
+  image: "dmcgowan/malevolent:0.1.0"
+  command: "-l 0.0.0.0:6666 -r http://registryv2:5000 -c /certs/localregistry.cert -k /certs/localregistry.key"
+  links:
+    - registryv2:registryv2
+  volumes:
+   - ./malevolent-certs:/certs:ro
+  ports:
+   - "6666"
+docker:
+  image: golem-dind:latest
+  container_name: dockerdaemon
+  command: "docker daemon --debug -s $DOCKER_GRAPHDRIVER"
+  privileged: true
+  environment:
+    DOCKER_GRAPHDRIVER:
+  volumes:
+    - ./generated_certs.d:/etc/docker/certs.d
+    - /var/lib/docker
+  links:
+    - nginx:localregistry
+    - nginx:auth.localregistry

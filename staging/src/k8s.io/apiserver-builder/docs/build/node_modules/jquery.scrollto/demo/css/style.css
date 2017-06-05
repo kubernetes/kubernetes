@@ -1,0 +1,150 @@
+body{
+	padding:5px;
+	height:1600px;
+	font-family: Verdana, sans-serif;
+	background-color: #DDD;
+}
+ul,li,h1,h2,h3,h4,p{
+	list-style:none;
+	padding:0;
+	margin:0;
+}
+.part{
+	border:1px solid black;
+	background-color:white;
+}
+	.part h3,
+	.part h4,
+	.part h4 a {
+		color:#933;
+	}
+#toc{
+	display:block;
+	padding:10px;
+	position:relative;
+	margin:15px 0;
+	float:left;
+	width:305px;
+}
+	#toc h3{
+		padding-bottom:10px;
+	}
+	#toc h3 strong{
+		font-size:13px;
+		color:black;
+	}
+#links{
+	border:1px solid black;
+	width:210px;
+	padding:10px;
+	float:right;
+	margin-top:-30px;
+}
+	#links h3{
+		color:#933;
+	}
+	#links ul{
+		padding: 8px 0 3px 20px;
+	}
+	#links li{
+		list-style-type:circle;
+	}
+	#links a{
+		color:#69C;
+	}
+	
+	#toc li, #links li{
+		list-style-type:circle;
+		padding-left:5px;
+		margin-left:15px;
+	}
+		#toc a{
+			color:#69C;
+		}
+.section{
+	border:1px black solid;
+	width:950px;
+	padding:10px;
+	margin: 5px 0;
+	position:relative;
+	clear:both;
+}
+	.section h3{
+		margin-bottom:10px;
+		margin-left: 8px;
+	}
+	.section h4{
+		margin:10px 0 10px 8px;
+	}
+	.section li{
+		float:left;
+	}
+	.pane{
+		overflow:auto;
+		clear:left;
+		margin: 10px 0 0 10px;
+		position:relative;
+		width:826px;
+		height:322px;
+	}
+ul.elements{
+	background-color:#5B739C;
+}
+	ul.elements li{
+		width:200px;
+		height:100px;
+		font-weight:bolder;
+		border:1px black solid;
+		text-align:center;
+		padding:50px;
+		position:relative;
+		background-color:#DDD;
+	}
+		ul.elements li a{
+			bottom:20px;
+			color:#933;
+			font-size:12px;
+			left:125px;
+			position:absolute;
+		}
+		ul.elements li p{
+			color:#666;
+		}
+	#pane-settings ul.elements li{
+		margin:5px;
+	}
+	#pane-settings{
+		margin-bottom:10px;
+	}
+ul.links{
+	height:20px;
+	overflow:hidden;
+	padding-left: 5px;
+}
+	ul.links a{
+		color:#69C;
+		margin:0 0 0 5px;
+	}
+.clear{
+	clear:left;
+}
+h3 span{
+	position:absolute;			
+}
+.message{
+	background:#EEE;
+	border:1px solid #999;
+	color:#333;
+	font-size:12px;
+	font-weight:normal;
+	padding:1px;
+	margin-top:2px;
+}
+
+h1{
+	color:#5B739C;
+}
+h1 strong{
+	font-size:13px;
+	color:#777;
+}

@@ -1,0 +1,624 @@
+// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
+// http://github.com/gogo/protobuf/gogoproto
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto2";
+package test;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.goproto_enum_prefix_all) = false;
+option (gogoproto.goproto_getters_all) = false;
+
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+option (gogoproto.stringer_all) = true;
+option (gogoproto.gostring_all) = true;
+option (gogoproto.face_all) = true;
+option (gogoproto.description_all) = true;
+
+option (gogoproto.testgen_all) = true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.benchgen_all) = true;
+option (gogoproto.unmarshaler_all) = false;
+option (gogoproto.marshaler_all) = false;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.protosizer_all) = false;
+
+option (gogoproto.goproto_enum_stringer_all) = false;
+option (gogoproto.enum_stringer_all) = true;
+
+option (gogoproto.unsafe_marshaler_all) = true;
+option (gogoproto.unsafe_unmarshaler_all) = false;
+
+option (gogoproto.compare_all) = true;
+
+message NidOptNative {
+	optional double Field1 = 1 [(gogoproto.nullable) = false];
+	optional float Field2 = 2 [(gogoproto.nullable) = false];
+	optional int32 Field3 = 3 [(gogoproto.nullable) = false];
+	optional int64 Field4 = 4 [(gogoproto.nullable) = false];
+	optional uint32 Field5 = 5 [(gogoproto.nullable) = false];
+	optional uint64 Field6 = 6 [(gogoproto.nullable) = false];
+	optional sint32 Field7 = 7 [(gogoproto.nullable) = false];
+	optional sint64 Field8 = 8 [(gogoproto.nullable) = false];
+	optional fixed32 Field9 = 9 [(gogoproto.nullable) = false];
+	optional sfixed32 Field10 = 10 [(gogoproto.nullable) = false];
+	optional fixed64 Field11 = 11 [(gogoproto.nullable) = false];
+	optional sfixed64 Field12 = 12 [(gogoproto.nullable) = false];
+	optional bool Field13 = 13 [(gogoproto.nullable) = false];
+	optional string Field14 = 14 [(gogoproto.nullable) = false];
+	optional bytes Field15 = 15 [(gogoproto.nullable) = false];
+}
+
+message NinOptNative {
+	optional double Field1 = 1;
+	optional float Field2 = 2;
+	optional int32 Field3 = 3;
+	optional int64 Field4 = 4;
+	optional uint32 Field5 = 5;
+	optional uint64 Field6 = 6;
+	optional sint32 Field7 = 7;
+	optional sint64 Field8 = 8;
+	optional fixed32 Field9 = 9;
+	optional sfixed32 Field10 = 10;
+	optional fixed64 Field11 = 11;
+	optional sfixed64 Field12 = 12;
+	optional bool Field13 = 13;
+	optional string Field14 = 14;
+	optional bytes Field15 = 15;
+}
+
+message NidRepNative {
+	repeated double Field1 = 1 [(gogoproto.nullable) = false];
+	repeated float Field2 = 2 [(gogoproto.nullable) = false];
+	repeated int32 Field3 = 3 [(gogoproto.nullable) = false];
+	repeated int64 Field4 = 4 [(gogoproto.nullable) = false];
+	repeated uint32 Field5 = 5 [(gogoproto.nullable) = false];
+	repeated uint64 Field6 = 6 [(gogoproto.nullable) = false];
+	repeated sint32 Field7 = 7 [(gogoproto.nullable) = false];
+	repeated sint64 Field8 = 8 [(gogoproto.nullable) = false];
+	repeated fixed32 Field9 = 9 [(gogoproto.nullable) = false];
+	repeated sfixed32 Field10 = 10 [(gogoproto.nullable) = false];
+	repeated fixed64 Field11 = 11 [(gogoproto.nullable) = false];
+	repeated sfixed64 Field12 = 12 [(gogoproto.nullable) = false];
+	repeated bool Field13 = 13 [(gogoproto.nullable) = false];
+	repeated string Field14 = 14 [(gogoproto.nullable) = false];
+	repeated bytes Field15 = 15 [(gogoproto.nullable) = false];
+}
+
+message NinRepNative {
+	repeated double Field1 = 1;
+	repeated float Field2 = 2;
+	repeated int32 Field3 = 3;
+	repeated int64 Field4 = 4;
+	repeated uint32 Field5 = 5;
+	repeated uint64 Field6 = 6;
+	repeated sint32 Field7 = 7;
+	repeated sint64 Field8 = 8;
+	repeated fixed32 Field9 = 9;
+	repeated sfixed32 Field10 = 10;
+	repeated fixed64 Field11 = 11;
+	repeated sfixed64 Field12 = 12;
+	repeated bool Field13 = 13;
+	repeated string Field14 = 14;
+	repeated bytes Field15 = 15;
+}
+
+message NidRepPackedNative {
+	repeated double Field1 = 1 [(gogoproto.nullable) = false, packed = true];
+	repeated float Field2 = 2 [(gogoproto.nullable) = false, packed = true];
+	repeated int32 Field3 = 3 [(gogoproto.nullable) = false, packed = true];
+	repeated int64 Field4 = 4 [(gogoproto.nullable) = false, packed = true];
+	repeated uint32 Field5 = 5 [(gogoproto.nullable) = false, packed = true];
+	repeated uint64 Field6 = 6 [(gogoproto.nullable) = false, packed = true];
+	repeated sint32 Field7 = 7 [(gogoproto.nullable) = false, packed = true];
+	repeated sint64 Field8 = 8 [(gogoproto.nullable) = false, packed = true];
+	repeated fixed32 Field9 = 9 [(gogoproto.nullable) = false, packed = true];
+	repeated sfixed32 Field10 = 10 [(gogoproto.nullable) = false, packed = true];
+	repeated fixed64 Field11 = 11 [(gogoproto.nullable) = false, packed = true];
+	repeated sfixed64 Field12 = 12 [(gogoproto.nullable) = false, packed = true];
+	repeated bool Field13 = 13 [(gogoproto.nullable) = false, packed = true];
+}
+
+message NinRepPackedNative {
+	repeated double Field1 = 1 [packed = true];
+	repeated float Field2 = 2 [packed = true];
+	repeated int32 Field3 = 3 [packed = true];
+	repeated int64 Field4 = 4 [packed = true];
+	repeated uint32 Field5 = 5 [packed = true];
+	repeated uint64 Field6 = 6 [packed = true];
+	repeated sint32 Field7 = 7 [packed = true];
+	repeated sint64 Field8 = 8 [packed = true];
+	repeated fixed32 Field9 = 9 [packed = true];
+	repeated sfixed32 Field10 = 10 [packed = true];
+	repeated fixed64 Field11 = 11 [packed = true];
+	repeated sfixed64 Field12 = 12 [packed = true];
+	repeated bool Field13 = 13 [packed = true];
+}
+
+message NidOptStruct {
+	optional double Field1 = 1 [(gogoproto.nullable) = false];
+	optional float Field2 = 2 [(gogoproto.nullable) = false];
+	optional NidOptNative Field3 = 3 [(gogoproto.nullable) = false];
+	optional NinOptNative Field4 = 4 [(gogoproto.nullable) = false];
+	optional uint64 Field6 = 6 [(gogoproto.nullable) = false];
+	optional sint32 Field7 = 7 [(gogoproto.nullable) = false];
+	optional NidOptNative Field8 = 8 [(gogoproto.nullable) = false];
+	optional bool Field13 = 13 [(gogoproto.nullable) = false];
+	optional string Field14 = 14 [(gogoproto.nullable) = false];
+	optional bytes Field15 = 15 [(gogoproto.nullable) = false];
+}
+
+message NinOptStruct {
+	optional double Field1 = 1;
+	optional float Field2 = 2;
+	optional NidOptNative Field3 = 3;
+	optional NinOptNative Field4 = 4;
+	optional uint64 Field6 = 6;
+	optional sint32 Field7 = 7;
+	optional NidOptNative Field8 = 8;
+	optional bool Field13 = 13;
+	optional string Field14 = 14;
+	optional bytes Field15 = 15;
+}
+
+message NidRepStruct {
+	repeated double Field1 = 1 [(gogoproto.nullable) = false];
+	repeated float Field2 = 2 [(gogoproto.nullable) = false];
+	repeated NidOptNative Field3 = 3 [(gogoproto.nullable) = false];
+	repeated NinOptNative Field4 = 4 [(gogoproto.nullable) = false];
+	repeated uint64 Field6 = 6 [(gogoproto.nullable) = false];
+	repeated sint32 Field7 = 7 [(gogoproto.nullable) = false];
+	repeated NidOptNative Field8 = 8 [(gogoproto.nullable) = false];
+	repeated bool Field13 = 13 [(gogoproto.nullable) = false];
+	repeated string Field14 = 14 [(gogoproto.nullable) = false];
+	repeated bytes Field15 = 15 [(gogoproto.nullable) = false];
+}
+
+message NinRepStruct {
+	repeated double Field1 = 1;
+	repeated float Field2 = 2;
+	repeated NidOptNative Field3 = 3;
+	repeated NinOptNative Field4 = 4;
+	repeated uint64 Field6 = 6;
+	repeated sint32 Field7 = 7;
+	repeated NidOptNative Field8 = 8;
+	repeated bool Field13 = 13;
+	repeated string Field14 = 14;
+	repeated bytes Field15 = 15;
+}
+
+message NidEmbeddedStruct {
+	optional NidOptNative Field1 = 1 [(gogoproto.embed) = true];
+	optional NidOptNative Field200 = 200 [(gogoproto.nullable) = false];
+	optional bool Field210 = 210 [(gogoproto.nullable) = false];
+}
+
+message NinEmbeddedStruct {
+	optional NidOptNative Field1 = 1 [(gogoproto.embed) = true];
+	optional NidOptNative Field200 = 200;
+	optional bool Field210 = 210;
+}
+
+message NidNestedStruct {
+	optional NidOptStruct Field1 = 1 [(gogoproto.nullable) = false];
+	repeated NidRepStruct Field2 = 2 [(gogoproto.nullable) = false];
+}
+
+message NinNestedStruct {
+	optional NinOptStruct Field1 = 1;
+	repeated NinRepStruct Field2 = 2;
+}
+
+message NidOptCustom {
+	optional bytes Id = 1 [(gogoproto.customtype) = "Uuid", (gogoproto.nullable) = false];
+	optional bytes Value = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
+}
+
+message CustomDash {
+	optional bytes Value = 1 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom-dash-type.Bytes"];
+}
+
+message NinOptCustom {
+	optional bytes Id = 1 [(gogoproto.customtype) = "Uuid"];
+	optional bytes Value = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
+}
+
+message NidRepCustom {
+	repeated bytes Id = 1 [(gogoproto.customtype) = "Uuid", (gogoproto.nullable) = false];
+	repeated bytes Value = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128", (gogoproto.nullable) = false];
+}
+
+message NinRepCustom {
+	repeated bytes Id = 1 [(gogoproto.customtype) = "Uuid"];
+	repeated bytes Value = 2 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
+}
+
+message NinOptNativeUnion {
+	option (gogoproto.onlyone) = true;
+	optional double Field1 = 1;
+	optional float Field2 = 2;
+	optional int32 Field3 = 3;
+	optional int64 Field4 = 4;
+	optional uint32 Field5 = 5;
+	optional uint64 Field6 = 6;
+	optional bool Field13 = 13;
+	optional string Field14 = 14;
+	optional bytes Field15 = 15;
+}
+
+message NinOptStructUnion {
+	option (gogoproto.onlyone) = true;
+	optional double Field1 = 1;
+	optional float Field2 = 2;
+	optional NidOptNative Field3 = 3;
+	optional NinOptNative Field4 = 4;
+	optional uint64 Field6 = 6;
+	optional sint32 Field7 = 7;
+	optional bool Field13 = 13;
+	optional string Field14 = 14;
+	optional bytes Field15 = 15;
+}
+
+message NinEmbeddedStructUnion {
+	option (gogoproto.onlyone) = true;
+	optional NidOptNative Field1 = 1 [(gogoproto.embed) = true];
+	optional NinOptNative Field200 = 200;
+	optional bool Field210 = 210;
+}
+
+message NinNestedStructUnion {
+	option (gogoproto.onlyone) = true;
+	optional NinOptNativeUnion Field1 = 1;
+	optional NinOptStructUnion Field2 = 2;
+	optional NinEmbeddedStructUnion Field3 = 3;
+}
+
+message Tree {
+	option (gogoproto.onlyone) = true;
+	optional OrBranch Or = 1;
+	optional AndBranch And = 2;
+	optional Leaf Leaf = 3;
+}
+
+message OrBranch {
+	optional Tree Left = 1 [(gogoproto.nullable) = false];
+	optional Tree Right = 2 [(gogoproto.nullable) = false];
+}
+
+message AndBranch {
+	optional Tree Left = 1 [(gogoproto.nullable) = false];
+	optional Tree Right = 2 [(gogoproto.nullable) = false];
+}
+
+message Leaf {
+	optional int64 Value = 1 [(gogoproto.nullable) = false];
+	optional string StrValue = 2 [(gogoproto.nullable) = false];
+}
+
+message DeepTree {
+	option (gogoproto.onlyone) = true;
+	optional ADeepBranch Down = 1;
+	optional AndDeepBranch And = 2;
+	optional DeepLeaf Leaf = 3;
+}
+
+message ADeepBranch {
+	optional DeepTree Down = 2 [(gogoproto.nullable) = false];
+}
+
+message AndDeepBranch {
+	optional DeepTree Left = 1 [(gogoproto.nullable) = false];
+	optional DeepTree Right = 2 [(gogoproto.nullable) = false];
+}
+
+message DeepLeaf {
+	optional Tree Tree = 1 [(gogoproto.nullable) = false];
+}
+
+message Nil {
+
+}
+
+enum TheTestEnum {
+    A = 0;
+    B = 1;
+    C = 2;
+}
+
+enum AnotherTestEnum {
+	option (gogoproto.goproto_enum_prefix) = false;
+    D = 10;
+    E = 11;
+}
+
+// YetAnotherTestEnum is used to test cross-package import of custom name
+// fields and default resolution.
+enum YetAnotherTestEnum {
+	option (gogoproto.goproto_enum_prefix) = false;
+	AA = 0;
+	BB = 1 [(gogoproto.enumvalue_customname) = "BetterYetBB"];
+}
+
+// YetAnotherTestEnum is used to test cross-package import of custom name
+// fields and default resolution.
+enum YetYetAnotherTestEnum {
+	option (gogoproto.goproto_enum_prefix) = true;
+	CC = 0;
+	DD = 1 [(gogoproto.enumvalue_customname) = "BetterYetDD"];
+}
+
+message NidOptEnum {
+	optional TheTestEnum Field1 = 1 [(gogoproto.nullable) = false];
+}
+
+message NinOptEnum {
+	optional TheTestEnum Field1 = 1;
+	optional YetAnotherTestEnum Field2 = 2;
+	optional YetYetAnotherTestEnum Field3 = 3;
+}
+
+message NidRepEnum {
+	repeated TheTestEnum Field1 = 1 [(gogoproto.nullable) = false];
+	repeated YetAnotherTestEnum Field2 = 2 [(gogoproto.nullable) = false];
+	repeated YetYetAnotherTestEnum Field3 = 3 [(gogoproto.nullable) = false];
+}
+
+message NinRepEnum {
+	repeated TheTestEnum Field1 = 1;
+	repeated YetAnotherTestEnum Field2 = 2;
+	repeated YetYetAnotherTestEnum Field3 = 3;
+}
+
+message NinOptEnumDefault {
+	option (gogoproto.goproto_getters) = true;
+	option (gogoproto.face) = false;
+	optional TheTestEnum Field1 = 1  [default=C];
+	optional YetAnotherTestEnum Field2 = 2 [default=BB];
+	optional YetYetAnotherTestEnum Field3 = 3 [default=CC];
+}
+
+message AnotherNinOptEnum {
+	optional AnotherTestEnum Field1 = 1;
+	optional YetAnotherTestEnum Field2 = 2;
+	optional YetYetAnotherTestEnum Field3 = 3;
+}
+
+message AnotherNinOptEnumDefault {
+	option (gogoproto.goproto_getters) = true;
+	option (gogoproto.face) = false;
+	optional AnotherTestEnum Field1 = 1 [default=E];
+	optional YetAnotherTestEnum Field2 = 2 [default=BB];
+	optional YetYetAnotherTestEnum Field3 = 3 [default=CC];
+}
+
+
+message Timer {
+	optional sfixed64 Time1 = 1 [(gogoproto.nullable) = false];
+	optional sfixed64 Time2 = 2 [(gogoproto.nullable) = false];
+	optional bytes Data = 3 [(gogoproto.nullable) = false];
+}
+
+message MyExtendable {
+	option (gogoproto.face) = false;
+	optional int64 Field1 = 1;
+	extensions 100 to 199;
+}
+
+extend MyExtendable {
+	optional double FieldA = 100;
+	optional NinOptNative FieldB = 101;
+	optional NinEmbeddedStruct FieldC = 102;
+	repeated int64 FieldD = 104;
+	repeated NinOptNative FieldE = 105;
+}
+
+message OtherExtenable {
+	option (gogoproto.face) = false;
+	optional int64 Field2 = 2;
+	extensions 14 to 16;
+	optional int64 Field13 = 13;
+	extensions 10 to 12;
+	optional MyExtendable M = 1;
+}
+
+message NestedDefinition {
+	optional int64 Field1 = 1;
+	message NestedMessage {
+		optional fixed64 NestedField1 = 1;
+		optional NestedNestedMsg NNM = 2;
+		message NestedNestedMsg {
+			optional string NestedNestedField1 = 10;
+		}
+	}
+	enum NestedEnum {
+		TYPE_NESTED = 1;
+	}
+	optional NestedEnum EnumField = 2;
+	optional NestedMessage.NestedNestedMsg NNM = 3;
+	optional NestedMessage NM = 4;
+}
+
+message NestedScope {
+	optional NestedDefinition.NestedMessage.NestedNestedMsg A = 1;
+	optional NestedDefinition.NestedEnum B = 2;
+	optional NestedDefinition.NestedMessage C = 3;
+}
+
+message NinOptNativeDefault {
+	option (gogoproto.goproto_getters) = true;
+	option (gogoproto.face) = false;
+	optional double Field1 = 1 [default = 1234.1234];
+	optional float Field2 = 2 [default = 1234.1234];
+	optional int32 Field3 = 3 [default = 1234];
+	optional int64 Field4 = 4 [default = 1234];
+	optional uint32 Field5 = 5 [default = 1234];
+	optional uint64 Field6 = 6 [default = 1234];
+	optional sint32 Field7 = 7 [default = 1234];
+	optional sint64 Field8 = 8 [default = 1234];
+	optional fixed32 Field9 = 9 [default = 1234];
+	optional sfixed32 Field10 = 10 [default = 1234];
+	optional fixed64 Field11 = 11 [default = 1234];
+	optional sfixed64 Field12 = 12 [default = 1234];
+	optional bool Field13 = 13 [default = true];
+	optional string Field14 = 14 [default = "1234"];
+	optional bytes Field15 = 15;
+}
+
+message CustomContainer {
+	optional NidOptCustom CustomStruct = 1 [(gogoproto.nullable) = false];
+}
+
+message CustomNameNidOptNative {
+	optional double Field1 = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldA"];
+	optional float Field2 = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldB"];
+	optional int32 Field3 = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldC"];
+	optional int64 Field4 = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldD"];
+	optional uint32 Field5 = 5 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldE"];
+	optional uint64 Field6 = 6 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldF"];
+	optional sint32 Field7 = 7 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldG"];
+	optional sint64 Field8 = 8 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldH"];
+	optional fixed32 Field9 = 9 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldI"];
+	optional sfixed32 Field10 = 10 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldJ"];
+	optional fixed64 Field11 = 11 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldK"];
+	optional sfixed64 Field12 = 12 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldL"];
+	optional bool Field13 = 13 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldM"];
+	optional string Field14 = 14 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldN"];
+	optional bytes Field15 = 15 [(gogoproto.nullable) = false, (gogoproto.customname) = "FieldO"];
+}
+
+message CustomNameNinOptNative {
+	optional double Field1 = 1 [(gogoproto.customname) = "FieldA"];
+	optional float Field2 = 2 [(gogoproto.customname) = "FieldB"];
+	optional int32 Field3 = 3 [(gogoproto.customname) = "FieldC"];
+	optional int64 Field4 = 4 [(gogoproto.customname) = "FieldD"];
+	optional uint32 Field5 = 5 [(gogoproto.customname) = "FieldE"];
+	optional uint64 Field6 = 6 [(gogoproto.customname) = "FieldF"];
+	optional sint32 Field7 = 7 [(gogoproto.customname) = "FieldG"];
+	optional sint64 Field8 = 8 [(gogoproto.customname) = "FieldH"];
+	optional fixed32 Field9 = 9 [(gogoproto.customname) = "FieldI"];
+	optional sfixed32 Field10 = 10 [(gogoproto.customname) = "FieldJ"];
+	optional fixed64 Field11 = 11 [(gogoproto.customname) = "FieldK"];
+	optional sfixed64 Field12 = 12 [(gogoproto.customname) = "FielL"];
+	optional bool Field13 = 13 [(gogoproto.customname) = "FieldM"];
+	optional string Field14 = 14 [(gogoproto.customname) = "FieldN"];
+	optional bytes Field15 = 15 [(gogoproto.customname) = "FieldO"];
+}
+
+message CustomNameNinRepNative {
+	repeated double Field1 = 1 [(gogoproto.customname) = "FieldA"];
+	repeated float Field2 = 2 [(gogoproto.customname) = "FieldB"];
+	repeated int32 Field3 = 3 [(gogoproto.customname) = "FieldC"];
+	repeated int64 Field4 = 4 [(gogoproto.customname) = "FieldD"];
+	repeated uint32 Field5 = 5 [(gogoproto.customname) = "FieldE"];
+	repeated uint64 Field6 = 6 [(gogoproto.customname) = "FieldF"];
+	repeated sint32 Field7 = 7 [(gogoproto.customname) = "FieldG"];
+	repeated sint64 Field8 = 8 [(gogoproto.customname) = "FieldH"];
+	repeated fixed32 Field9 = 9 [(gogoproto.customname) = "FieldI"];
+	repeated sfixed32 Field10 = 10 [(gogoproto.customname) = "FieldJ"];
+	repeated fixed64 Field11 = 11 [(gogoproto.customname) = "FieldK"];
+	repeated sfixed64 Field12 = 12 [(gogoproto.customname) = "FieldL"];
+	repeated bool Field13 = 13 [(gogoproto.customname) = "FieldM"];
+	repeated string Field14 = 14 [(gogoproto.customname) = "FieldN"];
+	repeated bytes Field15 = 15 [(gogoproto.customname) = "FieldO"];
+}
+
+message CustomNameNinStruct {
+	optional double Field1 = 1 [(gogoproto.customname) = "FieldA"];
+	optional float Field2 = 2 [(gogoproto.customname) = "FieldB"];
+	optional NidOptNative Field3 = 3 [(gogoproto.customname) = "FieldC"];
+	repeated NinOptNative Field4 = 4 [(gogoproto.customname) = "FieldD"];
+	optional uint64 Field6 = 6 [(gogoproto.customname) = "FieldE"];
+	optional sint32 Field7 = 7 [(gogoproto.customname) = "FieldF"];
+	optional NidOptNative Field8 = 8 [(gogoproto.customname) = "FieldG"];
+	optional bool Field13 = 13 [(gogoproto.customname) = "FieldH"];
+	optional string Field14 = 14 [(gogoproto.customname) = "FieldI"];
+	optional bytes Field15 = 15 [(gogoproto.customname) = "FieldJ"];
+}
+
+message CustomNameCustomType {
+	optional bytes Id = 1 [(gogoproto.customname) = "FieldA", (gogoproto.customtype) = "Uuid"];
+	optional bytes Value = 2 [(gogoproto.customname) = "FieldB", (gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
+	repeated bytes Ids = 3 [(gogoproto.customname) = "FieldC", (gogoproto.customtype) = "Uuid"];
+	repeated bytes Values = 4 [(gogoproto.customname) = "FieldD", (gogoproto.customtype) = "github.com/gogo/protobuf/test/custom.Uint128"];
+}
+
+message CustomNameNinEmbeddedStructUnion {
+	option (gogoproto.onlyone) = true;
+	optional NidOptNative Field1 = 1 [(gogoproto.embed) = true];
+	optional NinOptNative Field200 = 200 [(gogoproto.customname) = "FieldA"];
+	optional bool Field210 = 210 [(gogoproto.customname) = "FieldB"];
+}
+
+message CustomNameEnum {
+	optional TheTestEnum Field1 = 1 [(gogoproto.customname) = "FieldA"];
+	repeated TheTestEnum Field2 = 2 [(gogoproto.customname) = "FieldB"];
+}
+
+message NoExtensionsMap {
+	option (gogoproto.face) = false;
+	option (gogoproto.goproto_extensions_map) = false;
+	optional int64 Field1 = 1;
+	extensions 100 to 199;
+}
+
+extend NoExtensionsMap {
+	optional double FieldA1 = 100;
+	optional NinOptNative FieldB1 = 101;
+	optional NinEmbeddedStruct FieldC1 = 102;
+}
+
+message Unrecognized {
+	option (gogoproto.goproto_unrecognized) = false;
+	optional string Field1 = 1;
+}
+
+message UnrecognizedWithInner {
+	message Inner {
+		option (gogoproto.goproto_unrecognized) = false;
+		optional uint32 Field1 = 1;
+	}
+
+	repeated Inner embedded = 1;
+	optional string Field2 = 2;
+}
+
+message UnrecognizedWithEmbed {
+	message Embedded {
+		option (gogoproto.goproto_unrecognized) = false;
+		optional uint32 Field1 = 1;
+	}
+
+	optional Embedded embedded = 1 [(gogoproto.embed) = true, (gogoproto.nullable) = false];
+	optional string Field2 = 2;
+}
+
+message Node {
+	optional string Label = 1;
+	repeated Node Children = 2;
+}
+

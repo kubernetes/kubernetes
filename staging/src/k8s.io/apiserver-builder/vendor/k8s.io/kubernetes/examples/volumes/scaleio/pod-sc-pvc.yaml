@@ -1,0 +1,15 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: pod-sio-small
+spec:
+  containers:
+    - name: pod-sio-small-container
+      image: gcr.io/google_containers/test-webserver
+      volumeMounts:
+      - mountPath: /test
+        name: test-data
+  volumes:
+    - name: test-data
+      persistentVolumeClaim:
+        claimName: pvc-sio-small

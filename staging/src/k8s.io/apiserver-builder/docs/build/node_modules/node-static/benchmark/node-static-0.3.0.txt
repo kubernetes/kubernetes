@@ -1,0 +1,43 @@
+This is ApacheBench, Version 2.3 <$Revision: 655654 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking 127.0.0.1 (be patient)
+
+
+Server Software:        node-static/0.3.0
+Server Hostname:        127.0.0.1
+Server Port:            8080
+
+Document Path:          /lib/node-static.js
+Document Length:        6038 bytes
+
+Concurrency Level:      20
+Time taken for tests:   2.323 seconds
+Complete requests:      10000
+Failed requests:        0
+Write errors:           0
+Total transferred:      63190000 bytes
+HTML transferred:       60380000 bytes
+Requests per second:    4304.67 [#/sec] (mean)
+Time per request:       4.646 [ms] (mean)
+Time per request:       0.232 [ms] (mean, across all concurrent requests)
+Transfer rate:          26563.66 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.2      0       3
+Processing:     1    4   1.4      4      28
+Waiting:        1    4   1.3      4      18
+Total:          2    5   1.5      4      28
+
+Percentage of the requests served within a certain time (ms)
+  50%      4
+  66%      5
+  75%      5
+  80%      5
+  90%      5
+  95%      6
+  98%      8
+  99%      9
+ 100%     28 (longest request)

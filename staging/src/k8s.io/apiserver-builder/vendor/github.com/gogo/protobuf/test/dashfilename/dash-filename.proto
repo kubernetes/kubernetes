@@ -1,0 +1,10 @@
+syntax = "proto2";
+package dashfilename;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+
+message test {
+
+}

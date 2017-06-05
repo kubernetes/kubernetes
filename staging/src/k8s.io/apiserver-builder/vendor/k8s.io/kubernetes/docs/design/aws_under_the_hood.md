@@ -1,0 +1,1 @@
+This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/aws_under_the_hood.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/aws_under_the_hood.md)

@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+set -e
+
+VER=$1
+PROJ="etcd"
+
+if [ -z "$1" ]; then
+	echo "Usage: ${0} VERSION" >> /dev/stderr
+	exit 255
+fi
+
+set -u
+
+function setup_env {
+	local proj=${1}
+	local ver=${2}
+
+	if [ ! -d ${proj} ]; then
+		git clone https://github.com/coreos/${proj}
+	fi
+
+	pushd ${proj} >/dev/null
+		git checkout master
+		git fetch --all
+		git reset --hard origin/master
+		git checkout $ver
+	popd >/dev/null
+}
+
+
+function package {
+	local target=${1}
+	local srcdir="${2}/bin"
+
+	local ccdir="${srcdir}/${GOOS}_${GOARCH}"
+	if [ -d ${ccdir} ]; then
+		srcdir=${ccdir}
+	fi
+	local ext=""
+	if [ ${GOOS} == "windows" ]; then
+		ext=".exe"
+	fi
+	for bin in etcd etcdctl; do
+		cp ${srcdir}/${bin} ${target}/${bin}${ext}
+	done
+
+	cp etcd/README.md ${target}/README.md
+	cp etcd/etcdctl/README.md ${target}/README-etcdctl.md
+	cp etcd/etcdctl/READMEv2.md ${target}/READMEv2-etcdctl.md
+
+	cp -R etcd/Documentation ${target}/Documentation
+}
+
+function main {
+	mkdir release
+	cd release
+	setup_env ${PROJ} ${VER}
+
+	for os in darwin windows linux; do
+		export GOOS=${os}
+		export GOARCH="amd64"
+
+		pushd etcd >/dev/null
+			./build
+		popd >/dev/null
+
+		TARGET="etcd-${VER}-${GOOS}-${GOARCH}"
+		mkdir ${TARGET}
+		package ${TARGET} ${PROJ}
+
+		if [ ${GOOS} == "linux" ]; then
+			tar cfz ${TARGET}.tar.gz ${TARGET}
+			echo "Wrote release/${TARGET}.tar.gz"
+		else
+			zip -qr ${TARGET}.zip ${TARGET}
+			echo "Wrote release/${TARGET}.zip"
+		fi
+	done
+}
+
+main

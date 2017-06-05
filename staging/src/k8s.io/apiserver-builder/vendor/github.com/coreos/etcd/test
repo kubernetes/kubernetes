@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+#
+# Run all etcd tests
+# ./test
+# ./test -v
+#
+# Run tests for one package
+#
+# PKG=./wal ./test
+# PKG=snap ./test
+set -e
+
+source ./build
+
+# TODO: 'client' pkg fails with gosimple from generated files
+# TODO: 'rafttest' is failing with unused
+GOSIMPLE_UNUSED_PATHS=$(go list ./... | sed -e 's/github.com\/coreos\/etcd\///g' | grep -vE 'cmd|vendor|rafttest|github.com/coreos/etcd$|client$')
+
+# Invoke ./cover for HTML output
+COVER=${COVER:-"-cover"}
+
+# Hack: gofmt ./ will recursively check the .git directory. So use *.go for gofmt.
+IGNORE_PKGS="(cmd|vendor|etcdserverpb|rafttest)"
+INTEGRATION_PKGS="(integration|e2e|contrib|functional-tester)"
+TEST_PKGS=`find . -name \*_test.go | while read a; do dirname $a; done | sort | uniq | egrep -v "$IGNORE_PKGS" | sed "s|\./||g"`
+FORMATTABLE=`find . -name \*.go | while read a; do echo $(dirname $a)/"*.go"; done | sort | uniq | egrep -v "$IGNORE_PKGS" | sed "s|\./||g"`
+TESTABLE_AND_FORMATTABLE=`echo "$TEST_PKGS" | egrep -v "$INTEGRATION_PKGS"`
+
+# user has not provided PKG override
+if [ -z "$PKG" ]; then
+	TEST=$TESTABLE_AND_FORMATTABLE
+	FMT=$FORMATTABLE
+
+# user has provided PKG override
+else
+	# strip out leading dotslashes and trailing slashes from PKG=./foo/
+	TEST=${PKG/#./}
+	TEST=${TEST/#\//}
+	TEST=${TEST/%\//}
+
+	# only run gofmt on packages provided by user
+	FMT="$TEST"
+fi
+
+# split TEST into an array and prepend REPO_PATH to each local package
+split=(${TEST// / })
+TEST=${split[@]/#/${REPO_PATH}/}
+MACHINE_TYPE=$(uname -m)
+if [ $MACHINE_TYPE != "armv7l" ]; then
+	RACE="--race"
+fi
+
+function unit_tests {
+	echo "Running tests..."
+	# only -run=Test so examples can run in integration tests
+	go test -timeout 3m ${COVER} ${RACE} -cpu 1,2,4 -run=Test $@ ${TEST}
+}
+
+function integration_tests {
+	if [ "$RELEASE_TEST" = "y" ]; then
+		UPGRADE_VER=$(git tag -l | tail -1)
+		if [ -n "$MANUAL_VER" ]; then
+			# in case, we need to test against different version
+			UPGRADE_VER=$MANUAL_VER
+		fi
+		echo "Running release upgrade tests with" etcd $UPGRADE_VER
+		curl -L https://github.com/coreos/etcd/releases/download/$UPGRADE_VER/etcd-$UPGRADE_VER-linux-amd64.tar.gz -o /tmp/etcd-$UPGRADE_VER-linux-amd64.tar.gz
+		tar xzvf /tmp/etcd-$UPGRADE_VER-linux-amd64.tar.gz -C /tmp/ --strip-components=1
+		mv /tmp/etcd ./bin/etcd-last-release
+	fi;
+
+	go test -timeout 10m -v -cpu 1,2,4 $@ ${REPO_PATH}/e2e &
+	e2epid="$!"
+	go test -timeout 15m -v -cpu 1,2,4 $@ ${REPO_PATH}/integration &
+	intpid="$!"
+	wait $e2epid
+	wait $intpid
+	go test -timeout 1m -v ${RACE} -cpu 1,2,4 $@ ${REPO_PATH}/client/integration
+	go test -timeout 10m -v ${RACE} -cpu 1,2,4 $@ ${REPO_PATH}/clientv3/integration
+	go test -timeout 1m -v -cpu 1,2,4 $@ ${REPO_PATH}/contrib/raftexample
+	go test -timeout 1m -v ${RACE} -cpu 1,2,4 -run=Example $@ ${TEST}
+}
+
+function fmt_tests {
+	echo "Checking gofmt..."
+	fmtRes=$(gofmt -l -s -d $FMT)
+	if [ -n "${fmtRes}" ]; then
+		echo -e "gofmt checking failed:\n${fmtRes}"
+		exit 255
+	fi
+
+	echo "Checking govet..."
+	vetRes=$(go vet $TEST)
+	if [ -n "${vetRes}" ]; then
+		echo -e "govet checking failed:\n${vetRes}"
+		exit 255
+	fi
+
+	echo "Checking 'go tool vet -shadow'..."
+	for path in $FMT; do
+		if [ "${path##*.}" != "go" ]; then
+			path="${path}/*.go"
+		fi
+		vetRes=$(go tool vet -shadow ${path})
+		if [ -n "${vetRes}" ]; then
+			echo -e "govet -shadow checking ${path} failed:\n${vetRes}"
+			exit 255
+		fi
+	done
+
+	if which goword >/dev/null; then
+		echo "Checking goword..."
+		# get all go files to process
+		gofiles=`find $FMT -iname '*.go' 2>/dev/null`
+		# ignore tests and protobuf files
+		gofiles=`echo ${gofiles} | sort | uniq | sed "s/ /\n/g" | egrep -v "(\\_test.go|\\.pb\\.go)"`
+		# only check for broken exported godocs
+		gowordRes=`goword -use-spell=false ${gofiles} | grep godoc-export | sort`
+		if [ ! -z "$gowordRes" ]; then
+			echo -e "goword checking failed:\n${gowordRes}"
+			exit 255
+		fi
+	else
+		echo "Skipping goword..."
+	fi
+
+	if which gosimple >/dev/null; then
+		echo "Skipping gosimple..."
+	fi
+	
+	if which unused >/dev/null; then
+		echo "Checking unused..."
+		for path in $GOSIMPLE_UNUSED_PATHS; do
+			unusedResult=`unused $REPO_PATH/${path} || true`
+			if [ -n "${unusedResult}" ]; then
+				echo -e "unused checking ${path} failed:\n${unusedResult}"
+				exit 255
+			fi
+		done
+	else
+		echo "Skipping unused..."
+	fi
+
+	echo "Checking for license header..."
+	licRes=$(for file in $(find . -type f -iname '*.go' ! -path './cmd/*'); do
+			head -n3 "${file}" | grep -Eq "(Copyright|generated|GENERATED)" || echo -e "  ${file}"
+		done;)
+	if [ -n "${licRes}" ]; then
+		echo -e "license header checking failed:\n${licRes}"
+		exit 255
+	fi
+
+	echo "Checking commit titles..."
+	git log master..HEAD --oneline | while read l; do
+		commitMsg=`echo "$l" | cut -f2- -d' '`
+		if [[ "$commitMsg" == Merge* ]]; then
+			# ignore "Merge pull" commits
+			continue
+		fi
+		if [[ "$commitMsg" == Revert* ]]; then
+			# ignore revert commits
+			continue
+		fi
+
+		pkgPrefix=`echo "$commitMsg" | cut -f1 -d':'`
+		spaceCommas=`echo "$commitMsg" | sed 's/ /\n/g' | grep -c ',$' || echo 0`
+		commaSpaces=`echo "$commitMsg" | sed 's/,/\n/g' | grep -c '^ ' || echo 0`
+		if [[ `echo $commitMsg | grep -c ":..*"` == 0 || "$commitMsg" == "$pkgPrefix" || "$spaceCommas" != "$commaSpaces" ]]; then
+    			echo "$l"...
+			echo "Expected commit title format '<package>{\", \"<package>}: <description>'"
+			echo "Got: $l"
+			exit 255
+		fi
+	done
+}
+
+function dep_tests {
+	echo "Checking package dependencies..."
+	# don't pull in etcdserver package
+	pushd clientv3 >/dev/null
+	badpkg="(etcdserver|mvcc)"
+	deps=`go list -f '{{ .Deps }}'  | sed 's/ /\n/g' | egrep "${badpkg}" | egrep -v "${badpkg}/" || echo ""`
+	popd >/dev/null
+	if [ ! -z "$deps" ]; then
+		echo -e "clientv3 has masked dependencies:\n${deps}"
+		exit 255
+	fi
+}
+
+# Set up gopath so tests use vendored dependencies
+export GOPATH=${PWD}/gopath
+rm -rf $GOPATH/src
+mkdir -p $GOPATH
+ln -s ${PWD}/cmd/vendor $GOPATH/src
+
+# fail fast on static tests
+toggle_failpoints disable
+fmt_tests
+dep_tests
+
+# fail fast on static tests
+GO_BUILD_FLAGS="-a -v" etcd_build
+
+unit_tests
+if [ -n "$INTEGRATION" ]; then
+	integration_tests
+fi
+echo "Success"

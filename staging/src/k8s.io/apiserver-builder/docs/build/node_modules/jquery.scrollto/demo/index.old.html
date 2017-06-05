@@ -1,0 +1,128 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+	<title>jQuery.ScrollTo</title>
+	<meta name="keywords" content="javascript, jquery, plugins, scroll, scrollTo, smooth, animation, to, effect, ariel, flesler, window, overflow, element, navigation, customizable" />
+	<meta name="description" content="Demo of jQuery.scrollTo. Lightweight, cross-browser and highly customizable animated scrolling with jQuery, made by Ariel Flesler." />
+	<meta name="robots" content="index,follow" />
+	<link type="text/css" rel="stylesheet" href="css/style.old.css" />
+	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
+	<script type="text/javascript" src="../jquery.scrollTo.js"></script>
+	<script type="text/javascript">
+		jQuery(function( $ ){
+			//borrowed from jQuery easing plugin
+			//http://gsgd.co.uk/sandbox/jquery.easing.php
+			$.easing.elasout = function(x, t, b, c, d) {
+				var s=1.70158;var p=0;var a=c;
+				if (t==0) return b;  if ((t/=d)==1) return b+c;  if (!p) p=d*.3;
+				if (a < Math.abs(c)) { a=c; var s=p/4; }
+				else var s = p/(2*Math.PI) * Math.asin (c/a);
+				return a*Math.pow(2,-10*t) * Math.sin( (t*d-s)*(2*Math.PI)/p ) + c + b;
+			};	
+			$('button').click(function(){//this is not the cleanest way to do this, I'm just keeping it short.
+				var index = parseInt( $(this).prev('input').val() ) || 0;
+				var $c = $(this).parent().next();
+				$c.stop().scrollTo('li:eq('+index+')', {duration:2500, easing:'elasout',axis:$c.attr('id')});
+			});
+			$('#btn_screen').click(function(){
+				$.scrollTo( $('#txt_screen').val(), {duration:2500} );
+			});
+			$('div.container a').click(function(){
+				var $c = $(this).parents('.container');
+				$c.stop().scrollTo( 0, {duration:2000,axis:$c.attr('id'), queue:true} );
+				return false;
+			});
+		});
+	</script>
+</head>
+<body>
+	<h1>jQuery.ScrollTo&nbsp;<strong>by Ariel Flesler</strong></h1>
+	<div id="links" class="part" style="width:135px">
+		<h3>Links</h3>
+		<ul>
+			<li><a target="_blank" href="http://plugins.jquery.com/project/ScrollTo">Project Page</a></li>
+			<li><a target="_blank" href="http://flesler.blogspot.com/2007/10/jqueryscrollto.html">Main blog article</a></li>
+			<li><a target="_blank" href="http://flesler.blogspot.com/search/label/jQuery.ScrollTo">All articles</a></li>
+			<li><a target="_blank" href="http://flesler.webs.com/jQuery.LocalScroll/">LocalScroll Demo</a></li>
+			<li><a target="_blank" href="http://flesler.webs.com/jQuery.SerialScroll/">SerialScroll Demo</a></li>
+			<li><a target="_blank" href="./" rel="prev" rev="next">New Demo</a></li>
+		</ul>
+	</div>
+	<label for="txt_screen">Scroll the window to <input id="txt_screen" type="text" value=".pane:eq(1)" /><input id="btn_screen" type="button" value="Scroll" /></label><br /><br />
+	<label>Scroll to the #<input type="text" value="3" /> element inside this container<button>Scroll</button></label>
+	<div id="y" class="container">
+		<ul>
+			<li style="background-color:#9933CC;"><p>0</p><a href="#">back to top</a></li>
+			<li style="background-color:#FFCC99;"><p>1</p><a href="#">back to top</a></li>
+			<li style="background-color:#FF0000;"><p>2</p><a href="#">back to top</a></li>
+			<li style="background-color:#00FFCC;"><p>3</p><a href="#">back to top</a></li>
+			<li style="background-color:#663366;"><p>4</p><a href="#">back to top</a></li>
+			<li style="background-color:#CCCCFF;"><p>5</p><a href="#">back to top</a></li>
+			<li style="background-color:#FFFFCC;"><p>6</p><a href="#">back to top</a></li>
+			<li style="background-color:#00FF00;"><p>7</p><a href="#">back to top</a></li>
+		</ul>
+	</div>
+	<label>Scroll to the #<input type="text" value="3" /> element inside this container<button>Scroll</button></label>
+	<div id="x" class="container">
+		<ul style="width:4820px;">
+			<li style="background-color:#9933CC;"><p>0</p><a href="#">back to start</a></li>
+			<li style="background-color:#FFCC99;"><p>1</p><a href="#">back to start</a></li>
+			<li style="background-color:#FF0000;"><p>2</p><a href="#">back to start</a></li>
+			<li style="background-color:#00FFCC;"><p>3</p><a href="#">back to start</a></li>
+			<li style="background-color:#663366;"><p>4</p><a href="#">back to start</a></li>
+			<li style="background-color:#CCCCFF;"><p>5</p><a href="#">back to start</a></li>
+			<li style="background-color:#FFFFCC;"><p>6</p><a href="#">back to start</a></li>
+			<li style="background-color:#00FF00;"><p>7</p><a href="#">back to start</a></li>
+			<li style="background-color:#9933CC;"><p>8</p><a href="#">back to start</a></li>
+			<li style="background-color:#FFCC99;"><p>9</p><a href="#">back to start</a></li>
+			<li style="background-color:#FF0000;"><p>10</p><a href="#">back to start</a></li>
+			<li style="background-color:#00FFCC;"><p>11</p><a href="#">back to start</a></li>
+			<li style="background-color:#663366;"><p>12</p><a href="#">back to start</a></li>
+			<li style="background-color:#CCCCFF;"><p>13</p><a href="#">back to start</a></li>
+			<li style="background-color:#FFFFCC;"><p>14</p><a href="#">back to start</a></li>
+			<li style="background-color:#00FF00;"><p>15</p><a href="#">back to start</a></li>
+		</ul>
+	</div>
+	<label>Scroll to the #<input type="text" value="16" /> element inside this container<button>Scroll</button></label>
+	<div id="xy" class="container">
+		<ul style="width:1500px;">
+			<li style="background-color:#9933CC;"><p>0</p><a href="#">back to start</a></li>
+			<li style="background-color:#FFCC99;"><p>1</p><a href="#">back to start</a></li>
+			<li style="background-color:#FF0000;"><p>2</p><a href="#">back to start</a></li>
+			<li style="background-color:#00FFCC;"><p>3</p><a href="#">back to start</a></li>
+			<li style="background-color:#663366;"><p>4</p><a href="#">back to start</a></li>
+			<li style="background-color:#CCCCFF;"><p>5</p><a href="#">back to start</a></li>
+			<li style="background-color:#FFFFCC;"><p>6</p><a href="#">back to start</a></li>
+			<li style="background-color:#00FF00;"><p>7</p><a href="#">back to start</a></li>
+			<li style="background-color:#9933CC;"><p>8</p><a href="#">back to start</a></li>
+			<li style="background-color:#FFCC99;"><p>9</p><a href="#">back to start</a></li>
+			<li style="background-color:#FF0000;"><p>10</p><a href="#">back to start</a></li>
+			<li style="background-color:#00FFCC;"><p>11</p><a href="#">back to start</a></li>
+			<li style="background-color:#663366;"><p>12</p><a href="#">back to start</a></li>
+			<li style="background-color:#CCCCFF;"><p>13</p><a href="#">back to start</a></li>
+			<li style="background-color:#FFFFCC;"><p>14</p><a href="#">back to start</a></li>
+			<li style="background-color:#00FF00;"><p>15</p><a href="#">back to start</a></li>
+			<li style="background-color:#9933CC;"><p>16</p><a href="#">back to start</a></li>
+			<li style="background-color:#FFCC99;"><p>17</p><a href="#">back to start</a></li>
+			<li style="background-color:#FF0000;"><p>18</p><a href="#">back to start</a></li>
+			<li style="background-color:#00FFCC;"><p>19</p><a href="#">back to start</a></li>
+			<li style="background-color:#663366;"><p>20</p><a href="#">back to start</a></li>
+			<li style="background-color:#CCCCFF;"><p>21</p><a href="#">back to start</a></li>
+			<li style="background-color:#FFFFCC;"><p>22</p><a href="#">back to start</a></li>
+			<li style="background-color:#00FF00;"><p>23</p><a href="#">back to start</a></li>
+			<li style="background-color:#9933CC;"><p>24</p><a href="#">back to start</a></li>
+			<li style="background-color:#FFCC99;"><p>25</p><a href="#">back to start</a></li>
+			<li style="background-color:#FF0000;"><p>26</p><a href="#">back to start</a></li>
+			<li style="background-color:#00FFCC;"><p>27</p><a href="#">back to start</a></li>
+			<li style="background-color:#663366;"><p>28</p><a href="#">back to start</a></li>
+			<li style="background-color:#CCCCFF;"><p>29</p><a href="#">back to start</a></li>
+		</ul>
+	</div>
+	<div class="pane" style="background-color:#000000;margin-top:40px;"></div>
+	<div class="pane" style="background-color:#333333;"></div>
+	<div class="pane" style="background-color:#666666;"></div>
+	<div class="pane" style="background-color:#999999;"></div>
+	<div class="pane" style="background-color:#CCCCCC;"></div>
+</body>
+</html>

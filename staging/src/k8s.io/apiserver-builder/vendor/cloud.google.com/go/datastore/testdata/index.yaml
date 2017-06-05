@@ -1,0 +1,41 @@
+indexes:
+
+- kind: SQChild
+  ancestor: yes
+  properties:
+  - name: T
+  - name: I
+
+- kind: SQChild
+  ancestor: yes
+  properties:
+  - name: T
+  - name: I
+    direction: desc
+
+- kind: SQChild
+  ancestor: yes
+  properties:
+  - name: I
+  - name: T
+  - name: U
+
+- kind: SQChild
+  ancestor: yes
+  properties:
+  - name: I
+  - name: T
+  - name: U
+
+- kind: SQChild
+  ancestor: yes
+  properties:
+  - name: T
+  - name: J
+
+- kind: SQChild
+  ancestor: yes
+  properties:
+  - name: T
+  - name: J
+  - name: U

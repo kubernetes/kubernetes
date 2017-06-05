@@ -1,0 +1,314 @@
+heat_template_version: 2014-10-16
+
+description: >
+  This is a nested stack that defines a single Kubernetes minion, This stack is
+  included by an AutoScalingGroup resource in the parent template
+  (kubecluster.yaml).
+
+parameters:
+
+  server_image:
+    type: string
+    description: glance image used to boot the server
+
+  minion_flavor:
+    type: string
+    default: m1.small
+    description: flavor to use when booting the server
+
+  ssh_key_name:
+    type: string
+    description: name of ssh key to be provisioned on our server
+    default: lars
+
+  external_network:
+    type: string
+    description: uuid/name of a network to use for floating ip addresses
+
+  kubernetes_server_url:
+    type: string
+    description: URL of kubernetes server binary. Must be tar.gz.
+
+  kubernetes_salt_url:
+    type: string
+    description: URL of kubernetes salt scripts. Must be tar.gz.
+
+  token_kubelet:
+    type: string
+    description: Token used by kubelet
+
+  token_kube_proxy:
+    type: string
+    description: Token used by kube-proxy
+
+  os_auth_url:
+    type: string
+    description: OpenStack Auth URL
+    default: false
+
+  os_username:
+    type: string
+    description: OpenStack Username
+    default: false
+
+  os_password:
+    type: string
+    description: OpenStack Password
+    default: false
+
+  os_region_name:
+    type: string
+    description: OpenStack Region Name
+    default: false
+
+  os_tenant_name:
+    type: string
+    description: OpenStack Tenant Name
+    default: false
+
+  os_user_domain_name:
+    type: string
+    description: OpenStack User Domain Name (Domain-level authorization scope for keystone v3)
+
+  enable_proxy:
+    type: string
+    description: Whether or not to enable proxy settings
+    default: false
+
+  ftp_proxy:
+    type: string
+    description: FTP Proxy URL
+    default: localhost
+
+  http_proxy:
+    type: string
+    description: HTTP Proxy URL
+    default: localhost
+
+  https_proxy:
+    type: string
+    description: HTTPS Proxy URL
+    default: localhost
+
+  socks_proxy:
+    type: string
+    description: SOCKS Proxy URL
+    default: localhost
+
+  no_proxy:
+    type: string
+    description: Comma seperated list of domains/addresses that bypass proxying.
+    default: localhost
+
+  assign_floating_ip:
+    type: boolean
+    description: Indicates whether floating IPs will be generated for minions
+    default: true
+
+  # The following are all generated in the parent template.
+  kube_master_ip:
+    type: string
+    description: IP address of the Kubernetes master server.
+  fixed_network:
+    type: string
+    description: Network from which to allocate fixed addresses.
+  fixed_subnet:
+    type: string
+    description: Subnet from which to allocate fixed addresses.
+  cluster_cidr:
+    type: string
+    description: Subnet from which to allocate pod subnets.
+  wait_condition_timeout:
+    type: number
+    description : >
+      timeout for the Wait Conditions
+  metadata:
+    type: json
+    description: metadata for ceilometer query
+  cluster_name:
+    type: string
+  secgroup_base:
+    type: string
+  secgroup_node:
+    type: string
+
+conditions:
+  assign_floating_ip: {equals : [{get_param: assign_floating_ip}, true]}
+
+resources:
+
+  minion_wait_handle:
+    type: OS::Heat::WaitConditionHandle
+
+  minion_wait_condition:
+    type: OS::Heat::WaitCondition
+    depends_on: kube_minion
+    properties:
+      handle: {get_resource: minion_wait_handle}
+      timeout: {get_param: wait_condition_timeout}
+
+  ######################################################################
+  #
+  # software configs.  these are components that are combined into
+  # a multipart MIME user-data archive.
+  #
+
+  write_heat_params:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config:
+        str_replace:
+          template: {get_file: fragments/write-heat-params.yaml}
+          params:
+            "$KUBERNETES_SERVER_URL": {get_param: kubernetes_server_url}
+            "$KUBERNETES_SALT_URL": {get_param: kubernetes_salt_url}
+            "$MASTER_IP": {get_param: kube_master_ip}
+
+  proxy_config:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config:
+        str_replace:
+          template: {get_file: fragments/configure-proxy.sh}
+          params:
+            "$ENABLE_PROXY": {get_param: enable_proxy }
+            "$FTP_PROXY": {get_param: ftp_proxy }
+            "$HTTP_PROXY": {get_param: http_proxy }
+            "$HTTPS_PROXY": {get_param: https_proxy }
+            "$SOCKS_PROXY": {get_param: socks_proxy }
+            "$NO_PROXY": {get_param: no_proxy }
+
+  hostname_hack:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config: {get_file: fragments/hostname-hack.yaml}
+
+  hostname_hack_script:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config: {get_file: fragments/hostname-hack.sh}
+
+  kube_user:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config: {get_file: fragments/kube-user.yaml}
+
+  provision_network_node:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config: {get_file: fragments/provision-network-node.sh}
+
+  deploy_kube_auth_files_node:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config:
+        str_replace:
+          template: {get_file: fragments/deploy-kube-auth-files-node.yaml}
+          params:
+            "$token_kubelet": {get_param: token_kubelet}
+            "$token_kube_proxy": {get_param: token_kube_proxy}
+
+  configure_salt_node:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config:
+        str_replace:
+          template: {get_file: fragments/configure-salt.yaml}
+          params:
+            "$MASTER_IP": {get_param: kube_master_ip}
+            "$OS_AUTH_URL": {get_param: os_auth_url}
+            "$OS_USERNAME": {get_param: os_username}
+            "$OS_PASSWORD": {get_param: os_password}
+            "$OS_REGION_NAME": {get_param: os_region_name}
+            "$OS_TENANT_NAME": {get_param: os_tenant_name}
+            "$OS_USER_DOMAIN_NAME": {get_param: os_user_domain_name}
+            "$role": "kubernetes-pool"
+            "$cluster_cidr": {get_param: cluster_cidr}
+
+  run_salt:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config:
+        str_replace:
+          template: {get_file: fragments/run-salt.sh}
+          params:
+            "$$wc_notify": {get_attr: [minion_wait_handle, curl_cli]}
+
+  kube_minion_init:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+        - config: {get_resource: write_heat_params}
+        - config: {get_resource: proxy_config}
+        - config: {get_resource: hostname_hack}
+        - config: {get_resource: hostname_hack_script}
+        - config: {get_resource: kube_user}
+        - config: {get_resource: provision_network_node}
+        - config: {get_resource: deploy_kube_auth_files_node}
+        - config: {get_resource: configure_salt_node}
+        - config: {get_resource: run_salt}
+
+  ######################################################################
+  #
+  # a single kubernetes minion.
+  #
+  server_name_post_fix:
+    type: OS::Heat::RandomString
+    properties:
+      character_classes: [{'class': 'lowercase', 'min': 1}]
+      length: 8
+      character_classes:
+        - class: lowercase
+        - class: digits
+
+  kube_minion:
+    type: OS::Nova::Server
+    properties:
+      image: {get_param: server_image}
+      flavor: {get_param: minion_flavor}
+      key_name: {get_param: ssh_key_name}
+      metadata: {get_param: metadata}
+      user_data_format: RAW
+      user_data: {get_resource: kube_minion_init}
+      networks:
+        - port: {get_resource: kube_minion_eth0}
+      name:
+        list_join: [-, [{get_param: cluster_name}, node, {get_resource: server_name_post_fix}]]
+
+  kube_minion_eth0:
+    type: OS::Neutron::Port
+    properties:
+      network: {get_param: fixed_network}
+      security_groups:
+        - {get_param: secgroup_base}
+        - {get_param: secgroup_node}
+      fixed_ips:
+        - subnet: {get_param: fixed_subnet}
+      allowed_address_pairs:
+        - ip_address: 10.246.0.0/16
+      replacement_policy: AUTO
+
+  kube_minion_floating:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: {get_param: external_network}
+      port_id: {get_resource: kube_minion_eth0}
+    condition: assign_floating_ip
+
+outputs:
+
+  kube_minion_ip:
+    value: {get_attr: [kube_minion_eth0, fixed_ips, 0, ip_address]}
+
+  kube_minion_external_ip:
+    value: {get_attr: [kube_minion_floating, floating_ip_address]}
+    condition: assign_floating_ip

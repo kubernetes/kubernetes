@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quobyte
+spec:
+  containers:
+  - name: quobyte
+    image: kubernetes/pause
+    volumeMounts:
+    - mountPath: /mnt
+      name: quobytevolume
+  volumes:
+  - name: quobytevolume
+    quobyte:
+      registry: registry:7861
+      volume: testVolume
+      readOnly: false
+      user: root
+      group: root

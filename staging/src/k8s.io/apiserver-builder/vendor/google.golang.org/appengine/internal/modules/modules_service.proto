@@ -1,0 +1,80 @@
+syntax = "proto2";
+option go_package = "modules";
+
+package appengine;
+
+message ModulesServiceError {
+  enum ErrorCode {
+    OK  = 0;
+    INVALID_MODULE = 1;
+    INVALID_VERSION = 2;
+    INVALID_INSTANCES = 3;
+    TRANSIENT_ERROR = 4;
+    UNEXPECTED_STATE = 5;
+  }
+}
+
+message GetModulesRequest {
+}
+
+message GetModulesResponse {
+  repeated string module = 1;
+}
+
+message GetVersionsRequest {
+  optional string module = 1;
+}
+
+message GetVersionsResponse {
+  repeated string version = 1;
+}
+
+message GetDefaultVersionRequest {
+  optional string module = 1;
+}
+
+message GetDefaultVersionResponse {
+  required string version = 1;
+}
+
+message GetNumInstancesRequest {
+  optional string module = 1;
+  optional string version = 2;
+}
+
+message GetNumInstancesResponse {
+  required int64 instances = 1;
+}
+
+message SetNumInstancesRequest {
+  optional string module = 1;
+  optional string version = 2;
+  required int64 instances = 3;
+}
+
+message SetNumInstancesResponse {}
+
+message StartModuleRequest {
+  required string module = 1;
+  required string version = 2;
+}
+
+message StartModuleResponse {}
+
+message StopModuleRequest {
+  optional string module = 1;
+  optional string version = 2;
+}
+
+message StopModuleResponse {}
+
+message GetHostnameRequest {
+  optional string module = 1;
+  optional string version = 2;
+  optional string instance = 3;
+}
+
+message GetHostnameResponse {
+  required string hostname = 1;
+}
+

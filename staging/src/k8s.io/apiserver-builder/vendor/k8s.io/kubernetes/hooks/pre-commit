@@ -1,0 +1,190 @@
+#!/bin/bash
+
+readonly reset=$(tput sgr0)
+readonly red=$(tput bold; tput setaf 1)
+readonly green=$(tput bold; tput setaf 2)
+
+exit_code=0
+
+echo -ne "Checking that it builds... "
+if ! OUT=$(make 2>&1); then
+  echo
+  echo "${red}${OUT}"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+# Check if changes to Godeps are reproducible...
+files=($(git diff --cached --name-only --diff-filter ACM | grep "Godeps"))
+if [[ "${#files[@]}" -ne 0 ]]; then
+  echo -ne "Check if changes to Godeps are reproducible (this is pretty slow)..."
+  if ! OUT=$("hack/verify-godeps.sh" 2>&1); then
+    echo
+    echo "${red}${OUT}"
+    exit_code=1
+  else
+    echo "${green}OK"
+  fi
+  echo "${reset}"
+
+  echo -ne "Check if Godep licenses are up to date..."
+  if ! OUT=$("hack/verify-godep-licenses.sh" 2>&1); then
+    echo
+    echo "${red}${OUT}"
+    exit_code=1
+  else
+    echo "${green}OK"
+  fi
+  echo "${reset}"
+fi
+
+echo -ne "Checking for files that need gofmt... "
+files_need_gofmt=()
+files=($(git diff --cached --name-only --diff-filter ACM | grep "\.go" | grep -v -e "^third_party" -e "^vendor"))
+for file in "${files[@]}"; do
+  # Check for files that fail gofmt.
+  diff="$(git show ":${file}" | gofmt -s -d 2>&1)"
+  if [[ -n "$diff" ]]; then
+    files_need_gofmt+=("${file}")
+  fi
+done
+
+if [[ "${#files_need_gofmt[@]}" -ne 0 ]]; then
+  echo "${red}ERROR!"
+  echo "Some files have not been gofmt'd. To fix these errors, "
+  echo "copy and paste the following:"
+  echo "  gofmt -s -w ${files_need_gofmt[@]}"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+echo -ne "Checking for package aliases... "
+if ! hack/verify-pkg-names.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Some package aliases break go conventions. To fix these errors, "
+  echo "do not use capitalized or underlined characters in pkg aliases. "
+  echo "Refer to https://blog.golang.org/package-names for more info."
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+echo -ne "Checking for files that need boilerplate... "
+files=($(git diff --cached --name-only --diff-filter ACM))
+# We always make sure there is one file in the files list. Some tools check
+# the whole repo if they get no files, so in fact, this is much faster on
+# git commit --amend
+if [[ ${#files[@]} -eq 0 ]]; then
+  files+=("README.md")
+fi
+out=($(hack/boilerplate/boilerplate.py "${files[@]}"))
+if [[ "${#out}" -ne 0 ]]; then
+  echo "${red}ERROR!"
+  echo "Some files are missing the required boilerplate header"
+  echo "from hack/boilerplate/boilerplate.*.txt:"
+  for f in "${out[@]}"; do
+    echo "  ${f}"
+  done
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+echo -ne "Checking for problems with flag names... "
+invalid_flag_lines=$(hack/verify-flags-underscore.py "${files[@]}")
+if [[ "${invalid_flag_lines:-}" != "" ]]; then
+  echo "${red}ERROR!"
+  echo "There appear to be problems with the following:"
+  for line in "${invalid_flag_lines[@]}"; do
+    echo "  ${line}"
+  done
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+echo -ne "Checking for API descriptions... "
+files_need_description=()
+# Check API schema definitions for field descriptions
+for file in $(git diff --cached --name-only --diff-filter ACM | egrep "pkg/api/v.[^/]*/types\.go" | grep -v "third_party"); do
+  # Check for files with fields without description tags
+  descriptionless=$(hack/verify-description.sh "${file}" > /dev/null; echo $?)
+  if [[ "$descriptionless" -ne "0" ]]; then
+    files_need_description+=("${file}")
+  fi
+done
+
+if [[ "${#files_need_description[@]}" -ne 0 ]]; then
+  echo "${red}ERROR!"
+  echo "Some API files are missing the required field descriptions."
+  echo "Add description tags to all non-inline fields in the following files:"
+  for file in "${files_need_description[@]}"; do
+    echo "  ${file}"
+  done
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+echo -ne "Checking for swagger type documentation that need updating... "
+if ! hack/verify-generated-swagger-docs.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Swagger type documentation needs to be updated."
+  echo "To regenerate the spec, run:"
+  echo "  hack/update-generated-swagger-docs.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+echo -ne "Checking for swagger spec that need updating... "
+if ! hack/verify-swagger-spec.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Swagger spec needs to be updated."
+  echo "To regenerate the spec, run:"
+  echo "  hack/update-swagger-spec.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+echo -ne "Checking for openapi spec that need updating... "
+if ! hack/verify-openapi-spec.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Openapi spec needs to be updated."
+  echo "To regenerate the spec, run:"
+  echo "  hack/update-openapi-spec.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+echo -ne "Checking for federation openapi spec that need updating... "
+if ! hack/verify-federation-openapi-spec.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Federation OpenAPI spec needs to be updated."
+  echo "To regenerate the spec, run:"
+  echo "  hack/update-federation-openapi-spec.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+if [[ "${exit_code}" != 0 ]]; then
+  echo "${red}Aborting commit${reset}"
+fi
+exit ${exit_code}
+
+# ex: ts=2 sw=2 et filetype=sh

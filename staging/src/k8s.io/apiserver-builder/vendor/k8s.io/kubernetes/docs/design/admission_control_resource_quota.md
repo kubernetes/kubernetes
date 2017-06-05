@@ -1,0 +1,1 @@
+This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/admission_control_resource_quota.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/admission_control_resource_quota.md)

@@ -1,0 +1,418 @@
+/*
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package e2e_federation
+
+import (
+	"fmt"
+	"time"
+
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/wait"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/test/e2e/common"
+	"k8s.io/kubernetes/test/e2e/framework"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+)
+
+var (
+	DefaultFederationName = "e2e-federation"
+	// We use this to decide how long to wait for our DNS probes to succeed.
+	DNSTTL = 180 * time.Second // TODO: make k8s.io/kubernetes/federation/pkg/federation-controller/service.minDnsTtl exported, and import it here.
+)
+
+const (
+	// [30000, 32767] is the allowed default service nodeport range and our
+	// tests just use the defaults.
+	FederatedSvcNodePortFirst = 30000
+	FederatedSvcNodePortLast  = 32767
+)
+
+var FederationSuite common.Suite
+
+func createClusterObjectOrFail(f *fedframework.Framework, context *fedframework.E2EContext) {
+	framework.Logf("Creating cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
+	cluster := federationapi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: context.Name,
+		},
+		Spec: federationapi.ClusterSpec{
+			ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
+				{
+					ClientCIDR:    "0.0.0.0/0",
+					ServerAddress: context.Cluster.Cluster.Server,
+				},
+			},
+			SecretRef: &v1.LocalObjectReference{
+				// Note: Name must correlate with federation build script secret name,
+				//       which currently matches the cluster name.
+				//       See federation/cluster/common.sh:132
+				Name: context.Name,
+			},
+		},
+	}
+	_, err := f.FederationClientset.Federation().Clusters().Create(&cluster)
+	framework.ExpectNoError(err, fmt.Sprintf("creating cluster: %+v", err))
+	framework.Logf("Successfully created cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
+}
+
+// waitForServiceOrFail waits until a service is either present or absent in the cluster specified by clientset.
+// If the condition is not met within timout, it fails the calling test.
+func waitForServiceOrFail(clientset *kubeclientset.Clientset, namespace string, service *v1.Service, present bool, timeout time.Duration) {
+	By(fmt.Sprintf("Fetching a federated service shard of service %q in namespace %q from cluster", service.Name, namespace))
+	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		clusterService, err := clientset.Services(namespace).Get(service.Name, metav1.GetOptions{})
+		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
+			By(fmt.Sprintf("Success: shard of federated service %q in namespace %q in cluster is absent", service.Name, namespace))
+			return true, nil // Success
+		}
+		if present && err == nil { // We want it present, and the Get succeeded, so we're all good.
+			if equivalent(*clusterService, *service) {
+				By(fmt.Sprintf("Success: shard of federated service %q in namespace %q in cluster is present", service.Name, namespace))
+				return true, nil // Success
+			}
+			return false, nil
+		}
+		By(fmt.Sprintf("Service %q in namespace %q in cluster.  Found: %v, waiting for Found: %v, trying again in %s (err=%v)", service.Name, namespace, clusterService != nil && err == nil, present, framework.Poll, err))
+		return false, nil
+	})
+	framework.ExpectNoError(err, "Failed to verify service %q in namespace %q in cluster: Present=%v", service.Name, namespace, present)
+}
+
+// waitForServiceShardsOrFail waits for the service to appear in all clusters
+func waitForServiceShardsOrFail(namespace string, service *v1.Service, clusters fedframework.ClusterSlice) {
+	framework.Logf("Waiting for service %q in %d clusters", service.Name, len(clusters))
+	for _, c := range clusters {
+		waitForServiceOrFail(c.Clientset, namespace, service, true, fedframework.FederatedDefaultTestTimeout)
+	}
+}
+
+func createService(clientset *fedclientset.Clientset, namespace, name string) (*v1.Service, error) {
+	if clientset == nil || len(namespace) == 0 {
+		return nil, fmt.Errorf("Internal error: invalid parameters passed to createService: clientset: %v, namespace: %v", clientset, namespace)
+	}
+	By(fmt.Sprintf("Creating federated service %q in namespace %q", name, namespace))
+
+	// Tests can be run in parallel, so we need a different nodePort for
+	// each test.
+	// We add 1 to FederatedSvcNodePortLast because IntnRange's range end
+	// is not inclusive.
+	nodePort := int32(rand.IntnRange(FederatedSvcNodePortFirst, FederatedSvcNodePortLast+1))
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: v1.ServiceSpec{
+			Selector: FederatedServiceLabels,
+			Type:     "LoadBalancer",
+			Ports: []v1.ServicePort{
+				{
+					Name:       "http",
+					Protocol:   v1.ProtocolTCP,
+					Port:       80,
+					TargetPort: intstr.FromInt(8080),
+					NodePort:   nodePort,
+				},
+			},
+			SessionAffinity: v1.ServiceAffinityNone,
+		},
+	}
+	By(fmt.Sprintf("Trying to create service %q in namespace %q", service.Name, namespace))
+	return clientset.Services(namespace).Create(service)
+}
+
+func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name string) *v1.Service {
+	service, err := createService(clientset, namespace, name)
+	framework.ExpectNoError(err, "Creating service %q in namespace %q", service.Name, namespace)
+	By(fmt.Sprintf("Successfully created federated service %q in namespace %q", name, namespace))
+	return service
+}
+
+func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, serviceName string, orphanDependents *bool) {
+	if clientset == nil || len(namespace) == 0 || len(serviceName) == 0 {
+		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
+	}
+	framework.Logf("Deleting service %q in namespace %v", serviceName, namespace)
+	err := clientset.Services(namespace).Delete(serviceName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
+	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
+	// Wait for the service to be deleted.
+	err = wait.Poll(5*time.Second, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
+		_, err := clientset.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+	if err != nil {
+		framework.DescribeSvc(namespace)
+		framework.Failf("Error in deleting service %s: %v", serviceName, err)
+	}
+}
+
+func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Service, clusters fedframework.ClusterSlice) {
+	framework.Logf("Deleting service %q in %d clusters", service.Name, len(clusters))
+	for _, c := range clusters {
+		name := c.Name
+		var cSvc *v1.Service
+
+		err := wait.PollImmediate(framework.Poll, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
+			var err error
+			cSvc, err = c.Clientset.Services(namespace).Get(service.Name, metav1.GetOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				// Get failed with an error, try again.
+				framework.Logf("Failed to find service %q in namespace %q, in cluster %q: %v. Trying again in %s", service.Name, namespace, name, err, framework.Poll)
+				return false, nil
+			} else if errors.IsNotFound(err) {
+				cSvc = nil
+				By(fmt.Sprintf("Service %q in namespace %q in cluster %q not found", service.Name, namespace, name))
+				return true, err
+			}
+			By(fmt.Sprintf("Service %q in namespace %q in cluster %q found", service.Name, namespace, name))
+			return true, err
+		})
+
+		if err != nil || cSvc == nil {
+			By(fmt.Sprintf("Failed to find service %q in namespace %q, in cluster %q in %s", service.Name, namespace, name, fedframework.FederatedDefaultTestTimeout))
+			continue
+		}
+
+		err = cleanupServiceShard(c.Clientset, name, namespace, cSvc, fedframework.FederatedDefaultTestTimeout)
+		if err != nil {
+			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q: %v", service.Name, namespace, name, err)
+		}
+		err = cleanupServiceShardLoadBalancer(name, cSvc, fedframework.FederatedDefaultTestTimeout)
+		if err != nil {
+			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", service.Name, namespace, name)
+		}
+	}
+}
+
+func cleanupServiceShard(clientset *kubeclientset.Clientset, clusterName, namespace string, service *v1.Service, timeout time.Duration) error {
+	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		err := clientset.Services(namespace).Delete(service.Name, &metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			// Deletion failed with an error, try again.
+			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q", service.Name, namespace, clusterName)
+			return false, nil
+		}
+		By(fmt.Sprintf("Service %q in namespace %q in cluster %q deleted", service.Name, namespace, clusterName))
+		return true, nil
+	})
+	return err
+}
+
+func cleanupServiceShardLoadBalancer(clusterName string, service *v1.Service, timeout time.Duration) error {
+	provider := framework.TestContext.CloudConfig.Provider
+	if provider == nil {
+		return fmt.Errorf("cloud provider undefined")
+	}
+
+	internalSvc := &v1.Service{}
+	err := api.Scheme.Convert(service, internalSvc, nil)
+	if err != nil {
+		return fmt.Errorf("failed to convert versioned service object to internal type: %v", err)
+	}
+
+	err = wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		lbi, supported := provider.LoadBalancer()
+		if !supported {
+			return false, fmt.Errorf("%q doesn't support load balancers", provider.ProviderName())
+		}
+		err := lbi.EnsureLoadBalancerDeleted(clusterName, internalSvc)
+		if err != nil {
+			// Deletion failed with an error, try again.
+			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q: %v", service.Name, service.Namespace, clusterName, err)
+			return false, nil
+		}
+		By(fmt.Sprintf("Cloud provider resources for Service %q in namespace %q in cluster %q deleted", service.Name, service.Namespace, clusterName))
+		return true, nil
+	})
+	return err
+}
+
+func podExitCodeDetector(f *fedframework.Framework, name, namespace string, code int32) func() error {
+	// If we ever get any container logs, stash them here.
+	logs := ""
+
+	logerr := func(err error) error {
+		if err == nil {
+			return nil
+		}
+		if logs == "" {
+			return err
+		}
+		return fmt.Errorf("%s (%v)", logs, err)
+	}
+
+	return func() error {
+		pod, err := f.ClientSet.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+		if err != nil {
+			return logerr(err)
+		}
+		if len(pod.Status.ContainerStatuses) < 1 {
+			return logerr(fmt.Errorf("no container statuses"))
+		}
+
+		// Best effort attempt to grab pod logs for debugging
+		logs, err = framework.GetPodLogs(f.ClientSet, namespace, name, pod.Spec.Containers[0].Name)
+		if err != nil {
+			framework.Logf("Cannot fetch pod logs: %v", err)
+		}
+
+		status := pod.Status.ContainerStatuses[0]
+		if status.State.Terminated == nil {
+			return logerr(fmt.Errorf("container is not in terminated state"))
+		}
+		if status.State.Terminated.ExitCode == code {
+			return nil
+		}
+
+		return logerr(fmt.Errorf("exited %d", status.State.Terminated.ExitCode))
+	}
+}
+
+func discoverService(f *fedframework.Framework, name string, exists bool, podName string) {
+	command := []string{"sh", "-c", fmt.Sprintf("until nslookup '%s'; do sleep 10; done", name)}
+	By(fmt.Sprintf("Looking up %q", name))
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    "federated-service-discovery-container",
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Command: command,
+				},
+			},
+			RestartPolicy: v1.RestartPolicyOnFailure,
+		},
+	}
+
+	nsName := f.FederationNamespace.Name
+	By(fmt.Sprintf("Creating pod %q in namespace %q", pod.Name, nsName))
+	_, err := f.ClientSet.Core().Pods(nsName).Create(pod)
+	framework.ExpectNoError(err, "Trying to create pod to run %q", command)
+	By(fmt.Sprintf("Successfully created pod %q in namespace %q", pod.Name, nsName))
+	defer func() {
+		By(fmt.Sprintf("Deleting pod %q from namespace %q", podName, nsName))
+		err := f.ClientSet.Core().Pods(nsName).Delete(podName, metav1.NewDeleteOptions(0))
+		framework.ExpectNoError(err, "Deleting pod %q from namespace %q", podName, nsName)
+		By(fmt.Sprintf("Deleted pod %q from namespace %q", podName, nsName))
+	}()
+
+	if exists {
+		// TODO(mml): Eventually check the IP address is correct, too.
+		Eventually(podExitCodeDetector(f, podName, nsName, 0), 3*DNSTTL, time.Second*2).
+			Should(BeNil(), "%q should exit 0, but it never did", command)
+	} else {
+		Eventually(podExitCodeDetector(f, podName, nsName, 0), 3*DNSTTL, time.Second*2).
+			ShouldNot(BeNil(), "%q should eventually not exit 0, but it always did", command)
+	}
+}
+
+// BackendPodMap maps a cluster name to a backend pod created in that cluster
+type BackendPodMap map[string]*v1.Pod
+
+// createBackendPodsOrFail creates one pod in each cluster, and returns the created pods.  If creation of any pod fails,
+// the test fails (possibly with a partially created set of pods). No retries are attempted.
+func createBackendPodsOrFail(clusters fedframework.ClusterSlice, namespace string, name string) BackendPodMap {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			// Namespace: namespace,
+			Labels: FederatedServiceLabels,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  name,
+					Image: "gcr.io/google_containers/echoserver:1.4",
+				},
+			},
+			RestartPolicy: v1.RestartPolicyAlways,
+		},
+	}
+	podMap := make(BackendPodMap)
+	for _, c := range clusters {
+		name := c.Name
+		By(fmt.Sprintf("Creating pod %q in namespace %q in cluster %q", pod.Name, namespace, name))
+		createdPod, err := c.Clientset.Core().Pods(namespace).Create(pod)
+		framework.ExpectNoError(err, "Creating pod %q in namespace %q in cluster %q", name, namespace, name)
+		By(fmt.Sprintf("Successfully created pod %q in namespace %q in cluster %q: %v", pod.Name, namespace, name, *createdPod))
+		podMap[name] = createdPod
+	}
+	return podMap
+}
+
+// deleteOneBackendPodOrFail deletes exactly one backend pod which must not be nil
+// The test fails if there are any errors.
+func deleteOneBackendPodOrFail(c *fedframework.Cluster, pod *v1.Pod) {
+	Expect(pod).ToNot(BeNil())
+	err := c.Clientset.Core().Pods(pod.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+	msgFmt := fmt.Sprintf("Deleting Pod %q in namespace %q in cluster %q %%v", pod.Name, pod.Namespace, c.Name)
+	if errors.IsNotFound(err) {
+		framework.Logf(msgFmt, "does not exist. No need to delete it.")
+		return
+	}
+	framework.ExpectNoError(err, msgFmt, "")
+	framework.Logf(msgFmt, "was deleted")
+}
+
+// deleteBackendPodsOrFail deletes one pod from each cluster that has one.
+// If deletion of any pod fails, the test fails (possibly with a partially deleted set of pods). No retries are attempted.
+func deleteBackendPodsOrFail(clusters fedframework.ClusterSlice, backendPods BackendPodMap) {
+	if backendPods == nil {
+		return
+	}
+	for _, c := range clusters {
+		if pod, ok := backendPods[c.Name]; ok {
+			deleteOneBackendPodOrFail(c, pod)
+		} else {
+			By(fmt.Sprintf("No backend pod to delete for cluster %q", c.Name))
+		}
+	}
+}
+
+// waitForReplicatSetToBeDeletedOrFail waits for the named ReplicaSet in namespace to be deleted.
+// If the deletion fails, the enclosing test fails.
+func waitForReplicaSetToBeDeletedOrFail(clientset *fedclientset.Clientset, namespace string, replicaSet string) {
+	err := wait.Poll(5*time.Second, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
+		_, err := clientset.Extensions().ReplicaSets(namespace).Get(replicaSet, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+
+	if err != nil {
+		framework.Failf("Error in deleting replica set %s: %v", replicaSet, err)
+	}
+}

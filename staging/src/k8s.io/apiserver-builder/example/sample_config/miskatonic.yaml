@@ -1,0 +1,9 @@
+apiVersion: miskatonic.k8s.io/v1beta1
+kind: University
+metadata:
+  name: miskatonic-university
+  labels:
+    kind: school
+spec:
+  faculty_size: 10
+

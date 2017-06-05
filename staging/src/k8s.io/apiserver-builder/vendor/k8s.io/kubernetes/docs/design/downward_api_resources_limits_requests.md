@@ -1,0 +1,1 @@
+This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/downward_api_resources_limits_requests.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/downward_api_resources_limits_requests.md)

@@ -1,0 +1,112 @@
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+load(
+    "@io_bazel_rules_go//go:def.bzl",
+    "go_library",
+    "go_test",
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "describe_test.go",
+        "printers_test.go",
+        "sorted_resource_name_list_test.go",
+    ],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//federation/apis/federation:go_default_library",
+        "//federation/client/clientset_generated/federation_internalclientset/fake:go_default_library",
+        "//pkg/api:go_default_library",
+        "//pkg/api/testapi:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/apis/autoscaling:go_default_library",
+        "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
+        "//pkg/apis/policy:go_default_library",
+        "//pkg/apis/storage:go_default_library",
+        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
+        "//pkg/kubectl/testing:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/util:go_default_library",
+        "//vendor:github.com/ghodss/yaml",
+        "//vendor:k8s.io/apimachinery/pkg/api/equality",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/yaml",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+    ],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "describe.go",
+        "printers.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//federation/apis/federation:go_default_library",
+        "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
+        "//pkg/api:go_default_library",
+        "//pkg/api/annotations:go_default_library",
+        "//pkg/api/events:go_default_library",
+        "//pkg/apis/apps:go_default_library",
+        "//pkg/apis/autoscaling:go_default_library",
+        "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/certificates:go_default_library",
+        "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
+        "//pkg/apis/policy:go_default_library",
+        "//pkg/apis/rbac:go_default_library",
+        "//pkg/apis/storage:go_default_library",
+        "//pkg/apis/storage/util:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/extensions/v1beta1:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
+        "//pkg/controller/deployment/util:go_default_library",
+        "//pkg/fieldpath:go_default_library",
+        "//pkg/kubelet/qos:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/util/node:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/api/resource",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/intstr",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/dynamic",
+    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+)

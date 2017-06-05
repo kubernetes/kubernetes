@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+package grpc.testing;
+
+import "proto2.proto";
+extend ToBeExtened {
+  optional int32 bar = 13;
+  optional Extension baz = 17;
+}
+
+message Extension {
+  optional int32 baz = 1;
+}

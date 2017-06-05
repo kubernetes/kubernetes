@@ -1,0 +1,28 @@
+syntax = "proto2";
+option go_package = "capability";
+
+package appengine;
+
+message IsEnabledRequest {
+  required string package = 1;
+  repeated string capability = 2;
+  repeated string call = 3;
+}
+
+message IsEnabledResponse {
+  enum SummaryStatus {
+    DEFAULT = 0;
+    ENABLED = 1;
+    SCHEDULED_FUTURE = 2;
+    SCHEDULED_NOW = 3;
+    DISABLED = 4;
+    UNKNOWN = 5;
+  }
+  optional SummaryStatus summary_status = 1;
+
+  optional int64 time_until_scheduled = 2;
+}
+
+service CapabilityService {
+  rpc IsEnabled(IsEnabledRequest) returns (IsEnabledResponse) {};
+}

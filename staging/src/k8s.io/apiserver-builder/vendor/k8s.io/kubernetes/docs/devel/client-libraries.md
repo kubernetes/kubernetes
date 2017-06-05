@@ -1,0 +1,1 @@
+This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/devel/client-libraries.md](https://github.com/kubernetes/community/blob/master/contributors/devel/client-libraries.md)

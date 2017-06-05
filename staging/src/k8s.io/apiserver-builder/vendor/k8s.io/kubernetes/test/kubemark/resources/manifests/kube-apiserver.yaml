@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-apiserver
+    image: {{kube_docker_registry}}/kube-apiserver:{{kube-apiserver_docker_tag}}
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 250m
+    command:
+    - /bin/sh
+    - -c
+    - /usr/local/bin/kube-apiserver
+      {{params}}
+      1>>/var/log/kube-apiserver.log 2>&1
+    livenessProbe:
+      httpGet:
+        host: 127.0.0.1
+        path: /healthz
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 15
+      timeoutSeconds: 15
+    ports:
+    - name: https
+      containerPort: 443
+      hostPort: 443
+      protocol: TCP
+    - name: local
+      containerPort: 8080
+      hostPort: 8080
+      protocol: TCP
+    volumeMounts:
+    - name: srvkube
+      mountPath: /etc/srv/kubernetes
+      readOnly: true
+    - name: logfile
+      mountPath: /var/log/kube-apiserver.log
+    - name: etcssl
+      mountPath: /etc/ssl
+      readOnly: true
+    - name: usrsharecacerts
+      mountPath: /usr/share/ca-certificates
+      readOnly: true
+    - name: srvsshproxy
+      mountPath: /etc/srv/sshproxy
+  volumes:
+  - name: srvkube
+    hostPath:
+      path: /etc/srv/kubernetes
+  - name: logfile
+    hostPath:
+      path: /var/log/kube-apiserver.log
+  - name: etcssl
+    hostPath:
+      path: /etc/ssl
+  - name: usrsharecacerts
+    hostPath:
+      path: /usr/share/ca-certificates
+  - name: srvsshproxy
+    hostPath:
+      path: /etc/srv/sshproxy

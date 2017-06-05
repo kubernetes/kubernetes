@@ -1,0 +1,46 @@
+{
+  "swaggerVersion": "1.2",
+  "apis": [
+   {
+    "path": "/version",
+    "description": "git code version from which this is built"
+   },
+   {
+    "path": "/apis",
+    "description": "get available API versions"
+   },
+   {
+    "path": "/logs",
+    "description": "get log files"
+   },
+   {
+    "path": "/apis/federation/v1beta1",
+    "description": "API at /apis/federation/v1beta1"
+   },
+   {
+    "path": "/apis/federation",
+    "description": "get information of a group"
+   },
+   {
+    "path": "/api/v1",
+    "description": "API at /api/v1"
+   },
+   {
+    "path": "/api",
+    "description": "get available API versions"
+   },
+   {
+    "path": "/apis/extensions/v1beta1",
+    "description": "API at /apis/extensions/v1beta1"
+   },
+   {
+    "path": "/apis/extensions",
+    "description": "get information of a group"
+   }
+  ],
+  "apiVersion": "",
+  "info": {
+   "title": "",
+   "description": ""
+  }
+ }

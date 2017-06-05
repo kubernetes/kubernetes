@@ -1,0 +1,17 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: kube-system-kube-registry-pv
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+{% if pillar.get('cluster_registry_disk_type', '') == 'gce' %}
+  capacity:
+    storage: {{ pillar['cluster_registry_disk_size'] }}
+  accessModes:
+    - ReadWriteOnce
+  gcePersistentDisk:
+    pdName: "{{ pillar['cluster_registry_disk_name'] }}"
+    fsType: "ext4"
+{% endif %}

@@ -1,0 +1,16 @@
+version: 0.1
+log:
+  level: info
+  fields:
+    service: registry
+    environment: macbook-air
+storage:
+    cache:
+        blobdescriptor: inmemory
+    filesystem:
+        rootdirectory: /Users/Shared/Registry
+http:
+    addr: 0.0.0.0:5000
+    secret: mytokensecret 
+    debug:
+        addr: localhost:5001

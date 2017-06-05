@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-0
+spec:
+  containers:
+  - image: gcr.io/google_containers/test-webserver
+    name: pod-0
+    volumeMounts:
+    - mountPath: /test-pd
+      name: vol-0
+  volumes:
+  - name: vol-0
+    scaleIO:
+      gateway: https://localhost:443/api
+      system: scaleio
+      volumeName: vol-0
+      secretRef:
+        name: sio-secret
+      fsType: xfs

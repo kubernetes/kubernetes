@@ -1,0 +1,114 @@
+{
+  "swaggerVersion": "1.2",
+  "apiVersion": "",
+  "basePath": "https://10.10.10.10:6443",
+  "resourcePath": "/apis/storage.k8s.io",
+  "info": {
+   "title": "",
+   "description": ""
+  },
+  "apis": [
+   {
+    "path": "/apis/storage.k8s.io",
+    "description": "get information of a group",
+    "operations": [
+     {
+      "type": "v1.APIGroup",
+      "method": "GET",
+      "summary": "get information of a group",
+      "nickname": "getAPIGroup",
+      "parameters": [],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ]
+     }
+    ]
+   }
+  ],
+  "models": {
+   "v1.APIGroup": {
+    "id": "v1.APIGroup",
+    "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
+    "required": [
+     "name",
+     "versions",
+     "serverAddressByClientCIDRs"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "name": {
+      "type": "string",
+      "description": "name is the name of the group."
+     },
+     "versions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.GroupVersionForDiscovery"
+      },
+      "description": "versions are the versions supported in this group."
+     },
+     "preferredVersion": {
+      "$ref": "v1.GroupVersionForDiscovery",
+      "description": "preferredVersion is the version preferred by the API server, which probably is the storage version."
+     },
+     "serverAddressByClientCIDRs": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ServerAddressByClientCIDR"
+      },
+      "description": "a map of client CIDR to server address that is serving this group. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR. The server returns only those CIDRs that it thinks that the client can match. For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP. Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP."
+     }
+    }
+   },
+   "v1.GroupVersionForDiscovery": {
+    "id": "v1.GroupVersionForDiscovery",
+    "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
+    "required": [
+     "groupVersion",
+     "version"
+    ],
+    "properties": {
+     "groupVersion": {
+      "type": "string",
+      "description": "groupVersion specifies the API group and version in the form \"group/version\""
+     },
+     "version": {
+      "type": "string",
+      "description": "version specifies the version in the form of \"version\". This is to save the clients the trouble of splitting the GroupVersion."
+     }
+    }
+   },
+   "v1.ServerAddressByClientCIDR": {
+    "id": "v1.ServerAddressByClientCIDR",
+    "description": "ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.",
+    "required": [
+     "clientCIDR",
+     "serverAddress"
+    ],
+    "properties": {
+     "clientCIDR": {
+      "type": "string",
+      "description": "The CIDR with which clients can match their IP to figure out the server address that they should use."
+     },
+     "serverAddress": {
+      "type": "string",
+      "description": "Address of this server, suitable for a client that matches the above CIDR. This can be a hostname, hostname:port, IP or IP:port."
+     }
+    }
+   }
+  }
+ }

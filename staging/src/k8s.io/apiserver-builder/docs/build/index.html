@@ -1,0 +1,3224 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Kubernetes API Reference Docs</title>
+<link rel="shortcut icon" href="favicon.ico" type="image/vnd.microsoft.icon">
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="node_modules/bootstrap/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="node_modules/font-awesome/css/font-awesome.min.css" type="text/css">
+<link rel="stylesheet" href="node_modules/highlight.js/styles/default.css" type="text/css">
+<link rel="stylesheet" href="stylesheet.css" type="text/css">
+</head>
+<body>
+<div id="sidebar-wrapper" class="side-nav side-bar-nav"><ul><li class="nav-level-1 strong-nav"><a href="#-strong-overview-strong-" class="nav-item"><strong>Overview</strong></a></li></ul><ul><li class="nav-level-1 strong-nav"><a href="#-strong-innsmouth-strong-" class="nav-item"><strong>innsmouth</strong></a></li></ul><ul><li class="nav-level-1"><a href="#deepone-v1" class="nav-item">DeepOne v1</a></li><ul id="deepone-v1-nav" style="display: none;"><ul><li class="nav-level-2 strong-nav"><a href="#-strong-write-operations-strong-" class="nav-item"><strong>Write Operations</strong></a></li><ul id="-strong-write-operations-strong--nav" style="display: none;"><li class="nav-level-2"><a href="#create" class="nav-item">Create</a></li><li class="nav-level-2"><a href="#patch" class="nav-item">Patch</a></li><li class="nav-level-2"><a href="#replace" class="nav-item">Replace</a></li><li class="nav-level-2"><a href="#delete" class="nav-item">Delete</a></li><li class="nav-level-2"><a href="#delete-collection" class="nav-item">Delete Collection</a></li></ul></ul><ul><li class="nav-level-2 strong-nav"><a href="#-strong-read-operations-strong-" class="nav-item"><strong>Read Operations</strong></a></li><ul id="-strong-read-operations-strong--nav" style="display: none;"><li class="nav-level-2"><a href="#read" class="nav-item">Read</a></li><li class="nav-level-2"><a href="#list" class="nav-item">List</a></li><li class="nav-level-2"><a href="#list-all-namespaces" class="nav-item">List All Namespaces</a></li><li class="nav-level-2"><a href="#watch" class="nav-item">Watch</a></li><li class="nav-level-2"><a href="#watch-list" class="nav-item">Watch List</a></li><li class="nav-level-2"><a href="#watch-list-all-namespaces" class="nav-item">Watch List All Namespaces</a></li></ul></ul><ul><li class="nav-level-2 strong-nav"><a href="#-strong-status-operations-strong-" class="nav-item"><strong>Status Operations</strong></a></li><ul id="-strong-status-operations-strong--nav" style="display: none;"><li class="nav-level-2"><a href="#patch-status" class="nav-item">Patch Status</a></li><li class="nav-level-2"><a href="#read-status" class="nav-item">Read Status</a></li><li class="nav-level-2"><a href="#replace-status" class="nav-item">Replace Status</a></li></ul></ul></ul></ul><ul><li class="nav-level-1 strong-nav"><a href="#-strong-miskatonic-strong-" class="nav-item"><strong>miskatonic</strong></a></li></ul><ul><li class="nav-level-1"><a href="#university-v1beta1" class="nav-item">University v1beta1</a></li><ul id="university-v1beta1-nav" style="display: none;"><ul><li class="nav-level-2 strong-nav"><a href="#-strong-write-operations-strong--1" class="nav-item"><strong>Write Operations</strong></a></li><ul id="-strong-write-operations-strong--1-nav" style="display: none;"><li class="nav-level-2"><a href="#create-2" class="nav-item">Create</a></li><li class="nav-level-2"><a href="#patch-3" class="nav-item">Patch</a></li><li class="nav-level-2"><a href="#replace-4" class="nav-item">Replace</a></li><li class="nav-level-2"><a href="#delete-5" class="nav-item">Delete</a></li><li class="nav-level-2"><a href="#delete-collection-6" class="nav-item">Delete Collection</a></li></ul></ul><ul><li class="nav-level-2 strong-nav"><a href="#-strong-read-operations-strong--7" class="nav-item"><strong>Read Operations</strong></a></li><ul id="-strong-read-operations-strong--7-nav" style="display: none;"><li class="nav-level-2"><a href="#read-8" class="nav-item">Read</a></li><li class="nav-level-2"><a href="#list-9" class="nav-item">List</a></li><li class="nav-level-2"><a href="#list-all-namespaces-10" class="nav-item">List All Namespaces</a></li><li class="nav-level-2"><a href="#watch-11" class="nav-item">Watch</a></li><li class="nav-level-2"><a href="#watch-list-12" class="nav-item">Watch List</a></li><li class="nav-level-2"><a href="#watch-list-all-namespaces-13" class="nav-item">Watch List All Namespaces</a></li></ul></ul><ul><li class="nav-level-2 strong-nav"><a href="#-strong-status-operations-strong--14" class="nav-item"><strong>Status Operations</strong></a></li><ul id="-strong-status-operations-strong--14-nav" style="display: none;"><li class="nav-level-2"><a href="#patch-status-15" class="nav-item">Patch Status</a></li><li class="nav-level-2"><a href="#read-status-16" class="nav-item">Read Status</a></li><li class="nav-level-2"><a href="#replace-status-17" class="nav-item">Replace Status</a></li></ul></ul><ul><li class="nav-level-2 strong-nav"><a href="#-strong-scale-operations-strong-" class="nav-item"><strong>Scale Operations</strong></a></li><ul id="-strong-scale-operations-strong--nav" style="display: none;"><li class="nav-level-2"><a href="#patch-scale" class="nav-item">Patch Scale</a></li><li class="nav-level-2"><a href="#update-scale" class="nav-item">Update Scale</a></li><li class="nav-level-2"><a href="#create-scale" class="nav-item">Create Scale</a></li><li class="nav-level-2"><a href="#list-scale" class="nav-item">List Scale</a></li></ul></ul></ul></ul><ul><li class="nav-level-1 strong-nav"><a href="#-strong-definitions-strong-" class="nav-item"><strong>Definitions</strong></a></li><ul id="-strong-definitions-strong--nav" style="display: none;"><li class="nav-level-2"><a href="#status-v1-meta" class="nav-item">Status v1 meta</a></li></ul></ul><ul><li class="nav-level-1 strong-nav"><a href="#-strong-old-versions-strong-" class="nav-item"><strong>Old Versions</strong></a></li></ul><br/><div class="copyright"><a href="https://github.com/kubernetes/kubernetes">Copyright 2016 The Kubernetes Authors.</a></div></div>
+<div id="wrapper">
+<div id="code-tabs-wrapper" class="code-tabs"><ul class="code-tab-list"><li class="code-tab" id="kubectl">kubectl</li><li class="code-tab" id="curl">curl</li></ul></div>
+<div id="page-content-wrapper" class="body-content container-fluid"><h1 id="-strong-overview-strong-"><strong>Overview</strong></h1>
+<hr>
+<h1 id="-strong-innsmouth-strong-"><strong>innsmouth</strong></h1>
+<hr>
+<hr>
+<h1 id="deepone-v1">DeepOne v1</h1>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Version</th>
+<th>Kind</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>innsmouth</td>
+<td>v1</td>
+<td>DeepOne</td>
+</tr>
+</tbody>
+</table>
+<p>DeepOne defines a resident of innsmouth</p>
+<aside class="notice">
+Appears In <a href="#deeponelist-v1">DeepOneList</a> </aside>
+
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>apiVersion <br /> <em>string</em></td>
+<td>APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources</a></td>
+</tr>
+<tr>
+<td>kind <br /> <em>string</em></td>
+<td>Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></td>
+</tr>
+<tr>
+<td>metadata <br /> <em><a href="#objectmeta-v1">ObjectMeta</a></em></td>
+<td></td>
+</tr>
+<tr>
+<td>spec <br /> <em><a href="#deeponespec-v1">DeepOneSpec</a></em></td>
+<td></td>
+</tr>
+<tr>
+<td>status <br /> <em><a href="#deeponestatus-v1">DeepOneStatus</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="deeponespec-v1-innsmouth">DeepOneSpec v1 innsmouth</h3>
+<aside class="notice">
+Appears In <a href="#deepone-v1">DeepOne</a> </aside>
+
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fish_required <br /> <em>integer</em></td>
+<td>fish_required defines the number of fish required by the DeepOne.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="deeponestatus-v1-innsmouth">DeepOneStatus v1 innsmouth</h3>
+<aside class="notice">
+Appears In <a href="#deepone-v1">DeepOne</a> </aside>
+
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>actual_fish <br /> <em>integer</em></td>
+<td>actual_fish defines the number of fish caught by the DeepOne.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="deeponelist-v1-innsmouth">DeepOneList v1 innsmouth</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>apiVersion <br /> <em>string</em></td>
+<td>APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources</a></td>
+</tr>
+<tr>
+<td>items <br /> <em><a href="#deepone-v1">DeepOne</a> array</em></td>
+<td></td>
+</tr>
+<tr>
+<td>kind <br /> <em>string</em></td>
+<td>Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></td>
+</tr>
+<tr>
+<td>metadata <br /> <em><a href="#listmeta-v1">ListMeta</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="-strong-write-operations-strong-"><strong>Write Operations</strong></h2>
+<p>See supported operations below...</p>
+<h2 id="create">Create</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>create a DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>POST /apis/innsmouth.k8s.io/v1/namespaces/{namespace}/deepones</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#deepone-v1">DeepOne</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#deepone-v1">DeepOne</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="patch">Patch</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>partially update the specified DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>PATCH /apis/innsmouth.k8s.io/v1/namespaces/{namespace}/deepones/{name}</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the DeepOne</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#patch-v1">Patch</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#deepone-v1">DeepOne</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="replace">Replace</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>replace the specified DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>PUT /apis/innsmouth.k8s.io/v1/namespaces/{namespace}/deepones/{name}</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the DeepOne</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#deepone-v1">DeepOne</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#deepone-v1">DeepOne</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="delete">Delete</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>delete a DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>DELETE /apis/innsmouth.k8s.io/v1/namespaces/{namespace}/deepones/{name}</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the DeepOne</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>gracePeriodSeconds</td>
+<td>The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.</td>
+</tr>
+<tr>
+<td>orphanDependents</td>
+<td>Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the &quot;orphan&quot; finalizer will be added to/removed from the object&#39;s finalizers list. Either this field or PropagationPolicy may be set, but not both.</td>
+</tr>
+<tr>
+<td>propagationPolicy</td>
+<td>Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#deleteoptions-v1">DeleteOptions</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#status-v1">Status</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="delete-collection">Delete Collection</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>delete collection of DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>DELETE /apis/innsmouth.k8s.io/v1/namespaces/{namespace}/deepones</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>fieldSelector</td>
+<td>A selector to restrict the list of returned objects by their fields. Defaults to everything.</td>
+</tr>
+<tr>
+<td>labelSelector</td>
+<td>A selector to restrict the list of returned objects by their labels. Defaults to everything.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#39;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</td>
+</tr>
+<tr>
+<td>timeoutSeconds</td>
+<td>Timeout for the list/watch call.</td>
+</tr>
+<tr>
+<td>watch</td>
+<td>Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#status-v1">Status</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="-strong-read-operations-strong-"><strong>Read Operations</strong></h2>
+<p>See supported operations below...</p>
+<h2 id="read">Read</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>read the specified DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/innsmouth.k8s.io/v1/namespaces/{namespace}/deepones/{name}</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the DeepOne</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>exact</td>
+<td>Should the export be exact.  Exact export maintains cluster-specific fields like &#39;Namespace&#39;.</td>
+</tr>
+<tr>
+<td>export</td>
+<td>Should this value be exported.  Export strips fields that a user can not specify.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#deepone-v1">DeepOne</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="list">List</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>list or watch objects of kind DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/innsmouth.k8s.io/v1/namespaces/{namespace}/deepones</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>fieldSelector</td>
+<td>A selector to restrict the list of returned objects by their fields. Defaults to everything.</td>
+</tr>
+<tr>
+<td>labelSelector</td>
+<td>A selector to restrict the list of returned objects by their labels. Defaults to everything.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#39;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</td>
+</tr>
+<tr>
+<td>timeoutSeconds</td>
+<td>Timeout for the list/watch call.</td>
+</tr>
+<tr>
+<td>watch</td>
+<td>Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#deeponelist-v1">DeepOneList</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="list-all-namespaces">List All Namespaces</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>list or watch objects of kind DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/innsmouth.k8s.io/v1/deepones</code></p>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fieldSelector</td>
+<td>A selector to restrict the list of returned objects by their fields. Defaults to everything.</td>
+</tr>
+<tr>
+<td>labelSelector</td>
+<td>A selector to restrict the list of returned objects by their labels. Defaults to everything.</td>
+</tr>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#39;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</td>
+</tr>
+<tr>
+<td>timeoutSeconds</td>
+<td>Timeout for the list/watch call.</td>
+</tr>
+<tr>
+<td>watch</td>
+<td>Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#deeponelist-v1">DeepOneList</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="watch">Watch</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>watch changes to an object of kind DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/innsmouth.k8s.io/v1/watch/namespaces/{namespace}/deepones/{name}</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the DeepOne</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fieldSelector</td>
+<td>A selector to restrict the list of returned objects by their fields. Defaults to everything.</td>
+</tr>
+<tr>
+<td>labelSelector</td>
+<td>A selector to restrict the list of returned objects by their labels. Defaults to everything.</td>
+</tr>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#39;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</td>
+</tr>
+<tr>
+<td>timeoutSeconds</td>
+<td>Timeout for the list/watch call.</td>
+</tr>
+<tr>
+<td>watch</td>
+<td>Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#watchevent-v1">WatchEvent</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="watch-list">Watch List</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>watch individual changes to a list of DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/innsmouth.k8s.io/v1/watch/namespaces/{namespace}/deepones</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fieldSelector</td>
+<td>A selector to restrict the list of returned objects by their fields. Defaults to everything.</td>
+</tr>
+<tr>
+<td>labelSelector</td>
+<td>A selector to restrict the list of returned objects by their labels. Defaults to everything.</td>
+</tr>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#39;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</td>
+</tr>
+<tr>
+<td>timeoutSeconds</td>
+<td>Timeout for the list/watch call.</td>
+</tr>
+<tr>
+<td>watch</td>
+<td>Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#watchevent-v1">WatchEvent</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="watch-list-all-namespaces">Watch List All Namespaces</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>watch individual changes to a list of DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/innsmouth.k8s.io/v1/watch/deepones</code></p>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fieldSelector</td>
+<td>A selector to restrict the list of returned objects by their fields. Defaults to everything.</td>
+</tr>
+<tr>
+<td>labelSelector</td>
+<td>A selector to restrict the list of returned objects by their labels. Defaults to everything.</td>
+</tr>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#39;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</td>
+</tr>
+<tr>
+<td>timeoutSeconds</td>
+<td>Timeout for the list/watch call.</td>
+</tr>
+<tr>
+<td>watch</td>
+<td>Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#watchevent-v1">WatchEvent</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="-strong-status-operations-strong-"><strong>Status Operations</strong></h2>
+<p>See supported operations below...</p>
+<h2 id="patch-status">Patch Status</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>partially update status of the specified DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>PATCH /apis/innsmouth.k8s.io/v1/namespaces/{namespace}/deepones/{name}/status</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the DeepOne</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#patch-v1">Patch</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#deepone-v1">DeepOne</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="read-status">Read Status</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>read status of the specified DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/innsmouth.k8s.io/v1/namespaces/{namespace}/deepones/{name}/status</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the DeepOne</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>exact</td>
+<td>Should the export be exact.  Exact export maintains cluster-specific fields like &#39;Namespace&#39;.</td>
+</tr>
+<tr>
+<td>export</td>
+<td>Should this value be exported.  Export strips fields that a user can not specify.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#deepone-v1">DeepOne</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="replace-status">Replace Status</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>replace status of the specified DeepOne</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>PUT /apis/innsmouth.k8s.io/v1/namespaces/{namespace}/deepones/{name}/status</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the DeepOne</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#deepone-v1">DeepOne</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#deepone-v1">DeepOne</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h1 id="-strong-miskatonic-strong-"><strong>miskatonic</strong></h1>
+<hr>
+<hr>
+<h1 id="university-v1beta1">University v1beta1</h1>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Version</th>
+<th>Kind</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>miskatonic</td>
+<td>v1beta1</td>
+<td>University</td>
+</tr>
+</tbody>
+</table>
+<aside class="notice">
+Appears In <a href="#universitylist-v1beta1">UniversityList</a> </aside>
+
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>apiVersion <br /> <em>string</em></td>
+<td>APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources</a></td>
+</tr>
+<tr>
+<td>kind <br /> <em>string</em></td>
+<td>Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></td>
+</tr>
+<tr>
+<td>metadata <br /> <em><a href="#objectmeta-v1">ObjectMeta</a></em></td>
+<td></td>
+</tr>
+<tr>
+<td>spec <br /> <em><a href="#universityspec-v1beta1">UniversitySpec</a></em></td>
+<td></td>
+</tr>
+<tr>
+<td>status <br /> <em><a href="#universitystatus-v1beta1">UniversityStatus</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="universityspec-v1beta1-miskatonic">UniversitySpec v1beta1 miskatonic</h3>
+<aside class="notice">
+Appears In <a href="#university-v1beta1">University</a> </aside>
+
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>faculty_size <br /> <em>integer</em></td>
+<td>faculty_size defines the desired faculty size of the university.  Defaults to 15.</td>
+</tr>
+<tr>
+<td>max_students <br /> <em>integer</em></td>
+<td>max_students defines the maximum number of enrolled students.  Defaults to 300.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="universitystatus-v1beta1-miskatonic">UniversityStatus v1beta1 miskatonic</h3>
+<aside class="notice">
+Appears In <a href="#university-v1beta1">University</a> </aside>
+
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>enrolled_students <br /> <em>string array</em></td>
+<td>enrolled_students is the number of currently enrolled students</td>
+</tr>
+<tr>
+<td>faculty_employed <br /> <em>string array</em></td>
+<td>statusfield provides status information about University</td>
+</tr>
+</tbody>
+</table>
+<h3 id="universitylist-v1beta1-miskatonic">UniversityList v1beta1 miskatonic</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>apiVersion <br /> <em>string</em></td>
+<td>APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources</a></td>
+</tr>
+<tr>
+<td>items <br /> <em><a href="#university-v1beta1">University</a> array</em></td>
+<td></td>
+</tr>
+<tr>
+<td>kind <br /> <em>string</em></td>
+<td>Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></td>
+</tr>
+<tr>
+<td>metadata <br /> <em><a href="#listmeta-v1">ListMeta</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="-strong-write-operations-strong--1"><strong>Write Operations</strong></h2>
+<p>See supported operations below...</p>
+<h2 id="create-2">Create</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>create an University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>POST /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#university-v1beta1">University</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#university-v1beta1">University</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="patch-3">Patch</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>partially update the specified University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>PATCH /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities/{name}</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the University</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#patch-v1">Patch</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#university-v1beta1">University</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="replace-4">Replace</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>replace the specified University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>PUT /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities/{name}</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the University</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#university-v1beta1">University</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#university-v1beta1">University</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="delete-5">Delete</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>delete an University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>DELETE /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities/{name}</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the University</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>gracePeriodSeconds</td>
+<td>The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.</td>
+</tr>
+<tr>
+<td>orphanDependents</td>
+<td>Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the &quot;orphan&quot; finalizer will be added to/removed from the object&#39;s finalizers list. Either this field or PropagationPolicy may be set, but not both.</td>
+</tr>
+<tr>
+<td>propagationPolicy</td>
+<td>Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#deleteoptions-v1">DeleteOptions</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#status-v1">Status</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="delete-collection-6">Delete Collection</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>delete collection of University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>DELETE /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>fieldSelector</td>
+<td>A selector to restrict the list of returned objects by their fields. Defaults to everything.</td>
+</tr>
+<tr>
+<td>labelSelector</td>
+<td>A selector to restrict the list of returned objects by their labels. Defaults to everything.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#39;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</td>
+</tr>
+<tr>
+<td>timeoutSeconds</td>
+<td>Timeout for the list/watch call.</td>
+</tr>
+<tr>
+<td>watch</td>
+<td>Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#status-v1">Status</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="-strong-read-operations-strong--7"><strong>Read Operations</strong></h2>
+<p>See supported operations below...</p>
+<h2 id="read-8">Read</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>read the specified University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities/{name}</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the University</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>exact</td>
+<td>Should the export be exact.  Exact export maintains cluster-specific fields like &#39;Namespace&#39;.</td>
+</tr>
+<tr>
+<td>export</td>
+<td>Should this value be exported.  Export strips fields that a user can not specify.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#university-v1beta1">University</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="list-9">List</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>list or watch objects of kind University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>fieldSelector</td>
+<td>A selector to restrict the list of returned objects by their fields. Defaults to everything.</td>
+</tr>
+<tr>
+<td>labelSelector</td>
+<td>A selector to restrict the list of returned objects by their labels. Defaults to everything.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#39;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</td>
+</tr>
+<tr>
+<td>timeoutSeconds</td>
+<td>Timeout for the list/watch call.</td>
+</tr>
+<tr>
+<td>watch</td>
+<td>Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#universitylist-v1beta1">UniversityList</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="list-all-namespaces-10">List All Namespaces</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>list or watch objects of kind University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/miskatonic.k8s.io/v1beta1/universities</code></p>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fieldSelector</td>
+<td>A selector to restrict the list of returned objects by their fields. Defaults to everything.</td>
+</tr>
+<tr>
+<td>labelSelector</td>
+<td>A selector to restrict the list of returned objects by their labels. Defaults to everything.</td>
+</tr>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#39;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</td>
+</tr>
+<tr>
+<td>timeoutSeconds</td>
+<td>Timeout for the list/watch call.</td>
+</tr>
+<tr>
+<td>watch</td>
+<td>Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#universitylist-v1beta1">UniversityList</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="watch-11">Watch</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>watch changes to an object of kind University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/miskatonic.k8s.io/v1beta1/watch/namespaces/{namespace}/universities/{name}</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the University</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fieldSelector</td>
+<td>A selector to restrict the list of returned objects by their fields. Defaults to everything.</td>
+</tr>
+<tr>
+<td>labelSelector</td>
+<td>A selector to restrict the list of returned objects by their labels. Defaults to everything.</td>
+</tr>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#39;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</td>
+</tr>
+<tr>
+<td>timeoutSeconds</td>
+<td>Timeout for the list/watch call.</td>
+</tr>
+<tr>
+<td>watch</td>
+<td>Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#watchevent-v1">WatchEvent</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="watch-list-12">Watch List</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>watch individual changes to a list of University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/miskatonic.k8s.io/v1beta1/watch/namespaces/{namespace}/universities</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fieldSelector</td>
+<td>A selector to restrict the list of returned objects by their fields. Defaults to everything.</td>
+</tr>
+<tr>
+<td>labelSelector</td>
+<td>A selector to restrict the list of returned objects by their labels. Defaults to everything.</td>
+</tr>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#39;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</td>
+</tr>
+<tr>
+<td>timeoutSeconds</td>
+<td>Timeout for the list/watch call.</td>
+</tr>
+<tr>
+<td>watch</td>
+<td>Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#watchevent-v1">WatchEvent</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="watch-list-all-namespaces-13">Watch List All Namespaces</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>watch individual changes to a list of University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/miskatonic.k8s.io/v1beta1/watch/universities</code></p>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fieldSelector</td>
+<td>A selector to restrict the list of returned objects by their fields. Defaults to everything.</td>
+</tr>
+<tr>
+<td>labelSelector</td>
+<td>A selector to restrict the list of returned objects by their labels. Defaults to everything.</td>
+</tr>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>resourceVersion</td>
+<td>When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it&#39;s 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.</td>
+</tr>
+<tr>
+<td>timeoutSeconds</td>
+<td>Timeout for the list/watch call.</td>
+</tr>
+<tr>
+<td>watch</td>
+<td>Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#watchevent-v1">WatchEvent</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="-strong-status-operations-strong--14"><strong>Status Operations</strong></h2>
+<p>See supported operations below...</p>
+<h2 id="patch-status-15">Patch Status</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>partially update status of the specified University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>PATCH /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities/{name}/status</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the University</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#patch-v1">Patch</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#university-v1beta1">University</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="read-status-16">Read Status</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>read status of the specified University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities/{name}/status</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the University</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+<tr>
+<td>exact</td>
+<td>Should the export be exact.  Exact export maintains cluster-specific fields like &#39;Namespace&#39;.</td>
+</tr>
+<tr>
+<td>export</td>
+<td>Should this value be exported.  Export strips fields that a user can not specify.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#university-v1beta1">University</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="replace-status-17">Replace Status</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>replace status of the specified University</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>PUT /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities/{name}/status</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the University</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#university-v1beta1">University</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#university-v1beta1">University</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="-strong-scale-operations-strong-"><strong>Scale Operations</strong></h2>
+<p>See supported operations below...</p>
+<h2 id="patch-scale">Patch Scale</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>partially update scale of the specified Scale</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>PATCH /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities/{name}/scale</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the Scale</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#patch-v1">Patch</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#scale-v1beta1">Scale</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="update-scale">Update Scale</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>replace scale of the specified Scale</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>PUT /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities/{name}/scale</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the Scale</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#scale-v1beta1">Scale</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#scale-v1beta1">Scale</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="create-scale">Create Scale</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>create scale of a Scale</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>POST /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities/{name}/scale</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the Scale</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-parameters">Body Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body <br /> <em><a href="#scale-v1beta1">Scale</a></em></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#scale-v1beta1">Scale</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h2 id="list-scale">List Scale</h2>
+<blockquote class="code-block kubectl">
+<p> <code>kubectl</code> Command</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> <code>curl</code> Command (<em>requires <code>kubectl proxy</code> to be running</em>)</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-shell">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block kubectl">
+<p> Output</p>
+</blockquote>
+<pre class="code-block kubectl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<blockquote class="code-block curl">
+<p> Response Body</p>
+</blockquote>
+<pre class="code-block curl"><code class="lang-json">
+<span class="hljs-attribute">Coming Soon</span>
+</code></pre>
+<p>read scale of the specified Scale</p>
+<h3 id="http-request">HTTP Request</h3>
+<p><code>GET /apis/miskatonic.k8s.io/v1beta1/namespaces/{namespace}/universities/{name}/scale</code></p>
+<h3 id="path-parameters">Path Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>name of the Scale</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td>object name and auth scope, such as for teams and projects</td>
+</tr>
+</tbody>
+</table>
+<h3 id="query-parameters">Query Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pretty</td>
+<td>If &#39;true&#39;, then the output is pretty printed.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="response">Response</h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200 <br /> <em><a href="#scale-v1beta1">Scale</a></em></td>
+<td>OK</td>
+</tr>
+</tbody>
+</table>
+<h1 id="-strong-definitions-strong-"><strong>Definitions</strong></h1>
+<hr>
+<h2 id="status-v1-meta">Status v1 meta</h2>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Version</th>
+<th>Kind</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>meta</td>
+<td>v1</td>
+<td>Status</td>
+</tr>
+</tbody>
+</table>
+<p>Status is a return value for calls that don&#39;t return other objects.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>apiVersion <br /> <em>string</em></td>
+<td>APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources</a></td>
+</tr>
+<tr>
+<td>code <br /> <em>integer</em></td>
+<td>Suggested HTTP return code for this status, 0 if not set.</td>
+</tr>
+<tr>
+<td>details <br /> <em><a href="#statusdetails-v1">StatusDetails</a></em></td>
+<td>Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.</td>
+</tr>
+<tr>
+<td>kind <br /> <em>string</em></td>
+<td>Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></td>
+</tr>
+<tr>
+<td>message <br /> <em>string</em></td>
+<td>A human-readable description of the status of this operation.</td>
+</tr>
+<tr>
+<td>metadata <br /> <em><a href="#listmeta-v1">ListMeta</a></em></td>
+<td>Standard list metadata. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></td>
+</tr>
+<tr>
+<td>reason <br /> <em>string</em></td>
+<td>A machine-readable description of why this operation is in the &quot;Failure&quot; status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it.</td>
+</tr>
+<tr>
+<td>status <br /> <em>string</em></td>
+<td>Status of the operation. One of: &quot;Success&quot; or &quot;Failure&quot;. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status</a></td>
+</tr>
+</tbody>
+</table>
+<h1 id="-strong-old-versions-strong-"><strong>Old Versions</strong></h1>
+<hr>
+</div>
+</div>
+<script src="node_modules/jquery/dist/jquery.min.js"></script>
+<script src="node_modules/jquery.scrollto/jquery.scrollTo.min.js"></script>
+<script src="navData.js"></script>
+<script src="scroll.js"></script>
+<!--<script src="actions.js"></script>-->
+<script src="tabvisibility.js"></script>
+</body>
+</html>

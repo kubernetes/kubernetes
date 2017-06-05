@@ -1,0 +1,10 @@
+{
+  "Rules": [
+    {
+      "SelectorRegexp": "k8s[.]io",
+      "AllowedPrefixes": [
+        "k8s.io/gengo"
+      ]
+    }
+  ]
+}

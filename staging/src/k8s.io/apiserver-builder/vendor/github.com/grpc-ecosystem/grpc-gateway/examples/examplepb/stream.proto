@@ -1,0 +1,29 @@
+syntax = "proto3";
+option go_package = "examplepb";
+package grpc.gateway.examples.examplepb;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "examples/examplepb/a_bit_of_everything.proto";
+import "examples/sub/message.proto";
+
+// Defines some more operations to be added to ABitOfEverythingService
+service StreamService {
+	rpc BulkCreate(stream ABitOfEverything) returns (google.protobuf.Empty) {
+		option (google.api.http) = {
+			post: "/v1/example/a_bit_of_everything/bulk"
+			body: "*"
+		};
+	}
+	rpc List(google.protobuf.Empty) returns (stream ABitOfEverything) {
+		option (google.api.http) = {
+			get: "/v1/example/a_bit_of_everything"
+		};
+	}
+	rpc BulkEcho(stream grpc.gateway.examples.sub.StringMessage) returns (stream grpc.gateway.examples.sub.StringMessage) {
+		option (google.api.http) = {
+			post: "/v1/example/a_bit_of_everything/echo"
+			body: "*"
+		};
+	}
+}

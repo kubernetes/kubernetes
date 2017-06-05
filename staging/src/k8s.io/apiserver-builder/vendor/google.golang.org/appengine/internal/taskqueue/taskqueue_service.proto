@@ -1,0 +1,342 @@
+syntax = "proto2";
+option go_package = "taskqueue";
+
+import "google.golang.org/appengine/internal/datastore/datastore_v3.proto";
+
+package appengine;
+
+message TaskQueueServiceError {
+  enum ErrorCode {
+    OK = 0;
+    UNKNOWN_QUEUE = 1;
+    TRANSIENT_ERROR = 2;
+    INTERNAL_ERROR = 3;
+    TASK_TOO_LARGE = 4;
+    INVALID_TASK_NAME = 5;
+    INVALID_QUEUE_NAME = 6;
+    INVALID_URL = 7;
+    INVALID_QUEUE_RATE = 8;
+    PERMISSION_DENIED = 9;
+    TASK_ALREADY_EXISTS = 10;
+    TOMBSTONED_TASK = 11;
+    INVALID_ETA = 12;
+    INVALID_REQUEST = 13;
+    UNKNOWN_TASK = 14;
+    TOMBSTONED_QUEUE = 15;
+    DUPLICATE_TASK_NAME = 16;
+    SKIPPED = 17;
+    TOO_MANY_TASKS = 18;
+    INVALID_PAYLOAD = 19;
+    INVALID_RETRY_PARAMETERS = 20;
+    INVALID_QUEUE_MODE = 21;
+    ACL_LOOKUP_ERROR = 22;
+    TRANSACTIONAL_REQUEST_TOO_LARGE = 23;
+    INCORRECT_CREATOR_NAME = 24;
+    TASK_LEASE_EXPIRED = 25;
+    QUEUE_PAUSED = 26;
+    INVALID_TAG = 27;
+
+    // Reserved range for the Datastore error codes.
+    // Original Datastore error code is shifted by DATASTORE_ERROR offset.
+    DATASTORE_ERROR = 10000;
+  }
+}
+
+message TaskPayload {
+  extensions 10 to max;
+  option message_set_wire_format = true;
+}
+
+message TaskQueueRetryParameters {
+  optional int32 retry_limit = 1;
+  optional int64 age_limit_sec = 2;
+
+  optional double min_backoff_sec = 3 [default = 0.1];
+  optional double max_backoff_sec = 4 [default = 3600];
+  optional int32 max_doublings = 5 [default = 16];
+}
+
+message TaskQueueAcl {
+  repeated bytes user_email = 1;
+  repeated bytes writer_email = 2;
+}
+
+message TaskQueueHttpHeader {
+  required bytes key = 1;
+  required bytes value = 2;
+}
+
+message TaskQueueMode {
+  enum Mode {
+    PUSH = 0;
+    PULL = 1;
+  }
+}
+
+message TaskQueueAddRequest {
+  required bytes queue_name = 1;
+  required bytes task_name = 2;
+  required int64 eta_usec = 3;
+
+  enum RequestMethod {
+    GET = 1;
+    POST = 2;
+    HEAD = 3;
+    PUT = 4;
+    DELETE = 5;
+  }
+  optional RequestMethod method = 5 [default=POST];
+
+  optional bytes url = 4;
+
+  repeated group Header = 6 {
+    required bytes key = 7;
+    required bytes value = 8;
+  }
+
+  optional bytes body = 9 [ctype=CORD];
+  optional Transaction transaction = 10;
+  optional bytes app_id = 11;
+
+  optional group CronTimetable = 12 {
+    required bytes schedule = 13;
+    required bytes timezone = 14;
+  }
+
+  optional bytes description = 15;
+  optional TaskPayload payload = 16;
+  optional TaskQueueRetryParameters retry_parameters = 17;
+  optional TaskQueueMode.Mode mode = 18 [default=PUSH];
+  optional bytes tag = 19;
+}
+
+message TaskQueueAddResponse {
+  optional bytes chosen_task_name = 1;
+}
+
+message TaskQueueBulkAddRequest {
+  repeated TaskQueueAddRequest add_request = 1;
+}
+
+message TaskQueueBulkAddResponse {
+  repeated group TaskResult = 1 {
+    required TaskQueueServiceError.ErrorCode result = 2;
+    optional bytes chosen_task_name = 3;
+  }
+}
+
+message TaskQueueDeleteRequest {
+  required bytes queue_name = 1;
+  repeated bytes task_name = 2;
+  optional bytes app_id = 3;
+}
+
+message TaskQueueDeleteResponse {
+  repeated TaskQueueServiceError.ErrorCode result = 3;
+}
+
+message TaskQueueForceRunRequest {
+  optional bytes app_id = 1;
+  required bytes queue_name = 2;
+  required bytes task_name = 3;
+}
+
+message TaskQueueForceRunResponse {
+  required TaskQueueServiceError.ErrorCode result = 3;
+}
+
+message TaskQueueUpdateQueueRequest {
+  optional bytes app_id = 1;
+  required bytes queue_name = 2;
+  required double bucket_refill_per_second = 3;
+  required int32 bucket_capacity = 4;
+  optional string user_specified_rate = 5;
+  optional TaskQueueRetryParameters retry_parameters = 6;
+  optional int32 max_concurrent_requests = 7;
+  optional TaskQueueMode.Mode mode = 8 [default = PUSH];
+  optional TaskQueueAcl acl = 9;
+  repeated TaskQueueHttpHeader header_override = 10;
+}
+
+message TaskQueueUpdateQueueResponse {
+}
+
+message TaskQueueFetchQueuesRequest {
+  optional bytes app_id = 1;
+  required int32 max_rows = 2;
+}
+
+message TaskQueueFetchQueuesResponse {
+  repeated group Queue = 1 {
+    required bytes queue_name = 2;
+    required double bucket_refill_per_second = 3;
+    required double bucket_capacity = 4;
+    optional string user_specified_rate = 5;
+    required bool paused = 6 [default=false];
+    optional TaskQueueRetryParameters retry_parameters = 7;
+    optional int32 max_concurrent_requests = 8;
+    optional TaskQueueMode.Mode mode = 9 [default = PUSH];
+    optional TaskQueueAcl acl = 10;
+    repeated TaskQueueHttpHeader header_override = 11;
+    optional string creator_name = 12 [ctype=CORD, default="apphosting"];
+  }
+}
+
+message TaskQueueFetchQueueStatsRequest {
+  optional bytes app_id = 1;
+  repeated bytes queue_name = 2;
+  optional int32 max_num_tasks = 3 [default = 0];
+}
+
+message TaskQueueScannerQueueInfo {
+  required int64 executed_last_minute = 1;
+  required int64 executed_last_hour = 2;
+  required double sampling_duration_seconds = 3;
+  optional int32 requests_in_flight = 4;
+  optional double enforced_rate = 5;
+}
+
+message TaskQueueFetchQueueStatsResponse {
+  repeated group QueueStats = 1 {
+    required int32 num_tasks = 2;
+    required int64 oldest_eta_usec = 3;
+    optional TaskQueueScannerQueueInfo scanner_info = 4;
+  }
+}
+message TaskQueuePauseQueueRequest {
+  required bytes app_id = 1;
+  required bytes queue_name = 2;
+  required bool pause = 3;
+}
+
+message TaskQueuePauseQueueResponse {
+}
+
+message TaskQueuePurgeQueueRequest {
+  optional bytes app_id = 1;
+  required bytes queue_name = 2;
+}
+
+message TaskQueuePurgeQueueResponse {
+}
+
+message TaskQueueDeleteQueueRequest {
+  required bytes app_id = 1;
+  required bytes queue_name = 2;
+}
+
+message TaskQueueDeleteQueueResponse {
+}
+
+message TaskQueueDeleteGroupRequest {
+  required bytes app_id = 1;
+}
+
+message TaskQueueDeleteGroupResponse {
+}
+
+message TaskQueueQueryTasksRequest {
+  optional bytes app_id = 1;
+  required bytes queue_name = 2;
+
+  optional bytes start_task_name = 3;
+  optional int64 start_eta_usec = 4;
+  optional bytes start_tag = 6;
+  optional int32 max_rows = 5 [default = 1];
+}
+
+message TaskQueueQueryTasksResponse {
+  repeated group Task = 1 {
+    required bytes task_name = 2;
+    required int64 eta_usec = 3;
+    optional bytes url = 4;
+
+    enum RequestMethod {
+      GET = 1;
+      POST = 2;
+      HEAD = 3;
+      PUT = 4;
+      DELETE = 5;
+    }
+    optional RequestMethod method = 5;
+
+    optional int32 retry_count = 6 [default=0];
+
+    repeated group Header = 7 {
+      required bytes key = 8;
+      required bytes value = 9;
+    }
+
+    optional int32 body_size = 10;
+    optional bytes body = 11 [ctype=CORD];
+    required int64 creation_time_usec = 12;
+
+    optional group CronTimetable = 13 {
+      required bytes schedule = 14;
+      required bytes timezone = 15;
+    }
+
+    optional group RunLog = 16 {
+      required int64 dispatched_usec = 17;
+      required int64 lag_usec = 18;
+      required int64 elapsed_usec = 19;
+      optional int64 response_code = 20;
+      optional string retry_reason = 27;
+    }
+
+    optional bytes description = 21;
+    optional TaskPayload payload = 22;
+    optional TaskQueueRetryParameters retry_parameters = 23;
+    optional int64 first_try_usec = 24;
+    optional bytes tag = 25;
+    optional int32 execution_count = 26 [default=0];
+  }
+}
+
+message TaskQueueFetchTaskRequest {
+  optional bytes app_id = 1;
+  required bytes queue_name = 2;
+  required bytes task_name = 3;
+}
+
+message TaskQueueFetchTaskResponse {
+  required TaskQueueQueryTasksResponse task = 1;
+}
+
+message TaskQueueUpdateStorageLimitRequest {
+  required bytes app_id = 1;
+  required int64 limit = 2;
+}
+
+message TaskQueueUpdateStorageLimitResponse {
+  required int64 new_limit = 1;
+}
+
+message TaskQueueQueryAndOwnTasksRequest {
+  required bytes queue_name = 1;
+  required double lease_seconds = 2;
+  required int64 max_tasks = 3;
+  optional bool group_by_tag = 4 [default=false];
+  optional bytes tag = 5;
+}
+
+message TaskQueueQueryAndOwnTasksResponse {
+  repeated group Task = 1 {
+    required bytes task_name = 2;
+    required int64 eta_usec = 3;
+    optional int32 retry_count = 4 [default=0];
+    optional bytes body = 5 [ctype=CORD];
+    optional bytes tag = 6;
+  }
+}
+
+message TaskQueueModifyTaskLeaseRequest {
+  required bytes queue_name = 1;
+  required bytes task_name = 2;
+  required int64 eta_usec = 3;
+  required double lease_seconds = 4;
+}
+
+message TaskQueueModifyTaskLeaseResponse {
+  required int64 updated_eta_usec = 1;
+}

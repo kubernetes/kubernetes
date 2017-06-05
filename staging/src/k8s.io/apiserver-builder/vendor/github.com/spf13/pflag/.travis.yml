@@ -1,0 +1,20 @@
+sudo: false
+
+language: go
+
+go:
+        - 1.6.3
+        - 1.7.3
+        - tip
+
+matrix:
+        allow_failures:
+                  - go: tip
+install:
+        - go get github.com/golang/lint/golint
+        - export PATH=$GOPATH/bin:$PATH
+        - go install ./...
+
+script:
+        - verify/all.sh -v
+        - go test ./...

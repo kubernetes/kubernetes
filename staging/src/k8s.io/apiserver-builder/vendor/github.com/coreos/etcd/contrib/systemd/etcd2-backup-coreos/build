@@ -1,0 +1,25 @@
+#!/bin/bash -e
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "${SCRIPT_DIR}"
+
+if [ ! -f  "./rclone.conf" ];then
+    echo "Could not find $(pwd)/rclone.conf"
+    exit 1
+fi
+
+mkdir -p ./bin
+
+GOPATH=$(pwd) go build -o ./bin/etcd2-restore etcd2-restore.go
+
+tar cfz ./etcd2-backup.tgz \
+    *.{service,timer,conf} \
+    etcd2-join \
+    bin/etcd2-restore \
+    rclone.conf \
+    etcd2-backup-install
+
+printf "Install package saved at\n\t -> $(pwd)/etcd2-backup.tgz\n\n"
+
+printf "Copy to target machine and deploy.\n $> tar zxvf etcd2-backup.tgz && ./etcd2-backup-install\n\n"
+echo "WARNING: this tarball contains your rclone secrets. Be careful!"

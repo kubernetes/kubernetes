@@ -1,0 +1,8 @@
+language: go
+
+go:
+        - tip
+install:
+        - go get github.com/ugorji/go/codec
+        - go get github.com/pquerna/ffjson/fflib/v1
+        - go get github.com/golang/lint/golint

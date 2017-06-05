@@ -1,0 +1,176 @@
+Vagrantfile:      node_ip = $node_ips[n]
+cluster/addons/addon-manager/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
+cluster/aws/templates/configure-vm-aws.sh:  # We set the hostname_override to the full EC2 private dns name
+cluster/aws/templates/configure-vm-aws.sh:  api_servers: '${API_SERVERS}'
+cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
+cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "runtime_config"
+cluster/aws/templates/configure-vm-aws.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
+cluster/centos/config-default.sh:    etcd_servers="${prefix}http://${master_ip}:2379"
+cluster/centos/config-default.sh:  local etcd_servers=""
+cluster/centos/util.sh:  local node_ip=${node#*@}
+cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
+cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
+cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
+cluster/gce/configure-vm.sh:  env-to-grains "feature_gates"
+cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
+cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
+cluster/gce/container-linux/configure-helper.sh:    authorization_mode+=",ABAC"
+cluster/gce/container-linux/configure-helper.sh:    authorization_mode+=",Webhook"
+cluster/gce/container-linux/configure-helper.sh:    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
+cluster/gce/container-linux/configure-helper.sh:    sed -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g")
+cluster/gce/container-linux/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@${STORAGE_BACKEND}@g" "${temp_file}"
+cluster/gce/container-linux/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g" "${temp_file}"
+cluster/gce/container-linux/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+cluster/gce/container-linux/configure-helper.sh:  local authorization_mode="RBAC"
+cluster/gce/container-linux/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+cluster/gce/gci/configure-helper.sh:    authorization_mode+=",ABAC"
+cluster/gce/gci/configure-helper.sh:    authorization_mode+=",Webhook"
+cluster/gce/gci/configure-helper.sh:    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
+cluster/gce/gci/configure-helper.sh:    sed -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g")
+cluster/gce/gci/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@${STORAGE_BACKEND}@g" "${temp_file}"
+cluster/gce/gci/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g" "${temp_file}"
+cluster/gce/gci/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+cluster/gce/gci/configure-helper.sh:  local authorization_mode="RBAC"
+cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+cluster/gce/trusty/configure-helper.sh:    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
+cluster/gce/trusty/configure-helper.sh:    sed -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g")
+cluster/gce/trusty/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@${STORAGE_BACKEND}@g" "${temp_file}"
+cluster/gce/trusty/configure-helper.sh:    sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g" "${temp_file}"
+cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:            context['pillar'] = {'num_nodes': get_node_count()}
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ca_cert_path = layer_options.get('ca_certificate_path')
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    cluster_dns.set_dns_info(53, hookenv.config('dns_domain'), dns_ip)
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ip = service_cidr().split('/')[0]
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ip = service_cidr().split('/')[0]
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:def send_cluster_dns_detail(cluster_dns):
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:def service_cidr():
+cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:    context.update({'kube_api_endpoint': ','.join(api_servers),
+cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:    ca_cert_path = layer_options.get('ca_certificate_path')
+cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:def render_init_scripts(api_servers):
+cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
+cluster/lib/logging.sh:    local source_file=${BASH_SOURCE[$stack_skip]}
+cluster/log-dump.sh:    local -r node_name="${1}"
+cluster/log-dump.sh:  for node_name in "${node_names[@]}"; do
+cluster/log-dump.sh:readonly report_dir="${1:-_artifacts}"
+cluster/photon-controller/templates/salt-master.sh:  api_servers: $MASTER_NAME
+cluster/photon-controller/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
+cluster/photon-controller/util.sh:    node_ip=$(${PHOTON} vm networks "${node_id}" | grep -i $'\t'"00:0C:29" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
+cluster/photon-controller/util.sh:  local cert_dir="/srv/kubernetes"
+cluster/photon-controller/util.sh:  node_name=${1}
+cluster/photon-controller/util.sh:  ssh_key=$(ssh-add -L | head -1)
+cluster/rackspace/util.sh:    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
+cluster/saltbase/salt/cluster-autoscaler/cluster-autoscaler.manifest:{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config -%}
+cluster/saltbase/salt/etcd/etcd.manifest:        "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
+cluster/saltbase/salt/etcd/etcd.manifest:{% if pillar.get('storage_backend', 'etcd3') == 'etcd3' -%}
+cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + storage_backend + " " + storage_media_type + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + max_requests_inflight + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector + " " + etcd_quorum_read + " " + audit_log -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% if pillar.get('enable_hostpath_provisioner', '').lower() == 'true' -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + enable_garbage_collector + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = params + " " + feature_gates -%}
+cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:    - echo -998 > /proc/$$$/oom_score_adj && kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
+cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers + ":6443" -%}
+cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers -%}
+cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set cluster_cidr=" --cluster-cidr=" + pillar['cluster_cidr'] %}
+cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:{% set params = log_level + " " + feature_gates + " " + test_args -%}
+cluster/saltbase/salt/kube-scheduler/kube-scheduler.manifest:{% set params = params + log_level + " " + feature_gates + " " + scheduling_algorithm_provider -%}
+cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers + ":6443" -%}
+cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
+cluster/saltbase/salt/kubelet/default:  {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
+cluster/saltbase/salt/kubelet/default:  {% set eviction_hard="--eviction-hard=" + pillar['eviction_hard'] %}
+cluster/saltbase/salt/kubelet/default:  {% set kubelet_port="--port=" + pillar['kubelet_port'] %}
+cluster/saltbase/salt/kubelet/default:  {% set node_labels="--node-labels=" + pillar['node_labels'] %}
+cluster/saltbase/salt/kubelet/default:{% if grains['feature_gates'] is defined -%}
+cluster/saltbase/salt/kubelet/default:{% if pillar.get('non_masquerade_cidr','') -%}
+cluster/saltbase/salt/opencontrail-networking-master/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
+cluster/saltbase/salt/opencontrail-networking-minion/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
+cluster/saltbase/salt/supervisor/supervisor_watcher.sh:# Apply oom_score_adj: -901 to processes
+cluster/ubuntu/util.sh:  local node_ip=${1}
+cluster/vagrant/provision-utils.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+cluster/vagrant/provision-utils.sh:  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
+examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
+examples/storage/cassandra/image/files/jvm.options:# information in cassandra.yaml (such as listen_address).
+examples/storage/cassandra/image/files/jvm.options:#-Dcassandra.replace_address=listen_address or broadcast_address of dead node
+examples/storage/cassandra/image/files/run.sh:  cluster_name \
+examples/storage/cassandra/image/files/run.sh:  listen_address \
+examples/storage/vitess/env.sh:    node_ip=$(get_node_ip)
+federation/cluster/common.sh:  local cert_dir="${kube_temp}/easy-rsa-master/easyrsa3"
+federation/deploy/config.json.sample:      "cloud_provider": "gce",
+federation/deploy/config.json.sample:      "cloud_provider": "gce",
+federation/deploy/config.json.sample:      "cloud_provider": "gce",
+federation/deploy/config.json.sample:      "cluster_cidr": "10.180.0.0/14",
+federation/deploy/config.json.sample:      "cluster_cidr": "10.184.0.0/14",
+federation/deploy/config.json.sample:      "cluster_cidr": "10.188.0.0/14",
+federation/deploy/config.json.sample:      "cluster_name": "cluster1-kubernetes",
+federation/deploy/config.json.sample:      "cluster_name": "cluster2-kubernetes",
+federation/deploy/config.json.sample:      "cluster_name": "cluster3-kubernetes",
+federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
+federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
+federation/deploy/config.json.sample:      "kubernetes_version": "v1.4.0"
+federation/deploy/config.json.sample:      "num_nodes": 3,
+federation/deploy/config.json.sample:      "num_nodes": 3,
+federation/deploy/config.json.sample:      "num_nodes": 3,
+hack/lib/util.sh:    local api_port=$5
+hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST_IP}"
+hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
+hack/local-up-cluster.sh:    advertise_address=""
+hack/local-up-cluster.sh:    runtime_config=""
+hack/make-rules/test-e2e-node.sh:    image_project=${IMAGE_PROJECT:-"google-containers"}
+hack/make-rules/test-e2e-node.sh:  delete_instances=${DELETE_INSTANCES:-"false"}
+hack/make-rules/test-e2e-node.sh:  image_project=${IMAGE_PROJECT:-"kubernetes-node-e2e-images"}
+hack/test-update-storage-objects.sh:  local storage_backend=${1:-"${STORAGE_BACKEND_ETCD2}"}
+hack/test-update-storage-objects.sh:  local storage_media_type=${3:-""}
+hack/test-update-storage-objects.sh:  local storage_versions=${2:-""}
+hack/test-update-storage-objects.sh:  source_file=${test_data[0]}
+hack/test-update-storage-objects.sh:# source_file,resource,namespace,name,old_version,new_version
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	ContainerPort int32 `protobuf:"varint,2,opt,name=container_port,json=containerPort,proto3" json:"container_port,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	OomScoreAdj int64 `protobuf:"varint,5,opt,name=oom_score_adj,json=oomScoreAdj,proto3" json:"oom_score_adj,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	PodCidr string `protobuf:"bytes,1,opt,name=pod_cidr,json=podCidr,proto3" json:"pod_cidr,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	RuntimeConfig *RuntimeConfig `protobuf:"bytes,1,opt,name=runtime_config,json=runtimeConfig" json:"runtime_config,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.proto:    RuntimeConfig runtime_config = 1;
+pkg/kubelet/api/v1alpha1/runtime/api.proto:    int32 container_port = 2;
+pkg/kubelet/api/v1alpha1/runtime/api.proto:    int64 oom_score_adj = 5;
+pkg/kubelet/api/v1alpha1/runtime/api.proto:    string pod_cidr = 1;
+pkg/kubelet/cm/container_manager_linux.go:		glog.V(3).Infof("Failed to apply oom_score_adj %d for pid %d: %v", oomScoreAdj, pid, err)
+pkg/kubelet/cm/container_manager_linux.go:	glog.V(5).Infof("attempting to apply oom_score_adj of %d to pid %d", oomScoreAdj, pid)
+pkg/kubelet/dockershim/docker_checkpoint.go:	ContainerPort *int32 `json:"container_port,omitempty"`
+pkg/kubelet/network/hairpin/hairpin.go:	hairpinModeRelativePath = "hairpin_mode"
+pkg/kubelet/qos/policy_test.go:			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
+pkg/kubelet/qos/policy_test.go:	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
+pkg/kubelet/qos/policy_test.go:	lowOOMScoreAdj  int // The max oom_score_adj score the container should be assigned.
+pkg/util/oom/oom_linux.go:		return fmt.Errorf("invalid PID %d specified for oom_score_adj", pid)
+pkg/util/oom/oom_linux.go:	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
+pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj for all processes in cgroup cgroupName.
+pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
+test/e2e/common/configmap.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
+test/e2e/common/configmap.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
+test/e2e/common/configmap.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volumes/delete/data-1"},
+test/e2e/common/configmap.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volumes/update/data-3"},
+test/e2e/common/downwardapi_volume.go:			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
+test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePath),
+test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
+test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
+test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-configmap-volume/data-1"},
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-configmap-volumes/create/data-1"},
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-configmap-volumes/delete/data-1"},
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-configmap-volumes/update/data-3"},
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-secret-volumes/create/data-1"},
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-secret-volumes/delete/data-1"},
+test/e2e/common/projected.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-secret-volumes/update/data-3"},
+test/e2e/common/projected.go:			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
+test/e2e/common/secrets.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
+test/e2e/common/secrets.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/delete/data-1"},
+test/e2e/common/secrets.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/update/data-3"},
+test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be %d; found %d", pid, expectedOOMScoreAdj, oomScore)
+test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be < %d; found %d", pid, expectedMaxOOMScoreAdj, oomScore)
+test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be >= %d; found %d", pid, expectedMinOOMScoreAdj, oomScore)
+test/e2e_node/container_manager_test.go:		return fmt.Errorf("failed to get oom_score_adj for %d", pid)
+test/e2e_node/container_manager_test.go:		return fmt.Errorf("failed to get oom_score_adj for %d: %v", pid, err)
+test/e2e_node/container_manager_test.go:	procfsPath := path.Join("/proc", strconv.Itoa(pid), "oom_score_adj")
+test/e2e_node/node_container_manager_test.go:	kubeReservedCgroup   = "/kube_reserved"
+test/e2e_node/node_container_manager_test.go:	systemReservedCgroup = "/system_reserved"
+test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
+test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
+test/images/mount-tester/mt.go:	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")

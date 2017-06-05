@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-nfs
+  namespace: default
+spec:
+  containers:
+  - name: nginx-nfs
+    image: nginx
+    volumeMounts:
+    - name: test
+      mountPath: /data
+    ports:
+    - containerPort: 80
+  volumes:
+  - name: test
+    flexVolume:
+      driver: "k8s/nfs"
+      fsType: "nfs"
+      options:
+        server: "172.16.0.25"
+        share: "dws_nas_scratch"
