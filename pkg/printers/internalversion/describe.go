@@ -3114,11 +3114,61 @@ func describeNetworkPolicy(networkPolicy *networking.NetworkPolicy) (string, err
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", networkPolicy.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", networkPolicy.Namespace)
+		w.Write(LEVEL_0, "Created on:\t%s\n", networkPolicy.CreationTimestamp)
 		printLabelsMultiline(w, "Labels", networkPolicy.Labels)
 		printAnnotationsMultiline(w, "Annotations", networkPolicy.Annotations)
-
+		describeNetworkPolicySpec(networkPolicy.Spec, w)
 		return nil
 	})
+}
+
+func describeNetworkPolicySpec(nps networking.NetworkPolicySpec, w PrefixWriter) {
+	w.Write(LEVEL_0, "Spec:\n")
+	w.Write(LEVEL_1, "Pod Selector: ")
+	if len(nps.PodSelector.MatchLabels) == 0 && len(nps.PodSelector.MatchExpressions) == 0 {
+		w.Write(LEVEL_2, "<none> (Allowing the specific traffic to all pods in this namespace)\n")
+	} else {
+		w.Write(LEVEL_2, "%s\n", metav1.FormatLabelSelector(&nps.PodSelector))
+	}
+	w.Write(LEVEL_1, "Allowing ingress traffic:\n")
+	printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
+}
+
+func printNetworkPolicySpecIngressFrom(npirs []networking.NetworkPolicyIngressRule, initialIndent string, w PrefixWriter) {
+	if len(npirs) == 0 {
+		w.WriteLine("<none> (Selected pods are isolated for ingress connectivity)")
+		return
+	}
+	for i, npir := range npirs {
+		if len(npir.Ports) == 0 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To Port: <any> (traffic allowed to all ports)")
+		} else {
+			for _, port := range npir.Ports {
+				var proto api.Protocol
+				if port.Protocol != nil {
+					proto = *port.Protocol
+				} else {
+					proto = api.ProtocolTCP
+				}
+				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
+			}
+		}
+		if len(npir.From) == 0 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "From: <any> (traffic not restricted by source)")
+		} else {
+			for _, from := range npir.From {
+				w.Write(LEVEL_0, "%s", initialIndent)
+				if from.PodSelector != nil {
+					w.Write(LEVEL_0, "%s: %s\n", "From Pod Selector", metav1.FormatLabelSelector(from.PodSelector))
+				} else if from.NamespaceSelector != nil {
+					w.Write(LEVEL_0, "%s: %s\n", "From Namespace Selector", metav1.FormatLabelSelector(from.NamespaceSelector))
+				}
+			}
+		}
+		if i != len(npirs)-1 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "----------")
+		}
+	}
 }
 
 type StorageClassDescriber struct {
