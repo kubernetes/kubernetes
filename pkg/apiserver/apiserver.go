@@ -346,9 +346,9 @@ func APIVersionHandler(s runtime.NegotiatedSerializer, getAPIVersionsFunc func(r
 	}
 }
 
-// TODO: Remove in 1.6. Returns if kubectl is older than v1.5.0
-func isOldKubectl(userAgent string) bool {
-	// example userAgent string: kubectl-1.3/v1.3.8 (linux/amd64) kubernetes/e328d5b
+// TODO: Remove in 1.6. Returns if kubectl is older than v1.5.0 and newer than or equal to v1.3.0
+func is1314Kubectl(userAgent string) bool {
+	// example userAgent string: kubectl-1.4/v1.4.3 (linux/amd64) kubernetes/e328d5b
 	if !strings.Contains(userAgent, "kubectl") {
 		return false
 	}
@@ -361,7 +361,7 @@ func isOldKubectl(userAgent string) bool {
 	if versionErr != nil {
 		return false
 	}
-	return kubectlVersion.LT(version.MustParse("v1.5.0"))
+	return kubectlVersion.LT(version.MustParse("v1.5.0")) && kubectlVersion.GTE(version.MustParse("v1.3.0"))
 }
 
 // TODO: Remove in 1.6. This is for backward compatibility with 1.4 kubectl.
@@ -370,7 +370,7 @@ var groupsWithNewVersionsIn1_5 = sets.NewString("apps", "policy")
 
 // TODO: Remove in 1.6.
 func filterAPIGroups(req *restful.Request, groups []unversioned.APIGroup) []unversioned.APIGroup {
-	if !isOldKubectl(req.HeaderParameter("User-Agent")) {
+	if !is1314Kubectl(req.HeaderParameter("User-Agent")) {
 		return groups
 	}
 	// hide API group that has new versions added in 1.5.
