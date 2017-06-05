@@ -37,14 +37,14 @@ var (
 		# View the rollout history of a deployment
 		kubectl rollout history deployment/abc
 
-		# View the details of deployment revision 3
-		kubectl rollout history deployment/abc --revision=3`)
+		# View the details of daemonset revision 3
+		kubectl rollout history daemonset/abc --revision=3`)
 )
 
 func NewCmdRolloutHistory(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
-	validArgs := []string{"deployment"}
+	validArgs := []string{"deployment", "daemonset"}
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{

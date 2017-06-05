@@ -50,7 +50,7 @@ var (
 func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
-	validArgs := []string{"deployment"}
+	validArgs := []string{"deployment", "daemonset"}
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
