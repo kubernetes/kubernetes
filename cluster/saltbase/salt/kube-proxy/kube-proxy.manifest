@@ -54,6 +54,16 @@ metadata:
     component: kube-proxy
 spec:
   hostNetwork: true
+  initContainers:
+  - name: touch-lock
+    image: busybox
+    command: ['/bin/touch', '/run/xtables.lock']
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - mountPath: /run
+      name: run
+      readOnly: false
   containers:
   - name: kube-proxy
     image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
@@ -80,6 +90,9 @@ spec:
     - mountPath: /var/lib/kube-proxy/kubeconfig
       name: kubeconfig
       readOnly: false
+    - mountPath: /run/xtables.lock
+      name: iptableslock
+      readOnly: false
   volumes:
   - hostPath:
       path: /usr/share/ca-certificates
@@ -93,3 +106,9 @@ spec:
   - hostPath:
       path: /var/log
     name: varlog
+  - hostPath:
+      path: /run
+    name: run
+  - hostPath:
+      path: /run/xtables.lock
+    name: iptableslock

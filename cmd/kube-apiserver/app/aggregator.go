@@ -50,7 +50,6 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 
 	// the aggregator doesn't wire these up.  It just delegates them to the kubeapiserver
 	genericConfig.EnableSwaggerUI = false
-	genericConfig.OpenAPIConfig = nil
 	genericConfig.SwaggerConfig = nil
 
 	// copy the etcd options so we don't mutate originals.
@@ -120,7 +119,10 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		for _, apiService := range apiServices {
 			found := false
 			for _, item := range items {
-				if item.Name == apiService.Name {
+				if item.Name != apiService.Name {
+					continue
+				}
+				if apiregistration.IsAPIServiceConditionTrue(item, apiregistration.Available) {
 					found = true
 					break
 				}
