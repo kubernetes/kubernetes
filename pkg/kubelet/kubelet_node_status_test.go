@@ -249,6 +249,64 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
 }
 
+func TestUpdateNewNodeOutOfDiskStatus(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubeClient := testKubelet.fakeKubeClient
+	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
+	machineInfo := &cadvisorapi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 1024,
+	}
+	mockCadvisor := testKubelet.fakeCadvisor
+	mockCadvisor.On("Start").Return(nil)
+	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &cadvisorapi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+	}
+	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+
+	// Make Kubelet report that it has insufficient disk space.
+	err := updateDiskSpacePolicy(kubelet, mockCadvisor, 500, 500, 50, 200, 100, 100)
+	require.NoError(t, err, "update the disk space manager")
+
+	expectedNodeOutOfDiskCondition := v1.NodeCondition{
+		Type:               v1.NodeOutOfDisk,
+		Status:             v1.ConditionTrue,
+		Reason:             "KubeletOutOfDisk",
+		Message:            fmt.Sprintf("out of disk space"),
+		LastHeartbeatTime:  metav1.Time{},
+		LastTransitionTime: metav1.Time{},
+	}
+
+	kubelet.updateRuntimeUp()
+	assert.NoError(t, kubelet.updateNodeStatus())
+
+	actions := kubeClient.Actions()
+	require.Len(t, actions, 2)
+	require.True(t, actions[1].Matches("patch", "nodes"))
+	require.Equal(t, "status", actions[1].GetSubresource())
+
+	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
+	assert.NoError(t, err, "apply the node status patch")
+
+	var oodCondition v1.NodeCondition
+	for i, cond := range updatedNode.Status.Conditions {
+		updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
+		updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
+		if cond.Type == v1.NodeOutOfDisk {
+			oodCondition = updatedNode.Status.Conditions[i]
+		}
+	}
+	assert.EqualValues(t, expectedNodeOutOfDiskCondition, oodCondition)
+}
+
 func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
