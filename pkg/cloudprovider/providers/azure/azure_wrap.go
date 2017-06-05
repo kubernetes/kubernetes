@@ -43,6 +43,7 @@ func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualM
 	var realErr error
 
 	vmName := string(nodeName)
+	az.operationPollRateLimiter.Accept()
 	vm, err = az.VirtualMachinesClient.Get(az.ResourceGroup, vmName, "")
 
 	exists, realErr = checkResourceExistsFromError(err)

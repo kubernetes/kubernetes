@@ -17,35 +17,36 @@ limitations under the License.
 package azure
 
 import (
-	"time"
-
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-const (
-	operationPollInterval        = 3 * time.Second
-	operationPollTimeoutDuration = time.Hour
-	backoffRetries               = 12
-	backoffExponent              = 2
-	backoffDuration              = 1 * time.Second
-	backoffJitter                = 1.0
-)
-
-var azAPIBackoff = wait.Backoff{
-	Steps:    backoffRetries,
-	Factor:   backoffExponent,
-	Duration: backoffDuration,
-	Jitter:   backoffJitter,
+// GetVirtualMachineWithRetry invokes az.getVirtualMachine with exponential backoff retry
+func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.VirtualMachine, bool, error) {
+	var machine compute.VirtualMachine
+	var exists bool
+	err := wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
+		az.operationPollRateLimiter.Accept()
+		var retryErr error
+		machine, exists, retryErr = az.getVirtualMachine(name)
+		if retryErr != nil {
+			glog.Errorf("backoff: failure, will retry,err=%v", retryErr)
+			return false, nil
+		}
+		glog.V(2).Infof("backoff: success")
+		return true, nil
+	})
+	return machine, exists, err
 }
 
 // CreateOrUpdateSGWithRetry invokes az.SecurityGroupsClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup) error {
-	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+	return wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		resp, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
 		return processRetryResponse(resp, err)
@@ -54,7 +55,7 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup) error {
 
 // CreateOrUpdateLBWithRetry invokes az.LoadBalancerClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateLBWithRetry(lb network.LoadBalancer) error {
-	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+	return wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		resp, err := az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
 		return processRetryResponse(resp, err)
@@ -63,7 +64,7 @@ func (az *Cloud) CreateOrUpdateLBWithRetry(lb network.LoadBalancer) error {
 
 // CreateOrUpdatePIPWithRetry invokes az.PublicIPAddressesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdatePIPWithRetry(pip network.PublicIPAddress) error {
-	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+	return wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		resp, err := az.PublicIPAddressesClient.CreateOrUpdate(az.ResourceGroup, *pip.Name, pip, nil)
 		return processRetryResponse(resp, err)
@@ -72,7 +73,7 @@ func (az *Cloud) CreateOrUpdatePIPWithRetry(pip network.PublicIPAddress) error {
 
 // CreateOrUpdateInterfaceWithRetry invokes az.PublicIPAddressesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateInterfaceWithRetry(nic network.Interface) error {
-	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+	return wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		resp, err := az.InterfacesClient.CreateOrUpdate(az.ResourceGroup, *nic.Name, nic, nil)
 		return processRetryResponse(resp, err)
@@ -81,7 +82,7 @@ func (az *Cloud) CreateOrUpdateInterfaceWithRetry(nic network.Interface) error {
 
 // DeletePublicIPWithRetry invokes az.PublicIPAddressesClient.Delete with exponential backoff retry
 func (az *Cloud) DeletePublicIPWithRetry(pipName string) error {
-	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+	return wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		resp, err := az.PublicIPAddressesClient.Delete(az.ResourceGroup, pipName, nil)
 		return processRetryResponse(resp, err)
@@ -90,7 +91,7 @@ func (az *Cloud) DeletePublicIPWithRetry(pipName string) error {
 
 // DeleteLBWithRetry invokes az.LoadBalancerClient.Delete with exponential backoff retry
 func (az *Cloud) DeleteLBWithRetry(lbName string) error {
-	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+	return wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		resp, err := az.LoadBalancerClient.Delete(az.ResourceGroup, lbName, nil)
 		return processRetryResponse(resp, err)
@@ -99,7 +100,7 @@ func (az *Cloud) DeleteLBWithRetry(lbName string) error {
 
 // CreateOrUpdateRouteTableWithRetry invokes az.RouteTablesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateRouteTableWithRetry(routeTable network.RouteTable) error {
-	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+	return wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		resp, err := az.RouteTablesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, routeTable, nil)
 		return processRetryResponse(resp, err)
@@ -108,7 +109,7 @@ func (az *Cloud) CreateOrUpdateRouteTableWithRetry(routeTable network.RouteTable
 
 // CreateOrUpdateRouteWithRetry invokes az.RoutesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateRouteWithRetry(route network.Route) error {
-	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+	return wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		resp, err := az.RoutesClient.CreateOrUpdate(az.ResourceGroup, az.RouteTableName, *route.Name, route, nil)
 		return processRetryResponse(resp, err)
@@ -117,7 +118,7 @@ func (az *Cloud) CreateOrUpdateRouteWithRetry(route network.Route) error {
 
 // DeleteRouteWithRetry invokes az.RoutesClient.Delete with exponential backoff retry
 func (az *Cloud) DeleteRouteWithRetry(routeName string) error {
-	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+	return wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		resp, err := az.RoutesClient.Delete(az.ResourceGroup, az.RouteTableName, routeName, nil)
 		return processRetryResponse(resp, err)
@@ -126,7 +127,7 @@ func (az *Cloud) DeleteRouteWithRetry(routeName string) error {
 
 // CreateOrUpdateVMWithRetry invokes az.VirtualMachinesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateVMWithRetry(vmName string, newVM compute.VirtualMachine) error {
-	return wait.ExponentialBackoff(azAPIBackoff, func() (bool, error) {
+	return wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
 		resp, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
 		return processRetryResponse(resp, err)
