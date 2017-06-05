@@ -147,22 +147,22 @@ verify_base_image() {
 }
 
 setup_overlay_mounts() {
-    mkdir -p ${USR_WRITABLE_DIR} ${USR_WORK_DIR} ${LIB_WRITABLE_DIR} ${LIB_WORK_DIR} 
+    mkdir -p ${USR_WRITABLE_DIR} ${USR_WORK_DIR} ${LIB_WRITABLE_DIR} ${LIB_WORK_DIR}
     mount -t overlay -o lowerdir=/usr,upperdir=${USR_WRITABLE_DIR},workdir=${USR_WORK_DIR} none /usr
     mount -t overlay -o lowerdir=/lib,upperdir=${LIB_WRITABLE_DIR},workdir=${LIB_WORK_DIR} none /lib
 }
 
 exit_if_install_not_needed() {
     if nvidia-smi; then
-	echo "nvidia drivers already installed. Skipping installation"
+        echo "nvidia drivers already installed. Skipping installation"
         post_installation_sequence
-	exit 0
+        exit 0
     fi
 }
 
 restart_kubelet() {
     echo "Sending SIGTERM to kubelet"
-    pkill -SIGTERM kubelet
+    pkill -SIGTERM kubelet || true
 }
 
 # Copy user space libraries and debug utilities to a special output directory on the host.
@@ -190,7 +190,7 @@ main() {
     check_nvidia_device
     # Setup overlay mounts to capture nvidia driver artificats in a more permanent storage on the host.
     setup_overlay_mounts
-    # Disable a critical security feature in COS that will allow for dynamically loading Nvidia drivers 
+    # Disable a critical security feature in COS that will allow for dynamically loading Nvidia drivers
     unlock_loadpin_and_reboot_if_needed
     # Exit if installation is not required (for idempotency)
     exit_if_install_not_needed

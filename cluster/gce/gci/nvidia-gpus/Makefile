@@ -21,7 +21,7 @@ all: container
 container:
 	docker build --pull -t ${REGISTRY}/${IMAGE}:${TAG} .
 
-push: 
+push:
 	gcloud docker -- push ${REGISTRY}/${IMAGE}:${TAG}
 
 .PHONY: all container push
