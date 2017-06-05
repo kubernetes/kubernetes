@@ -58,6 +58,8 @@ type managerImpl struct {
 	killPodFunc KillPodFunc
 	// the interface that knows how to do image gc
 	imageGC ImageGC
+	// the interface that knows how to do image gc
+	containerGC ContainerGC
 	// protects access to internal state
 	sync.RWMutex
 	// node conditions are the set of conditions present
@@ -95,6 +97,7 @@ func NewManager(
 	config Config,
 	killPodFunc KillPodFunc,
 	imageGC ImageGC,
+	containerGC ContainerGC,
 	recorder record.EventRecorder,
 	nodeRef *clientv1.ObjectReference,
 	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler) {
@@ -102,6 +105,7 @@ func NewManager(
 		clock:           clock,
 		killPodFunc:     killPodFunc,
 		imageGC:         imageGC,
+		containerGC:     containerGC,
 		config:          config,
 		recorder:        recorder,
 		summaryProvider: summaryProvider,
@@ -223,8 +227,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		}
 		m.dedicatedImageFs = &hasImageFs
 		m.resourceToRankFunc = buildResourceToRankFunc(hasImageFs)
-		m.resourceToNodeReclaimFuncs = buildResourceToNodeReclaimFuncs(m.imageGC, hasImageFs)
-
+		m.resourceToNodeReclaimFuncs = buildResourceToNodeReclaimFuncs(m.imageGC, m.containerGC, hasImageFs)
 	}
 
 	activePods := podFunc()

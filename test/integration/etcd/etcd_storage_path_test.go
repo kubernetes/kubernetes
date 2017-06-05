@@ -604,7 +604,11 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 
 			kubeAPIServerOptions.SecureServing.BindPort = kubePort
 
-			kubeAPIServerConfig, sharedInformers, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions)
+			tunneler, proxyTransport, err := app.CreateDialer(kubeAPIServerOptions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			kubeAPIServerConfig, sharedInformers, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions, tunneler, proxyTransport)
 			if err != nil {
 				t.Fatal(err)
 			}

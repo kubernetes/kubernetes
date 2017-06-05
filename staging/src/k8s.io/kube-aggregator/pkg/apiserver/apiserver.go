@@ -111,6 +111,7 @@ type APIAggregator struct {
 	// this to confirm the proxy's identity
 	proxyClientCert []byte
 	proxyClientKey  []byte
+	proxyTransport  *http.Transport
 
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
 	proxyHandlers map[string]*proxyHandler
@@ -159,7 +160,7 @@ func (r *aggregatorClusterRouting) ResolveEndpoint(namespace, name string) (*url
 }
 
 // New returns a new instance of APIAggregator from the given config.
-func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
+func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget, proxyTransport *http.Transport) (*APIAggregator, error) {
 	genericServer, err := c.Config.GenericConfig.SkipComplete().New("kube-aggregator", delegationTarget) // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
@@ -193,6 +194,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		contextMapper:    c.GenericConfig.RequestContextMapper,
 		proxyClientCert:  c.ProxyClientCert,
 		proxyClientKey:   c.ProxyClientKey,
+		proxyTransport:   proxyTransport,
 		proxyHandlers:    map[string]*proxyHandler{},
 		handledGroups:    sets.String{},
 		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
@@ -267,6 +269,7 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
 		localDelegate:   s.delegateHandler,
 		proxyClientCert: s.proxyClientCert,
 		proxyClientKey:  s.proxyClientKey,
+		proxyTransport:  s.proxyTransport,
 		routing:         s.routing,
 	}
 	proxyHandler.updateAPIService(apiService)
