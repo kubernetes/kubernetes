@@ -126,6 +126,13 @@ func (t *prefixTransformers) TransformFromStorage(data []byte, context Context) 
 	for i, transformer := range t.transformers {
 		if bytes.HasPrefix(data, transformer.Prefix) {
 			result, stale, err := transformer.Transformer.TransformFromStorage(data[len(transformer.Prefix):], context)
+			// To migrate away from encryption, user can specify an identity transformer higher up
+			// (in the config file) than the encryption transformer. In that scenario, the identity transformer needs to
+			// identify (during reads from disk) whether the data being read is encrypted or not. If the data is encrypted,
+			// it shall throw an error, but that error should not prevent subsequent transformers from being tried.
+			if len(transformer.Prefix) == 0 && err != nil {
+				continue
+			}
 			return result, stale || i != 0, err
 		}
 	}
