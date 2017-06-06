@@ -33,10 +33,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-const VolumeStatusPending = "pending"
-const VolumeStatusDone = "done"
+const (
+	VolumeStatusPending = "pending"
+	VolumeStatusDone    = "done"
+)
 
-var VolumeIsNotAttached = true
+var attachStatus = "Attach"
+var detachStatus = "Detach"
 
 func TestGetDeviceName_Volume(t *testing.T) {
 	plugin := newPlugin()
@@ -98,7 +101,7 @@ type testcase struct {
 	disksAreAttached disksAreAttachedCall
 	diskPath         diskPathCall
 	t                *testing.T
-	notAttached      *bool
+	attachOrDetach   *string
 
 	instanceID string
 	// Actual test to run
@@ -156,28 +159,12 @@ func TestAttachDetach(t *testing.T) {
 		{
 			name:             "Attach_is_attaching",
 			instanceID:       instanceID,
-			operationPending: operationPendingCall{volumeID, true, pending, nil},
-			diskIsAttached:   diskIsAttachedCall{instanceID, volumeID, false, diskCheckError},
+			operationPending: operationPendingCall{volumeID, true, pending, operationFinishTimeout},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
 				return attacher.Attach(spec, nodeName)
 			},
-			expectedResult: "",
-		},
-
-		// DiskIsAttached fails and Attach succeeds
-		{
-			name:             "Attach_Positive_CheckFails",
-			instanceID:       instanceID,
-			operationPending: operationPendingCall{volumeID, false, done, nil},
-			diskIsAttached:   diskIsAttachedCall{instanceID, volumeID, false, diskCheckError},
-			attach:           attachCall{instanceID, volumeID, "", nil},
-			diskPath:         diskPathCall{instanceID, volumeID, "/dev/sda", nil},
-			test: func(testcase *testcase) (string, error) {
-				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
-			},
-			expectedResult: "/dev/sda",
+			expectedError: operationFinishTimeout,
 		},
 
 		// Attach call fails
@@ -199,7 +186,7 @@ func TestAttachDetach(t *testing.T) {
 			name:             "Attach_Negative_DiskPatchFails",
 			instanceID:       instanceID,
 			operationPending: operationPendingCall{volumeID, false, done, nil},
-			diskIsAttached:   diskIsAttachedCall{instanceID, volumeID, false, diskCheckError},
+			diskIsAttached:   diskIsAttachedCall{instanceID, volumeID, false, nil},
 			attach:           attachCall{instanceID, volumeID, "", nil},
 			diskPath:         diskPathCall{instanceID, volumeID, "", diskPathError},
 			test: func(testcase *testcase) (string, error) {
@@ -316,9 +303,8 @@ func TestAttachDetach(t *testing.T) {
 
 	for _, testcase := range tests {
 		testcase.t = t
-		// set VolumeIsNotAttached to test detach case, attach case ignore it
-		VolumeIsNotAttached = false
-		testcase.notAttached = &VolumeIsNotAttached
+		attachOrDetach := ""
+		testcase.attachOrDetach = &attachOrDetach
 		result, err := testcase.test(&testcase)
 		if err != testcase.expectedError {
 			t.Errorf("%s failed: expected err=%q, got %q", testcase.name, testcase.expectedError, err)
@@ -480,8 +466,7 @@ func (testcase *testcase) AttachDisk(instanceID, volumeID string) (string, error
 
 	glog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", volumeID, instanceID, expected.retDeviceName, expected.ret)
 
-	VolumeIsNotAttached = false
-	testcase.notAttached = &VolumeIsNotAttached
+	testcase.attachOrDetach = &attachStatus
 	return expected.retDeviceName, expected.ret
 }
 
@@ -507,8 +492,7 @@ func (testcase *testcase) DetachDisk(instanceID, volumeID string) error {
 
 	glog.V(4).Infof("DetachDisk call: %s, %s, returning %v", volumeID, instanceID, expected.ret)
 
-	VolumeIsNotAttached = true
-	testcase.notAttached = &VolumeIsNotAttached
+	testcase.attachOrDetach = &detachStatus
 	return expected.ret
 }
 
@@ -528,8 +512,13 @@ func (testcase *testcase) OperationPending(diskName string) (bool, string, error
 func (testcase *testcase) DiskIsAttached(instanceID, volumeID string) (bool, error) {
 	expected := &testcase.diskIsAttached
 	// If testcase call DetachDisk*, return false
-	if *testcase.notAttached == true {
+	if *testcase.attachOrDetach == detachStatus {
 		return false, nil
+	}
+
+	// If testcase call AttachDisk*, return true
+	if *testcase.attachOrDetach == attachStatus {
+		return true, nil
 	}
 
 	if expected.volumeID == "" && expected.instanceID == "" {
