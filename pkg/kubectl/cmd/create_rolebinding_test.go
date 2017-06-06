@@ -107,13 +107,18 @@ func TestCreateRoleBinding(t *testing.T) {
 		},
 	}
 
+	expectedOutput := "rolebinding/" + expectBinding.Name + "\n"
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateRoleBinding(f, buf)
 	cmd.Flags().Set("role", "fake-role")
 	cmd.Flags().Set("user", "fake-user")
 	cmd.Flags().Set("group", "fake-group")
+	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("serviceaccount", "fake-namespace:fake-account")
 	cmd.Run(cmd, []string{"fake-binding"})
+	if buf.String() != expectedOutput {
+		t.Errorf("TestCreateRoleBinding: expected %v\n but got %v\n", expectedOutput, buf.String())
+	}
 }
 
 type RoleBindingRESTClient struct {
