@@ -92,6 +92,7 @@ func (az *Cloud) getPublicIPName(clusterName string, service *v1.Service) (strin
 		return fmt.Sprintf("%s-%s", clusterName, cloudprovider.GetLoadBalancerName(service)), nil
 	}
 
+	az.operationPollRateLimiter.Accept()
 	list, err := az.PublicIPAddressesClient.List(az.ResourceGroup)
 	if err != nil {
 		return "", err
@@ -135,6 +136,7 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	serviceName := getServiceName(service)
 	glog.V(5).Infof("ensure(%s): START clusterName=%q lbName=%q", serviceName, clusterName, lbName)
 
+	az.operationPollRateLimiter.Accept()
 	sg, err := az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
 	if err != nil {
 		return nil, err
@@ -445,6 +447,7 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.Pub
 		return nil, err
 	}
 
+	az.operationPollRateLimiter.Accept()
 	pip, err = az.PublicIPAddressesClient.Get(az.ResourceGroup, *pip.Name, "")
 	if err != nil {
 		return nil, err
@@ -875,6 +878,7 @@ func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, b
 		}
 	}
 
+	az.operationPollRateLimiter.Accept()
 	nic, err := az.InterfacesClient.Get(az.ResourceGroup, nicName, "")
 	if err != nil {
 		return err

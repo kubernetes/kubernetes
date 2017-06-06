@@ -259,6 +259,7 @@ func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, error) {
 		return "", err
 	}
 
+	az.operationPollRateLimiter.Accept()
 	nic, err := az.InterfacesClient.Get(az.ResourceGroup, nicName, "")
 	if err != nil {
 		glog.Errorf("error: az.getIPForMachine(%s), az.InterfacesClient.Get(%s, %s, %s), err=%v", nodeName, az.ResourceGroup, nicName, "", err)
