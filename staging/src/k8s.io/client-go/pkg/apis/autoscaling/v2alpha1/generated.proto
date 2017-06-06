@@ -34,7 +34,7 @@ option go_package = "v2alpha1";
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
-  // Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+  // Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
   optional string kind = 1;
 
   // Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
@@ -50,12 +50,12 @@ message CrossVersionObjectReference {
 // implementing the scale subresource based on the metrics specified.
 message HorizontalPodAutoscaler {
   // metadata is the standard object metadata.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the specification for the behaviour of the autoscaler.
-  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
   // +optional
   optional HorizontalPodAutoscalerSpec spec = 2;
 

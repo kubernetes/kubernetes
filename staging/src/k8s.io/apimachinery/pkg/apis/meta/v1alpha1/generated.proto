@@ -33,7 +33,7 @@ option go_package = "v1alpha1";
 // to get access to a particular ObjectMeta schema without knowing the details of the version.
 message PartialObjectMetadata {
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 }

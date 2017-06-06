@@ -45,7 +45,7 @@ const (
 
 var (
 	zeroDuration = metav1.Duration{}
-	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node-allocatable.md) doc for more information.
 	defaultNodeAllocatableEnforcement = []string{"pods"}
 )
 

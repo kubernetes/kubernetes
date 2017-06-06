@@ -98,7 +98,7 @@ type ClusterStatus struct {
 type Cluster struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
@@ -114,7 +114,7 @@ type Cluster struct {
 type ClusterList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta
 
