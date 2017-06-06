@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
 
-	tprv1 "k8s.io/client-go/examples/third-party-resources/apis/tpr/v1"
+	tprv1 "k8s.io/client-go/examples/third-party-resources-deprecated/apis/tpr/v1"
 )
 
 func NewClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, error) {

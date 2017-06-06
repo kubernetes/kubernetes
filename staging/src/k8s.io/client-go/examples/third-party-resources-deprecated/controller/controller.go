@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
-	tprv1 "k8s.io/client-go/examples/third-party-resources/apis/tpr/v1"
+	tprv1 "k8s.io/client-go/examples/third-party-resources-deprecated/apis/tpr/v1"
 )
 
 // Watcher is an example of watching on resource create/update/delete events

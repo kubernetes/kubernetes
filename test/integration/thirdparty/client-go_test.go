@@ -28,9 +28,9 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/integration/framework"
 
-	exampletprv1 "k8s.io/client-go/examples/third-party-resources/apis/tpr/v1"
-	exampleclient "k8s.io/client-go/examples/third-party-resources/client"
-	examplecontroller "k8s.io/client-go/examples/third-party-resources/controller"
+	exampletprv1 "k8s.io/client-go/examples/third-party-resources-deprecated/apis/tpr/v1"
+	exampleclient "k8s.io/client-go/examples/third-party-resources-deprecated/client"
+	examplecontroller "k8s.io/client-go/examples/third-party-resources-deprecated/controller"
 )
 
 func TestClientGoThirdPartyResourceExample(t *testing.T) {
