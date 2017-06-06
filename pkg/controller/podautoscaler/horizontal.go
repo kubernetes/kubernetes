@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -371,6 +372,12 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		return fmt.Errorf("failed to convert the given HPA to %s: %v", autoscalingv2.SchemeGroupVersion.String(), err)
 	}
 	hpa := hpaRaw.(*autoscalingv2.HorizontalPodAutoscaler)
+	hpaStatusOriginalRaw, err := api.Scheme.DeepCopy(&hpa.Status)
+	if err != nil {
+		a.eventRecorder.Event(hpav1Shared, v1.EventTypeWarning, "FailedConvertHPA", err.Error())
+		return fmt.Errorf("failed to deep-copy the HPA status: %v", err)
+	}
+	hpaStatusOriginal := hpaStatusOriginalRaw.(*autoscalingv2.HorizontalPodAutoscalerStatus)
 
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleTargetRef.Kind, hpa.Namespace, hpa.Spec.ScaleTargetRef.Name)
 
@@ -378,7 +385,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
-		a.update(hpa)
+		a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
 	}
 	setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "SucceededGetScale", "the HPA controller was able to get the target's current scale")
@@ -412,7 +419,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	} else {
 		metricDesiredReplicas, metricName, metricStatuses, metricTimestamp, err = a.computeReplicasForMetrics(hpa, scale, hpa.Spec.Metrics)
 		if err != nil {
-			a.updateCurrentReplicasInStatus(hpa, currentReplicas)
+			a.setCurrentReplicasInStatus(hpa, currentReplicas)
+			if err := a.updateStatusIfNeeded(hpaStatusOriginal, hpa); err != nil {
+				utilruntime.HandleError(err)
+			}
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedComputeMetricsReplicas", err.Error())
 			return fmt.Errorf("failed to compute desired number of replicas based on listed metrics for %s: %v", reference, err)
 		}
@@ -489,7 +499,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		if err != nil {
 			a.eventRecorder.Eventf(hpa, v1.EventTypeWarning, "FailedRescale", "New size: %d; reason: %s; error: %v", desiredReplicas, rescaleReason, err.Error())
 			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedUpdateScale", "the HPA controller was unable to update the target scale: %v", err)
-			a.updateCurrentReplicasInStatus(hpa, currentReplicas)
+			a.setCurrentReplicasInStatus(hpa, currentReplicas)
+			if err := a.updateStatusIfNeeded(hpaStatusOriginal, hpa); err != nil {
+				utilruntime.HandleError(err)
+			}
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
 		}
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "SucceededRescale", "the HPA controller was able to update the target scale to %d", desiredReplicas)
@@ -501,7 +514,8 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		desiredReplicas = currentReplicas
 	}
 
-	return a.updateStatusWithReplicas(hpa, currentReplicas, desiredReplicas, metricStatuses, rescale)
+	a.setStatus(hpa, currentReplicas, desiredReplicas, metricStatuses, rescale)
+	return a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
 }
 
 func (a *HorizontalController) shouldScale(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, timestamp time.Time) bool {
@@ -528,14 +542,14 @@ func (a *HorizontalController) shouldScale(hpa *autoscalingv2.HorizontalPodAutos
 	return false
 }
 
-func (a *HorizontalController) updateCurrentReplicasInStatus(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas int32) {
-	err := a.updateStatusWithReplicas(hpa, currentReplicas, hpa.Status.DesiredReplicas, hpa.Status.CurrentMetrics, false)
-	if err != nil {
-		utilruntime.HandleError(err)
-	}
+// setCurrentReplicasInStatus sets the current replica count in the status of the HPA.
+func (a *HorizontalController) setCurrentReplicasInStatus(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas int32) {
+	a.setStatus(hpa, currentReplicas, hpa.Status.DesiredReplicas, hpa.Status.CurrentMetrics, false)
 }
 
-func (a *HorizontalController) updateStatusWithReplicas(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, metricStatuses []autoscalingv2.MetricStatus, rescale bool) error {
+// setStatus recreates the status of the given HPA, updating the current and
+// desired replicas, as well as the metric statuses
+func (a *HorizontalController) setStatus(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, metricStatuses []autoscalingv2.MetricStatus, rescale bool) {
 	hpa.Status = autoscalingv2.HorizontalPodAutoscalerStatus{
 		CurrentReplicas: currentReplicas,
 		DesiredReplicas: desiredReplicas,
@@ -548,11 +562,19 @@ func (a *HorizontalController) updateStatusWithReplicas(hpa *autoscalingv2.Horiz
 		now := metav1.NewTime(time.Now())
 		hpa.Status.LastScaleTime = &now
 	}
-
-	return a.update(hpa)
 }
 
-func (a *HorizontalController) update(hpa *autoscalingv2.HorizontalPodAutoscaler) error {
+// updateStatusIfNeeded calls updateStatus only if the status of the new HPA is not the same as the old status
+func (a *HorizontalController) updateStatusIfNeeded(oldStatus *autoscalingv2.HorizontalPodAutoscalerStatus, newHPA *autoscalingv2.HorizontalPodAutoscaler) error {
+	// skip a write if we wouldn't need to update
+	if apiequality.Semantic.DeepEqual(oldStatus, &newHPA.Status) {
+		return nil
+	}
+	return a.updateStatus(newHPA)
+}
+
+// updateStatus actually does the update request for the status of the given HPA
+func (a *HorizontalController) updateStatus(hpa *autoscalingv2.HorizontalPodAutoscaler) error {
 	// convert back to autoscalingv1
 	hpaRaw, err := UnsafeConvertToVersionVia(hpa, autoscalingv1.SchemeGroupVersion)
 	if err != nil {
