@@ -123,6 +123,11 @@ func doMount(mounterPath string, mountCmd string, source string, target string, 
 		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n",
 			err, mountCmd, source, target, fstype, options, string(output))
 	}
+	// TODO: This is a temporary work around for Issue #7972. Once the underlying issue has been resolved, this can be removed.
+	_, udeverr := exec.Command("udevadm", "trigger").CombinedOutput()
+	if udeverr != nil {
+		glog.Errorf("udevadm trigger failed while mounting %q to %q with: %v\n", source, target, udeverr)
+	}
 	return err
 }
 
@@ -153,6 +158,13 @@ func (mounter *Mounter) Unmount(target string) error {
 	if err != nil {
 		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
 	}
+	// TODO: This is a temporary work around for Issue #7972. Once the underlying issue has been resolved, this can be removed.
+	_, udeverr := exec.Command("udevadm", "trigger").CombinedOutput()
+	if udeverr != nil {
+		glog.Errorf("udevadm trigger failed while unmounting %q with: %v\n", target, udeverr)
+	}
+	return err
+
 	return nil
 }
 
