@@ -10,9 +10,13 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "etcd.go",
         "master_utils.go",
         "perf_utils.go",
         "serializer.go",
+    ],
+    data = [
+        "@com_coreos_etcd//:etcd",
     ],
     tags = ["automanaged"],
     deps = [

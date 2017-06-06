@@ -588,7 +588,7 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 			kubeAPIServerOptions := options.NewServerRunOptions()
 			kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
 			kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
-			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURLFromEnv()}
+			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
 			kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // TODO use protobuf?
 			kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
 			kubeAPIServerOptions.Authorization.Mode = "RBAC"
