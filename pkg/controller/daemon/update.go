@@ -22,6 +22,7 @@ import (
 	"sort"
 
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -37,8 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
-
-var patchCodec = api.Codecs.LegacyCodec(extensions.SchemeGroupVersion)
 
 // rollingUpdate deletes old daemon set pods making sure that no more than
 // ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable pods are unavailable
@@ -305,25 +304,24 @@ func Match(ds *extensions.DaemonSet, history *apps.ControllerRevision) (bool, er
 	return bytes.Equal(patch, history.Data.Raw), nil
 }
 
-func DecodeHistory(history *apps.ControllerRevision) (*v1.PodTemplateSpec, error) {
-	template := v1.PodTemplate{}
-	err := json.Unmarshal(history.Data.Raw, &template)
-	return &template.Template, err
-}
-
 // getPatch returns a strategic merge patch that can be applied to restore a Daemonset to a
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
 func getPatch(ds *extensions.DaemonSet) ([]byte, error) {
-	str, err := runtime.Encode(patchCodec, ds)
+	dsBytes, err := json.Marshal(ds)
 	if err != nil {
 		return nil, err
 	}
 	var raw map[string]interface{}
-	json.Unmarshal([]byte(str), &raw)
+	err = json.Unmarshal(dsBytes, &raw)
+	if err != nil {
+		return nil, err
+	}
 	objCopy := make(map[string]interface{})
 	specCopy := make(map[string]interface{})
+
+	// Create a patch of the DaemonSet that replaces spec.template
 	spec := raw["spec"].(map[string]interface{})
 	template := spec["template"].(map[string]interface{})
 	specCopy["template"] = template

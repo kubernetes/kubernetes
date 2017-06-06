@@ -268,7 +268,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		// Check history and labels
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		first := curHistory(listDaemonHistories(c, ns, label), &ds.Spec.Template)
+		first := curHistory(listDaemonHistories(c, ns, label), ds)
 		firstHash := ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(first.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).To(Equal(firstHash))
 		Expect(first.Revision).To(Equal(int64(1)))
@@ -295,7 +295,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		// Check history and labels
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		cur := curHistory(listDaemonHistories(c, ns, label), &ds.Spec.Template)
+		cur := curHistory(listDaemonHistories(c, ns, label), ds)
 		curHash := ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).To(Equal(curHash))
 		Expect(cur.Revision).To(Equal(int64(2)))
@@ -325,7 +325,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		// Check history and labels
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		cur := curHistory(listDaemonHistories(c, ns, label), &ds.Spec.Template)
+		cur := curHistory(listDaemonHistories(c, ns, label), ds)
 		hash := ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).To(Equal(hash))
 		Expect(cur.Revision).To(Equal(int64(1)))
@@ -353,7 +353,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		// Check history and labels
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		cur = curHistory(listDaemonHistories(c, ns, label), &ds.Spec.Template)
+		cur = curHistory(listDaemonHistories(c, ns, label), ds)
 		hash = ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).To(Equal(hash))
 		Expect(cur.Revision).To(Equal(int64(2)))
@@ -760,14 +760,14 @@ func listDaemonHistories(c clientset.Interface, ns string, label map[string]stri
 	return historyList
 }
 
-func curHistory(historyList *apps.ControllerRevisionList, template *v1.PodTemplateSpec) *apps.ControllerRevision {
+func curHistory(historyList *apps.ControllerRevisionList, ds *extensions.DaemonSet) *apps.ControllerRevision {
 	var curHistory *apps.ControllerRevision
 	foundCurHistories := 0
 	for i := range historyList.Items {
 		history := &historyList.Items[i]
 		// Every history should have the hash label
 		Expect(len(history.Labels[extensions.DefaultDaemonSetUniqueLabelKey])).To(BeNumerically(">", 0))
-		match, err := daemon.Match(template, history)
+		match, err := daemon.Match(ds, history)
 		Expect(err).NotTo(HaveOccurred())
 		if match {
 			curHistory = history
