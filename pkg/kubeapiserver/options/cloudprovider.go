@@ -54,8 +54,7 @@ func (s *CloudProviderOptions) DefaultExternalHost(genericoptions *genericoption
 		return nil
 	}
 
-	// TODO: extend for other providers
-	if s.CloudProvider == "gce" || s.CloudProvider == "aws" {
+	if cloudprovider.IsCloudProvider(s.CloudProvider) {
 		cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 		if err != nil {
 			return fmt.Errorf("%q cloud provider could not be initialized: %v", s.CloudProvider, err)
