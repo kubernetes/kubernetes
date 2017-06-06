@@ -195,6 +195,7 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID)
 	data, err := s.collectData()
 	if err != nil {
 		glog.Errorf("Error preparing data for projected volume %v for pod %v/%v: %s", s.volName, s.pod.Namespace, s.pod.Name, err.Error())
+		return err
 	}
 
 	writerContext := fmt.Sprintf("pod %v/%v volume %v", s.pod.Namespace, s.pod.Name, s.volName)
