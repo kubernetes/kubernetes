@@ -481,7 +481,7 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 	testPod := validPodInit(validPod("foo", 1, getResourceRequirements(api.ResourceList{}, api.ResourceList{})), getResourceRequirements(api.ResourceList{}, api.ResourceList{}))
 	err := PodLimitFunc(&limitRange, &testPod)
 	if err != nil {
-		t.Errorf("Unexpected error for valid pod: %v, %v", testPod.Name, err)
+		t.Errorf("Unexpected error for valid pod: %s, %v", testPod.Name, err)
 	}
 
 	for i := range testPod.Spec.Containers {
