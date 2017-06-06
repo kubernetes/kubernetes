@@ -30,7 +30,7 @@ kube::golang::server_targets() {
     cmd/kubeadm
     cmd/hyperkube
     vendor/k8s.io/kube-aggregator
-    vendor/k8s.io/kube-apiextensions-server
+    vendor/k8s.io/apiextensions-apiserver
     plugin/cmd/kube-scheduler
   )
   echo "${targets[@]}"

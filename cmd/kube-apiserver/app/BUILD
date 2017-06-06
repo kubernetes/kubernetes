@@ -74,6 +74,10 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/cmd/server:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/openapi:go_default_library",
@@ -98,10 +102,6 @@ go_library(
         "//vendor/k8s.io/kube-aggregator/pkg/apiserver:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/controllers/autoregister:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1beta1:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/apiserver:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion:go_default_library",
-        "//vendor/k8s.io/kube-apiextensions-server/pkg/cmd/server:go_default_library",
     ],
 )
 

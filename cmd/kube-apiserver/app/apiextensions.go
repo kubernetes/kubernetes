@@ -20,11 +20,11 @@ limitations under the License.
 package app
 
 import (
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	apiextensionscmd "k8s.io/apiextensions-apiserver/pkg/cmd/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions/v1beta1"
-	apiextensionsapiserver "k8s.io/kube-apiextensions-server/pkg/apiserver"
-	apiextensionscmd "k8s.io/kube-apiextensions-server/pkg/cmd/server"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
