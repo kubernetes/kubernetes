@@ -19,6 +19,7 @@ package apiserver
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"path"
 	"sync"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -267,11 +269,16 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 		return ret
 	}
 
+	kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.Kind}
 	storage := customresource.NewREST(
 		schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural},
 		schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.ListKind},
 		UnstructuredCopier{},
-		customresource.NewStrategy(discovery.NewUnstructuredObjectTyper(nil), crd.Spec.Scope == apiextensions.NamespaceScoped),
+		customresource.NewStrategy(
+			discovery.NewUnstructuredObjectTyper(nil),
+			crd.Spec.Scope == apiextensions.NamespaceScoped,
+			kind,
+		),
 		r.restOptionsGetter,
 	)
 
@@ -319,7 +326,7 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 		UnsafeConvertor: unstructured.UnstructuredObjectConverter{},
 
 		Resource:    schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural},
-		Kind:        schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.Kind},
+		Kind:        kind,
 		Subresource: "",
 
 		MetaGroupVersion: metav1.SchemeGroupVersion,
@@ -353,11 +360,34 @@ func (s UnstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 }
 
 func (s UnstructuredNegotiatedSerializer) EncoderForVersion(serializer runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
-	return unstructured.UnstructuredJSONScheme
+	return versioning.NewDefaultingCodecForScheme(Scheme, crEncoderInstance, nil, gv, nil)
 }
 
 func (s UnstructuredNegotiatedSerializer) DecoderToVersion(serializer runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
 	return unstructured.UnstructuredJSONScheme
+}
+
+var crEncoderInstance = crEncoder{}
+
+// crEncoder *usually* encodes using the unstructured.UnstructuredJSONScheme, but if the type is Status or WatchEvent
+// it will serialize them out using the converting codec.
+type crEncoder struct{}
+
+func (crEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	switch t := obj.(type) {
+	case *metav1.Status, *metav1.WatchEvent:
+		for _, info := range Codecs.SupportedMediaTypes() {
+			// we are always json
+			if info.MediaType == "application/json" {
+				return info.Serializer.Encode(obj, w)
+			}
+		}
+
+		return fmt.Errorf("unable to find json serializer for %T", t)
+
+	default:
+		return unstructured.UnstructuredJSONScheme.Encode(obj, w)
+	}
 }
 
 type UnstructuredCreator struct{}

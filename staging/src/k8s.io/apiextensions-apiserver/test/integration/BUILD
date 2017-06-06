@@ -13,6 +13,7 @@ go_test(
         "basic_test.go",
         "finalization_test.go",
         "registration_test.go",
+        "validation_test.go",
     ],
     tags = [
         "automanaged",

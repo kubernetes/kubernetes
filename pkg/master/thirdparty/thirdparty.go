@@ -261,7 +261,7 @@ func (m *ThirdPartyResourceServer) migrateThirdPartyResourceData(gvk schema.Grou
 		schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural},
 		schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.ListKind},
 		apiextensionsserver.UnstructuredCopier{},
-		customresource.NewStrategy(discoveryclient.NewUnstructuredObjectTyper(nil), true),
+		customresource.NewStrategy(discoveryclient.NewUnstructuredObjectTyper(nil), true, gvk),
 		m.crdRESTOptionsGetter,
 	)
 
