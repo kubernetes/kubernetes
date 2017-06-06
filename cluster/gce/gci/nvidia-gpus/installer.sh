@@ -18,13 +18,15 @@
 
 set -o errexit
 set -o pipefail
+set -u
 set -x
 
 # The script must be run as a root.
-# Prerequisites:
+# Input:
 #
-# LAKITU_KERNEL_SHA1 - The env variable is expected to be set to HEAD of the kernel version used on the host.
+# Environment Variables
 # BASE_DIR - Directory that is mapped to a stateful partition on host. Defaults to `/rootfs/nvidia`.
+# LAKITU_KERNEL_SHA1 (Optional) - If set, it should point to the HEAD of the kernel version used on the host. Otherwise, the script will attempt to auto-detect kernel commit ID from `/etc/os-release`
 #
 # The script will output the following artifacts:
 # ${BASE_DIR}/lib* --> Nvidia CUDA libraries
@@ -43,6 +45,7 @@ LIB_OUTPUT_DIR="${BASE_DIR}/lib"
 BIN_OUTPUT_DIR="${BASE_DIR}/bin"
 
 KERNEL_SRC_DIR="/lakitu-kernel"
+
 NVIDIA_DRIVER_DIR="/nvidia"
 NVIDIA_DRIVER_VERSION="375.26"
 
@@ -62,15 +65,12 @@ check_nvidia_device() {
 }
 
 prepare_kernel_source() {
-    local kernel_git_repo="https://chromium.googlesource.com/chromiumos/third_party/kernel"
-    local kernel_version="$(uname -r)"
-    local kernel_version_stripped="$(echo ${kernel_version} | sed 's/\+//')"
-
     # Checkout the correct tag.
-    echo "Downloading kernel source at tag ${kernel_version_stripped} ..."
     pushd "${KERNEL_SRC_DIR}"
-    # TODO: Consume KERNEL SHA1 from COS image directly.
-    # git checkout "tags/v${kernel_version_stripped}"
+    until git pull origin
+    do
+        echo "Pulling Origin failed for Lakitu kernel source git repo. Retrying after 5 seconds" && sleep 5
+    done
     git checkout ${LAKITU_KERNEL_SHA1}
 
     # Prepare kernel configu and source for modules.
@@ -146,6 +146,19 @@ verify_base_image() {
     fi
 }
 
+cache_kernel_commit() {
+    # Attempt to cache Kernel Commit ID from /etc/os-release if it's not already set.
+    if [[ -z ${LAKITU_KERNEL_SHA1+x} ]]; then
+        local kernel_sha=$(grep "^KERNEL_COMMIT_ID=" /etc/os-release)
+        if [[ $? != 0 ]]; then
+            echo "Failed to identify kernel commit ID for underlying COS base image from /etc/os-release"
+            cat /etc/os-release
+            exit 1
+        fi
+        LAKITU_KERNEL_SHA1=$(echo ${kernel_sha} | cut -d= -f2)
+    fi
+}
+
 setup_overlay_mounts() {
     mkdir -p ${USR_WRITABLE_DIR} ${USR_WORK_DIR} ${LIB_WRITABLE_DIR} ${LIB_WORK_DIR}
     mount -t overlay -o lowerdir=/usr,upperdir=${USR_WRITABLE_DIR},workdir=${USR_WORK_DIR} none /usr
@@ -162,7 +175,9 @@ exit_if_install_not_needed() {
 
 restart_kubelet() {
     echo "Sending SIGTERM to kubelet"
-    pkill -SIGTERM kubelet || true
+    if pidof kubelet &> /dev/null; then
+        pkill -SIGTERM kubelet
+    fi
 }
 
 # Copy user space libraries and debug utilities to a special output directory on the host.
@@ -188,6 +203,8 @@ main() {
     verify_base_image
     # Do not run the installer unless a Nvidia device is found on the PCI bus
     check_nvidia_device
+    # Identify kernel commit id for the base image. Exits if commit id cannot be identified.
+    cache_kernel_commit
     # Setup overlay mounts to capture nvidia driver artificats in a more permanent storage on the host.
     setup_overlay_mounts
     # Disable a critical security feature in COS that will allow for dynamically loading Nvidia drivers
