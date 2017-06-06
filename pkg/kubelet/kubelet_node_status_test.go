@@ -43,6 +43,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -891,9 +892,9 @@ func TestRegisterWithApiServer(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testKubeletHostname,
 				Labels: map[string]string{
-					metav1.LabelHostname: testKubeletHostname,
-					metav1.LabelOS:       goruntime.GOOS,
-					metav1.LabelArch:     goruntime.GOARCH,
+					kubeletapis.LabelHostname: testKubeletHostname,
+					kubeletapis.LabelOS:       goruntime.GOOS,
+					kubeletapis.LabelArch:     goruntime.GOARCH,
 				},
 			},
 			Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
@@ -953,9 +954,9 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		node := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					metav1.LabelHostname: testKubeletHostname,
-					metav1.LabelOS:       goruntime.GOOS,
-					metav1.LabelArch:     goruntime.GOARCH,
+					kubeletapis.LabelHostname: testKubeletHostname,
+					kubeletapis.LabelOS:       goruntime.GOOS,
+					kubeletapis.LabelArch:     goruntime.GOARCH,
 				},
 			},
 			Spec: v1.NodeSpec{
@@ -1204,12 +1205,12 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			initialNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						metav1.LabelHostname:          "new-hostname",
-						metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
-						metav1.LabelZoneRegion:        "new-zone-region",
-						metav1.LabelInstanceType:      "new-instance-type",
-						metav1.LabelOS:                "new-os",
-						metav1.LabelArch:              "new-arch",
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
 					},
 				},
 			},
@@ -1220,12 +1221,12 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			},
 			needsUpdate: true,
 			finalLabels: map[string]string{
-				metav1.LabelHostname:          "new-hostname",
-				metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
-				metav1.LabelZoneRegion:        "new-zone-region",
-				metav1.LabelInstanceType:      "new-instance-type",
-				metav1.LabelOS:                "new-os",
-				metav1.LabelArch:              "new-arch",
+				kubeletapis.LabelHostname:          "new-hostname",
+				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+				kubeletapis.LabelZoneRegion:        "new-zone-region",
+				kubeletapis.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:                "new-os",
+				kubeletapis.LabelArch:              "new-arch",
 			},
 		},
 		{
@@ -1233,35 +1234,35 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			initialNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						metav1.LabelHostname:          "new-hostname",
-						metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
-						metav1.LabelZoneRegion:        "new-zone-region",
-						metav1.LabelInstanceType:      "new-instance-type",
-						metav1.LabelOS:                "new-os",
-						metav1.LabelArch:              "new-arch",
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
 					},
 				},
 			},
 			existingNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						metav1.LabelHostname:          "old-hostname",
-						metav1.LabelZoneFailureDomain: "old-zone-failure-domain",
-						metav1.LabelZoneRegion:        "old-zone-region",
-						metav1.LabelInstanceType:      "old-instance-type",
-						metav1.LabelOS:                "old-os",
-						metav1.LabelArch:              "old-arch",
+						kubeletapis.LabelHostname:          "old-hostname",
+						kubeletapis.LabelZoneFailureDomain: "old-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "old-zone-region",
+						kubeletapis.LabelInstanceType:      "old-instance-type",
+						kubeletapis.LabelOS:                "old-os",
+						kubeletapis.LabelArch:              "old-arch",
 					},
 				},
 			},
 			needsUpdate: true,
 			finalLabels: map[string]string{
-				metav1.LabelHostname:          "new-hostname",
-				metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
-				metav1.LabelZoneRegion:        "new-zone-region",
-				metav1.LabelInstanceType:      "new-instance-type",
-				metav1.LabelOS:                "new-os",
-				metav1.LabelArch:              "new-arch",
+				kubeletapis.LabelHostname:          "new-hostname",
+				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+				kubeletapis.LabelZoneRegion:        "new-zone-region",
+				kubeletapis.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:                "new-os",
+				kubeletapis.LabelArch:              "new-arch",
 			},
 		},
 		{
@@ -1269,37 +1270,37 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			initialNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						metav1.LabelHostname:          "new-hostname",
-						metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
-						metav1.LabelZoneRegion:        "new-zone-region",
-						metav1.LabelInstanceType:      "new-instance-type",
-						metav1.LabelOS:                "new-os",
-						metav1.LabelArch:              "new-arch",
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
 					},
 				},
 			},
 			existingNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						metav1.LabelHostname:          "new-hostname",
-						metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
-						metav1.LabelZoneRegion:        "new-zone-region",
-						metav1.LabelInstanceType:      "new-instance-type",
-						metav1.LabelOS:                "new-os",
-						metav1.LabelArch:              "new-arch",
-						"please-persist":              "foo",
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
+						"please-persist":                   "foo",
 					},
 				},
 			},
 			needsUpdate: false,
 			finalLabels: map[string]string{
-				metav1.LabelHostname:          "new-hostname",
-				metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
-				metav1.LabelZoneRegion:        "new-zone-region",
-				metav1.LabelInstanceType:      "new-instance-type",
-				metav1.LabelOS:                "new-os",
-				metav1.LabelArch:              "new-arch",
-				"please-persist":              "foo",
+				kubeletapis.LabelHostname:          "new-hostname",
+				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+				kubeletapis.LabelZoneRegion:        "new-zone-region",
+				kubeletapis.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:                "new-os",
+				kubeletapis.LabelArch:              "new-arch",
+				"please-persist":                   "foo",
 			},
 		},
 		{
@@ -1307,35 +1308,35 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			initialNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						metav1.LabelHostname:          "new-hostname",
-						metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
-						metav1.LabelZoneRegion:        "new-zone-region",
-						metav1.LabelInstanceType:      "new-instance-type",
-						metav1.LabelOS:                "new-os",
-						metav1.LabelArch:              "new-arch",
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
 					},
 				},
 			},
 			existingNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						metav1.LabelHostname:          "new-hostname",
-						metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
-						metav1.LabelZoneRegion:        "new-zone-region",
-						metav1.LabelInstanceType:      "new-instance-type",
-						metav1.LabelOS:                "new-os",
-						metav1.LabelArch:              "new-arch",
+						kubeletapis.LabelHostname:          "new-hostname",
+						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+						kubeletapis.LabelZoneRegion:        "new-zone-region",
+						kubeletapis.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:                "new-os",
+						kubeletapis.LabelArch:              "new-arch",
 					},
 				},
 			},
 			needsUpdate: false,
 			finalLabels: map[string]string{
-				metav1.LabelHostname:          "new-hostname",
-				metav1.LabelZoneFailureDomain: "new-zone-failure-domain",
-				metav1.LabelZoneRegion:        "new-zone-region",
-				metav1.LabelInstanceType:      "new-instance-type",
-				metav1.LabelOS:                "new-os",
-				metav1.LabelArch:              "new-arch",
+				kubeletapis.LabelHostname:          "new-hostname",
+				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
+				kubeletapis.LabelZoneRegion:        "new-zone-region",
+				kubeletapis.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:                "new-os",
+				kubeletapis.LabelArch:              "new-arch",
 			},
 		},
 	}

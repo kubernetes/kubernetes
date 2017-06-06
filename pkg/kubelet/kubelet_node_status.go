@@ -162,12 +162,12 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 //updateDefaultLabels will set the default labels on the node
 func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool {
 	defaultLabels := []string{
-		metav1.LabelHostname,
-		metav1.LabelZoneFailureDomain,
-		metav1.LabelZoneRegion,
-		metav1.LabelInstanceType,
-		metav1.LabelOS,
-		metav1.LabelArch,
+		kubeletapis.LabelHostname,
+		kubeletapis.LabelZoneFailureDomain,
+		kubeletapis.LabelZoneRegion,
+		kubeletapis.LabelInstanceType,
+		kubeletapis.LabelOS,
+		kubeletapis.LabelArch,
 	}
 
 	if existingNode.Labels == nil {
