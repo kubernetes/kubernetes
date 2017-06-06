@@ -27,7 +27,6 @@ import (
 
 	"github.com/golang/glog"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -35,7 +34,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
@@ -243,27 +241,8 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 	namespaceKubeClient := clientset.NewForConfigOrDie(nsKubeconfig)
 	namespaceClientPool := dynamic.NewClientPool(nsKubeconfig, restMapper, dynamic.LegacyAPIPathResolverFunc)
 
-	// Find the list of namespaced resources via discovery that the namespace controller must manage
-	// TODO: consider using a list-watch + cache here rather than polling
-	resources, err := namespaceKubeClient.Discovery().ServerResources()
-	if err != nil {
-		return true, fmt.Errorf("failed to get preferred server resources: %v", err)
-	}
-	gvrs, err := discovery.GroupVersionResources(resources)
-	if err != nil {
-		return true, fmt.Errorf("failed to parse preferred server resources: %v", err)
-	}
 	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
-	if _, found := gvrs[extensions.SchemeGroupVersion.WithResource("thirdpartyresource")]; !found {
-		// make discovery static
-		snapshot, err := discoverResourcesFn()
-		if err != nil {
-			return true, fmt.Errorf("failed to get server resources: %v", err)
-		}
-		discoverResourcesFn = func() ([]*metav1.APIResourceList, error) {
-			return snapshot, nil
-		}
-	}
+
 	namespaceController := namespacecontroller.NewNamespaceController(
 		namespaceKubeClient,
 		namespaceClientPool,
@@ -275,7 +254,6 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 	go namespaceController.Run(int(ctx.Options.ConcurrentNamespaceSyncs), ctx.Stop)
 
 	return true, nil
-
 }
 
 func startServiceAccountController(ctx ControllerContext) (bool, error) {
