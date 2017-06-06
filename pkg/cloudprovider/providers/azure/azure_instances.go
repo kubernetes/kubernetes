@@ -101,6 +101,7 @@ func (az *Cloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 func (az *Cloud) listAllNodesInResourceGroup() ([]compute.VirtualMachine, error) {
 	allNodes := []compute.VirtualMachine{}
 
+	az.operationPollRateLimiter.Accept()
 	result, err := az.VirtualMachinesClient.List(az.ResourceGroup)
 	if err != nil {
 		glog.Errorf("error: az.listAllNodesInResourceGroup(), az.VirtualMachinesClient.List(%s), err=%v", az.ResourceGroup, err)
@@ -112,6 +113,7 @@ func (az *Cloud) listAllNodesInResourceGroup() ([]compute.VirtualMachine, error)
 	for morePages {
 		allNodes = append(allNodes, *result.Value...)
 
+		az.operationPollRateLimiter.Accept()
 		result, err = az.VirtualMachinesClient.ListAllNextResults(result)
 		if err != nil {
 			glog.Errorf("error: az.listAllNodesInResourceGroup(), az.VirtualMachinesClient.ListAllNextResults(%s), err=%v", result, err)
