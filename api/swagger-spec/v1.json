@@ -18891,6 +18891,10 @@
       "$ref": "v1.LocalVolumeSource",
       "description": "Local represents directly-attached storage with node affinity"
      },
+     "rook": {
+      "$ref": "v1.RookVolumeSource",
+      "description": "Rook represents a Rook volume that is attached and mounted on Kubernetes nodes."
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -19482,6 +19486,39 @@
      }
     }
    },
+   "v1.RookVolumeSource": {
+    "id": "v1.RookVolumeSource",
+    "description": "RookVolumeSource represents a Rook volume that is persistend and attached to Kubernetes nodes.",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "volumeID": {
+      "type": "string",
+      "description": "VolumeID uniquely identifies a Rook volume."
+     },
+     "volumeGroup": {
+      "type": "string",
+      "description": "The group containing this volume."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#rbd"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false."
+     },
+     "cluster": {
+      "type": "string",
+      "description": "Cluster is the name of the rook cluster. Default is rook."
+     },
+     "options": {
+      "type": "object",
+      "description": "Extra Rook metadata if any."
+     }
+    }
+   },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
@@ -19789,6 +19826,10 @@
      "scaleIO": {
       "$ref": "v1.ScaleIOVolumeSource",
       "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
+     },
+     "rook": {
+      "$ref": "v1.RookVolumeSource",
+      "description": "Rook represents a rook volume attached and mounted on Kubernetes nodes."
      }
     }
    },

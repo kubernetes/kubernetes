@@ -87,6 +87,9 @@ func SetObjectDefaults_DaemonSet(in *DaemonSet) {
 		if a.VolumeSource.ScaleIO != nil {
 			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
+		if a.VolumeSource.Rook != nil {
+			v1.SetDefaults_RookVolumeSource(a.VolumeSource.Rook)
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
@@ -227,6 +230,9 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 		}
 		if a.VolumeSource.ScaleIO != nil {
 			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
+		if a.VolumeSource.Rook != nil {
+			v1.SetDefaults_RookVolumeSource(a.VolumeSource.Rook)
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
@@ -379,6 +385,9 @@ func SetObjectDefaults_ReplicaSet(in *ReplicaSet) {
 		}
 		if a.VolumeSource.ScaleIO != nil {
 			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+		}
+		if a.VolumeSource.Rook != nil {
+			v1.SetDefaults_RookVolumeSource(a.VolumeSource.Rook)
 		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {

@@ -948,6 +948,7 @@ var (
 	Projected             FSType = "projected"
 	PortworxVolume        FSType = "portworxVolume"
 	ScaleIO               FSType = "scaleIO"
+	Rook                  FSType = "rook"
 	All                   FSType = "*"
 )
 

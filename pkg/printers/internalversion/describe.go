@@ -742,6 +742,8 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printScaleIOVolumeSource(volume.VolumeSource.ScaleIO, w)
 		case volume.VolumeSource.CephFS != nil:
 			printCephFSVolumeSource(volume.VolumeSource.CephFS, w)
+		case volume.VolumeSource.Rook != nil:
+			printRookVolumeSource(volume.VolumeSource.Rook, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -940,6 +942,17 @@ func printCephFSVolumeSource(cephfs *api.CephFSVolumeSource, w PrefixWriter) {
 		cephfs.Monitors, cephfs.Path, cephfs.User, cephfs.SecretFile, cephfs.SecretRef, cephfs.ReadOnly)
 }
 
+func printRookVolumeSource(rook *api.RookVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tRook (a persistent volume on Rook)\n"+
+		"    VolumeID:\t%v\n"+
+		"    VolumeGroup:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n"+
+		"    Cluster:\t%v\n"+
+		"    VolumeMetadata:\t%v\n",
+		rook.VolumeID, rook.VolumeGroup, rook.FSType, rook.ReadOnly, rook.Cluster, rook.VolumeMetadata)
+}
+
 type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
@@ -1013,6 +1026,8 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 			printLocalVolumeSource(pv.Spec.Local, w)
 		case pv.Spec.CephFS != nil:
 			printCephFSVolumeSource(pv.Spec.CephFS, w)
+		case pv.Spec.Rook != nil:
+			printRookVolumeSource(pv.Spec.Rook, w)
 		}
 
 		if events != nil {
