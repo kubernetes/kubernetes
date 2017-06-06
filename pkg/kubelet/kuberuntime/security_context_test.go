@@ -45,60 +45,72 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		},
 	}
 
-	err := verifyRunAsNonRoot(pod, &pod.Spec.Containers[0], int64(0))
-	assert.NoError(t, err)
-
-	runAsUser := types.UnixUserID(0)
-	RunAsNonRoot := false
-	podWithContainerSecurityContext := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "bar",
-			Namespace: "new",
+	rootUser := types.UnixUserID(0)
+	runAsNonRootTrue := true
+	runAsNonRootFalse := false
+	imageRootUser := int64(0)
+	imageNonRootUser := int64(123)
+	for _, test := range []struct {
+		desc      string
+		sc        *v1.SecurityContext
+		imageUser int64
+		fail      bool
+	}{
+		{
+			desc:      "Pass if SecurityContext is not set",
+			sc:        nil,
+			imageUser: imageRootUser,
+			fail:      false,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "foo",
-					Image:           "busybox",
-					ImagePullPolicy: v1.PullIfNotPresent,
-					Command:         []string{"testCommand"},
-					WorkingDir:      "testWorkingDir",
-					SecurityContext: &v1.SecurityContext{
-						RunAsNonRoot: &RunAsNonRoot,
-						RunAsUser:    &runAsUser,
-					},
-				},
+		{
+			desc: "Pass if RunAsNonRoot is not set",
+			sc: &v1.SecurityContext{
+				RunAsUser: &rootUser,
 			},
+			imageUser: imageRootUser,
+			fail:      false,
 		},
-	}
-
-	err2 := verifyRunAsNonRoot(podWithContainerSecurityContext, &podWithContainerSecurityContext.Spec.Containers[0], int64(0))
-	assert.EqualError(t, err2, "container's runAsUser breaks non-root policy")
-
-	RunAsNonRoot = false
-	podWithContainerSecurityContext = &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "bar",
-			Namespace: "new",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "foo",
-					Image:           "busybox",
-					ImagePullPolicy: v1.PullIfNotPresent,
-					Command:         []string{"testCommand"},
-					WorkingDir:      "testWorkingDir",
-					SecurityContext: &v1.SecurityContext{
-						RunAsNonRoot: &RunAsNonRoot,
-					},
-				},
+		{
+			desc: "Pass if RunAsNonRoot is false (image user is root)",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootFalse,
 			},
+			imageUser: imageRootUser,
+			fail:      false,
 		},
+		{
+			desc: "Pass if RunAsNonRoot is false (RunAsUser is root)",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootFalse,
+				RunAsUser:    &rootUser,
+			},
+			imageUser: imageNonRootUser,
+			fail:      false,
+		},
+		{
+			desc: "Fail if container's RunAsUser is root and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+				RunAsUser:    &rootUser,
+			},
+			imageUser: imageNonRootUser,
+			fail:      true,
+		},
+		{
+			desc: "Fail if image's user is root and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+			},
+			imageUser: imageRootUser,
+			fail:      true,
+		},
+	} {
+		pod.Spec.Containers[0].SecurityContext = test.sc
+		err := verifyRunAsNonRoot(pod, &pod.Spec.Containers[0], int64(0))
+		if test.fail {
+			assert.Error(t, err, test.desc)
+		} else {
+			assert.NoError(t, err, test.desc)
+		}
 	}
-
-	err3 := verifyRunAsNonRoot(podWithContainerSecurityContext, &podWithContainerSecurityContext.Spec.Containers[0], int64(0))
-	assert.EqualError(t, err3, "container has runAsNonRoot and image will run as root")
 }
