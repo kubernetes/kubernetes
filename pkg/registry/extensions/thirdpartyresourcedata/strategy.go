@@ -77,12 +77,12 @@ func (strategy) AllowUnconditionalUpdate() bool {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	tprd, ok := obj.(*extensions.ThirdPartyResourceData)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a ThirdPartyResourceData")
+		return nil, nil, false, fmt.Errorf("not a ThirdPartyResourceData")
 	}
-	return labels.Set(tprd.Labels), SelectableFields(tprd), nil
+	return labels.Set(tprd.Labels), SelectableFields(tprd), tprd.Initializers != nil, nil
 }
 
 // Matcher returns a generic matcher for a given label and field selector.

@@ -419,6 +419,7 @@ enable_cluster_ui: '$(echo "$ENABLE_CLUSTER_UI" | sed -e "s/'/''/g")'
 enable_node_problem_detector: '$(echo "$ENABLE_NODE_PROBLEM_DETECTOR" | sed -e "s/'/''/g")'
 enable_l7_loadbalancing: '$(echo "$ENABLE_L7_LOADBALANCING" | sed -e "s/'/''/g")'
 enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
+enable_metadata_proxy: '$(echo "$ENABLE_METADATA_PROXY" | sed -e "s/'/''/g")'
 enable_rescheduler: '$(echo "$ENABLE_RESCHEDULER" | sed -e "s/'/''/g")'
 logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
 elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
@@ -615,7 +616,7 @@ function convert-bytes-gce-kube() {
 #    connect to the apiserver.
 
 function create-salt-kubelet-auth() {
-  local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
+  local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/bootstrap-kubeconfig"
   if [ ! -e "${kubelet_kubeconfig_file}" ]; then
     mkdir -p /srv/salt-overlay/salt/kubelet
     (umask 077;
@@ -630,7 +631,7 @@ users:
 clusters:
 - name: local
   cluster:
-    server: https://kubernetes-master
+    server: https://${KUBERNETES_MASTER_NAME}
     certificate-authority: ${CA_CERT_BUNDLE_PATH}
 contexts:
 - context:

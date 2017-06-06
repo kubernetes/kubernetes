@@ -67,7 +67,7 @@ func (s *storage) GetSecret(ctx genericapirequest.Context, name string, options 
 }
 
 func (s *storage) CreateSecret(ctx genericapirequest.Context, secret *api.Secret) (*api.Secret, error) {
-	obj, err := s.Create(ctx, secret)
+	obj, err := s.Create(ctx, secret, false)
 	return obj.(*api.Secret), err
 }
 

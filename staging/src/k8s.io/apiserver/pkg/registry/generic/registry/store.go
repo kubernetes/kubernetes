@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -154,6 +155,9 @@ type Store struct {
 	// ExportStrategy implements resource-specific behavior during export,
 	// optional. Exported objects are not decorated.
 	ExportStrategy rest.RESTExportStrategy
+	// TableConvertor is an optional interface for transforming items or lists
+	// of items into tabular output. If unset, the default will be used.
+	TableConvertor rest.TableConvertor
 
 	// Storage is the interface for the underlying storage for the resource.
 	Storage storage.Interface
@@ -168,6 +172,7 @@ type Store struct {
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
 var _ rest.StandardStorage = &Store{}
 var _ rest.Exporter = &Store{}
+var _ rest.TableConvertor = &Store{}
 
 const OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
 
@@ -254,6 +259,7 @@ func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.Selection
 		// By default we should serve the request from etcd.
 		options = &metainternalversion.ListOptions{ResourceVersion: ""}
 	}
+	p.IncludeUninitialized = options.IncludeUninitialized
 	list := e.NewListFunc()
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
@@ -268,7 +274,7 @@ func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.Selection
 }
 
 // Create inserts a new item according to the unique key from the object.
-func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}
@@ -314,15 +320,91 @@ func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object) (runti
 			return nil, err
 		}
 	}
+	if !includeUninitialized {
+		return e.WaitForInitialized(ctx, out)
+	}
 	return out, nil
+}
+
+func (e *Store) WaitForInitialized(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+	// return early if we don't have initializers, or if they've completed already
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return obj, nil
+	}
+	initializers := accessor.GetInitializers()
+	if initializers == nil {
+		return obj, nil
+	}
+	if result := initializers.Result; result != nil {
+		return nil, kubeerr.FromObject(result)
+	}
+
+	key, err := e.KeyFunc(ctx, accessor.GetName())
+	if err != nil {
+		return nil, err
+	}
+	w, err := e.Storage.Watch(ctx, key, accessor.GetResourceVersion(), storage.SelectionPredicate{
+		Label: labels.Everything(),
+		Field: fields.Everything(),
+
+		IncludeUninitialized: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer w.Stop()
+
+	latest := obj
+	ch := w.ResultChan()
+	for {
+		select {
+		case event, ok := <-ch:
+			if !ok {
+				// TODO: should we just expose the partially initialized object?
+				return nil, kubeerr.NewServerTimeout(e.QualifiedResource, "create", 0)
+			}
+			switch event.Type {
+			case watch.Deleted:
+				if latest = event.Object; latest != nil {
+					if accessor, err := meta.Accessor(latest); err == nil {
+						if initializers := accessor.GetInitializers(); initializers != nil && initializers.Result != nil {
+							// initialization failed, but we missed the modification event
+							return nil, kubeerr.FromObject(initializers.Result)
+						}
+					}
+				}
+				return nil, kubeerr.NewInternalError(fmt.Errorf("object deleted while waiting for creation"))
+			case watch.Error:
+				if status, ok := event.Object.(*metav1.Status); ok {
+					return nil, &kubeerr.StatusError{ErrStatus: *status}
+				}
+				return nil, kubeerr.NewInternalError(fmt.Errorf("unexpected object in watch stream, can't complete initialization %T", event.Object))
+			case watch.Modified:
+				latest = event.Object
+				accessor, err = meta.Accessor(latest)
+				if err != nil {
+					return nil, kubeerr.NewInternalError(fmt.Errorf("object no longer has access to metadata %T: %v", latest, err))
+				}
+				initializers := accessor.GetInitializers()
+				if initializers == nil {
+					// completed initialization
+					return latest, nil
+				}
+				if result := initializers.Result; result != nil {
+					// initialization failed
+					return nil, kubeerr.FromObject(result)
+				}
+			}
+		case <-ctx.Done():
+		}
+	}
 }
 
 // shouldDeleteDuringUpdate checks if a Update is removing all the object's
 // finalizers. If so, it further checks if the object's
-// DeletionGracePeriodSeconds is 0. If so, it returns true.
-//
-// If the store does not have garbage collection enabled,
-// shouldDeleteDuringUpdate will always return false.
+// DeletionGracePeriodSeconds is 0. If so, it returns true. If garbage collection
+// is disabled it always returns false.
 func (e *Store) shouldDeleteDuringUpdate(ctx genericapirequest.Context, key string, obj, existing runtime.Object) bool {
 	if !e.EnableGarbageCollection {
 		return false
@@ -340,9 +422,23 @@ func (e *Store) shouldDeleteDuringUpdate(ctx genericapirequest.Context, key stri
 	return len(newMeta.GetFinalizers()) == 0 && oldMeta.GetDeletionGracePeriodSeconds() != nil && *oldMeta.GetDeletionGracePeriodSeconds() == 0
 }
 
-// deleteForEmptyFinalizers handles deleting an object once its finalizer list
-// becomes empty due to an update.
-func (e *Store) deleteForEmptyFinalizers(ctx genericapirequest.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions) (runtime.Object, bool, error) {
+// shouldDeleteForFailedInitialization returns true if the provided object is initializing and has
+// a failure recorded.
+func (e *Store) shouldDeleteForFailedInitialization(ctx genericapirequest.Context, obj runtime.Object) bool {
+	m, err := meta.Accessor(obj)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return false
+	}
+	if initializers := m.GetInitializers(); initializers != nil && initializers.Result != nil {
+		return true
+	}
+	return false
+}
+
+// deleteWithoutFinalizers handles deleting an object ignoring its finalizer list.
+// Used for objects that are either been finalized or have never initialized.
+func (e *Store) deleteWithoutFinalizers(ctx genericapirequest.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions) (runtime.Object, bool, error) {
 	out := e.NewFunc()
 	glog.V(6).Infof("going to delete %s from registry, triggered by update", name)
 	if err := e.Storage.Delete(ctx, key, out, preconditions); err != nil {
@@ -472,7 +568,7 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 	if err != nil {
 		// delete the object
 		if err == errEmptiedFinalizers {
-			return e.deleteForEmptyFinalizers(ctx, name, key, deleteObj, storagePreconditions)
+			return e.deleteWithoutFinalizers(ctx, name, key, deleteObj, storagePreconditions)
 		}
 		if creating {
 			err = storeerr.InterpretCreateError(err, e.QualifiedResource, name)
@@ -482,6 +578,11 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		}
 		return nil, false, err
 	}
+
+	if e.shouldDeleteForFailedInitialization(ctx, out) {
+		return e.deleteWithoutFinalizers(ctx, name, key, out, storagePreconditions)
+	}
+
 	if creating {
 		if e.AfterCreate != nil {
 			if err := e.AfterCreate(out); err != nil {
@@ -1020,11 +1121,14 @@ func (e *Store) Watch(ctx genericapirequest.Context, options *metainternalversio
 	if options != nil && options.FieldSelector != nil {
 		field = options.FieldSelector
 	}
+	predicate := e.PredicateFunc(label, field)
+
 	resourceVersion := ""
 	if options != nil {
 		resourceVersion = options.ResourceVersion
+		predicate.IncludeUninitialized = options.IncludeUninitialized
 	}
-	return e.WatchPredicate(ctx, e.PredicateFunc(label, field), resourceVersion)
+	return e.WatchPredicate(ctx, predicate, resourceVersion)
 }
 
 // WatchPredicate starts a watch for the items that m matches.
@@ -1241,4 +1345,11 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	}
 
 	return nil
+}
+
+func (e *Store) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error) {
+	if e.TableConvertor != nil {
+		return e.TableConvertor.ConvertToTable(ctx, object, tableOptions)
+	}
+	return rest.DefaultTableConvertor.ConvertToTable(ctx, object, tableOptions)
 }

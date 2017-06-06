@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
+	policyv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/retry"
@@ -510,6 +511,8 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 // this jig, but does not actually create the RC.  The default RC has the same
 // name as the jig and runs the "netexec" container.
 func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationController {
+	var replicas int32 = 1
+
 	rc := &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -517,7 +520,7 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationControll
 			Labels:    j.Labels,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: func(i int) *int32 { x := int32(i); return &x }(1),
+			Replicas: &replicas,
 			Selector: j.Labels,
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -548,6 +551,59 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationControll
 	return rc
 }
 
+func (j *ServiceTestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
+	var replicas int32 = 2
+
+	rc.Spec.Replicas = &replicas
+	if rc.Spec.Template.Spec.Affinity == nil {
+		rc.Spec.Template.Spec.Affinity = &v1.Affinity{}
+	}
+	if rc.Spec.Template.Spec.Affinity.PodAntiAffinity == nil {
+		rc.Spec.Template.Spec.Affinity.PodAntiAffinity = &v1.PodAntiAffinity{}
+	}
+	rc.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+		rc.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+		v1.PodAffinityTerm{
+			LabelSelector: &metav1.LabelSelector{MatchLabels: j.Labels},
+			Namespaces:    nil,
+			TopologyKey:   "kubernetes.io/hostname",
+		})
+}
+
+func (j *ServiceTestJig) CreatePDBOrFail(namespace string, rc *v1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
+	pdb := j.newPDBTemplate(namespace, rc)
+	newPdb, err := j.Client.Policy().PodDisruptionBudgets(namespace).Create(pdb)
+	if err != nil {
+		Failf("Failed to create PDB %q %v", pdb.Name, err)
+	}
+	if err := j.waitForPdbReady(namespace); err != nil {
+		Failf("Failed waiting for PDB to be ready: %v", err)
+	}
+
+	return newPdb
+}
+
+// newPDBTemplate returns the default policyv1beta1.PodDisruptionBudget object for
+// this jig, but does not actually create the PDB.  The default PDB specifies a
+// MinAvailable of N-1 and matches the pods created by the RC.
+func (j *ServiceTestJig) newPDBTemplate(namespace string, rc *v1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
+	minAvailable := intstr.FromInt(int(*rc.Spec.Replicas) - 1)
+
+	pdb := &policyv1beta1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      j.Name,
+			Labels:    j.Labels,
+		},
+		Spec: policyv1beta1.PodDisruptionBudgetSpec{
+			MinAvailable: &minAvailable,
+			Selector:     &metav1.LabelSelector{MatchLabels: j.Labels},
+		},
+	}
+
+	return pdb
+}
+
 // RunOrFail creates a ReplicationController and Pod(s) and waits for the
 // Pod(s) to be running. Callers can provide a function to tweak the RC object
 // before it is created.
@@ -558,7 +614,7 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *v1.Replicati
 	}
 	result, err := j.Client.Core().ReplicationControllers(namespace).Create(rc)
 	if err != nil {
-		Failf("Failed to created RC %q: %v", rc.Name, err)
+		Failf("Failed to create RC %q: %v", rc.Name, err)
 	}
 	pods, err := j.waitForPodsCreated(namespace, int(*(rc.Spec.Replicas)))
 	if err != nil {
@@ -568,6 +624,21 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *v1.Replicati
 		Failf("Failed waiting for pods to be running: %v", err)
 	}
 	return result
+}
+
+func (j *ServiceTestJig) waitForPdbReady(namespace string) error {
+	timeout := 2 * time.Minute
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
+		pdb, err := j.Client.Policy().PodDisruptionBudgets(namespace).Get(j.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if pdb.Status.PodDisruptionsAllowed > 0 {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("Timeout waiting for PDB %q to be ready", j.Name)
 }
 
 func (j *ServiceTestJig) waitForPodsCreated(namespace string, replicas int) ([]string, error) {

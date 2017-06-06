@@ -322,7 +322,7 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(p *api.ServiceExternalTrafficPolicyType, c fuzz.Continue) {
-			types := []api.ServiceExternalTrafficPolicyType{api.ServiceExternalTrafficPolicyTypeGlobal, api.ServiceExternalTrafficPolicyTypeLocal}
+			types := []api.ServiceExternalTrafficPolicyType{api.ServiceExternalTrafficPolicyTypeCluster, api.ServiceExternalTrafficPolicyTypeLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(ct *api.Container, c fuzz.Continue) {
@@ -552,6 +552,11 @@ func extensionFuncs(t apitesting.TestingCommon) []interface{} {
 					},
 				}
 			}
+		},
+		func(j *extensions.DaemonSetSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			rhl := int32(c.Rand.Int31())
+			j.RevisionHistoryLimit = &rhl
 		},
 		func(j *extensions.DaemonSetUpdateStrategy, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again

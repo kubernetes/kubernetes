@@ -23,6 +23,7 @@ go_library(
         "//vendor/github.com/google/cadvisor/pages/static:go_default_library",
         "//vendor/github.com/google/cadvisor/validate:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:go_default_library",
     ],
 )
 

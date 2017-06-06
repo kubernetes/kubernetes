@@ -456,8 +456,7 @@ func TestApplyObjectOutput(t *testing.T) {
 	}
 
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
-	tf.CommandPrinter = &printers.YAMLPrinter{}
-	tf.GenericPrinter = true
+	tf.Printer = &printers.YAMLPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
@@ -987,9 +986,8 @@ func TestRunApplySetLastApplied(t *testing.T) {
 		if buf.String() != test.expectedOut {
 			t.Fatalf("%s: unexpected output: %s\nexpected: %s", test.name, buf.String(), test.expectedOut)
 		}
-
 	}
-
+	cmdutil.BehaviorOnFatal(func(str string, code int) {})
 }
 
 func checkPatchString(t *testing.T, req *http.Request) {

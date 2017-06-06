@@ -92,8 +92,8 @@ func (r *REST) List(ctx genericapirequest.Context, options *metainternalversion.
 	return r.store.List(ctx, options)
 }
 
-func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
-	return r.store.Create(ctx, obj)
+func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
+	return r.store.Create(ctx, obj, includeUninitialized)
 }
 
 func (r *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {

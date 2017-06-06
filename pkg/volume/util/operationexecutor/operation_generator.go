@@ -465,11 +465,14 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			return detailedErr
 		}
 
+		simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.SetUp succeeded", "")
 		verbosity := glog.Level(1)
 		if isRemount {
 			verbosity = glog.Level(7)
+		} else {
+			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.SuccessfulMountVolume, simpleMsg)
 		}
-		glog.V(verbosity).Infof(volumeToMount.GenerateMsgDetailed("MountVolume.SetUp succeeded", ""))
+		glog.V(verbosity).Infof(detailedMsg)
 
 		// Update actual state of world
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(

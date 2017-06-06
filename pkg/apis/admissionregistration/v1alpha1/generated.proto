@@ -69,7 +69,7 @@ message ExternalAdmissionHook {
 
 // ExternalAdmissionHookConfiguration describes the configuration of initializers.
 message ExternalAdmissionHookConfiguration {
-  // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -84,7 +84,7 @@ message ExternalAdmissionHookConfiguration {
 // ExternalAdmissionHookConfigurationList is a list of ExternalAdmissionHookConfiguration.
 message ExternalAdmissionHookConfigurationList {
   // Standard list metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -105,6 +105,7 @@ message Initializer {
 
   // Rules describes what resources/subresources the initializer cares about.
   // The initializer cares about an operation if it matches _any_ Rule.
+  // Rule.Resources must not include subresources.
   repeated Rule rules = 2;
 
   // FailurePolicy defines what happens if the responsible initializer controller
@@ -117,7 +118,7 @@ message Initializer {
 
 // InitializerConfiguration describes the configuration of initializers.
 message InitializerConfiguration {
-  // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -136,7 +137,7 @@ message InitializerConfiguration {
 // InitializerConfigurationList is a list of InitializerConfiguration.
 message InitializerConfigurationList {
   // Standard list metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -167,7 +168,10 @@ message Rule {
   // '*/scale' means all scale subresources.
   // '*/*' means all resources and their subresources.
   // 
-  // If '*' or '*/*' is present, the length of the slice must be one.
+  // If wildcard is present, the validation rule will ensure resources do not
+  // overlap with each other.
+  // 
+  // Depending on the enclosing object, subresources might not be allowed.
   // Required.
   repeated string resources = 3;
 }

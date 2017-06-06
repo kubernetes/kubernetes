@@ -30,13 +30,13 @@ func TestValidDir(t *testing.T) {
 func TestInvalidDir(t *testing.T) {
 	_, err := OutDir("./nondir")
 	if err == nil {
-		t.Fatal(err)
+		t.Fatal("expected an error")
 	}
 }
 
 func TestNotDir(t *testing.T) {
 	_, err := OutDir("./genutils_test.go")
 	if err == nil {
-		t.Fatal(err)
+		t.Fatal("expected an error")
 	}
 }

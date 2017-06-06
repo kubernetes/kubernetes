@@ -42,7 +42,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 // createStatefulSet is a helper function that returns a StatefulSet with the updated resource version.
 func createStatefulSet(storage *REST, ps apps.StatefulSet, t *testing.T) (apps.StatefulSet, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), ps.Namespace)
-	obj, err := storage.Create(ctx, &ps)
+	obj, err := storage.Create(ctx, &ps, false)
 	if err != nil {
 		t.Errorf("Failed to create StatefulSet, %v", err)
 	}
@@ -185,6 +185,14 @@ func TestWatch(t *testing.T) {
 			{"metadata.name": "bar"},
 		},
 	)
+}
+
+func TestCategories(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage, expected)
 }
 
 // TODO: Test generation number.

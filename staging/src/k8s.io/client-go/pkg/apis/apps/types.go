@@ -140,7 +140,7 @@ type StatefulSetList struct {
 type ControllerRevision struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 

@@ -33,6 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+)
+
+const (
+	defaultZone = ""
 )
 
 func newInstancesMetricContext(request, zone string) *metricContext {
@@ -40,6 +45,34 @@ func newInstancesMetricContext(request, zone string) *metricContext {
 		start:      time.Now(),
 		attributes: []string{"instances_" + request, unusedMetricLabel, zone},
 	}
+}
+
+func splitNodesByZone(nodes []*v1.Node) map[string][]*v1.Node {
+	zones := make(map[string][]*v1.Node)
+	for _, n := range nodes {
+		z := getZone(n)
+		if z != defaultZone {
+			zones[z] = append(zones[z], n)
+		}
+	}
+	return zones
+}
+
+func getZone(n *v1.Node) string {
+	zone, ok := n.Labels[kubeletapis.LabelZoneFailureDomain]
+	if !ok {
+		return defaultZone
+	}
+	return zone
+}
+
+// ToInstanceReferences returns instance references by links
+func (gce *GCECloud) ToInstanceReferences(zone string, instanceNames []string) (refs []*compute.InstanceReference) {
+	for _, ins := range instanceNames {
+		instanceLink := makeHostURL(gce.projectID, zone, ins)
+		refs = append(refs, &compute.InstanceReference{Instance: instanceLink})
+	}
+	return refs
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.

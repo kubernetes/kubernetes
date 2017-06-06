@@ -30,6 +30,11 @@ const (
 	defaultFailureThreshold = 5
 )
 
+var (
+	ErrNotReady = fmt.Errorf("configuration is not ready")
+	ErrDisabled = fmt.Errorf("disabled")
+)
+
 type getFunc func() (runtime.Object, error)
 
 // When running, poller calls `get` every `interval`. If `get` is
@@ -46,11 +51,14 @@ type poller struct {
 	// if the number of consecutive read failure equals or exceeds the failureThreshold , the
 	// configuration is regarded as not ready.
 	failureThreshold int
+	// number of consecutive failures so far.
+	failures int
 	// if the configuration is regarded as ready.
 	ready               bool
 	mergedConfiguration runtime.Object
 	// lock much be hold when reading ready or mergedConfiguration
-	lock sync.RWMutex
+	lock    sync.RWMutex
+	lastErr error
 }
 
 func newPoller(get getFunc) *poller {
@@ -59,6 +67,12 @@ func newPoller(get getFunc) *poller {
 		interval:         defaultInterval,
 		failureThreshold: defaultFailureThreshold,
 	}
+}
+
+func (a *poller) lastError(err error) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	a.lastErr = err
 }
 
 func (a *poller) notReady() {
@@ -71,7 +85,10 @@ func (a *poller) configuration() (runtime.Object, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	if !a.ready {
-		return nil, fmt.Errorf("configuration is not ready")
+		if a.lastErr != nil {
+			return nil, a.lastErr
+		}
+		return nil, ErrNotReady
 	}
 	return a.mergedConfiguration, nil
 }
@@ -81,20 +98,23 @@ func (a *poller) setConfigurationAndReady(value runtime.Object) {
 	defer a.lock.Unlock()
 	a.mergedConfiguration = value
 	a.ready = true
+	a.lastErr = nil
 }
 
 func (a *poller) Run(stopCh <-chan struct{}) {
-	var failure int
-	go wait.Until(func() {
-		configuration, err := a.get()
-		if err != nil {
-			failure++
-			if failure >= a.failureThreshold {
-				a.notReady()
-			}
-			return
+	go wait.Until(a.sync, a.interval, stopCh)
+}
+
+func (a *poller) sync() {
+	configuration, err := a.get()
+	if err != nil {
+		a.failures++
+		a.lastError(err)
+		if a.failures >= a.failureThreshold {
+			a.notReady()
 		}
-		failure = 0
-		a.setConfigurationAndReady(configuration)
-	}, a.interval, stopCh)
+		return
+	}
+	a.failures = 0
+	a.setConfigurationAndReady(configuration)
 }

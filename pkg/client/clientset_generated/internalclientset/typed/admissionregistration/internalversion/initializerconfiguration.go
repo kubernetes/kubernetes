@@ -28,7 +28,7 @@ import (
 // InitializerConfigurationsGetter has a method to return a InitializerConfigurationInterface.
 // A group's client should implement this interface.
 type InitializerConfigurationsGetter interface {
-	InitializerConfigurations(namespace string) InitializerConfigurationInterface
+	InitializerConfigurations() InitializerConfigurationInterface
 }
 
 // InitializerConfigurationInterface has methods to work with InitializerConfiguration resources.
@@ -47,14 +47,12 @@ type InitializerConfigurationInterface interface {
 // initializerConfigurations implements InitializerConfigurationInterface
 type initializerConfigurations struct {
 	client rest.Interface
-	ns     string
 }
 
 // newInitializerConfigurations returns a InitializerConfigurations
-func newInitializerConfigurations(c *AdmissionregistrationClient, namespace string) *initializerConfigurations {
+func newInitializerConfigurations(c *AdmissionregistrationClient) *initializerConfigurations {
 	return &initializerConfigurations{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -62,7 +60,6 @@ func newInitializerConfigurations(c *AdmissionregistrationClient, namespace stri
 func (c *initializerConfigurations) Create(initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
 	result = &admissionregistration.InitializerConfiguration{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("initializerconfigurations").
 		Body(initializerConfiguration).
 		Do().
@@ -74,7 +71,6 @@ func (c *initializerConfigurations) Create(initializerConfiguration *admissionre
 func (c *initializerConfigurations) Update(initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
 	result = &admissionregistration.InitializerConfiguration{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("initializerconfigurations").
 		Name(initializerConfiguration.Name).
 		Body(initializerConfiguration).
@@ -86,7 +82,6 @@ func (c *initializerConfigurations) Update(initializerConfiguration *admissionre
 // Delete takes name of the initializerConfiguration and deletes it. Returns an error if one occurs.
 func (c *initializerConfigurations) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("initializerconfigurations").
 		Name(name).
 		Body(options).
@@ -97,7 +92,6 @@ func (c *initializerConfigurations) Delete(name string, options *v1.DeleteOption
 // DeleteCollection deletes a collection of objects.
 func (c *initializerConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("initializerconfigurations").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
@@ -109,7 +103,6 @@ func (c *initializerConfigurations) DeleteCollection(options *v1.DeleteOptions, 
 func (c *initializerConfigurations) Get(name string, options v1.GetOptions) (result *admissionregistration.InitializerConfiguration, err error) {
 	result = &admissionregistration.InitializerConfiguration{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("initializerconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -122,7 +115,6 @@ func (c *initializerConfigurations) Get(name string, options v1.GetOptions) (res
 func (c *initializerConfigurations) List(opts v1.ListOptions) (result *admissionregistration.InitializerConfigurationList, err error) {
 	result = &admissionregistration.InitializerConfigurationList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("initializerconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
@@ -134,7 +126,6 @@ func (c *initializerConfigurations) List(opts v1.ListOptions) (result *admission
 func (c *initializerConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("initializerconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
@@ -144,7 +135,6 @@ func (c *initializerConfigurations) Watch(opts v1.ListOptions) (watch.Interface,
 func (c *initializerConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *admissionregistration.InitializerConfiguration, err error) {
 	result = &admissionregistration.InitializerConfiguration{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("initializerconfigurations").
 		SubResource(subresources...).
 		Name(name).

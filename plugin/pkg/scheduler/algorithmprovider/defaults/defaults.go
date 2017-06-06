@@ -86,7 +86,7 @@ func init() {
 	// predicates.GeneralPredicates()
 	factory.RegisterFitPredicate("HostName", predicates.PodFitsHost)
 	// Fit is determined by node selector query.
-	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodSelectorMatches)
+	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodMatchNodeSelector)
 
 	// Use equivalence class to speed up predicates & priorities
 	factory.RegisterGetEquivalencePodFunction(GetEquivalencePod)

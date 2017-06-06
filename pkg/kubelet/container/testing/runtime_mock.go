@@ -140,8 +140,8 @@ func (r *Mock) GetPodContainerID(pod *Pod) (ContainerID, error) {
 	return ContainerID{}, args.Error(0)
 }
 
-func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool) error {
-	args := r.Called(gcPolicy, ready)
+func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {
+	args := r.Called(gcPolicy, ready, evictNonDeletedPods)
 	return args.Error(0)
 }
 

@@ -32,12 +32,12 @@ type AdmissionregistrationClient struct {
 	restClient rest.Interface
 }
 
-func (c *AdmissionregistrationClient) ExternalAdmissionHookConfigurations(namespace string) ExternalAdmissionHookConfigurationInterface {
-	return newExternalAdmissionHookConfigurations(c, namespace)
+func (c *AdmissionregistrationClient) ExternalAdmissionHookConfigurations() ExternalAdmissionHookConfigurationInterface {
+	return newExternalAdmissionHookConfigurations(c)
 }
 
-func (c *AdmissionregistrationClient) InitializerConfigurations(namespace string) InitializerConfigurationInterface {
-	return newInitializerConfigurations(c, namespace)
+func (c *AdmissionregistrationClient) InitializerConfigurations() InitializerConfigurationInterface {
+	return newInitializerConfigurations(c)
 }
 
 // NewForConfig creates a new AdmissionregistrationClient for the given config.

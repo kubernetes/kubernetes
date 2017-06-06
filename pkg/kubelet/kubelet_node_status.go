@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -42,6 +43,7 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 const (
@@ -193,9 +195,9 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
-				metav1.LabelHostname: kl.hostname,
-				metav1.LabelOS:       goruntime.GOOS,
-				metav1.LabelArch:     goruntime.GOARCH,
+				kubeletapis.LabelHostname: kl.hostname,
+				kubeletapis.LabelOS:       goruntime.GOOS,
+				kubeletapis.LabelArch:     goruntime.GOARCH,
 			},
 		},
 		Spec: v1.NodeSpec{
@@ -214,7 +216,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 	}
 	if kl.externalCloudProvider {
 		taint := v1.Taint{
-			Key:    metav1.TaintExternalCloudProvider,
+			Key:    algorithm.TaintExternalCloudProvider,
 			Value:  "true",
 			Effect: v1.TaintEffectNoSchedule,
 		}
@@ -296,8 +298,8 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			return nil, err
 		}
 		if instanceType != "" {
-			glog.Infof("Adding node label from cloud provider: %s=%s", metav1.LabelInstanceType, instanceType)
-			node.ObjectMeta.Labels[metav1.LabelInstanceType] = instanceType
+			glog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelInstanceType, instanceType)
+			node.ObjectMeta.Labels[kubeletapis.LabelInstanceType] = instanceType
 		}
 		// If the cloud has zone information, label the node with the zone information
 		zones, ok := kl.cloud.Zones()
@@ -307,12 +309,12 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
 			if zone.FailureDomain != "" {
-				glog.Infof("Adding node label from cloud provider: %s=%s", metav1.LabelZoneFailureDomain, zone.FailureDomain)
-				node.ObjectMeta.Labels[metav1.LabelZoneFailureDomain] = zone.FailureDomain
+				glog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneFailureDomain, zone.FailureDomain)
+				node.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain] = zone.FailureDomain
 			}
 			if zone.Region != "" {
-				glog.Infof("Adding node label from cloud provider: %s=%s", metav1.LabelZoneRegion, zone.Region)
-				node.ObjectMeta.Labels[metav1.LabelZoneRegion] = zone.Region
+				glog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneRegion, zone.Region)
+				node.ObjectMeta.Labels[kubeletapis.LabelZoneRegion] = zone.Region
 			}
 		}
 	} else {
@@ -470,7 +472,7 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 		// 4) Try to get the IP from the network interface used as default gateway
 		if kl.nodeIP != nil {
 			ipAddr = kl.nodeIP
-			node.ObjectMeta.Annotations[metav1.AnnotationProvidedIPAddr] = kl.nodeIP.String()
+			node.ObjectMeta.Annotations[kubeletapis.AnnotationProvidedIPAddr] = kl.nodeIP.String()
 		} else if addr := net.ParseIP(kl.hostname); addr != nil {
 			ipAddr = addr
 		} else {
@@ -549,6 +551,26 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 				"Node %s has been rebooted, boot id: %s", kl.nodeName, info.BootID)
 		}
 		node.Status.NodeInfo.BootID = info.BootID
+	}
+
+	rootfs, err := kl.GetCachedRootFsInfo()
+	if err != nil {
+		node.Status.Capacity[v1.ResourceStorage] = resource.MustParse("0Gi")
+	} else {
+		for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
+			node.Status.Capacity[rName] = rCap
+		}
+	}
+
+	if hasDedicatedImageFs, _ := kl.HasDedicatedImageFs(); hasDedicatedImageFs {
+		imagesfs, err := kl.ImagesFsInfo()
+		if err != nil {
+			node.Status.Capacity[v1.ResourceStorageOverlay] = resource.MustParse("0Gi")
+		} else {
+			for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(imagesfs) {
+				node.Status.Capacity[rName] = rCap
+			}
+		}
 	}
 
 	// Set Allocatable.

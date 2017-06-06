@@ -13,16 +13,15 @@ go_library(
         "decode.go",
         "encode.go",
         "expfmt.go",
-        "json_decode.go",
         "text_create.go",
         "text_parse.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor/bitbucket.org/ww/goautoneg:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/matttproud/golang_protobuf_extensions/pbutil:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
+        "//vendor/github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
     ],
 )

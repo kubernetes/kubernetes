@@ -13,6 +13,8 @@ go_library(
     srcs = [
         "doc.go",
         "gce.go",
+        "gce_addresses.go",
+        "gce_annotations.go",
         "gce_backendservice.go",
         "gce_cert.go",
         "gce_clusterid.go",
@@ -24,9 +26,12 @@ go_library(
         "gce_instancegroup.go",
         "gce_instances.go",
         "gce_loadbalancer.go",
+        "gce_loadbalancer_external.go",
+        "gce_loadbalancer_internal.go",
+        "gce_loadbalancer_naming.go",
         "gce_op.go",
         "gce_routes.go",
-        "gce_staticip.go",
+        "gce_targetpool.go",
         "gce_targetproxy.go",
         "gce_urlmap.go",
         "gce_util.go",
@@ -41,6 +46,7 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/util/net/sets:go_default_library",
         "//pkg/util/version:go_default_library",
@@ -80,9 +86,9 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )
 

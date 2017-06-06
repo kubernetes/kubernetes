@@ -176,7 +176,7 @@ func TestCreate(t *testing.T) {
 		}
 		rest := NewREST(auth)
 
-		result, err := rest.Create(genericapirequest.NewContext(), &authorizationapi.SubjectAccessReview{Spec: tc.spec})
+		result, err := rest.Create(genericapirequest.NewContext(), &authorizationapi.SubjectAccessReview{Spec: tc.spec}, false)
 		if err != nil {
 			if tc.expectedErr != "" {
 				if !strings.Contains(err.Error(), tc.expectedErr) {

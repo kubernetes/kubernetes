@@ -77,7 +77,8 @@ func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipall
 	}
 }
 
-func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+// TODO: implement includeUninitialized by refactoring this to move to store
+func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
 	if err := rest.BeforeCreate(Strategy, ctx, obj); err != nil {

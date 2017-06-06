@@ -60,8 +60,12 @@ func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 }
 
 // TODO: implement HandledResources()
-func (p *SortingPrinter) HandledResources() []string {
+func (s *SortingPrinter) HandledResources() []string {
 	return []string{}
+}
+
+func (s *SortingPrinter) IsGeneric() bool {
+	return s.Delegate.IsGeneric()
 }
 
 func (s *SortingPrinter) sortObj(obj runtime.Object) error {

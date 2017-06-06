@@ -50,8 +50,8 @@ pushd "${KUBE_ROOT}" > /dev/null
   if [ ! -e "vendor/k8s.io/kube-aggregator" ]; then
     ln -s ../../staging/src/k8s.io/kube-aggregator vendor/k8s.io/kube-aggregator
   fi
-  if [ ! -e "vendor/k8s.io/kube-apiextensions-server" ]; then
-    ln -s ../../staging/src/k8s.io/kube-apiextensions-server vendor/k8s.io/kube-apiextensions-server
+  if [ ! -e "vendor/k8s.io/apiextensions-apiserver" ]; then
+    ln -s ../../staging/src/k8s.io/apiextensions-apiserver vendor/k8s.io/apiextensions-apiserver
   fi
   if [ ! -e "vendor/k8s.io/sample-apiserver" ]; then
     ln -s ../../staging/src/k8s.io/sample-apiserver vendor/k8s.io/sample-apiserver

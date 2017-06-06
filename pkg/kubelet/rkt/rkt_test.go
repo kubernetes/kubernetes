@@ -1831,7 +1831,8 @@ func TestGarbageCollect(t *testing.T) {
 		}
 
 		allSourcesReady := true
-		err := rkt.GarbageCollect(tt.gcPolicy, allSourcesReady)
+		evictNonDeletedPods := false
+		err := rkt.GarbageCollect(tt.gcPolicy, allSourcesReady, evictNonDeletedPods)
 		assert.NoError(t, err, testCaseHint)
 
 		sort.Sort(sortedStringList(tt.expectedCommands))

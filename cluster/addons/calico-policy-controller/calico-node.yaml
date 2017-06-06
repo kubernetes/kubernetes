@@ -17,9 +17,6 @@ spec:
         k8s-app: calico-node
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
-        scheduler.alpha.kubernetes.io/tolerations: |
-          [{"key": "dedicated", "value": "master", "effect": "NoSchedule" },
-           {"key":"CriticalAddonsOnly", "operator":"Exists"}]
     spec:
       nodeSelector:
         projectcalico.org/ds-ready: "true"
@@ -134,3 +131,6 @@ spec:
         - name: cni-net-dir
           hostPath:
             path: /etc/cni/net.d
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"

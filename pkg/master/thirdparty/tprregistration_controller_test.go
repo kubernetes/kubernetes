@@ -20,13 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	crdlisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
-	crdlisters "k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/internalversion"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	listers "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
 )

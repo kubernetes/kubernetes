@@ -183,6 +183,9 @@ func DeepCopy_extensions_DaemonSet(in interface{}, out interface{}, c *conversio
 		if err := DeepCopy_extensions_DaemonSetSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
+		if err := DeepCopy_extensions_DaemonSetStatus(&in.Status, &out.Status, c); err != nil {
+			return err
+		}
 		return nil
 	}
 }
@@ -226,6 +229,11 @@ func DeepCopy_extensions_DaemonSetSpec(in interface{}, out interface{}, c *conve
 		if err := DeepCopy_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, c); err != nil {
 			return err
 		}
+		if in.RevisionHistoryLimit != nil {
+			in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
+			*out = new(int32)
+			**out = **in
+		}
 		return nil
 	}
 }
@@ -236,6 +244,11 @@ func DeepCopy_extensions_DaemonSetStatus(in interface{}, out interface{}, c *con
 		in := in.(*DaemonSetStatus)
 		out := out.(*DaemonSetStatus)
 		*out = *in
+		if in.CollisionCount != nil {
+			in, out := &in.CollisionCount, &out.CollisionCount
+			*out = new(int64)
+			**out = **in
+		}
 		return nil
 	}
 }

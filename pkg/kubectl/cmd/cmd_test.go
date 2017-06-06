@@ -80,8 +80,9 @@ func defaultClientConfigForVersion(version *schema.GroupVersion) *restclient.Con
 }
 
 type testPrinter struct {
-	Objects []runtime.Object
-	Err     error
+	Objects        []runtime.Object
+	Err            error
+	GenericPrinter bool
 }
 
 func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
@@ -97,6 +98,10 @@ func (t *testPrinter) HandledResources() []string {
 
 func (t *testPrinter) AfterPrint(output io.Writer, res string) error {
 	return nil
+}
+
+func (t *testPrinter) IsGeneric() bool {
+	return t.GenericPrinter
 }
 
 type testDescriber struct {
@@ -192,7 +197,7 @@ func Example_printReplicationControllerWithNamespace() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, ctrl, os.Stdout)
+	err := f.PrintObject(cmd, mapper, ctrl, printers.GetNewTabWriter(os.Stdout))
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -247,7 +252,7 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, ctrl, os.Stdout)
+	err := f.PrintObject(cmd, mapper, ctrl, printers.GetNewTabWriter(os.Stdout))
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -301,7 +306,7 @@ func Example_printReplicationController() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, ctrl, os.Stdout)
+	err := f.PrintObject(cmd, mapper, ctrl, printers.GetNewTabWriter(os.Stdout))
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -344,7 +349,7 @@ func Example_printPodWithWideFormat() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, pod, os.Stdout)
+	err := f.PrintObject(cmd, mapper, pod, printers.GetNewTabWriter(os.Stdout))
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -390,7 +395,7 @@ func Example_printPodWithShowLabels() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, pod, os.Stdout)
+	err := f.PrintObject(cmd, mapper, pod, printers.GetNewTabWriter(os.Stdout))
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -514,7 +519,7 @@ func Example_printPodHideTerminated() {
 	}
 	for _, pod := range filteredPodList {
 		mapper, _ := f.Object()
-		err := f.PrintObject(cmd, mapper, pod, os.Stdout)
+		err := f.PrintObject(cmd, mapper, pod, printers.GetNewTabWriter(os.Stdout))
 		if err != nil {
 			fmt.Printf("Unexpected error: %v", err)
 		}
@@ -542,7 +547,7 @@ func Example_printPodShowAll() {
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	podList := newAllPhasePodList()
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, podList, os.Stdout)
+	err := f.PrintObject(cmd, mapper, podList, printers.GetNewTabWriter(os.Stdout))
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -616,9 +621,10 @@ func Example_printServiceWithNamespacesAndLabels() {
 	}
 	ld := strings.NewLineDelimiter(os.Stdout, "|")
 	defer ld.Flush()
-
+	out := printers.GetNewTabWriter(ld)
+	defer out.Flush()
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, mapper, svc, ld)
+	err := f.PrintObject(cmd, mapper, svc, out)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}

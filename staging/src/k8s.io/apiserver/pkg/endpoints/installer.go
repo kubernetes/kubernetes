@@ -26,6 +26,8 @@ import (
 	"time"
 	"unicode"
 
+	restful "github.com/emicklei/go-restful"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -38,8 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-
-	"github.com/emicklei/go-restful"
+	genericfilters "k8s.io/apiserver/pkg/server/filters"
 )
 
 const (
@@ -374,6 +375,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		shortNames = shortNamesProvider.ShortNames()
 	}
 
+	tableProvider, ok := storage.(rest.TableConvertor)
+	if !ok {
+		tableProvider = rest.DefaultTableConvertor
+	}
+
+	var categories []string
+	categoriesProvider, ok := storage.(rest.CategoriesProvider)
+	if ok {
+		categories = categoriesProvider.Categories()
+	}
+
 	var apiResource metav1.APIResource
 	// Get the list of actions for the given scope.
 	switch scope.Name() {
@@ -525,6 +537,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Typer:           a.group.Typer,
 		UnsafeConvertor: a.group.UnsafeConvertor,
 
+		// TODO: Check for the interface on storage
+		TableConvertor: tableProvider,
+
 		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
 		Resource:    a.group.GroupVersion.WithResource(resource),
 		Subresource: subresource,
@@ -573,6 +588,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				handler = restfulGetResource(getter, exporter, reqScope)
 			}
 			handler = metrics.InstrumentRouteFunc(action.Verb, resource, subresource, handler)
+			handler = genericfilters.RestfulWithCompression(handler, a.group.Context)
 			doc := "read the specified " + kind
 			if hasSubresource {
 				doc = "read " + subresource + " of the specified " + kind
@@ -602,6 +618,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				doc = "list " + subresource + " of objects of kind " + kind
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
+			handler = genericfilters.RestfulWithCompression(handler, a.group.Context)
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -817,6 +834,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	sort.Strings(apiResource.Verbs)
 	apiResource.ShortNames = shortNames
+	apiResource.Categories = categories
 
 	return &apiResource, nil
 }

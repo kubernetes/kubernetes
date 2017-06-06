@@ -23,23 +23,23 @@ import (
 	compute "google.golang.org/api/compute/v1"
 )
 
-func newBackendServiceMetricContext(request string) *metricContext {
+func newBackendServiceMetricContext(request, region string) *metricContext {
 	return &metricContext{
 		start:      time.Now(),
-		attributes: []string{"backendservice_" + request, unusedMetricLabel, unusedMetricLabel},
+		attributes: []string{"backendservice_" + request, region, unusedMetricLabel},
 	}
 }
 
 // GetGlobalBackendService retrieves a backend by name.
 func (gce *GCECloud) GetGlobalBackendService(name string) (*compute.BackendService, error) {
-	mc := newBackendServiceMetricContext("get")
+	mc := newBackendServiceMetricContext("get", "")
 	v, err := gce.service.BackendServices.Get(gce.projectID, name).Do()
 	return v, mc.Observe(err)
 }
 
 // UpdateGlobalBackendService applies the given BackendService as an update to an existing service.
 func (gce *GCECloud) UpdateGlobalBackendService(bg *compute.BackendService) error {
-	mc := newBackendServiceMetricContext("update")
+	mc := newBackendServiceMetricContext("update", "")
 	op, err := gce.service.BackendServices.Update(gce.projectID, bg.Name, bg).Do()
 	if err != nil {
 		return mc.Observe(err)
@@ -50,7 +50,7 @@ func (gce *GCECloud) UpdateGlobalBackendService(bg *compute.BackendService) erro
 
 // DeleteGlobalBackendService deletes the given BackendService by name.
 func (gce *GCECloud) DeleteGlobalBackendService(name string) error {
-	mc := newBackendServiceMetricContext("delete")
+	mc := newBackendServiceMetricContext("delete", "")
 	op, err := gce.service.BackendServices.Delete(gce.projectID, name).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
@@ -64,7 +64,7 @@ func (gce *GCECloud) DeleteGlobalBackendService(name string) error {
 
 // CreateGlobalBackendService creates the given BackendService.
 func (gce *GCECloud) CreateGlobalBackendService(bg *compute.BackendService) error {
-	mc := newBackendServiceMetricContext("create")
+	mc := newBackendServiceMetricContext("create", "")
 	op, err := gce.service.BackendServices.Insert(gce.projectID, bg).Do()
 	if err != nil {
 		return mc.Observe(err)
@@ -75,7 +75,7 @@ func (gce *GCECloud) CreateGlobalBackendService(bg *compute.BackendService) erro
 
 // ListGlobalBackendServices lists all backend services in the project.
 func (gce *GCECloud) ListGlobalBackendServices() (*compute.BackendServiceList, error) {
-	mc := newBackendServiceMetricContext("list")
+	mc := newBackendServiceMetricContext("list", "")
 	// TODO: use PageToken to list all not just the first 500
 	v, err := gce.service.BackendServices.List(gce.projectID).Do()
 	return v, mc.Observe(err)
@@ -85,7 +85,7 @@ func (gce *GCECloud) ListGlobalBackendServices() (*compute.BackendServiceList, e
 // name, in the given instanceGroup. The instanceGroupLink is the fully
 // qualified self link of an instance group.
 func (gce *GCECloud) GetGlobalBackendServiceHealth(name string, instanceGroupLink string) (*compute.BackendServiceGroupHealth, error) {
-	mc := newBackendServiceMetricContext("get_health")
+	mc := newBackendServiceMetricContext("get_health", "")
 	groupRef := &compute.ResourceGroupReference{Group: instanceGroupLink}
 	v, err := gce.service.BackendServices.GetHealth(gce.projectID, name, groupRef).Do()
 	return v, mc.Observe(err)
@@ -93,25 +93,25 @@ func (gce *GCECloud) GetGlobalBackendServiceHealth(name string, instanceGroupLin
 
 // GetRegionBackendService retrieves a backend by name.
 func (gce *GCECloud) GetRegionBackendService(name, region string) (*compute.BackendService, error) {
-	mc := newBackendServiceMetricContext("get")
+	mc := newBackendServiceMetricContext("get", region)
 	v, err := gce.service.RegionBackendServices.Get(gce.projectID, region, name).Do()
 	return v, mc.Observe(err)
 }
 
 // UpdateRegionBackendService applies the given BackendService as an update to an existing service.
-func (gce *GCECloud) UpdateRegionBackendService(bg *compute.BackendService) error {
-	mc := newBackendServiceMetricContext("update")
-	op, err := gce.service.RegionBackendServices.Update(gce.projectID, bg.Region, bg.Name, bg).Do()
+func (gce *GCECloud) UpdateRegionBackendService(bg *compute.BackendService, region string) error {
+	mc := newBackendServiceMetricContext("update", region)
+	op, err := gce.service.RegionBackendServices.Update(gce.projectID, region, bg.Name, bg).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForRegionOp(op, bg.Region, mc)
+	return gce.waitForRegionOp(op, region, mc)
 }
 
 // DeleteRegionBackendService deletes the given BackendService by name.
 func (gce *GCECloud) DeleteRegionBackendService(name, region string) error {
-	mc := newBackendServiceMetricContext("delete")
+	mc := newBackendServiceMetricContext("delete", region)
 	op, err := gce.service.RegionBackendServices.Delete(gce.projectID, region, name).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
@@ -124,19 +124,19 @@ func (gce *GCECloud) DeleteRegionBackendService(name, region string) error {
 }
 
 // CreateRegionBackendService creates the given BackendService.
-func (gce *GCECloud) CreateRegionBackendService(bg *compute.BackendService) error {
-	mc := newBackendServiceMetricContext("create")
-	op, err := gce.service.RegionBackendServices.Insert(gce.projectID, bg.Region, bg).Do()
+func (gce *GCECloud) CreateRegionBackendService(bg *compute.BackendService, region string) error {
+	mc := newBackendServiceMetricContext("create", region)
+	op, err := gce.service.RegionBackendServices.Insert(gce.projectID, region, bg).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForRegionOp(op, bg.Region, mc)
+	return gce.waitForRegionOp(op, region, mc)
 }
 
 // ListRegionBackendServices lists all backend services in the project.
 func (gce *GCECloud) ListRegionBackendServices(region string) (*compute.BackendServiceList, error) {
-	mc := newBackendServiceMetricContext("list")
+	mc := newBackendServiceMetricContext("list", region)
 	// TODO: use PageToken to list all not just the first 500
 	v, err := gce.service.RegionBackendServices.List(gce.projectID, region).Do()
 	return v, mc.Observe(err)
@@ -146,7 +146,7 @@ func (gce *GCECloud) ListRegionBackendServices(region string) (*compute.BackendS
 // name, in the given instanceGroup. The instanceGroupLink is the fully
 // qualified self link of an instance group.
 func (gce *GCECloud) GetRegionalBackendServiceHealth(name, region string, instanceGroupLink string) (*compute.BackendServiceGroupHealth, error) {
-	mc := newBackendServiceMetricContext("get_health")
+	mc := newBackendServiceMetricContext("get_health", region)
 	groupRef := &compute.ResourceGroupReference{Group: instanceGroupLink}
 	v, err := gce.service.RegionBackendServices.GetHealth(gce.projectID, region, name, groupRef).Do()
 	return v, mc.Observe(err)

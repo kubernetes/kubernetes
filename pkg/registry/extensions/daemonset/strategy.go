@@ -131,12 +131,12 @@ func DaemonSetToSelectableFields(daemon *extensions.DaemonSet) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	ds, ok := obj.(*extensions.DaemonSet)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a ds.")
+		return nil, nil, false, fmt.Errorf("given object is not a ds.")
 	}
-	return labels.Set(ds.ObjectMeta.Labels), DaemonSetToSelectableFields(ds), nil
+	return labels.Set(ds.ObjectMeta.Labels), DaemonSetToSelectableFields(ds), ds.Initializers != nil, nil
 }
 
 // MatchSetDaemon is the filter used by the generic etcd backend to route

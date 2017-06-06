@@ -35,7 +35,7 @@ option go_package = "v1";
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 message NetworkPolicy {
   // Standard object's metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -67,7 +67,7 @@ message NetworkPolicyIngressRule {
 // NetworkPolicyList is a list of NetworkPolicy objects.
 message NetworkPolicyList {
   // Standard list metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

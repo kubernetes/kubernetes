@@ -19,6 +19,7 @@ package apiconfig
 import (
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
@@ -45,8 +46,8 @@ const (
 
 // TODO: Are there any unit tests that could be made for this file other than duplicating all values and logic in a separate file?
 
-// CreateServiceAccounts creates the necessary serviceaccounts that kubeadm uses/might use.
-func CreateServiceAccounts(clientset *clientset.Clientset) error {
+// CreateServiceAccounts creates the necessary serviceaccounts that kubeadm uses/might use, if they don't already exist.
+func CreateServiceAccounts(clientset clientset.Interface) error {
 	serviceAccounts := []v1.ServiceAccount{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -64,7 +65,9 @@ func CreateServiceAccounts(clientset *clientset.Clientset) error {
 
 	for _, sa := range serviceAccounts {
 		if _, err := clientset.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Create(&sa); err != nil {
-			return err
+			if !apierrors.IsAlreadyExists(err) {
+				return err
+			}
 		}
 	}
 	return nil

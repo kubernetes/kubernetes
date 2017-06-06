@@ -885,15 +885,15 @@ func TestSetDefaulServiceExternalTraffic(t *testing.T) {
 	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeNodePort}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*v1.Service)
-	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeGlobal {
-		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeGlobal, out.Spec.ExternalTrafficPolicy)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
 	}
 
 	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*v1.Service)
-	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeGlobal {
-		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeGlobal, out.Spec.ExternalTrafficPolicy)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
 	}
 
 	in = &v1.Service{

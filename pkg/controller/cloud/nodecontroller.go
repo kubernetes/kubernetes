@@ -37,7 +37,9 @@ import (
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	clientretry "k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 var UpdateNodeSpecBackoff = wait.Backoff{
@@ -302,8 +304,8 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 			glog.Errorf("%v", err)
 			return err
 		} else if instanceType != "" {
-			glog.Infof("Adding node label from cloud provider: %s=%s", metav1.LabelInstanceType, instanceType)
-			curNode.ObjectMeta.Labels[metav1.LabelInstanceType] = instanceType
+			glog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelInstanceType, instanceType)
+			curNode.ObjectMeta.Labels[kubeletapis.LabelInstanceType] = instanceType
 		}
 
 		// TODO(wlan0): Move this logic to the route controller using the node taint instead of condition
@@ -325,12 +327,12 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 				return fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
 			if zone.FailureDomain != "" {
-				glog.Infof("Adding node label from cloud provider: %s=%s", metav1.LabelZoneFailureDomain, zone.FailureDomain)
-				curNode.ObjectMeta.Labels[metav1.LabelZoneFailureDomain] = zone.FailureDomain
+				glog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneFailureDomain, zone.FailureDomain)
+				curNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain] = zone.FailureDomain
 			}
 			if zone.Region != "" {
-				glog.Infof("Adding node label from cloud provider: %s=%s", metav1.LabelZoneRegion, zone.Region)
-				curNode.ObjectMeta.Labels[metav1.LabelZoneRegion] = zone.Region
+				glog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneRegion, zone.Region)
+				curNode.ObjectMeta.Labels[kubeletapis.LabelZoneRegion] = zone.Region
 			}
 		}
 
@@ -353,7 +355,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 
 func getCloudTaint(taints []v1.Taint) *v1.Taint {
 	for _, taint := range taints {
-		if taint.Key == metav1.TaintExternalCloudProvider {
+		if taint.Key == algorithm.TaintExternalCloudProvider {
 			return &taint
 		}
 	}
@@ -406,7 +408,7 @@ func nodeAddressesChangeDetected(addressSet1, addressSet2 []v1.NodeAddress) bool
 func ensureNodeProvidedIPExists(node *v1.Node, nodeAddresses []v1.NodeAddress) (*v1.NodeAddress, bool) {
 	var nodeIP *v1.NodeAddress
 	nodeIPExists := false
-	if providedIP, ok := node.ObjectMeta.Annotations[metav1.AnnotationProvidedIPAddr]; ok {
+	if providedIP, ok := node.ObjectMeta.Annotations[kubeletapis.AnnotationProvidedIPAddr]; ok {
 		nodeIPExists = true
 		for i := range nodeAddresses {
 			if nodeAddresses[i].Address == providedIP {

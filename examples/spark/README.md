@@ -55,13 +55,13 @@ $ kubectl config use-context spark
 
 ## Step Two: Start your Master service
 
-The Master [service](../../docs/user-guide/services.md) is the master service
+The Master [service](https://kubernetes.io/docs/user-guide/services.md) is the master service
 for a Spark cluster.
 
 Use the
 [`examples/spark/spark-master-controller.yaml`](spark-master-controller.yaml)
 file to create a
-[replication controller](../../docs/user-guide/replication-controller.md)
+[replication controller](https://kubernetes.io/docs/user-guide/replication-controller.md)
 running the Spark Master service.
 
 ```console
@@ -137,7 +137,7 @@ spark-ui-proxy   10.0.51.107   aad59283284d611e6839606c214502b5-833417581.us-eas
 
 The Spark UI in the above example output will be available at http://aad59283284d611e6839606c214502b5-833417581.us-east-1.elb.amazonaws.com
 
-If your Kubernetes cluster is not equipped with a Loadbalancer integration, you will need to use the [kubectl proxy](../../docs/user-guide/accessing-the-cluster.md#using-kubectl-proxy) to
+If your Kubernetes cluster is not equipped with a Loadbalancer integration, you will need to use the [kubectl proxy](https://kubernetes.io/docs/user-guide/accessing-the-cluster.md#using-kubectl-proxy) to
 connect to the Spark WebUI:
 
 ```console
@@ -156,7 +156,7 @@ program.
 The Spark workers need the Master service to be running.
 
 Use the [`examples/spark/spark-worker-controller.yaml`](spark-worker-controller.yaml) file to create a
-[replication controller](../../docs/user-guide/replication-controller.md) that manages the worker pods.
+[replication controller](https://kubernetes.io/docs/user-guide/replication-controller.md) that manages the worker pods.
 
 ```console
 $ kubectl create -f examples/spark/spark-worker-controller.yaml
@@ -353,7 +353,7 @@ Then visit [http://localhost:8080/](http://localhost:8080/).
   the `zeppelin` pod, you will need to provide a way for your clients to get to
   the
   [`examples/spark/spark-master-service.yaml`](spark-master-service.yaml). See
-  [Services](../../docs/user-guide/services.md) for more information.
+  [Services](https://kubernetes.io/docs/user-guide/services.md) for more information.
 
 ## Known Issues With Zeppelin
 

@@ -65,11 +65,11 @@ type Config struct {
 	GetDefinitions GetOpenAPIDefinitions
 
 	// GetOperationIDAndTags returns operation id and tags for a restful route. It is an optional function to customize operation IDs.
-	GetOperationIDAndTags func(servePath string, r *restful.Route) (string, []string, error)
+	GetOperationIDAndTags func(r *restful.Route) (string, []string, error)
 
 	// GetDefinitionName returns a friendly name for a definition base on the serving path. parameter `name` is the full name of the definition.
 	// It is an optional function to customize model names.
-	GetDefinitionName func(servePath string, name string) (string, spec.Extensions)
+	GetDefinitionName func(name string) (string, spec.Extensions)
 
 	// PostProcessSpec runs after the spec is ready to serve. It allows a final modification to the spec before serving.
 	PostProcessSpec func(*spec.Swagger) (*spec.Swagger, error)

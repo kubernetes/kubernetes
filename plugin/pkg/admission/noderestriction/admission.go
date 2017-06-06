@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -155,8 +156,12 @@ func (c *nodePlugin) admitPod(nodeName string, a admission.Attributes) error {
 		return nil
 
 	case admission.Delete:
-		// get the existing pod
+		// get the existing pod from the server cache
 		existingPod, err := c.podsGetter.Pods(a.GetNamespace()).Get(a.GetName(), v1.GetOptions{ResourceVersion: "0"})
+		if errors.IsNotFound(err) {
+			// wasn't found in the server cache, do a live lookup before forbidding
+			existingPod, err = c.podsGetter.Pods(a.GetNamespace()).Get(a.GetName(), v1.GetOptions{})
+		}
 		if err != nil {
 			return admission.NewForbidden(a, err)
 		}

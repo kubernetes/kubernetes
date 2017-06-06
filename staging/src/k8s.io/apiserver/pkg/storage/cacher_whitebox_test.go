@@ -37,7 +37,7 @@ import (
 func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	var lock sync.RWMutex
 	count := 0
-	filter := func(string, labels.Set, fields.Set) bool { return true }
+	filter := func(string, labels.Set, fields.Set, bool) bool { return true }
 	forget := func(bool) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -61,7 +61,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 }
 
 func TestCacheWatcherHandlesFiltering(t *testing.T) {
-	filter := func(_ string, _ labels.Set, field fields.Set) bool {
+	filter := func(_ string, _ labels.Set, field fields.Set, _ bool) bool {
 		return field["spec.nodeName"] == "host"
 	}
 	forget := func(bool) {}

@@ -133,6 +133,10 @@ func (a *ConfigMapAdapter) ClusterWatch(client kubeclientset.Interface, namespac
 	return client.CoreV1().ConfigMaps(namespace).Watch(options)
 }
 
+func (a *ConfigMapAdapter) IsSchedulingAdapter() bool {
+	return false
+}
+
 func (a *ConfigMapAdapter) NewTestObject(namespace string) pkgruntime.Object {
 	return &apiv1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

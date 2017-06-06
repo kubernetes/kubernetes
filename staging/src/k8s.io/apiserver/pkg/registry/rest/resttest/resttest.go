@@ -251,7 +251,7 @@ func (t *Tester) testCreateAlreadyExisting(obj runtime.Object, createFn CreateFu
 	}
 	defer t.delete(ctx, foo)
 
-	_, err := t.storage.(rest.Creater).Create(ctx, foo)
+	_, err := t.storage.(rest.Creater).Create(ctx, foo, false)
 	if !errors.IsAlreadyExists(err) {
 		t.Errorf("expected already exists err, got %v", err)
 	}
@@ -263,7 +263,7 @@ func (t *Tester) testCreateEquals(obj runtime.Object, getFn GetFunc) {
 	foo := copyOrDie(obj, t.scheme)
 	t.setObjectMeta(foo, t.namer(2))
 
-	created, err := t.storage.(rest.Creater).Create(ctx, foo)
+	created, err := t.storage.(rest.Creater).Create(ctx, foo, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -291,7 +291,7 @@ func (t *Tester) testCreateDiscardsObjectNamespace(valid runtime.Object) {
 	objectMeta.SetNamespace("not-default")
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
-	created, err := t.storage.(rest.Creater).Create(t.TestContext(), copyOrDie(valid, t.scheme))
+	created, err := t.storage.(rest.Creater).Create(t.TestContext(), copyOrDie(valid, t.scheme), false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -307,7 +307,7 @@ func (t *Tester) testCreateGeneratesName(valid runtime.Object) {
 	objectMeta.SetName("")
 	objectMeta.SetGenerateName("test-")
 
-	created, err := t.storage.(rest.Creater).Create(t.TestContext(), valid)
+	created, err := t.storage.(rest.Creater).Create(t.TestContext(), valid, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -322,7 +322,7 @@ func (t *Tester) testCreateHasMetadata(valid runtime.Object) {
 	objectMeta.SetName(t.namer(1))
 	objectMeta.SetNamespace(t.TestNamespace())
 
-	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid)
+	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -340,7 +340,7 @@ func (t *Tester) testCreateIgnoresContextNamespace(valid runtime.Object) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "not-default2")
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
-	created, err := t.storage.(rest.Creater).Create(ctx, copyOrDie(valid, t.scheme))
+	created, err := t.storage.(rest.Creater).Create(ctx, copyOrDie(valid, t.scheme), false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -359,7 +359,7 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "not-default2")
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
-	created, err := t.storage.(rest.Creater).Create(ctx, copyOrDie(valid, t.scheme))
+	created, err := t.storage.(rest.Creater).Create(ctx, copyOrDie(valid, t.scheme), false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -377,7 +377,7 @@ func (t *Tester) testCreateValidatesNames(valid runtime.Object) {
 		objCopyMeta.SetName(invalidName)
 
 		ctx := t.TestContext()
-		_, err := t.storage.(rest.Creater).Create(ctx, objCopy)
+		_, err := t.storage.(rest.Creater).Create(ctx, objCopy, false)
 		if !errors.IsInvalid(err) {
 			t.Errorf("%s: Expected to get an invalid resource error, got '%v'", invalidName, err)
 		}
@@ -389,7 +389,7 @@ func (t *Tester) testCreateValidatesNames(valid runtime.Object) {
 		objCopyMeta.SetName(objCopyMeta.GetName() + invalidSuffix)
 
 		ctx := t.TestContext()
-		_, err := t.storage.(rest.Creater).Create(ctx, objCopy)
+		_, err := t.storage.(rest.Creater).Create(ctx, objCopy, false)
 		if !errors.IsInvalid(err) {
 			t.Errorf("%s: Expected to get an invalid resource error, got '%v'", invalidSuffix, err)
 		}
@@ -399,7 +399,7 @@ func (t *Tester) testCreateValidatesNames(valid runtime.Object) {
 func (t *Tester) testCreateInvokesValidation(invalid ...runtime.Object) {
 	for i, obj := range invalid {
 		ctx := t.TestContext()
-		_, err := t.storage.(rest.Creater).Create(ctx, obj)
+		_, err := t.storage.(rest.Creater).Create(ctx, obj, false)
 		if !errors.IsInvalid(err) {
 			t.Errorf("%d: Expected to get an invalid resource error, got %v", i, err)
 		}
@@ -410,7 +410,7 @@ func (t *Tester) testCreateRejectsMismatchedNamespace(valid runtime.Object) {
 	objectMeta := t.getObjectMetaOrFail(valid)
 	objectMeta.SetNamespace("not-default")
 
-	_, err := t.storage.(rest.Creater).Create(t.TestContext(), valid)
+	_, err := t.storage.(rest.Creater).Create(t.TestContext(), valid, false)
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
 	} else if !strings.Contains(err.Error(), "does not match the namespace sent on the request") {
@@ -424,7 +424,7 @@ func (t *Tester) testCreateResetsUserData(valid runtime.Object) {
 	objectMeta.SetUID("bad-uid")
 	objectMeta.SetCreationTimestamp(now)
 
-	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid)
+	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -442,7 +442,7 @@ func (t *Tester) testCreateIgnoreClusterName(valid runtime.Object) {
 	objectMeta.SetName(t.namer(3))
 	objectMeta.SetClusterName("clustername-to-ignore")
 
-	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), copyOrDie(valid, t.scheme))
+	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), copyOrDie(valid, t.scheme), false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1071,14 +1071,14 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 
 	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar3")
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx1))
-	_, err := t.storage.(rest.Creater).Create(ctx1, obj)
+	_, err := t.storage.(rest.Creater).Create(ctx1, obj, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar4")
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx2))
-	_, err = t.storage.(rest.Creater).Create(ctx2, obj)
+	_, err = t.storage.(rest.Creater).Create(ctx2, obj, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1112,7 +1112,7 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 	ctx := t.TestContext()
 	t.setObjectMeta(obj, t.namer(1))
 
-	existing, err := t.storage.(rest.Creater).Create(ctx, obj)
+	existing, err := t.storage.(rest.Creater).Create(ctx, obj, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1135,7 +1135,7 @@ func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
 	objMeta := t.getObjectMetaOrFail(obj)
 	objMeta.SetName(t.namer(4))
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx1))
-	_, err := t.storage.(rest.Creater).Create(ctx1, obj)
+	_, err := t.storage.(rest.Creater).Create(ctx1, obj, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1154,7 +1154,7 @@ func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
 func (t *Tester) testGetNotFound(obj runtime.Object) {
 	ctx := t.TestContext()
 	t.setObjectMeta(obj, t.namer(2))
-	_, err := t.storage.(rest.Creater).Create(ctx, obj)
+	_, err := t.storage.(rest.Creater).Create(ctx, obj, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

@@ -92,12 +92,13 @@ func (x *AdmissionReview) CodecEncodeSelf(e *codec1978.Encoder) {
 			const yyr2 bool = false
 			yyq2[0] = x.Kind != ""
 			yyq2[1] = x.APIVersion != ""
+			yyq2[2] = true
 			yyq2[3] = true
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(4)
 			} else {
-				yynn2 = 1
+				yynn2 = 0
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -158,14 +159,20 @@ func (x *AdmissionReview) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yy10 := &x.Spec
-				yy10.CodecEncodeSelf(e)
+				if yyq2[2] {
+					yy10 := &x.Spec
+					yy10.CodecEncodeSelf(e)
+				} else {
+					r.EncodeNil()
+				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("spec"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yy12 := &x.Spec
-				yy12.CodecEncodeSelf(e)
+				if yyq2[2] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("spec"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					yy12 := &x.Spec
+					yy12.CodecEncodeSelf(e)
+				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)

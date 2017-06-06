@@ -2901,10 +2901,10 @@ func validateServiceExternalTrafficFieldsValue(service *api.Service) field.Error
 
 	// Check first class fields.
 	if service.Spec.ExternalTrafficPolicy != "" &&
-		service.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeGlobal &&
+		service.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeCluster &&
 		service.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeLocal {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("externalTrafficPolicy"), service.Spec.ExternalTrafficPolicy,
-			fmt.Sprintf("ExternalTrafficPolicy must be empty, %v or %v", api.ServiceExternalTrafficPolicyTypeGlobal, api.ServiceExternalTrafficPolicyTypeLocal)))
+			fmt.Sprintf("ExternalTrafficPolicy must be empty, %v or %v", api.ServiceExternalTrafficPolicyTypeCluster, api.ServiceExternalTrafficPolicyTypeLocal)))
 	}
 	if service.Spec.HealthCheckNodePort < 0 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("healthCheckNodePort"), service.Spec.HealthCheckNodePort,
@@ -3299,6 +3299,7 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 // Refer to docs/design/resources.md for more details.
 func validateContainerResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
+
 	if len(strings.Split(value, "/")) == 1 {
 		if !helper.IsStandardContainerResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))

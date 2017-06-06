@@ -46,6 +46,10 @@ func (t *testRolePrinter) HandledResources() []string {
 	return []string{}
 }
 
+func (t *testRolePrinter) IsGeneric() bool {
+	return true
+}
+
 func TestCreateRole(t *testing.T) {
 	roleName := "my-role"
 
@@ -344,8 +348,8 @@ func TestValidate(t *testing.T) {
 	for name, test := range tests {
 		test.roleOptions.Mapper, _ = f.Object()
 		err := test.roleOptions.Validate()
-		if test.expectErr && err != nil {
-			continue
+		if test.expectErr && err == nil {
+			t.Errorf("%s: expect error happens but validate passes.", name)
 		}
 		if !test.expectErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", name, err)
@@ -492,8 +496,13 @@ func TestComplete(t *testing.T) {
 		if !test.expectErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", name, err)
 		}
-		if test.expectErr && err != nil {
-			continue
+
+		if test.expectErr {
+			if err != nil {
+				continue
+			} else {
+				t.Errorf("%s: expect error happens but test passes.", name)
+			}
 		}
 
 		if test.roleOptions.Name != test.expected.Name {

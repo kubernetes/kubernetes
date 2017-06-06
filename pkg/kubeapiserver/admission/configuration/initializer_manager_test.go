@@ -30,7 +30,6 @@ type mockLister struct {
 	invoked           int
 	successes         int
 	failures          int
-	stopCh            chan struct{}
 	configurationList v1alpha1.InitializerConfigurationList
 	t                 *testing.T
 }
@@ -40,20 +39,15 @@ func newMockLister(successes, failures int, configurationList v1alpha1.Initializ
 		failures:          failures,
 		successes:         successes,
 		configurationList: configurationList,
-		stopCh:            make(chan struct{}),
 		t:                 t,
 	}
 }
 
 // The first List will be successful; the next m.failures List will
-// fail; the next m.successes List will be successful; the stopCh is closed at
-// the 1+m.failures+m.successes call.
+// fail; the next m.successes List will be successful
+// List should only be called 1+m.failures+m.successes times.
 func (m *mockLister) List(options metav1.ListOptions) (*v1alpha1.InitializerConfigurationList, error) {
 	m.invoked++
-	// m.successes could be 0, so call this `if` first.
-	if m.invoked == 1+m.failures+m.successes {
-		close(m.stopCh)
-	}
 	if m.invoked == 1 {
 		return &m.configurationList, nil
 	}
@@ -63,7 +57,7 @@ func (m *mockLister) List(options metav1.ListOptions) (*v1alpha1.InitializerConf
 	if m.invoked <= 1+m.failures+m.successes {
 		return &m.configurationList, nil
 	}
-	m.t.Fatalf("unexpected call to List, stopCh has been closed at the %d time call", 1+m.successes+m.failures)
+	m.t.Fatalf("unexpected call to List, should only be called %d times", 1+m.successes+m.failures)
 	return nil, nil
 }
 
@@ -103,8 +97,9 @@ func TestConfiguration(t *testing.T) {
 		mock := newMockLister(c.successes, c.failures, v1alpha1.InitializerConfigurationList{}, t)
 		manager := NewInitializerConfigurationManager(mock)
 		manager.interval = 1 * time.Millisecond
-		manager.Run(mock.stopCh)
-		<-mock.stopCh
+		for i := 0; i < 1+c.successes+c.failures; i++ {
+			manager.sync()
+		}
 		_, err := manager.Initializers()
 		if err != nil && c.expectReady {
 			t.Errorf("case %s, expect ready, got: %v", c.name, err)

@@ -122,3 +122,86 @@ func TestToKubeContainer(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expect, got)
 }
+
+func TestGetImageUser(t *testing.T) {
+	_, i, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	type image struct {
+		name     string
+		uid      *runtimeapi.Int64Value
+		username string
+	}
+
+	type imageUserValues struct {
+		// getImageUser can return (*int64)(nil) so comparing with *uid will break
+		// type cannot be *int64 as Golang does not allow to take the address of a numeric constant"
+		uid      interface{}
+		username string
+		err      error
+	}
+
+	tests := []struct {
+		description             string
+		originalImage           image
+		expectedImageUserValues imageUserValues
+	}{
+		{
+			"image without username and uid should return (new(int64), \"\", nil)",
+			image{
+				name:     "test-image-ref1",
+				uid:      (*runtimeapi.Int64Value)(nil),
+				username: "",
+			},
+			imageUserValues{
+				uid:      int64(0),
+				username: "",
+				err:      nil,
+			},
+		},
+		{
+			"image with username and no uid should return ((*int64)nil, imageStatus.Username, nil)",
+			image{
+				name:     "test-image-ref2",
+				uid:      (*runtimeapi.Int64Value)(nil),
+				username: "testUser",
+			},
+			imageUserValues{
+				uid:      (*int64)(nil),
+				username: "testUser",
+				err:      nil,
+			},
+		},
+		{
+			"image with uid should return (*int64, \"\", nil)",
+			image{
+				name: "test-image-ref3",
+				uid: &runtimeapi.Int64Value{
+					Value: 2,
+				},
+				username: "whatever",
+			},
+			imageUserValues{
+				uid:      int64(2),
+				username: "",
+				err:      nil,
+			},
+		},
+	}
+
+	i.SetFakeImages([]string{"test-image-ref1", "test-image-ref2", "test-image-ref3"})
+	for j, test := range tests {
+		i.Images[test.originalImage.name].Username = test.originalImage.username
+		i.Images[test.originalImage.name].Uid = test.originalImage.uid
+
+		uid, username, error := m.getImageUser(test.originalImage.name)
+		assert.NoError(t, error, "TestCase[%d]", j)
+
+		if test.expectedImageUserValues.uid == (*int64)(nil) {
+			assert.Equal(t, test.expectedImageUserValues.uid, uid, "TestCase[%d]", j)
+		} else {
+			assert.Equal(t, test.expectedImageUserValues.uid, *uid, "TestCase[%d]", j)
+		}
+		assert.Equal(t, test.expectedImageUserValues.username, username, "TestCase[%d]", j)
+	}
+}

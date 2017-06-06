@@ -11,6 +11,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "config_selfclient_test.go",
         "config_test.go",
         "genericapiserver_test.go",
     ],
@@ -100,6 +101,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server/filters:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/mux:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/openapi:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/routes:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",

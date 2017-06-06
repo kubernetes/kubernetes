@@ -334,6 +334,12 @@ kube::util::group-version-to-pkg-path() {
     meta/v1)
       echo "../vendor/k8s.io/apimachinery/pkg/apis/meta/v1"
       ;;
+    meta/v1alpha1)
+      echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+      ;;
+    meta/v1alpha1)
+      echo "../vendor/k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+      ;;
     unversioned)
       echo "pkg/api/unversioned"
       ;;

@@ -24,7 +24,7 @@ import (
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
-	// Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
@@ -77,11 +77,11 @@ type HorizontalPodAutoscalerStatus struct {
 // configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
 	// +optional
 	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
@@ -104,15 +104,15 @@ type HorizontalPodAutoscalerList struct {
 // Scale represents a scaling request for a resource.
 type Scale struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
 	// +optional
 	Spec ScaleSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
+	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
 	// +optional
 	Status ScaleStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
@@ -249,6 +249,42 @@ type MetricStatus struct {
 	// to normal per-pod metrics using the "pods" source.
 	// +optional
 	Resource *ResourceMetricStatus `json:"resource,omitempty" protobuf:"bytes,4,opt,name=resource"`
+}
+
+// HorizontalPodAutoscalerConditionType are the valid conditions of
+// a HorizontalPodAutoscaler.
+type HorizontalPodAutoscalerConditionType string
+
+var (
+	// ScalingActive indicates that the HPA controller is able to scale if necessary:
+	// it's correctly configured, can fetch the desired metrics, and isn't disabled.
+	ScalingActive HorizontalPodAutoscalerConditionType = "ScalingActive"
+	// AbleToScale indicates a lack of transient issues which prevent scaling from occuring,
+	// such as being in a backoff window, or being unable to access/update the target scale.
+	AbleToScale HorizontalPodAutoscalerConditionType = "AbleToScale"
+	// ScalingLimited indicates that the calculated scale based on metrics would be above or
+	// below the range for the HPA, and has thus been capped.
+	ScalingLimited HorizontalPodAutoscalerConditionType = "ScalingLimited"
+)
+
+// HorizontalPodAutoscalerCondition describes the state of
+// a HorizontalPodAutoscaler at a certain point.
+type HorizontalPodAutoscalerCondition struct {
+	// type describes the current condition
+	Type HorizontalPodAutoscalerConditionType `json:"type" protobuf:"bytes,1,name=type"`
+	// status is the status of the condition (True, False, Unknown)
+	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,name=status"`
+	// lastTransitionTime is the last time the condition transitioned from
+	// one status to another
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
+	// reason is the reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
+	// message is a human-readable explanation containing details about
+	// the transition
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
 // ObjectMetricStatus indicates the current value of a metric describing a

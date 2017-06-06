@@ -52,14 +52,17 @@ type Manager interface {
 	// Start the API server status sync loop.
 	Start()
 	// Current returns the currently selected certificate from the
-	// certificate manager.
+	// certificate manager, as well as the associated certificate and key data
+	// in PEM format.
 	Current() *tls.Certificate
 }
 
 // Config is the set of configuration parameters available for a new Manager.
 type Config struct {
 	// CertificateSigningRequestClient will be used for signing new certificate
-	// requests generated when a key rotation occurs.
+	// requests generated when a key rotation occurs. It must be set either at
+	// initialization or by using CertificateSigningRequestClient before
+	// Manager.Start() is called.
 	CertificateSigningRequestClient certificatesclient.CertificateSigningRequestInterface
 	// Template is the CertificateRequest that will be used as a template for
 	// generating certificate signing requests for all new keys generated as
@@ -99,7 +102,8 @@ type Config struct {
 // Depending on the concrete implementation, the backing store for this
 // behavior may vary.
 type Store interface {
-	// Current returns the currently selected certificate. If the Store doesn't
+	// Current returns the currently selected certificate, as well as the
+	// associated certificate and key data in PEM format. If the Store doesn't
 	// have a cert/key pair currently, it should return a NoCertKeyError so
 	// that the Manager can recover by using bootstrap certificates to request
 	// a new cert/key pair.
