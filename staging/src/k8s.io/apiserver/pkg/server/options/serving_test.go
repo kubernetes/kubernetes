@@ -395,7 +395,8 @@ func TestServerRunWithSNI(t *testing.T) {
 	}
 
 	specToName := func(spec TestCertSpec) string {
-		return spec.host + "_" + strings.Join(spec.names, ",") + "_" + strings.Join(spec.ips, ",")
+		name := spec.host + "_" + strings.Join(spec.names, ",") + "_" + strings.Join(spec.ips, ",")
+		return strings.Replace(name, "*", "star", -1)
 	}
 
 NextTest:
