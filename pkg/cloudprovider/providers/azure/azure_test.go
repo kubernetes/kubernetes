@@ -604,6 +604,20 @@ func TestNewCloudFromJSON(t *testing.T) {
 	validateConfig(t, config)
 }
 
+// Test Backoff and Rate Limit defaults (json)
+func TestCloudDefaultConfigFromJSON(t *testing.T) {
+	config := `{}`
+
+	validateEmptyConfig(t, config)
+}
+
+// Test Backoff and Rate Limit defaults (yaml)
+func TestCloudDefaultConfigFromYAML(t *testing.T) {
+	config := ``
+
+	validateEmptyConfig(t, config)
+}
+
 // Test Configuration deserialization (yaml)
 func TestNewCloudFromYAML(t *testing.T) {
 	config := `
@@ -631,16 +645,7 @@ cloudProviderRateLimitBucket: 5
 }
 
 func validateConfig(t *testing.T, config string) {
-	configReader := strings.NewReader(config)
-	cloud, err := NewCloud(configReader)
-	if err != nil {
-		t.Error(err)
-	}
-
-	azureCloud, ok := cloud.(*Cloud)
-	if !ok {
-		t.Error("NewCloud returned incorrect type")
-	}
+	azureCloud := getCloudFromConfig(t, config)
 
 	if azureCloud.TenantID != "--tenant-id--" {
 		t.Errorf("got incorrect value for TenantID")
@@ -698,6 +703,34 @@ func validateConfig(t *testing.T, config string) {
 	}
 	if azureCloud.CloudProviderRateLimitBucket != 5 {
 		t.Errorf("got incorrect value for CloudProviderRateLimitBucket")
+	}
+}
+
+func getCloudFromConfig(t *testing.T, config string) *Cloud {
+	configReader := strings.NewReader(config)
+	cloud, err := NewCloud(configReader)
+	if err != nil {
+		t.Error(err)
+	}
+	azureCloud, ok := cloud.(*Cloud)
+	if !ok {
+		t.Error("NewCloud returned incorrect type")
+	}
+	return azureCloud
+}
+
+// TODO include checks for other appropriate default config parameters
+func validateEmptyConfig(t *testing.T, config string) {
+	azureCloud := getCloudFromConfig(t, config)
+
+	// backoff should be disabled by default if not explicitly enabled in config
+	if azureCloud.CloudProviderBackoff != false {
+		t.Errorf("got incorrect value for CloudProviderBackoff")
+	}
+
+	// rate limits should be disabled by default if not explicitly enabled in config
+	if azureCloud.CloudProviderRateLimit != false {
+		t.Errorf("got incorrect value for CloudProviderRateLimit")
 	}
 }
 
