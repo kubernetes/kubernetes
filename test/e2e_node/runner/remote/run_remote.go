@@ -590,7 +590,39 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		}
 		instanceRunning = true
 	}
+	// If instance didn't reach running state in time, return with error now.
+	if err != nil {
+		return name, err
+	}
+	// Instance reached running state in time, make sure that cloud-init is complete
+	if isCloudInitUsed(imageConfig.metadata) {
+		cloudInitFinished := false
+		for i := 0; i < 60 && !cloudInitFinished; i++ {
+			if i > 0 {
+				time.Sleep(time.Second * 20)
+			}
+			var finished string
+			finished, err = remote.SSH(name, "ls", "/var/lib/cloud/instance/boot-finished")
+			if err != nil {
+				err = fmt.Errorf("instance %s has not finished cloud-init script: %s", name, finished)
+				continue
+			}
+			cloudInitFinished = true
+		}
+	}
 	return name, err
+}
+
+func isCloudInitUsed(metadata *compute.Metadata) bool {
+	if metadata == nil {
+		return false
+	}
+	for _, item := range metadata.Items {
+		if item.Key == "user-data" && strings.HasPrefix(item.Value, "#cloud-config") {
+			return true
+		}
+	}
+	return false
 }
 
 func getExternalIp(instance *compute.Instance) string {
