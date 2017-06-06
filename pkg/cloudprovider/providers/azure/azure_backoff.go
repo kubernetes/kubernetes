@@ -31,7 +31,6 @@ func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.Virtua
 	var machine compute.VirtualMachine
 	var exists bool
 	err := wait.ExponentialBackoff(az.resourceRequestBackoff, func() (bool, error) {
-		az.operationPollRateLimiter.Accept()
 		var retryErr error
 		machine, exists, retryErr = az.getVirtualMachine(name)
 		if retryErr != nil {
