@@ -280,25 +280,6 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 	kl.runtimeState.setPodCIDR(cidr)
 }
 
-// shapingEnabled returns whether traffic shaping is enabled.
-func (kl *Kubelet) shapingEnabled() bool {
-	// Disable shaping if a network plugin is defined and supports shaping
-	if kl.networkPlugin != nil && kl.networkPlugin.Capabilities().Has(network.NET_PLUGIN_CAPABILITY_SHAPING) {
-		return false
-	}
-	// This is not strictly true but we need to figure out how to handle
-	// bandwidth shaping anyway. If the kubelet doesn't have a networkPlugin,
-	// it could mean:
-	// a. the kubelet is responsible for bandwidth shaping
-	// b. the kubelet is using cri, and the cri has a network plugin
-	// Today, the only plugin that understands bandwidth shaping is kubenet, and
-	// it doesn't support bandwidth shaping when invoked through cri, so it
-	// effectively boils down to letting the kubelet decide how to handle
-	// shaping annotations. The combination of (cri + network plugin that
-	// handles bandwidth shaping) may not work because of this.
-	return true
-}
-
 // syncNetworkUtil ensures the network utility are present on host.
 // Network util includes:
 // 1. 	In nat table, KUBE-MARK-DROP rule to mark connections for dropping

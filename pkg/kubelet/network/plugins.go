@@ -43,12 +43,6 @@ const DefaultPluginName = "kubernetes.io/no-op"
 const NET_PLUGIN_EVENT_POD_CIDR_CHANGE = "pod-cidr-change"
 const NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
 
-// Plugin capabilities
-const (
-	// Indicates the plugin handles Kubernetes bandwidth shaping annotations internally
-	NET_PLUGIN_CAPABILITY_SHAPING int = 1
-)
-
 // Plugin is an interface to network plugins for the kubelet
 type NetworkPlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
