@@ -250,22 +250,19 @@ func extractOwnerReference(src interface{}) metav1.OwnerReference {
 
 func setOwnerReference(src metav1.OwnerReference) map[string]interface{} {
 	ret := make(map[string]interface{})
-	controllerPtr := src.Controller
-	if controllerPtr != nil {
-		controller := *controllerPtr
-		controllerPtr = &controller
-	}
-	blockOwnerDeletionPtr := src.BlockOwnerDeletion
-	if blockOwnerDeletionPtr != nil {
-		blockOwnerDeletion := *blockOwnerDeletionPtr
-		blockOwnerDeletionPtr = &blockOwnerDeletion
-	}
 	setNestedField(ret, src.Kind, "kind")
 	setNestedField(ret, src.Name, "name")
 	setNestedField(ret, src.APIVersion, "apiVersion")
 	setNestedField(ret, string(src.UID), "uid")
-	setNestedField(ret, controllerPtr, "controller")
-	setNestedField(ret, blockOwnerDeletionPtr, "blockOwnerDeletion")
+	// json.Unmarshal() extracts boolean json fields as bool, not as *bool and hence extractOwnerReference()
+	// expects bool or a missing field, not *bool. So if pointer is nil, fields are omitted from the ret object.
+	// If pointer is non-nil, they are set to the referenced value.
+	if src.Controller != nil {
+		setNestedField(ret, *src.Controller, "controller")
+	}
+	if src.BlockOwnerDeletion != nil {
+		setNestedField(ret, *src.BlockOwnerDeletion, "blockOwnerDeletion")
+	}
 	return ret
 }
 
