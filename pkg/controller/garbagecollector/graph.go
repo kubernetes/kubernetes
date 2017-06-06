@@ -56,6 +56,18 @@ type node struct {
 	// when processing an Update event, we need to compare the updated
 	// ownerReferences with the owners recorded in the graph.
 	owners []metav1.OwnerReference
+	// deletionGeneration can only be set once, it records the generation of the
+	// object when gc's attemptToOrphanWorker processes the object for the first
+	// time.
+	deletionGeneration     int64
+	deletionGenerationOnce sync.Once
+}
+
+func (n *node) setDeletionGenerationOnce(generation int64) int64 {
+	n.deletionGenerationOnce.Do(func() {
+		n.deletionGeneration = generation
+	})
+	return n.deletionGeneration
 }
 
 // An object is on a one way trip to its final deletion if it starts being
