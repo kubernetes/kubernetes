@@ -879,8 +879,15 @@ func TestRegisterWithApiServer(t *testing.T) {
 	kubeClient.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		// Return an existing (matching) node on get.
 		return true, &v1.Node{
-			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
-			Spec:       v1.NodeSpec{ExternalID: testKubeletHostname},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testKubeletHostname,
+				Labels: map[string]string{
+					metav1.LabelHostname: testKubeletHostname,
+					metav1.LabelOS:       goruntime.GOOS,
+					metav1.LabelArch:     goruntime.GOARCH,
+				},
+			},
+			Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
 		}, nil
 	})
 	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
@@ -935,7 +942,13 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 	newNode := func(cmad bool, externalID string) *v1.Node {
 		node := &v1.Node{
-			ObjectMeta: metav1.ObjectMeta{},
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					metav1.LabelHostname: testKubeletHostname,
+					metav1.LabelOS:       goruntime.GOOS,
+					metav1.LabelArch:     goruntime.GOARCH,
+				},
+			},
 			Spec: v1.NodeSpec{
 				ExternalID: externalID,
 			},
@@ -1167,8 +1180,6 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 
 func TestUpdateDefaultLabels(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
 
 	cases := []struct {
 		name         string
@@ -1319,6 +1330,9 @@ func TestUpdateDefaultLabels(t *testing.T) {
 	}
 
 	for _, tc := range cases {
+		defer testKubelet.Cleanup()
+		kubelet := testKubelet.kubelet
+
 		needsUpdate := kubelet.updateDefaultLabels(tc.initialNode, tc.existingNode)
 		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 		assert.Equal(t, tc.finalLabels, tc.existingNode.Labels, tc.name)
