@@ -103,7 +103,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	// JSON is valid YAML, so this should work for everything.
 	json, err := utilyaml.ToJSON(data)
 	if err != nil {
-		return false, nil, err
+		return false, pod, err
 	}
 	obj, err := runtime.Decode(api.Codecs.UniversalDecoder(), json)
 	if err != nil {
