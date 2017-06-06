@@ -33,6 +33,20 @@ type ExternalAdmissionHookConfigurationManager struct {
 	*poller
 }
 
+func NewExternalAdmissionHookConfigurationManager(c ExternalAdmissionHookConfigurationLister) *ExternalAdmissionHookConfigurationManager {
+	getFn := func() (runtime.Object, error) {
+		list, err := c.List(metav1.ListOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return mergeExternalAdmissionHookConfigurations(list), nil
+	}
+
+	return &ExternalAdmissionHookConfigurationManager{
+		newPoller(getFn),
+	}
+}
+
 // ExternalAdmissionHooks returns the merged ExternalAdmissionHookConfiguration.
 func (im *ExternalAdmissionHookConfigurationManager) ExternalAdmissionHooks() (*v1alpha1.ExternalAdmissionHookConfiguration, error) {
 	configuration, err := im.poller.configuration()
@@ -46,17 +60,8 @@ func (im *ExternalAdmissionHookConfigurationManager) ExternalAdmissionHooks() (*
 	return externalAdmissionHookConfiguration, nil
 }
 
-func NewExternalAdmissionHookConfigurationManager(c ExternalAdmissionHookConfigurationLister) *ExternalAdmissionHookConfigurationManager {
-	getFn := func() (runtime.Object, error) {
-		list, err := c.List(metav1.ListOptions{})
-		if err != nil {
-			return nil, err
-		}
-		return mergeExternalAdmissionHookConfigurations(list), nil
-	}
-
-	return &ExternalAdmissionHookConfigurationManager{
-		newPoller(getFn)}
+func (im *ExternalAdmissionHookConfigurationManager) Run(stopCh <-chan struct{}) {
+	im.poller.Run(stopCh)
 }
 
 func mergeExternalAdmissionHookConfigurations(

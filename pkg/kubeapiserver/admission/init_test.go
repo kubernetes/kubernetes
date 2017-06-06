@@ -57,7 +57,7 @@ var _ WantsAuthorizer = &WantAuthorizerAdmission{}
 // TestWantsAuthorizer ensures that the authorizer is injected when the WantsAuthorizer
 // interface is implemented.
 func TestWantsAuthorizer(t *testing.T) {
-	initializer := NewPluginInitializer(nil, nil, &TestAuthorizer{}, nil, nil, nil)
+	initializer := NewPluginInitializer(nil, nil, nil, &TestAuthorizer{}, nil, nil, nil)
 	wantAuthorizerAdmission := &WantAuthorizerAdmission{}
 	initializer.Initialize(wantAuthorizerAdmission)
 	if wantAuthorizerAdmission.auth == nil {
@@ -76,7 +76,7 @@ func (self *WantsCloudConfigAdmissionPlugin) SetCloudConfig(cloudConfig []byte) 
 
 func TestCloudConfigAdmissionPlugin(t *testing.T) {
 	cloudConfig := []byte("cloud-configuration")
-	initializer := NewPluginInitializer(nil, nil, &TestAuthorizer{}, cloudConfig, nil, nil)
+	initializer := NewPluginInitializer(nil, nil, nil, &TestAuthorizer{}, cloudConfig, nil, nil)
 	wantsCloudConfigAdmission := &WantsCloudConfigAdmissionPlugin{}
 	initializer.Initialize(wantsCloudConfigAdmission)
 

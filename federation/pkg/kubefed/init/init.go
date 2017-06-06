@@ -692,7 +692,7 @@ func createAPIServer(clientset client.Interface, namespace, name, federationName
 		"--client-ca-file":       "/etc/federation/apiserver/ca.crt",
 		"--tls-cert-file":        "/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file": "/etc/federation/apiserver/server.key",
-		"--admission-control":    "Initializers,NamespaceLifecycle",
+		"--admission-control":    "NamespaceLifecycle",
 	}
 
 	if advertiseAddress != "" {
