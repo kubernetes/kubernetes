@@ -2,6 +2,8 @@ apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
   name: echomap
+  annotations:
+    ingress.kubernetes.io/rewrite-target: /
 spec:
   rules:
   - host: foo.bar.com
