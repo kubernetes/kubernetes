@@ -1,12 +1,12 @@
 # Kubernetes Documentation: releases.k8s.io/HEAD
 
-* The [User's guide](user-guide/README.md) is for anyone who wants to run programs and
+* The [User's guide](https://kubernetes.io/docs/home/) is for anyone who wants to run programs and
   services on an existing Kubernetes cluster.
 
-* The [Cluster Admin's guide](admin/README.md) is for anyone setting up
+* The [Cluster Admin's guide](https://kubernetes.io/docs/concepts/cluster-administration/cluster-administration-overview/) is for anyone setting up
   a Kubernetes cluster or administering it.
 
-* The [Developer guide](devel/README.md) is for anyone wanting to write
+* The [Developer guide](https://github.com/kubernetes/community/blob/master/contributors/devel/README.md) is for anyone wanting to write
   programs that access the Kubernetes API, write plugins or extensions, or
   modify the core code of Kubernetes.
 
@@ -24,7 +24,7 @@
 * If something went wrong, see the [troubleshooting](http://kubernetes.io/docs/troubleshooting/) guide for how to debug.
 You should also check the [known issues for the release](../CHANGELOG.md) you're using.
 
-* To report a security issue, see [Reporting a Security Issue](reporting-security-issues.md).
+* To report a security issue, see [Reporting a Security Issue](https://kubernetes.io/security/).
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
