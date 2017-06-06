@@ -457,7 +457,7 @@ func TestNotReadNodeDaemonDoesNotLaunchPod(t *testing.T) {
 		}
 		manager.nodeStore.Add(node)
 		manager.dsStore.Add(ds)
-		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 	}
 }
 
@@ -585,7 +585,7 @@ func TestNetworkUnavailableNodeDaemonLaunchesPod(t *testing.T) {
 		manager.nodeStore.Add(node)
 		manager.dsStore.Add(ds)
 
-		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 	}
 }
 
@@ -1088,7 +1088,7 @@ func TestNotReadyNodeDaemonLaunchesPod(t *testing.T) {
 		manager.nodeStore.Add(node)
 		manager.dsStore.Add(ds)
 
-		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 	}
 }
 
@@ -1107,7 +1107,7 @@ func TestUnreachableNodeDaemonLaunchesPod(t *testing.T) {
 		manager.nodeStore.Add(node)
 		manager.dsStore.Add(ds)
 
-		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 	}
 }
 
