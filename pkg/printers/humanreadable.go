@@ -60,12 +60,12 @@ type handlerEntry struct {
 // will only be printed if the object type changes. This makes it useful for printing items
 // received from watches.
 type HumanReadablePrinter struct {
-	handlerMap   map[reflect.Type]*handlerEntry
-	options      PrintOptions
-	lastType     reflect.Type
-	hiddenObjNum int
-	encoder      runtime.Encoder
-	decoder      runtime.Decoder
+	handlerMap    map[reflect.Type]*handlerEntry
+	options       PrintOptions
+	lastType      reflect.Type
+	skipTabWriter bool
+	encoder       runtime.Encoder
+	decoder       runtime.Decoder
 }
 
 var _ PrintHandler = &HumanReadablePrinter{}
@@ -87,6 +87,13 @@ func NewTablePrinter() *HumanReadablePrinter {
 	return &HumanReadablePrinter{
 		handlerMap: make(map[reflect.Type]*handlerEntry),
 	}
+}
+
+// AddTabWriter sets whether the PrintObj function will format with tabwriter (true
+// by default).
+func (a *HumanReadablePrinter) AddTabWriter(t bool) *HumanReadablePrinter {
+	a.skipTabWriter = !t
+	return a
 }
 
 func (a *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePrinter {
@@ -267,9 +274,14 @@ func (h *HumanReadablePrinter) printHeader(columnNames []string, w io.Writer) er
 }
 
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
+// TODO: unify the behavior of PrintObj, which often expects single items and tracks
+// headers and filtering, with other printers, that expect list objects. The tracking
+// behavior should probably be a higher level wrapper (MultiObjectTablePrinter) that
+// calls into the PrintTable method and then displays consistent output.
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
-	// if output is a tabwriter (when it's called by kubectl get), we use it; create a new tabwriter otherwise
-	if w, found := output.(*tabwriter.Writer); found {
+	if w, found := output.(*tabwriter.Writer); !found && !h.skipTabWriter {
+		w = GetNewTabWriter(output)
+		output = w
 		defer w.Flush()
 	}
 
