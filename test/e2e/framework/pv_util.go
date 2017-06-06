@@ -641,10 +641,10 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 	}
 }
 
-func CreatePDWithRetry() (string, error) {
+func createPDWithRetry(zone string) (string, error) {
 	var err error
 	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
-		newDiskName, err := createPD()
+		newDiskName, err := createPD(zone)
 		if err != nil {
 			Logf("Couldn't create a new PD, sleeping 5 seconds: %v", err)
 			continue
@@ -653,6 +653,14 @@ func CreatePDWithRetry() (string, error) {
 		return newDiskName, nil
 	}
 	return "", err
+}
+
+func CreatePDWithRetry() (string, error) {
+	return createPDWithRetry("")
+}
+
+func CreatePDWithRetryAndZone(zone string) (string, error) {
+	return createPDWithRetry(zone)
 }
 
 func DeletePDWithRetry(diskName string) error {
@@ -669,7 +677,11 @@ func DeletePDWithRetry(diskName string) error {
 	return fmt.Errorf("unable to delete PD %q: %v", diskName, err)
 }
 
-func createPD() (string, error) {
+func createPD(zone string) (string, error) {
+	if zone == "" {
+		zone = TestContext.CloudConfig.Zone
+	}
+
 	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
 		pdName := fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
 
@@ -679,7 +691,7 @@ func createPD() (string, error) {
 		}
 
 		tags := map[string]string{}
-		err = gceCloud.CreateDisk(pdName, gcecloud.DiskTypeSSD, TestContext.CloudConfig.Zone, 10 /* sizeGb */, tags)
+		err = gceCloud.CreateDisk(pdName, gcecloud.DiskTypeSSD, zone, 10 /* sizeGb */, tags)
 		if err != nil {
 			return "", err
 		}
@@ -688,7 +700,7 @@ func createPD() (string, error) {
 		client := ec2.New(session.New())
 
 		request := &ec2.CreateVolumeInput{}
-		request.AvailabilityZone = aws.String(TestContext.CloudConfig.Zone)
+		request.AvailabilityZone = aws.String(zone)
 		request.Size = aws.Int64(10)
 		request.VolumeType = aws.String(awscloud.DefaultVolumeType)
 		response, err := client.CreateVolume(request)
@@ -864,4 +876,40 @@ func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.Persist
 		}
 	}
 	return persistentvolumes, nil
+}
+
+func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
+	diskName, err := CreatePDWithRetryAndZone(zone)
+	if err != nil {
+		return nil, err
+	}
+
+	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
+		return &v1.PersistentVolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName:   diskName,
+				FSType:   "ext3",
+				ReadOnly: false,
+			},
+		}, nil
+	} else if TestContext.Provider == "aws" {
+		return &v1.PersistentVolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+				VolumeID: diskName,
+				FSType:   "ext3",
+			},
+		}, nil
+	} else {
+		return nil, fmt.Errorf("Provider not supported")
+	}
+}
+
+func DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
+	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
+		return DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
+	} else if TestContext.Provider == "aws" {
+		return DeletePDWithRetry(pvSource.AWSElasticBlockStore.VolumeID)
+	} else {
+		return fmt.Errorf("Provider not supported")
+	}
 }

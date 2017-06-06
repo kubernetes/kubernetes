@@ -334,6 +334,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 				// If the iscsi disk config is not found, fall back to the original behavior.
 				// This portal/iqn/iface is no longer referenced, log out.
 				// Extract the portal and iqn from device path.
+				bkpPortal = make([]string, 1)
 				bkpPortal[0], iqn, err = extractPortalAndIqn(device)
 				if err != nil {
 					return err

@@ -133,7 +133,7 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 				}
 			} else if len(val.Filesystem) > 1 && containerName != "/" {
 				// Cannot handle multiple devices per container.
-				glog.V(2).Infof("failed to handle multiple devices for container %s. Skipping Filesystem stats", containerName)
+				glog.V(4).Infof("failed to handle multiple devices for container %s. Skipping Filesystem stats", containerName)
 			}
 		}
 		if spec.HasDiskIo {
@@ -259,6 +259,7 @@ func ContainerSpecFromV1(specV1 *v1.ContainerSpec, aliases []string, namespace s
 		HasCustomMetrics: specV1.HasCustomMetrics,
 		Image:            specV1.Image,
 		Labels:           specV1.Labels,
+		Envs:             specV1.Envs,
 	}
 	if specV1.HasCpu {
 		specV2.Cpu.Limit = specV1.Cpu.Limit

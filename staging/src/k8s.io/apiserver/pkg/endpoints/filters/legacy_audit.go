@@ -75,7 +75,7 @@ var _ http.CloseNotifier = &fancyLegacyResponseWriterDelegator{}
 var _ http.Flusher = &fancyLegacyResponseWriterDelegator{}
 var _ http.Hijacker = &fancyLegacyResponseWriterDelegator{}
 
-// WithAudit decorates a http.Handler with audit logging information for all the
+// WithLegacyAudit decorates a http.Handler with audit logging information for all the
 // requests coming to the server. If out is nil, no decoration takes place.
 // Each audit log contains two entries:
 // 1. the request line containing:

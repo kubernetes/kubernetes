@@ -29,7 +29,7 @@ package v1alpha1
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_PartialObjectMetadata = map[string]string{
 	"":         "PartialObjectMetadata is a generic representation of any object with ObjectMeta. It allows clients to get access to a particular ObjectMeta schema without knowing the details of the version.",
-	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 }
 
 func (PartialObjectMetadata) SwaggerDoc() map[string]string {
@@ -47,7 +47,7 @@ func (PartialObjectMetadataList) SwaggerDoc() map[string]string {
 
 var map_Table = map[string]string{
 	"":                  "Table is a tabular representation of a set of API resources. The server transforms the object into a set of preferred columns for quickly reviewing the objects.",
-	"metadata":          "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+	"metadata":          "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
 	"columnDefinitions": "columnDefinitions describes each column in the returned items array. The number of cells per row will always match the number of column definitions.",
 	"rows":              "rows is the list of items in the table.",
 }

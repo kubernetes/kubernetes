@@ -566,9 +566,24 @@ func (self *manager) getDockerContainer(containerName string) (*containerData, e
 		Namespace: docker.DockerNamespace,
 		Name:      containerName,
 	}]
+
+	// Look for container by short prefix name if no exact match found.
 	if !ok {
-		return nil, fmt.Errorf("unable to find Docker container %q", containerName)
+		for contName, c := range self.containers {
+			if contName.Namespace == docker.DockerNamespace && strings.HasPrefix(contName.Name, containerName) {
+				if cont == nil {
+					cont = c
+				} else {
+					return nil, fmt.Errorf("unable to find container. Container %q is not unique", containerName)
+				}
+			}
+		}
+
+		if cont == nil {
+			return nil, fmt.Errorf("unable to find Docker container %q", containerName)
+		}
 	}
+
 	return cont, nil
 }
 

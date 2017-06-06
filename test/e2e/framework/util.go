@@ -5167,19 +5167,14 @@ func CleanupGCEResources(loadBalancerName string) (retErr error) {
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = err
 	}
-	if err := gceCloud.DeleteForwardingRule(loadBalancerName); err != nil &&
+	if err := gceCloud.DeleteRegionForwardingRule(loadBalancerName, gceCloud.Region()); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 
 	}
-	if err := gceCloud.DeleteGlobalStaticIP(loadBalancerName); err != nil &&
+	if err := gceCloud.DeleteRegionAddress(loadBalancerName, gceCloud.Region()); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
-	}
-	// This function shells out to gcloud, so we can't compare for NotFound errors.
-	// TODO: Invoke cloudprovider method directly instead.
-	if err := DeleteGCEStaticIP(loadBalancerName); err != nil {
-		Logf("%v", err)
 	}
 	var hcNames []string
 	hc, getErr := gceCloud.GetHttpHealthCheck(loadBalancerName)
@@ -5190,7 +5185,7 @@ func CleanupGCEResources(loadBalancerName string) (retErr error) {
 	if hc != nil {
 		hcNames = append(hcNames, hc.Name)
 	}
-	if err := gceCloud.DeleteTargetPool(loadBalancerName, hcNames...); err != nil &&
+	if err := gceCloud.DeleteExternalTargetPoolAndChecks(loadBalancerName, gceCloud.Region(), hcNames...); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 	}

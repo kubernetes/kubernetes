@@ -228,7 +228,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
 
 	runAsUser := types.UnixUserID(0)
-	RunAsNonRoot := false
+	runAsNonRootTrue := true
 	podWithContainerSecurityContext := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -244,7 +244,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 					Command:         []string{"testCommand"},
 					WorkingDir:      "testWorkingDir",
 					SecurityContext: &v1.SecurityContext{
-						RunAsNonRoot: &RunAsNonRoot,
+						RunAsNonRoot: &runAsNonRootTrue,
 						RunAsUser:    &runAsUser,
 					},
 				},

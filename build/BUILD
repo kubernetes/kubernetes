@@ -34,18 +34,6 @@ docker_build(
     },
 )
 
-docker_build(
-    name = "busybox-net",
-    base = ":busybox",
-    debs = [
-        "@libc_deb//file",
-        "@iptables_deb//file",
-        "@iproute2_deb//file",
-        "@libnetlink_deb//file",
-        "@libxtables_deb//file",
-    ],
-)
-
 # This list should roughly match kube::build::get_docker_wrapped_binaries()
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
@@ -66,7 +54,7 @@ DOCKERIZED_BINARIES = {
         "target": "//plugin/cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
-        "base": ":busybox-net",
+        "base": "@debian-iptables-amd64//image:image.tar",
         "target": "//cmd/kube-proxy:kube-proxy",
     },
 }

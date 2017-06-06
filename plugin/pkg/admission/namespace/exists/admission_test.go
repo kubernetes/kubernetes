@@ -37,7 +37,7 @@ import (
 func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler := NewExists()
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(c, nil, f, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err := admission.Validate(handler)
 	return handler, f, err

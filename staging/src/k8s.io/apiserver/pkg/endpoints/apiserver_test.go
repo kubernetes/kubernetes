@@ -18,6 +18,7 @@ package endpoints
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1157,6 +1158,148 @@ func TestList(t *testing.T) {
 	}
 }
 
+func TestRequestsWithInvalidQuery(t *testing.T) {
+	storage := map[string]rest.Storage{}
+
+	storage["simple"] = &SimpleRESTStorage{expectedResourceNamespace: "default"}
+	storage["withoptions"] = GetWithOptionsRESTStorage{}
+
+	var handler = handleInternal(storage, admissionControl, selfLinker, nil)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	for i, test := range []struct {
+		postfix string
+		method  string
+	}{
+		{"/simple?labelSelector=<invalid>", http.MethodGet},
+		{"/simple/foo?gracePeriodSeconds=<invalid>", http.MethodDelete},
+		// {"/simple?labelSelector=<value>", http.MethodDelete}, TODO: implement DeleteCollection in  SimpleRESTStorage
+		// {"/simple/foo?export=<invalid>", http.MethodGet}, TODO: there is no invalid bool in conversion. Should we be more strict?
+		// {"/simple/foo?resourceVersion=<invalid>", http.MethodGet}, TODO: there is no invalid resourceVersion. Should we be more strict?
+		// {"/withoptions?labelSelector=<invalid>", http.MethodGet}, TODO: SimpleGetOptions is always valid. Add more validation that can fail.
+	} {
+		baseURL := server.URL + "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default"
+		url := baseURL + test.postfix
+		r, err := http.NewRequest(test.method, url, nil)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		resp, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, url, http.StatusBadRequest, resp)
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
+			t.Logf("%d: body: %s", i, string(body))
+		}
+	}
+}
+
+func TestListCompresion(t *testing.T) {
+	testCases := []struct {
+		url            string
+		namespace      string
+		selfLink       string
+		legacy         bool
+		label          string
+		field          string
+		acceptEncoding string
+	}{
+		// list items in a namespace in the path
+		{
+			url:            "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
+			namespace:      "default",
+			selfLink:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
+			acceptEncoding: "",
+		},
+		{
+			url:            "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
+			namespace:      "default",
+			selfLink:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
+			acceptEncoding: "gzip",
+		},
+	}
+	for i, testCase := range testCases {
+		storage := map[string]rest.Storage{}
+		simpleStorage := SimpleRESTStorage{expectedResourceNamespace: testCase.namespace}
+		storage["simple"] = &simpleStorage
+		selfLinker := &setTestSelfLinker{
+			t:           t,
+			namespace:   testCase.namespace,
+			expectedSet: testCase.selfLink,
+		}
+		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
+		server := httptest.NewServer(handler)
+		defer server.Close()
+
+		req, err := http.NewRequest("GET", server.URL+testCase.url, nil)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		// It's necessary to manually set Accept-Encoding here
+		// to prevent http.DefaultClient from automatically
+		// decoding responses
+		req.Header.Set("Accept-Encoding", testCase.acceptEncoding)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, testCase.url, http.StatusOK, resp)
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
+			t.Logf("%d: body: %s", i, string(body))
+			continue
+		}
+		// TODO: future, restore get links
+		if !selfLinker.called {
+			t.Errorf("%d: never set self link", i)
+		}
+		if !simpleStorage.namespacePresent {
+			t.Errorf("%d: namespace not set", i)
+		} else if simpleStorage.actualNamespace != testCase.namespace {
+			t.Errorf("%d: %q unexpected resource namespace: %s", i, testCase.url, simpleStorage.actualNamespace)
+		}
+		if simpleStorage.requestedLabelSelector == nil || simpleStorage.requestedLabelSelector.String() != testCase.label {
+			t.Errorf("%d: unexpected label selector: %v", i, simpleStorage.requestedLabelSelector)
+		}
+		if simpleStorage.requestedFieldSelector == nil || simpleStorage.requestedFieldSelector.String() != testCase.field {
+			t.Errorf("%d: unexpected field selector: %v", i, simpleStorage.requestedFieldSelector)
+		}
+
+		var decoder *json.Decoder
+		if testCase.acceptEncoding == "gzip" {
+			gzipReader, err := gzip.NewReader(resp.Body)
+			if err != nil {
+				t.Fatalf("unexpected error creating gzip reader: %v", err)
+			}
+			decoder = json.NewDecoder(gzipReader)
+		} else {
+			decoder = json.NewDecoder(resp.Body)
+		}
+		var itemOut genericapitesting.SimpleList
+		err = decoder.Decode(&itemOut)
+		if err != nil {
+			t.Errorf("failed to read response body as SimpleList: %v", err)
+		}
+	}
+}
+
 func TestLogs(t *testing.T) {
 	handler := handle(map[string]rest.Storage{})
 	server := httptest.NewServer(handler)
@@ -1469,6 +1612,77 @@ func TestGet(t *testing.T) {
 	}
 	if !selfLinker.called {
 		t.Errorf("Never set self link")
+	}
+}
+
+func TestGetCompression(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		item: genericapitesting.Simple{
+			Other: "foo",
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		name:        "id",
+		namespace:   "default",
+	}
+
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	tests := []struct {
+		acceptEncoding string
+	}{
+		{acceptEncoding: ""},
+		{acceptEncoding: "gzip"},
+	}
+
+	for _, test := range tests {
+		req, err := http.NewRequest("GET", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/id", nil)
+		if err != nil {
+			t.Fatalf("unexpected error cretaing request: %v", err)
+		}
+		// It's necessary to manually set Accept-Encoding here
+		// to prevent http.DefaultClient from automatically
+		// decoding responses
+		req.Header.Set("Accept-Encoding", test.acceptEncoding)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("unexpected response: %#v", resp)
+		}
+		var decoder *json.Decoder
+		if test.acceptEncoding == "gzip" {
+			gzipReader, err := gzip.NewReader(resp.Body)
+			if err != nil {
+				t.Fatalf("unexpected error creating gzip reader: %v", err)
+			}
+			decoder = json.NewDecoder(gzipReader)
+		} else {
+			decoder = json.NewDecoder(resp.Body)
+		}
+		var itemOut genericapitesting.Simple
+		err = decoder.Decode(&itemOut)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Errorf("unexpected error reading body: %v", err)
+		}
+
+		if itemOut.Name != simpleStorage.item.Name {
+			t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
+		}
+		if !selfLinker.called {
+			t.Errorf("Never set self link")
+		}
 	}
 }
 

@@ -49,9 +49,9 @@ var (
 
 		To start using your cluster, you need to run (as a regular user):
 
-		  sudo cp {{.KubeConfigPath}} $HOME/
-		  sudo chown $(id -u):$(id -g) $HOME/{{.KubeConfigName}}
-		  export KUBECONFIG=$HOME/{{.KubeConfigName}}
+		  mkdir -p $HOME/.kube
+		  sudo cp -i {{.KubeConfigPath}} $HOME/.kube/config
+		  sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 		You should now deploy a pod network to the cluster.
 		Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
@@ -247,7 +247,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	if err := tokenphase.CreateBootstrapConfigMap(adminKubeConfigPath); err != nil {
+	if err := tokenphase.CreateBootstrapConfigMapIfNotExists(client, adminKubeConfigPath); err != nil {
 		return err
 	}
 

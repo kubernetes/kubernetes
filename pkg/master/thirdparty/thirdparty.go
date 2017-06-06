@@ -23,6 +23,10 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -41,10 +45,6 @@ import (
 	serverstorgage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	discoveryclient "k8s.io/client-go/discovery"
-	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
-	apiextensionsserver "k8s.io/kube-apiextensions-server/pkg/apiserver"
-	apiextensionsclient "k8s.io/kube-apiextensions-server/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion"
-	"k8s.io/kube-apiextensions-server/pkg/registry/customresource"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
@@ -261,7 +261,7 @@ func (m *ThirdPartyResourceServer) migrateThirdPartyResourceData(gvk schema.Grou
 		schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural},
 		schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.ListKind},
 		apiextensionsserver.UnstructuredCopier{},
-		customresource.NewStrategy(discoveryclient.NewUnstructuredObjectTyper(nil), true),
+		customresource.NewStrategy(discoveryclient.NewUnstructuredObjectTyper(nil), true, gvk),
 		m.crdRESTOptionsGetter,
 	)
 

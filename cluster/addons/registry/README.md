@@ -52,7 +52,7 @@ spec:
 
 If, for example, you wanted to use NFS you would just need to change the
 `gcePersistentDisk` block to `nfs`. See
-[here](../../../docs/user-guide/volumes.md) for more details on volumes.
+[here](https://kubernetes.io/docs/user-guide/volumes.md) for more details on volumes.
 
 Note that in any case, the storage (in the case the GCE PersistentDisk) must be
 created independently - this is not something Kubernetes manages for you (yet).

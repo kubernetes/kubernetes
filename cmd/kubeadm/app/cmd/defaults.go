@@ -25,11 +25,8 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
-
-	"github.com/blang/semver"
+	"k8s.io/kubernetes/pkg/util/version"
 )
-
-var minK8sVersion = semver.MustParse(kubeadmconstants.MinimumControlPlaneVersion)
 
 func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
@@ -48,13 +45,13 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 	cfg.KubernetesVersion = ver
 
-	// Omit the "v" in the beginning, otherwise semver will fail
-	k8sVersion, err := semver.Parse(cfg.KubernetesVersion[1:])
+	// Parse the given kubernetes version and make sure it's higher than the lowest supported
+	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
 	if err != nil {
 		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
 	}
-	if k8sVersion.LT(minK8sVersion) {
-		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= v%s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion, cfg.KubernetesVersion)
+	if k8sVersion.LessThan(kubeadmconstants.MinimumControlPlaneVersion) {
+		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
 	}
 
 	fmt.Printf("[init] Using Kubernetes version: %s\n", cfg.KubernetesVersion)

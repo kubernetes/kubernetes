@@ -10,7 +10,7 @@ This process will create privileged containers which have full access to the hos
 
 If you are using a Salt based KUBERNETES\_PROVIDER (**gce**, **vagrant**, **aws**), you should make sure the creation of privileged containers via the API is enabled. Check `cluster/saltbase/pillar/privilege.sls`.
 
-DaemonSets must be enabled on your cluster. Instructions for enabling DaemonSet can be found [here](../../docs/api.md#enabling-the-extensions-group).
+DaemonSets must be enabled on your cluster. Instructions for enabling DaemonSet can be found [here](https://kubernetes.io/docs/api.md#enabling-the-extensions-group).
 
 ### Step 1: Configure New Relic Agent
 
