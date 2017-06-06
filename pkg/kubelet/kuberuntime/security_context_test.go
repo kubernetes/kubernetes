@@ -48,31 +48,44 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 	rootUser := types.UnixUserID(0)
 	runAsNonRootTrue := true
 	runAsNonRootFalse := false
-
+	imageRootUser := int64(0)
+	imageNonRootUser := int64(123)
 	for _, test := range []struct {
-		desc   string
-		sc     *v1.SecurityContext
-		errStr string
+		desc      string
+		sc        *v1.SecurityContext
+		imageUser int64
+		fail      bool
 	}{
 		{
-			desc:   "Pass if SecurityContext is not set",
-			sc:     nil,
-			errStr: "",
+			desc:      "Pass if SecurityContext is not set",
+			sc:        nil,
+			imageUser: imageRootUser,
+			fail:      false,
 		},
 		{
 			desc: "Pass if RunAsNonRoot is not set",
 			sc: &v1.SecurityContext{
 				RunAsUser: &rootUser,
 			},
-			errStr: "",
+			imageUser: imageRootUser,
+			fail:      false,
 		},
 		{
-			desc: "Pass if RunAsNonRoot is false",
+			desc: "Pass if RunAsNonRoot is false (image user is root)",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootFalse,
+			},
+			imageUser: imageRootUser,
+			fail:      false,
+		},
+		{
+			desc: "Pass if RunAsNonRoot is false (RunAsUser is root)",
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootFalse,
 				RunAsUser:    &rootUser,
 			},
-			errStr: "",
+			imageUser: imageNonRootUser,
+			fail:      false,
 		},
 		{
 			desc: "Fail if container's RunAsUser is root and RunAsNonRoot is true",
@@ -80,22 +93,24 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 				RunAsNonRoot: &runAsNonRootTrue,
 				RunAsUser:    &rootUser,
 			},
-			errStr: "container's runAsUser breaks non-root policy",
+			imageUser: imageNonRootUser,
+			fail:      true,
 		},
 		{
 			desc: "Fail if image's user is root and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
-			errStr: "container has runAsNonRoot and image will run as root",
+			imageUser: imageRootUser,
+			fail:      true,
 		},
 	} {
 		pod.Spec.Containers[0].SecurityContext = test.sc
 		err := verifyRunAsNonRoot(pod, &pod.Spec.Containers[0], int64(0))
-		if len(test.errStr) == 0 {
-			assert.NoError(t, err, test.desc)
+		if test.fail {
+			assert.Error(t, err, test.desc)
 		} else {
-			assert.EqualError(t, err, test.errStr, test.desc)
+			assert.NoError(t, err, test.desc)
 		}
 	}
 }
