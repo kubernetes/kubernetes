@@ -11,6 +11,6 @@ towards making all code in `staging/` authoritative.
 
 The `vendor/k8s.io` directory contains symlinks pointing to this staging area,
 so to use a package in the staging area, you can import it as
-`k8s.io/<package-name>`, as if the package were vendored. Packages will be
-vendored from `k8s.io/<package-name>` for real after the test matrix is
+`staging/src/k8s.io/<package-name>`, as if the package were vendored. Packages will be
+vendored from `staging/src/k8s.io/<package-name>` for real after the test matrix is
 converted to vendor k8s components.
