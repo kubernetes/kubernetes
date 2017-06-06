@@ -1,0 +1,9 @@
+kind: Bar
+apiVersion: company.com/v1
+metadata:
+  name: test
+  labels:
+    pruneGroup: "true"
+spec:
+  someField: field1
+  otherField: field2

@@ -1367,7 +1367,7 @@ __EOF__
   # Post-Condition: assertion object exist
   kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{$id_field}}:{{end}}" 'bars.company.com:foos.company.com:'
 
-  run_non_native_resource_tests
+  run_non_native_resource_tests CRD
 
   # teardown
   kubectl delete customresourcedefinitions/foos.company.com "${kube_flags_with_token[@]}"
@@ -1412,7 +1412,7 @@ __EOF__
   # Post-Condition: assertion object exist
   kube::test::get_object_assert thirdpartyresources "{{range.items}}{{$id_field}}:{{end}}" 'bar.company.com:foo.company.com:'
 
-  run_non_native_resource_tests
+  run_non_native_resource_tests TPR
 
   # teardown
   kubectl delete thirdpartyresources/foo.company.com "${kube_flags[@]}"
@@ -1541,16 +1541,23 @@ kube::util::non_native_resources() {
 run_non_native_resource_tests() {
   kube::util::non_native_resources
 
-  # Test that we can list this new third party resource (foos)
+  # Set spec field for CRDs
+  if [ $1 == CRD ]; then
+    SPEC=spec.
+  else
+    SPEC=
+  fi
+
+  # Test that we can list this new TPR/CRD (foos)
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
 
-  # Test that we can list this new third party resource (bars)
+  # Test that we can list this new TPR/CRD (bars)
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Test that we can create a new resource of type Foo
-  kubectl "${kube_flags[@]}" create -f hack/testdata/TPR/foo.yaml "${kube_flags[@]}"
+  kubectl "${kube_flags[@]}" create -f hack/testdata/$1/foo.yaml "${kube_flags[@]}"
 
-  # Test that we can list this new third party resource
+  # Test that we can list this new TPR/CRD
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
 
   # Test alternate forms
@@ -1559,7 +1566,7 @@ run_non_native_resource_tests() {
   kube::test::get_object_assert foos.v1.company.com "{{range.items}}{{$id_field}}:{{end}}" 'test:'
 
   # Test all printers, with lists and individual items
-  kube::log::status "Testing ThirdPartyResource printing"
+  kube::log::status "Testing '$1' printing"
   kubectl "${kube_flags[@]}" get foos
   kubectl "${kube_flags[@]}" get foos/test
   kubectl "${kube_flags[@]}" get foos      -o name
@@ -1570,15 +1577,15 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" get foos/test -o json
   kubectl "${kube_flags[@]}" get foos      -o yaml
   kubectl "${kube_flags[@]}" get foos/test -o yaml
-  kubectl "${kube_flags[@]}" get foos      -o "jsonpath={.items[*].someField}" --allow-missing-template-keys=false
-  kubectl "${kube_flags[@]}" get foos/test -o "jsonpath={.someField}"          --allow-missing-template-keys=false
-  kubectl "${kube_flags[@]}" get foos      -o "go-template={{range .items}}{{.someField}}{{end}}" --allow-missing-template-keys=false
-  kubectl "${kube_flags[@]}" get foos/test -o "go-template={{.someField}}"                        --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos      -o "jsonpath={.items[*].${SPEC}someField}" --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos/test -o "jsonpath={.${SPEC}someField}"          --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos      -o "go-template={{range.items}}{{.${SPEC}someField}}{{end}}" --allow-missing-template-keys=false
+  kubectl "${kube_flags[@]}" get foos/test -o "go-template={{.${SPEC}someField}}"                        --allow-missing-template-keys=false
   output_message=$(kubectl "${kube_flags[@]}" get foos/test -o name)
   kube::test::if_has_string "${output_message}" 'foos/test'
 
   # Test patching
-  kube::log::status "Testing ThirdPartyResource patching"
+  kube::log::status "Testing '$1' patching"
   kubectl "${kube_flags[@]}" patch foos/test -p '{"patched":"value1"}' --type=merge
   kube::test::get_object_assert foos/test "{{.patched}}" 'value1'
   kubectl "${kube_flags[@]}" patch foos/test -p '{"patched":"value2"}' --type=merge --record
@@ -1586,37 +1593,37 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" patch foos/test -p '{"patched":null}' --type=merge --record
   kube::test::get_object_assert foos/test "{{.patched}}" '<no value>'
   # Get local version
-  TPR_RESOURCE_FILE="${KUBE_TEMP}/tpr-foos-test.json"
-  kubectl "${kube_flags[@]}" get foos/test -o json > "${TPR_RESOURCE_FILE}"
+  TPR_CRD_RESOURCE_FILE="${KUBE_TEMP}/tpr-crd-foos-test.json"
+  kubectl "${kube_flags[@]}" get foos/test -o json > "${TPR_CRD_RESOURCE_FILE}"
   # cannot apply strategic patch locally
-  TPR_PATCH_ERROR_FILE="${KUBE_TEMP}/tpr-foos-test-error"
-  ! kubectl "${kube_flags[@]}" patch --local -f "${TPR_RESOURCE_FILE}" -p '{"patched":"value3"}' 2> "${TPR_PATCH_ERROR_FILE}"
-  if grep -q "try --type merge" "${TPR_PATCH_ERROR_FILE}"; then
-    kube::log::status "\"kubectl patch --local\" returns error as expected for ThirdPartyResource: $(cat ${TPR_PATCH_ERROR_FILE})"
+  TPR_CRD_PATCH_ERROR_FILE="${KUBE_TEMP}/tpr-crd-foos-test-error"
+  ! kubectl "${kube_flags[@]}" patch --local -f "${TPR_CRD_RESOURCE_FILE}" -p '{"patched":"value3"}' 2> "${TPR_CRD_PATCH_ERROR_FILE}"
+  if grep -q "try --type merge" "${TPR_CRD_PATCH_ERROR_FILE}"; then
+    kube::log::status "\"kubectl patch --local\" returns error as expected for '$1': $(cat ${TPR_CRD_PATCH_ERROR_FILE})"
   else
-    kube::log::status "\"kubectl patch --local\" returns unexpected error or non-error: $(cat ${TPR_PATCH_ERROR_FILE})"
+    kube::log::status "\"kubectl patch --local\" returns unexpected error or non-error: $(cat ${TPR_CRD_PATCH_ERROR_FILE})"
     exit 1
   fi
   # can apply merge patch locally
-  kubectl "${kube_flags[@]}" patch --local -f "${TPR_RESOURCE_FILE}" -p '{"patched":"value3"}' --type=merge -o json
+  kubectl "${kube_flags[@]}" patch --local -f "${TPR_CRD_RESOURCE_FILE}" -p '{"patched":"value3"}' --type=merge -o json
   # can apply merge patch remotely
-  kubectl "${kube_flags[@]}" patch --record -f "${TPR_RESOURCE_FILE}" -p '{"patched":"value3"}' --type=merge -o json
+  kubectl "${kube_flags[@]}" patch --record -f "${TPR_CRD_RESOURCE_FILE}" -p '{"patched":"value3"}' --type=merge -o json
   kube::test::get_object_assert foos/test "{{.patched}}" 'value3'
-  rm "${TPR_RESOURCE_FILE}"
-  rm "${TPR_PATCH_ERROR_FILE}"
+  rm "${TPR_CRD_RESOURCE_FILE}"
+  rm "${TPR_CRD_PATCH_ERROR_FILE}"
 
   # Test labeling
-  kube::log::status "Testing ThirdPartyResource labeling"
+  kube::log::status "Testing '$1' labeling"
   kubectl "${kube_flags[@]}" label foos --all listlabel=true
   kubectl "${kube_flags[@]}" label foo/test itemlabel=true
 
   # Test annotating
-  kube::log::status "Testing ThirdPartyResource annotating"
+  kube::log::status "Testing '$1' annotating"
   kubectl "${kube_flags[@]}" annotate foos --all listannotation=true
   kubectl "${kube_flags[@]}" annotate foo/test itemannotation=true
 
   # Test describing
-  kube::log::status "Testing ThirdPartyResource describing"
+  kube::log::status "Testing '$1' describing"
   kubectl "${kube_flags[@]}" describe foos
   kubectl "${kube_flags[@]}" describe foos/test
   kubectl "${kube_flags[@]}" describe foos | grep listlabel=true
@@ -1629,9 +1636,9 @@ run_non_native_resource_tests() {
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Test that we can create a new resource of type Bar
-  kubectl "${kube_flags[@]}" create -f hack/testdata/TPR/bar.yaml "${kube_flags[@]}"
+  kubectl "${kube_flags[@]}" create -f hack/testdata/$1/bar.yaml "${kube_flags[@]}"
 
-  # Test that we can list this new third party resource
+  # Test that we can list this new TPR/CRD
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test:'
 
   # Delete the resource
@@ -1641,106 +1648,106 @@ run_non_native_resource_tests() {
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Test that we can create single item via apply
-  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo.yaml
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/$1/foo.yaml
 
   # Test that we have create a foo named test
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
 
   # Test that the field has the expected value
-  kube::test::get_object_assert foos/test '{{.someField}}' 'field1'
+  kube::test::get_object_assert foos/test '{{.${SPEC}someField}}' 'field1'
 
   # Test that apply an empty patch doesn't change fields
-  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo.yaml
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/$1/foo.yaml
 
   # Test that the field has the same value after re-apply
-  kube::test::get_object_assert foos/test '{{.someField}}' 'field1'
+  kube::test::get_object_assert foos/test '{{.${SPEC}someField}}' 'field1'
 
   # Test that apply has updated the subfield
-  kube::test::get_object_assert foos/test '{{.nestedField.someSubfield}}' 'subfield1'
+  kube::test::get_object_assert foos/test '{{.${SPEC}nestedField.someSubfield}}' 'subfield1'
 
   # Update a subfield and then apply the change
-  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo-updated-subfield.yaml
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/$1/foo-updated-subfield.yaml
 
   # Test that apply has updated the subfield
-  kube::test::get_object_assert foos/test '{{.nestedField.someSubfield}}' 'modifiedSubfield'
+  kube::test::get_object_assert foos/test '{{.${SPEC}nestedField.someSubfield}}' 'modifiedSubfield'
 
   # Test that the field has the expected value
-  kube::test::get_object_assert foos/test '{{.nestedField.otherSubfield}}' 'subfield2'
+  kube::test::get_object_assert foos/test '{{.${SPEC}nestedField.otherSubfield}}' 'subfield2'
 
   # Delete a subfield and then apply the change
-  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo-deleted-subfield.yaml
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/$1/foo-deleted-subfield.yaml
 
   # Test that apply has deleted the field
-  kube::test::get_object_assert foos/test '{{.nestedField.otherSubfield}}' '<no value>'
+  kube::test::get_object_assert foos/test '{{.${SPEC}nestedField.otherSubfield}}' '<no value>'
 
   # Test that the field does not exist
-  kube::test::get_object_assert foos/test '{{.nestedField.newSubfield}}' '<no value>'
+  kube::test::get_object_assert foos/test '{{.${SPEC}nestedField.newSubfield}}' '<no value>'
 
   # Add a field and then apply the change
-  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo-added-subfield.yaml
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/$1/foo-added-subfield.yaml
 
   # Test that apply has added the field
-  kube::test::get_object_assert foos/test '{{.nestedField.newSubfield}}' 'subfield3'
+  kube::test::get_object_assert foos/test '{{.${SPEC}nestedField.newSubfield}}' 'subfield3'
 
   # Delete the resource
-  kubectl "${kube_flags[@]}" delete -f hack/testdata/TPR/foo.yaml
+  kubectl "${kube_flags[@]}" delete -f hack/testdata/$1/foo.yaml
 
   # Make sure it's gone
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Test that we can create list via apply
-  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list.yaml
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/$1/multi-list.yaml
 
   # Test that we have create a foo and a bar from a list
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test-list:'
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test-list:'
 
   # Test that the field has the expected value
-  kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
-  kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
+  kube::test::get_object_assert foos/test-list '{{.${SPEC}someField}}' 'field1'
+  kube::test::get_object_assert bars/test-list '{{.${SPEC}someField}}' 'field1'
 
   # Test that re-apply an list doesn't change anything
-  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list.yaml
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/$1/multi-list.yaml
 
   # Test that the field has the same value after re-apply
-  kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
-  kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
+  kube::test::get_object_assert foos/test-list '{{.${SPEC}someField}}' 'field1'
+  kube::test::get_object_assert bars/test-list '{{.${SPEC}someField}}' 'field1'
 
   # Test that the fields have the expected value
-  kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
-  kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
+  kube::test::get_object_assert foos/test-list '{{.${SPEC}someField}}' 'field1'
+  kube::test::get_object_assert bars/test-list '{{.${SPEC}someField}}' 'field1'
 
   # Update fields and then apply the change
-  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list-updated-field.yaml
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/$1/multi-list-updated-field.yaml
 
   # Test that apply has updated the fields
-  kube::test::get_object_assert foos/test-list '{{.someField}}' 'modifiedField'
-  kube::test::get_object_assert bars/test-list '{{.someField}}' 'modifiedField'
+  kube::test::get_object_assert foos/test-list '{{.${SPEC}someField}}' 'modifiedField'
+  kube::test::get_object_assert bars/test-list '{{.${SPEC}someField}}' 'modifiedField'
 
   # Test that the field has the expected value
-  kube::test::get_object_assert foos/test-list '{{.otherField}}' 'field2'
-  kube::test::get_object_assert bars/test-list '{{.otherField}}' 'field2'
+  kube::test::get_object_assert foos/test-list '{{.${SPEC}otherField}}' 'field2'
+  kube::test::get_object_assert bars/test-list '{{.${SPEC}otherField}}' 'field2'
 
   # Delete fields and then apply the change
-  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list-deleted-field.yaml
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/$1/multi-list-deleted-field.yaml
 
   # Test that apply has deleted the fields
-  kube::test::get_object_assert foos/test-list '{{.otherField}}' '<no value>'
-  kube::test::get_object_assert bars/test-list '{{.otherField}}' '<no value>'
+  kube::test::get_object_assert foos/test-list '{{.${SPEC}otherField}}' '<no value>'
+  kube::test::get_object_assert bars/test-list '{{.${SPEC}otherField}}' '<no value>'
 
   # Test that the fields does not exist
-  kube::test::get_object_assert foos/test-list '{{.newField}}' '<no value>'
-  kube::test::get_object_assert bars/test-list '{{.newField}}' '<no value>'
+  kube::test::get_object_assert foos/test-list '{{.${SPEC}newField}}' '<no value>'
+  kube::test::get_object_assert bars/test-list '{{.${SPEC}newField}}' '<no value>'
 
   # Add a field and then apply the change
-  kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/multi-tpr-list-added-field.yaml
+  kubectl "${kube_flags[@]}" apply -f hack/testdata/$1/multi-list-added-field.yaml
 
   # Test that apply has added the field
-  kube::test::get_object_assert foos/test-list '{{.newField}}' 'field3'
-  kube::test::get_object_assert bars/test-list '{{.newField}}' 'field3'
+  kube::test::get_object_assert foos/test-list '{{.${SPEC}newField}}' 'field3'
+  kube::test::get_object_assert bars/test-list '{{.${SPEC}newField}}' 'field3'
 
   # Delete the resource
-  kubectl "${kube_flags[@]}" delete -f hack/testdata/TPR/multi-tpr-list.yaml
+  kubectl "${kube_flags[@]}" delete -f hack/testdata/$1/multi-list.yaml
 
   # Make sure it's gone
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -1752,19 +1759,19 @@ run_non_native_resource_tests() {
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # apply --prune on foo.yaml that has foo/test
-  kubectl apply --prune -l pruneGroup=true -f hack/testdata/TPR/foo.yaml "${kube_flags[@]}" --prune-whitelist=company.com/v1/Foo --prune-whitelist=company.com/v1/Bar
-  # check right tprs exist
+  kubectl apply --prune -l pruneGroup=true -f hack/testdata/$1/foo.yaml "${kube_flags[@]}" --prune-whitelist=company.com/v1/Foo --prune-whitelist=company.com/v1/Bar
+  # check right TPRs/CRDs exist
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # apply --prune on bar.yaml that has bar/test
-  kubectl apply --prune -l pruneGroup=true -f hack/testdata/TPR/bar.yaml "${kube_flags[@]}" --prune-whitelist=company.com/v1/Foo --prune-whitelist=company.com/v1/Bar
-  # check right tprs exist
+  kubectl apply --prune -l pruneGroup=true -f hack/testdata/$1/bar.yaml "${kube_flags[@]}" --prune-whitelist=company.com/v1/Foo --prune-whitelist=company.com/v1/Bar
+  # check right TPRs/CRDs exist
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test:'
 
   # Delete the resource
-  kubectl "${kube_flags[@]}" delete -f hack/testdata/TPR/bar.yaml
+  kubectl "${kube_flags[@]}" delete -f hack/testdata/$1/bar.yaml
 
   # Make sure it's gone
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
