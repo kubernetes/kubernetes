@@ -158,7 +158,7 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 }
 
 //updateDefaultLabels will set the default labels on the node
-func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) (needsUpdate bool) {
+func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool {
 	defaultLabels := []string{
 		metav1.LabelHostname,
 		metav1.LabelZoneFailureDomain,
@@ -173,6 +173,7 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) (need
 		return true
 	}
 
+	var needsUpdate bool = false
 	//Set default labels but make sure to not set labels with empty values
 	for _, label := range defaultLabels {
 		if existingNode.Labels[label] != initialNode.Labels[label] {
