@@ -18,6 +18,7 @@ package encryptionconfig
 
 import (
 	"crypto/aes"
+	"crypto/cipher"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -30,10 +31,13 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
 )
 
 const (
-	aesTransformerPrefixV1 = "k8s:enc:aes:v1:"
+	aesCBCTransformerPrefixV1    = "k8s:enc:aescbc:v1:"
+	aesGCMTransformerPrefixV1    = "k8s:enc:aesgcm:v1:"
+	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1"
 )
 
 // GetTransformerOverrides returns the transformer overrides by reading and parsing the encryption provider configuration file
@@ -102,25 +106,48 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 	for _, provider := range config.Providers {
 		found := false
 
-		if provider.AES != nil {
-			transformer, err := GetAESPrefixTransformer(provider.AES)
-			found = true
+		var transformer value.PrefixTransformer
+		var err error
+
+		if provider.AESGCM != nil {
+			transformer, err = GetAESPrefixTransformer(provider.AESGCM, aestransformer.NewGCMTransformer, aesGCMTransformerPrefixV1)
 			if err != nil {
 				return result, err
 			}
-			result = append(result, transformer)
+			found = true
+		}
+
+		if provider.AESCBC != nil {
+			if found == true {
+				return result, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
+			}
+			transformer, err = GetAESPrefixTransformer(provider.AESCBC, aestransformer.NewCBCTransformer, aesCBCTransformerPrefixV1)
+			found = true
+		}
+
+		if provider.Secretbox != nil {
+			if found == true {
+				return result, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
+			}
+			transformer, err = GetSecretboxPrefixTransformer(provider.Secretbox)
+			found = true
 		}
 
 		if provider.Identity != nil {
 			if found == true {
 				return result, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
 			}
-			found = true
-			result = append(result, value.PrefixTransformer{
+			transformer = value.PrefixTransformer{
 				Transformer: identity.NewEncryptCheckTransformer(),
 				Prefix:      []byte{},
-			})
+			}
+			found = true
 		}
+
+		if err != nil {
+			return result, err
+		}
+		result = append(result, transformer)
 
 		if found == false {
 			return result, fmt.Errorf("invalid provider configuration provided")
@@ -129,8 +156,12 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 	return result, nil
 }
 
-// GetAESPrefixTransformer returns a prefix transformer from the provided configuration
-func GetAESPrefixTransformer(config *AESConfig) (value.PrefixTransformer, error) {
+// BlockTransformerFunc taske an AES cipher block and returns a value transformer.
+type BlockTransformerFunc func(cipher.Block) value.Transformer
+
+// GetAESPrefixTransformer returns a prefix transformer from the provided configuration.
+// Returns an AES transformer based on the provided prefix and block transformer.
+func GetAESPrefixTransformer(config *AESConfig, fn BlockTransformerFunc, prefix string) (value.PrefixTransformer, error) {
 	var result value.PrefixTransformer
 
 	if len(config.Keys) == 0 {
@@ -160,7 +191,7 @@ func GetAESPrefixTransformer(config *AESConfig) (value.PrefixTransformer, error)
 		// Create a new PrefixTransformer for this key
 		keyTransformers = append(keyTransformers,
 			value.PrefixTransformer{
-				Transformer: aestransformer.NewGCMTransformer(block),
+				Transformer: fn(block),
 				Prefix:      []byte(keyData.Name + ":"),
 			})
 	}
@@ -172,7 +203,58 @@ func GetAESPrefixTransformer(config *AESConfig) (value.PrefixTransformer, error)
 	// Create a PrefixTransformer which shall later be put in a list with other providers
 	result = value.PrefixTransformer{
 		Transformer: keyTransformer,
-		Prefix:      []byte(aesTransformerPrefixV1),
+		Prefix:      []byte(prefix),
+	}
+	return result, nil
+}
+
+// GetSecretboxPrefixTransformer returns a prefix transformer from the provided configuration
+func GetSecretboxPrefixTransformer(config *SecretboxConfig) (value.PrefixTransformer, error) {
+	var result value.PrefixTransformer
+
+	if len(config.Keys) == 0 {
+		return result, fmt.Errorf("secretbox provider has no valid keys")
+	}
+	for _, key := range config.Keys {
+		if key.Name == "" {
+			return result, fmt.Errorf("key with invalid name provided")
+		}
+		if key.Secret == "" {
+			return result, fmt.Errorf("key %v has no provided secret", key.Name)
+		}
+	}
+
+	keyTransformers := []value.PrefixTransformer{}
+
+	for _, keyData := range config.Keys {
+		key, err := base64.StdEncoding.DecodeString(keyData.Secret)
+		if err != nil {
+			return result, fmt.Errorf("could not obtain secret for named key %s: %s", keyData.Name, err)
+		}
+
+		if len(key) != 32 {
+			return result, fmt.Errorf("expected key size 32 for aes-cbc provider, got %v", len(key))
+		}
+
+		keyArray := [32]byte{}
+		copy(keyArray[:], key)
+
+		// Create a new PrefixTransformer for this key
+		keyTransformers = append(keyTransformers,
+			value.PrefixTransformer{
+				Transformer: secretbox.NewSecretboxTransformer(keyArray),
+				Prefix:      []byte(keyData.Name + ":"),
+			})
+	}
+
+	// Create a prefixTransformer which can choose between these keys
+	keyTransformer := value.NewPrefixTransformers(
+		fmt.Errorf("no matching key was found for the provided Secretbox transformer"), keyTransformers...)
+
+	// Create a PrefixTransformer which shall later be put in a list with other providers
+	result = value.PrefixTransformer{
+		Transformer: keyTransformer,
+		Prefix:      []byte(secretboxTransformerPrefixV1),
 	}
 	return result, nil
 }
