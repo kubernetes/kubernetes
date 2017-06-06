@@ -425,16 +425,102 @@ EOF
   fi
 }
 
+# Write the config for the audit policy.
 function create-master-audit-policy {
-  # This is the config for the audit policy.
-  # TODO(timstclair): Provide a more thorough policy.
-  cat <<EOF >/etc/audit_policy.config
+  local -r path="${1}"
+
+  # Known api groups
+  local -r known_apis='
+      - group: "" # core
+      - group: "admissionregistration.k8s.io/v1alpha1"
+      - group: "apps/v1beta1"
+      - group: "authentication.k8s.io"
+      - group: "authorization.k8s.io"
+      - group: "autoscaling"
+      - group: "batch"
+      - group: "certificates.k8s.io/v1beta1"
+      - group: "extensions/v1beta1"
+      - group: "networking.k8s.io/v1"
+      - group: "policy/v1beta1"
+      - group: "rbac.authorization.k8s.io"
+      - group: "settings.k8s.io/v1alpha1"
+      - group: "storage.k8s.io"'
+
+  cat <<EOF >"${path}"
 rules:
+  # The following requests were manually identified as high-volume and low-risk,
+  # so drop them.
+  - level: None
+    users: ["system:kube-proxy"]
+    verbs: ["watch"]
+    resources:
+      - group: "" # core
+        resources: ["endpoints", "services"]
+  - level: None
+    # Ingress controller reads `configmaps/ingress-uid` through the unsecured port.
+    # TODO(#46983): Change this to the ingress controller service account.
+    users: ["system:unsecured"]
+    namespaces: ["kube-sytem"]
+    verbs: ["get"]
+    resources:
+      - group: "" # core
+        resources: ["configmaps"]
+  - level: None
+    users: ["kubelet"] # legacy kubelet identity
+    verbs: ["get"]
+    resources:
+      - group: "" # core
+        resources: ["nodes"]
+  - level: None
+    groups: ["system:nodes"]
+    verbs: ["get"]
+    resources:
+      - group: "" # core
+        resources: ["nodes"]
+  - level: None
+    users:
+      - system:kube-controller-manager
+      - system:kube-scheduler
+      - system:serviceaccount:kube-system:endpoint-controller
+    verbs: ["get", "update"]
+    namespaces: ["kube-sytem"]
+    resources:
+      - group: "" # core
+        resources: ["endpoints"]
+  - level: None
+    users: ["system:apiserver"]
+    verbs: ["get"]
+    resources:
+      - group: "" # core
+        resources: ["namespaces"]
+
+  # Don't log these read-only URLs.
   - level: None
     nonResourceURLs:
       - /healthz*
       - /version
       - /swagger*
+
+  # Don't log events requests.
+  - level: None
+    resources:
+      - group: "" # core
+        resources: ["events"]
+
+  # Secrets & ConfigMaps can contain sensitive & binary data,
+  # so only log at the Metadata level.
+  - level: Metadata
+    resources:
+      - group: "" # core
+        resources: ["secrets", "configmaps"]
+  # Get repsonses can be large; skip them.
+  - level: Request
+    verbs: ["get", "list", "watch"]
+    resources: ${known_apis}
+  # Default level for known APIs
+  - level: RequestResponse
+    resources: ${known_apis}
+  # Default level for all other requests.
   - level: Metadata
 EOF
 }
@@ -1112,7 +1198,7 @@ function start-kube-apiserver {
     params+=" --audit-policy-file=${audit_policy_file}"
 
     # Create the audit policy file, and mount it into the apiserver pod.
-    create-master-audit-policy
+    create-master-audit-policy "${audit_policy_file}"
     audit_policy_config_mount="{\"name\": \"auditpolicyconfigmount\",\"mountPath\": \"${audit_policy_file}\", \"readOnly\": false},"
     audit_policy_config_volume="{\"name\": \"auditpolicyconfigmount\",\"hostPath\": {\"path\": \"${audit_policy_file}\"}},"
   fi
