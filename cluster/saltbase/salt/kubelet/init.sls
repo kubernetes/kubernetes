@@ -19,6 +19,11 @@
     - group: root
     - mode: 755
 
+/var/lib/kubelet/pki:
+  file.directory:
+    - mode: 755
+    - makedirs: True
+
 # The default here is that this file is blank. If this is the case, the kubelet
 # won't be able to parse it as JSON and it will not be able to publish events
 # to the apiserver. You'll see a single error line in the kubelet start up file
@@ -57,6 +62,7 @@ fix-service-kubelet:
   cmd.wait:
     - name: /opt/kubernetes/helpers/services bounce kubelet
     - watch:
+      - file: /var/lib/kubelet/pki
       - file: /usr/local/bin/kubelet
       - file: {{ pillar.get('systemd_system_path') }}/kubelet.service
       - file: {{ environment_file }}
