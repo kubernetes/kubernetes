@@ -100,7 +100,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	if lister == nil {
 		lister = staticLister{apiResources}
 	}
-	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, lister)
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, lister, g.Context)
 	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
 	return utilerrors.NewAggregate(registrationErrors)
@@ -129,7 +129,7 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 	if lister == nil {
 		lister = staticLister{apiResources}
 	}
-	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, lister)
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, lister, g.Context)
 	versionDiscoveryHandler.AddToWebService(ws)
 	return utilerrors.NewAggregate(registrationErrors)
 }

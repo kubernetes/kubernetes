@@ -30,12 +30,14 @@ import (
 
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
-	// utilconfig "k8s.io/kubernetes/pkg/util/config"
+	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -291,4 +293,18 @@ func getLocalNode(f *framework.Framework) *v1.Node {
 	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	Expect(len(nodeList.Items)).To(Equal(1), "Unexpected number of node objects for node e2e. Expects only one node.")
 	return &nodeList.Items[0]
+}
+
+// logs prometheus metrics from the local kubelet.
+func logKubeletMetrics(metricKeys ...string) {
+	metricSet := sets.NewString()
+	for _, key := range metricKeys {
+		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
+	}
+	metric, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")
+	if err != nil {
+		framework.Logf("Error getting kubelet metrics: %v", err)
+	} else {
+		framework.Logf("Kubelet Metrics: %+v", framework.GetKubeletMetrics(metric, metricSet))
+	}
 }

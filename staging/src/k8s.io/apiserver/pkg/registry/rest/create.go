@@ -44,6 +44,11 @@ type RESTCreateStrategy interface {
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
+	//
+	// Often implemented as a type check and an initailization or clearing of
+	// status. Clear the status because status changes are internal. External
+	// callers of an api (users) should not be setting an initial status on
+	// newly created objects.
 	PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object)
 	// Validate returns an ErrorList with validation errors or nil.  Validate
 	// is invoked after default fields in the object have been filled in
@@ -54,7 +59,8 @@ type RESTCreateStrategy interface {
 	// ensures that code that operates on these objects can rely on the common
 	// form for things like comparison.  Canonicalize is invoked after
 	// validation has succeeded but before the object has been persisted.
-	// This method may mutate the object.
+	// This method may mutate the object. Often implemented as a type check or
+	// empty method.
 	Canonicalize(obj runtime.Object)
 }
 

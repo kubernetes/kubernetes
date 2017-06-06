@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	. "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
@@ -131,6 +132,16 @@ func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secre
 	return func(namespace, name string) (*v1.Secret, error) {
 		return f.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
 	}
+}
+
+func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
+	return func(namespace, name string) (*v1.ConfigMap, error) {
+		return f.kubeClient.Core().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	}
+}
+
+func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
+	return map[string]string{"test-label": "test-value"}, nil
 }
 
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
@@ -303,7 +314,11 @@ func (plugin *FakeVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode
 }
 
 func (plugin *FakeVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error) {
-	return nil, nil
+	return &Spec{
+		Volume: &v1.Volume{
+			Name: volumeName,
+		},
+	}, nil
 }
 
 func (plugin *FakeVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
@@ -387,7 +402,7 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 	fv.Lock()
 	defer fv.Unlock()
 	fv.AttachCallCount++
-	return "", nil
+	return "/dev/vdb-test", nil
 }
 
 func (fv *FakeVolume) GetAttachCallCount() int {
@@ -481,7 +496,7 @@ func (fc *FakeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fc.Options.PVName,
 			Annotations: map[string]string{
-				"kubernetes.io/createdby": "fakeplugin-provisioner",
+				volumehelper.VolumeDynamicallyCreatedByKey: "fakeplugin-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

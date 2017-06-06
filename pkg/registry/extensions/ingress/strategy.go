@@ -106,12 +106,12 @@ func IngressToSelectableFields(ingress *extensions.Ingress) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	ingress, ok := obj.(*extensions.Ingress)
 	if !ok {
-		return nil, nil, fmt.Errorf("Given object is not an Ingress.")
+		return nil, nil, false, fmt.Errorf("given object is not an Ingress.")
 	}
-	return labels.Set(ingress.ObjectMeta.Labels), IngressToSelectableFields(ingress), nil
+	return labels.Set(ingress.ObjectMeta.Labels), IngressToSelectableFields(ingress), ingress.Initializers != nil, nil
 }
 
 // MatchIngress is the filter used by the generic etcd backend to ingress

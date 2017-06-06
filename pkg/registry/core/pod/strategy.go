@@ -38,9 +38,9 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper/qos"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
 
 // podStrategy implements behavior for Pods
@@ -63,7 +63,7 @@ func (podStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.O
 	pod := obj.(*api.Pod)
 	pod.Status = api.PodStatus{
 		Phase:    api.PodPending,
-		QOSClass: qos.InternalGetPodQOS(pod),
+		QOSClass: qos.GetPodQOS(pod),
 	}
 }
 
@@ -153,6 +153,10 @@ func (podStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 	oldPod := old.(*api.Pod)
 	newPod.Spec = oldPod.Spec
 	newPod.DeletionTimestamp = nil
+
+	// don't allow the pods/status endpoint to touch owner references since old kubelets corrupt them in a way
+	// that breaks garbage collection
+	newPod.OwnerReferences = oldPod.OwnerReferences
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
@@ -161,12 +165,12 @@ func (podStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old 
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	pod, ok := obj.(*api.Pod)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a pod")
+		return nil, nil, false, fmt.Errorf("not a pod")
 	}
-	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
+	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), pod.Initializers != nil, nil
 }
 
 // MatchPod returns a generic matcher for a given label and field selector.

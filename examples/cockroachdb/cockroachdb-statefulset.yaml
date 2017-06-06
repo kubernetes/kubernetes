@@ -88,29 +88,31 @@ spec:
       # has to decide what command-line flags to use when starting CockroachDB.
       # This only matters when a pod's persistent volume is empty - if it has
       # data from a previous execution, that data will always be used.
+      #
+      # If your Kubernetes cluster uses a custom DNS domain, you will have
+      # to add an additional arg to this pod: "-domain=<your-custom-domain>"
       initContainers:
       - name: bootstrap
-        image: cockroachdb/cockroach-k8s-init:0.1
+        image: cockroachdb/cockroach-k8s-init:0.2
         imagePullPolicy: IfNotPresent
         args:
-          - "-on-start=/on-start.sh"
-          - "-service=cockroachdb"
+        - "-on-start=/on-start.sh"
+        - "-service=cockroachdb"
         env:
-          - name: POD_NAMESPACE
-            valueFrom:
-              fieldRef:
-                apiVersion: v1
-                fieldPath: metadata.namespace
-       volumeMounts:
-       - name: datadir
-         mountPath: "/cockroach/cockroach-data"
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: datadir
+          mountPath: "/cockroach/cockroach-data"
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 100
             podAffinityTerm:
               labelSelector:
-                matchExpress:
+                matchExpressions:
                 - key: app
                   operator: In
                   values:
@@ -118,12 +120,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
       - name: cockroachdb
-        # Runs the master branch. Not recommended for production, but since
-        # CockroachDB is in Beta, you don't want to run it in production
-        # anyway. See
-        # https://hub.docker.com/r/cockroachdb/cockroach/tags/
-        # if you prefer to run a beta release.
-        image: cockroachdb/cockroach
+        image: cockroachdb/cockroach:v1.0.1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 26257

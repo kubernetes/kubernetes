@@ -30,10 +30,14 @@ type flexVolume struct {
 	// mounter provides the interface that is used to mount the actual
 	// block device.
 	mounter mount.Interface
+	// podName is the name of the pod, if available.
+	podName string
 	// podUID is the UID of the pod.
 	podUID types.UID
-	// podNamespace is the namespace of the pod.
+	// podNamespace is the namespace of the pod, if available.
 	podNamespace string
+	// podServiceAccountName is the service account name of the pod, if available.
+	podServiceAccountName string
 	// volName is the name of the pod's volume.
 	volName string
 	// the underlying plugin

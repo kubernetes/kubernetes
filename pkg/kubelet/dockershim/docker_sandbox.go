@@ -27,10 +27,10 @@ import (
 	"github.com/golang/glog"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -161,7 +161,7 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 		// actions will only have sandbox ID and not have pod namespace and name information.
 		// Return error if encounter any unexpected error.
 		if checkpointErr != nil {
-			if dockertools.IsContainerNotFoundError(statusErr) && checkpointErr == errors.CheckpointNotFoundError {
+			if libdocker.IsContainerNotFoundError(statusErr) && checkpointErr == errors.CheckpointNotFoundError {
 				glog.Warningf("Both sandbox container and checkpoint for id %q could not be found. "+
 					"Proceed without further sandbox information.", podSandboxID)
 			} else {
@@ -206,7 +206,7 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 	if err := ds.client.StopContainer(podSandboxID, defaultSandboxGracePeriod); err != nil {
 		glog.Errorf("Failed to stop sandbox %q: %v", podSandboxID, err)
 		// Do not return error if the container does not exist
-		if !dockertools.IsContainerNotFoundError(err) {
+		if !libdocker.IsContainerNotFoundError(err) {
 			errList = append(errList, err)
 		}
 	}
@@ -231,13 +231,13 @@ func (ds *dockerService) RemovePodSandbox(podSandboxID string) error {
 
 	// Remove all containers in the sandbox.
 	for i := range containers {
-		if err := ds.RemoveContainer(containers[i].ID); err != nil && !dockertools.IsContainerNotFoundError(err) {
+		if err := ds.RemoveContainer(containers[i].ID); err != nil && !libdocker.IsContainerNotFoundError(err) {
 			errs = append(errs, err)
 		}
 	}
 
 	// Remove the sandbox container.
-	if err := ds.client.RemoveContainer(podSandboxID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); err != nil && !dockertools.IsContainerNotFoundError(err) {
+	if err := ds.client.RemoveContainer(podSandboxID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true, Force: true}); err != nil && !libdocker.IsContainerNotFoundError(err) {
 		errs = append(errs, err)
 	}
 
@@ -305,7 +305,7 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 		return nil, err
 	}
 
-	// Parse the timstamps.
+	// Parse the timestamps.
 	createdAt, _, _, err := getContainerTimestamps(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", podSandboxID, err)
@@ -477,6 +477,9 @@ func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig
 		return err
 	}
 
+	// Set sysctls.
+	hc.Sysctls = lc.Sysctls
+
 	return nil
 }
 
@@ -507,13 +510,6 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 		},
 		HostConfig: hc,
 	}
-
-	// Set sysctls if requested
-	sysctls, err := getSysctlsFromAnnotations(c.Annotations)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sysctls from annotations %v for sandbox %q: %v", c.Annotations, c.Metadata.Name, err)
-	}
-	hc.Sysctls = sysctls
 
 	// Apply linux-specific options.
 	if lc := c.GetLinux(); lc != nil {

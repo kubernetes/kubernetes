@@ -15,6 +15,8 @@ filegroup(
         ":package-srcs",
         "//build/debs:all-srcs",
         "//build/release-tars:all-srcs",
+        "//build/rpms:all-srcs",
+        "//build/visible_to:all-srcs",
     ],
     tags = ["automanaged"],
 )
@@ -30,18 +32,6 @@ docker_build(
         "/usr/sbin/busybox": "/bin/busybox",
         "/sbin/busybox": "/bin/busybox",
     },
-)
-
-docker_build(
-    name = "busybox-net",
-    base = ":busybox",
-    debs = [
-        "@libc_deb//file",
-        "@iptables_deb//file",
-        "@iproute2_deb//file",
-        "@libnetlink_deb//file",
-        "@libxtables_deb//file",
-    ],
 )
 
 # This list should roughly match kube::build::get_docker_wrapped_binaries()
@@ -64,7 +54,7 @@ DOCKERIZED_BINARIES = {
         "target": "//plugin/cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
-        "base": ":busybox-net",
+        "base": "@debian-iptables-amd64//image:image.tar",
         "target": "//cmd/kube-proxy:kube-proxy",
     },
 }
@@ -96,6 +86,18 @@ DOCKERIZED_BINARIES = {
     cmd = "grep ^STABLE_DOCKER_TAG bazel-out/stable-status.txt | awk '{print $$2}' >$@",
     stamp = 1,
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
+
+genrule(
+    name = "os_package_version",
+    outs = ["version"],
+    cmd = """
+grep ^STABLE_BUILD_SCM_REVISION bazel-out/stable-status.txt \
+    | awk '{print $$2}' \
+    | sed -e 's/^v//' -e 's/[\+-]/_/g' \
+    >$@
+""",
+    stamp = 1,
+)
 
 release_filegroup(
     name = "docker-artifacts",

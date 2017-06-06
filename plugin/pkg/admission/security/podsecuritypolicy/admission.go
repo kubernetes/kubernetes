@@ -44,8 +44,9 @@ const (
 	PluginName = "PodSecurityPolicy"
 )
 
-func init() {
-	kubeapiserveradmission.Plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		plugin := NewPlugin(psp.NewSimpleStrategyFactory(), getMatchingPolicies, true)
 		return plugin, nil
 	})

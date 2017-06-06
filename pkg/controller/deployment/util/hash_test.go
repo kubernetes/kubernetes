@@ -18,11 +18,14 @@ package util
 
 import (
 	"encoding/json"
+	"hash/adler32"
 	"strconv"
 	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/controller"
+	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
 var podSpec string = `
@@ -103,34 +106,12 @@ var podSpec string = `
 
 func TestPodTemplateSpecHash(t *testing.T) {
 	seenHashes := make(map[uint32]int)
-	broken := false
 
 	for i := 0; i < 1000; i++ {
 		specJson := strings.Replace(podSpec, "@@VERSION@@", strconv.Itoa(i), 1)
 		spec := v1.PodTemplateSpec{}
 		json.Unmarshal([]byte(specJson), &spec)
-		hash := GetPodTemplateSpecHash(spec)
-		if v, ok := seenHashes[hash]; ok {
-			broken = true
-			t.Logf("Hash collision, old: %d new: %d", v, i)
-			break
-		}
-		seenHashes[hash] = i
-	}
-
-	if !broken {
-		t.Errorf("expected adler to break but it didn't")
-	}
-}
-
-func TestPodTemplateSpecHashFnv(t *testing.T) {
-	seenHashes := make(map[uint32]int)
-
-	for i := 0; i < 1000; i++ {
-		specJson := strings.Replace(podSpec, "@@VERSION@@", strconv.Itoa(i), 1)
-		spec := v1.PodTemplateSpec{}
-		json.Unmarshal([]byte(specJson), &spec)
-		hash := GetPodTemplateSpecHashFnv(spec)
+		hash := controller.ComputeHash(&spec, nil)
 		if v, ok := seenHashes[hash]; ok {
 			t.Errorf("Hash collision, old: %d new: %d", v, i)
 			break
@@ -144,8 +125,14 @@ func BenchmarkAdler(b *testing.B) {
 	json.Unmarshal([]byte(podSpec), &spec)
 
 	for i := 0; i < b.N; i++ {
-		GetPodTemplateSpecHash(spec)
+		getPodTemplateSpecOldHash(spec)
 	}
+}
+
+func getPodTemplateSpecOldHash(template v1.PodTemplateSpec) uint32 {
+	podTemplateSpecHasher := adler32.New()
+	hashutil.DeepHashObject(podTemplateSpecHasher, template)
+	return podTemplateSpecHasher.Sum32()
 }
 
 func BenchmarkFnv(b *testing.B) {
@@ -153,6 +140,6 @@ func BenchmarkFnv(b *testing.B) {
 	json.Unmarshal([]byte(podSpec), &spec)
 
 	for i := 0; i < b.N; i++ {
-		GetPodTemplateSpecHashFnv(spec)
+		controller.ComputeHash(&spec, nil)
 	}
 }

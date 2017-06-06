@@ -11,7 +11,7 @@ spec:
     - /bin/sh
     - -c
     - /usr/local/bin/kube-apiserver --address=127.0.0.1 --etcd-servers=http://127.0.0.1:4001
-      --cloud-provider=gce   --admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+      --cloud-provider=gce   --admission-control=Initializers,NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
       --service-cluster-ip-range=10.0.0.0/16 --client-ca-file=/srv/kubernetes/ca.crt
       --basic-auth-file=/srv/kubernetes/basic_auth.csv --cluster-name=e2e-test-bburns
       --tls-cert-file=/srv/kubernetes/server.cert --tls-private-key-file=/srv/kubernetes/server.key

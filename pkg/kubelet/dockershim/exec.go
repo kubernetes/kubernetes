@@ -26,16 +26,17 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	"k8s.io/client-go/tools/remotecommand"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/term"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 // ExecHandler knows how to execute a command in a running Docker container.
 type ExecHandler interface {
-	ExecInContainer(client dockertools.DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
+	ExecInContainer(client libdocker.Interface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
 }
 
 // NsenterExecHandler executes commands in Docker containers using nsenter.
@@ -62,7 +63,7 @@ func (d *dockerExitError) ExitStatus() int {
 }
 
 // TODO should we support nsenter in a container, running with elevated privs and --pid=host?
-func (*NsenterExecHandler) ExecInContainer(client dockertools.DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
+func (*NsenterExecHandler) ExecInContainer(client libdocker.Interface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	nsenter, err := exec.LookPath("nsenter")
 	if err != nil {
 		return fmt.Errorf("exec unavailable - unable to locate nsenter")
@@ -133,7 +134,7 @@ func (*NsenterExecHandler) ExecInContainer(client dockertools.DockerInterface, c
 // NativeExecHandler executes commands in Docker containers using Docker's exec API.
 type NativeExecHandler struct{}
 
-func (*NativeExecHandler) ExecInContainer(client dockertools.DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
+func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	createOpts := dockertypes.ExecConfig{
 		Cmd:          cmd,
 		AttachStdin:  stdin != nil,
@@ -153,7 +154,7 @@ func (*NativeExecHandler) ExecInContainer(client dockertools.DockerInterface, co
 	})
 
 	startOpts := dockertypes.ExecStartCheck{Detach: false, Tty: tty}
-	streamOpts := dockertools.StreamOptions{
+	streamOpts := libdocker.StreamOptions{
 		InputStream:  stdin,
 		OutputStream: stdout,
 		ErrorStream:  stderr,

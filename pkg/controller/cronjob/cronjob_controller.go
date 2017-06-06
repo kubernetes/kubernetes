@@ -205,8 +205,7 @@ func syncOne(sj *batchv2alpha1.CronJob, js []batchv1.Job, now time.Time, jc jobC
 	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
 
 	childrenJobs := make(map[types.UID]bool)
-	for i := range js {
-		j := js[i]
+	for _, j := range js {
 		childrenJobs[j.ObjectMeta.UID] = true
 		found := inActiveList(*sj, j.ObjectMeta.UID)
 		if !found && !IsJobFinished(&j) {
@@ -366,11 +365,11 @@ func deleteJob(sj *batchv2alpha1.CronJob, job *batchv1.Job, jc jobControlInterfa
 	// TODO: this should be replaced with server side job deletion
 	// currencontinuetly this mimics JobReaper from pkg/kubectl/stop.go
 	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
-	var err error
 
 	// scale job down to 0
 	if *job.Spec.Parallelism != 0 {
 		zero := int32(0)
+		var err error
 		job.Spec.Parallelism = &zero
 		job, err = jc.UpdateJob(job.Namespace, job)
 		if err != nil {

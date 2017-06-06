@@ -19,8 +19,30 @@ package gce
 import (
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/master/ports"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
+
+	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v1"
 )
+
+const (
+	nodesHealthCheckPath   = "/healthz"
+	lbNodesHealthCheckPort = ports.ProxyHealthzPort
+)
+
+var (
+	minNodesHealthCheckVersion *utilversion.Version
+)
+
+func init() {
+	if v, err := utilversion.ParseGeneric("1.7.0"); err != nil {
+		panic(err)
+	} else {
+		minNodesHealthCheckVersion = v
+	}
+}
 
 func newHealthcheckMetricContext(request string) *metricContext {
 	return &metricContext{
@@ -177,4 +199,38 @@ func (gce *GCECloud) ListHealthChecks() (*compute.HealthCheckList, error) {
 	// TODO: use PageToken to list all not just the first 500
 	v, err := gce.service.HealthChecks.List(gce.projectID).Do()
 	return v, mc.Observe(err)
+}
+
+// GetNodesHealthCheckPort returns the health check port used by the GCE load
+// balancers (l4) for performing health checks on nodes.
+func GetNodesHealthCheckPort() int32 {
+	return lbNodesHealthCheckPort
+}
+
+// GetNodesHealthCheckPath returns the health check path used by the GCE load
+// balancers (l4) for performing health checks on nodes.
+func GetNodesHealthCheckPath() string {
+	return nodesHealthCheckPath
+}
+
+// isAtLeastMinNodesHealthCheckVersion checks if a version is higher than
+// `minNodesHealthCheckVersion`.
+func isAtLeastMinNodesHealthCheckVersion(vstring string) bool {
+	version, err := utilversion.ParseGeneric(vstring)
+	if err != nil {
+		glog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
+		return false
+	}
+	return version.AtLeast(minNodesHealthCheckVersion)
+}
+
+// supportsNodesHealthCheck returns false if anyone of the nodes has version
+// lower than `minNodesHealthCheckVersion`.
+func supportsNodesHealthCheck(nodes []*v1.Node) bool {
+	for _, node := range nodes {
+		if !isAtLeastMinNodesHealthCheckVersion(node.Status.NodeInfo.KubeProxyVersion) {
+			return false
+		}
+	}
+	return true
 }

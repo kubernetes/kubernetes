@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -49,7 +50,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
 	restclientwatch "k8s.io/client-go/rest/watch"
-	"k8s.io/client-go/util/clock"
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
 )
@@ -326,6 +326,16 @@ func TestResultIntoWithErrReturnsErr(t *testing.T) {
 	res := Result{err: errors.New("test")}
 	if err := res.Into(&v1.Pod{}); err != res.err {
 		t.Errorf("should have returned exact error from result")
+	}
+}
+
+func TestResultIntoWithNoBodyReturnsErr(t *testing.T) {
+	res := Result{
+		body:    []byte{},
+		decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+	}
+	if err := res.Into(&v1.Pod{}); err == nil || !strings.Contains(err.Error(), "0-length") {
+		t.Errorf("should have complained about 0 length body")
 	}
 }
 

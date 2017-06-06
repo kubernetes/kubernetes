@@ -370,7 +370,7 @@ func PrioritizeNodes(
 
 	// Summarize all scores.
 	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
-	// TODO: Consider parallelizing it.
+
 	for i := range nodes {
 		result = append(result, schedulerapi.HostPriority{Host: nodes[i].Name, Score: 0})
 		for j := range priorityConfigs {

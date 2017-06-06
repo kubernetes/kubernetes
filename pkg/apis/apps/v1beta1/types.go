@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -48,7 +49,7 @@ type ScaleStatus struct {
 	// avoid introspection in the clients. The string will be in the same format as the
 	// query-param syntax. If the target type only supports map-based selectors, both this
 	// field and map-based selector field are populated.
-	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
 	TargetSelector string `json:"targetSelector,omitempty" protobuf:"bytes,3,opt,name=targetSelector"`
 }
@@ -95,9 +96,24 @@ type StatefulSet struct {
 	Status StatefulSetStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// PodManagementPolicyType defines the policy for creating pods under a stateful set.
+type PodManagementPolicyType string
+
+const (
+	// OrderedReadyPodManagement will create pods in strictly increasing order on
+	// scale up and strictly decreasing order on scale down, progressing only when
+	// the previous pod is ready or terminated. At most one pod will be changed
+	// at any time.
+	OrderedReadyPodManagement PodManagementPolicyType = "OrderedReady"
+	// ParallelPodManagement will create and delete pods as soon as the stateful set
+	// replica count is changed, and will not wait for pods to be ready or complete
+	// termination.
+	ParallelPodManagement = "Parallel"
+)
+
 // A StatefulSetSpec is the specification of a StatefulSet.
 type StatefulSetSpec struct {
-	// Replicas is the desired number of replicas of the given Template.
+	// replicas is the desired number of replicas of the given Template.
 	// These are replicas in the sense that they are instantiations of the
 	// same Template, but individual replicas also have a consistent identity.
 	// If unspecified, defaults to 1.
@@ -105,19 +121,19 @@ type StatefulSetSpec struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 
-	// Selector is a label query over pods that should match the replica count.
+	// selector is a label query over pods that should match the replica count.
 	// If empty, defaulted to labels on the pod template.
-	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
-	// Template is the object that describes the pod that will be created if
+	// template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. Each pod stamped out by the StatefulSet
 	// will fulfill this Template, but have a unique identity from the rest
 	// of the StatefulSet.
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
 
-	// VolumeClaimTemplates is a list of claims that pods are allowed to reference.
+	// volumeClaimTemplates is a list of claims that pods are allowed to reference.
 	// The StatefulSet controller is responsible for mapping network identities to
 	// claims in a way that maintains the identity of a pod. Every claim in
 	// this list must have at least one matching (by name) volumeMount in one
@@ -127,21 +143,32 @@ type StatefulSetSpec struct {
 	// +optional
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty" protobuf:"bytes,4,rep,name=volumeClaimTemplates"`
 
-	// ServiceName is the name of the service that governs this StatefulSet.
+	// serviceName is the name of the service that governs this StatefulSet.
 	// This service must exist before the StatefulSet, and is responsible for
 	// the network identity of the set. Pods get DNS/hostnames that follow the
 	// pattern: pod-specific-string.serviceName.default.svc.cluster.local
 	// where "pod-specific-string" is managed by the StatefulSet controller.
 	ServiceName string `json:"serviceName" protobuf:"bytes,5,opt,name=serviceName"`
+
+	// podManagementPolicy controls how pods are created during initial scale up,
+	// when replacing pods on nodes, or when scaling down. The default policy is
+	// `OrderedReady`, where pods are created in increasing order (pod-0, then
+	// pod-1, etc) and the controller will wait until each pod is ready before
+	// continuing. When scaling down, the pods are removed in the opposite order.
+	// The alternative policy is `Parallel` which will create pods in parallel
+	// to match the desired scale without waiting, and on scale down will delete
+	// all pods at once.
+	// +optional
+	PodManagementPolicy PodManagementPolicyType `json:"podManagementPolicy,omitempty" protobuf:"bytes,6,opt,name=podManagementPolicy,casttype=PodManagementPolicyType"`
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
 type StatefulSetStatus struct {
-	// most recent generation observed by this StatefulSet.
+	// observedGeneration is the most recent generation observed by this StatefulSet.
 	// +optional
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
 
-	// Replicas is the number of actual replicas.
+	// replicas is the number of actual replicas.
 	Replicas int32 `json:"replicas" protobuf:"varint,2,opt,name=replicas"`
 }
 
@@ -233,7 +260,7 @@ type DeploymentRollback struct {
 }
 
 type RollbackConfig struct {
-	// The revision to rollback to. If set to 0, rollbck to the last revision.
+	// The revision to rollback to. If set to 0, rollback to the last revision.
 	// +optional
 	Revision int64 `json:"revision,omitempty" protobuf:"varint,1,opt,name=revision"`
 }
@@ -330,6 +357,12 @@ type DeploymentStatus struct {
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	Conditions []DeploymentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,6,rep,name=conditions"`
+
+	// Count of hash collisions for the Deployment. The Deployment controller uses this
+	// field as a collision avoidance mechanism when it needs to create the name for the
+	// newest ReplicaSet.
+	// +optional
+	CollisionCount *int64 `json:"collisionCount,omitempty" protobuf:"varint,8,opt,name=collisionCount"`
 }
 
 type DeploymentConditionType string
@@ -374,4 +407,41 @@ type DeploymentList struct {
 
 	// Items is the list of Deployments.
 	Items []Deployment `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient=true
+
+// ControllerRevision implements an immutable snapshot of state data. Clients
+// are responsible for serializing and deserializing the objects that contain
+// their internal state.
+// Once a ControllerRevision has been successfully created, it can not be updated.
+// The API Server will fail validation of all requests that attempt to mutate
+// the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both
+// the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However,
+// it may be subject to name and representation changes in future releases, and clients should not
+// depend on its stability. It is primarily for internal use by controllers.
+type ControllerRevision struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Data is the serialized representation of the state.
+	Data runtime.RawExtension `json:"data,omitempty" protobuf:"bytes,2,opt,name=data"`
+
+	// Revision indicates the revision of the state represented by Data.
+	Revision int64 `json:"revision" protobuf:"varint,3,opt,name=revision"`
+}
+
+// ControllerRevisionList is a resource containing a list of ControllerRevision objects.
+type ControllerRevisionList struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of ControllerRevisions
+	Items []ControllerRevision `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

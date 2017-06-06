@@ -24,12 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
@@ -70,7 +73,7 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 // OperationGenerator interface that extracts out the functions from operation_executor to make it dependency injectable
 type OperationGenerator interface {
 	// Generates the MountVolume function needed to perform the mount of a volume plugin
-	GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (func() error, error)
+	GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) (func() error, error)
 
 	// Generates the UnmountVolume function needed to perform the unmount of a volume plugin
 	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (func() error, error)
@@ -263,6 +266,9 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 				og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
 			}
 			return detailedErr
+		} else if devicePath == "" {
+			// do nothing and get device path next time.
+			return nil
 		}
 
 		glog.Infof(volumeToAttach.GenerateMsgDetailed("AttachVolume.Attach succeeded", ""))
@@ -351,12 +357,18 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 func (og *operationGenerator) GenerateMountVolumeFunc(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
-	actualStateOfWorld ActualStateOfWorldMounterUpdater) (func() error, error) {
+	actualStateOfWorld ActualStateOfWorldMounterUpdater,
+	isRemount bool) (func() error, error) {
 	// Get mounter plugin
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
 	if err != nil || volumePlugin == nil {
 		return nil, volumeToMount.GenerateErrorDetailed("MountVolume.FindPluginBySpec failed", err)
+	}
+
+	affinityErr := checkNodeAffinity(og, volumeToMount, volumePlugin)
+	if affinityErr != nil {
+		return nil, affinityErr
 	}
 
 	volumeMounter, newMounterErr := volumePlugin.NewMounter(
@@ -453,7 +465,14 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			return detailedErr
 		}
 
-		glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.SetUp succeeded", ""))
+		simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.SetUp succeeded", "")
+		verbosity := glog.Level(1)
+		if isRemount {
+			verbosity = glog.Level(7)
+		} else {
+			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.SuccessfulMountVolume, simpleMsg)
+		}
+		glog.V(verbosity).Infof(detailedMsg)
 
 		// Update actual state of world
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(
@@ -702,6 +721,30 @@ func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount
 		eventErr, detailedErr := volumeToMount.GenerateError("Mount options are not supported for this volume type", nil)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.UnsupportedMountOption, eventErr.Error())
 		return detailedErr
+	}
+	return nil
+}
+
+// checkNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
+// This ensures that we don't mount a volume that doesn't belong to this node
+func checkNodeAffinity(og *operationGenerator, volumeToMount VolumeToMount, plugin volume.VolumePlugin) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
+		return nil
+	}
+
+	pv := volumeToMount.VolumeSpec.PersistentVolume
+	if pv != nil {
+		nodeLabels, err := og.volumePluginMgr.Host.GetNodeLabels()
+		if err != nil {
+			return volumeToMount.GenerateErrorDetailed("Error getting node labels", err)
+		}
+
+		err = util.CheckNodeAffinity(pv, nodeLabels)
+		if err != nil {
+			eventErr, detailedErr := volumeToMount.GenerateError("Storage node affinity check failed", err)
+			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
+			return detailedErr
+		}
 	}
 	return nil
 }

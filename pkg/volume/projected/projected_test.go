@@ -505,7 +505,8 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 				sources: source.Sources,
 				podUID:  pod.UID,
 				plugin: &projectedPlugin{
-					host: host,
+					host:         host,
+					getConfigMap: host.GetConfigMapFunc(),
 				},
 			},
 			source: *source,

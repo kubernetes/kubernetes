@@ -58,6 +58,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	return &REST{store}, &StatusREST{store: &statusStore}
 }
 
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (r *REST) Categories() []string {
+	return []string{"all"}
+}
+
 // StatusREST implements the REST endpoint for changing the status of an statefulSet
 type StatusREST struct {
 	store *genericregistry.Store
@@ -75,4 +83,12 @@ func (r *StatusREST) Get(ctx genericapirequest.Context, name string, options *me
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, name, objInfo)
+}
+
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"sts"}
 }

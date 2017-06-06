@@ -26,7 +26,7 @@ spec:
       dnsPolicy: Default
       containers:
       - name: fluentd-gcp
-        image: gcr.io/google-containers/fluentd-gcp:2.0.2
+        image: gcr.io/google-containers/fluentd-gcp:2.0.5
         # If fluentd consumes its own logs, the following situation may happen:
         # fluentd fails to send a chunk to the server => writes it to the log =>
         # tries to send this message to the server => fails to send a chunk and so on.
@@ -103,6 +103,8 @@ spec:
       tolerations:
       - key: "node.alpha.kubernetes.io/ismaster"
         effect: "NoSchedule"
+      - operator: "Exists"
+        effect: "NoExecute"
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog
@@ -116,7 +118,7 @@ spec:
           path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-gcp-config
+          name: fluentd-gcp-config-v1.0
       - name: ssl-certs
         hostPath:
           path: /etc/ssl/certs

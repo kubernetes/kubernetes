@@ -2,15 +2,25 @@
 
 [GlusterFS](http://www.gluster.org) is an open source scale-out filesystem. These examples provide information about how to allow containers use GlusterFS volumes.
 
+There are couple of ways to use GlusterFS as a persistent data store in application pods.
+
+*) Static Provisioning of GlusterFS Volumes.
+*) Dynamic Provisioning of GlusterFS Volumes.
+
+### Static Provisioning
+
+Static Provisioning of GlusterFS Volumes is analogues to creation of a PV ( Persistent Volume) resource by specifying the parameters in it. This
+also need a working GlusterFS cluster/trusted pool available to carve out GlusterFS volumes.
+
 The example assumes that you have already set up a GlusterFS server cluster and have a working GlusterFS volume ready to use in the containers.
 
-### Prerequisites
+#### Prerequisites
 
 * Set up a GlusterFS server cluster
 * Create a GlusterFS volume
 * If you are not using hyperkube, you may need to install the GlusterFS client package on the Kubernetes nodes ([Guide](http://gluster.readthedocs.io/en/latest/Administrator%20Guide/))
 
-### Create endpoints
+#### Create endpoints
 
 The first step is to create the GlusterFS endpoints definition in Kubernetes. Here is a snippet of [glusterfs-endpoints.json](glusterfs-endpoints.json):
 
@@ -52,7 +62,7 @@ $ kubectl create -f examples/volumes/glusterfs/glusterfs-service.json
 ```
 
 
-### Create a Pod
+#### Create a Pod
 
 The following *volume* spec in [glusterfs-pod.json](glusterfs-pod.json) illustrates a sample configuration:
 
@@ -93,11 +103,15 @@ You may execute the command `mount` inside the container to see if the GlusterFS
 
 ```sh
 $ kubectl exec glusterfs -- mount | grep gluster
-10.240.106.152:kube_vol on /mnt/glusterfs type fuse.glusterfs (rw,relatime,user_id=0,group_id=0,default_permissions,allow_other,max_read=131072)```
+10.240.106.152:kube_vol on /mnt/glusterfs type fuse.glusterfs (rw,relatime,user_id=0,group_id=0,default_permissions,allow_other,max_read=131072)
+```
 
 You may also run `docker ps` on the host to see the actual container.
 
+### Dynamic Provisioning of GlusterFS Volumes:
 
+Dynamic Provisioning means provisioning of GlusterFS volumes based on a Storage class. Please refer [this guide](./../../persistent-volume-provisioning/README.md)
+.
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/glusterfs/README.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->

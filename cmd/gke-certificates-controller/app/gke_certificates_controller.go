@@ -72,7 +72,7 @@ func Run(s *GKECertificatesController) error {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Duration(12)*time.Hour)
 
-	signer, err := NewGKESigner(s.ClusterSigningGKEKubeconfig, s.ClusterSigningGKERetryBackoff.Duration, recorder)
+	signer, err := NewGKESigner(s.ClusterSigningGKEKubeconfig, s.ClusterSigningGKERetryBackoff.Duration, recorder, client)
 	if err != nil {
 		return err
 	}
@@ -80,8 +80,7 @@ func Run(s *GKECertificatesController) error {
 	controller, err := certificates.NewCertificateController(
 		client,
 		sharedInformers.Certificates().V1beta1().CertificateSigningRequests(),
-		signer,
-		certificates.NewGroupApprover(s.ApproveAllKubeletCSRsForGroup),
+		signer.handle,
 	)
 	if err != nil {
 		return err

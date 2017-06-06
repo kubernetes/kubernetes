@@ -12,7 +12,7 @@ go_library(
     srcs = ["interface.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor/k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1alpha1:go_default_library",
+        "//vendor/k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1beta1:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/client/informers/externalversions/internalinterfaces:go_default_library",
     ],
 )

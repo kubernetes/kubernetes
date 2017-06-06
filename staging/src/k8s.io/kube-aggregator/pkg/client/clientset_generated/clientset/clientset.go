@@ -21,38 +21,38 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
-	apiregistrationv1alpha1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1"
+	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1beta1"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	ApiregistrationV1alpha1() apiregistrationv1alpha1.ApiregistrationV1alpha1Interface
+	ApiregistrationV1beta1() apiregistrationv1beta1.ApiregistrationV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Apiregistration() apiregistrationv1alpha1.ApiregistrationV1alpha1Interface
+	Apiregistration() apiregistrationv1beta1.ApiregistrationV1beta1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*apiregistrationv1alpha1.ApiregistrationV1alpha1Client
+	*apiregistrationv1beta1.ApiregistrationV1beta1Client
 }
 
-// ApiregistrationV1alpha1 retrieves the ApiregistrationV1alpha1Client
-func (c *Clientset) ApiregistrationV1alpha1() apiregistrationv1alpha1.ApiregistrationV1alpha1Interface {
+// ApiregistrationV1beta1 retrieves the ApiregistrationV1beta1Client
+func (c *Clientset) ApiregistrationV1beta1() apiregistrationv1beta1.ApiregistrationV1beta1Interface {
 	if c == nil {
 		return nil
 	}
-	return c.ApiregistrationV1alpha1Client
+	return c.ApiregistrationV1beta1Client
 }
 
 // Deprecated: Apiregistration retrieves the default version of ApiregistrationClient.
 // Please explicitly pick a version.
-func (c *Clientset) Apiregistration() apiregistrationv1alpha1.ApiregistrationV1alpha1Interface {
+func (c *Clientset) Apiregistration() apiregistrationv1beta1.ApiregistrationV1beta1Interface {
 	if c == nil {
 		return nil
 	}
-	return c.ApiregistrationV1alpha1Client
+	return c.ApiregistrationV1beta1Client
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -71,7 +71,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.ApiregistrationV1alpha1Client, err = apiregistrationv1alpha1.NewForConfig(&configShallowCopy)
+	cs.ApiregistrationV1beta1Client, err = apiregistrationv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.ApiregistrationV1alpha1Client = apiregistrationv1alpha1.NewForConfigOrDie(c)
+	cs.ApiregistrationV1beta1Client = apiregistrationv1beta1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -97,7 +97,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.ApiregistrationV1alpha1Client = apiregistrationv1alpha1.New(c)
+	cs.ApiregistrationV1beta1Client = apiregistrationv1beta1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

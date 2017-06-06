@@ -163,8 +163,9 @@ type RCConfig struct {
 	NodeDumpFunc      func(c clientset.Interface, nodeNames []string, logFunc func(fmt string, args ...interface{}))
 	ContainerDumpFunc func(c clientset.Interface, ns string, logFunc func(ftm string, args ...interface{}))
 
-	// Names of the secrets to mount
-	SecretNames []string
+	// Names of the secrets and configmaps to mount.
+	SecretNames    []string
+	ConfigMapNames []string
 }
 
 func (rc *RCConfig) RCConfigLog(fmt string, args ...interface{}) {
@@ -306,6 +307,9 @@ func (config *DeploymentConfig) create() error {
 	if len(config.SecretNames) > 0 {
 		attachSecrets(&deployment.Spec.Template, config.SecretNames)
 	}
+	if len(config.ConfigMapNames) > 0 {
+		attachConfigMaps(&deployment.Spec.Template, config.ConfigMapNames)
+	}
 
 	config.applyTo(&deployment.Spec.Template)
 
@@ -370,6 +374,9 @@ func (config *ReplicaSetConfig) create() error {
 	if len(config.SecretNames) > 0 {
 		attachSecrets(&rs.Spec.Template, config.SecretNames)
 	}
+	if len(config.ConfigMapNames) > 0 {
+		attachConfigMaps(&rs.Spec.Template, config.ConfigMapNames)
+	}
 
 	config.applyTo(&rs.Spec.Template)
 
@@ -429,6 +436,9 @@ func (config *JobConfig) create() error {
 
 	if len(config.SecretNames) > 0 {
 		attachSecrets(&job.Spec.Template, config.SecretNames)
+	}
+	if len(config.ConfigMapNames) > 0 {
+		attachConfigMaps(&job.Spec.Template, config.ConfigMapNames)
 	}
 
 	config.applyTo(&job.Spec.Template)
@@ -494,6 +504,7 @@ func (config *RCConfig) create() error {
 	if config.DNSPolicy == nil {
 		config.DNSPolicy = &dnsDefault
 	}
+	one := int64(1)
 	rc := &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
@@ -517,8 +528,9 @@ func (config *RCConfig) create() error {
 							ReadinessProbe: config.ReadinessProbe,
 						},
 					},
-					DNSPolicy:    *config.DNSPolicy,
-					NodeSelector: config.NodeSelector,
+					DNSPolicy:                     *config.DNSPolicy,
+					NodeSelector:                  config.NodeSelector,
+					TerminationGracePeriodSeconds: &one,
 				},
 			},
 		},
@@ -526,6 +538,9 @@ func (config *RCConfig) create() error {
 
 	if len(config.SecretNames) > 0 {
 		attachSecrets(rc.Spec.Template, config.SecretNames)
+	}
+	if len(config.ConfigMapNames) > 0 {
+		attachConfigMaps(rc.Spec.Template, config.ConfigMapNames)
 	}
 
 	config.applyTo(rc.Spec.Template)
@@ -1103,6 +1118,67 @@ func attachSecrets(template *v1.PodTemplateSpec, secretNames []string) {
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
 					SecretName: name,
+				},
+			},
+		})
+		mounts = append(mounts, v1.VolumeMount{
+			Name:      name,
+			MountPath: fmt.Sprintf("/%v", name),
+		})
+	}
+
+	template.Spec.Volumes = volumes
+	template.Spec.Containers[0].VolumeMounts = mounts
+}
+
+type ConfigMapConfig struct {
+	Content   map[string]string
+	Client    clientset.Interface
+	Name      string
+	Namespace string
+	// If set this function will be used to print log lines instead of glog.
+	LogFunc func(fmt string, args ...interface{})
+}
+
+func (config *ConfigMapConfig) Run() error {
+	configMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Name,
+		},
+		Data: map[string]string{},
+	}
+	for k, v := range config.Content {
+		configMap.Data[k] = v
+	}
+
+	_, err := config.Client.Core().ConfigMaps(config.Namespace).Create(configMap)
+	if err != nil {
+		return fmt.Errorf("Error creating configmap: %v", err)
+	}
+	config.LogFunc("Created configmap %v/%v", config.Namespace, config.Name)
+	return nil
+}
+
+func (config *ConfigMapConfig) Stop() error {
+	if err := config.Client.Core().ConfigMaps(config.Namespace).Delete(config.Name, &metav1.DeleteOptions{}); err != nil {
+		return fmt.Errorf("Error deleting configmap: %v", err)
+	}
+	config.LogFunc("Deleted configmap %v/%v", config.Namespace, config.Name)
+	return nil
+}
+
+// TODO: attach configmaps using different possibilities: env vars.
+func attachConfigMaps(template *v1.PodTemplateSpec, configMapNames []string) {
+	volumes := make([]v1.Volume, 0, len(configMapNames))
+	mounts := make([]v1.VolumeMount, 0, len(configMapNames))
+	for _, name := range configMapNames {
+		volumes = append(volumes, v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: name,
+					},
 				},
 			},
 		})

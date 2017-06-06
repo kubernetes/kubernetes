@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 licenses(["notice"])
 
 load(
@@ -19,6 +17,7 @@ go_library(
         "set_subject.go",
     ],
     tags = ["automanaged"],
+    visibility = ["//build/visible_to:pkg_kubectl_cmd_set_CONSUMERS"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/rbac:go_default_library",
@@ -44,6 +43,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "set_image_test.go",
+        "set_resources_test.go",
         "set_selector_test.go",
         "set_subject_test.go",
         "set_test.go",
@@ -75,11 +75,13 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
-    visibility = ["//visibility:private"],
 )
 
 filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = [
+        "//build/visible_to:pkg_kubectl_cmd_set_CONSUMERS",
+    ],
 )

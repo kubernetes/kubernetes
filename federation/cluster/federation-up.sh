@@ -94,7 +94,8 @@ function init() {
       --apiserver-enable-basic-auth=true \
       --apiserver-enable-token-auth=true \
       --apiserver-arg-overrides="--v=4" \
-      --controllermanager-arg-overrides="--v=4"
+      --controllermanager-arg-overrides="--v=4" \
+      --v=4
 }
 
 # join_clusters joins the clusters in the local kubeconfig to federation. The clusters
@@ -107,7 +108,8 @@ function join_clusters() {
         "${context}" \
         --federation-system-namespace=${FEDERATION_NAMESPACE} \
         --host-cluster-context="${HOST_CLUSTER_CONTEXT}" \
-        --context="${FEDERATION_KUBE_CONTEXT}"
+        --context="${FEDERATION_KUBE_CONTEXT}" \
+        --v=4
   done
 }
 

@@ -16,6 +16,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/admissionregistration/v1alpha1:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/apis/authentication/v1:go_default_library",
         "//pkg/apis/authentication/v1beta1:go_default_library",
@@ -27,6 +28,7 @@ go_library(
         "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
+        "//pkg/apis/networking/v1:go_default_library",
         "//pkg/apis/policy/v1beta1:go_default_library",
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/apis/rbac/v1beta1:go_default_library",

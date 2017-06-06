@@ -91,6 +91,7 @@ func TestParseResolvConf(t *testing.T) {
 		{"nameserver\t1.2.3.4", []string{"1.2.3.4"}, []string{}},
 		{"nameserver \t 1.2.3.4", []string{"1.2.3.4"}, []string{}},
 		{"nameserver 1.2.3.4\nnameserver 5.6.7.8", []string{"1.2.3.4", "5.6.7.8"}, []string{}},
+		{"nameserver 1.2.3.4 #comment", []string{"1.2.3.4"}, []string{}},
 		{"search foo", []string{}, []string{"foo"}},
 		{"search foo bar", []string{}, []string{"foo", "bar"}},
 		{"search foo bar bat\n", []string{}, []string{"foo", "bar", "bat"}},
@@ -112,6 +113,7 @@ func TestParseResolvConf(t *testing.T) {
 
 func TestComposeDNSSearch(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	recorder := record.NewFakeRecorder(20)

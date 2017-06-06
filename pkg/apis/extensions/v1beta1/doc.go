@@ -18,6 +18,7 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/extensions
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/autoscaling
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/batch
+// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/networking
 // +k8s:openapi-gen=true
 // +k8s:defaulter-gen=TypeMeta
 

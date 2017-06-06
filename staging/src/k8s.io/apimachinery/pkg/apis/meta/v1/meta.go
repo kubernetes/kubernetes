@@ -55,6 +55,8 @@ type Object interface {
 	SetLabels(labels map[string]string)
 	GetAnnotations() map[string]string
 	SetAnnotations(annotations map[string]string)
+	GetInitializers() *Initializers
+	SetInitializers(initializers *Initializers)
 	GetFinalizers() []string
 	SetFinalizers(finalizers []string)
 	GetOwnerReferences() []OwnerReference
@@ -141,10 +143,15 @@ func (meta *ObjectMeta) GetLabels() map[string]string                 { return m
 func (meta *ObjectMeta) SetLabels(labels map[string]string)           { meta.Labels = labels }
 func (meta *ObjectMeta) GetAnnotations() map[string]string            { return meta.Annotations }
 func (meta *ObjectMeta) SetAnnotations(annotations map[string]string) { meta.Annotations = annotations }
+func (meta *ObjectMeta) GetInitializers() *Initializers               { return meta.Initializers }
+func (meta *ObjectMeta) SetInitializers(initializers *Initializers)   { meta.Initializers = initializers }
 func (meta *ObjectMeta) GetFinalizers() []string                      { return meta.Finalizers }
 func (meta *ObjectMeta) SetFinalizers(finalizers []string)            { meta.Finalizers = finalizers }
 
 func (meta *ObjectMeta) GetOwnerReferences() []OwnerReference {
+	if meta.OwnerReferences == nil {
+		return nil
+	}
 	ret := make([]OwnerReference, len(meta.OwnerReferences))
 	for i := 0; i < len(meta.OwnerReferences); i++ {
 		ret[i].Kind = meta.OwnerReferences[i].Kind
@@ -164,6 +171,10 @@ func (meta *ObjectMeta) GetOwnerReferences() []OwnerReference {
 }
 
 func (meta *ObjectMeta) SetOwnerReferences(references []OwnerReference) {
+	if references == nil {
+		meta.OwnerReferences = nil
+		return
+	}
 	newReferences := make([]OwnerReference, len(references))
 	for i := 0; i < len(references); i++ {
 		newReferences[i].Kind = references[i].Kind

@@ -10,6 +10,8 @@
 $ build/run.sh make cross
 
 # Build for linux/amd64 (default)
+# export REGISTRY=$HOST/$ORG to switch from gcr.io/google_containers
+
 $ make push VERSION={target_version} ARCH=amd64
 # ---> gcr.io/google_containers/hyperkube-amd64:VERSION
 # ---> gcr.io/google_containers/hyperkube:VERSION (image with backwards-compatible naming)

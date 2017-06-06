@@ -39,9 +39,6 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-
-	// need to register pods
-	_ "k8s.io/client-go/pkg/api/install"
 )
 
 var (
@@ -163,11 +160,11 @@ func (p *testNamer) SetSelfLink(obj runtime.Object, url string) error {
 }
 
 // GenerateLink creates a path and query for a given runtime object that represents the canonical path.
-func (p *testNamer) GenerateLink(req *http.Request, obj runtime.Object) (uri string, err error) {
+func (p *testNamer) GenerateLink(requestInfo *request.RequestInfo, obj runtime.Object) (uri string, err error) {
 	return "", errors.New("not implemented")
 }
 
-// GenerateLink creates a path and query for a list that represents the canonical path.
+// GenerateListLink creates a path and query for a list that represents the canonical path.
 func (p *testNamer) GenerateListLink(req *http.Request) (uri string, err error) {
 	return "", errors.New("not implemented")
 }
@@ -598,5 +595,64 @@ func TestParseTimeout(t *testing.T) {
 	}
 	if d := parseTimeout("10s"); d != 10*time.Second {
 		t.Errorf("10s timeout produced: %v", d)
+	}
+}
+
+func TestFinishRequest(t *testing.T) {
+	exampleObj := &example.Pod{}
+	exampleErr := fmt.Errorf("error")
+	successStatusObj := &metav1.Status{Status: metav1.StatusSuccess, Message: "success message"}
+	errorStatusObj := &metav1.Status{Status: metav1.StatusFailure, Message: "error message"}
+	testcases := []struct {
+		timeout     time.Duration
+		fn          resultFunc
+		expectedObj runtime.Object
+		expectedErr error
+	}{
+		{
+			// Expected obj is returned.
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				return exampleObj, nil
+			},
+			expectedObj: exampleObj,
+			expectedErr: nil,
+		},
+		{
+			// Expected error is returned.
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				return nil, exampleErr
+			},
+			expectedObj: nil,
+			expectedErr: exampleErr,
+		},
+		{
+			// Successful status object is returned as expected.
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				return successStatusObj, nil
+			},
+			expectedObj: successStatusObj,
+			expectedErr: nil,
+		},
+		{
+			// Error status object is converted to StatusError.
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				return errorStatusObj, nil
+			},
+			expectedObj: nil,
+			expectedErr: apierrors.FromObject(errorStatusObj),
+		},
+	}
+	for i, tc := range testcases {
+		obj, err := finishRequest(tc.timeout, tc.fn)
+		if (err == nil && tc.expectedErr != nil) || (err != nil && tc.expectedErr == nil) || (err != nil && tc.expectedErr != nil && err.Error() != tc.expectedErr.Error()) {
+			t.Errorf("%d: unexpected err. expected: %v, got: %v", i, tc.expectedErr, err)
+		}
+		if !apiequality.Semantic.DeepEqual(obj, tc.expectedObj) {
+			t.Errorf("%d: unexpected obj. expected %#v, got %#v", i, tc.expectedObj, obj)
+		}
 	}
 }

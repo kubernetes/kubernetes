@@ -18,11 +18,34 @@ package token
 
 import (
 	"bytes"
+	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	core "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/pkg/api"
 )
+
+const testConfig = `apiVersion: v1
+clusters:
+- cluster:
+    server: https://10.128.0.6:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: kubernetes-admin
+  name: kubernetes-admin@kubernetes
+current-context: kubernetes-admin@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: kubernetes-admin`
 
 func TestEncodeTokenSecretData(t *testing.T) {
 	var tests = []struct {
@@ -54,6 +77,54 @@ func TestEncodeTokenSecretData(t *testing.T) {
 					"failed EncodeTokenSecretData, duration was not added to time",
 				)
 			}
+		}
+	}
+}
+
+func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
+	tests := []struct {
+		name      string
+		createErr error
+		expectErr bool
+	}{
+		{
+			"successful case should have no error",
+			nil,
+			false,
+		},
+		{
+			"duplicate creation should have no error",
+			apierrors.NewAlreadyExists(api.Resource("configmaps"), "test"),
+			false,
+		},
+		{
+			"unexpected error should be returned",
+			apierrors.NewUnauthorized("go away!"),
+			true,
+		},
+	}
+
+	file, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatalf("could not create tempfile: %v", err)
+	}
+	defer os.Remove(file.Name())
+
+	file.Write([]byte(testConfig))
+
+	for _, tc := range tests {
+		client := clientsetfake.NewSimpleClientset()
+		if tc.createErr != nil {
+			client.PrependReactor("create", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+				return true, nil, tc.createErr
+			})
+		}
+
+		err = CreateBootstrapConfigMapIfNotExists(client, file.Name())
+		if tc.expectErr && err == nil {
+			t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) wanted error, got nil", tc.name)
+		} else if !tc.expectErr && err != nil {
+			t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) returned unexpected error: %v", tc.name, err)
 		}
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
@@ -29,6 +30,7 @@ import (
 	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -84,11 +86,12 @@ func TestWriteStaticPodManifests(t *testing.T) {
 
 		// Below is dead code.
 		if rt.expectedAPIProbePort != 0 {
-			manifest, err := os.Open(kubeadmapi.GlobalEnvParams.KubernetesDir + "/manifests/kube-apiserver.yaml")
+			manifest, err := os.Open(filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "kube-apiserver.yaml"))
 			if err != nil {
 				t.Errorf("WriteStaticPodManifests: %v", err)
 				continue
 			}
+			defer manifest.Close()
 
 			var pod api.Pod
 			d := yaml.NewYAMLOrJSONDecoder(manifest, 4096)
@@ -519,7 +522,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
+				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -551,7 +554,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
+				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -584,7 +587,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
+				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -619,7 +622,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
+				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -664,7 +667,8 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}{
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				CertificatesDir: testCertsDir,
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.7.0",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -675,15 +679,14 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
 				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
 				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
-				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:bootstrappers",
 				"--use-service-account-credentials=true",
 				"--controllers=*,bootstrapsigner,tokencleaner",
 			},
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				CloudProvider:   "foo",
-				CertificatesDir: testCertsDir,
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.6.4",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -694,7 +697,26 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
 				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
 				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
+				"--use-service-account-credentials=true",
+				"--controllers=*,bootstrapsigner,tokencleaner",
 				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:bootstrappers",
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				CloudProvider:     "foo",
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.7.0",
+			},
+			expected: []string{
+				"kube-controller-manager",
+				"--address=127.0.0.1",
+				"--leader-elect=true",
+				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
+				"--root-ca-file=" + testCertsDir + "/ca.crt",
+				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
+				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
+				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
 				"--use-service-account-credentials=true",
 				"--controllers=*,bootstrapsigner,tokencleaner",
 				"--cloud-provider=foo",
@@ -702,8 +724,9 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				Networking:      kubeadm.Networking{PodSubnet: "bar"},
-				CertificatesDir: testCertsDir,
+				Networking:        kubeadm.Networking{PodSubnet: "bar"},
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.7.0",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -714,7 +737,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
 				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
 				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
-				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:bootstrappers",
 				"--use-service-account-credentials=true",
 				"--controllers=*,bootstrapsigner,tokencleaner",
 				"--allocate-node-cidrs=true",
@@ -724,7 +746,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getControllerManagerCommand(rt.cfg, false)
+		actual := getControllerManagerCommand(rt.cfg, false, version.MustParseSemantic(rt.cfg.KubernetesVersion))
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
@@ -935,7 +957,7 @@ func TestVersionCompare(t *testing.T) {
 		"v1.7.1",
 	}
 	for _, v := range versions {
-		if !version.MustParseSemantic(v).AtLeast(v170) {
+		if !version.MustParseSemantic(v).AtLeast(kubeadmconstants.MinimumAPIAggregationVersion) {
 			t.Errorf("err")
 		}
 	}

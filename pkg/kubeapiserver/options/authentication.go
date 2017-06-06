@@ -163,8 +163,14 @@ func (s *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptio
 	return s
 }
 
+// Validate checks invalid config combination
 func (s *BuiltInAuthenticationOptions) Validate() []error {
 	allErrors := []error{}
+
+	if s.OIDC != nil && (len(s.OIDC.IssuerURL) > 0) != (len(s.OIDC.ClientID) > 0) {
+		allErrors = append(allErrors, fmt.Errorf("oidc-issuer-url and oidc-client-id should be specified together"))
+	}
+
 	return allErrors
 }
 

@@ -42,6 +42,7 @@ func TestSelectionPredicate(t *testing.T) {
 		labelSelector, fieldSelector string
 		labels                       labels.Set
 		fields                       fields.Set
+		uninitialized                bool
 		err                          error
 		shouldMatch                  bool
 		matchSingleKey               string
@@ -74,6 +75,14 @@ func TestSelectionPredicate(t *testing.T) {
 			shouldMatch:    true,
 			matchSingleKey: "12345",
 		},
+		"E": {
+			fieldSelector:  "metadata.name=12345",
+			labels:         labels.Set{},
+			fields:         fields.Set{"metadata.name": "12345"},
+			uninitialized:  true,
+			shouldMatch:    false,
+			matchSingleKey: "12345",
+		},
 		"error": {
 			labelSelector: "name=foo",
 			fieldSelector: "uid=12345",
@@ -94,8 +103,8 @@ func TestSelectionPredicate(t *testing.T) {
 		sp := &SelectionPredicate{
 			Label: parsedLabel,
 			Field: parsedField,
-			GetAttrs: func(runtime.Object) (label labels.Set, field fields.Set, err error) {
-				return item.labels, item.fields, item.err
+			GetAttrs: func(runtime.Object) (label labels.Set, field fields.Set, uninitialized bool, err error) {
+				return item.labels, item.fields, item.uninitialized, item.err
 			},
 		}
 		got, err := sp.Matches(&Ignored{})

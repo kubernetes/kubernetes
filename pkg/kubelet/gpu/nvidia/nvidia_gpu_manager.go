@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/gpu"
 )
 
@@ -60,13 +60,13 @@ type nvidiaGPUManager struct {
 	defaultDevices []string
 	// The interface which could get GPU mapping from all the containers.
 	// TODO: Should make this independent of Docker in the future.
-	dockerClient     dockertools.DockerInterface
+	dockerClient     libdocker.Interface
 	activePodsLister activePodsLister
 }
 
 // NewNvidiaGPUManager returns a GPUManager that manages local Nvidia GPUs.
 // TODO: Migrate to use pod level cgroups and make it generic to all runtimes.
-func NewNvidiaGPUManager(activePodsLister activePodsLister, dockerClient dockertools.DockerInterface) (gpu.GPUManager, error) {
+func NewNvidiaGPUManager(activePodsLister activePodsLister, dockerClient libdocker.Interface) (gpu.GPUManager, error) {
 	if dockerClient == nil {
 		return nil, fmt.Errorf("invalid docker client specified")
 	}

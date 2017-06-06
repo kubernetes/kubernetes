@@ -42,7 +42,9 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/api/v1/helper:go_default_library",
         "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
+        "//plugin/pkg/scheduler/util:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

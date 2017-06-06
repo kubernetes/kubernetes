@@ -26,11 +26,13 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
-// GetPodTemplateWithHash returns copy of provided template with additional
-// label which contains hash of provided template and sets default daemon tolerations.
-func GetPodTemplateWithGeneration(template v1.PodTemplateSpec, generation int64) v1.PodTemplateSpec {
+// CreatePodTemplate returns copy of provided template with additional
+// label which contains templateGeneration (for backward compatibility),
+// hash of provided template and sets default daemon tolerations.
+func CreatePodTemplate(template v1.PodTemplateSpec, generation int64, hash string) v1.PodTemplateSpec {
 	obj, _ := api.Scheme.DeepCopy(template)
 	newTemplate := obj.(v1.PodTemplateSpec)
 	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
@@ -38,7 +40,7 @@ func GetPodTemplateWithGeneration(template v1.PodTemplateSpec, generation int64)
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns not ready.
 	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
-		Key:      metav1.TaintNodeNotReady,
+		Key:      algorithm.TaintNodeNotReady,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
@@ -48,7 +50,7 @@ func GetPodTemplateWithGeneration(template v1.PodTemplateSpec, generation int64)
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns unreachable.
 	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
-		Key:      metav1.TaintNodeUnreachable,
+		Key:      algorithm.TaintNodeUnreachable,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
@@ -59,14 +61,19 @@ func GetPodTemplateWithGeneration(template v1.PodTemplateSpec, generation int64)
 		extensions.DaemonSetTemplateGenerationKey,
 		templateGenerationStr,
 	)
+	// TODO: do we need to validate if the DaemonSet is RollingUpdate or not?
+	if len(hash) > 0 {
+		newTemplate.ObjectMeta.Labels[extensions.DefaultDaemonSetUniqueLabelKey] = hash
+	}
 	return newTemplate
 }
 
-// IsPodUpdate checks if pod contains label with provided hash
-func IsPodUpdated(dsTemplateGeneration int64, pod *v1.Pod) bool {
-	podTemplateGeneration, generationExists := pod.ObjectMeta.Labels[extensions.DaemonSetTemplateGenerationKey]
-	dsTemplateGenerationStr := fmt.Sprint(dsTemplateGeneration)
-	return generationExists && podTemplateGeneration == dsTemplateGenerationStr
+// IsPodUpdate checks if pod contains label value that either matches templateGeneration or hash
+func IsPodUpdated(dsTemplateGeneration int64, pod *v1.Pod, hash string) bool {
+	// Compare with hash to see if the pod is updated, need to maintain backward compatibility of templateGeneration
+	templateMatches := pod.Labels[extensions.DaemonSetTemplateGenerationKey] == fmt.Sprint(dsTemplateGeneration)
+	hashMatches := len(hash) > 0 && pod.Labels[extensions.DefaultDaemonSetUniqueLabelKey] == hash
+	return hashMatches || templateMatches
 }
 
 // SplitByAvailablePods splits provided daemon set pods by availabilty

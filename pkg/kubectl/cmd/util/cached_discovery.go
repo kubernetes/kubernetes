@@ -196,7 +196,7 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 		return err
 	}
 
-	err = f.Chmod(0755)
+	err = os.Chmod(f.Name(), 0755)
 	if err != nil {
 		return err
 	}

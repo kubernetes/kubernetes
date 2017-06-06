@@ -18,12 +18,13 @@ package e2e_node
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	docker "k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -150,19 +151,9 @@ func containerGCTest(f *framework.Framework, test testRun) {
 			By("Making sure all containers restart the specified number of times")
 			Eventually(func() error {
 				for _, podSpec := range test.testPods {
-					updatedPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(podSpec.podName, metav1.GetOptions{})
+					err := verifyPodRestartCount(f, podSpec.podName, podSpec.numContainers, podSpec.restartCount)
 					if err != nil {
 						return err
-					}
-					if len(updatedPod.Status.ContainerStatuses) != podSpec.numContainers {
-						return fmt.Errorf("expected pod %s to have %d containers, actual: %d",
-							updatedPod.Name, podSpec.numContainers, len(updatedPod.Status.ContainerStatuses))
-					}
-					for _, containerStatus := range updatedPod.Status.ContainerStatuses {
-						if containerStatus.RestartCount != podSpec.restartCount {
-							return fmt.Errorf("pod %s had container with restartcount %d.  Should have been at least %d",
-								updatedPod.Name, containerStatus.RestartCount, podSpec.restartCount)
-						}
 					}
 				}
 				return nil
@@ -258,16 +249,16 @@ func containerGCTest(f *framework.Framework, test testRun) {
 
 // Runs containerGCTest using the docker runtime.
 func dockerContainerGCTest(f *framework.Framework, test testRun) {
-	var runtime docker.DockerInterface
+	var runtime libdocker.Interface
 	BeforeEach(func() {
-		runtime = docker.ConnectToDockerOrDie(defaultDockerEndpoint, defaultRuntimeRequestTimeoutDuration, defaultImagePullProgressDeadline)
+		runtime = libdocker.ConnectToDockerOrDie(defaultDockerEndpoint, defaultRuntimeRequestTimeoutDuration, defaultImagePullProgressDeadline)
 	})
 	for _, pod := range test.testPods {
-		// Initialize the getContainerNames function to use the dockertools api
+		// Initialize the getContainerNames function to use the libdocker api
 		thisPrefix := pod.containerPrefix
 		pod.getContainerNames = func() ([]string, error) {
 			relevantContainers := []string{}
-			dockerContainers, err := docker.GetKubeletDockerContainers(runtime, true)
+			dockerContainers, err := libdocker.GetKubeletDockerContainers(runtime, true)
 			if err != nil {
 				return relevantContainers, err
 			}
@@ -289,20 +280,9 @@ func getPods(specs []*testPodSpec) (pods []*v1.Pod) {
 		containers := []v1.Container{}
 		for i := 0; i < spec.numContainers; i++ {
 			containers = append(containers, v1.Container{
-				Image: "gcr.io/google_containers/busybox:1.24",
-				Name:  spec.getContainerName(i),
-				Command: []string{
-					"sh",
-					"-c",
-					fmt.Sprintf(`
-						f=/test-empty-dir-mnt/countfile%d
-						count=$(echo 'hello' >> $f ; wc -l $f | awk {'print $1'})
-						if [ $count -lt %d ]; then
-							exit 0
-						fi
-						while true; do sleep 1; done
-					`, i, spec.restartCount+1),
-				},
+				Image:   "gcr.io/google_containers/busybox:1.24",
+				Name:    spec.getContainerName(i),
+				Command: getRestartingContainerCommand("/test-empty-dir-mnt", i, spec.restartCount, ""),
 				VolumeMounts: []v1.VolumeMount{
 					{MountPath: "/test-empty-dir-mnt", Name: "test-empty-dir"},
 				},
@@ -320,4 +300,37 @@ func getPods(specs []*testPodSpec) (pods []*v1.Pod) {
 		})
 	}
 	return
+}
+
+func getRestartingContainerCommand(path string, containerNum int, restarts int32, loopingCommand string) []string {
+	return []string{
+		"sh",
+		"-c",
+		fmt.Sprintf(`
+			f=%s/countfile%s
+			count=$(echo 'hello' >> $f ; wc -l $f | awk {'print $1'})
+			if [ $count -lt %d ]; then
+				exit 0
+			fi
+			while true; do %s sleep 1; done`,
+			path, strconv.Itoa(containerNum), restarts+1, loopingCommand),
+	}
+}
+
+func verifyPodRestartCount(f *framework.Framework, podName string, expectedNumContainers int, expectedRestartCount int32) error {
+	updatedPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(podName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if len(updatedPod.Status.ContainerStatuses) != expectedNumContainers {
+		return fmt.Errorf("expected pod %s to have %d containers, actual: %d",
+			updatedPod.Name, expectedNumContainers, len(updatedPod.Status.ContainerStatuses))
+	}
+	for _, containerStatus := range updatedPod.Status.ContainerStatuses {
+		if containerStatus.RestartCount != expectedRestartCount {
+			return fmt.Errorf("pod %s had container with restartcount %d.  Should have been at least %d",
+				updatedPod.Name, containerStatus.RestartCount, expectedRestartCount)
+		}
+	}
+	return nil
 }

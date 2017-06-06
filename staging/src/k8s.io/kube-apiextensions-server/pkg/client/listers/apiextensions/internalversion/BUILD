@@ -10,7 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "customresource.go",
+        "customresourcedefinition.go",
         "expansion_generated.go",
     ],
     tags = ["automanaged"],

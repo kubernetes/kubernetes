@@ -206,7 +206,7 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 }
 
 func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
-	By("creating the target pod")
+	By("Creating the target pod")
 	pod := pfPod("", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
 	if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
@@ -262,7 +262,7 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 }
 
 func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
-	By("creating the target pod")
+	By("Creating the target pod")
 	pod := pfPod("abc", "1", "1", "1", fmt.Sprintf("%s", bindAddress))
 	if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
@@ -307,7 +307,7 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 }
 
 func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework) {
-	By("creating the target pod")
+	By("Creating the target pod")
 	pod := pfPod("abc", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
 	if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
@@ -377,7 +377,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	config, err := framework.LoadConfig()
 	Expect(err).NotTo(HaveOccurred(), "unable to get base config")
 
-	By("creating the pod")
+	By("Creating the pod")
 	pod := pfPod("def", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
 	if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
@@ -436,13 +436,13 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 		return nil
 	}, time.Minute, 10*time.Second).Should(BeNil())
 
-	By("sending the expected data to the local port")
+	By("Sending the expected data to the local port")
 	err = wsWrite(ws, 0, []byte("def"))
 	if err != nil {
 		framework.Failf("Failed to write to websocket %s: %v", url.String(), err)
 	}
 
-	By("reading data from the local port")
+	By("Reading data from the local port")
 	buf := bytes.Buffer{}
 	expectedData := bytes.Repeat([]byte("x"), 100)
 	Eventually(func() error {
@@ -460,7 +460,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 		return nil
 	}, time.Minute, 10*time.Second).Should(BeNil())
 
-	By("verifying logs")
+	By("Verifying logs")
 	logOutput, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
 	if err != nil {
 		framework.Failf("Error retrieving pod logs: %v", err)

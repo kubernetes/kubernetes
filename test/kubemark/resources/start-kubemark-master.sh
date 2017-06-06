@@ -17,6 +17,10 @@
 # Script that starts kubelet on kubemark-master as a supervisord process
 # and then runs the master components as pods using kubelet.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 # Define key path variables.
 KUBE_ROOT="/home/kubernetes"
 KUBE_BINDIR="${KUBE_ROOT}/kubernetes/server/bin"
@@ -93,7 +97,6 @@ function safe-format-and-mount() {
 		mkfs.ext4 -F "${device}"
 	fi
 
-	mkdir -p "${mountpoint}"
 	echo "Mounting '${device}' at '${mountpoint}'"
 	mount -o discard,defaults "${device}" "${mountpoint}"
 }
@@ -231,7 +234,6 @@ function load-docker-images {
 function compute-kubelet-params {
 	local params="${KUBELET_TEST_ARGS:-}"
 	params+=" --allow-privileged=true"
-	params+=" --babysit-daemons=true"
 	params+=" --cgroup-root=/"
 	params+=" --cloud-provider=gce"
 	params+=" --pod-manifest-path=/etc/kubernetes/manifests"
@@ -456,7 +458,7 @@ fi
 	mkdir -p "${main_etcd_mount_point}/srv/kubernetes"
 	ln -s -f "${main_etcd_mount_point}/srv/kubernetes" /etc/srv/kubernetes
 	# Copy the files to the PD only if they don't exist (so we do it only the first time).
-	if [[ "$(ls -A {main_etcd_mount_point}/srv/kubernetes/)" == "" ]]; then
+	if [[ "$(ls -A ${main_etcd_mount_point}/srv/kubernetes/)" == "" ]]; then
 		cp -r "${KUBE_ROOT}"/k8s_auth_data/* "${main_etcd_mount_point}/srv/kubernetes/"
 	fi
 	# Directory for kube-apiserver to store SSH key (if necessary).
@@ -494,9 +496,17 @@ start-kubemaster-component "kube-controller-manager"
 start-kubemaster-component "kube-scheduler"
 start-kubemaster-component "kube-addon-manager"
 
-# Wait till apiserver is working fine.
+# Wait till apiserver is working fine or timeout.
+echo -n "Waiting for apiserver to be healthy"
+start=$(date +%s)
 until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do
+	echo -n "."
 	sleep 1
+	now=$(date +%s)
+	if [ $((now - start)) -gt 300 ]; then
+		echo "Timeout!"
+		exit 1
+	fi
 done
 
 echo "Done for the configuration for kubermark master"

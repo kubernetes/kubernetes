@@ -34,7 +34,7 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/etcdtest:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd3:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api/install:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
     ],
 )
 
@@ -42,8 +42,5 @@ go_library(
     name = "go_default_library",
     srcs = ["utils.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor/k8s.io/apiserver/pkg/apis/example:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api/install:go_default_library",
-    ],
+    deps = ["//vendor/k8s.io/apiserver/pkg/apis/example:go_default_library"],
 )

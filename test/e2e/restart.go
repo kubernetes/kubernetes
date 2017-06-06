@@ -133,7 +133,7 @@ func waitForNPods(ps *testutils.PodStore, expect int, timeout time.Duration) ([]
 	var errLast error
 	found := wait.Poll(framework.Poll, timeout, func() (bool, error) {
 		allPods := ps.List()
-		pods := filterIrrelevantPods(allPods)
+		pods = filterIrrelevantPods(allPods)
 		if len(pods) != expect {
 			errLast = fmt.Errorf("expected to find %d pods but found only %d", expect, len(pods))
 			framework.Logf("Error getting pods: %v", errLast)

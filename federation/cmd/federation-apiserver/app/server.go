@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/generated/openapi"
@@ -50,6 +50,7 @@ import (
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeserver "k8s.io/kubernetes/pkg/kubeapiserver/server"
+	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/version"
@@ -85,6 +86,9 @@ func Run(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 // NonBlockingRun runs the specified APIServer and configures it to
 // stop with the given channel.
 func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
+	// register all admission plugins
+	registerAllAdmissionPlugins(s.Admission.Plugins)
+
 	// set defaults
 	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing); err != nil {
 		return err
@@ -177,6 +181,10 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %v", err)
 	}
+	externalClient, err := clientset.NewForConfig(genericConfig.LoopbackClientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create external clientset: %v", err)
+	}
 	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
@@ -185,21 +193,23 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		return fmt.Errorf("invalid Authorization Config: %v", err)
 	}
 
-	admissionControlPluginNames := strings.Split(s.Admission.Control, ",")
 	var cloudConfig []byte
-
 	if s.CloudProvider.CloudConfigFile != "" {
 		cloudConfig, err = ioutil.ReadFile(s.CloudProvider.CloudConfigFile)
 		if err != nil {
 			glog.Fatalf("Error reading from cloud configuration file %s: %#v", s.CloudProvider.CloudConfigFile, err)
 		}
 	}
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig, nil)
-	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.Admission.ControlConfigFile)
-	if err != nil {
-		return fmt.Errorf("failed to read plugin config: %v", err)
-	}
-	admissionController, err := kubeapiserveradmission.Plugins.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
+
+	// NOTE: we do not provide informers to the quota registry because admission level decisions
+	// do not require us to open watches for all items tracked by quota.
+	quotaRegistry := quotainstall.NewRegistry(nil, nil)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, externalClient, sharedInformers, apiAuthorizer, cloudConfig, nil, quotaRegistry)
+
+	err = s.Admission.ApplyTo(
+		genericConfig,
+		pluginInitializer,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize plugins: %v", err)
 	}
@@ -208,7 +218,6 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	genericConfig.Version = &kubeVersion
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
-	genericConfig.AdmissionControl = admissionController
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, api.Scheme)
 	genericConfig.OpenAPIConfig.PostProcessSpec = postProcessOpenAPISpecForBackwardCompatibility
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
@@ -224,12 +233,12 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)
 	}
 
-	m, err := genericConfig.Complete().New(genericapiserver.EmptyDelegate)
+	m, err := genericConfig.Complete().New("federation", genericapiserver.EmptyDelegate)
 	if err != nil {
 		return err
 	}
 
-	routes.UIRedirect{}.Install(m.Handler.PostGoRestfulMux)
+	routes.UIRedirect{}.Install(m.Handler.NonGoRestfulMux)
 	routes.Logs{}.Install(m.Handler.GoRestfulContainer)
 
 	apiResourceConfigSource := storageFactory.APIResourceConfigSource

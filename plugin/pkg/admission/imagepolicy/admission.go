@@ -31,15 +31,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeschema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/util/cache"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 
 	// install the clientgo image policy API for use with api registry
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
@@ -49,8 +48,9 @@ var (
 	groupVersions = []schema.GroupVersion{v1alpha1.SchemeGroupVersion}
 )
 
-func init() {
-	kubeapiserveradmission.Plugins.Register("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("ImagePolicyWebhook", func(config io.Reader) (admission.Interface, error) {
 		newImagePolicyWebhook, err := NewImagePolicyWebhook(config)
 		if err != nil {
 			return nil, err
@@ -89,10 +89,16 @@ func (a *imagePolicyWebhook) filterAnnotations(allAnnotations map[string]string)
 }
 
 // Function to call on webhook failure; behavior determined by defaultAllow flag
-func (a *imagePolicyWebhook) webhookError(attributes admission.Attributes, err error) error {
+func (a *imagePolicyWebhook) webhookError(pod *api.Pod, attributes admission.Attributes, err error) error {
 	if err != nil {
 		glog.V(2).Infof("error contacting webhook backend: %s", err)
 		if a.defaultAllow {
+			annotations := pod.GetAnnotations()
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
+			annotations[api.ImagePolicyFailedOpenKey] = "true"
+			pod.ObjectMeta.SetAnnotations(annotations)
 			glog.V(2).Infof("resource allowed in spite of webhook backend failure")
 			return nil
 		}
@@ -134,13 +140,13 @@ func (a *imagePolicyWebhook) Admit(attributes admission.Attributes) (err error) 
 			Namespace:   attributes.GetNamespace(),
 		},
 	}
-	if err := a.admitPod(attributes, &imageReview); err != nil {
+	if err := a.admitPod(pod, attributes, &imageReview); err != nil {
 		return admission.NewForbidden(attributes, err)
 	}
 	return nil
 }
 
-func (a *imagePolicyWebhook) admitPod(attributes admission.Attributes, review *v1alpha1.ImageReview) error {
+func (a *imagePolicyWebhook) admitPod(pod *api.Pod, attributes admission.Attributes, review *v1alpha1.ImageReview) error {
 	cacheKey, err := json.Marshal(review.Spec)
 	if err != nil {
 		return err
@@ -153,15 +159,15 @@ func (a *imagePolicyWebhook) admitPod(attributes admission.Attributes, review *v
 		})
 
 		if err := result.Error(); err != nil {
-			return a.webhookError(attributes, err)
+			return a.webhookError(pod, attributes, err)
 		}
 		var statusCode int
 		if result.StatusCode(&statusCode); statusCode < 200 || statusCode >= 300 {
-			return a.webhookError(attributes, fmt.Errorf("Error contacting webhook: %d", statusCode))
+			return a.webhookError(pod, attributes, fmt.Errorf("Error contacting webhook: %d", statusCode))
 		}
 
 		if err := result.Into(review); err != nil {
-			return a.webhookError(attributes, err)
+			return a.webhookError(pod, attributes, err)
 		}
 
 		a.responseCache.Add(string(cacheKey), review.Status, a.statusTTL(review.Status))
@@ -169,7 +175,7 @@ func (a *imagePolicyWebhook) admitPod(attributes admission.Attributes, review *v
 
 	if !review.Status.Allowed {
 		if len(review.Status.Reason) > 0 {
-			return fmt.Errorf("image policy webook backend denied one or more images: %s", review.Status.Reason)
+			return fmt.Errorf("image policy webhook backend denied one or more images: %s", review.Status.Reason)
 		}
 		return errors.New("one or more images rejected by webhook backend")
 	}

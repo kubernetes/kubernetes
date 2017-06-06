@@ -184,6 +184,11 @@ token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
 network-name = ${NODE_NETWORK}
 EOF
+    if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
+      cat <<EOF >>/etc/gce.conf
+subnetwork-name = ${NODE_SUBNETWORK}
+EOF
+    fi
   fi
   if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
     use_cloud_config="true"
@@ -499,7 +504,6 @@ function start-kubelet {
   echo "Using kubelet binary at ${kubelet_bin}"
   local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
   flags+=" --allow-privileged=true"
-  flags+=" --babysit-daemons=true"
   flags+=" --cgroup-root=/"
   flags+=" --cloud-provider=gce"
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
@@ -616,6 +620,7 @@ function start-kube-proxy {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
+  params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s"
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
   fi
@@ -805,6 +810,7 @@ function start-kube-apiserver {
   params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
   params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
   params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
+  params+=" --enable-aggregator-routing=true"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
     params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
   fi
@@ -847,6 +853,10 @@ function start-kube-apiserver {
     # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
     # never restarts. Please manually restart apiserver before this time.
     params+=" --audit-log-maxsize=2000000000"
+  fi
+
+  if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
+    params+=" --enable-logs-handler=false"
   fi
 
   local admission_controller_config_mount=""
@@ -1201,6 +1211,10 @@ function start-kube-addons {
   fi
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
+
+    # Replace the cluster cidr.
+    local -r calico_file="${dst_dir}/calico-policy-controller/calico-node.yaml"
+    sed -i -e "s@__CLUSTER_CIDR__@${CLUSTER_IP_RANGE}@g" "${calico_file}"
   fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"

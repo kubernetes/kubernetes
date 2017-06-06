@@ -24,6 +24,7 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/path"
 )
 
 // genFakeForType produces a file for each top-level type.
@@ -99,7 +100,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	}
 
 	// allow user to define a group name that's different from the one parsed from the directory.
-	p := c.Universe.Package(g.inputPackage)
+	p := c.Universe.Package(path.Vendorless(g.inputPackage))
 	if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
 		groupName = override[0]
 	}
@@ -149,6 +150,8 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 
 	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
 
+	readonly := extractBoolTagOrDie("readonly", t.SecondClosestCommentLines) == true
+
 	if namespaced {
 		sw.Do(structNamespaced, m)
 	} else {
@@ -158,6 +161,9 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	if !noMethods {
 		sw.Do(resource, m)
 		sw.Do(kind, m)
+	}
+
+	if !noMethods && !readonly {
 		sw.Do(createTemplate, m)
 		sw.Do(updateTemplate, m)
 		// Generate the UpdateStatus method if the type has a status
@@ -166,6 +172,9 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		}
 		sw.Do(deleteTemplate, m)
 		sw.Do(deleteCollectionTemplate, m)
+	}
+
+	if !noMethods {
 		sw.Do(getTemplate, m)
 		if hasObjectMeta(t) {
 			sw.Do(listUsingOptionsTemplate, m)
@@ -173,6 +182,9 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 			sw.Do(listTemplate, m)
 		}
 		sw.Do(watchTemplate, m)
+	}
+
+	if !noMethods && !readonly {
 		sw.Do(patchTemplate, m)
 	}
 
@@ -197,7 +209,7 @@ type Fake$.type|publicPlural$ struct {
 `
 
 var resource = `
-var $.type|allLowercasePlural$Resource = $.GroupVersionResource|raw${Group: "$.groupName$", Version: "$.version$", Resource: "$.type|allLowercasePlural$"}
+var $.type|allLowercasePlural$Resource = $.GroupVersionResource|raw${Group: "$.groupName$", Version: "$.version$", Resource: "$.type|resource$"}
 `
 
 var kind = `

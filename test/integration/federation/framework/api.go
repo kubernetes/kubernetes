@@ -104,7 +104,6 @@ func startServer(t *testing.T, runOptions *options.ServerRunOptions, stopChan <-
 		}
 
 		runOptions.InsecureServing.BindPort = port
-
 		err = app.NonBlockingRun(runOptions, stopChan)
 		if err != nil {
 			t.Logf("Error starting the %s: %v", apiNoun, err)

@@ -179,12 +179,14 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componen
 
 // TODO: move thic logic into cni bridge plugin and remove this from kubenet
 func (plugin *kubenetNetworkPlugin) ensureMasqRule() error {
-	if _, err := plugin.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting,
-		"-m", "comment", "--comment", "kubenet: SNAT for outbound traffic from cluster",
-		"-m", "addrtype", "!", "--dst-type", "LOCAL",
-		"!", "-d", plugin.nonMasqueradeCIDR,
-		"-j", "MASQUERADE"); err != nil {
-		return fmt.Errorf("Failed to ensure that %s chain %s jumps to MASQUERADE: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, err)
+	if plugin.nonMasqueradeCIDR != "0.0.0.0/0" {
+		if _, err := plugin.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting,
+			"-m", "comment", "--comment", "kubenet: SNAT for outbound traffic from cluster",
+			"-m", "addrtype", "!", "--dst-type", "LOCAL",
+			"!", "-d", plugin.nonMasqueradeCIDR,
+			"-j", "MASQUERADE"); err != nil {
+			return fmt.Errorf("Failed to ensure that %s chain %s jumps to MASQUERADE: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, err)
+		}
 	}
 	return nil
 }
@@ -557,6 +559,9 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
 		return nil, fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
+	}
+	if netnsPath == "" {
+		return nil, fmt.Errorf("Cannot find the network namespace, skipping pod network status for container %q", id)
 	}
 	ip, err := network.GetPodIP(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
 	if err != nil {

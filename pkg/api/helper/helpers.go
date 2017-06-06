@@ -17,18 +17,15 @@ limitations under the License.
 package helper
 
 import (
-	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
@@ -225,6 +222,7 @@ func IsServiceIPRequested(service *api.Service) bool {
 var standardFinalizers = sets.NewString(
 	string(api.FinalizerKubernetes),
 	metav1.FinalizerOrphanDependents,
+	metav1.FinalizerDeleteDependents,
 )
 
 // HasAnnotation returns a bool if passed in annotation exists
@@ -260,14 +258,6 @@ func AddToNodeAddresses(addresses *[]api.NodeAddress, addAddresses ...api.NodeAd
 			*addresses = append(*addresses, add)
 		}
 	}
-}
-
-func HashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
-	data, err := runtime.Encode(codec, obj)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", md5.Sum(data)), nil
 }
 
 // TODO: make method on LoadBalancerStatus?
@@ -360,18 +350,6 @@ func containsAccessMode(modes []api.PersistentVolumeAccessMode, mode api.Persist
 		}
 	}
 	return false
-}
-
-// ParseRFC3339 parses an RFC3339 date in either RFC3339Nano or RFC3339 format.
-func ParseRFC3339(s string, nowFn func() metav1.Time) (metav1.Time, error) {
-	if t, timeErr := time.Parse(time.RFC3339Nano, s); timeErr == nil {
-		return metav1.Time{Time: t}, nil
-	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return metav1.Time{}, err
-	}
-	return metav1.Time{Time: t}, nil
 }
 
 // NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
@@ -593,4 +571,34 @@ func PersistentVolumeClaimHasClass(claim *api.PersistentVolumeClaim) bool {
 	}
 
 	return false
+}
+
+// GetStorageNodeAffinityFromAnnotation gets the json serialized data from PersistentVolume.Annotations
+// and converts it to the NodeAffinity type in api.
+// TODO: update when storage node affinity graduates to beta
+func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*api.NodeAffinity, error) {
+	if len(annotations) > 0 && annotations[api.AlphaStorageNodeAffinityAnnotation] != "" {
+		var affinity api.NodeAffinity
+		err := json.Unmarshal([]byte(annotations[api.AlphaStorageNodeAffinityAnnotation]), &affinity)
+		if err != nil {
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
+}
+
+// Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
+// TODO: update when storage node affinity graduates to beta
+func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *api.NodeAffinity) error {
+	if affinity == nil {
+		return nil
+	}
+
+	json, err := json.Marshal(*affinity)
+	if err != nil {
+		return err
+	}
+	annotations[api.AlphaStorageNodeAffinityAnnotation] = string(json)
+	return nil
 }

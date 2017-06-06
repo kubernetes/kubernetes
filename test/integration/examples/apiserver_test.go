@@ -33,12 +33,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/cert"
-	apiregistrationv1alpha1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
+	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	kubeaggregatorserver "k8s.io/kube-aggregator/pkg/cmd/server"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -111,13 +112,17 @@ func TestAggregatedAPIServer(t *testing.T) {
 			kubeAPIServerOptions.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
 			kubeAPIServerOptions.Authorization.Mode = "RBAC"
 
-			kubeAPIServerConfig, sharedInformers, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions)
+			tunneler, proxyTransport, err := app.CreateDialer(kubeAPIServerOptions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			kubeAPIServerConfig, sharedInformers, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions, tunneler, proxyTransport)
 			if err != nil {
 				t.Fatal(err)
 			}
 			kubeClientConfigValue.Store(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
 
-			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, sharedInformers, wait.NeverStop)
+			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -303,10 +308,10 @@ func TestAggregatedAPIServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	aggregatorClient := aggregatorclient.NewForConfigOrDie(aggregatorClientConfig)
-	_, err = aggregatorClient.ApiregistrationV1alpha1().APIServices().Create(&apiregistrationv1alpha1.APIService{
+	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.k8s.io"},
-		Spec: apiregistrationv1alpha1.APIServiceSpec{
-			Service: &apiregistrationv1alpha1.ServiceReference{
+		Spec: apiregistrationv1beta1.APIServiceSpec{
+			Service: &apiregistrationv1beta1.ServiceReference{
 				Namespace: "kube-wardle",
 				Name:      "api",
 			},
@@ -327,9 +332,9 @@ func TestAggregatedAPIServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = aggregatorClient.ApiregistrationV1alpha1().APIServices().Create(&apiregistrationv1alpha1.APIService{
+	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1."},
-		Spec: apiregistrationv1alpha1.APIServiceSpec{
+		Spec: apiregistrationv1beta1.APIServiceSpec{
 			// register this as a loca service so it doesn't try to lookup the default kubernetes service
 			// which will have an unroutable IP address since its fake.
 			Group:    "",
@@ -378,9 +383,6 @@ func createKubeConfig(clientCfg *rest.Config) *clientcmdapi.Config {
 		cluster.CertificateAuthorityData = clientCfg.CAData
 	}
 	cluster.InsecureSkipTLSVerify = clientCfg.Insecure
-	if clientCfg.GroupVersion != nil {
-		cluster.APIVersion = clientCfg.GroupVersion.String()
-	}
 	config.Clusters[clusterNick] = cluster
 
 	context := clientcmdapi.NewContext()

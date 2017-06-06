@@ -20,9 +20,10 @@
 function run-gcloud-compute-with-retries {
   RETRIES="${RETRIES:-3}"
   for attempt in $(seq 1 ${RETRIES}); do
+    exec 5>&1  # Duplicate &1 to &5 for use below.
     # We don't use 'local' to declare gcloud_result as then ret_val always gets value 0.
-    gcloud_result=$(gcloud compute "$@" 2>&1) || local ret_val="$?"
-    echo "${gcloud_result}"
+    # We use tee to output to &5 (redirected to stdout) while also storing it in the variable.
+    gcloud_result=$(gcloud compute "$@" 2>&1 | tee >(cat - >&5)) || local ret_val="$?"
     if [[ "${ret_val:-0}" -ne "0" ]]; then
       if [[ $(echo "${gcloud_result}" | grep -c "already exists") -gt 0 ]]; then
         if [[ "${attempt}" == 1 ]]; then
@@ -64,7 +65,14 @@ function create-master-instance-with-resources {
   
   MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
     --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
-  
+
+  # Override the master image project to cos-cloud for COS images staring with `cos` string prefix.
+  DEFAULT_GCI_PROJECT=google-containers
+  if [[ "${GCI_VERSION}" == "cos"* ]]; then
+      DEFAULT_GCI_PROJECT=cos-cloud
+  fi
+  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
+
   run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
     ${GCLOUD_COMMON_ARGS} \
     --address "${MASTER_IP}" \
@@ -104,7 +112,7 @@ function execute-cmd-on-master-with-retries() {
 }
 
 function copy-files() {
-	run-gcloud-compute-with-retries copy-files --zone="${ZONE}" --project="${PROJECT}" $@
+	run-gcloud-compute-with-retries scp --recurse --zone="${ZONE}" --project="${PROJECT}" $@
 }
 
 function delete-master-instance-and-resources {

@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"sync"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/logs"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -77,7 +79,9 @@ func setupProviderConfig() error {
 		if !framework.TestContext.CloudConfig.MultiZone {
 			managedZones = []string{zone}
 		}
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID,
+			region, zone, managedZones, "" /* networkUrl */, "" /* subnetworkUrl */, nil, /* nodeTags */
+			"" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
 		}
@@ -95,6 +99,7 @@ func setupProviderConfig() error {
 			framework.Logf("Couldn't open cloud provider configuration %s: %#v",
 				cloudConfig.ConfigFile, err)
 		}
+		defer config.Close()
 		cloudConfig.Provider, err = azure.NewCloud(config)
 	}
 
@@ -264,7 +269,44 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 	if framework.TestContext.ReportDir != "" {
 		framework.CoreDump(framework.TestContext.ReportDir)
 	}
+	if framework.TestContext.GatherSuiteMetricsAfterTest {
+		if err := gatherTestSuiteMetrics(); err != nil {
+			framework.Logf("Error gathering metrics: %v", err)
+		}
+	}
 })
+
+func gatherTestSuiteMetrics() error {
+	framework.Logf("Gathering metrics")
+	c, err := framework.LoadClientset()
+	if err != nil {
+		return fmt.Errorf("error loading client: %v", err)
+	}
+
+	// Grab metrics for apiserver, scheduler, controller-manager, kubelet (for non-kubemark case).
+	grabber, err := metrics.NewMetricsGrabber(c, !framework.ProviderIs("kubemark"), true, true, true)
+	if err != nil {
+		return fmt.Errorf("failed to create MetricsGrabber: %v", err)
+	}
+
+	received, err := grabber.Grab()
+	if err != nil {
+		return fmt.Errorf("failed to grab metrics: %v", err)
+	}
+
+	metricsForE2E := (*framework.MetricsForE2E)(&received)
+	metricsJson := metricsForE2E.PrintJSON()
+	if framework.TestContext.ReportDir != "" {
+		filePath := path.Join(framework.TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
+		if err := ioutil.WriteFile(filePath, []byte(metricsJson), 0644); err != nil {
+			return fmt.Errorf("error writing to %q: %v", filePath, err)
+		}
+	} else {
+		framework.Logf("\n\nTest Suite Metrics:\n%s\n\n", metricsJson)
+	}
+
+	return nil
+}
 
 // TestE2E checks configuration parameters (specified through flags) and then runs
 // E2E tests using the Ginkgo runner.

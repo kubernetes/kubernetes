@@ -29,6 +29,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"math"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -111,6 +113,12 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.Pod
 		allErrs = append(allErrs, ValidateAffinityInPodAnnotations(annotations, fldPath)...)
 	}
 
+	if value, isMirror := annotations[api.MirrorPodAnnotationKey]; isMirror {
+		if len(spec.NodeName) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(api.MirrorPodAnnotationKey), value, "must set spec.nodeName if mirror pod annotation is set"))
+		}
+	}
+
 	if annotations[api.TolerationsAnnotationKey] != "" {
 		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
 	}
@@ -177,20 +185,26 @@ func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *api.Pod, fldPath *fiel
 	newAnnotations := newPod.Annotations
 	oldAnnotations := oldPod.Annotations
 	for k, oldVal := range oldAnnotations {
-		if newAnnotations[k] == oldVal {
+		if newVal, exists := newAnnotations[k]; exists && newVal == oldVal {
 			continue // No change.
 		}
 		if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not update AppArmor annotations"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not remove or update AppArmor annotations"))
+		}
+		if k == api.MirrorPodAnnotationKey {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not remove or update mirror pod annotation"))
 		}
 	}
-	// Check for removals.
+	// Check for additions
 	for k := range newAnnotations {
 		if _, ok := oldAnnotations[k]; ok {
 			continue // No change.
 		}
 		if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not remove AppArmor annotations"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not add AppArmor annotations"))
+		}
+		if k == api.MirrorPodAnnotationKey {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not add mirror pod annotation"))
 		}
 	}
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(newAnnotations, &newPod.Spec, fldPath)...)
@@ -384,7 +398,12 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 	allErrs := field.ErrorList{}
 	if source.EmptyDir != nil {
 		numVolumes++
-		// EmptyDirs have nothing to validate
+		if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+			unsetSizeLimit := resource.Quantity{}
+			if unsetSizeLimit.Cmp(source.EmptyDir.SizeLimit) != 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field disabled by feature-gate for EmptyDir volumes"))
+			}
+		}
 	}
 	if source.HostPath != nil {
 		if numVolumes > 0 {
@@ -530,10 +549,16 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 			allErrs = append(allErrs, validateConfigMapVolumeSource(source.ConfigMap, fldPath.Child("configMap"))...)
 		}
 	}
+
 	if source.AzureFile != nil {
-		numVolumes++
-		allErrs = append(allErrs, validateAzureFile(source.AzureFile, fldPath.Child("azureFile"))...)
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("azureFile"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateAzureFile(source.AzureFile, fldPath.Child("azureFile"))...)
+		}
 	}
+
 	if source.VsphereVolume != nil {
 		if numVolumes > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("vsphereVolume"), "may not specify more than 1 volume type"))
@@ -559,8 +584,12 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 		}
 	}
 	if source.AzureDisk != nil {
-		numVolumes++
-		allErrs = append(allErrs, validateAzureDisk(source.AzureDisk, fldPath.Child("azureDisk"))...)
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("azureDisk"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateAzureDisk(source.AzureDisk, fldPath.Child("azureDisk"))...)
+		}
 	}
 	if source.Projected != nil {
 		if numVolumes > 0 {
@@ -1005,19 +1034,39 @@ func validateAzureFile(azure *api.AzureFileVolumeSource, fldPath *field.Path) fi
 	return allErrs
 }
 
-var supportedCachingModes = sets.NewString(string(api.AzureDataDiskCachingNone), string(api.AzureDataDiskCachingReadOnly), string(api.AzureDataDiskCachingReadWrite))
-
 func validateAzureDisk(azure *api.AzureDiskVolumeSource, fldPath *field.Path) field.ErrorList {
+	var supportedCachingModes = sets.NewString(string(api.AzureDataDiskCachingNone), string(api.AzureDataDiskCachingReadOnly), string(api.AzureDataDiskCachingReadWrite))
+	var supportedDiskKinds = sets.NewString(string(api.AzureSharedBlobDisk), string(api.AzureDedicatedBlobDisk), string(api.AzureManagedDisk))
+
+	diskUriSupportedManaged := []string{"/subscriptions/{sub-id}/resourcegroups/{group-name}/providers/microsoft.compute/disks/{disk-id}"}
+	diskUriSupportedblob := []string{"https://{account-name}.blob.core.windows.net/{container-name}/{disk-name}.vhd"}
+
 	allErrs := field.ErrorList{}
 	if azure.DiskName == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("diskName"), ""))
 	}
+
 	if azure.DataDiskURI == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("diskURI"), ""))
 	}
+
 	if azure.CachingMode != nil && !supportedCachingModes.Has(string(*azure.CachingMode)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("cachingMode"), *azure.CachingMode, supportedCachingModes.List()))
 	}
+
+	if azure.Kind != nil && !supportedDiskKinds.Has(string(*azure.Kind)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), *azure.Kind, supportedDiskKinds.List()))
+	}
+
+	// validate that DiskUri is the correct format
+	if azure.Kind != nil && *azure.Kind == api.AzureManagedDisk && strings.Index(azure.DataDiskURI, "/subscriptions/") != 0 {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DataDiskURI, diskUriSupportedManaged))
+	}
+
+	if azure.Kind != nil && *azure.Kind != api.AzureManagedDisk && strings.Index(azure.DataDiskURI, "https://") != 0 {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DataDiskURI, diskUriSupportedblob))
+	}
+
 	return allErrs
 }
 
@@ -1059,6 +1108,14 @@ func validateScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, fldPath *field.Pa
 	return allErrs
 }
 
+func validateLocalVolumeSource(ls *api.LocalVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if ls.Path == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+	}
+	return allErrs
+}
+
 // ValidatePersistentVolumeName checks that a name is appropriate for a
 // PersistentVolumeName object.
 var ValidatePersistentVolumeName = NameIsDNSSubdomain
@@ -1068,7 +1125,8 @@ var supportedAccessModes = sets.NewString(string(api.ReadWriteOnce), string(api.
 var supportedReclaimPolicy = sets.NewString(string(api.PersistentVolumeReclaimDelete), string(api.PersistentVolumeReclaimRecycle), string(api.PersistentVolumeReclaimRetain))
 
 func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
-	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, field.NewPath("metadata"))
+	metaPath := field.NewPath("metadata")
+	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, metaPath)
 
 	specPath := field.NewPath("spec")
 	if len(pv.Spec.AccessModes) == 0 {
@@ -1096,6 +1154,9 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.NotSupported(specPath.Child("persistentVolumeReclaimPolicy"), pv.Spec.PersistentVolumeReclaimPolicy, supportedReclaimPolicy.List()))
 		}
 	}
+
+	nodeAffinitySpecified, errs := validateStorageNodeAffinityAnnotation(pv.ObjectMeta.Annotations, metaPath.Child("annotations"))
+	allErrs = append(allErrs, errs...)
 
 	numVolumes := 0
 	if pv.Spec.HostPath != nil {
@@ -1199,9 +1260,15 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 		allErrs = append(allErrs, validateFlexVolumeSource(pv.Spec.FlexVolume, specPath.Child("flexVolume"))...)
 	}
 	if pv.Spec.AzureFile != nil {
-		numVolumes++
-		allErrs = append(allErrs, validateAzureFile(pv.Spec.AzureFile, specPath.Child("azureFile"))...)
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("azureFile"), "may not specify more than 1 volume type"))
+
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateAzureFile(pv.Spec.AzureFile, specPath.Child("azureFile"))...)
+		}
 	}
+
 	if pv.Spec.VsphereVolume != nil {
 		if numVolumes > 0 {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("vsphereVolume"), "may not specify more than 1 volume type"))
@@ -1227,8 +1294,12 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 		}
 	}
 	if pv.Spec.AzureDisk != nil {
-		numVolumes++
-		allErrs = append(allErrs, validateAzureDisk(pv.Spec.AzureDisk, specPath.Child("azureDisk"))...)
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("azureDisk"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateAzureDisk(pv.Spec.AzureDisk, specPath.Child("azureDisk"))...)
+		}
 	}
 	if pv.Spec.ScaleIO != nil {
 		if numVolumes > 0 {
@@ -1236,6 +1307,22 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateScaleIOVolumeSource(pv.Spec.ScaleIO, specPath.Child("scaleIO"))...)
+		}
+	}
+	if pv.Spec.Local != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("local"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
+				allErrs = append(allErrs, field.Forbidden(specPath.Child("local"), "Local volumes are disabled by feature-gate"))
+			}
+			allErrs = append(allErrs, validateLocalVolumeSource(pv.Spec.Local, specPath.Child("local"))...)
+
+			// NodeAffinity is required
+			if !nodeAffinitySpecified {
+				allErrs = append(allErrs, field.Required(metaPath.Child("annotations"), "Local volume requires node affinity"))
+			}
 		}
 	}
 
@@ -1313,7 +1400,7 @@ func ValidatePersistentVolumeClaimSpec(spec *api.PersistentVolumeClaimSpec, fldP
 	return allErrs
 }
 
-// ValidatePersistentVolumeClaimUpdate validates an update to a PeristentVolumeClaim
+// ValidatePersistentVolumeClaimUpdate validates an update to a PersistentVolumeClaim
 func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeClaim) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPvc.ObjectMeta, &oldPvc.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidatePersistentVolumeClaim(newPvc)...)
@@ -1339,7 +1426,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeCla
 	return allErrs
 }
 
-// ValidatePersistentVolumeClaimStatusUpdate validates an update to status of a PeristentVolumeClaim
+// ValidatePersistentVolumeClaimStatusUpdate validates an update to status of a PersistentVolumeClaim
 func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *api.PersistentVolumeClaim) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPvc.ObjectMeta, &oldPvc.ObjectMeta, field.NewPath("metadata"))
 	if len(newPvc.ResourceVersion) == 0 {
@@ -2108,8 +2195,9 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	if spec.ActiveDeadlineSeconds != nil {
-		if *spec.ActiveDeadlineSeconds <= 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), spec.ActiveDeadlineSeconds, "must be greater than 0"))
+		value := *spec.ActiveDeadlineSeconds
+		if value < 1 || value > math.MaxInt32 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), value, validation.InclusiveRangeError(1, math.MaxInt32)))
 		}
 	}
 
@@ -2495,8 +2583,8 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 	// 2.  from a positive value to a lesser, non-negative value
 	if newPod.Spec.ActiveDeadlineSeconds != nil {
 		newActiveDeadlineSeconds := *newPod.Spec.ActiveDeadlineSeconds
-		if newActiveDeadlineSeconds < 0 {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("activeDeadlineSeconds"), newActiveDeadlineSeconds, isNegativeErrorMsg))
+		if newActiveDeadlineSeconds < 0 || newActiveDeadlineSeconds > math.MaxInt32 {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("activeDeadlineSeconds"), newActiveDeadlineSeconds, validation.InclusiveRangeError(0, math.MaxInt32)))
 			return allErrs
 		}
 		if oldPod.Spec.ActiveDeadlineSeconds != nil {
@@ -2548,9 +2636,10 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 // ValidatePodStatusUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
 // that cannot be changed.
 func ValidatePodStatusUpdate(newPod, oldPod *api.Pod) field.ErrorList {
-	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, field.NewPath("metadata"))
+	fldPath := field.NewPath("metadata")
+	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
+	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"))...)
 
-	// TODO: allow change when bindings are properly decoupled from pods
 	if newPod.Spec.NodeName != oldPod.Spec.NodeName {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("status", "nodeName"), "may not be changed directly"))
 	}
@@ -2722,7 +2811,7 @@ func ValidateService(service *api.Service) field.ErrorList {
 	}
 
 	// Validate SourceRange field and annotation
-	_, ok := service.Annotations[apiservice.AnnotationLoadBalancerSourceRangesKey]
+	_, ok := service.Annotations[api.AnnotationLoadBalancerSourceRangesKey]
 	if len(service.Spec.LoadBalancerSourceRanges) > 0 || ok {
 		var fieldPath *field.Path
 		var val string
@@ -2730,8 +2819,8 @@ func ValidateService(service *api.Service) field.ErrorList {
 			fieldPath = specPath.Child("LoadBalancerSourceRanges")
 			val = fmt.Sprintf("%v", service.Spec.LoadBalancerSourceRanges)
 		} else {
-			fieldPath = field.NewPath("metadata", "annotations").Key(apiservice.AnnotationLoadBalancerSourceRangesKey)
-			val = service.Annotations[apiservice.AnnotationLoadBalancerSourceRangesKey]
+			fieldPath = field.NewPath("metadata", "annotations").Key(api.AnnotationLoadBalancerSourceRangesKey)
+			val = service.Annotations[api.AnnotationLoadBalancerSourceRangesKey]
 		}
 		if service.Spec.Type != api.ServiceTypeLoadBalancer {
 			allErrs = append(allErrs, field.Invalid(fieldPath, "", "may only be used when `type` is 'LoadBalancer'"))
@@ -2742,7 +2831,8 @@ func ValidateService(service *api.Service) field.ErrorList {
 		}
 	}
 
-	allErrs = append(allErrs, validateServiceExternalTrafficFields(service)...)
+	allErrs = append(allErrs, validateServiceExternalTrafficFieldsValue(service)...)
+	allErrs = append(allErrs, validateServiceExternalTrafficAPIVersion(service)...)
 
 	return allErrs
 }
@@ -2785,61 +2875,68 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 	return allErrs
 }
 
-// validateServiceExternalTrafficFields validates ExternalTraffic related annotations
+// validateServiceExternalTrafficFieldsValue validates ExternalTraffic related annotations
 // have legal value.
-func validateServiceExternalTrafficFields(service *api.Service) field.ErrorList {
+func validateServiceExternalTrafficFieldsValue(service *api.Service) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	for _, annotation := range []string{apiservice.AlphaAnnotationExternalTraffic, apiservice.BetaAnnotationExternalTraffic} {
-		if l, ok := service.Annotations[annotation]; ok {
-			if l != apiservice.AnnotationValueExternalTrafficLocal &&
-				l != apiservice.AnnotationValueExternalTrafficGlobal {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(annotation), l,
-					fmt.Sprintf("ExternalTraffic must be %v or %v", apiservice.AnnotationValueExternalTrafficLocal, apiservice.AnnotationValueExternalTrafficGlobal)))
-			}
+	// Check beta annotations.
+	if l, ok := service.Annotations[api.BetaAnnotationExternalTraffic]; ok {
+		if l != api.AnnotationValueExternalTrafficLocal &&
+			l != api.AnnotationValueExternalTrafficGlobal {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(api.BetaAnnotationExternalTraffic), l,
+				fmt.Sprintf("ExternalTraffic must be %v or %v", api.AnnotationValueExternalTrafficLocal, api.AnnotationValueExternalTrafficGlobal)))
 		}
 	}
-	for _, annotation := range []string{apiservice.AlphaAnnotationHealthCheckNodePort, apiservice.BetaAnnotationHealthCheckNodePort} {
-		if l, ok := service.Annotations[annotation]; ok {
-			p, err := strconv.Atoi(l)
-			if err != nil {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(annotation), l,
-					"HealthCheckNodePort must be a valid port number"))
-			} else if p <= 0 {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(annotation), l,
-					"HealthCheckNodePort must be greater than 0"))
-			}
+	if l, ok := service.Annotations[api.BetaAnnotationHealthCheckNodePort]; ok {
+		p, err := strconv.Atoi(l)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(api.BetaAnnotationHealthCheckNodePort), l,
+				"HealthCheckNodePort must be a valid port number"))
+		} else if p <= 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(api.BetaAnnotationHealthCheckNodePort), l,
+				"HealthCheckNodePort must be greater than 0"))
 		}
 	}
 
-	allErrs = append(allErrs, validateServiceExternalTrafficAPIVersion(service)...)
+	// Check first class fields.
+	if service.Spec.ExternalTrafficPolicy != "" &&
+		service.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeCluster &&
+		service.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeLocal {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("externalTrafficPolicy"), service.Spec.ExternalTrafficPolicy,
+			fmt.Sprintf("ExternalTrafficPolicy must be empty, %v or %v", api.ServiceExternalTrafficPolicyTypeCluster, api.ServiceExternalTrafficPolicyTypeLocal)))
+	}
+	if service.Spec.HealthCheckNodePort < 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("healthCheckNodePort"), service.Spec.HealthCheckNodePort,
+			"HealthCheckNodePort must be not less than 0"))
+	}
 
 	return allErrs
 }
 
 // serviceExternalTrafficStatus stores flags indicating whether ExternalTraffic
-// related beta annotations and alpha annotations are set on service.
+// related beta annotations and GA fields are set on service.
 type serviceExternalTrafficStatus struct {
-	alphaExternalTrafficIsSet bool
-	alphaHealthCheckIsSet     bool
-	betaExternalTrafficIsSet  bool
-	betaHealthCheckIsSet      bool
+	betaExternalTrafficIsSet bool
+	betaHealthCheckIsSet     bool
+	gaExternalTrafficIsSet   bool
+	gaHealthCheckIsSet       bool
 }
 
-func (s *serviceExternalTrafficStatus) useAlphaExternalTrafficWithBeta() bool {
-	return s.alphaExternalTrafficIsSet && (s.betaExternalTrafficIsSet || s.betaHealthCheckIsSet)
+func (s *serviceExternalTrafficStatus) useBetaExternalTrafficWithGA() bool {
+	return s.betaExternalTrafficIsSet && (s.gaExternalTrafficIsSet || s.gaHealthCheckIsSet)
 }
 
-func (s *serviceExternalTrafficStatus) useAlphaHealthCheckWithBeta() bool {
-	return s.alphaHealthCheckIsSet && (s.betaExternalTrafficIsSet || s.betaHealthCheckIsSet)
+func (s *serviceExternalTrafficStatus) useBetaHealthCheckWithGA() bool {
+	return s.betaHealthCheckIsSet && (s.gaExternalTrafficIsSet || s.gaHealthCheckIsSet)
 }
 
 func getServiceExternalTrafficStatus(service *api.Service) *serviceExternalTrafficStatus {
 	s := serviceExternalTrafficStatus{}
-	_, s.alphaExternalTrafficIsSet = service.Annotations[apiservice.AlphaAnnotationExternalTraffic]
-	_, s.alphaHealthCheckIsSet = service.Annotations[apiservice.AlphaAnnotationHealthCheckNodePort]
-	_, s.betaExternalTrafficIsSet = service.Annotations[apiservice.BetaAnnotationExternalTraffic]
-	_, s.betaHealthCheckIsSet = service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]
+	_, s.betaExternalTrafficIsSet = service.Annotations[api.BetaAnnotationExternalTraffic]
+	_, s.betaHealthCheckIsSet = service.Annotations[api.BetaAnnotationHealthCheckNodePort]
+	s.gaExternalTrafficIsSet = service.Spec.ExternalTrafficPolicy != ""
+	s.gaHealthCheckIsSet = service.Spec.HealthCheckNodePort != 0
 	return &s
 }
 
@@ -2850,16 +2947,39 @@ func validateServiceExternalTrafficAPIVersion(service *api.Service) field.ErrorL
 
 	status := getServiceExternalTrafficStatus(service)
 
-	if status.useAlphaExternalTrafficWithBeta() {
-		fieldPath := field.NewPath("metadata", "annotations").Key(apiservice.AlphaAnnotationExternalTraffic)
-		msg := fmt.Sprintf("please replace the alpha annotation with beta annotation")
-		allErrs = append(allErrs, field.Invalid(fieldPath, apiservice.AlphaAnnotationExternalTraffic, msg))
+	if status.useBetaExternalTrafficWithGA() {
+		fieldPath := field.NewPath("metadata", "annotations").Key(api.BetaAnnotationExternalTraffic)
+		msg := fmt.Sprintf("please replace the beta annotation with 'ExternalTrafficPolicy' field")
+		allErrs = append(allErrs, field.Invalid(fieldPath, api.BetaAnnotationExternalTraffic, msg))
 	}
 
-	if status.useAlphaHealthCheckWithBeta() {
-		fieldPath := field.NewPath("metadata", "annotations").Key(apiservice.AlphaAnnotationHealthCheckNodePort)
-		msg := fmt.Sprintf("please replace the alpha annotation with beta annotation")
-		allErrs = append(allErrs, field.Invalid(fieldPath, apiservice.AlphaAnnotationHealthCheckNodePort, msg))
+	if status.useBetaHealthCheckWithGA() {
+		fieldPath := field.NewPath("metadata", "annotations").Key(api.BetaAnnotationHealthCheckNodePort)
+		msg := fmt.Sprintf("please replace the beta annotation with 'HealthCheckNodePort' field")
+		allErrs = append(allErrs, field.Invalid(fieldPath, api.BetaAnnotationHealthCheckNodePort, msg))
+	}
+
+	return allErrs
+}
+
+// ValidateServiceExternalTrafficFieldsCombination validates if ExternalTrafficPolicy,
+// HealthCheckNodePort and Type combination are legal. For update, it should be called
+// after clearing externalTraffic related fields for the ease of transitioning between
+// different service types.
+func ValidateServiceExternalTrafficFieldsCombination(service *api.Service) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if service.Spec.Type != api.ServiceTypeLoadBalancer &&
+		service.Spec.Type != api.ServiceTypeNodePort &&
+		service.Spec.ExternalTrafficPolicy != "" {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "externalTrafficPolicy"), service.Spec.ExternalTrafficPolicy,
+			"ExternalTrafficPolicy can only be set on NodePort and LoadBalancer service"))
+	}
+
+	if !apiservice.NeedsHealthCheck(service) &&
+		service.Spec.HealthCheckNodePort != 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "healthCheckNodePort"), service.Spec.HealthCheckNodePort,
+			"HealthCheckNodePort can only be set on LoadBalancer service with ExternalTrafficPolicy=Local"))
 	}
 
 	return allErrs
@@ -3179,6 +3299,7 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 // Refer to docs/design/resources.md for more details.
 func validateContainerResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
+
 	if len(strings.Split(value, "/")) == 1 {
 		if !helper.IsStandardContainerResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
@@ -3520,6 +3641,9 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 			} else if quantity.Cmp(requestQuantity) < 0 {
 				allErrs = append(allErrs, field.Invalid(limPath, quantity.String(), fmt.Sprintf("must be greater than or equal to %s request", resourceName)))
 			}
+		}
+		if resourceName == api.ResourceStorageOverlay && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+			allErrs = append(allErrs, field.Forbidden(limPath, "ResourceStorageOverlay field disabled by feature-gate for ResourceRequirements"))
 		}
 	}
 	for resourceName, quantity := range requirements.Requests {
@@ -3959,4 +4083,33 @@ func sysctlIntersection(a []api.Sysctl, b []api.Sysctl) []string {
 		}
 	}
 	return result
+}
+
+// validateStorageNodeAffinityAnnotation tests that the serialized TopologyConstraints in PersistentVolume.Annotations has valid data
+func validateStorageNodeAffinityAnnotation(annotations map[string]string, fldPath *field.Path) (bool, field.ErrorList) {
+	allErrs := field.ErrorList{}
+
+	na, err := helper.GetStorageNodeAffinityFromAnnotation(annotations)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, api.AlphaStorageNodeAffinityAnnotation, err.Error()))
+		return false, allErrs
+	}
+	if na == nil {
+		return false, allErrs
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "Storage node affinity is disabled by feature-gate"))
+	}
+
+	policySpecified := false
+	if na.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+		policySpecified = true
+	}
+
+	if len(na.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("preferredDuringSchedulingIgnoredDuringExection"), "Storage node affinity does not support preferredDuringSchedulingIgnoredDuringExecution"))
+	}
+	return policySpecified, allErrs
 }

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2016 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2017 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -148,6 +148,30 @@ type ContainerView struct {
 
 func init() {
 	t["ContainerView"] = reflect.TypeOf((*ContainerView)(nil)).Elem()
+}
+
+type CryptoManager struct {
+	Self types.ManagedObjectReference
+
+	Enabled bool `mo:"enabled"`
+}
+
+func (m CryptoManager) Reference() types.ManagedObjectReference {
+	return m.Self
+}
+
+func init() {
+	t["CryptoManager"] = reflect.TypeOf((*CryptoManager)(nil)).Elem()
+}
+
+type CryptoManagerKmip struct {
+	CryptoManager
+
+	KmipServers []types.KmipClusterInfo `mo:"kmipServers"`
+}
+
+func init() {
+	t["CryptoManagerKmip"] = reflect.TypeOf((*CryptoManagerKmip)(nil)).Elem()
 }
 
 type CustomFieldsManager struct {
@@ -356,6 +380,34 @@ func init() {
 	t["ExtensionManager"] = reflect.TypeOf((*ExtensionManager)(nil)).Elem()
 }
 
+type FailoverClusterConfigurator struct {
+	Self types.ManagedObjectReference
+
+	DisabledConfigureMethod []string `mo:"disabledConfigureMethod"`
+}
+
+func (m FailoverClusterConfigurator) Reference() types.ManagedObjectReference {
+	return m.Self
+}
+
+func init() {
+	t["FailoverClusterConfigurator"] = reflect.TypeOf((*FailoverClusterConfigurator)(nil)).Elem()
+}
+
+type FailoverClusterManager struct {
+	Self types.ManagedObjectReference
+
+	DisabledClusterMethod []string `mo:"disabledClusterMethod"`
+}
+
+func (m FailoverClusterManager) Reference() types.ManagedObjectReference {
+	return m.Self
+}
+
+func init() {
+	t["FailoverClusterManager"] = reflect.TypeOf((*FailoverClusterManager)(nil)).Elem()
+}
+
 type FileManager struct {
 	Self types.ManagedObjectReference
 }
@@ -459,6 +511,18 @@ func (m GuestWindowsRegistryManager) Reference() types.ManagedObjectReference {
 
 func init() {
 	t["GuestWindowsRegistryManager"] = reflect.TypeOf((*GuestWindowsRegistryManager)(nil)).Elem()
+}
+
+type HealthUpdateManager struct {
+	Self types.ManagedObjectReference
+}
+
+func (m HealthUpdateManager) Reference() types.ManagedObjectReference {
+	return m.Self
+}
+
+func init() {
+	t["HealthUpdateManager"] = reflect.TypeOf((*HealthUpdateManager)(nil)).Elem()
 }
 
 type HistoryCollector struct {
@@ -695,8 +759,9 @@ func init() {
 type HostGraphicsManager struct {
 	ExtensibleManagedObject
 
-	GraphicsInfo           []types.HostGraphicsInfo `mo:"graphicsInfo"`
-	SharedPassthruGpuTypes []string                 `mo:"sharedPassthruGpuTypes"`
+	GraphicsInfo           []types.HostGraphicsInfo  `mo:"graphicsInfo"`
+	GraphicsConfig         *types.HostGraphicsConfig `mo:"graphicsConfig"`
+	SharedPassthruGpuTypes []string                  `mo:"sharedPassthruGpuTypes"`
 }
 
 func init() {
@@ -803,7 +868,8 @@ func init() {
 type HostPciPassthruSystem struct {
 	ExtensibleManagedObject
 
-	PciPassthruInfo []types.BaseHostPciPassthruInfo `mo:"pciPassthruInfo"`
+	PciPassthruInfo     []types.BaseHostPciPassthruInfo     `mo:"pciPassthruInfo"`
+	SriovDevicePoolInfo []types.BaseHostSriovDevicePoolInfo `mo:"sriovDevicePoolInfo"`
 }
 
 func init() {
@@ -866,6 +932,18 @@ func (m HostSnmpSystem) Reference() types.ManagedObjectReference {
 
 func init() {
 	t["HostSnmpSystem"] = reflect.TypeOf((*HostSnmpSystem)(nil)).Elem()
+}
+
+type HostSpecificationManager struct {
+	Self types.ManagedObjectReference
+}
+
+func (m HostSpecificationManager) Reference() types.ManagedObjectReference {
+	return m.Self
+}
+
+func init() {
+	t["HostSpecificationManager"] = reflect.TypeOf((*HostSpecificationManager)(nil)).Elem()
 }
 
 type HostStorageSystem struct {
@@ -931,6 +1009,14 @@ func init() {
 	t["HostVMotionSystem"] = reflect.TypeOf((*HostVMotionSystem)(nil)).Elem()
 }
 
+type HostVStorageObjectManager struct {
+	VStorageObjectManagerBase
+}
+
+func init() {
+	t["HostVStorageObjectManager"] = reflect.TypeOf((*HostVStorageObjectManager)(nil)).Elem()
+}
+
 type HostVirtualNicManager struct {
 	ExtensibleManagedObject
 
@@ -982,18 +1068,6 @@ func (m HttpNfcLease) Reference() types.ManagedObjectReference {
 
 func init() {
 	t["HttpNfcLease"] = reflect.TypeOf((*HttpNfcLease)(nil)).Elem()
-}
-
-type InternalDynamicTypeManager struct {
-	Self types.ManagedObjectReference
-}
-
-func (m InternalDynamicTypeManager) Reference() types.ManagedObjectReference {
-	return m.Self
-}
-
-func init() {
-	t["InternalDynamicTypeManager"] = reflect.TypeOf((*InternalDynamicTypeManager)(nil)).Elem()
 }
 
 type InventoryView struct {
@@ -1163,6 +1237,9 @@ func init() {
 
 type OpaqueNetwork struct {
 	Network
+
+	Capability  *types.OpaqueNetworkCapability `mo:"capability"`
+	ExtraConfig []types.BaseOptionValue        `mo:"extraConfig"`
 }
 
 func init() {
@@ -1300,18 +1377,6 @@ func (m PropertyFilter) Reference() types.ManagedObjectReference {
 
 func init() {
 	t["PropertyFilter"] = reflect.TypeOf((*PropertyFilter)(nil)).Elem()
-}
-
-type ReflectManagedMethodExecuter struct {
-	Self types.ManagedObjectReference
-}
-
-func (m ReflectManagedMethodExecuter) Reference() types.ManagedObjectReference {
-	return m.Self
-}
-
-func init() {
-	t["ReflectManagedMethodExecuter"] = reflect.TypeOf((*ReflectManagedMethodExecuter)(nil)).Elem()
 }
 
 type ResourcePlanningManager struct {
@@ -1518,6 +1583,26 @@ func (m UserDirectory) Reference() types.ManagedObjectReference {
 
 func init() {
 	t["UserDirectory"] = reflect.TypeOf((*UserDirectory)(nil)).Elem()
+}
+
+type VStorageObjectManagerBase struct {
+	Self types.ManagedObjectReference
+}
+
+func (m VStorageObjectManagerBase) Reference() types.ManagedObjectReference {
+	return m.Self
+}
+
+func init() {
+	t["VStorageObjectManagerBase"] = reflect.TypeOf((*VStorageObjectManagerBase)(nil)).Elem()
+}
+
+type VcenterVStorageObjectManager struct {
+	VStorageObjectManagerBase
+}
+
+func init() {
+	t["VcenterVStorageObjectManager"] = reflect.TypeOf((*VcenterVStorageObjectManager)(nil)).Elem()
 }
 
 type View struct {

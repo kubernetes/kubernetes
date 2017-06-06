@@ -1,6 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel//tools/build_defs/pkg:pkg.bzl", "pkg_tar", "pkg_deb")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load("@io_kubernetes_build//defs:deb.bzl", "k8s_deb", "deb_data")
 load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
 

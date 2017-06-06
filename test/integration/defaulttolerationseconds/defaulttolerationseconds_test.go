@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -34,8 +35,8 @@ func TestAdmission(t *testing.T) {
 	masterConfig.GenericConfig.EnableProfiling = true
 	masterConfig.GenericConfig.EnableMetrics = true
 	masterConfig.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
@@ -64,14 +65,14 @@ func TestAdmission(t *testing.T) {
 
 	var defaultSeconds int64 = 300
 	nodeNotReady := v1.Toleration{
-		Key:               metav1.TaintNodeNotReady,
+		Key:               algorithm.TaintNodeNotReady,
 		Operator:          v1.TolerationOpExists,
 		Effect:            v1.TaintEffectNoExecute,
 		TolerationSeconds: &defaultSeconds,
 	}
 
 	nodeUnreachable := v1.Toleration{
-		Key:               metav1.TaintNodeUnreachable,
+		Key:               algorithm.TaintNodeUnreachable,
 		Operator:          v1.TolerationOpExists,
 		Effect:            v1.TaintEffectNoExecute,
 		TolerationSeconds: &defaultSeconds,

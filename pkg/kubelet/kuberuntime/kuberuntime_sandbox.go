@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -116,24 +116,34 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		}
 
 	}
-
-	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
-	podSandboxConfig.Linux = m.generatePodSandboxLinuxConfig(pod, cgroupParent)
 	if len(portMappings) > 0 {
 		podSandboxConfig.PortMappings = portMappings
 	}
+
+	lc, err := m.generatePodSandboxLinuxConfig(pod)
+	if err != nil {
+		return nil, err
+	}
+	podSandboxConfig.Linux = lc
 
 	return podSandboxConfig, nil
 }
 
 // generatePodSandboxLinuxConfig generates LinuxPodSandboxConfig from v1.Pod.
-func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod, cgroupParent string) *runtimeapi.LinuxPodSandboxConfig {
+func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (*runtimeapi.LinuxPodSandboxConfig, error) {
+	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
 	lc := &runtimeapi.LinuxPodSandboxConfig{
 		CgroupParent: cgroupParent,
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
 			Privileged: kubecontainer.HasPrivilegedContainer(pod),
 		},
 	}
+
+	sysctls, err := getSysctlsFromAnnotations(pod.Annotations)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sysctls from annotations %v for pod %q: %v", pod.Annotations, format.Pod(pod), err)
+	}
+	lc.Sysctls = sysctls
 
 	if pod.Spec.SecurityContext != nil {
 		sc := pod.Spec.SecurityContext
@@ -167,7 +177,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod, c
 		}
 	}
 
-	return lc
+	return lc, nil
 }
 
 // getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.

@@ -28,13 +28,23 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
-func init() {
-	kubeapiserveradmission.Plugins.Register("OwnerReferencesPermissionEnforcement", func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("OwnerReferencesPermissionEnforcement", func(config io.Reader) (admission.Interface, error) {
+		// the pods/status endpoint is ignored by this plugin since old kubelets
+		// corrupt them.  the pod status strategy ensures status updates cannot mutate
+		// ownerRef.
+		whiteList := []whiteListItem{
+			{
+				groupResource: schema.GroupResource{Resource: "pods"},
+				subresource:   "status",
+			},
+		}
 		return &gcPermissionsEnforcement{
-			Handler: admission.NewHandler(admission.Create, admission.Update),
+			Handler:   admission.NewHandler(admission.Create, admission.Update),
+			whiteList: whiteList,
 		}, nil
 	})
 }
@@ -46,9 +56,35 @@ type gcPermissionsEnforcement struct {
 	authorizer authorizer.Authorizer
 
 	restMapper meta.RESTMapper
+
+	// items in this whitelist are ignored upon admission.
+	// any item in this list must protect against ownerRef mutations
+	// via strategy enforcement.
+	whiteList []whiteListItem
+}
+
+// whiteListItem describes an entry in a whitelist ignored by gc permission enforcement.
+type whiteListItem struct {
+	groupResource schema.GroupResource
+	subresource   string
+}
+
+// isWhiteListed returns true if the specified item is in the whitelist.
+func (a *gcPermissionsEnforcement) isWhiteListed(groupResource schema.GroupResource, subresource string) bool {
+	for _, item := range a.whiteList {
+		if item.groupResource == groupResource && item.subresource == subresource {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (err error) {
+	// // if the request is in the whitelist, we skip mutation checks for this resource.
+	if a.isWhiteListed(attributes.GetResource().GroupResource(), attributes.GetSubresource()) {
+		return nil
+	}
+
 	// if we aren't changing owner references, then the edit is always allowed
 	if !isChangingOwnerReference(attributes.GetObject(), attributes.GetOldObject()) {
 		return nil

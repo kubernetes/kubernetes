@@ -80,12 +80,12 @@ func (strategy) AllowUnconditionalUpdate() bool {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	sa, ok := obj.(*api.ServiceAccount)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a serviceaccount")
+		return nil, nil, false, fmt.Errorf("not a serviceaccount")
 	}
-	return labels.Set(sa.Labels), SelectableFields(sa), nil
+	return labels.Set(sa.Labels), SelectableFields(sa), sa.Initializers != nil, nil
 }
 
 // Matcher returns a generic matcher for a given label and field selector.

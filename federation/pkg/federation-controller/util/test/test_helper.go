@@ -288,6 +288,32 @@ func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *Watch
 	return objChan
 }
 
+// RegisterFakeOnDelete registers a reactor in the given fake client that passes
+// all deleted objects to the given watcher. Since we could get only name of the
+// deleted object from DeleteAction, this register function relies on the getObject
+// function passed to get the object by name and pass it watcher.
+func RegisterFakeOnDelete(resource string, client *core.Fake, watcher *WatcherDispatcher, getObject func(name, namespace string) runtime.Object) {
+	client.AddReactor("delete", resource, func(action core.Action) (bool, runtime.Object, error) {
+		deleteAction := action.(core.DeleteAction)
+		obj := getObject(deleteAction.GetName(), deleteAction.GetNamespace())
+		glog.V(7).Infof("Deleting %s: %v", resource, obj)
+
+		operation := func() {
+			glog.V(4).Infof("Object deleted %v", obj)
+			watcher.Delete(obj)
+		}
+		select {
+		case watcher.orderExecution <- operation:
+			break
+		case <-time.After(pushTimeout):
+			glog.Errorf("Fake client execution channel blocked")
+			glog.Errorf("Tried to push %v", deleteAction)
+		}
+		return true, obj, nil
+	})
+	return
+}
+
 // Adds an update reactor to the given fake client.
 // The reactor just returns the object passed to update action.
 // This is used as a hack to workaround https://github.com/kubernetes/kubernetes/issues/40939.
@@ -344,7 +370,7 @@ func CompareObjectMeta(a, b metav1.ObjectMeta) error {
 		return fmt.Errorf("Different namespace expected:%s observed:%s", a.Namespace, b.Namespace)
 	}
 	if a.Name != b.Name {
-		return fmt.Errorf("Different name expected:%s observed:%s", a.Namespace, b.Namespace)
+		return fmt.Errorf("Different name expected:%s observed:%s", a.Name, b.Name)
 	}
 	if !reflect.DeepEqual(a.Labels, b.Labels) && (len(a.Labels) != 0 || len(b.Labels) != 0) {
 		return fmt.Errorf("Labels are different expected:%v observed:%v", a.Labels, b.Labels)
@@ -366,6 +392,7 @@ func NewCluster(name string, readyStatus apiv1.ConditionStatus) *federationapi.C
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: map[string]string{},
+			Labels:      map[string]string{"cluster": name},
 		},
 		Status: federationapi.ClusterStatus{
 			Conditions: []federationapi.ClusterCondition{

@@ -246,16 +246,19 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		// print the current object
 		if !isWatchOnly {
 			var objsToPrint []runtime.Object
+			writer := printers.GetNewTabWriter(out)
+
 			if isList {
 				objsToPrint, _ = meta.ExtractList(obj)
 			} else {
 				objsToPrint = append(objsToPrint, obj)
 			}
 			for _, objToPrint := range objsToPrint {
-				if err := printer.PrintObj(objToPrint, out); err != nil {
+				if err := printer.PrintObj(objToPrint, writer); err != nil {
 					return fmt.Errorf("unable to output the provided object: %v", err)
 				}
 			}
+			writer.Flush()
 		}
 
 		// print watched changes
@@ -274,10 +277,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 					return false, nil
 				}
 				err := printer.PrintObj(e.Object, out)
-				if err != nil {
-					return false, err
-				}
-				return false, nil
+				return false, err
 			})
 			return err
 		})
@@ -299,7 +299,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return err
 	}
 
-	printer, generic, err := f.PrinterForCommand(cmd)
+	printer, err := f.PrinterForCommand(cmd, printers.PrintOptions{})
 	if err != nil {
 		return err
 	}
@@ -310,7 +310,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		r.IgnoreErrors(kapierrors.IsNotFound)
 	}
 
-	if generic {
+	if printer.IsGeneric() {
 		// we flattened the data from the builder, so we have individual items, but now we'd like to either:
 		// 1. if there is more than one item, combine them all into a single list
 		// 2. if there is a single item and that item is a list, leave it as its specific list
@@ -433,7 +433,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			mapping = infos[ix].Mapping
 			original = infos[ix].Object
 		}
-		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
+		if shouldGetNewPrinterForMapping(printer, lastMapping, mapping) {
 			if printer != nil {
 				w.Flush()
 			}
@@ -509,4 +509,8 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	w.Flush()
 	cmdutil.PrintFilterCount(errOut, len(objs), filteredResourceCount, len(allErrs), filterOpts, options.IgnoreNotFound)
 	return utilerrors.NewAggregate(allErrs)
+}
+
+func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
+	return printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource
 }

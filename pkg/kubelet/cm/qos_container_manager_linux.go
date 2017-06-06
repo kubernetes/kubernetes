@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
 
 const (
@@ -143,7 +143,7 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 	burstablePodCPURequest := int64(0)
 	for i := range pods {
 		pod := pods[i]
-		qosClass := qos.GetPodQOS(pod)
+		qosClass := v1qos.GetPodQOS(pod)
 		if qosClass != v1.PodQOSBurstable {
 			// we only care about the burstable qos tier
 			continue
@@ -183,7 +183,7 @@ func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*C
 	pods := m.activePods()
 	for _, pod := range pods {
 		podMemoryRequest := int64(0)
-		qosClass := qos.GetPodQOS(pod)
+		qosClass := v1qos.GetPodQOS(pod)
 		if qosClass == v1.PodQOSBestEffort {
 			// limits are not set for Best Effort pods
 			continue

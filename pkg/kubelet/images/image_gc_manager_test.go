@@ -24,8 +24,8 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/clock"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -462,4 +462,64 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 	require.NoError(t, err)
 	assert.EqualValues(1024, spaceFreed)
 	assert.Len(fakeRuntime.ImageList, 1)
+}
+
+func TestValidateImageGCPolicy(t *testing.T) {
+	testCases := []struct {
+		name          string
+		imageGCPolicy ImageGCPolicy
+		expectErr     string
+	}{
+		{
+			name: "Test for LowThresholdPercent < HighThresholdPercent",
+			imageGCPolicy: ImageGCPolicy{
+				HighThresholdPercent: 2,
+				LowThresholdPercent:  1,
+			},
+		},
+		{
+			name: "Test for HighThresholdPercent < 0,",
+			imageGCPolicy: ImageGCPolicy{
+				HighThresholdPercent: -1,
+			},
+			expectErr: "invalid HighThresholdPercent -1, must be in range [0-100]",
+		},
+		{
+			name: "Test for HighThresholdPercent > 100",
+			imageGCPolicy: ImageGCPolicy{
+				HighThresholdPercent: 101,
+			},
+			expectErr: "invalid HighThresholdPercent 101, must be in range [0-100]",
+		},
+		{
+			name: "Test for LowThresholdPercent < 0",
+			imageGCPolicy: ImageGCPolicy{
+				LowThresholdPercent: -1,
+			},
+			expectErr: "invalid LowThresholdPercent -1, must be in range [0-100]",
+		},
+		{
+			name: "Test for LowThresholdPercent > 100",
+			imageGCPolicy: ImageGCPolicy{
+				LowThresholdPercent: 101,
+			},
+			expectErr: "invalid LowThresholdPercent 101, must be in range [0-100]",
+		},
+		{
+			name: "Test for LowThresholdPercent > HighThresholdPercent",
+			imageGCPolicy: ImageGCPolicy{
+				HighThresholdPercent: 1,
+				LowThresholdPercent:  2,
+			},
+			expectErr: "LowThresholdPercent 2 can not be higher than HighThresholdPercent 1",
+		},
+	}
+
+	for _, tc := range testCases {
+		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy); err != nil {
+			if err.Error() != tc.expectErr {
+				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
+			}
+		}
+	}
 }

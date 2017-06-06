@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -291,6 +292,9 @@ func newPCCloud(cfg PCConfig) (*PCCloud, error) {
 
 	return &pc, nil
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (pc *PCCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 // Instances returns an implementation of Instances for Photon Controller.
 func (pc *PCCloud) Instances() (cloudprovider.Instances, bool) {

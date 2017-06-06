@@ -17,6 +17,7 @@ limitations under the License.
 package discovery
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/emicklei/go-restful"
@@ -26,17 +27,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // APIGroupHandler creates a webservice serving the supported versions, preferred version, and name
 // of a group. E.g., such a web service will be registered at /apis/extensions.
 type APIGroupHandler struct {
-	serializer runtime.NegotiatedSerializer
-
-	group metav1.APIGroup
+	serializer    runtime.NegotiatedSerializer
+	contextMapper request.RequestContextMapper
+	group         metav1.APIGroup
 }
 
-func NewAPIGroupHandler(serializer runtime.NegotiatedSerializer, group metav1.APIGroup) *APIGroupHandler {
+func NewAPIGroupHandler(serializer runtime.NegotiatedSerializer, group metav1.APIGroup, contextMapper request.RequestContextMapper) *APIGroupHandler {
 	if keepUnversioned(group.Name) {
 		// Because in release 1.1, /apis/extensions returns response with empty
 		// APIVersion, we use stripVersionNegotiatedSerializer to keep the
@@ -45,8 +47,9 @@ func NewAPIGroupHandler(serializer runtime.NegotiatedSerializer, group metav1.AP
 	}
 
 	return &APIGroupHandler{
-		serializer: serializer,
-		group:      group,
+		serializer:    serializer,
+		contextMapper: contextMapper,
+		group:         group,
 	}
 }
 
@@ -70,5 +73,10 @@ func (s *APIGroupHandler) handle(req *restful.Request, resp *restful.Response) {
 }
 
 func (s *APIGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	responsewriters.WriteObjectNegotiated(s.serializer, schema.GroupVersion{}, w, req, http.StatusOK, &s.group)
+	ctx, ok := s.contextMapper.Get(req)
+	if !ok {
+		responsewriters.InternalError(w, req, errors.New("no context found for request"))
+		return
+	}
+	responsewriters.WriteObjectNegotiated(ctx, s.serializer, schema.GroupVersion{}, w, req, http.StatusOK, &s.group)
 }

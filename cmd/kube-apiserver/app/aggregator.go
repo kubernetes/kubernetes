@@ -33,9 +33,11 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	kubeclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
+	apiextensionsinformers "k8s.io/kube-apiextensions-server/pkg/client/informers/internalversion"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/master/thirdparty"
@@ -48,17 +50,11 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 
 	// the aggregator doesn't wire these up.  It just delegates them to the kubeapiserver
 	genericConfig.EnableSwaggerUI = false
-	genericConfig.OpenAPIConfig = nil
 	genericConfig.SwaggerConfig = nil
-
-	// copy the loopbackclientconfig.  We're going to change the contenttype back to json until we get protobuf serializations for it
-	t := *kubeAPIServerConfig.LoopbackClientConfig
-	genericConfig.LoopbackClientConfig = &t
-	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = ""
 
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
-	etcdOptions.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(schema.GroupVersion{Group: "apiregistration.k8s.io", Version: "v1alpha1"})
+	etcdOptions.StorageConfig.Codec = aggregatorapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)
 	etcdOptions.StorageConfig.Copier = aggregatorapiserver.Scheme
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
@@ -78,19 +74,20 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 			return nil, err
 		}
 	}
+
 	aggregatorConfig := &aggregatorapiserver.Config{
-		GenericConfig:       &genericConfig,
-		CoreAPIServerClient: client,
-		ProxyClientCert:     certBytes,
-		ProxyClientKey:      keyBytes,
+		GenericConfig:           &genericConfig,
+		CoreAPIServerClient:     client,
+		ProxyClientCert:         certBytes,
+		ProxyClientKey:          keyBytes,
+		EnableAggregatorRouting: commandOptions.EnableAggregatorRouting,
 	}
 
 	return aggregatorConfig, nil
-
 }
 
-func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, sharedInformers informers.SharedInformerFactory, stopCh <-chan struct{}) (*aggregatorapiserver.APIAggregator, error) {
-	aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(delegateAPIServer, stopCh)
+func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, kubeInformers informers.SharedInformerFactory, apiExtensionInformers apiextensionsinformers.SharedInformerFactory, proxyTransport *http.Transport) (*aggregatorapiserver.APIAggregator, error) {
+	aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(delegateAPIServer, proxyTransport)
 	if err != nil {
 		return nil, err
 	}
@@ -102,11 +99,14 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	}
 	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices(), apiRegistrationClient)
 	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
-	tprRegistrationController := thirdparty.NewAutoRegistrationController(sharedInformers.Extensions().InternalVersion().ThirdPartyResources(), autoRegistrationController)
+	tprRegistrationController := thirdparty.NewAutoRegistrationController(
+		kubeInformers.Extensions().InternalVersion().ThirdPartyResources(),
+		apiExtensionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
+		autoRegistrationController)
 
 	aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
-		go autoRegistrationController.Run(5, stopCh)
-		go tprRegistrationController.Run(5, stopCh)
+		go autoRegistrationController.Run(5, context.StopCh)
+		go tprRegistrationController.Run(5, context.StopCh)
 		return nil
 	})
 	aggregatorServer.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("autoregister-completion", func(r *http.Request) error {
@@ -119,7 +119,10 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		for _, apiService := range apiServices {
 			found := false
 			for _, item := range items {
-				if item.Name == apiService.Name {
+				if item.Name != apiService.Name {
+					continue
+				}
+				if apiregistration.IsAPIServiceConditionTrue(item, apiregistration.Available) {
 					found = true
 					break
 				}

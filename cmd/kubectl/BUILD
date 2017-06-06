@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 licenses(["notice"])
 
 load(
@@ -19,6 +17,9 @@ go_binary(
     library = ":go_default_library",
     linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
+    visibility = [
+        "//build/visible_to:COMMON_release",
+    ],
 )
 
 go_library(
@@ -32,7 +33,6 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
-    visibility = ["//visibility:private"],
 )
 
 filegroup(
@@ -42,4 +42,7 @@ filegroup(
         "//cmd/kubectl/app:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = [
+        "//build/visible_to:cmd_kubectl_CONSUMERS",
+    ],
 )

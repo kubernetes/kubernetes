@@ -17,15 +17,18 @@ limitations under the License.
 package constants
 
 import (
-	"path"
+	"path/filepath"
 	"time"
 
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
 	// KubernetesDir is the directory kubernetes owns for storing various configuration files
 	KubernetesDir = "/etc/kubernetes"
+
+	ManifestsSubDirName = "manifests"
 
 	CACertAndKeyBaseName = "ca"
 	CACertName           = "ca.crt"
@@ -55,9 +58,6 @@ const (
 	KubeletKubeConfigFileName           = "kubelet.conf"
 	ControllerManagerKubeConfigFileName = "controller-manager.conf"
 	SchedulerKubeConfigFileName         = "scheduler.conf"
-
-	// Important: a "v"-prefix shouldn't exist here; semver doesn't allow that
-	MinimumControlPlaneVersion = "1.6.0-beta.3"
 
 	// Some well-known users and groups in the core Kubernetes authorization system
 
@@ -91,7 +91,7 @@ const (
 	MinExternalEtcdVersion = "3.0.14"
 
 	// DefaultAdmissionControl specifies the default admission control options that will be used
-	DefaultAdmissionControl = "NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds"
+	DefaultAdmissionControl = "Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds"
 )
 
 var (
@@ -102,9 +102,18 @@ var (
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	AuthorizationPolicyPath        = path.Join(KubernetesDir, "abac_policy.json")
-	AuthorizationWebhookConfigPath = path.Join(KubernetesDir, "webhook_authz.conf")
+	AuthorizationPolicyPath        = filepath.Join(KubernetesDir, "abac_policy.json")
+	AuthorizationWebhookConfigPath = filepath.Join(KubernetesDir, "webhook_authz.conf")
 
 	// DefaultTokenUsages specifies the default functions a token will get
 	DefaultTokenUsages = []string{"signing", "authentication"}
+
+	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.6.0")
+
+	// MinimumCSRSARApproverVersion specifies the minimum kubernetes version that can be used for enabling the new-in-v1.7 CSR approver based on a SubjectAccessReview
+	MinimumCSRSARApproverVersion = version.MustParseSemantic("v1.7.0-beta.0")
+
+	// MinimumAPIAggregationVersion specifies the minimum kubernetes version that can be used enabling the API aggregation in the apiserver and the front proxy flags
+	MinimumAPIAggregationVersion = version.MustParseSemantic("v1.7.0-alpha.1")
 )

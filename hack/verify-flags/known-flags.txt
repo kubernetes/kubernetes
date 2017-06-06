@@ -46,6 +46,8 @@ audit-log-maxage
 audit-log-maxbackup
 audit-log-maxsize
 audit-log-path
+audit-webhook-config-file
+audit-webhook-mode
 authentication-kubeconfig
 authentication-token-webhook
 authentication-token-webhook-cache-ttl
@@ -62,7 +64,6 @@ auth-provider
 auth-provider-arg
 auth-provider-arg
 azure-container-registry-config
-babysit-daemons
 basic-auth-file
 bench-pods
 bench-quiet
@@ -86,7 +87,6 @@ cgroups-per-qos
 chaos-chance
 cidr-allocator-type
 clean-start
-cleanup
 cleanup-iptables
 client-ca-file
 client-certificate
@@ -178,6 +178,7 @@ dns-provider
 dns-provider-config
 dns-zone-name
 dockercfg-path
+docker-disable-shared-pid
 docker-email
 docker-endpoint
 docker-exec-handler
@@ -191,8 +192,8 @@ dump-logs-on-failure
 duration-sec
 e2e-output-dir
 e2e-verify-service-account
+enable-aggregator-routing
 enable-controller-attach-detach
-enable-cri
 enable-custom-metrics
 enable-debugging-handlers
 enable-dynamic-provisioning
@@ -200,6 +201,7 @@ enable-garbage-collector
 enable-garbage-collector
 enable-garbage-collector
 enable-hostpath-provisioner
+enable-logs-handler
 enable-server
 enable-swagger-ui
 enable-taint-manager
@@ -209,12 +211,14 @@ etcd-cafile
 etcd-certfile
 etcd-config
 etcd-keyfile
+etcd-image
 etcd-metrics-scrape-uri
 etcd-metrics-scrape-uri
 etcd-mutation-timeout
 etcd-persistent-storage
 etcd-prefix
 etcd-pv-capacity
+etcd-pv-storage-class
 etcd-quorum-read
 etcd-server
 etcd-servers
@@ -240,12 +244,13 @@ exit-on-lock-contention
 experimental-allocatable-ignore-eviction
 experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
+bootstrap-kubeconfig
 experimental-bootstrap-token-auth
 experimental-check-node-capabilities-before-mount
+experimental-cluster-signing-duration
 experimental-cri
 experimental-dockershim
 experimental-dockershim-root-directory
-experimental-docker-enable-shared-pid
 experimental-fail-swap-on
 experimental-kernel-memcg-notification
 experimental-keystone-ca-file
@@ -275,7 +280,6 @@ federation-name
 federation-system-namespace
 federation-upgrade-target
 file-check-frequency
-file_content_in_loop
 file-suffix
 flex-volume-plugin-dir
 forward-services
@@ -292,6 +296,7 @@ garbage-collector-enabled
 gather-logs-sizes
 gather-metrics-at-teardown
 gather-resource-usage
+gather-suite-metrics-at-teardown
 gce-multizone
 gce-project
 gce-service-account
@@ -304,7 +309,6 @@ google-json-key
 grace-period
 ha-domain
 hairpin-mode
-hard
 hard-pod-affinity-symmetric-weight
 healthz-bind-address
 healthz-port
@@ -426,7 +430,9 @@ large-cluster-size-threshold
 last-release-pr
 leader-elect
 leader-elect-lease-duration
+leader-elect-lock-type
 leader-elect-renew-deadline
+leader-elect-resource-lock
 leader-elect-retry-period
 lease-duration
 leave-stdin-open
@@ -459,6 +465,7 @@ max-outgoing-burst
 max-outgoing-qps
 max-pods
 max-requests-inflight
+max-unavailable
 mesos-authentication-principal
 mesos-authentication-provider
 mesos-authentication-secret-file
@@ -508,6 +515,7 @@ node-sync-period
 no-headers
 no-headers
 non-masquerade-cidr
+non-resource-url
 no-suggestions
 no-suggestions
 num-nodes
@@ -563,7 +571,6 @@ pv-recycler-minimum-timeout-nfs
 pv-recycler-pod-template-filepath-hostpath
 pv-recycler-pod-template-filepath-nfs
 pv-recycler-timeout-increment-hostpath
-quiet
 read-only-port
 really-crash-for-testing
 reconcile-cidr
@@ -592,13 +599,11 @@ requestheader-username-headers
 required-contexts
 require-kubeconfig
 resolv-conf
-resource
 resource-container
 resource-name
 resource-quota-sync-period
 resource-version
 results-dir
-retry_time
 rkt-api-endpoint
 rkt-path
 rkt-stage1-image
@@ -617,7 +622,6 @@ schedule-pods-here
 scheduler-config
 scheduler-name
 schema-cache-dir
-scopes
 scrape-timeout
 seccomp-profile-root
 secondary-node-eviction-rate
@@ -668,7 +672,6 @@ storage-media-type
 storage-version
 storage-versions
 streaming-connection-idle-timeout
-subresource
 suicide-timeout
 sync-frequency
 system-cgroups
@@ -704,6 +707,7 @@ upgrade-target
 use-kubernetes-cluster-service
 use-kubernetes-version
 use-legacy-policy-config
+use-real-proxier
 use-service-account-credentials
 user-whitelist
 use-service-account-credentials
@@ -711,7 +715,6 @@ use-service-account-credentials
 user-whitelist
 use-service-account-credentials
 use-taint-based-evictions
-verb
 verify-only
 versioned-clientset-package
 viper-config
@@ -724,6 +727,7 @@ watch-cache-sizes
 watch-only
 whitelist-override-label
 windows-line-endings
+write-config-to
 www-prefix
 zone-id
 zone-name

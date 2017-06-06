@@ -574,7 +574,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to retrieve deployment %v from store: %v", key, err))
 		return err
 	}
 

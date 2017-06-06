@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -47,7 +48,7 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 		}
 		// The node may appear to have no labels at first,
 		// so we wait for it to get hostname label.
-		_, found := n.ObjectMeta.Labels[metav1.LabelHostname]
+		_, found := n.ObjectMeta.Labels[kubeletapis.LabelHostname]
 		return found, nil
 	})
 
@@ -58,7 +59,7 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 
 	// The master node is tainted and labelled accordingly
 	n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleMaster] = ""
-	n.Spec.Taints = append(n.Spec.Taints, v1.Taint{Key: kubeadmconstants.LabelNodeRoleMaster, Value: "", Effect: "NoSchedule"})
+	addTaintIfNotExists(n, v1.Taint{Key: kubeadmconstants.LabelNodeRoleMaster, Value: "", Effect: "NoSchedule"})
 
 	newData, err := json.Marshal(n)
 	if err != nil {
@@ -81,6 +82,16 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 	}
 
 	return nil
+}
+
+func addTaintIfNotExists(n *v1.Node, t v1.Taint) {
+	for _, taint := range n.Spec.Taints {
+		if taint == t {
+			return
+		}
+	}
+
+	n.Spec.Taints = append(n.Spec.Taints, t)
 }
 
 // UpdateMasterRoleLabelsAndTaints taints the master and sets the master label

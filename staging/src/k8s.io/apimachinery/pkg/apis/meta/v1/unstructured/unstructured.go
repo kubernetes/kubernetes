@@ -27,10 +27,12 @@ import (
 	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // Unstructured allows objects that do not have Golang structs registered to be manipulated
@@ -248,22 +250,19 @@ func extractOwnerReference(src interface{}) metav1.OwnerReference {
 
 func setOwnerReference(src metav1.OwnerReference) map[string]interface{} {
 	ret := make(map[string]interface{})
-	controllerPtr := src.Controller
-	if controllerPtr != nil {
-		controller := *controllerPtr
-		controllerPtr = &controller
-	}
-	blockOwnerDeletionPtr := src.BlockOwnerDeletion
-	if blockOwnerDeletionPtr != nil {
-		blockOwnerDeletion := *blockOwnerDeletionPtr
-		blockOwnerDeletionPtr = &blockOwnerDeletion
-	}
 	setNestedField(ret, src.Kind, "kind")
 	setNestedField(ret, src.Name, "name")
 	setNestedField(ret, src.APIVersion, "apiVersion")
 	setNestedField(ret, string(src.UID), "uid")
-	setNestedField(ret, controllerPtr, "controller")
-	setNestedField(ret, blockOwnerDeletionPtr, "blockOwnerDeletion")
+	// json.Unmarshal() extracts boolean json fields as bool, not as *bool and hence extractOwnerReference()
+	// expects bool or a missing field, not *bool. So if pointer is nil, fields are omitted from the ret object.
+	// If pointer is non-nil, they are set to the referenced value.
+	if src.Controller != nil {
+		setNestedField(ret, *src.Controller, "controller")
+	}
+	if src.BlockOwnerDeletion != nil {
+		setNestedField(ret, *src.BlockOwnerDeletion, "blockOwnerDeletion")
+	}
 	return ret
 }
 
@@ -450,6 +449,36 @@ func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
 	}
 	gvk := gv.WithKind(u.GetKind())
 	return gvk
+}
+
+var converter = unstructured.NewConverter(false)
+
+func (u *Unstructured) GetInitializers() *metav1.Initializers {
+	field := getNestedField(u.Object, "metadata", "initializers")
+	if field == nil {
+		return nil
+	}
+	obj, ok := field.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	out := &metav1.Initializers{}
+	if err := converter.FromUnstructured(obj, out); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
+	}
+	return out
+}
+
+func (u *Unstructured) SetInitializers(initializers *metav1.Initializers) {
+	if initializers == nil {
+		setNestedField(u.Object, nil, "metadata", "initializers")
+		return
+	}
+	out := make(map[string]interface{})
+	if err := converter.ToUnstructured(initializers, &out); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
+	}
+	setNestedField(u.Object, out, "metadata", "initializers")
 }
 
 func (u *Unstructured) GetFinalizers() []string {

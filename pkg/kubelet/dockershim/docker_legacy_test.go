@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -105,8 +105,8 @@ func TestConvertLegacyNameAndLabels(t *testing.T) {
 }
 
 // getFakeLegacyContainers returns a list of fake legacy containers.
-func getFakeLegacyContainers() []*dockertools.FakeContainer {
-	return []*dockertools.FakeContainer{
+func getFakeLegacyContainers() []*libdocker.FakeContainer {
+	return []*libdocker.FakeContainer{
 		{
 			ID:   "12",
 			Name: "k8s_POD.hash1_podname_podnamespace_poduid_randomid",
@@ -139,8 +139,8 @@ func getFakeLegacyContainers() []*dockertools.FakeContainer {
 }
 
 // getFakeNewContainers returns a list of fake new containers.
-func getFakeNewContainers() []*dockertools.FakeContainer {
-	return []*dockertools.FakeContainer{
+func getFakeNewContainers() []*libdocker.FakeContainer {
+	return []*libdocker.FakeContainer{
 		{
 			ID:   "56",
 			Name: "k8s_POD_podname_podnamespace_poduid_0",
@@ -233,11 +233,11 @@ func TestListLegacyPodSandbox(t *testing.T) {
 
 func TestCheckLegacyCleanup(t *testing.T) {
 	for desc, test := range map[string]struct {
-		containers []*dockertools.FakeContainer
+		containers []*libdocker.FakeContainer
 		done       bool
 	}{
 		"no containers": {
-			containers: []*dockertools.FakeContainer{},
+			containers: []*libdocker.FakeContainer{},
 			done:       true,
 		},
 		"only new containers": {

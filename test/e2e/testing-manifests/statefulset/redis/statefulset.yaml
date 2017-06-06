@@ -22,24 +22,24 @@ spec:
           mountPath: "/opt"
         - name: workdir
           mountPath: "/work-dir"
-     - name: bootstrap
-       image: debian:jessie
-       command:
-       - "/work-dir/peer-finder"
-       args:
-       - -on-start="/work-dir/on-start.sh"
-       - "-service=redis"
-       env:
-       - name: POD_NAMESPACE
-         valueFrom:
-           fieldRef:
-             apiVersion: v1
-             fieldPath: metadata.namespace
-       volumeMounts:
-       - name: opt
-         mountPath: "/opt"
-       - name: workdir
-         mountPath: "/work-dir"
+      - name: bootstrap
+        image: debian:jessie
+        command:
+        - "/work-dir/peer-finder"
+        args:
+        - -on-start="/work-dir/on-start.sh"
+        - "-service=redis"
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: opt
+          mountPath: "/opt"
+        - name: workdir
+          mountPath: "/work-dir"
       containers:
       - name: redis
         image: debian:jessie

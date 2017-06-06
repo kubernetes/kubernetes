@@ -38,27 +38,36 @@ else
 fi
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
-  # If the master image is not set, we use the latest GCI image.
-  # Otherwise, we respect whatever is set by the user.
-  MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}
-  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
+    DEFAULT_GCI_PROJECT=google-containers
+    if [[ "${GCI_VERSION}" == "cos"* ]]; then
+        DEFAULT_GCI_PROJECT=cos-cloud
+    fi
+    MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
+    # If the master image is not set, we use the latest GCI image.
+    # Otherwise, we respect whatever is set by the user.
+    MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}
 elif [[ "${MASTER_OS_DISTRIBUTION}" == "debian" ]]; then
-  MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${CVM_VERSION}}
-  MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
+    MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${CVM_VERSION}}
+    MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 fi
 
 # Sets node image based on the specified os distro. Currently this function only
 # supports gci and debian.
 function set-node-image() {
-  if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
-    # If the node image is not set, we use the latest GCI image.
-    # Otherwise, we respect whatever is set by the user.
-    NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
-    NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
-  elif [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
-    NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
-    NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
-  fi
+    if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
+        DEFAULT_GCI_PROJECT=google-containers
+        if [[ "${GCI_VERSION}" == "cos"* ]]; then
+            DEFAULT_GCI_PROJECT=cos-cloud
+        fi
+
+        # If the node image is not set, we use the latest GCI image.
+        # Otherwise, we respect whatever is set by the user.
+        NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
+        NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-${DEFAULT_GCI_PROJECT}}
+    elif [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
+        NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
+        NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
+    fi
 }
 
 set-node-image
@@ -498,15 +507,24 @@ function create-node-template() {
   #                 distinguish an ephemeral failed call from a "not-exists".
   if gcloud compute instance-templates describe "$template_name" --project "${PROJECT}" &>/dev/null; then
     echo "Instance template ${1} already exists; deleting." >&2
-    if ! gcloud compute instance-templates delete "$template_name" --project "${PROJECT}" &>/dev/null; then
+    if ! gcloud compute instance-templates delete "$template_name" --project "${PROJECT}" --quiet &>/dev/null; then
       echo -e "${color_yellow}Failed to delete existing instance template${color_norm}" >&2
       exit 2
     fi
   fi
 
   local gcloud="gcloud"
+
+  local accelerator_args=""
+  # VMs with Accelerators cannot be live migrated.
+  # More details here - https://cloud.google.com/compute/docs/gpus/add-gpus#create-new-gpu-instance
+  if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
+    accelerator_args="--maintenance-policy TERMINATE --restart-on-failure --accelerator ${NODE_ACCELERATORS}"
+    gcloud="gcloud beta"
+  fi
+
   if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
-    gcloud="gcloud alpha"
+    gcloud="gcloud beta"
   fi
 
   local preemptible_minions=""
@@ -527,16 +545,10 @@ function create-node-template() {
     "${IP_ALIAS_SUBNETWORK:-}" \
     "${IP_ALIAS_SIZE:-}")
 
-  local accelerator_args=""
-  # VMs with Accelerators cannot be live migrated.
-  # More details here - https://cloud.google.com/compute/docs/gpus/add-gpus#create-new-gpu-instance
-  if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-      accelerator_args="--maintenance-policy TERMINATE --restart-on-failure --accelerator ${NODE_ACCELERATORS}"
-  fi
   local attempt=1
   while true; do
     echo "Attempt ${attempt} to create ${1}" >&2
-    if ! ${gcloud} beta compute instance-templates create \
+    if ! ${gcloud} compute instance-templates create \
       "$template_name" \
       --project "${PROJECT}" \
       --machine-type "${NODE_SIZE}" \
@@ -647,7 +659,7 @@ function kube-up() {
   if [[ ${KUBE_USE_EXISTING_MASTER:-} == "true" ]]; then
     detect-master
     parse-master-env
-    create-subnetwork
+    create-subnetworks
     create-nodes
   elif [[ ${KUBE_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
     if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" && "${MASTER_OS_DISTRIBUTION}" != "debian" && "${MASTER_OS_DISTRIBUTION}" != "ubuntu" ]]; then
@@ -663,7 +675,7 @@ function kube-up() {
   else
     check-existing
     create-network
-    create-subnetwork
+    create-subnetworks
     write-cluster-name
     create-autoscaler-config
     create-master
@@ -732,7 +744,7 @@ function create-network() {
   fi
 }
 
-function create-subnetwork() {
+function create-subnetworks() {
   case ${ENABLE_IP_ALIASES} in
     true) ;;
     false) return;;
@@ -740,9 +752,9 @@ function create-subnetwork() {
        exit 1;;
   esac
 
-  # Look for the subnet, it must exist and have a secondary range
-  # configured.
-  local subnet=$(gcloud alpha compute networks subnets describe \
+  # Look for the alias subnet, it must exist and have a secondary
+  # range configured.
+  local subnet=$(gcloud beta compute networks subnets describe \
     --project "${PROJECT}" \
     --region ${REGION} \
     ${IP_ALIAS_SUBNETWORK} 2>/dev/null)
@@ -759,21 +771,45 @@ function create-subnetwork() {
     fi
 
     echo "Creating subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
-    gcloud alpha compute networks subnets create \
+    gcloud beta compute networks subnets create \
       ${IP_ALIAS_SUBNETWORK} \
       --description "Automatically generated subnet for ${INSTANCE_PREFIX} cluster. This will be removed on cluster teardown." \
       --project "${PROJECT}" \
       --network ${NETWORK} \
       --region ${REGION} \
       --range ${NODE_IP_RANGE} \
-      --secondary-range "name=pods-default,range=${CLUSTER_IP_RANGE}"
-
+      --secondary-range "pods-default=${CLUSTER_IP_RANGE}"
     echo "Created subnetwork ${IP_ALIAS_SUBNETWORK}"
   else
     if ! echo ${subnet} | grep --quiet secondaryIpRanges ${subnet}; then
       echo "${color_red}Subnet ${IP_ALIAS_SUBNETWORK} does not have a secondary range${color_norm}"
       exit 1
     fi
+  fi
+
+  # Services subnetwork.
+  local subnet=$(gcloud beta compute networks subnets describe \
+    --project "${PROJECT}" \
+    --region ${REGION} \
+    ${SERVICE_CLUSTER_IP_SUBNETWORK} 2>/dev/null)
+
+  if [[ -z ${subnet} ]]; then
+    if [[ ${SERVICE_CLUSTER_IP_SUBNETWORK} != ${INSTANCE_PREFIX}-subnet-services ]]; then
+      echo "${color_red}Subnetwork ${NETWORK}:${SERVICE_CLUSTER_IP_SUBNETWORK} does not exist${color_norm}"
+      exit 1
+    fi
+
+    echo "Creating subnet for reserving service cluster IPs ${NETWORK}:${SERVICE_CLUSTER_IP_SUBNETWORK}"
+    gcloud beta compute networks subnets create \
+      ${SERVICE_CLUSTER_IP_SUBNETWORK} \
+      --description "Automatically generated subnet for ${INSTANCE_PREFIX} cluster. This will be removed on cluster teardown." \
+      --project "${PROJECT}" \
+      --network ${NETWORK} \
+      --region ${REGION} \
+      --range ${SERVICE_CLUSTER_IP_RANGE}
+    echo "Created subnetwork ${SERVICE_CLUSTER_IP_SUBNETWORK}"
+  else
+    echo "Subnet ${SERVICE_CLUSTER_IP_SUBNETWORK} already exists"
   fi
 }
 
@@ -798,25 +834,36 @@ function delete-network() {
   fi
 }
 
-function delete-subnetwork() {
+function delete-subnetworks() {
   if [[ ${ENABLE_IP_ALIASES:-} != "true" ]]; then
     return
   fi
 
   # Only delete automatically created subnets.
-  if [[ ${IP_ALIAS_SUBNETWORK} != ${INSTANCE_PREFIX}-subnet-default ]]; then
-    return
-  fi
-
-  echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
-  if [[ -n $(gcloud alpha compute networks subnets describe \
+  if [[ ${IP_ALIAS_SUBNETWORK} == ${INSTANCE_PREFIX}-subnet-default ]]; then
+    echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
+    if [[ -n $(gcloud beta compute networks subnets describe \
+          --project "${PROJECT}" \
+          --region ${REGION} \
+          ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
+      gcloud beta --quiet compute networks subnets delete \
         --project "${PROJECT}" \
         --region ${REGION} \
-        ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
-    gcloud alpha --quiet compute networks subnets delete \
-      --project "${PROJECT}" \
-      --region ${REGION} \
-      ${IP_ALIAS_SUBNETWORK}
+        ${IP_ALIAS_SUBNETWORK}
+    fi
+  fi
+
+  if [[ ${SERVICE_CLUSTER_IP_SUBNETWORK} == ${INSTANCE_PREFIX}-subnet-services ]]; then
+    echo "Removing auto-created subnet ${NETWORK}:${SERVICE_CLUSTER_IP_SUBNETWORK}"
+    if [[ -n $(gcloud beta compute networks subnets describe \
+          --project "${PROJECT}" \
+          --region ${REGION} \
+          ${SERVICE_CLUSTER_IP_SUBNETWORK} 2>/dev/null) ]]; then
+      gcloud --quiet beta compute networks subnets delete \
+        --project "${PROJECT}" \
+        --region ${REGION} \
+        ${SERVICE_CLUSTER_IP_SUBNETWORK}
+    fi
   fi
 }
 
@@ -1200,14 +1247,14 @@ function create-cluster-autoscaler-mig-config() {
 
   # Each MIG must have at least one node, so the min number of nodes
   # must be greater or equal to the number of migs.
-  if [[ ${AUTOSCALER_MIN_NODES} < ${NUM_MIGS} ]]; then
+  if [[ ${AUTOSCALER_MIN_NODES} -lt ${NUM_MIGS} ]]; then
     echo "AUTOSCALER_MIN_NODES must be greater or equal ${NUM_MIGS}"
     exit 2
   fi
 
   # Each MIG must have at least one node, so the min number of nodes
   # must be greater or equal to the number of migs.
-  if [[ ${AUTOSCALER_MAX_NODES} < ${NUM_MIGS} ]]; then
+  if [[ ${AUTOSCALER_MAX_NODES} -lt ${NUM_MIGS} ]]; then
     echo "AUTOSCALER_MAX_NODES must be greater or equal ${NUM_MIGS}"
     exit 2
   fi
@@ -1534,7 +1581,7 @@ function kube-down() {
       "${NETWORK}-default-ssh" \
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
 
-    delete-subnetwork
+    delete-subnetworks
 
     if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
       delete-network || true  # might fail if there are leaked firewall rules

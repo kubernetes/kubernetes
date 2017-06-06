@@ -38,10 +38,6 @@ import (
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
-
-	// we need the API types for rest mapping lookup
-	_ "k8s.io/client-go/pkg/api/install"
-	_ "k8s.io/client-go/pkg/apis/extensions/install"
 )
 
 type restClientTestCase struct {
@@ -74,7 +70,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 	fakeCMClient := &cmfake.FakeCustomMetricsClient{}
 
 	if isResource {
-		fakeMetricsClient.AddReactor("list", "podmetricses", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		fakeMetricsClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			metrics := &metricsapi.PodMetricsList{}
 			for i, containers := range tc.reportedPodMetrics {
 				metric := metricsapi.PodMetrics{

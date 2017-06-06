@@ -59,8 +59,10 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer) *cobra
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, cmdutil.PodDisruptionBudgetV1GeneratorName)
-	cmd.Flags().String("min-available", "1", i18n.T("The minimum number or percentage of available pods this budget requires."))
+	cmdutil.AddGeneratorFlags(cmd, cmdutil.PodDisruptionBudgetV2GeneratorName)
+
+	cmd.Flags().String("min-available", "", i18n.T("The minimum number or percentage of available pods this budget requires."))
+	cmd.Flags().String("max-unavailable", "", i18n.T("The maximum number or percentage of unavailable pods this budget requires."))
 	cmd.Flags().String("selector", "", i18n.T("A label selector to use for this budget. Only equality-based selector requirements are supported."))
 	return cmd
 }
@@ -78,6 +80,13 @@ func CreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 			Name:         name,
 			MinAvailable: cmdutil.GetFlagString(cmd, "min-available"),
 			Selector:     cmdutil.GetFlagString(cmd, "selector"),
+		}
+	case cmdutil.PodDisruptionBudgetV2GeneratorName:
+		generator = &kubectl.PodDisruptionBudgetV2Generator{
+			Name:           name,
+			MinAvailable:   cmdutil.GetFlagString(cmd, "min-available"),
+			MaxUnavailable: cmdutil.GetFlagString(cmd, "max-unavailable"),
+			Selector:       cmdutil.GetFlagString(cmd, "selector"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))

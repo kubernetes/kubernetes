@@ -28,7 +28,7 @@ type ServiceListerExpansion interface {
 }
 
 // ServiceNamespaceListerExpansion allows custom methods to be added to
-// ServiceNamespaeLister.
+// ServiceNamespaceLister.
 type ServiceNamespaceListerExpansion interface{}
 
 // TODO: Move this back to scheduler as a helper function that takes a Store,

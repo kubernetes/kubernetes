@@ -25,15 +25,16 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/clock"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -63,8 +64,9 @@ func TestRunOnce(t *testing.T) {
 		Capacity: 10 * mb,
 	}, nil)
 	fakeSecretManager := secret.NewFakeManager()
+	fakeConfigMapManager := configmap.NewFakeManager()
 	podManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient(), fakeSecretManager)
+		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager)
 	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 	fakeRuntime := &containertest.FakeRuntime{}
 	basePath, err := utiltesting.MkTmpdir("kubelet")
@@ -73,29 +75,27 @@ func TestRunOnce(t *testing.T) {
 	}
 	defer os.RemoveAll(basePath)
 	kb := &Kubelet{
-		rootDirectory:       basePath,
-		recorder:            &record.FakeRecorder{},
-		cadvisor:            cadvisor,
-		nodeLister:          testNodeLister{},
-		nodeInfo:            testNodeInfo{},
-		statusManager:       status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}),
-		containerRefManager: kubecontainer.NewRefManager(),
-		podManager:          podManager,
-		os:                  &containertest.FakeOS{},
-		diskSpaceManager:    diskSpaceManager,
-		containerRuntime:    fakeRuntime,
-		reasonCache:         NewReasonCache(),
-		clock:               clock.RealClock{},
-		kubeClient:          &fake.Clientset{},
-		hostname:            testKubeletHostname,
-		nodeName:            testKubeletHostname,
-		runtimeState:        newRuntimeState(time.Second),
+		rootDirectory:    basePath,
+		recorder:         &record.FakeRecorder{},
+		cadvisor:         cadvisor,
+		nodeInfo:         testNodeInfo{},
+		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}),
+		podManager:       podManager,
+		os:               &containertest.FakeOS{},
+		diskSpaceManager: diskSpaceManager,
+		containerRuntime: fakeRuntime,
+		reasonCache:      NewReasonCache(),
+		clock:            clock.RealClock{},
+		kubeClient:       &fake.Clientset{},
+		hostname:         testKubeletHostname,
+		nodeName:         testKubeletHostname,
+		runtimeState:     newRuntimeState(time.Second),
 	}
 	kb.containerManager = cm.NewStubContainerManager()
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kb.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(kb, fakeSecretManager, []volume.VolumePlugin{plug})
+		NewInitializedVolumePluginMgr(kb, fakeSecretManager, fakeConfigMapManager, []volume.VolumePlugin{plug})
 	if err != nil {
 		t.Fatalf("failed to initialize VolumePluginMgr: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestRunOnce(t *testing.T) {
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount */
 		false /* keepTerminatedPodVolumes */)
 
-	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, kb.nonMasqueradeCIDR, network.UseDefaultMTU)
+	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, "", network.UseDefaultMTU)
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
 	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod, kb.containerRuntime)
@@ -126,7 +126,7 @@ func TestRunOnce(t *testing.T) {
 	fakeKillPodFunc := func(pod *v1.Pod, podStatus v1.PodStatus, gracePeriodOverride *int64) error {
 		return nil
 	}
-	evictionManager, evictionAdmitHandler := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, nil, kb.recorder, nodeRef, kb.clock)
+	evictionManager, evictionAdmitHandler := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, nil, nil, kb.recorder, nodeRef, kb.clock)
 
 	kb.evictionManager = evictionManager
 	kb.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)

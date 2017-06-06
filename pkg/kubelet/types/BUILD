@@ -28,6 +28,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "labels_test.go",
         "pod_update_test.go",
         "types_test.go",
     ],

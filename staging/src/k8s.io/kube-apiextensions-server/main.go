@@ -34,7 +34,7 @@ func main() {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
 
-	cmd := server.NewCommandStartCustomResourcesServer(os.Stdout, os.Stderr, wait.NeverStop)
+	cmd := server.NewCommandStartCustomResourceDefinitionsServer(os.Stdout, os.Stderr, wait.NeverStop)
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
 		panic(err)

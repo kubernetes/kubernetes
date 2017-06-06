@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 licenses(["notice"])
 
 load(
@@ -22,11 +20,13 @@ go_library(
         "shortcut_restmapper.go",
     ],
     tags = ["automanaged"],
+    visibility = [
+        "//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS",
+    ],
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/service:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/apps:go_default_library",
@@ -89,6 +89,9 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
+    visibility = [
+        "//build/visible_to:COMMON_testing",
+    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
@@ -132,7 +135,6 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
-    visibility = ["//visibility:private"],
 )
 
 filegroup(
@@ -145,4 +147,5 @@ filegroup(
         "//pkg/kubectl/cmd/util/sanity:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS"],
 )

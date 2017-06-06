@@ -474,6 +474,16 @@ func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.S
 			oldService.UID, newService.UID)
 		return true
 	}
+	if oldService.Spec.ExternalTrafficPolicy != newService.Spec.ExternalTrafficPolicy {
+		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "ExternalTrafficPolicy", "%v -> %v",
+			oldService.Spec.ExternalTrafficPolicy, newService.Spec.ExternalTrafficPolicy)
+		return true
+	}
+	if oldService.Spec.HealthCheckNodePort != newService.Spec.HealthCheckNodePort {
+		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "HealthCheckNodePort", "%v -> %v",
+			oldService.Spec.HealthCheckNodePort, newService.Spec.HealthCheckNodePort)
+		return true
+	}
 
 	return false
 }

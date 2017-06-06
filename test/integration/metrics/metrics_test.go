@@ -90,8 +90,8 @@ func TestMasterProcessMetrics(t *testing.T) {
 		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
 	}
 
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	metrics, err := scrapeMetrics(s)
 	if err != nil {
@@ -106,8 +106,8 @@ func TestMasterProcessMetrics(t *testing.T) {
 }
 
 func TestApiserverMetrics(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	// Make a request to the apiserver to ensure there's at least one data point
 	// for the metrics we're expecting -- otherwise, they won't be exported.

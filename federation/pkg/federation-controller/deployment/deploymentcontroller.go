@@ -18,7 +18,6 @@ package deployment
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/planner"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/podanalyzer"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/replicapreferences"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -66,21 +66,6 @@ var (
 	allDeploymentReviewDelay = 2 * time.Minute
 	updateTimeout            = 30 * time.Second
 )
-
-func parseFederationDeploymentPreference(fd *extensionsv1.Deployment) (*fed.FederatedReplicaSetPreferences, error) {
-	if fd.Annotations == nil {
-		return nil, nil
-	}
-	fdPrefString, found := fd.Annotations[FedDeploymentPreferencesAnnotation]
-	if !found {
-		return nil, nil
-	}
-	var fdPref fed.FederatedReplicaSetPreferences
-	if err := json.Unmarshal([]byte(fdPrefString), &fdPref); err != nil {
-		return nil, err
-	}
-	return &fdPref, nil
-}
 
 type DeploymentController struct {
 	fedClient fedclientset.Interface
@@ -116,8 +101,8 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		clusterDeliverer:    fedutil.NewDelayingDeliverer(),
 		deploymentWorkQueue: workqueue.New(),
 		deploymentBackoff:   flowcontrol.NewBackOff(5*time.Second, time.Minute),
-		defaultPlanner: planner.NewPlanner(&fed.FederatedReplicaSetPreferences{
-			Clusters: map[string]fed.ClusterReplicaSetPreferences{
+		defaultPlanner: planner.NewPlanner(&fed.ReplicaAllocationPreferences{
+			Clusters: map[string]fed.ClusterPreferences{
 				"*": {Weight: 1},
 			},
 		}),
@@ -188,7 +173,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		),
 	)
 
-	fdc.fedUpdater = fedutil.NewFederatedUpdater(fdc.fedDeploymentInformer, "deployment", fdc.eventRecorder,
+	fdc.fedUpdater = fedutil.NewFederatedUpdater(fdc.fedDeploymentInformer, "deployment", updateTimeout, fdc.eventRecorder,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.Deployment)
 			_, err := client.Extensions().Deployments(rs.Namespace).Create(rs)
@@ -213,7 +198,6 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 			deployment := obj.(*extensionsv1.Deployment)
 			return fmt.Sprintf("%s/%s", deployment.Namespace, deployment.Name)
 		},
-		updateTimeout,
 		fdc.fedDeploymentInformer,
 		fdc.fedUpdater,
 	)
@@ -373,7 +357,7 @@ func (fdc *DeploymentController) schedule(fd *extensionsv1.Deployment, clusters 
 	// TODO: integrate real scheduler
 
 	plannerToBeUsed := fdc.defaultPlanner
-	fdPref, err := parseFederationDeploymentPreference(fd)
+	fdPref, err := replicapreferences.GetAllocationPreferences(fd, FedDeploymentPreferencesAnnotation)
 	if err != nil {
 		glog.Info("Invalid Deployment specific preference, use default. deployment: %v, err: %v", fd.Name, err)
 	}
@@ -488,6 +472,9 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		return statusError, err
 	}
 	podStatus, err := podanalyzer.AnalysePods(fd.Spec.Selector, allPods, time.Now())
+	if err != nil {
+		return statusError, err
+	}
 	current := make(map[string]int64)
 	estimatedCapacity := make(map[string]int64)
 	for _, cluster := range clusters {
@@ -567,7 +554,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 		// Everything is in order
 		return statusAllOk, nil
 	}
-	err = fdc.fedUpdater.Update(operations, updateTimeout)
+	err = fdc.fedUpdater.Update(operations)
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", key, err)
 		return statusError, err

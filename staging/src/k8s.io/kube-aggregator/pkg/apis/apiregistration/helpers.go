@@ -66,3 +66,37 @@ func APIServiceNameToGroupVersion(apiServiceName string) schema.GroupVersion {
 	tokens := strings.SplitN(apiServiceName, ".", 2)
 	return schema.GroupVersion{Group: tokens[1], Version: tokens[0]}
 }
+
+// SetAPIServiceCondition sets the status condition.  It either overwrites the existing one or
+// creates a new one
+func SetAPIServiceCondition(apiService *APIService, newCondition APIServiceCondition) {
+	var existingCondition *APIServiceCondition
+	for i := range apiService.Status.Conditions {
+		if apiService.Status.Conditions[i].Type == newCondition.Type {
+			existingCondition = &apiService.Status.Conditions[i]
+			break
+		}
+	}
+	if existingCondition == nil {
+		apiService.Status.Conditions = append(apiService.Status.Conditions, newCondition)
+		return
+	}
+
+	if existingCondition.Status != newCondition.Status {
+		existingCondition.Status = newCondition.Status
+		existingCondition.LastTransitionTime = newCondition.LastTransitionTime
+	}
+
+	existingCondition.Reason = newCondition.Reason
+	existingCondition.Message = newCondition.Message
+}
+
+// IsAPIServiceConditionTrue indicates if the condition is present and strictly true
+func IsAPIServiceConditionTrue(apiService *APIService, conditionType APIServiceConditionType) bool {
+	for _, condition := range apiService.Status.Conditions {
+		if condition.Type == conditionType && condition.Status == ConditionTrue {
+			return true
+		}
+	}
+	return false
+}

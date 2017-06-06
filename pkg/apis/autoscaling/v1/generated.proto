@@ -26,8 +26,6 @@ import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
-import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
-import "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -59,6 +57,30 @@ message HorizontalPodAutoscaler {
   // current information about the autoscaler.
   // +optional
   optional HorizontalPodAutoscalerStatus status = 3;
+}
+
+// HorizontalPodAutoscalerCondition describes the state of
+// a HorizontalPodAutoscaler at a certain point.
+message HorizontalPodAutoscalerCondition {
+  // type describes the current condition
+  optional string type = 1;
+
+  // status is the status of the condition (True, False, Unknown)
+  optional string status = 2;
+
+  // lastTransitionTime is the last time the condition transitioned from
+  // one status to another
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+
+  // reason is the reason for the condition's last transition.
+  // +optional
+  optional string reason = 4;
+
+  // message is a human-readable explanation containing details about
+  // the transition
+  // +optional
+  optional string message = 5;
 }
 
 // list of horizontal pod autoscaler objects.

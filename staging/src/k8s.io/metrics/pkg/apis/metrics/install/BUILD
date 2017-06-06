@@ -16,7 +16,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api:go_default_library",
         "//vendor/k8s.io/metrics/pkg/apis/metrics:go_default_library",
         "//vendor/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",
     ],

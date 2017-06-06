@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -56,7 +56,7 @@ func (f *fakePodGetter) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 	return pod, found
 }
 
-func NewFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper) (*kubeGenericRuntimeManager, error) {
+func NewFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
 	recorder := &record.FakeRecorder{}
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
@@ -68,7 +68,7 @@ func NewFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		runtimeHelper:       runtimeHelper,
 		runtimeService:      runtimeService,
 		imageService:        imageService,
-		keyring:             credentialprovider.NewDockerKeyring(),
+		keyring:             keyring,
 	}
 
 	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)

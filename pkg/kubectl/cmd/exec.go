@@ -27,9 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/i18n"
@@ -47,7 +47,15 @@ var (
 
 		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
 		# and sends stdout/stderr from 'bash' back to the client
-		kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il`))
+		kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il
+
+		# List contents of /usr from the first container of pod 123456-7890 and sort by modification time.
+		# If the command you want to execute in the pod has any flags in common (e.g. -i),
+		# you must use two dashes (--) to separate your command's flags/arguments.
+		# Also note, do not surround your command and its flags/arguments with quotes
+		# unless that is how you would execute it normally (i.e., do ls -t /usr, not "ls -t /usr").
+		kubectl exec 123456-7890 -i -t -- ls -t /usr
+		`))
 )
 
 const (

@@ -22,13 +22,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/clock"
 	kubeapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -77,17 +77,24 @@ func (m *mockNodeProvider) GetNode() (*v1.Node, error) {
 	return &m.node, nil
 }
 
-// mockImageGC is used to simulate invoking image garbage collection.
-type mockImageGC struct {
-	err     error
-	freed   int64
-	invoked bool
+// mockDiskGC is used to simulate invoking image and container garbage collection.
+type mockDiskGC struct {
+	err                error
+	imageBytesFreed    int64
+	imageGCInvoked     bool
+	containerGCInvoked bool
 }
 
 // DeleteUnusedImages returns the mocked values.
-func (m *mockImageGC) DeleteUnusedImages() (int64, error) {
-	m.invoked = true
-	return m.freed, m.err
+func (m *mockDiskGC) DeleteUnusedImages() (int64, error) {
+	m.imageGCInvoked = true
+	return m.imageBytesFreed, m.err
+}
+
+// DeleteAllUnusedContainers returns the mocked value
+func (m *mockDiskGC) DeleteAllUnusedContainers() error {
+	m.containerGCInvoked = true
+	return m.err
 }
 
 func makePodWithMemoryStats(name string, requests v1.ResourceList, limits v1.ResourceList, memoryWorkingSet string) (*v1.Pod, statsapi.PodStats) {
@@ -194,7 +201,7 @@ func TestMemoryPressure(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
-	imageGC := &mockImageGC{freed: int64(0), err: nil}
+	imageGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
 	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -412,7 +419,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
-	imageGC := &mockImageGC{freed: int64(0), err: nil}
+	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
 	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -440,7 +447,8 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
-		imageGC:         imageGC,
+		imageGC:         diskGC,
+		containerGC:     diskGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -610,7 +618,7 @@ func TestMinReclaim(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
-	imageGC := &mockImageGC{freed: int64(0), err: nil}
+	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
 	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -633,7 +641,8 @@ func TestMinReclaim(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
-		imageGC:         imageGC,
+		imageGC:         diskGC,
+		containerGC:     diskGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -750,7 +759,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
 	imageGcFree := resource.MustParse("700Mi")
-	imageGC := &mockImageGC{freed: imageGcFree.Value(), err: nil}
+	diskGC := &mockDiskGC{imageBytesFreed: imageGcFree.Value(), err: nil}
 	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -773,7 +782,8 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
-		imageGC:         imageGC,
+		imageGC:         diskGC,
+		containerGC:     diskGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -801,7 +811,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	}
 
 	// verify image gc was invoked
-	if !imageGC.invoked {
+	if !diskGC.imageGCInvoked || !diskGC.containerGCInvoked {
 		t.Errorf("Manager should have invoked image gc")
 	}
 
@@ -811,7 +821,8 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	}
 
 	// reset state
-	imageGC.invoked = false
+	diskGC.imageGCInvoked = false
+	diskGC.containerGCInvoked = false
 
 	// remove disk pressure
 	fakeClock.Step(20 * time.Minute)
@@ -833,8 +844,8 @@ func TestNodeReclaimFuncs(t *testing.T) {
 		t.Errorf("Manager should report disk pressure")
 	}
 
-	// ensure image gc was invoked
-	if !imageGC.invoked {
+	// ensure disk gc was invoked
+	if !diskGC.imageGCInvoked || !diskGC.containerGCInvoked {
 		t.Errorf("Manager should have invoked image gc")
 	}
 
@@ -850,8 +861,9 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	// reduce disk pressure
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
-	imageGC.invoked = false // reset state
-	podKiller.pod = nil     // reset state
+	diskGC.imageGCInvoked = false     // reset state
+	diskGC.containerGCInvoked = false // reset state
+	podKiller.pod = nil               // reset state
 	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
 
 	// we should have disk pressure (because transition period not yet met)
@@ -860,7 +872,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	}
 
 	// no image gc should have occurred
-	if imageGC.invoked {
+	if diskGC.imageGCInvoked || diskGC.containerGCInvoked {
 		t.Errorf("Manager chose to perform image gc when it was not neeed")
 	}
 
@@ -872,8 +884,9 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	// move the clock past transition period to ensure that we stop reporting pressure
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
-	imageGC.invoked = false // reset state
-	podKiller.pod = nil     // reset state
+	diskGC.imageGCInvoked = false     // reset state
+	diskGC.containerGCInvoked = false // reset state
+	podKiller.pod = nil               // reset state
 	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
 
 	// we should not have disk pressure (because transition period met)
@@ -882,7 +895,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	}
 
 	// no image gc should have occurred
-	if imageGC.invoked {
+	if diskGC.imageGCInvoked || diskGC.containerGCInvoked {
 		t.Errorf("Manager chose to perform image gc when it was not neeed")
 	}
 
@@ -943,7 +956,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
-	imageGC := &mockImageGC{freed: int64(0), err: nil}
+	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
 	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -971,7 +984,8 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
-		imageGC:         imageGC,
+		imageGC:         diskGC,
+		containerGC:     diskGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -1144,7 +1158,7 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
-	imageGC := &mockImageGC{freed: int64(0), err: nil}
+	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
 	nodeRef := &clientv1.ObjectReference{
 		Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: "",
 	}
@@ -1174,7 +1188,8 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
-		imageGC:         imageGC,
+		imageGC:         diskGC,
+		containerGC:     diskGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -1276,7 +1291,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
-	imageGC := &mockImageGC{freed: int64(0), err: nil}
+	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
 	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -1296,7 +1311,8 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
-		imageGC:         imageGC,
+		imageGC:         diskGC,
+		containerGC:     diskGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,

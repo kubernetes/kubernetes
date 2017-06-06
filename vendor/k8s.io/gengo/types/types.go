@@ -101,10 +101,11 @@ type Package struct {
 	// 'package x' line.
 	Name string
 
-	// DocComments from doc.go, if any.
+	// The comment right above the package declaration in doc.go, if any.
 	DocComments []string
 
-	// Comments from doc.go, if any.
+	// All comments from doc.go, if any.
+	// TODO: remove Comments and use DocComments everywhere.
 	Comments []string
 
 	// Types within this package, indexed by their name (*not* including

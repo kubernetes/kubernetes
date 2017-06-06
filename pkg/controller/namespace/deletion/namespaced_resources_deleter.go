@@ -28,11 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
-	// "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubernetes/pkg/api/v1"
 	v1clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 )
 
@@ -504,14 +504,20 @@ func (d *namespacedResourcesDeleter) deleteAllContent(
 	if err != nil {
 		return estimate, err
 	}
+	var errs []error
 	for gvr := range groupVersionResources {
 		gvrEstimate, err := d.deleteAllContentForGroupVersionResource(gvr, namespace, namespaceDeletedAt)
 		if err != nil {
-			return estimate, err
+			// If there is an error, hold on to it but proceed with all the remaining
+			// groupVersionResources.
+			errs = append(errs, err)
 		}
 		if gvrEstimate > estimate {
 			estimate = gvrEstimate
 		}
+	}
+	if len(errs) > 0 {
+		return estimate, utilerrors.NewAggregate(errs)
 	}
 	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, estimate: %v", namespace, estimate)
 	return estimate, nil

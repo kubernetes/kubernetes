@@ -161,6 +161,9 @@ grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \
 echo "rewrite proto names in proto.RegisterType"
 find "${CLIENT_REPO_TEMP}" -type f -name "generated.pb.go" -print0 | xargs -0 ${SED} -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
 
+echo "rewrite proto IDL package names"
+find "${CLIENT_REPO_TEMP}" -type f -name "generated.proto" -print0 | xargs -0 ${SED} -i "s/k8s\.io\.kubernetes/k8s.io.client_go/g"
+
 # strip all generator tags from client-go
 find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 ${SED} -i '/^\/\/ +k8s:openapi-gen=true/d'
 find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 ${SED} -i '/^\/\/ +k8s:defaulter-gen=/d'

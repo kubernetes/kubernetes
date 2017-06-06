@@ -27,12 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/clock"
 )
 
 func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
@@ -50,8 +50,8 @@ func newTestWatchCache(capacity int) *watchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
 		return NamespaceKeyFunc("prefix", obj)
 	}
-	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, error) {
-		return nil, nil, nil
+	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+		return nil, nil, false, nil
 	}
 	wc := newWatchCache(capacity, keyFunc, getAttrsFunc)
 	wc.clock = clock.NewFakeClock(time.Now())

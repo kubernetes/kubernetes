@@ -874,6 +874,41 @@ func TestSetDefaultServicePort(t *testing.T) {
 	}
 }
 
+func TestSetDefaulServiceExternalTraffic(t *testing.T) {
+	in := &v1.Service{}
+	obj := roundTrip(t, runtime.Object(in))
+	out := obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != "" {
+		t.Errorf("Expected ExternalTrafficPolicy to be empty, got %v", out.Spec.ExternalTrafficPolicy)
+	}
+
+	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeNodePort}}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
+	}
+
+	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer}}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
+	}
+
+	in = &v1.Service{
+		Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficLocal},
+		},
+	}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != "" {
+		t.Errorf("Expected ExternalTrafficPolicy to be empty, got %v", out.Spec.ExternalTrafficPolicy)
+	}
+}
+
 func TestSetDefaultNamespace(t *testing.T) {
 	s := &v1.Namespace{}
 	obj2 := roundTrip(t, runtime.Object(s))

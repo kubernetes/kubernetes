@@ -45,8 +45,8 @@ import (
 )
 
 func TestClient(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
@@ -117,8 +117,8 @@ func TestClient(t *testing.T) {
 }
 
 func TestAtomicPut(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	c := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
@@ -209,8 +209,8 @@ func TestAtomicPut(t *testing.T) {
 }
 
 func TestPatch(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	c := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
@@ -348,8 +348,8 @@ func TestPatch(t *testing.T) {
 }
 
 func TestPatchWithCreateOnUpdate(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	c := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
@@ -459,8 +459,8 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 }
 
 func TestAPIVersions(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	c := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
@@ -481,8 +481,8 @@ func TestAPIVersions(t *testing.T) {
 }
 
 func TestSingleWatch(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("single-watch", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -566,8 +566,8 @@ func TestMultiWatch(t *testing.T) {
 	const watcherCount = 50
 	rt.GOMAXPROCS(watcherCount)
 
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("multi-watch", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -822,8 +822,8 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 }
 
 func TestSelfLinkOnNamespace(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("selflink", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)

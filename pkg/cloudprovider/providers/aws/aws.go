@@ -42,13 +42,14 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -69,8 +70,6 @@ const TagNameSubnetPublicELB = "kubernetes.io/role/elb"
 
 // ServiceAnnotationLoadBalancerInternal is the annotation used on the service
 // to indicate that we want an internal ELB.
-// Currently we accept only the value "0.0.0.0/0" - other values are an error.
-// This lets us define more advanced semantics in future.
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/aws-load-balancer-internal"
 
 // ServiceAnnotationLoadBalancerProxyProtocol is the annotation used on the
@@ -131,6 +130,12 @@ const ServiceAnnotationLoadBalancerSSLPorts = "service.beta.kubernetes.io/aws-lo
 // If set to `http` and `aws-load-balancer-ssl-cert` is not used then
 // a HTTP listener is used.
 const ServiceAnnotationLoadBalancerBEProtocol = "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
+
+// ServiceAnnotationLoadBalancerAdditionalTags is the annotation used on the service
+// to specify a comma-separated list of key-value pairs which will be recorded as
+// additional tags in the ELB.
+// For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2"
+const ServiceAnnotationLoadBalancerAdditionalTags = "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags"
 
 const (
 	// volumeAttachmentConsecutiveErrorLimit is the number of consecutive errors we will ignore when waiting for a volume to attach/detach
@@ -288,11 +293,14 @@ const (
 
 // VolumeOptions specifies capacity and tags for a volume.
 type VolumeOptions struct {
-	CapacityGB       int
-	Tags             map[string]string
-	PVCName          string
-	VolumeType       string
-	AvailabilityZone string
+	CapacityGB        int
+	Tags              map[string]string
+	PVCName           string
+	VolumeType        string
+	ZonePresent       bool
+	ZonesPresent      bool
+	AvailabilityZone  string
+	AvailabilityZones string
 	// IOPSPerGB x CapacityGB will give total IOPS of the volume to create.
 	// Calculated total IOPS will be capped at MaxTotalIOPS.
 	IOPSPerGB int
@@ -411,6 +419,11 @@ type CloudConfig struct {
 		//has setup a rule that allows inbound traffic on kubelet ports from the
 		//local VPC subnet (so load balancers can access it). E.g. 10.82.0.0/16 30000-32000.
 		DisableSecurityGroupIngress bool
+
+		//AWS has a hard limit of 500 security groups. For large clusters creating a security group for each ELB
+		//can cause the max number of security groups to be reached. If this is set instead of creating a new
+		//Security group for each ELB this security group will be used instead.
+		ElbSecurityGroup string
 
 		//During the instantiation of an new AWS cloud provider, the detected region
 		//is validated against a known set of regions.
@@ -889,6 +902,9 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 
 	return awsCloud, nil
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (c *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 // Clusters returns the list of clusters.
 func (c *Cloud) Clusters() (cloudprovider.Clusters, bool) {
@@ -1511,6 +1527,28 @@ func (c *Cloud) getAwsInstance(nodeName types.NodeName) (*awsInstance, error) {
 	return awsInstance, nil
 }
 
+// wrapAttachError wraps the error returned by an AttachVolume request with
+// additional information, if needed and possible.
+func wrapAttachError(err error, disk *awsDisk, instance string) error {
+	if awsError, ok := err.(awserr.Error); ok {
+		if awsError.Code() == "VolumeInUse" {
+			info, err := disk.describeVolume()
+			if err != nil {
+				glog.Errorf("Error describing volume %q: %v", disk.awsID, err)
+			} else {
+				for _, a := range info.Attachments {
+					if disk.awsID != awsVolumeID(aws.StringValue(a.VolumeId)) {
+						glog.Warningf("Expected to get attachment info of volume %q but instead got info of %q", disk.awsID, aws.StringValue(a.VolumeId))
+					} else if aws.StringValue(a.State) == "attached" {
+						return fmt.Errorf("Error attaching EBS volume %q to instance %q: %v. The volume is currently attached to instance %q", disk.awsID, instance, awsError, aws.StringValue(a.InstanceId))
+					}
+				}
+			}
+		}
+	}
+	return fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", disk.awsID, instance, err)
+}
+
 // AttachDisk implements Volumes.AttachDisk
 func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName, readOnly bool) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
@@ -1567,7 +1605,7 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 		if err != nil {
 			attachEnded = true
 			// TODO: Check if the volume was concurrently attached?
-			return "", fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", disk.awsID, awsInstance.awsID, err)
+			return "", wrapAttachError(err, disk, awsInstance.awsID)
 		}
 		if da, ok := c.deviceAllocators[awsInstance.nodeName]; ok {
 			da.Deprioritize(mountDevice)
@@ -1673,9 +1711,22 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 		return "", fmt.Errorf("error querying for all zones: %v", err)
 	}
 
-	createAZ := volumeOptions.AvailabilityZone
-	if createAZ == "" {
+	var createAZ string
+	if !volumeOptions.ZonePresent && !volumeOptions.ZonesPresent {
 		createAZ = volume.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
+	}
+	if !volumeOptions.ZonePresent && volumeOptions.ZonesPresent {
+		if adminSetOfZones, err := volume.ZonesToSet(volumeOptions.AvailabilityZones); err != nil {
+			return "", err
+		} else {
+			createAZ = volume.ChooseZoneForVolume(adminSetOfZones, volumeOptions.PVCName)
+		}
+	}
+	if volumeOptions.ZonePresent && !volumeOptions.ZonesPresent {
+		if err := volume.ValidateZone(volumeOptions.AvailabilityZone); err != nil {
+			return "", err
+		}
+		createAZ = volumeOptions.AvailabilityZone
 	}
 
 	var createType string
@@ -1770,12 +1821,12 @@ func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]strin
 		return nil, fmt.Errorf("volume did not have AZ information: %q", info.VolumeId)
 	}
 
-	labels[metav1.LabelZoneFailureDomain] = az
+	labels[kubeletapis.LabelZoneFailureDomain] = az
 	region, err := azToRegion(az)
 	if err != nil {
 		return nil, err
 	}
-	labels[metav1.LabelZoneRegion] = region
+	labels[kubeletapis.LabelZoneRegion] = region
 
 	return labels, nil
 }
@@ -2575,7 +2626,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for AWS ELB")
 	}
 
-	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes))
+	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes), "running")
 	if err != nil {
 		return nil, err
 	}
@@ -2589,13 +2640,6 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 	internalELB := false
 	internalAnnotation := apiService.Annotations[ServiceAnnotationLoadBalancerInternal]
 	if internalAnnotation != "" {
-		if internalAnnotation != "0.0.0.0/0" {
-			return nil, fmt.Errorf("annotation %q=%q detected, but the only value supported currently is 0.0.0.0/0", ServiceAnnotationLoadBalancerInternal, internalAnnotation)
-		}
-		if !service.IsAllowAll(sourceRanges) {
-			// TODO: Unify the two annotations
-			return nil, fmt.Errorf("source-range annotation cannot be combined with the internal-elb annotation")
-		}
 		internalELB = true
 	}
 
@@ -2725,48 +2769,54 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 	// Create a security group for the load balancer
 	var securityGroupID string
 	{
-		sgName := "k8s-elb-" + loadBalancerName
-		sgDescription := fmt.Sprintf("Security group for Kubernetes ELB %s (%v)", loadBalancerName, serviceName)
-		securityGroupID, err = c.ensureSecurityGroup(sgName, sgDescription)
-		if err != nil {
-			glog.Error("Error creating load balancer security group: ", err)
-			return nil, err
-		}
+		if c.cfg.Global.ElbSecurityGroup != "" {
+			securityGroupID = c.cfg.Global.ElbSecurityGroup
 
-		ec2SourceRanges := []*ec2.IpRange{}
-		for _, sourceRange := range sourceRanges.StringSlice() {
-			ec2SourceRanges = append(ec2SourceRanges, &ec2.IpRange{CidrIp: aws.String(sourceRange)})
-		}
+		} else {
 
-		permissions := NewIPPermissionSet()
-		for _, port := range apiService.Spec.Ports {
-			portInt64 := int64(port.Port)
-			protocol := strings.ToLower(string(port.Protocol))
-
-			permission := &ec2.IpPermission{}
-			permission.FromPort = &portInt64
-			permission.ToPort = &portInt64
-			permission.IpRanges = ec2SourceRanges
-			permission.IpProtocol = &protocol
-
-			permissions.Insert(permission)
-		}
-
-		// Allow ICMP fragmentation packets, important for MTU discovery
-		{
-			permission := &ec2.IpPermission{
-				IpProtocol: aws.String("icmp"),
-				FromPort:   aws.Int64(3),
-				ToPort:     aws.Int64(4),
-				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+			sgName := "k8s-elb-" + loadBalancerName
+			sgDescription := fmt.Sprintf("Security group for Kubernetes ELB %s (%v)", loadBalancerName, serviceName)
+			securityGroupID, err = c.ensureSecurityGroup(sgName, sgDescription)
+			if err != nil {
+				glog.Error("Error creating load balancer security group: ", err)
+				return nil, err
 			}
 
-			permissions.Insert(permission)
-		}
+			ec2SourceRanges := []*ec2.IpRange{}
+			for _, sourceRange := range sourceRanges.StringSlice() {
+				ec2SourceRanges = append(ec2SourceRanges, &ec2.IpRange{CidrIp: aws.String(sourceRange)})
+			}
 
-		_, err = c.setSecurityGroupIngress(securityGroupID, permissions)
-		if err != nil {
-			return nil, err
+			permissions := NewIPPermissionSet()
+			for _, port := range apiService.Spec.Ports {
+				portInt64 := int64(port.Port)
+				protocol := strings.ToLower(string(port.Protocol))
+
+				permission := &ec2.IpPermission{}
+				permission.FromPort = &portInt64
+				permission.ToPort = &portInt64
+				permission.IpRanges = ec2SourceRanges
+				permission.IpProtocol = &protocol
+
+				permissions.Insert(permission)
+			}
+
+			// Allow ICMP fragmentation packets, important for MTU discovery
+			{
+				permission := &ec2.IpPermission{
+					IpProtocol: aws.String("icmp"),
+					FromPort:   aws.Int64(3),
+					ToPort:     aws.Int64(4),
+					IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+				}
+
+				permissions.Insert(permission)
+			}
+
+			_, err = c.setSecurityGroupIngress(securityGroupID, permissions)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	securityGroupIDs := []string{securityGroupID}
@@ -2781,14 +2831,34 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		internalELB,
 		proxyProtocol,
 		loadBalancerAttributes,
+		annotations,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	err = c.ensureLoadBalancerHealthCheck(loadBalancer, listeners)
-	if err != nil {
-		return nil, err
+	if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
+		glog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to ensure health check for localized service %v on node port %v: %v", loadBalancerName, healthCheckNodePort, err)
+		}
+	} else {
+		glog.V(4).Infof("service %v does not need custom health checks", apiService.Name)
+		// We only configure a TCP health-check on the first port
+		var tcpHealthCheckPort int32
+		for _, listener := range listeners {
+			if listener.InstancePort == nil {
+				continue
+			}
+			tcpHealthCheckPort = int32(*listener.InstancePort)
+			break
+		}
+		// there must be no path on TCP health check
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "TCP", tcpHealthCheckPort, "")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = c.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
@@ -3084,6 +3154,10 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 		// Collect the security groups to delete
 		securityGroupIDs := map[string]struct{}{}
 		for _, securityGroupID := range lb.SecurityGroups {
+			if *securityGroupID == c.cfg.Global.ElbSecurityGroup {
+				//We don't want to delete a security group that was defined in the Cloud Configurationn.
+				continue
+			}
 			if isNilOrEmpty(securityGroupID) {
 				glog.Warning("Ignoring empty security group in ", service.Name)
 				continue
@@ -3139,7 +3213,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
 func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes))
+	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes), "running")
 	if err != nil {
 		return err
 	}
@@ -3211,10 +3285,11 @@ func (c *Cloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Instan
 	return instancesByID, nil
 }
 
-// Fetches and caches instances by node names; returns an error if any cannot be found.
+// Fetches and caches instances in the given state, by node names; returns an error if any cannot be found. If no states
+// are given, no state filter is used and instances of all states are fetched.
 // This is implemented with a multi value filter on the node names, fetching the desired instances with a single query.
 // TODO(therc): make all the caching more rational during the 1.4 timeframe
-func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Instance, error) {
+func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String, states ...string) ([]*ec2.Instance, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if nodeNames.Equal(c.lastNodeNames) {
@@ -3225,7 +3300,7 @@ func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Ins
 			return c.lastInstancesByNodeNames, nil
 		}
 	}
-	instances, err := c.getInstancesByNodeNames(nodeNames.List())
+	instances, err := c.getInstancesByNodeNames(nodeNames.List(), states...)
 
 	if err != nil {
 		return nil, err
@@ -3241,7 +3316,7 @@ func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Ins
 	return instances, nil
 }
 
-func (c *Cloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance, error) {
+func (c *Cloud) getInstancesByNodeNames(nodeNames []string, states ...string) ([]*ec2.Instance, error) {
 	names := aws.StringSlice(nodeNames)
 
 	nodeNameFilter := &ec2.Filter{
@@ -3249,9 +3324,9 @@ func (c *Cloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance, er
 		Values: names,
 	}
 
-	filters := []*ec2.Filter{
-		nodeNameFilter,
-		newEc2Filter("instance-state-name", "running"),
+	filters := []*ec2.Filter{nodeNameFilter}
+	if len(states) > 0 {
+		filters = append(filters, newEc2Filter("instance-state-name", states...))
 	}
 
 	instances, err := c.describeInstances(filters)

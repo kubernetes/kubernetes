@@ -80,7 +80,7 @@ type CgroupManager interface {
 	Name(name CgroupName) string
 	// CgroupName converts the literal cgroupfs name on the host to an internal identifier.
 	CgroupName(name string) CgroupName
-	// Pids scans through all subsytems to find pids associated with specified cgroup.
+	// Pids scans through all subsystems to find pids associated with specified cgroup.
 	Pids(name CgroupName) []int
 	// ReduceCPULimits reduces the CPU CFS values to the minimum amount of shares.
 	ReduceCPULimits(cgroupName CgroupName) error

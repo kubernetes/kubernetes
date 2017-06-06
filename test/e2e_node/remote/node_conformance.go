@@ -223,7 +223,7 @@ func stopKubelet(host, workspace string) error {
 	glog.Info("Wait for kubelet launcher to stop")
 	stopped := false
 	for start := time.Now(); time.Since(start) < kubeletStopGracePeriod; time.Sleep(time.Second) {
-		// Check whehther the process is still running.
+		// Check whether the process is still running.
 		output, err := SSH(host, "pidof", conformanceTestBinary, "||", "true")
 		if err != nil {
 			return fmt.Errorf("failed to check kubelet stopping: error - %v output -%q",

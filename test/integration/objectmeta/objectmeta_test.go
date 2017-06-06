@@ -31,8 +31,8 @@ import (
 
 func TestIgnoreClusterName(t *testing.T) {
 	config := framework.NewMasterConfig()
-	_, s := framework.RunAMaster(config)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(config)
+	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	ns := v1.Namespace{

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"path"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -44,72 +45,71 @@ import (
 
 	"k8s.io/kube-apiextensions-server/pkg/apis/apiextensions"
 	listers "k8s.io/kube-apiextensions-server/pkg/client/listers/apiextensions/internalversion"
-	"k8s.io/kube-apiextensions-server/pkg/registry/customresourcestorage"
+	"k8s.io/kube-apiextensions-server/pkg/controller/finalizer"
+	"k8s.io/kube-apiextensions-server/pkg/registry/customresource"
 )
 
-// customResourceHandler serves the `/apis` endpoint.
+// crdHandler serves the `/apis` endpoint.
 // This is registered as a filter so that it never collides with any explictly registered endpoints
-type customResourceHandler struct {
+type crdHandler struct {
 	versionDiscoveryHandler *versionDiscoveryHandler
 	groupDiscoveryHandler   *groupDiscoveryHandler
 
 	customStorageLock sync.Mutex
-	// customStorage contains a customResourceStorageMap
+	// customStorage contains a crdStorageMap
 	customStorage atomic.Value
 
 	requestContextMapper apirequest.RequestContextMapper
 
-	customResourceLister listers.CustomResourceLister
+	crdLister listers.CustomResourceDefinitionLister
 
 	delegate          http.Handler
 	restOptionsGetter generic.RESTOptionsGetter
 	admission         admission.Interface
 }
 
-// customResourceInfo stores enough information to serve the storage for the custom resource
-type customResourceInfo struct {
-	storage      *customresourcestorage.REST
+// crdInfo stores enough information to serve the storage for the custom resource
+type crdInfo struct {
+	storage      *customresource.REST
 	requestScope handlers.RequestScope
 }
 
-// customResourceStorageMap goes from customresource to its storage
-type customResourceStorageMap map[types.UID]*customResourceInfo
+// crdStorageMap goes from customresourcedefinition to its storage
+type crdStorageMap map[types.UID]*crdInfo
 
-func NewCustomResourceHandler(
+func NewCustomResourceDefinitionHandler(
 	versionDiscoveryHandler *versionDiscoveryHandler,
 	groupDiscoveryHandler *groupDiscoveryHandler,
 	requestContextMapper apirequest.RequestContextMapper,
-	customResourceLister listers.CustomResourceLister,
+	crdLister listers.CustomResourceDefinitionLister,
 	delegate http.Handler,
 	restOptionsGetter generic.RESTOptionsGetter,
-	admission admission.Interface) *customResourceHandler {
-	ret := &customResourceHandler{
+	admission admission.Interface) *crdHandler {
+	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
 		customStorage:           atomic.Value{},
 		requestContextMapper:    requestContextMapper,
-		customResourceLister:    customResourceLister,
+		crdLister:               crdLister,
 		delegate:                delegate,
 		restOptionsGetter:       restOptionsGetter,
 		admission:               admission,
 	}
 
-	ret.customStorage.Store(customResourceStorageMap{})
+	ret.customStorage.Store(crdStorageMap{})
 	return ret
 }
 
-func (r *customResourceHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx, ok := r.requestContextMapper.Get(req)
 	if !ok {
 		// programmer error
 		panic("missing context")
-		return
 	}
 	requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 	if !ok {
 		// programmer error
 		panic("missing requestInfo")
-		return
 	}
 	if !requestInfo.IsResourceRequest {
 		pathParts := splitPath(requestInfo.Path)
@@ -128,13 +128,9 @@ func (r *customResourceHandler) ServeHTTP(w http.ResponseWriter, req *http.Reque
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
-	if len(requestInfo.Subresource) > 0 {
-		http.NotFound(w, req)
-		return
-	}
 
-	customResourceName := requestInfo.Resource + "." + requestInfo.APIGroup
-	customResource, err := r.customResourceLister.Get(customResourceName)
+	crdName := requestInfo.Resource + "." + requestInfo.APIGroup
+	crd, err := r.crdLister.Get(crdName)
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -143,15 +139,23 @@ func (r *customResourceHandler) ServeHTTP(w http.ResponseWriter, req *http.Reque
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if customResource.Spec.Version != requestInfo.APIVersion {
+	if crd.Spec.Version != requestInfo.APIVersion {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
-	// TODO this is the point to do the condition checks
+	if !apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
+		r.delegate.ServeHTTP(w, req)
+	}
+	if len(requestInfo.Subresource) > 0 {
+		http.NotFound(w, req)
+		return
+	}
 
-	customResourceInfo := r.getServingInfoFor(customResource)
-	storage := customResourceInfo.storage
-	requestScope := customResourceInfo.requestScope
+	terminating := apiextensions.IsCRDConditionTrue(crd, apiextensions.Terminating)
+
+	crdInfo := r.getServingInfoFor(crd)
+	storage := crdInfo.storage
+	requestScope := crdInfo.requestScope
 	minRequestTimeout := 1 * time.Minute
 
 	switch requestInfo.Verb {
@@ -170,20 +174,37 @@ func (r *customResourceHandler) ServeHTTP(w http.ResponseWriter, req *http.Reque
 		handler(w, req)
 		return
 	case "create":
+		if terminating {
+			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
+			return
+		}
 		handler := handlers.CreateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
 		handler(w, req)
 		return
 	case "update":
+		if terminating {
+			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
+			return
+		}
 		handler := handlers.UpdateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
 		handler(w, req)
 		return
 	case "patch":
+		if terminating {
+			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
+			return
+		}
 		handler := handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{})
 		handler(w, req)
 		return
 	case "delete":
 		allowsOptions := true
 		handler := handlers.DeleteResource(storage, allowsOptions, requestScope, r.admission)
+		handler(w, req)
+		return
+	case "deletecollection":
+		checkBody := true
+		handler := handlers.DeleteCollection(storage, checkBody, requestScope, r.admission)
 		handler(w, req)
 		return
 
@@ -194,12 +215,12 @@ func (r *customResourceHandler) ServeHTTP(w http.ResponseWriter, req *http.Reque
 }
 
 // removeDeadStorage removes REST storage that isn't being used
-func (r *customResourceHandler) removeDeadStorage() {
+func (r *crdHandler) removeDeadStorage() {
 	// these don't have to be live.  A snapshot is fine
 	// if we wrongly delete, that's ok.  The rest storage will be recreated on the next request
 	// if we wrongly miss one, that's ok.  We'll get it next time
-	storageMap := r.customStorage.Load().(customResourceStorageMap)
-	allCustomResources, err := r.customResourceLister.List(labels.Everything())
+	storageMap := r.customStorage.Load().(crdStorageMap)
+	allCustomResourceDefinitions, err := r.crdLister.List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(err)
 		return
@@ -207,8 +228,8 @@ func (r *customResourceHandler) removeDeadStorage() {
 
 	for uid := range storageMap {
 		found := false
-		for _, customResource := range allCustomResources {
-			if customResource.UID == uid {
+		for _, crd := range allCustomResourceDefinitions {
+			if crd.UID == uid {
 				found = true
 				break
 			}
@@ -224,9 +245,16 @@ func (r *customResourceHandler) removeDeadStorage() {
 	r.customStorage.Store(storageMap)
 }
 
-func (r *customResourceHandler) getServingInfoFor(customResource *apiextensions.CustomResource) *customResourceInfo {
-	storageMap := r.customStorage.Load().(customResourceStorageMap)
-	ret, ok := storageMap[customResource.UID]
+// GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter for
+// the given uid, or nil if one does not exist.
+func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) finalizer.ListerCollectionDeleter {
+	info := r.getServingInfoFor(crd)
+	return info.storage
+}
+
+func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefinition) *crdInfo {
+	storageMap := r.customStorage.Load().(crdStorageMap)
+	ret, ok := storageMap[crd.UID]
 	if ok {
 		return ret
 	}
@@ -234,21 +262,21 @@ func (r *customResourceHandler) getServingInfoFor(customResource *apiextensions.
 	r.customStorageLock.Lock()
 	defer r.customStorageLock.Unlock()
 
-	ret, ok = storageMap[customResource.UID]
+	ret, ok = storageMap[crd.UID]
 	if ok {
 		return ret
 	}
 
-	storage := customresourcestorage.NewREST(
-		schema.GroupResource{Group: customResource.Spec.Group, Resource: customResource.Spec.Names.Plural},
-		schema.GroupVersionKind{Group: customResource.Spec.Group, Version: customResource.Spec.Version, Kind: customResource.Spec.Names.ListKind},
+	storage := customresource.NewREST(
+		schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural},
+		schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.ListKind},
 		UnstructuredCopier{},
-		customresourcestorage.NewStrategy(discovery.NewUnstructuredObjectTyper(nil), customResource.Spec.Scope == apiextensions.NamespaceScoped),
+		customresource.NewStrategy(discovery.NewUnstructuredObjectTyper(nil), crd.Spec.Scope == apiextensions.NamespaceScoped),
 		r.restOptionsGetter,
 	)
 
 	parameterScheme := runtime.NewScheme()
-	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: customResource.Spec.Group, Version: customResource.Spec.Version},
+	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version},
 		&metav1.ListOptions{},
 		&metav1.ExportOptions{},
 		&metav1.GetOptions{},
@@ -257,14 +285,23 @@ func (r *customResourceHandler) getServingInfoFor(customResource *apiextensions.
 	parameterScheme.AddGeneratedDeepCopyFuncs(metav1.GetGeneratedDeepCopyFuncs()...)
 	parameterCodec := runtime.NewParameterCodec(parameterScheme)
 
+	selfLinkPrefix := ""
+	switch crd.Spec.Scope {
+	case apiextensions.ClusterScoped:
+		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, crd.Spec.Version) + "/"
+	case apiextensions.NamespaceScoped:
+		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, crd.Spec.Version, "namespaces") + "/"
+	}
+
 	requestScope := handlers.RequestScope{
 		Namer: handlers.ContextBasedNaming{
 			GetContext: func(req *http.Request) apirequest.Context {
 				ret, _ := r.requestContextMapper.Get(req)
 				return ret
 			},
-			SelfLinker:    meta.NewAccessor(),
-			ClusterScoped: customResource.Spec.Scope == apiextensions.ClusterScoped,
+			SelfLinker:         meta.NewAccessor(),
+			ClusterScoped:      crd.Spec.Scope == apiextensions.ClusterScoped,
+			SelfLinkPathPrefix: selfLinkPrefix,
 		},
 		ContextFunc: func(req *http.Request) apirequest.Context {
 			ret, _ := r.requestContextMapper.Get(req)
@@ -281,18 +318,18 @@ func (r *customResourceHandler) getServingInfoFor(customResource *apiextensions.
 		Typer:           discovery.NewUnstructuredObjectTyper(nil),
 		UnsafeConvertor: unstructured.UnstructuredObjectConverter{},
 
-		Resource:    schema.GroupVersionResource{Group: customResource.Spec.Group, Version: customResource.Spec.Version, Resource: customResource.Spec.Names.Plural},
-		Kind:        schema.GroupVersionKind{Group: customResource.Spec.Group, Version: customResource.Spec.Version, Kind: customResource.Spec.Names.Kind},
+		Resource:    schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural},
+		Kind:        schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.Kind},
 		Subresource: "",
 
 		MetaGroupVersion: metav1.SchemeGroupVersion,
 	}
 
-	ret = &customResourceInfo{
+	ret = &crdInfo{
 		storage:      storage,
 		requestScope: requestScope,
 	}
-	storageMap[customResource.UID] = ret
+	storageMap[crd.UID] = ret
 	r.customStorage.Store(storageMap)
 	return ret
 }
@@ -349,15 +386,16 @@ type UnstructuredDefaulter struct{}
 
 func (UnstructuredDefaulter) Default(in runtime.Object) {}
 
-type CustomResourceRESTOptionsGetter struct {
+type CRDRESTOptionsGetter struct {
 	StorageConfig           storagebackend.Config
 	StoragePrefix           string
 	EnableWatchCache        bool
+	DefaultWatchCacheSize   int
 	EnableGarbageCollection bool
 	DeleteCollectionWorkers int
 }
 
-func (t CustomResourceRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret := generic.RESTOptions{
 		StorageConfig:           &t.StorageConfig,
 		Decorator:               generic.UndecoratedStorage,
@@ -366,7 +404,7 @@ func (t CustomResourceRESTOptionsGetter) GetRESTOptions(resource schema.GroupRes
 		ResourcePrefix:          t.StoragePrefix + "/" + resource.Group + "/" + resource.Resource,
 	}
 	if t.EnableWatchCache {
-		ret.Decorator = genericregistry.StorageWithCacher
+		ret.Decorator = genericregistry.StorageWithCacher(t.DefaultWatchCacheSize)
 	}
 	return ret, nil
 }

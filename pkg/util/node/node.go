@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -64,7 +65,7 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 		// If hostname was requested and no Hostname address was registered...
 		if addressType == v1.NodeHostName {
 			// ...fall back to the kubernetes.io/hostname label for compatibility with kubelets before 1.5
-			if hostname, ok := node.Labels[metav1.LabelHostname]; ok && len(hostname) > 0 {
+			if hostname, ok := node.Labels[kubeletapis.LabelHostname]; ok && len(hostname) > 0 {
 				return hostname, nil
 			}
 		}
@@ -116,8 +117,8 @@ func GetZoneKey(node *v1.Node) string {
 		return ""
 	}
 
-	region, _ := labels[metav1.LabelZoneRegion]
-	failureDomain, _ := labels[metav1.LabelZoneFailureDomain]
+	region, _ := labels[kubeletapis.LabelZoneRegion]
+	failureDomain, _ := labels[kubeletapis.LabelZoneFailureDomain]
 
 	if region == "" && failureDomain == "" {
 		return ""

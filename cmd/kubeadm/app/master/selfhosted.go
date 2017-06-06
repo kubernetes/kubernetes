@@ -19,7 +19,7 @@ package master
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -124,7 +124,12 @@ func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
 	start := time.Now()
 
-	ctrlMgr := getControllerManagerDeployment(cfg, volumes, volumeMounts)
+	kubeVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
+	if err != nil {
+		return err
+	}
+
+	ctrlMgr := getControllerManagerDeployment(cfg, volumes, volumeMounts, kubeVersion)
 	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(&ctrlMgr); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeControllerManager, err)
 	}
@@ -232,7 +237,7 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 	return ds
 }
 
-func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount) ext.Deployment {
+func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount, kubeVersion *version.Version) ext.Deployment {
 	d := ext.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
@@ -268,7 +273,7 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 						{
 							Name:          "self-hosted-" + kubeControllerManager,
 							Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-							Command:       getControllerManagerCommand(cfg, true),
+							Command:       getControllerManagerCommand(cfg, true, kubeVersion),
 							VolumeMounts:  volumeMounts,
 							LivenessProbe: componentProbe(10252, "/healthz", v1.URISchemeHTTP),
 							Resources:     componentResources("200m"),
@@ -338,5 +343,5 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Vo
 }
 
 func buildStaticManifestFilepath(name string) string {
-	return path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests", name+".yaml")
+	return filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsSubDirName, name+".yaml")
 }

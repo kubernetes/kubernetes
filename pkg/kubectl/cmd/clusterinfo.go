@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/util/i18n"
 
-	"github.com/daviddengcn/go-colortext"
+	ct "github.com/daviddengcn/go-colortext"
 	"github.com/spf13/cobra"
 )
 
@@ -45,9 +44,7 @@ var (
 
 func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "cluster-info",
-		// clusterinfo is deprecated.
-		Aliases: []string{"clusterinfo"},
+		Use:     "cluster-info",
 		Short:   i18n.T("Display cluster info"),
 		Long:    longDescr,
 		Example: clusterinfoExample,
@@ -62,10 +59,6 @@ func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	if len(os.Args) > 1 && os.Args[1] == "clusterinfo" {
-		printDeprecationWarning("cluster-info", "clusterinfo")
-	}
-
 	client, err := f.ClientConfig()
 	if err != nil {
 		return err

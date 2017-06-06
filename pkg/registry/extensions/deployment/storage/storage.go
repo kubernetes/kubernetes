@@ -92,6 +92,14 @@ func (r *REST) ShortNames() []string {
 	return []string{"deploy"}
 }
 
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (r *REST) Categories() []string {
+	return []string{"all"}
+}
+
 // StatusREST implements the REST endpoint for changing the status of a deployment
 type StatusREST struct {
 	store *genericregistry.Store
@@ -123,7 +131,7 @@ func (r *RollbackREST) New() runtime.Object {
 
 var _ = rest.Creater(&RollbackREST{})
 
-func (r *RollbackREST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+func (r *RollbackREST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	rollback, ok := obj.(*extensions.DeploymentRollback)
 	if !ok {
 		return nil, errors.NewBadRequest(fmt.Sprintf("not a DeploymentRollback: %#v", obj))

@@ -17,19 +17,19 @@ limitations under the License.
 package oidc
 
 import (
+	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/coreos/go-oidc/jose"
-	"github.com/coreos/go-oidc/oauth2"
-	"github.com/coreos/go-oidc/oidc"
 	"github.com/golang/glog"
-
+	"golang.org/x/oauth2"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -39,9 +39,11 @@ const (
 	cfgClientSecret             = "client-secret"
 	cfgCertificateAuthority     = "idp-certificate-authority"
 	cfgCertificateAuthorityData = "idp-certificate-authority-data"
-	cfgExtraScopes              = "extra-scopes"
 	cfgIDToken                  = "id-token"
 	cfgRefreshToken             = "refresh-token"
+
+	// Unused. Scopes aren't sent during refreshing.
+	cfgExtraScopes = "extra-scopes"
 )
 
 func init() {
@@ -59,9 +61,12 @@ const expiryDelta = 10 * time.Second
 
 var cache = newClientCache()
 
-// Like TLS transports, keep a cache of OIDC clients indexed by issuer URL.
+// Like TLS transports, keep a cache of OIDC clients indexed by issuer URL. This ensures
+// current requests from different clients don't concurrently attempt to refresh the same
+// set of credentials.
 type clientCache struct {
-	mu    sync.RWMutex
+	mu sync.RWMutex
+
 	cache map[cacheKey]*oidcAuthProvider
 }
 
@@ -72,27 +77,22 @@ func newClientCache() *clientCache {
 type cacheKey struct {
 	// Canonical issuer URL string of the provider.
 	issuerURL string
-
-	clientID     string
-	clientSecret string
-
-	// Don't use CA as cache key because we only add a cache entry if we can connect
-	// to the issuer in the first place. A valid CA is a prerequisite.
+	clientID  string
 }
 
-func (c *clientCache) getClient(issuer, clientID, clientSecret string) (*oidcAuthProvider, bool) {
+func (c *clientCache) getClient(issuer, clientID string) (*oidcAuthProvider, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	client, ok := c.cache[cacheKey{issuer, clientID, clientSecret}]
+	client, ok := c.cache[cacheKey{issuer, clientID}]
 	return client, ok
 }
 
 // setClient attempts to put the client in the cache but may return any clients
 // with the same keys set before. This is so there's only ever one client for a provider.
-func (c *clientCache) setClient(issuer, clientID, clientSecret string, client *oidcAuthProvider) *oidcAuthProvider {
+func (c *clientCache) setClient(issuer, clientID string, client *oidcAuthProvider) *oidcAuthProvider {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	key := cacheKey{issuer, clientID, clientSecret}
+	key := cacheKey{issuer, clientID}
 
 	// If another client has already initialized a client for the given provider we want
 	// to use that client instead of the one we're trying to set. This is so all transports
@@ -117,14 +117,14 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 		return nil, fmt.Errorf("Must provide %s", cfgClientID)
 	}
 
-	clientSecret := cfg[cfgClientSecret]
-	if clientSecret == "" {
-		return nil, fmt.Errorf("Must provide %s", cfgClientSecret)
+	// Check cache for existing provider.
+	if provider, ok := cache.getClient(issuer, clientID); ok {
+		return provider, nil
 	}
 
-	// Check cache for existing provider.
-	if provider, ok := cache.getClient(issuer, clientID, clientSecret); ok {
-		return provider, nil
+	if len(cfg[cfgExtraScopes]) > 0 {
+		glog.V(2).Infof("%s auth provider field depricated, refresh request don't send scopes",
+			cfgExtraScopes)
 	}
 
 	var certAuthData []byte
@@ -149,41 +149,20 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 	}
 	hc := &http.Client{Transport: trans}
 
-	providerCfg, err := oidc.FetchProviderConfig(hc, issuer)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching provider config: %v", err)
-	}
-
-	scopes := strings.Split(cfg[cfgExtraScopes], ",")
-	oidcCfg := oidc.ClientConfig{
-		HTTPClient: hc,
-		Credentials: oidc.ClientCredentials{
-			ID:     clientID,
-			Secret: clientSecret,
-		},
-		ProviderConfig: providerCfg,
-		Scope:          append(scopes, oidc.DefaultScope...),
-	}
-	client, err := oidc.NewClient(oidcCfg)
-	if err != nil {
-		return nil, fmt.Errorf("error creating OIDC Client: %v", err)
-	}
-
 	provider := &oidcAuthProvider{
-		client:    &oidcClient{client},
+		client:    hc,
+		now:       time.Now,
 		cfg:       cfg,
 		persister: persister,
-		now:       time.Now,
 	}
 
-	return cache.setClient(issuer, clientID, clientSecret, provider), nil
+	return cache.setClient(issuer, clientID, provider), nil
 }
 
 type oidcAuthProvider struct {
-	// Interface rather than a raw *oidc.Client for testing.
-	client OIDCClient
+	client *http.Client
 
-	// Stubbed out for testing.
+	// Method for determining the current time.
 	now func() time.Time
 
 	// Mutex guards persisting to the kubeconfig file and allows synchronized
@@ -205,17 +184,15 @@ func (p *oidcAuthProvider) Login() error {
 	return errors.New("not yet implemented")
 }
 
-type OIDCClient interface {
-	refreshToken(rt string) (oauth2.TokenResponse, error)
-	verifyJWT(jwt *jose.JWT) error
-}
-
 type roundTripper struct {
 	provider *oidcAuthProvider
 	wrapped  http.RoundTripper
 }
 
 func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if len(req.Header.Get("Authorization")) != 0 {
+		return r.wrapped.RoundTrip(req)
+	}
 	token, err := r.provider.idToken()
 	if err != nil {
 		return nil, err
@@ -240,7 +217,7 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 	defer p.mu.Unlock()
 
 	if idToken, ok := p.cfg[cfgIDToken]; ok && len(idToken) > 0 {
-		valid, err := verifyJWTExpiry(p.now(), idToken)
+		valid, err := idTokenExpired(p.now, idToken)
 		if err != nil {
 			return "", err
 		}
@@ -256,17 +233,27 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 		return "", errors.New("No valid id-token, and cannot refresh without refresh-token")
 	}
 
-	tokens, err := p.client.refreshToken(rt)
-	if err != nil {
-		return "", fmt.Errorf("could not refresh token: %v", err)
-	}
-	jwt, err := jose.ParseJWT(tokens.IDToken)
+	// Determine provider's OAuth2 token endpoint.
+	tokenURL, err := tokenEndpoint(p.client, p.cfg[cfgIssuerUrl])
 	if err != nil {
 		return "", err
 	}
 
-	if err := p.client.verifyJWT(&jwt); err != nil {
-		return "", err
+	config := oauth2.Config{
+		ClientID:     p.cfg[cfgClientID],
+		ClientSecret: p.cfg[cfgClientSecret],
+		Endpoint:     oauth2.Endpoint{TokenURL: tokenURL},
+	}
+
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, p.client)
+	token, err := config.TokenSource(ctx, &oauth2.Token{RefreshToken: rt}).Token()
+	if err != nil {
+		return "", fmt.Errorf("failed to refresh token: %v", err)
+	}
+
+	idToken, ok := token.Extra("id_token").(string)
+	if !ok {
+		return "", fmt.Errorf("token response did not contain an id_token")
 	}
 
 	// Create a new config to persist.
@@ -275,59 +262,109 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 		newCfg[key] = val
 	}
 
-	if tokens.RefreshToken != "" && tokens.RefreshToken != rt {
-		newCfg[cfgRefreshToken] = tokens.RefreshToken
+	// Update the refresh token if the server returned another one.
+	if token.RefreshToken != "" && token.RefreshToken != rt {
+		newCfg[cfgRefreshToken] = token.RefreshToken
 	}
+	newCfg[cfgIDToken] = idToken
 
-	newCfg[cfgIDToken] = tokens.IDToken
+	// Persist new config and if successful, update the in memory config.
 	if err = p.persister.Persist(newCfg); err != nil {
 		return "", fmt.Errorf("could not perist new tokens: %v", err)
 	}
-
-	// Update the in memory config to reflect the on disk one.
 	p.cfg = newCfg
 
-	return tokens.IDToken, nil
+	return idToken, nil
 }
 
-// oidcClient is the real implementation of the OIDCClient interface, which is
-// used for testing.
-type oidcClient struct {
-	client *oidc.Client
-}
-
-func (o *oidcClient) refreshToken(rt string) (oauth2.TokenResponse, error) {
-	oac, err := o.client.OAuthClient()
+// tokenEndpoint uses OpenID Connect discovery to determine the OAuth2 token
+// endpoint for the provider, the endpoint the client will use the refresh
+// token against.
+func tokenEndpoint(client *http.Client, issuer string) (string, error) {
+	// Well known URL for getting OpenID Connect metadata.
+	//
+	// https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig
+	wellKnown := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
+	resp, err := client.Get(wellKnown)
 	if err != nil {
-		return oauth2.TokenResponse{}, err
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		// Don't produce an error that's too huge (e.g. if we get HTML back for some reason).
+		const n = 80
+		if len(body) > n {
+			body = append(body[:n], []byte("...")...)
+		}
+		return "", fmt.Errorf("oidc: failed to query metadata endpoint %s: %q", resp.Status, body)
 	}
 
-	return oac.RequestToken(oauth2.GrantTypeRefreshToken, rt)
-}
-
-func (o *oidcClient) verifyJWT(jwt *jose.JWT) error {
-	return o.client.VerifyJWT(*jwt)
-}
-
-func verifyJWTExpiry(now time.Time, s string) (valid bool, err error) {
-	jwt, err := jose.ParseJWT(s)
-	if err != nil {
-		return false, fmt.Errorf("invalid %q", cfgIDToken)
+	// Metadata object. We only care about the token_endpoint, the thing endpoint
+	// we'll be refreshing against.
+	//
+	// https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
+	var metadata struct {
+		TokenURL string `json:"token_endpoint"`
 	}
-	claims, err := jwt.Claims()
+	if err := json.Unmarshal(body, &metadata); err != nil {
+		return "", fmt.Errorf("oidc: failed to decode provider discovery object: %v", err)
+	}
+	if metadata.TokenURL == "" {
+		return "", fmt.Errorf("oidc: discovery object doesn't contain a token_endpoint")
+	}
+	return metadata.TokenURL, nil
+}
+
+func idTokenExpired(now func() time.Time, idToken string) (bool, error) {
+	parts := strings.Split(idToken, ".")
+	if len(parts) != 3 {
+		return false, fmt.Errorf("ID Token is not a valid JWT")
+	}
+
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
 		return false, err
 	}
-
-	exp, ok, err := claims.TimeClaim("exp")
-	switch {
-	case err != nil:
-		return false, fmt.Errorf("failed to parse 'exp' claim: %v", err)
-	case !ok:
-		return false, errors.New("missing required 'exp' claim")
-	case exp.After(now.Add(expiryDelta)):
-		return true, nil
+	var claims struct {
+		Expiry jsonTime `json:"exp"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return false, fmt.Errorf("parsing claims: %v", err)
 	}
 
-	return false, nil
+	return now().Add(expiryDelta).Before(time.Time(claims.Expiry)), nil
+}
+
+// jsonTime is a json.Unmarshaler that parses a unix timestamp.
+// Because JSON numbers don't differentiate between ints and floats,
+// we want to ensure we can parse either.
+type jsonTime time.Time
+
+func (j *jsonTime) UnmarshalJSON(b []byte) error {
+	var n json.Number
+	if err := json.Unmarshal(b, &n); err != nil {
+		return err
+	}
+	var unix int64
+
+	if t, err := n.Int64(); err == nil {
+		unix = t
+	} else {
+		f, err := n.Float64()
+		if err != nil {
+			return err
+		}
+		unix = int64(f)
+	}
+	*j = jsonTime(time.Unix(unix, 0))
+	return nil
+}
+
+func (j jsonTime) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Time(j).Unix())
 }

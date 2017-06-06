@@ -151,8 +151,8 @@ func (s *Scheme) AddUnversionedTypes(version schema.GroupVersion, types ...Objec
 		t := reflect.TypeOf(obj).Elem()
 		gvk := version.WithKind(t.Name())
 		s.unversionedTypes[t] = gvk
-		if _, ok := s.unversionedKinds[gvk.Kind]; ok {
-			panic(fmt.Sprintf("%v has already been registered as unversioned kind %q - kind name must be unique", reflect.TypeOf(t), gvk.Kind))
+		if old, ok := s.unversionedKinds[gvk.Kind]; ok && t != old {
+			panic(fmt.Sprintf("%v.%v has already been registered as unversioned kind %q - kind name must be unique", old.PkgPath(), old.Name(), gvk))
 		}
 		s.unversionedKinds[gvk.Kind] = t
 	}
@@ -243,7 +243,7 @@ func (s *Scheme) ObjectKinds(obj Object) ([]schema.GroupVersionKind, bool, error
 
 	gvks, ok := s.typeToGVK[t]
 	if !ok {
-		return nil, false, NewNotRegisteredErr(schema.GroupVersionKind{}, t)
+		return nil, false, NewNotRegisteredErrForType(t)
 	}
 	_, unversionedType := s.unversionedTypes[t]
 
@@ -281,7 +281,7 @@ func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
 	if t, exists := s.unversionedKinds[kind.Kind]; exists {
 		return reflect.New(t).Interface().(Object), nil
 	}
-	return nil, NewNotRegisteredErr(kind, nil)
+	return nil, NewNotRegisteredErrForKind(kind)
 }
 
 // AddGenericConversionFunc adds a function that accepts the ConversionFunc call pattern
@@ -492,7 +492,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	}
 	kinds, ok := s.typeToGVK[t]
 	if !ok || len(kinds) == 0 {
-		return nil, NewNotRegisteredErr(schema.GroupVersionKind{}, t)
+		return nil, NewNotRegisteredErrForType(t)
 	}
 
 	gvk, ok := target.KindForGroupVersionKinds(kinds)
@@ -506,8 +506,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 			return copyAndSetTargetKind(copy, s, in, unversionedKind)
 		}
 
-		// TODO: should this be a typed error?
-		return nil, fmt.Errorf("%v is not suitable for converting to %q", t, target)
+		return nil, NewNotRegisteredErrForTarget(t, target)
 	}
 
 	// target wants to use the existing type, set kind and return (no conversion necessary)

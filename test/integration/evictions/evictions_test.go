@@ -48,8 +48,8 @@ const (
 func TestConcurrentEvictionRequests(t *testing.T) {
 	podNameFormat := "test-pod-%d"
 
-	s, rm, informers, clientSet := rmSetup(t)
-	defer s.Close()
+	s, closeFn, rm, informers, clientSet := rmSetup(t)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("concurrent-eviction-requests", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -200,7 +200,7 @@ func newPDB() *v1beta1.PodDisruptionBudget {
 			Name: "test-pdb",
 		},
 		Spec: v1beta1.PodDisruptionBudgetSpec{
-			MinAvailable: intstr.IntOrString{
+			MinAvailable: &intstr.IntOrString{
 				Type:   intstr.Int,
 				IntVal: 0,
 			},
@@ -225,9 +225,9 @@ func newEviction(ns, evictionName string, deleteOption *metav1.DeleteOptions) *v
 	}
 }
 
-func rmSetup(t *testing.T) (*httptest.Server, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface) {
+func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAMaster(masterConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -246,7 +246,7 @@ func rmSetup(t *testing.T) (*httptest.Server, *disruption.DisruptionController, 
 		informers.Apps().V1beta1().StatefulSets(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "disruption-controller")),
 	)
-	return s, rm, informers, clientSet
+	return s, closeFn, rm, informers, clientSet
 }
 
 // wait for the podInformer to observe the pods. Call this function before

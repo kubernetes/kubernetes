@@ -72,10 +72,9 @@ func New(client *http.Client) (*Service, error) {
 }
 
 type Service struct {
-	client                    *http.Client
-	BasePath                  string // API endpoint base URL
-	UserAgent                 string // optional additional User-Agent fragment
-	GoogleClientHeaderElement string // client header fragment, for Google use only
+	client    *http.Client
+	BasePath  string // API endpoint base URL
+	UserAgent string // optional additional User-Agent fragment
 
 	Projects *ProjectsService
 }
@@ -85,10 +84,6 @@ func (s *Service) userAgent() string {
 		return googleapi.UserAgent
 	}
 	return googleapi.UserAgent + " " + s.UserAgent
-}
-
-func (s *Service) clientHeader() string {
-	return gensupport.GoogleClientHeader("20170210", s.GoogleClientHeaderElement)
 }
 
 func NewProjectsService(s *Service) *ProjectsService {
@@ -172,25 +167,21 @@ type ProjectsTimeSeriesService struct {
 	s *Service
 }
 
-// BucketOptions: A Distribution may optionally contain a histogram of
-// the values in the population. The histogram is given in bucket_counts
-// as counts of values that fall into one of a sequence of
-// non-overlapping buckets. The sequence of buckets is described by
-// bucket_options.A bucket specifies an inclusive lower bound and
+// BucketOptions: BucketOptions describes the bucket boundaries used to
+// create a histogram for the distribution. The buckets can be in a
+// linear sequence, an exponential sequence, or each bucket can be
+// specified explicitly. BucketOptions does not include the number of
+// values in each bucket.A bucket has an inclusive lower bound and
 // exclusive upper bound for the values that are counted for that
-// bucket. The upper bound of a bucket is strictly greater than the
-// lower bound.The sequence of N buckets for a Distribution consists of
+// bucket. The upper bound of a bucket must be strictly greater than the
+// lower bound. The sequence of N buckets for a distribution consists of
 // an underflow bucket (number 0), zero or more finite buckets (number 1
 // through N - 2) and an overflow bucket (number N - 1). The buckets are
 // contiguous: the lower bound of bucket i (i > 0) is the same as the
 // upper bound of bucket i - 1. The buckets span the whole range of
 // finite values: lower bound of the underflow bucket is -infinity and
 // the upper bound of the overflow bucket is +infinity. The finite
-// buckets are so-called because both bounds are finite.BucketOptions
-// describes bucket boundaries in one of three ways. Two describe the
-// boundaries by giving parameters for a formula to generate boundaries
-// and one gives the bucket boundaries explicitly.If bucket_options is
-// not given, then no bucket_counts may be given.
+// buckets are so-called because both bounds are finite.
 type BucketOptions struct {
 	// ExplicitBuckets: The explicit buckets.
 	ExplicitBuckets *Explicit `json:"explicitBuckets,omitempty"`
@@ -399,34 +390,36 @@ func (s *CreateTimeSeriesRequest) MarshalJSON() ([]byte, error) {
 }
 
 // Distribution: Distribution contains summary statistics for a
-// population of values and, optionally, a histogram representing the
-// distribution of those values across a specified set of histogram
-// buckets.The summary statistics are the count, mean, sum of the
-// squared deviation from the mean, the minimum, and the maximum of the
-// set of population of values.The histogram is based on a sequence of
-// buckets and gives a count of values that fall into each bucket. The
-// boundaries of the buckets are given either explicitly or by
-// specifying parameters for a method of computing them (buckets of
-// fixed width or buckets of exponentially increasing width).Although it
-// is not forbidden, it is generally a bad idea to include non-finite
-// values (infinities or NaNs) in the population of values, as this will
-// render the mean and sum_of_squared_deviation fields meaningless.
+// population of values. It optionally contains a histogram representing
+// the distribution of those values across a set of buckets.The summary
+// statistics are the count, mean, sum of the squared deviation from the
+// mean, the minimum, and the maximum of the set of population of
+// values. The histogram is based on a sequence of buckets and gives a
+// count of values that fall into each bucket. The boundaries of the
+// buckets are given either explicitly or by formulas for buckets of
+// fixed or exponentially increasing widths.Although it is not
+// forbidden, it is generally a bad idea to include non-finite values
+// (infinities or NaNs) in the population of values, as this will render
+// the mean and sum_of_squared_deviation fields meaningless.
 type Distribution struct {
-	// BucketCounts: If bucket_options is given, then the sum of the values
-	// in bucket_counts must equal the value in count. If bucket_options is
-	// not given, no bucket_counts fields may be given.Bucket counts are
-	// given in order under the numbering scheme described above (the
-	// underflow bucket has number 0; the finite buckets, if any, have
-	// numbers 1 through N-2; the overflow bucket has number N-1).The size
-	// of bucket_counts must be no greater than N as defined in
-	// bucket_options.Any suffix of trailing zero bucket_count fields may be
-	// omitted.
+	// BucketCounts: Required in the Stackdriver Monitoring API v3. The
+	// values for each bucket specified in bucket_options. The sum of the
+	// values in bucketCounts must equal the value in the count field of the
+	// Distribution object. The order of the bucket counts follows the
+	// numbering schemes described for the three bucket types. The underflow
+	// bucket has number 0; the finite buckets, if any, have numbers 1
+	// through N-2; and the overflow bucket has number N-1. The size of
+	// bucket_counts must not be greater than N. If the size is less than N,
+	// then the remaining buckets are assigned values of zero.
 	BucketCounts googleapi.Int64s `json:"bucketCounts,omitempty"`
 
-	// BucketOptions: Defines the histogram bucket boundaries.
+	// BucketOptions: Required in the Stackdriver Monitoring API v3. Defines
+	// the histogram bucket boundaries.
 	BucketOptions *BucketOptions `json:"bucketOptions,omitempty"`
 
 	// Count: The number of values in the population. Must be non-negative.
+	// This value must equal the sum of the values in bucket_counts if a
+	// histogram is provided.
 	Count int64 `json:"count,omitempty,string"`
 
 	// Mean: The arithmetic mean of the values in the population. If count
@@ -501,12 +494,13 @@ type Empty struct {
 	googleapi.ServerResponse `json:"-"`
 }
 
-// Explicit: A set of buckets with arbitrary widths.Defines size(bounds)
-// + 1 (= N) buckets with these boundaries for bucket i:Upper bound (0
-// <= i < N-1): boundsi  Lower bound (1 <= i < N); boundsi - 1There must
-// be at least one element in bounds. If bounds has only one element,
-// there are no finite buckets, and that single element is the common
-// boundary of the overflow and underflow buckets.
+// Explicit: Specifies a set of buckets with arbitrary widths.There are
+// size(bounds) + 1 (= N) buckets. Bucket i has the following
+// boundaries:Upper bound (0 <= i < N-1): boundsi  Lower bound (1 <= i <
+// N); boundsi - 1The bounds field must contain at least one element. If
+// bounds has only one element, then there are no finite buckets, and
+// that single element is the common boundary of the overflow and
+// underflow buckets.
 type Explicit struct {
 	// Bounds: The values must be monotonically increasing.
 	Bounds []float64 `json:"bounds,omitempty"`
@@ -534,11 +528,11 @@ func (s *Explicit) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// Exponential: Specify a sequence of buckets that have a width that is
-// proportional to the value of the lower bound. Each bucket represents
-// a constant relative uncertainty on a specific value in the
-// bucket.Defines num_finite_buckets + 2 (= N) buckets with these
-// boundaries for bucket i:Upper bound (0 <= i < N-1): scale *
+// Exponential: Specifies an exponential sequence of buckets that have a
+// width that is proportional to the value of the lower bound. Each
+// bucket represents a constant relative uncertainty on a specific value
+// in the bucket.There are num_finite_buckets + 2 (= N) buckets. Bucket
+// i has the following boundaries:Upper bound (0 <= i < N-1): scale *
 // (growth_factor ^ i).  Lower bound (1 <= i < N): scale *
 // (growth_factor ^ (i - 1)).
 type Exponential struct {
@@ -793,12 +787,12 @@ func (s *LabelDescriptor) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// Linear: Specify a sequence of buckets that all have the same width
-// (except overflow and underflow). Each bucket represents a constant
-// absolute uncertainty on the specific value in the bucket.Defines
-// num_finite_buckets + 2 (= N) buckets with these boundaries for bucket
-// i:Upper bound (0 <= i < N-1): offset + (width * i).  Lower bound (1
-// <= i < N): offset + (width * (i - 1)).
+// Linear: Specifies a linear sequence of buckets that all have the same
+// width (except overflow and underflow). Each bucket represents a
+// constant absolute uncertainty on the specific value in the
+// bucket.There are num_finite_buckets + 2 (= N) buckets. Bucket i has
+// the following boundaries:Upper bound (0 <= i < N-1): offset + (width
+// * i).  Lower bound (1 <= i < N): offset + (width * (i - 1)).
 type Linear struct {
 	// NumFiniteBuckets: Must be greater than 0.
 	NumFiniteBuckets int64 `json:"numFiniteBuckets,omitempty"`
@@ -966,7 +960,7 @@ func (s *ListMetricDescriptorsResponse) MarshalJSON() ([]byte, error) {
 }
 
 // ListMonitoredResourceDescriptorsResponse: The
-// ListMonitoredResourcDescriptors response.
+// ListMonitoredResourceDescriptors response.
 type ListMonitoredResourceDescriptorsResponse struct {
 	// NextPageToken: If there are more results than have been returned,
 	// then this field is set to a non-empty value. To see the additional
@@ -1244,13 +1238,13 @@ func (s *MetricDescriptor) MarshalJSON() ([]byte, error) {
 //
 type MonitoredResource struct {
 	// Labels: Required. Values for all of the labels listed in the
-	// associated monitored resource descriptor. For example, Cloud SQL
-	// databases use the labels "database_id" and "zone".
+	// associated monitored resource descriptor. For example, Compute Engine
+	// VM instances use the labels "project_id", "instance_id", and "zone".
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Type: Required. The monitored resource type. This field must match
 	// the type field of a MonitoredResourceDescriptor object. For example,
-	// the type of a Cloud SQL database is "cloudsql_database".
+	// the type of a Compute Engine VM instance is gce_instance.
 	Type string `json:"type,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Labels") to
@@ -1571,8 +1565,8 @@ type TimeSeries struct {
 	// type, which must be BOOL, INT64, DOUBLE, or DISTRIBUTION.
 	Points []*Point `json:"points,omitempty"`
 
-	// Resource: The associated resource. A fully-specified monitored
-	// resource used to identify the time series.
+	// Resource: The associated monitored resource. Custom metrics can use
+	// only certain monitored resource types in their time series data.
 	Resource *MonitoredResource `json:"resource,omitempty"`
 
 	// ValueType: The value type of the time series. When listing time
@@ -1777,7 +1771,6 @@ func (c *ProjectsCollectdTimeSeriesCreateCall) doRequest(alt string) (*http.Resp
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	var body io.Reader = nil
 	body, err := googleapi.WithoutDataWrapper.JSONReader(c.createcollectdtimeseriesrequest)
 	if err != nil {
@@ -1922,7 +1915,6 @@ func (c *ProjectsGroupsCreateCall) doRequest(alt string) (*http.Response, error)
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	var body io.Reader = nil
 	body, err := googleapi.WithoutDataWrapper.JSONReader(c.group)
 	if err != nil {
@@ -2062,7 +2054,6 @@ func (c *ProjectsGroupsDeleteCall) doRequest(alt string) (*http.Response, error)
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}")
@@ -2200,7 +2191,6 @@ func (c *ProjectsGroupsGetCall) doRequest(alt string) (*http.Response, error) {
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	if c.ifNoneMatch_ != "" {
 		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
 	}
@@ -2388,7 +2378,6 @@ func (c *ProjectsGroupsListCall) doRequest(alt string) (*http.Response, error) {
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	if c.ifNoneMatch_ != "" {
 		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
 	}
@@ -2576,7 +2565,6 @@ func (c *ProjectsGroupsUpdateCall) doRequest(alt string) (*http.Response, error)
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	var body io.Reader = nil
 	body, err := googleapi.WithoutDataWrapper.JSONReader(c.group)
 	if err != nil {
@@ -2770,7 +2758,6 @@ func (c *ProjectsGroupsMembersListCall) doRequest(alt string) (*http.Response, e
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	if c.ifNoneMatch_ != "" {
 		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
 	}
@@ -2953,7 +2940,6 @@ func (c *ProjectsMetricDescriptorsCreateCall) doRequest(alt string) (*http.Respo
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	var body io.Reader = nil
 	body, err := googleapi.WithoutDataWrapper.JSONReader(c.metricdescriptor)
 	if err != nil {
@@ -3090,7 +3076,6 @@ func (c *ProjectsMetricDescriptorsDeleteCall) doRequest(alt string) (*http.Respo
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v3/{+name}")
@@ -3229,7 +3214,6 @@ func (c *ProjectsMetricDescriptorsGetCall) doRequest(alt string) (*http.Response
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	if c.ifNoneMatch_ != "" {
 		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
 	}
@@ -3400,7 +3384,6 @@ func (c *ProjectsMetricDescriptorsListCall) doRequest(alt string) (*http.Respons
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	if c.ifNoneMatch_ != "" {
 		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
 	}
@@ -3581,7 +3564,6 @@ func (c *ProjectsMonitoredResourceDescriptorsGetCall) doRequest(alt string) (*ht
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	if c.ifNoneMatch_ != "" {
 		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
 	}
@@ -3752,7 +3734,6 @@ func (c *ProjectsMonitoredResourceDescriptorsListCall) doRequest(alt string) (*h
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	if c.ifNoneMatch_ != "" {
 		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
 	}
@@ -3928,7 +3909,6 @@ func (c *ProjectsTimeSeriesCreateCall) doRequest(alt string) (*http.Response, er
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	var body io.Reader = nil
 	body, err := googleapi.WithoutDataWrapper.JSONReader(c.createtimeseriesrequest)
 	if err != nil {
@@ -4186,6 +4166,103 @@ func (c *ProjectsTimeSeriesListCall) PageToken(pageToken string) *ProjectsTimeSe
 	return c
 }
 
+// SecondaryAggregationAlignmentPeriod sets the optional parameter
+// "secondaryAggregation.alignmentPeriod": The alignment period for
+// per-time series alignment. If present, alignmentPeriod must be at
+// least 60 seconds. After per-time series alignment, each time series
+// will contain data points only on the period boundaries. If
+// perSeriesAligner is not specified or equals ALIGN_NONE, then this
+// field is ignored. If perSeriesAligner is specified and does not equal
+// ALIGN_NONE, then this field must be defined; otherwise an error is
+// returned.
+func (c *ProjectsTimeSeriesListCall) SecondaryAggregationAlignmentPeriod(secondaryAggregationAlignmentPeriod string) *ProjectsTimeSeriesListCall {
+	c.urlParams_.Set("secondaryAggregation.alignmentPeriod", secondaryAggregationAlignmentPeriod)
+	return c
+}
+
+// SecondaryAggregationCrossSeriesReducer sets the optional parameter
+// "secondaryAggregation.crossSeriesReducer": The approach to be used to
+// combine time series. Not all reducer functions may be applied to all
+// time series, depending on the metric type and the value type of the
+// original time series. Reduction may change the metric type of value
+// type of the time series.Time series data must be aligned in order to
+// perform cross-time series reduction. If crossSeriesReducer is
+// specified, then perSeriesAligner must be specified and not equal
+// ALIGN_NONE and alignmentPeriod must be specified; otherwise, an error
+// is returned.
+//
+// Possible values:
+//   "REDUCE_NONE"
+//   "REDUCE_MEAN"
+//   "REDUCE_MIN"
+//   "REDUCE_MAX"
+//   "REDUCE_SUM"
+//   "REDUCE_STDDEV"
+//   "REDUCE_COUNT"
+//   "REDUCE_COUNT_TRUE"
+//   "REDUCE_FRACTION_TRUE"
+//   "REDUCE_PERCENTILE_99"
+//   "REDUCE_PERCENTILE_95"
+//   "REDUCE_PERCENTILE_50"
+//   "REDUCE_PERCENTILE_05"
+func (c *ProjectsTimeSeriesListCall) SecondaryAggregationCrossSeriesReducer(secondaryAggregationCrossSeriesReducer string) *ProjectsTimeSeriesListCall {
+	c.urlParams_.Set("secondaryAggregation.crossSeriesReducer", secondaryAggregationCrossSeriesReducer)
+	return c
+}
+
+// SecondaryAggregationGroupByFields sets the optional parameter
+// "secondaryAggregation.groupByFields": The set of fields to preserve
+// when crossSeriesReducer is specified. The groupByFields determine how
+// the time series are partitioned into subsets prior to applying the
+// aggregation function. Each subset contains time series that have the
+// same value for each of the grouping fields. Each individual time
+// series is a member of exactly one subset. The crossSeriesReducer is
+// applied to each subset of time series. It is not possible to reduce
+// across different resource types, so this field implicitly contains
+// resource.type. Fields not specified in groupByFields are aggregated
+// away. If groupByFields is not specified and all the time series have
+// the same resource type, then the time series are aggregated into a
+// single output time series. If crossSeriesReducer is not defined, this
+// field is ignored.
+func (c *ProjectsTimeSeriesListCall) SecondaryAggregationGroupByFields(secondaryAggregationGroupByFields ...string) *ProjectsTimeSeriesListCall {
+	c.urlParams_.SetMulti("secondaryAggregation.groupByFields", append([]string{}, secondaryAggregationGroupByFields...))
+	return c
+}
+
+// SecondaryAggregationPerSeriesAligner sets the optional parameter
+// "secondaryAggregation.perSeriesAligner": The approach to be used to
+// align individual time series. Not all alignment functions may be
+// applied to all time series, depending on the metric type and value
+// type of the original time series. Alignment may change the metric
+// type or the value type of the time series.Time series data must be
+// aligned in order to perform cross-time series reduction. If
+// crossSeriesReducer is specified, then perSeriesAligner must be
+// specified and not equal ALIGN_NONE and alignmentPeriod must be
+// specified; otherwise, an error is returned.
+//
+// Possible values:
+//   "ALIGN_NONE"
+//   "ALIGN_DELTA"
+//   "ALIGN_RATE"
+//   "ALIGN_INTERPOLATE"
+//   "ALIGN_NEXT_OLDER"
+//   "ALIGN_MIN"
+//   "ALIGN_MAX"
+//   "ALIGN_MEAN"
+//   "ALIGN_COUNT"
+//   "ALIGN_SUM"
+//   "ALIGN_STDDEV"
+//   "ALIGN_COUNT_TRUE"
+//   "ALIGN_FRACTION_TRUE"
+//   "ALIGN_PERCENTILE_99"
+//   "ALIGN_PERCENTILE_95"
+//   "ALIGN_PERCENTILE_50"
+//   "ALIGN_PERCENTILE_05"
+func (c *ProjectsTimeSeriesListCall) SecondaryAggregationPerSeriesAligner(secondaryAggregationPerSeriesAligner string) *ProjectsTimeSeriesListCall {
+	c.urlParams_.Set("secondaryAggregation.perSeriesAligner", secondaryAggregationPerSeriesAligner)
+	return c
+}
+
 // View sets the optional parameter "view": Specifies which information
 // is returned about the time series.
 //
@@ -4238,7 +4315,6 @@ func (c *ProjectsTimeSeriesListCall) doRequest(alt string) (*http.Response, erro
 		reqHeaders[k] = v
 	}
 	reqHeaders.Set("User-Agent", c.s.userAgent())
-	reqHeaders.Set("x-goog-api-client", c.s.clientHeader())
 	if c.ifNoneMatch_ != "" {
 		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
 	}
@@ -4393,6 +4469,62 @@ func (c *ProjectsTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*ListTime
 	//     },
 	//     "pageToken": {
 	//       "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return additional results from the previous method call.",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "secondaryAggregation.alignmentPeriod": {
+	//       "description": "The alignment period for per-time series alignment. If present, alignmentPeriod must be at least 60 seconds. After per-time series alignment, each time series will contain data points only on the period boundaries. If perSeriesAligner is not specified or equals ALIGN_NONE, then this field is ignored. If perSeriesAligner is specified and does not equal ALIGN_NONE, then this field must be defined; otherwise an error is returned.",
+	//       "format": "google-duration",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "secondaryAggregation.crossSeriesReducer": {
+	//       "description": "The approach to be used to combine time series. Not all reducer functions may be applied to all time series, depending on the metric type and the value type of the original time series. Reduction may change the metric type of value type of the time series.Time series data must be aligned in order to perform cross-time series reduction. If crossSeriesReducer is specified, then perSeriesAligner must be specified and not equal ALIGN_NONE and alignmentPeriod must be specified; otherwise, an error is returned.",
+	//       "enum": [
+	//         "REDUCE_NONE",
+	//         "REDUCE_MEAN",
+	//         "REDUCE_MIN",
+	//         "REDUCE_MAX",
+	//         "REDUCE_SUM",
+	//         "REDUCE_STDDEV",
+	//         "REDUCE_COUNT",
+	//         "REDUCE_COUNT_TRUE",
+	//         "REDUCE_FRACTION_TRUE",
+	//         "REDUCE_PERCENTILE_99",
+	//         "REDUCE_PERCENTILE_95",
+	//         "REDUCE_PERCENTILE_50",
+	//         "REDUCE_PERCENTILE_05"
+	//       ],
+	//       "location": "query",
+	//       "type": "string"
+	//     },
+	//     "secondaryAggregation.groupByFields": {
+	//       "description": "The set of fields to preserve when crossSeriesReducer is specified. The groupByFields determine how the time series are partitioned into subsets prior to applying the aggregation function. Each subset contains time series that have the same value for each of the grouping fields. Each individual time series is a member of exactly one subset. The crossSeriesReducer is applied to each subset of time series. It is not possible to reduce across different resource types, so this field implicitly contains resource.type. Fields not specified in groupByFields are aggregated away. If groupByFields is not specified and all the time series have the same resource type, then the time series are aggregated into a single output time series. If crossSeriesReducer is not defined, this field is ignored.",
+	//       "location": "query",
+	//       "repeated": true,
+	//       "type": "string"
+	//     },
+	//     "secondaryAggregation.perSeriesAligner": {
+	//       "description": "The approach to be used to align individual time series. Not all alignment functions may be applied to all time series, depending on the metric type and value type of the original time series. Alignment may change the metric type or the value type of the time series.Time series data must be aligned in order to perform cross-time series reduction. If crossSeriesReducer is specified, then perSeriesAligner must be specified and not equal ALIGN_NONE and alignmentPeriod must be specified; otherwise, an error is returned.",
+	//       "enum": [
+	//         "ALIGN_NONE",
+	//         "ALIGN_DELTA",
+	//         "ALIGN_RATE",
+	//         "ALIGN_INTERPOLATE",
+	//         "ALIGN_NEXT_OLDER",
+	//         "ALIGN_MIN",
+	//         "ALIGN_MAX",
+	//         "ALIGN_MEAN",
+	//         "ALIGN_COUNT",
+	//         "ALIGN_SUM",
+	//         "ALIGN_STDDEV",
+	//         "ALIGN_COUNT_TRUE",
+	//         "ALIGN_FRACTION_TRUE",
+	//         "ALIGN_PERCENTILE_99",
+	//         "ALIGN_PERCENTILE_95",
+	//         "ALIGN_PERCENTILE_50",
+	//         "ALIGN_PERCENTILE_05"
+	//       ],
 	//       "location": "query",
 	//       "type": "string"
 	//     },

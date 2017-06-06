@@ -46,7 +46,9 @@ type DesiredStateOfWorld interface {
 	// AddNode adds the given node to the list of nodes managed by the attach/
 	// detach controller.
 	// If the node already exists this is a no-op.
-	AddNode(nodeName k8stypes.NodeName)
+	// keepTerminatedPodVolumes is a property of the node that determines
+	// if for terminated pods volumes should be mounted and attached.
+	AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool)
 
 	// AddPod adds the given pod to the list of pods that reference the
 	// specified volume and is scheduled to the specified node.
@@ -95,6 +97,10 @@ type DesiredStateOfWorld interface {
 	// GetPodToAdd generates and returns a map of pods based on the current desired
 	// state of world
 	GetPodToAdd() map[types.UniquePodName]PodToAdd
+
+	// GetKeepTerminatedPodVolumesForNode determines if node wants volumes to be
+	// mounted and attached for terminated pods
+	GetKeepTerminatedPodVolumesForNode(k8stypes.NodeName) bool
 }
 
 // VolumeToAttach represents a volume that should be attached to a node.
@@ -144,10 +150,18 @@ type nodeManaged struct {
 	// attached to this node. The key in the map is the name of the volume and
 	// the value is a pod object containing more information about the volume.
 	volumesToAttach map[v1.UniqueVolumeName]volumeToAttach
+
+	// keepTerminatedPodVolumes determines if for terminated pods(on this node) - volumes
+	// should be kept mounted and attached.
+	keepTerminatedPodVolumes bool
 }
 
 // The volume object represents a volume that should be attached to a node.
 type volumeToAttach struct {
+	// multiAttachErrorReported indicates whether the multi-attach error has been reported for the given volume.
+	// It is used to to prevent reporting the error from being reported more than once for a given volume.
+	multiAttachErrorReported bool
+
 	// volumeName contains the unique identifier for this volume.
 	volumeName v1.UniqueVolumeName
 
@@ -173,14 +187,15 @@ type pod struct {
 	podObj *v1.Pod
 }
 
-func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName) {
+func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool) {
 	dsw.Lock()
 	defer dsw.Unlock()
 
 	if _, nodeExists := dsw.nodesManaged[nodeName]; !nodeExists {
 		dsw.nodesManaged[nodeName] = nodeManaged{
-			nodeName:        nodeName,
-			volumesToAttach: make(map[v1.UniqueVolumeName]volumeToAttach),
+			nodeName:                 nodeName,
+			volumesToAttach:          make(map[v1.UniqueVolumeName]volumeToAttach),
+			keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		}
 	}
 }
@@ -220,9 +235,10 @@ func (dsw *desiredStateOfWorld) AddPod(
 	volumeObj, volumeExists := nodeObj.volumesToAttach[volumeName]
 	if !volumeExists {
 		volumeObj = volumeToAttach{
-			volumeName:    volumeName,
-			spec:          volumeSpec,
-			scheduledPods: make(map[types.UniquePodName]pod),
+			multiAttachErrorReported: false,
+			volumeName:               volumeName,
+			spec:                     volumeSpec,
+			scheduledPods:            make(map[types.UniquePodName]pod),
 		}
 		dsw.nodesManaged[nodeName].volumesToAttach[volumeName] = volumeObj
 	}
@@ -313,6 +329,21 @@ func (dsw *desiredStateOfWorld) VolumeExists(
 	return false
 }
 
+// GetKeepTerminatedPodVolumesForNode determines if node wants volumes to be
+// mounted and attached for terminated pods
+func (dsw *desiredStateOfWorld) GetKeepTerminatedPodVolumesForNode(nodeName k8stypes.NodeName) bool {
+	dsw.RLock()
+	defer dsw.RUnlock()
+
+	if nodeName == "" {
+		return false
+	}
+	if node, ok := dsw.nodesManaged[nodeName]; ok {
+		return node.keepTerminatedPodVolumes
+	}
+	return false
+}
+
 func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 	dsw.RLock()
 	defer dsw.RUnlock()
@@ -323,10 +354,11 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 			volumesToAttach = append(volumesToAttach,
 				VolumeToAttach{
 					VolumeToAttach: operationexecutor.VolumeToAttach{
-						VolumeName:    volumeName,
-						VolumeSpec:    volumeObj.spec,
-						NodeName:      nodeName,
-						ScheduledPods: getPodsFromMap(volumeObj.scheduledPods),
+						MultiAttachErrorReported: volumeObj.multiAttachErrorReported,
+						VolumeName:               volumeName,
+						VolumeSpec:               volumeObj.spec,
+						NodeName:                 nodeName,
+						ScheduledPods:            getPodsFromMap(volumeObj.scheduledPods),
 					}})
 		}
 	}

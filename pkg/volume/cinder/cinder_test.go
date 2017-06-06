@@ -116,8 +116,8 @@ func (fake *fakePDManager) DetachDisk(c *cinderVolumeUnmounter) error {
 	return nil
 }
 
-func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, err error) {
-	return "test-volume-name", 1, nil
+func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error) {
+	return "test-volume-name", 1, nil, nil
 }
 
 func (fake *fakePDManager) DeleteVolume(cd *cinderVolumeDeleter) error {

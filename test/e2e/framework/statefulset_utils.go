@@ -265,14 +265,21 @@ func (s *StatefulSetTester) GetPodList(ss *apps.StatefulSet) *v1.PodList {
 
 // ConfirmStatefulPodCount asserts that the current number of Pods in ss is count waiting up to timeout for ss to
 // to scale to count.
-func (s *StatefulSetTester) ConfirmStatefulPodCount(count int, ss *apps.StatefulSet, timeout time.Duration) {
+func (s *StatefulSetTester) ConfirmStatefulPodCount(count int, ss *apps.StatefulSet, timeout time.Duration, hard bool) {
 	start := time.Now()
 	deadline := start.Add(timeout)
 	for t := time.Now(); t.Before(deadline); t = time.Now() {
 		podList := s.GetPodList(ss)
 		statefulPodCount := len(podList.Items)
 		if statefulPodCount != count {
-			Failf("StatefulSet %v scaled unexpectedly scaled to %d -> %d replicas: %+v", ss.Name, count, len(podList.Items), podList)
+			logPodStates(podList.Items)
+			if hard {
+				Failf("StatefulSet %v scaled unexpectedly scaled to %d -> %d replicas", ss.Name, count, len(podList.Items))
+			} else {
+				Logf("StatefulSet %v has not reached scale %d, at %d", ss.Name, count, statefulPodCount)
+			}
+			time.Sleep(1 * time.Second)
+			continue
 		}
 		Logf("Verifying statefulset %v doesn't scale past %d for another %+v", ss.Name, count, deadline.Sub(t))
 		time.Sleep(1 * time.Second)

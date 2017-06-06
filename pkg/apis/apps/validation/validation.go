@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,6 +66,14 @@ func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, select
 // ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
 func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	switch spec.PodManagementPolicy {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("podManagementPolicy"), ""))
+	case apps.OrderedReadyPodManagement, apps.ParallelPodManagement:
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("podManagementPolicy"), spec.PodManagementPolicy, fmt.Sprintf("must be '%s' or '%s'", apps.OrderedReadyPodManagement, apps.ParallelPodManagement)))
+	}
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	if spec.Selector == nil {
@@ -131,4 +140,35 @@ func ValidateStatefulSetStatusUpdate(statefulSet, oldStatefulSet *apps.StatefulS
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))...)
 	// TODO: Validate status.
 	return allErrs
+}
+
+// ValidateControllerRevisionName can be used to check whether the given ControllerRevision name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+var ValidateControllerRevisionName = apivalidation.NameIsDNSSubdomain
+
+// ValidateControllerRevision collects errors for the fields of state and returns those errors as an ErrorList. If the
+// returned list is empty, state is valid. Validation is performed to ensure that state is a valid ObjectMeta, its name
+// is valid, and that it doesn't exceed the MaxControllerRevisionSize.
+func ValidateControllerRevision(revision *apps.ControllerRevision) field.ErrorList {
+	errs := field.ErrorList{}
+
+	errs = append(errs, apivalidation.ValidateObjectMeta(&revision.ObjectMeta, true, ValidateControllerRevisionName, field.NewPath("metadata"))...)
+	if revision.Data == nil {
+		errs = append(errs, field.Required(field.NewPath("data"), "data is mandatory"))
+	}
+	errs = append(errs, apivalidation.ValidateNonnegativeField(revision.Revision, field.NewPath("revision"))...)
+	return errs
+}
+
+// ValidateControllerRevisionUpdate collects errors pertaining to the mutation of an ControllerRevision Object. If the
+// returned ErrorList is empty the update operation is valid. Any mutation to the ControllerRevision's Data or Revision
+// is considered to be invalid.
+func ValidateControllerRevisionUpdate(newHistory, oldHistory *apps.ControllerRevision) field.ErrorList {
+	errs := field.ErrorList{}
+
+	errs = append(errs, apivalidation.ValidateObjectMetaUpdate(&newHistory.ObjectMeta, &oldHistory.ObjectMeta, field.NewPath("metadata"))...)
+	errs = append(errs, ValidateControllerRevision(newHistory)...)
+	errs = append(errs, apivalidation.ValidateImmutableField(newHistory.Data, oldHistory.Data, field.NewPath("data"))...)
+	return errs
 }

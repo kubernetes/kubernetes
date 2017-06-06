@@ -187,6 +187,7 @@ func getConfig(fullMethods bool) (*openapi.Config, *restful.Container) {
 			InfoProps: spec.InfoProps{
 				Title:       "TestAPI",
 				Description: "Test API",
+				Version:     "unversioned",
 			},
 		},
 		GetDefinitions: func(_ openapi.ReferenceCallback) map[string]openapi.OpenAPIDefinition {
@@ -199,7 +200,7 @@ func getConfig(fullMethods bool) (*openapi.Config, *restful.Container) {
 				"k8s.io/apiserver/pkg/server/openapi/go_default_test.TestOutput": *TestOutput{}.OpenAPIDefinition(),
 			}
 		},
-		GetDefinitionName: func(_ string, name string) (string, spec.Extensions) {
+		GetDefinitionName: func(name string) (string, spec.Extensions) {
 			friendlyName := name[strings.LastIndex(name, "/")+1:]
 			if strings.HasPrefix(friendlyName, "go_default_test") {
 				friendlyName = "openapi" + friendlyName[len("go_default_test"):]
@@ -330,7 +331,7 @@ func getAdditionalTestParameters() []spec.Parameter {
 		ParamProps: spec.ParamProps{
 			Name:        "fparam",
 			Description: "a test form parameter",
-			In:          "form",
+			In:          "formData",
 		},
 		SimpleSchema: spec.SimpleSchema{
 			Type: "number",
@@ -432,6 +433,7 @@ func TestBuildSwaggerSpec(t *testing.T) {
 				InfoProps: spec.InfoProps{
 					Title:       "TestAPI",
 					Description: "Test API",
+					Version:     "unversioned",
 				},
 			},
 			Swagger: "2.0",

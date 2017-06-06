@@ -20,6 +20,7 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/controller:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/mesos/mesos-go/detector:go_default_library",
         "//vendor/github.com/mesos/mesos-go/detector/zoo:go_default_library",

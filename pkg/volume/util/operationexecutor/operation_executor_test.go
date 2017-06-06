@@ -60,7 +60,7 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForNonAttachablePlugins(t 
 			PluginIsAttachable: false, // this field determines whether the plugin is attachable
 			ReportedInUse:      true,
 		}
-		oe.MountVolume(0 /* waitForAttachTimeOut */, volumesToMount[i], nil /* actualStateOfWorldMounterUpdater */)
+		oe.MountVolume(0 /* waitForAttachTimeOut */, volumesToMount[i], nil /* actualStateOfWorldMounterUpdater */, false /* isRemount */)
 	}
 
 	// Assert
@@ -86,7 +86,7 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForAttachablePlugins(t *te
 			PluginIsAttachable: true, // this field determines whether the plugin is attachable
 			ReportedInUse:      true,
 		}
-		oe.MountVolume(0 /* waitForAttachTimeout */, volumesToMount[i], nil /* actualStateOfWorldMounterUpdater */)
+		oe.MountVolume(0 /* waitForAttachTimeout */, volumesToMount[i], nil /* actualStateOfWorldMounterUpdater */, false /* isRemount */)
 	}
 
 	// Assert
@@ -239,7 +239,7 @@ func newFakeOperationGenerator(ch chan interface{}, quit chan interface{}) Opera
 	}
 }
 
-func (fopg *fakeOperationGenerator) GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (func() error, error) {
+func (fopg *fakeOperationGenerator) GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) (func() error, error) {
 	return func() error {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil

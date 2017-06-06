@@ -81,7 +81,7 @@ type PodStatusProvider interface {
 // An object which provides guarantees that a pod can be saftely deleted.
 type PodDeletionSafetyProvider interface {
 	// A function which returns true if the pod can safely be deleted
-	OkToDeletePod(pod *v1.Pod) bool
+	PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool
 }
 
 // Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
@@ -454,7 +454,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	m.apiStatusVersions[pod.UID] = status.version
 
 	// We don't handle graceful deletion of mirror pods.
-	if !kubepod.IsMirrorPod(pod) && m.podDeletionSafety.OkToDeletePod(pod) {
+	if m.canBeDeleted(pod, status.status) {
 		deleteOptions := metav1.NewDeleteOptions(0)
 		// Use the pod UID as the precondition for deletion to prevent deleting a newly created pod with the same name and namespace.
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod.UID))
@@ -472,16 +472,21 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 // This method is not thread safe, and most only be accessed by the sync thread.
 func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 	latest, ok := m.apiStatusVersions[uid]
-	return !ok || latest < status.version || m.couldBeDeleted(uid, status.status)
-}
-
-func (m *manager) couldBeDeleted(uid types.UID, status v1.PodStatus) bool {
-	// The pod could be a static pod, so we should translate first.
+	if !ok || latest < status.version {
+		return true
+	}
 	pod, ok := m.podManager.GetPodByUID(uid)
 	if !ok {
 		return false
 	}
-	return !kubepod.IsMirrorPod(pod) && m.podDeletionSafety.OkToDeletePod(pod)
+	return m.canBeDeleted(pod, status.status)
+}
+
+func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
+	if pod.DeletionTimestamp == nil || kubepod.IsMirrorPod(pod) {
+		return false
+	}
+	return m.podDeletionSafety.PodResourcesAreReclaimed(pod, status)
 }
 
 // needsReconcile compares the given status with the status in the pod manager (which

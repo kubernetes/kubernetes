@@ -40,13 +40,26 @@ func (CrossVersionObjectReference) SwaggerDoc() map[string]string {
 
 var map_HorizontalPodAutoscaler = map[string]string{
 	"":         "HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.",
-	"metadata": "metadata is the standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"spec":     "spec is the specification for the behaviour of the autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+	"metadata": "metadata is the standard object metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata",
+	"spec":     "spec is the specification for the behaviour of the autoscaler. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status.",
 	"status":   "status is the current information about the autoscaler.",
 }
 
 func (HorizontalPodAutoscaler) SwaggerDoc() map[string]string {
 	return map_HorizontalPodAutoscaler
+}
+
+var map_HorizontalPodAutoscalerCondition = map[string]string{
+	"":                   "HorizontalPodAutoscalerCondition describes the state of a HorizontalPodAutoscaler at a certain point.",
+	"type":               "type describes the current condition",
+	"status":             "status is the status of the condition (True, False, Unknown)",
+	"lastTransitionTime": "lastTransitionTime is the last time the condition transitioned from one status to another",
+	"reason":             "reason is the reason for the condition's last transition.",
+	"message":            "message is a human-readable explanation containing details about the transition",
+}
+
+func (HorizontalPodAutoscalerCondition) SwaggerDoc() map[string]string {
+	return map_HorizontalPodAutoscalerCondition
 }
 
 var map_HorizontalPodAutoscalerList = map[string]string{
@@ -78,6 +91,7 @@ var map_HorizontalPodAutoscalerStatus = map[string]string{
 	"currentReplicas":    "currentReplicas is current number of replicas of pods managed by this autoscaler, as last seen by the autoscaler.",
 	"desiredReplicas":    "desiredReplicas is the desired number of replicas of pods managed by this autoscaler, as last calculated by the autoscaler.",
 	"currentMetrics":     "currentMetrics is the last read state of the metrics used by this autoscaler.",
+	"conditions":         "conditions is the set of conditions required for this autoscaler to scale its target, and indicates whether or not those conditions are met.",
 }
 
 func (HorizontalPodAutoscalerStatus) SwaggerDoc() map[string]string {

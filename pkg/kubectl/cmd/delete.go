@@ -294,7 +294,10 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 			return err
 		}
 		found++
-		return deleteResource(info, out, shortOutput, mapper, nil)
+
+		// if we're here, it means that cascade=false (not the default), so we should orphan as requested
+		orphan := true
+		return deleteResource(info, out, shortOutput, mapper, &metav1.DeleteOptions{OrphanDependents: &orphan})
 	})
 	if err != nil {
 		return err

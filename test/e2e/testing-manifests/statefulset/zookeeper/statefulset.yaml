@@ -22,26 +22,26 @@ spec:
           mountPath: "/opt/"
         - name: workdir
           mountPath: "/work-dir"
-     - name: bootstrap
-       image: java:openjdk-8-jre
-       command:
-       - "/work-dir/peer-finder"
-       args:
-       - -on-start="/work-dir/on-start.sh"
-       - "-service=zk"
-       env:
-       - name: POD_NAMESPACE
-         valueFrom:
-           fieldRef:
-             apiVersion: v1
-             fieldPath: metadata.namespace
-      volumeMounts:
-      - name: opt
-        mountPath: "/opt"
-      - name: workdir
-        mountPath: "/work-dir"
-      - name: datadir
-        mountPath: "/tmp/zookeeper"
+      - name: bootstrap
+        image: java:openjdk-8-jre
+        command:
+        - "/work-dir/peer-finder"
+        args:
+        - -on-start="/work-dir/on-start.sh"
+        - "-service=zk"
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: opt
+          mountPath: "/opt"
+        - name: workdir
+          mountPath: "/work-dir"
+        - name: datadir
+          mountPath: "/tmp/zookeeper"
       containers:
       - name: zk
         image: java:openjdk-8-jre

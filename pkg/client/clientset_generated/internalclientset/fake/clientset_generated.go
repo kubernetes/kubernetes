@@ -23,6 +23,8 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	admissionregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion"
+	fakeadmissionregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion/fake"
 	appsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	fakeappsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion/fake"
 	authenticationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion"
@@ -39,6 +41,8 @@ import (
 	fakecoreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion/fake"
 	extensionsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	fakeextensionsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion/fake"
+	networkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion"
+	fakenetworkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion/fake"
 	policyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	fakepolicyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion/fake"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
@@ -82,6 +86,11 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
+// Admissionregistration retrieves the AdmissionregistrationClient
+func (c *Clientset) Admissionregistration() admissionregistrationinternalversion.AdmissionregistrationInterface {
+	return &fakeadmissionregistrationinternalversion.FakeAdmissionregistration{Fake: &c.Fake}
+}
+
 // Core retrieves the CoreClient
 func (c *Clientset) Core() coreinternalversion.CoreInterface {
 	return &fakecoreinternalversion.FakeCore{Fake: &c.Fake}
@@ -120,6 +129,11 @@ func (c *Clientset) Certificates() certificatesinternalversion.CertificatesInter
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() extensionsinternalversion.ExtensionsInterface {
 	return &fakeextensionsinternalversion.FakeExtensions{Fake: &c.Fake}
+}
+
+// Networking retrieves the NetworkingClient
+func (c *Clientset) Networking() networkinginternalversion.NetworkingInterface {
+	return &fakenetworkinginternalversion.FakeNetworking{Fake: &c.Fake}
 }
 
 // Policy retrieves the PolicyClient

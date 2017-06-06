@@ -58,7 +58,9 @@ API_HOST=${API_HOST:-127.0.0.1}
 
 kube::etcd::start
 
+
 # Start kube-apiserver, with alpha api versions on so we can harvest their swagger docs
+# Set --runtime-config to all versions in KUBE_AVAILABLE_GROUP_VERSIONS to enable alpha features.
 kube::log::status "Starting kube-apiserver"
 "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --insecure-bind-address="${API_HOST}" \
@@ -67,8 +69,7 @@ kube::log::status "Starting kube-apiserver"
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
-  --runtime-config="batch/v2alpha1" \
-  --runtime-config="autoscaling/v2alpha1" \
+  --runtime-config=$(echo "${KUBE_AVAILABLE_GROUP_VERSIONS}" | sed -E 's|[[:blank:]]+|,|g') \
   --service-cluster-ip-range="10.0.0.0/24" >/tmp/swagger-api-server.log 2>&1 &
 APISERVER_PID=$!
 

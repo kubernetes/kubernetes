@@ -478,7 +478,7 @@ func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 
 func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
-	beList, err := gceCloud.ListBackendServices()
+	beList, err := gceCloud.ListGlobalBackendServices()
 	if err != nil {
 		if cont.isHTTPErrorCode(err, http.StatusNotFound) {
 			return msg
@@ -495,7 +495,7 @@ func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 		}
 		if del {
 			Logf("Deleting backed-service: %s", be.Name)
-			if err := gceCloud.DeleteBackendService(be.Name); err != nil &&
+			if err := gceCloud.DeleteGlobalBackendService(be.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete backend service %v: %v\n", be.Name, err)
 			}
@@ -717,9 +717,10 @@ func (cont *GCEIngressController) Init() {
 // invoking deleteStaticIPs.
 func (cont *GCEIngressController) CreateStaticIP(name string) string {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
-	ip, err := gceCloud.ReserveGlobalStaticIP(name, "")
+	addr := &compute.Address{Name: name}
+	ip, err := gceCloud.ReserveGlobalAddress(addr)
 	if err != nil {
-		if delErr := gceCloud.DeleteGlobalStaticIP(name); delErr != nil {
+		if delErr := gceCloud.DeleteGlobalAddress(name); delErr != nil {
 			if cont.isHTTPErrorCode(delErr, http.StatusNotFound) {
 				Logf("Static ip with name %v was not allocated, nothing to delete", name)
 			} else {

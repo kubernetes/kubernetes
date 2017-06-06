@@ -20,35 +20,169 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
-	"strings"
-	"time"
+	"sync"
 
-	"github.com/golang/glog"
-	"github.com/pborman/uuid"
-
-	utilnet "k8s.io/apimachinery/pkg/util/net"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	authenticationapi "k8s.io/client-go/pkg/apis/authentication"
 )
+
+// WithAudit decorates a http.Handler with audit logging information for all the
+// requests coming to the server. Audit level is decided according to requests'
+// attributes and audit policy. Logs are emitted to the audit sink to
+// process events. If sink or audit policy is nil, no decoration takes place.
+func WithAudit(handler http.Handler, requestContextMapper request.RequestContextMapper, sink audit.Sink, policy policy.Checker, longRunningCheck request.LongRunningRequestCheck) http.Handler {
+	if sink == nil || policy == nil {
+		return handler
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ctx, ok := requestContextMapper.Get(req)
+		if !ok {
+			responsewriters.InternalError(w, req, errors.New("no context found for request"))
+			return
+		}
+
+		attribs, err := GetAuthorizerAttributes(ctx)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to GetAuthorizerAttributes: %v", err))
+			responsewriters.InternalError(w, req, errors.New("failed to parse request"))
+			return
+		}
+
+		level := policy.Level(attribs)
+		audit.ObservePolicyLevel(level)
+		if level == auditinternal.LevelNone {
+			// Don't audit.
+			handler.ServeHTTP(w, req)
+			return
+		}
+
+		ev, err := audit.NewEventFromRequest(req, level, attribs)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to complete audit event from request: %v", err))
+			responsewriters.InternalError(w, req, errors.New("failed to update context"))
+			return
+		}
+
+		ctx = request.WithAuditEvent(ctx, ev)
+		if err := requestContextMapper.Update(req, ctx); err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to attach audit event to the context: %v", err))
+			responsewriters.InternalError(w, req, errors.New("failed to update context"))
+			return
+		}
+
+		ev.Stage = auditinternal.StageRequestReceived
+		processEvent(sink, ev)
+
+		// intercept the status code
+		var longRunningSink audit.Sink
+		if longRunningCheck != nil {
+			ri, _ := request.RequestInfoFrom(ctx)
+			if longRunningCheck(req, ri) {
+				longRunningSink = sink
+			}
+		}
+		respWriter := decorateResponseWriter(w, ev, longRunningSink)
+
+		// send audit event when we leave this func, either via a panic or cleanly. In the case of long
+		// running requests, this will be the second audit event.
+		defer func() {
+			if r := recover(); r != nil {
+				defer panic(r)
+				ev.Stage = auditinternal.StagePanic
+				ev.ResponseStatus = &metav1.Status{
+					Code:    http.StatusInternalServerError,
+					Status:  metav1.StatusFailure,
+					Reason:  metav1.StatusReasonInternalError,
+					Message: fmt.Sprintf("APIServer panic'd: %v", r),
+				}
+				processEvent(sink, ev)
+				return
+			}
+
+			// if no StageResponseStarted event was sent b/c neither a status code nor a body was sent, fake it here
+			fakedSuccessStatus := &metav1.Status{
+				Code:    http.StatusOK,
+				Status:  metav1.StatusSuccess,
+				Message: "Connection closed early",
+			}
+			if ev.ResponseStatus == nil && longRunningSink != nil {
+				ev.ResponseStatus = fakedSuccessStatus
+				ev.Stage = auditinternal.StageResponseStarted
+				processEvent(longRunningSink, ev)
+			}
+
+			ev.Stage = auditinternal.StageResponseComplete
+			if ev.ResponseStatus == nil {
+				ev.ResponseStatus = fakedSuccessStatus
+			}
+			processEvent(sink, ev)
+		}()
+		handler.ServeHTTP(respWriter, req)
+	})
+}
+
+func processEvent(sink audit.Sink, ev *auditinternal.Event) {
+	audit.ObserveEvent()
+	sink.ProcessEvents(ev)
+}
+
+func decorateResponseWriter(responseWriter http.ResponseWriter, ev *auditinternal.Event, sink audit.Sink) http.ResponseWriter {
+	delegate := &auditResponseWriter{
+		ResponseWriter: responseWriter,
+		event:          ev,
+		sink:           sink,
+	}
+
+	// check if the ResponseWriter we're wrapping is the fancy one we need
+	// or if the basic is sufficient
+	_, cn := responseWriter.(http.CloseNotifier)
+	_, fl := responseWriter.(http.Flusher)
+	_, hj := responseWriter.(http.Hijacker)
+	if cn && fl && hj {
+		return &fancyResponseWriterDelegator{delegate}
+	}
+	return delegate
+}
 
 var _ http.ResponseWriter = &auditResponseWriter{}
 
+// auditResponseWriter intercepts WriteHeader, sets it in the event. If the sink is set, it will
+// create immediately an event (for long running requests).
 type auditResponseWriter struct {
 	http.ResponseWriter
-	out io.Writer
-	id  string
+	event *auditinternal.Event
+	once  sync.Once
+	sink  audit.Sink
+}
+
+func (a *auditResponseWriter) processCode(code int) {
+	a.once.Do(func() {
+		if a.event.ResponseStatus == nil {
+			a.event.ResponseStatus = &metav1.Status{}
+		}
+		a.event.ResponseStatus.Code = int32(code)
+		a.event.Stage = auditinternal.StageResponseStarted
+
+		if a.sink != nil {
+			processEvent(a.sink, a.event)
+		}
+	})
+}
+
+func (a *auditResponseWriter) Write(bs []byte) (int, error) {
+	a.processCode(http.StatusOK) // the Go library calls WriteHeader internally if no code was written yet. But this will go unnoticed for us
+	return a.ResponseWriter.Write(bs)
 }
 
 func (a *auditResponseWriter) WriteHeader(code int) {
-	line := fmt.Sprintf("%s AUDIT: id=%q response=\"%d\"\n", time.Now().Format(time.RFC3339Nano), a.id, code)
-	if _, err := fmt.Fprint(a.out, line); err != nil {
-		glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
-	}
-
+	a.processCode(code)
 	a.ResponseWriter.WriteHeader(code)
 }
 
@@ -68,95 +202,11 @@ func (f *fancyResponseWriterDelegator) Flush() {
 }
 
 func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	// fake a response status before protocol switch happens
+	f.processCode(http.StatusSwitchingProtocols)
 	return f.ResponseWriter.(http.Hijacker).Hijack()
 }
 
 var _ http.CloseNotifier = &fancyResponseWriterDelegator{}
 var _ http.Flusher = &fancyResponseWriterDelegator{}
 var _ http.Hijacker = &fancyResponseWriterDelegator{}
-
-// WithAudit decorates a http.Handler with audit logging information for all the
-// requests coming to the server. If out is nil, no decoration takes place.
-// Each audit log contains two entries:
-// 1. the request line containing:
-//    - unique id allowing to match the response line (see 2)
-//    - source ip of the request
-//    - HTTP method being invoked
-//    - original user invoking the operation
-//    - original user's groups info
-//    - impersonated user for the operation
-//    - impersonated groups info
-//    - namespace of the request or <none>
-//    - uri is the full URI as requested
-// 2. the response line containing:
-//    - the unique id from 1
-//    - response code
-func WithAudit(handler http.Handler, requestContextMapper request.RequestContextMapper, out io.Writer) http.Handler {
-	if out == nil {
-		return handler
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, ok := requestContextMapper.Get(req)
-		if !ok {
-			responsewriters.InternalError(w, req, errors.New("no context found for request"))
-			return
-		}
-		attribs, err := GetAuthorizerAttributes(ctx)
-		if err != nil {
-			responsewriters.InternalError(w, req, err)
-			return
-		}
-
-		username := "<none>"
-		groups := "<none>"
-		if attribs.GetUser() != nil {
-			username = attribs.GetUser().GetName()
-			if userGroups := attribs.GetUser().GetGroups(); len(userGroups) > 0 {
-				groups = auditStringSlice(userGroups)
-			}
-		}
-		asuser := req.Header.Get(authenticationapi.ImpersonateUserHeader)
-		if len(asuser) == 0 {
-			asuser = "<self>"
-		}
-		asgroups := "<lookup>"
-		requestedGroups := req.Header[authenticationapi.ImpersonateGroupHeader]
-		if len(requestedGroups) > 0 {
-			asgroups = auditStringSlice(requestedGroups)
-		}
-		namespace := attribs.GetNamespace()
-		if len(namespace) == 0 {
-			namespace = "<none>"
-		}
-		id := uuid.NewRandom().String()
-
-		line := fmt.Sprintf("%s AUDIT: id=%q ip=%q method=%q user=%q groups=%q as=%q asgroups=%q namespace=%q uri=%q\n",
-			time.Now().Format(time.RFC3339Nano), id, utilnet.GetClientIP(req), req.Method, username, groups, asuser, asgroups, namespace, req.URL)
-		if _, err := fmt.Fprint(out, line); err != nil {
-			glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
-		}
-		respWriter := decorateResponseWriter(w, out, id)
-		handler.ServeHTTP(respWriter, req)
-	})
-}
-
-func auditStringSlice(inList []string) string {
-	quotedElements := make([]string, len(inList))
-	for i, in := range inList {
-		quotedElements[i] = fmt.Sprintf("%q", in)
-	}
-	return strings.Join(quotedElements, ",")
-}
-
-func decorateResponseWriter(responseWriter http.ResponseWriter, out io.Writer, id string) http.ResponseWriter {
-	delegate := &auditResponseWriter{ResponseWriter: responseWriter, out: out, id: id}
-	// check if the ResponseWriter we're wrapping is the fancy one we need
-	// or if the basic is sufficient
-	_, cn := responseWriter.(http.CloseNotifier)
-	_, fl := responseWriter.(http.Flusher)
-	_, hj := responseWriter.(http.Hijacker)
-	if cn && fl && hj {
-		return &fancyResponseWriterDelegator{delegate}
-	}
-	return delegate
-}

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,6 +43,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -64,6 +66,8 @@ type RequestScope struct {
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
 
+	TableConvertor rest.TableConvertor
+
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind
 	Subresource string
@@ -72,7 +76,32 @@ type RequestScope struct {
 }
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
-	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+	ctx := scope.ContextFunc(req)
+	responsewriters.ErrorNegotiated(ctx, err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+}
+
+func (scope *RequestScope) AllowsConversion(gvk schema.GroupVersionKind) bool {
+	// TODO: this is temporary, replace with an abstraction calculated at endpoint installation time
+	if gvk.GroupVersion() == metav1alpha1.SchemeGroupVersion {
+		switch gvk.Kind {
+		case "Table":
+			return scope.TableConvertor != nil
+		case "PartialObjectMetadata", "PartialObjectMetadataList":
+			// TODO: should delineate between lists and non-list endpoints
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+func (scope *RequestScope) AllowsServerVersion(version string) bool {
+	return version == scope.MetaGroupVersion.Version
+}
+
+func (scope *RequestScope) AllowsStreamSchema(s string) bool {
+	return s == "watch"
 }
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -102,12 +131,18 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 			scope.err(err, w, req)
 			return
 		}
-		if err := setSelfLink(result, req, scope.Namer); err != nil {
+		requestInfo, ok := request.RequestInfoFrom(ctx)
+		if !ok {
+			scope.err(fmt.Errorf("missing requestInfo"), w, req)
+			return
+		}
+		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
 			scope.err(err, w, req)
 			return
 		}
+
 		trace.Step("About to write a response")
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 	}
 }
 
@@ -120,6 +155,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 			if values := req.URL.Query(); len(values) > 0 {
 				exports := metav1.ExportOptions{}
 				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &exports); err != nil {
+					err = errors.NewBadRequest(err.Error())
 					return nil, err
 				}
 				if exports.Export {
@@ -129,6 +165,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 					return e.Export(ctx, name, exports)
 				}
 				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &options); err != nil {
+					err = errors.NewBadRequest(err.Error())
 					return nil, err
 				}
 			}
@@ -146,6 +183,7 @@ func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, isSubr
 			opts, subpath, subpathKey := r.NewGetOptions()
 			trace.Step("About to process Get options")
 			if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
+				err = errors.NewBadRequest(err.Error())
 				return nil, err
 			}
 			if trace != nil {
@@ -192,6 +230,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 		ctx = request.WithNamespace(ctx, namespace)
 		opts, subpath, subpathKey := connecter.NewConnectOptions()
 		if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
+			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)
 			return
 		}
@@ -226,7 +265,8 @@ type responder struct {
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	responsewriters.WriteObject(statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.w, r.req)
+	ctx := r.scope.ContextFunc(r.req)
+	responsewriters.WriteObject(ctx, statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.w, r.req)
 }
 
 func (r *responder) Error(err error) {
@@ -257,6 +297,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 
 		opts := metainternalversion.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &opts); err != nil {
+			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)
 			return
 		}
@@ -292,7 +333,11 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			opts.FieldSelector = nameSelector
 		}
 
-		if (opts.Watch || forceWatch) && rw != nil {
+		if opts.Watch || forceWatch {
+			if rw == nil {
+				scope.err(errors.NewMethodNotSupported(scope.Resource.GroupResource(), "watch"), w, req)
+				return
+			}
 			// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
 			timeout := time.Duration(0)
 			if opts.TimeoutSeconds != nil {
@@ -321,7 +366,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			return
 		}
 		trace.Step("Listing from storage done")
-		numberOfItems, err := setListSelfLink(result, req, scope.Namer)
+		numberOfItems, err := setListSelfLink(result, ctx, req, scope.Namer)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -334,7 +379,8 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				return
 			}
 		}
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+
+		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
 }
@@ -395,6 +441,9 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 		trace.Step("Conversion done")
 
+		ae := request.AuditEventFrom(ctx)
+		audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
+
 		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := request.UserFrom(ctx)
 
@@ -405,13 +454,12 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			}
 		}
 
+		// TODO: replace with content type negotiation?
+		includeUninitialized := req.URL.Query().Get("includeUninitialized") == "1"
+
 		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			out, err := r.Create(ctx, name, obj)
-			if status, ok := out.(*metav1.Status); ok && err == nil && status.Code == 0 {
-				status.Code = http.StatusCreated
-			}
-			return out, err
+			return r.Create(ctx, name, obj, includeUninitialized)
 		})
 		if err != nil {
 			scope.err(err, w, req)
@@ -419,13 +467,30 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 		trace.Step("Object stored in database")
 
-		if err := setSelfLink(result, req, scope.Namer); err != nil {
+		requestInfo, ok := request.RequestInfoFrom(ctx)
+		if !ok {
+			scope.err(fmt.Errorf("missing requestInfo"), w, req)
+			return
+		}
+		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
 			scope.err(err, w, req)
 			return
 		}
 		trace.Step("Self-link added")
 
-		responsewriters.WriteObject(http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		// If the object is partially initialized, always indicate it via StatusAccepted
+		code := http.StatusCreated
+		if accessor, err := meta.Accessor(result); err == nil {
+			if accessor.GetInitializers() != nil {
+				code = http.StatusAccepted
+			}
+		}
+		status, ok := result.(*metav1.Status)
+		if ok && err == nil && status.Code == 0 {
+			status.Code = int32(code)
+		}
+
+		transformResponseObject(ctx, scope, req, w, code, result)
 	}
 }
 
@@ -443,8 +508,8 @@ type namedCreaterAdapter struct {
 	rest.Creater
 }
 
-func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runtime.Object) (runtime.Object, error) {
-	return c.Creater.Create(ctx, obj)
+func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
+	return c.Creater.Create(ctx, obj, includeUninitialized)
 }
 
 // PatchResource returns a function that will handle a resource patch
@@ -485,6 +550,9 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
+		ae := request.AuditEventFrom(ctx)
+		audit.LogRequestPatch(ae, patchJS)
+
 		s, ok := runtime.SerializerInfoForMediaType(scope.Serializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
 		if !ok {
 			scope.err(fmt.Errorf("no serializer defined for JSON"), w, req)
@@ -512,14 +580,18 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		if err := setSelfLink(result, req, scope.Namer); err != nil {
+		requestInfo, ok := request.RequestInfoFrom(ctx)
+		if !ok {
+			scope.err(fmt.Errorf("missing requestInfo"), w, req)
+			return
+		}
+		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
 			scope.err(err, w, req)
 			return
 		}
 
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 	}
-
 }
 
 type updateAdmissionFunc func(updatedObject runtime.Object, currentObject runtime.Object) error
@@ -803,6 +875,9 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 		trace.Step("Conversion done")
 
+		ae := request.AuditEventFrom(ctx)
+		audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
+
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
 			scope.err(err, w, req)
 			return
@@ -829,7 +904,12 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		}
 		trace.Step("Object stored in database")
 
-		if err := setSelfLink(result, req, scope.Namer); err != nil {
+		requestInfo, ok := request.RequestInfoFrom(ctx)
+		if !ok {
+			scope.err(fmt.Errorf("missing requestInfo"), w, req)
+			return
+		}
+		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
 			scope.err(err, w, req)
 			return
 		}
@@ -839,7 +919,8 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if wasCreated {
 			status = http.StatusCreated
 		}
-		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+
+		transformResponseObject(ctx, scope, req, w, status, result)
 	}
 }
 
@@ -886,9 +967,13 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), w, req)
 					return
 				}
+
+				ae := request.AuditEventFrom(ctx)
+				audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
 			} else {
 				if values := req.URL.Query(); len(values) > 0 {
 					if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, options); err != nil {
+						err = errors.NewBadRequest(err.Error())
 						scope.err(err, w, req)
 						return
 					}
@@ -942,14 +1027,20 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			}
 		} else {
 			// when a non-status response is returned, set the self link
+			requestInfo, ok := request.RequestInfoFrom(ctx)
+			if !ok {
+				scope.err(fmt.Errorf("missing requestInfo"), w, req)
+				return
+			}
 			if _, ok := result.(*metav1.Status); !ok {
-				if err := setSelfLink(result, req, scope.Namer); err != nil {
+				if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 		}
-		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+
+		transformResponseObject(ctx, scope, req, w, status, result)
 	}
 }
 
@@ -980,6 +1071,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 
 		listOptions := metainternalversion.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &listOptions); err != nil {
+			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)
 			return
 		}
@@ -1021,6 +1113,9 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), w, req)
 					return
 				}
+
+				ae := request.AuditEventFrom(ctx)
+				audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
 			}
 		}
 
@@ -1045,13 +1140,14 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		} else {
 			// when a non-status response is returned, set the self link
 			if _, ok := result.(*metav1.Status); !ok {
-				if _, err := setListSelfLink(result, req, scope.Namer); err != nil {
+				if _, err := setListSelfLink(result, ctx, req, scope.Namer); err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 		}
-		responsewriters.WriteObjectNegotiated(scope.Serializer, scope.Kind.GroupVersion(), w, req, http.StatusOK, result)
+
+		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 	}
 }
 
@@ -1059,7 +1155,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 type resultFunc func() (runtime.Object, error)
 
 // finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
-// Any api.Status object returned is considered an "error", which interrupts the normal response flow.
+// An api.Status object with status != success is considered an "error", which interrupts the normal response flow.
 func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object, err error) {
 	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
 	// when the select statement reads something other than the one the goroutine sends on.
@@ -1083,7 +1179,9 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	select {
 	case result = <-ch:
 		if status, ok := result.(*metav1.Status); ok {
-			return nil, errors.FromObject(status)
+			if status.Status != metav1.StatusSuccess {
+				return nil, errors.FromObject(status)
+			}
 		}
 		return result, nil
 	case err = <-errCh:
@@ -1111,9 +1209,9 @@ func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime
 
 // setSelfLink sets the self link of an object (or the child items in a list) to the base URL of the request
 // plus the path and query generated by the provided linkFunc
-func setSelfLink(obj runtime.Object, req *http.Request, namer ScopeNamer) error {
+func setSelfLink(obj runtime.Object, requestInfo *request.RequestInfo, namer ScopeNamer) error {
 	// TODO: SelfLink generation should return a full URL?
-	uri, err := namer.GenerateLink(req, obj)
+	uri, err := namer.GenerateLink(requestInfo, obj)
 	if err != nil {
 		return nil
 	}
@@ -1158,7 +1256,7 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 
 // setListSelfLink sets the self link of a list to the base URL, then sets the self links
 // on all child objects returned. Returns the number of items in the list.
-func setListSelfLink(obj runtime.Object, req *http.Request, namer ScopeNamer) (int, error) {
+func setListSelfLink(obj runtime.Object, ctx request.Context, req *http.Request, namer ScopeNamer) (int, error) {
 	if !meta.IsListType(obj) {
 		return 0, nil
 	}
@@ -1170,11 +1268,15 @@ func setListSelfLink(obj runtime.Object, req *http.Request, namer ScopeNamer) (i
 	if err := namer.SetSelfLink(obj, uri); err != nil {
 		glog.V(4).Infof("Unable to set self link on object: %v", err)
 	}
+	requestInfo, ok := request.RequestInfoFrom(ctx)
+	if !ok {
+		return 0, fmt.Errorf("missing requestInfo")
+	}
 
 	count := 0
 	err = meta.EachListItem(obj, func(obj runtime.Object) error {
 		count++
-		return setSelfLink(obj, req, namer)
+		return setSelfLink(obj, requestInfo, namer)
 	})
 	return count, err
 }

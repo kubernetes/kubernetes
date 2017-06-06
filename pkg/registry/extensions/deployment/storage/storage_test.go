@@ -340,10 +340,10 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 		storage, server := newStorage(t)
 		rollbackStorage := storage.Rollback
 
-		if _, err := storage.Deployment.Create(ctx, validNewDeployment()); err != nil {
+		if _, err := storage.Deployment.Create(ctx, validNewDeployment(), false); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
 		}
-		if _, err := rollbackStorage.Create(ctx, &test.rollback); !test.errOK(err) {
+		if _, err := rollbackStorage.Create(ctx, &test.rollback, false); !test.errOK(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		} else if err == nil {
 			// If rollback succeeded, verify Rollback field of deployment
@@ -372,7 +372,7 @@ func TestEtcdCreateDeploymentRollbackNoDeployment(t *testing.T) {
 		Name:               name,
 		UpdatedAnnotations: map[string]string{},
 		RollbackTo:         extensions.RollbackConfig{Revision: 1},
-	})
+	}, false)
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
@@ -395,4 +395,12 @@ func TestShortNames(t *testing.T) {
 	defer storage.Deployment.Store.DestroyFunc()
 	expected := []string{"deploy"}
 	registrytest.AssertShortNames(t, storage.Deployment, expected)
+}
+
+func TestCategories(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Deployment.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage.Deployment, expected)
 }

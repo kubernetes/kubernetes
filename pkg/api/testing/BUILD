@@ -20,6 +20,8 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/admissionregistration:go_default_library",
+        "//pkg/apis/apps:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/certificates:go_default_library",

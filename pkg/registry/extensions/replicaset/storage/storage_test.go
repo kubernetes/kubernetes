@@ -47,7 +47,7 @@ func newStorage(t *testing.T) (*ReplicaSetStorage, *etcdtesting.EtcdTestServer) 
 // createReplicaSet is a helper function that returns a ReplicaSet with the updated resource version.
 func createReplicaSet(storage *REST, rs extensions.ReplicaSet, t *testing.T) (extensions.ReplicaSet, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), rs.Namespace)
-	obj, err := storage.Create(ctx, &rs)
+	obj, err := storage.Create(ctx, &rs, false)
 	if err != nil {
 		t.Errorf("Failed to create ReplicaSet, %v", err)
 	}
@@ -375,4 +375,12 @@ func TestShortNames(t *testing.T) {
 	defer storage.ReplicaSet.DestroyFunc()
 	expected := []string{"rs"}
 	registrytest.AssertShortNames(t, storage.ReplicaSet, expected)
+}
+
+func TestCategories(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage.ReplicaSet, expected)
 }

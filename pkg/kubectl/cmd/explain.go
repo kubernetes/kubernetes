@@ -57,6 +57,7 @@ func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().Bool("recursive", false, "Print the fields of fields (Currently only 1 level deep)")
+	cmd.Flags().String("api-version", "", "Get different explanations for particular API version")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }

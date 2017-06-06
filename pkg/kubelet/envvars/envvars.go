@@ -18,6 +18,7 @@ package envvars
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -78,18 +79,21 @@ func makeLinkVariables(service *v1.Service) []v1.EnvVar {
 		if sp.Protocol != "" {
 			protocol = string(sp.Protocol)
 		}
+
+		hostPort := net.JoinHostPort(service.Spec.ClusterIP, strconv.Itoa(int(sp.Port)))
+
 		if i == 0 {
 			// Docker special-cases the first port.
 			all = append(all, v1.EnvVar{
 				Name:  prefix + "_PORT",
-				Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), service.Spec.ClusterIP, sp.Port),
+				Value: fmt.Sprintf("%s://%s", strings.ToLower(protocol), hostPort),
 			})
 		}
 		portPrefix := fmt.Sprintf("%s_PORT_%d_%s", prefix, sp.Port, strings.ToUpper(protocol))
 		all = append(all, []v1.EnvVar{
 			{
 				Name:  portPrefix,
-				Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), service.Spec.ClusterIP, sp.Port),
+				Value: fmt.Sprintf("%s://%s", strings.ToLower(protocol), hostPort),
 			},
 			{
 				Name:  portPrefix + "_PROTO",

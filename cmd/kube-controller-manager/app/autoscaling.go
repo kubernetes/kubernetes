@@ -26,10 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1"
 	"k8s.io/metrics/pkg/client/custom_metrics"
-
-	// install the APIs so that they're registered with the scheme for the clients
-	_ "k8s.io/metrics/pkg/apis/custom_metrics/install"
-	_ "k8s.io/metrics/pkg/apis/metrics/install"
 )
 
 func startHPAController(ctx ControllerContext) (bool, error) {

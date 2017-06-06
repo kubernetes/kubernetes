@@ -91,7 +91,7 @@ coreos:
         ExecStart=/opt/bin/kube-apiserver \
         --service-account-key-file=/opt/bin/kube-serviceaccount.key \
         --service-account-lookup=true \
-        --admission-control=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota \
+        --admission-control=Initializers,NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota \
         --runtime-config=api/v1 \
         --allow-privileged=true \
         --insecure-bind-address=0.0.0.0 \
