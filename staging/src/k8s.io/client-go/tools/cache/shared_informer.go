@@ -147,7 +147,7 @@ type sharedIndexInformer struct {
 	// stopCh is the channel used to stop the main Run process.  We have to track it so that
 	// late joiners can have a proper stop
 	stopCh <-chan struct{}
-	wg     sync.WaitGroup
+	wg     wait.Group
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -211,8 +211,8 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 
 	defer s.wg.Wait()
 
-	wait.StartWithChannelWithinGroup(stopCh, &s.wg, s.cacheMutationDetector.Run)
-	wait.StartWithChannelWithinGroup(stopCh, &s.wg, s.processor.run)
+	s.wg.StartWithChannel(stopCh, s.cacheMutationDetector.Run)
+	s.wg.StartWithChannel(stopCh, s.processor.run)
 	s.controller.Run(stopCh)
 }
 
@@ -327,8 +327,8 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 
 	s.processor.addListener(listener)
 
-	wait.StartWithChannelWithinGroup(s.stopCh, &s.wg, listener.run)
-	wait.StartWithChannelWithinGroup(s.stopCh, &s.wg, listener.pop)
+	s.wg.StartWithChannel(s.stopCh, listener.run)
+	s.wg.StartWithChannel(s.stopCh, listener.pop)
 
 	items := s.indexer.List()
 	for i := range items {
@@ -398,13 +398,13 @@ func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
 }
 
 func (p *sharedProcessor) run(stopCh <-chan struct{}) {
-	var wg sync.WaitGroup
+	var wg wait.Group
 	func() {
 		p.listenersLock.RLock()
 		defer p.listenersLock.RUnlock()
 		for _, listener := range p.listeners {
-			wait.StartWithChannelWithinGroup(stopCh, &wg, listener.run)
-			wait.StartWithChannelWithinGroup(stopCh, &wg, listener.pop)
+			wg.StartWithChannel(stopCh, listener.run)
+			wg.StartWithChannel(stopCh, listener.pop)
 		}
 	}()
 	wg.Wait()

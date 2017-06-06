@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -37,33 +38,36 @@ var ForeverTestTimeout = time.Second * 30
 // NeverStop may be passed to Until to make it never stop.
 var NeverStop <-chan struct{} = make(chan struct{})
 
-// Group is an interface to decouple code from sync.WaitGroup.
-type Group interface {
-	Add(delta int)
-	Done()
+// Group allows to start a group of goroutines and wait for their completion.
+type Group struct {
+	wg sync.WaitGroup
 }
 
-// StartWithChannelWithinGroup adds 1 to the group, starts f in a new goroutine and calls g.Done once f has finished.
+func (g *Group) Wait() {
+	g.wg.Wait()
+}
+
+// StartWithChannel starts f in a new goroutine in the group.
 // stopCh is passed to f as an argument. f should stop when stopCh is available.
-func StartWithChannelWithinGroup(stopCh <-chan struct{}, g Group, f func(stopCh <-chan struct{})) {
-	StartWithinGroup(g, func() {
+func (g *Group) StartWithChannel(stopCh <-chan struct{}, f func(stopCh <-chan struct{})) {
+	g.Start(func() {
 		f(stopCh)
 	})
 }
 
-// StartWithContextWithinGroup adds 1 to the group, starts f in a new goroutine and calls g.Done once f has finished.
+// StartWithContext starts f in a new goroutine in the group.
 // ctx is passed to f as an argument. f should stop when ctx.Done() is available.
-func StartWithContextWithinGroup(ctx context.Context, g Group, f func(context.Context)) {
-	StartWithinGroup(g, func() {
+func (g *Group) StartWithContext(ctx context.Context, f func(context.Context)) {
+	g.Start(func() {
 		f(ctx)
 	})
 }
 
-// StartWithinGroup adds 1 to the group, starts f in a new goroutine and calls g.Done once f has finished.
-func StartWithinGroup(g Group, f func()) {
-	g.Add(1)
+// Start starts f in a new goroutine in the group.
+func (g *Group) Start(f func()) {
+	g.wg.Add(1)
 	go func() {
-		defer g.Done()
+		defer g.wg.Done()
 		f()
 	}()
 }
