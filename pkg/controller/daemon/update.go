@@ -17,17 +17,20 @@ limitations under the License.
 package daemon
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 
 	"github.com/golang/glog"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -103,7 +106,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *extensions.DaemonSet) (cur
 		}
 		// Compare histories with ds to separate cur and old history
 		found := false
-		found, err = Match(&ds.Spec.Template, history)
+		found, err = Match(ds, history)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -294,24 +297,66 @@ func (dsc *DaemonSetsController) controlledHistories(ds *extensions.DaemonSet) (
 	return result, nil
 }
 
-// Match check if ds template is semantically equal to the template stored in history
-func Match(template *v1.PodTemplateSpec, history *apps.ControllerRevision) (bool, error) {
-	t, err := DecodeHistory(history)
-	return apiequality.Semantic.DeepEqual(template, t), err
+// Match check if the given DaemonSet's template matches the template stored in the given history.
+func Match(ds *extensions.DaemonSet, history *apps.ControllerRevision) (bool, error) {
+	patch, err := getPatch(ds)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(patch, history.Data.Raw), nil
 }
 
-func DecodeHistory(history *apps.ControllerRevision) (*v1.PodTemplateSpec, error) {
-	template := v1.PodTemplateSpec{}
-	err := json.Unmarshal(history.Data.Raw, &template)
-	return &template, err
+// ApplyHistory returns a specific revision of DaemonSet by applying the given history to a copy of the given DaemonSet
+func ApplyHistory(ds *extensions.DaemonSet, history *apps.ControllerRevision) (*extensions.DaemonSet, error) {
+	obj, err := scheme.Scheme.DeepCopy(ds)
+	if err != nil {
+		return nil, err
+	}
+	clone := obj.(*extensions.DaemonSet)
+	cloneBytes, err := json.Marshal(clone)
+	if err != nil {
+		return nil, err
+	}
+	patched, err := strategicpatch.StrategicMergePatch(cloneBytes, history.Data.Raw, clone)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(patched, clone)
+	if err != nil {
+		return nil, err
+	}
+	return clone, nil
 }
 
-func encodeTemplate(template *v1.PodTemplateSpec) ([]byte, error) {
-	return json.Marshal(template)
+// getPatch returns a strategic merge patch that can be applied to restore a Daemonset to a
+// previous version. If the returned error is nil the patch is valid. The current state that we save is just the
+// PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
+// recorded patches.
+func getPatch(ds *extensions.DaemonSet) ([]byte, error) {
+	dsBytes, err := json.Marshal(ds)
+	if err != nil {
+		return nil, err
+	}
+	var raw map[string]interface{}
+	err = json.Unmarshal(dsBytes, &raw)
+	if err != nil {
+		return nil, err
+	}
+	objCopy := make(map[string]interface{})
+	specCopy := make(map[string]interface{})
+
+	// Create a patch of the DaemonSet that replaces spec.template
+	spec := raw["spec"].(map[string]interface{})
+	template := spec["template"].(map[string]interface{})
+	specCopy["template"] = template
+	template["$patch"] = "replace"
+	objCopy["spec"] = specCopy
+	patch, err := json.Marshal(objCopy)
+	return patch, err
 }
 
 func (dsc *DaemonSetsController) snapshot(ds *extensions.DaemonSet, revision int64) (*apps.ControllerRevision, error) {
-	encodedTemplate, err := encodeTemplate(&ds.Spec.Template)
+	patch, err := getPatch(ds)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +370,7 @@ func (dsc *DaemonSetsController) snapshot(ds *extensions.DaemonSet, revision int
 			Annotations:     ds.Annotations,
 			OwnerReferences: []metav1.OwnerReference{*newControllerRef(ds)},
 		},
-		Data:     runtime.RawExtension{Raw: encodedTemplate},
+		Data:     runtime.RawExtension{Raw: patch},
 		Revision: revision,
 	}
 
@@ -337,7 +382,7 @@ func (dsc *DaemonSetsController) snapshot(ds *extensions.DaemonSet, revision int
 			return nil, getErr
 		}
 		// Check if we already created it
-		done, err := Match(&ds.Spec.Template, existedHistory)
+		done, err := Match(ds, existedHistory)
 		if err != nil {
 			return nil, err
 		}
