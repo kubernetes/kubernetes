@@ -1135,16 +1135,7 @@ func (e *Store) Watch(ctx genericapirequest.Context, options *metainternalversio
 func (e *Store) WatchPredicate(ctx genericapirequest.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			// For performance reasons, we can optimize the further computations of
-			// selector, by removing then "matches-single" fields, because they are
-			// already satisfied by choosing appropriate key.
-			sp, err := p.RemoveMatchesSingleRequirements()
-			if err != nil {
-				glog.Warningf("Couldn't remove matches-single requirements: %v", err)
-				// Since we couldn't optimize selector, reset to the original one.
-				sp = p
-			}
-			w, err := e.Storage.Watch(ctx, key, resourceVersion, sp)
+			w, err := e.Storage.Watch(ctx, key, resourceVersion, p)
 			if err != nil {
 				return nil, err
 			}
