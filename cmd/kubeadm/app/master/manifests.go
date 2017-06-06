@@ -33,6 +33,7 @@ import (
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/version"
@@ -51,10 +52,6 @@ const (
 	kubeControllerManager = "kube-controller-manager"
 	kubeScheduler         = "kube-scheduler"
 	kubeProxy             = "kube-proxy"
-)
-
-var (
-	v170 = version.MustParseSemantic("v1.7.0-alpha.0")
 )
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
@@ -97,7 +94,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		kubeControllerManager: componentPod(api.Container{
 			Name:          kubeControllerManager,
 			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-			Command:       getControllerManagerCommand(cfg, false),
+			Command:       getControllerManagerCommand(cfg, false, k8sVersion),
 			VolumeMounts:  volumeMounts,
 			LivenessProbe: componentProbe(10252, "/healthz", api.URISchemeHTTP),
 			Resources:     componentResources("200m"),
@@ -349,7 +346,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 		"requestheader-client-ca-file":       filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName),
 		"requestheader-allowed-names":        "front-proxy-client",
 	}
-	if k8sVersion.AtLeast(v170) {
+	if k8sVersion.AtLeast(kubeadmconstants.MinimumAPIAggregationVersion) {
 		// add options which allow the kube-apiserver to act as a front-proxy to aggregated API servers
 		defaultArguments["proxy-client-cert-file"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientCertName)
 		defaultArguments["proxy-client-key-file"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName)
@@ -409,7 +406,7 @@ func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	return command
 }
 
-func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
+func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k8sVersion *version.Version) []string {
 	var command []string
 
 	// self-hosted controller-manager needs to wait on a lock
@@ -427,6 +424,11 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		"cluster-signing-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName),
 		"use-service-account-credentials":  "true",
 		"controllers":                      "*,bootstrapsigner,tokencleaner",
+	}
+	if k8sVersion.LessThan(kubeadmconstants.MinimumCSRSARApproverVersion) {
+		// enable the former CSR group approver for v1.6 clusters.
+		// TODO(luxas): Remove this once we're targeting v1.8 at HEAD
+		defaultArguments["insecure-experimental-approve-all-kubelet-csrs-for-group"] = bootstrapapi.BootstrapGroup
 	}
 
 	command = getComponentBaseCommand(controllerManager)
