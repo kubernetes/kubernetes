@@ -211,8 +211,8 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 
 	defer s.wg.Wait()
 
-	wait.StartUntil(stopCh, &s.wg, s.cacheMutationDetector.Run)
-	wait.StartUntil(stopCh, &s.wg, s.processor.run)
+	wait.StartWithChannelWithinGroup(stopCh, &s.wg, s.cacheMutationDetector.Run)
+	wait.StartWithChannelWithinGroup(stopCh, &s.wg, s.processor.run)
 	s.controller.Run(stopCh)
 }
 
@@ -327,8 +327,8 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 
 	s.processor.addListener(listener)
 
-	wait.StartUntil(s.stopCh, &s.wg, listener.run)
-	wait.StartUntil(s.stopCh, &s.wg, listener.pop)
+	wait.StartWithChannelWithinGroup(s.stopCh, &s.wg, listener.run)
+	wait.StartWithChannelWithinGroup(s.stopCh, &s.wg, listener.pop)
 
 	items := s.indexer.List()
 	for i := range items {
@@ -403,8 +403,8 @@ func (p *sharedProcessor) run(stopCh <-chan struct{}) {
 		p.listenersLock.RLock()
 		defer p.listenersLock.RUnlock()
 		for _, listener := range p.listeners {
-			wait.StartUntil(stopCh, &wg, listener.run)
-			wait.StartUntil(stopCh, &wg, listener.pop)
+			wait.StartWithChannelWithinGroup(stopCh, &wg, listener.run)
+			wait.StartWithChannelWithinGroup(stopCh, &wg, listener.pop)
 		}
 	}()
 	wg.Wait()
