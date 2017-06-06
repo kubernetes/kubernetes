@@ -148,7 +148,7 @@ type initFederationOptions struct {
 	apiServerServiceTypeString       string
 	apiServerServiceType             v1.ServiceType
 	apiServerAdvertiseAddress        string
-	apiServerNodePortPort           int32
+	apiServerNodePortPort            int32
 	apiServerEnableHTTPBasicAuth     bool
 	apiServerEnableTokenAuth         bool
 }
@@ -165,7 +165,7 @@ func (o *initFederationOptions) Bind(flags *pflag.FlagSet, defaultImage string) 
 	flags.StringVar(&o.controllerManagerOverridesString, "controllermanager-arg-overrides", "", "comma separated list of federation-controller-manager arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
 	flags.StringVar(&o.apiServerServiceTypeString, apiserverServiceTypeFlag, string(v1.ServiceTypeLoadBalancer), "The type of service to create for federation API server. Options: 'LoadBalancer' (default), 'NodePort'.")
 	flags.StringVar(&o.apiServerAdvertiseAddress, apiserverAdvertiseAddressFlag, "", "Preferred address to advertise api server nodeport service. Valid only if '"+apiserverServiceTypeFlag+"=NodePort'.")
-	flags.Int32Var(&o.apiServerNodePortPort, apiserverPortFlag , 0, "Preferred port to use for api server nodeport service (0 for random port assignment). Valid only if '"+apiserverServiceTypeFlag+"=NodePort'.")
+	flags.Int32Var(&o.apiServerNodePortPort, apiserverPortFlag, 0, "Preferred port to use for api server nodeport service (0 for random port assignment). Valid only if '"+apiserverServiceTypeFlag+"=NodePort'.")
 	flags.BoolVar(&o.apiServerEnableHTTPBasicAuth, "apiserver-enable-basic-auth", false, "Enables HTTP Basic authentication for the federation-apiserver. Defaults to false.")
 	flags.BoolVar(&o.apiServerEnableTokenAuth, "apiserver-enable-token-auth", false, "Enables token authentication for the federation-apiserver. Defaults to false.")
 }
@@ -455,11 +455,11 @@ func createNamespace(clientset client.Interface, federationName, namespace strin
 }
 
 func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcName, federationName, apiserverAdvertiseAddress string, apiserverPort int32, apiserverServiceType v1.ServiceType, dryRun bool) (*api.Service, []string, []string, error) {
-	port := api.ServicePort {
-			Name:       "https",
-			Protocol:   "TCP",
-			Port:       443,
-			TargetPort: intstr.FromString(apiServerSecurePortName),
+	port := api.ServicePort{
+		Name:       "https",
+		Protocol:   "TCP",
+		Port:       443,
+		TargetPort: intstr.FromString(apiServerSecurePortName),
 	}
 	if apiserverServiceType == v1.ServiceTypeNodePort && apiserverPort > 0 {
 		port.NodePort = apiserverPort
@@ -474,7 +474,7 @@ func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcN
 		Spec: api.ServiceSpec{
 			Type:     api.ServiceType(apiserverServiceType),
 			Selector: apiserverSvcSelector,
-			Ports: []api.ServicePort{port},
+			Ports:    []api.ServicePort{port},
 		},
 	}
 
