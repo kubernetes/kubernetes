@@ -176,7 +176,7 @@ type CgroupSubsystems struct {
 }
 
 // cgroupManagerImpl implements the CgroupManager interface.
-// Its a stateless object which can be used to
+// It's a stateless object which can be used to
 // update,create or delete any number of cgroups
 // It uses the Libcontainer raw fs cgroup manager for cgroup management.
 type cgroupManagerImpl struct {
