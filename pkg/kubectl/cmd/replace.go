@@ -45,7 +45,7 @@ var (
 
 		    $ kubectl get TYPE NAME -o yaml
 
-		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`))
+		Please refer to the models in https://htmlpreview.github.io/?https://github.com/kubernetes/kubernetes.github.io/blob/HEAD/docs/api-reference/v1/definitions.html to find if a field is mutable.`))
 
 	replaceExample = templates.Examples(i18n.T(`
 		# Replace a pod using the data in pod.json.
