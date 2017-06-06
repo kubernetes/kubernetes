@@ -269,19 +269,8 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 		return ret
 	}
 
-	kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.Kind}
-	storage := customresource.NewREST(
-		schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural},
-		schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.ListKind},
-		UnstructuredCopier{},
-		customresource.NewStrategy(
-			discovery.NewUnstructuredObjectTyper(nil),
-			crd.Spec.Scope == apiextensions.NamespaceScoped,
-			kind,
-		),
-		r.restOptionsGetter,
-	)
-
+	// In addition to Unstructured objects (Custom Resources), we also may sometimes need to
+	// decode unversioned Options objects, so we delegate to parameterScheme for such types.
 	parameterScheme := runtime.NewScheme()
 	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version},
 		&metav1.ListOptions{},
@@ -291,6 +280,24 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 	)
 	parameterScheme.AddGeneratedDeepCopyFuncs(metav1.GetGeneratedDeepCopyFuncs()...)
 	parameterCodec := runtime.NewParameterCodec(parameterScheme)
+
+	kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.Kind}
+	typer := unstructuredObjectTyper{
+		delegate:          parameterScheme,
+		unstructuredTyper: discovery.NewUnstructuredObjectTyper(nil),
+	}
+	creator := unstructuredCreator{}
+	storage := customresource.NewREST(
+		schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural},
+		schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Spec.Names.ListKind},
+		UnstructuredCopier{},
+		customresource.NewStrategy(
+			typer,
+			crd.Spec.Scope == apiextensions.NamespaceScoped,
+			kind,
+		),
+		r.restOptionsGetter,
+	)
 
 	selfLinkPrefix := ""
 	switch crd.Spec.Scope {
@@ -315,14 +322,14 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 			return ret
 		},
 
-		Serializer:     UnstructuredNegotiatedSerializer{},
+		Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator},
 		ParameterCodec: parameterCodec,
 
-		Creater:         UnstructuredCreator{},
+		Creater:         creator,
 		Convertor:       unstructured.UnstructuredObjectConverter{},
-		Defaulter:       UnstructuredDefaulter{},
+		Defaulter:       unstructuredDefaulter{parameterScheme},
 		Copier:          UnstructuredCopier{},
-		Typer:           discovery.NewUnstructuredObjectTyper(nil),
+		Typer:           typer,
 		UnsafeConvertor: unstructured.UnstructuredObjectConverter{},
 
 		Resource:    schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Spec.Names.Plural},
@@ -341,30 +348,62 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 	return ret
 }
 
-type UnstructuredNegotiatedSerializer struct{}
+type unstructuredNegotiatedSerializer struct {
+	typer   runtime.ObjectTyper
+	creator runtime.ObjectCreater
+}
 
-func (s UnstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
+func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
 	return []runtime.SerializerInfo{
 		{
 			MediaType:        "application/json",
 			EncodesAsText:    true,
-			Serializer:       json.NewSerializer(json.DefaultMetaFactory, UnstructuredCreator{}, discovery.NewUnstructuredObjectTyper(nil), false),
-			PrettySerializer: json.NewSerializer(json.DefaultMetaFactory, UnstructuredCreator{}, discovery.NewUnstructuredObjectTyper(nil), true),
+			Serializer:       json.NewSerializer(json.DefaultMetaFactory, s.creator, s.typer, false),
+			PrettySerializer: json.NewSerializer(json.DefaultMetaFactory, s.creator, s.typer, true),
 			StreamSerializer: &runtime.StreamSerializerInfo{
 				EncodesAsText: true,
-				Serializer:    json.NewSerializer(json.DefaultMetaFactory, UnstructuredCreator{}, discovery.NewUnstructuredObjectTyper(nil), false),
+				Serializer:    json.NewSerializer(json.DefaultMetaFactory, s.creator, s.typer, false),
 				Framer:        json.Framer,
 			},
 		},
 	}
 }
 
-func (s UnstructuredNegotiatedSerializer) EncoderForVersion(serializer runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
+func (s unstructuredNegotiatedSerializer) EncoderForVersion(serializer runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
 	return versioning.NewDefaultingCodecForScheme(Scheme, crEncoderInstance, nil, gv, nil)
 }
 
-func (s UnstructuredNegotiatedSerializer) DecoderToVersion(serializer runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	return unstructured.UnstructuredJSONScheme
+func (s unstructuredNegotiatedSerializer) DecoderToVersion(serializer runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
+	return unstructuredDecoder{delegate: Codecs.DecoderToVersion(serializer, gv)}
+}
+
+type unstructuredDecoder struct {
+	delegate runtime.Decoder
+}
+
+func (d unstructuredDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	// Delegate for things other than Unstructured.
+	if _, ok := into.(runtime.Unstructured); !ok && into != nil {
+		return d.delegate.Decode(data, defaults, into)
+	}
+	return unstructured.UnstructuredJSONScheme.Decode(data, defaults, into)
+}
+
+type unstructuredObjectTyper struct {
+	delegate          runtime.ObjectTyper
+	unstructuredTyper runtime.ObjectTyper
+}
+
+func (t unstructuredObjectTyper) ObjectKinds(obj runtime.Object) ([]schema.GroupVersionKind, bool, error) {
+	// Delegate for things other than Unstructured.
+	if _, ok := obj.(runtime.Unstructured); !ok {
+		return t.delegate.ObjectKinds(obj)
+	}
+	return t.unstructuredTyper.ObjectKinds(obj)
+}
+
+func (t unstructuredObjectTyper) Recognizes(gvk schema.GroupVersionKind) bool {
+	return t.delegate.Recognizes(gvk) || t.unstructuredTyper.Recognizes(gvk)
 }
 
 var crEncoderInstance = crEncoder{}
@@ -390,9 +429,9 @@ func (crEncoder) Encode(obj runtime.Object, w io.Writer) error {
 	}
 }
 
-type UnstructuredCreator struct{}
+type unstructuredCreator struct{}
 
-func (UnstructuredCreator) New(kind schema.GroupVersionKind) (runtime.Object, error) {
+func (c unstructuredCreator) New(kind schema.GroupVersionKind) (runtime.Object, error) {
 	ret := &unstructured.Unstructured{}
 	ret.SetGroupVersionKind(kind)
 	return ret, nil
@@ -401,6 +440,14 @@ func (UnstructuredCreator) New(kind schema.GroupVersionKind) (runtime.Object, er
 type UnstructuredCopier struct{}
 
 func (UnstructuredCopier) Copy(obj runtime.Object) (runtime.Object, error) {
+	if _, ok := obj.(runtime.Unstructured); !ok {
+		// Callers should not use this UnstructuredCopier for things other than Unstructured.
+		// If they do, the copy they get back will become Unstructured, which can lead to
+		// difficult-to-debug errors downstream. To make such errors more obvious,
+		// we explicitly reject anything that isn't Unstructured.
+		return nil, fmt.Errorf("UnstructuredCopier can't copy type %T", obj)
+	}
+
 	// serialize and deserialize to ensure a clean copy
 	buf := &bytes.Buffer{}
 	err := unstructured.UnstructuredJSONScheme.Encode(obj, buf)
@@ -412,9 +459,16 @@ func (UnstructuredCopier) Copy(obj runtime.Object) (runtime.Object, error) {
 	return result, err
 }
 
-type UnstructuredDefaulter struct{}
+type unstructuredDefaulter struct {
+	delegate runtime.ObjectDefaulter
+}
 
-func (UnstructuredDefaulter) Default(in runtime.Object) {}
+func (d unstructuredDefaulter) Default(in runtime.Object) {
+	// Delegate for things other than Unstructured.
+	if _, ok := in.(runtime.Unstructured); !ok {
+		d.delegate.Default(in)
+	}
+}
 
 type CRDRESTOptionsGetter struct {
 	StorageConfig           storagebackend.Config
