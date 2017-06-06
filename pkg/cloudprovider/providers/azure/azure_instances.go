@@ -60,7 +60,6 @@ func (az *Cloud) InstanceID(name types.NodeName) (string, error) {
 	var machine compute.VirtualMachine
 	var exists bool
 	var err error
-	az.operationPollRateLimiter.Accept()
 	machine, exists, err = az.getVirtualMachine(name)
 	if err != nil {
 		if az.CloudProviderBackoff {
