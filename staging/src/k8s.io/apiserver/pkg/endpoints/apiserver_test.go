@@ -1157,6 +1157,52 @@ func TestList(t *testing.T) {
 	}
 }
 
+func TestRequestsWithInvalidQuery(t *testing.T) {
+	storage := map[string]rest.Storage{}
+
+	storage["simple"] = &SimpleRESTStorage{expectedResourceNamespace: "default"}
+	storage["withoptions"] = GetWithOptionsRESTStorage{}
+
+	var handler = handleInternal(storage, admissionControl, selfLinker, nil)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	for i, test := range []struct {
+		postfix string
+		method  string
+	}{
+		{"/simple?labelSelector=<invalid>", http.MethodGet},
+		{"/simple/foo?gracePeriodSeconds=<invalid>", http.MethodDelete},
+		// {"/simple?labelSelector=<value>", http.MethodDelete}, TODO: implement DeleteCollection in  SimpleRESTStorage
+		// {"/simple/foo?export=<invalid>", http.MethodGet}, TODO: there is no invalid bool in conversion. Should we be more strict?
+		// {"/simple/foo?resourceVersion=<invalid>", http.MethodGet}, TODO: there is no invalid resourceVersion. Should we be more strict?
+		// {"/withoptions?labelSelector=<invalid>", http.MethodGet}, TODO: SimpleGetOptions is always valid. Add more validation that can fail.
+	} {
+		baseURL := server.URL + "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default"
+		url := baseURL + test.postfix
+		r, err := http.NewRequest(test.method, url, nil)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		resp, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, url, http.StatusBadRequest, resp)
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
+			t.Logf("%d: body: %s", i, string(body))
+		}
+	}
+}
+
 func TestLogs(t *testing.T) {
 	handler := handle(map[string]rest.Storage{})
 	server := httptest.NewServer(handler)
