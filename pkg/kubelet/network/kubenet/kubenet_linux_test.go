@@ -125,7 +125,7 @@ func TestGetPodNetworkStatus(t *testing.T) {
 	}
 }
 
-// TestTeardownBeforeSetUp tests that a `TearDown` call does call
+// TestTeardownCallsShaper tests that a `TearDown` call does call
 // `shaper.Reset`
 func TestTeardownCallsShaper(t *testing.T) {
 	fexec := &exec.FakeExec{
