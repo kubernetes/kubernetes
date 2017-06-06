@@ -75,6 +75,7 @@ go_test(
         "kuberuntime_manager_test.go",
         "kuberuntime_sandbox_test.go",
         "labels_test.go",
+        "security_context_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
