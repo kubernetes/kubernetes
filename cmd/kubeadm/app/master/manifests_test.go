@@ -667,7 +667,8 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}{
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				CertificatesDir: testCertsDir,
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.7.0",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -684,8 +685,28 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				CloudProvider:   "foo",
-				CertificatesDir: testCertsDir,
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.6.4",
+			},
+			expected: []string{
+				"kube-controller-manager",
+				"--address=127.0.0.1",
+				"--leader-elect=true",
+				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
+				"--root-ca-file=" + testCertsDir + "/ca.crt",
+				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
+				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
+				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
+				"--use-service-account-credentials=true",
+				"--controllers=*,bootstrapsigner,tokencleaner",
+				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:bootstrappers",
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				CloudProvider:     "foo",
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.7.0",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -703,8 +724,9 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				Networking:      kubeadm.Networking{PodSubnet: "bar"},
-				CertificatesDir: testCertsDir,
+				Networking:        kubeadm.Networking{PodSubnet: "bar"},
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.7.0",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -724,7 +746,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getControllerManagerCommand(rt.cfg, false)
+		actual := getControllerManagerCommand(rt.cfg, false, version.MustParseSemantic(rt.cfg.KubernetesVersion))
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
@@ -935,7 +957,7 @@ func TestVersionCompare(t *testing.T) {
 		"v1.7.1",
 	}
 	for _, v := range versions {
-		if !version.MustParseSemantic(v).AtLeast(v170) {
+		if !version.MustParseSemantic(v).AtLeast(kubeadmconstants.MinimumAPIAggregationVersion) {
 			t.Errorf("err")
 		}
 	}
