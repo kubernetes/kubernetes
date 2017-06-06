@@ -1098,13 +1098,13 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 				return
 			}
 			if len(body) > 0 {
-				s, err := negotiation.NegotiateInputSerializer(req, scope.Serializer)
+				s, err := negotiation.NegotiateInputSerializer(req, metainternalversion.Codecs)
 				if err != nil {
 					scope.err(err, w, req)
 					return
 				}
 				defaultGVK := scope.Kind.GroupVersion().WithKind("DeleteOptions")
-				obj, _, err := scope.Serializer.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
+				obj, _, err := metainternalversion.Codecs.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
 				if err != nil {
 					scope.err(err, w, req)
 					return
