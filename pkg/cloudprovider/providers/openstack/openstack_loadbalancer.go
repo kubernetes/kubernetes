@@ -1293,6 +1293,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 	for _, node := range nodes {
 		addr, err := nodeAddressForLB(node)
 		if err != nil {
+			pools.Delete(lb.network, pool.ID)
 			return nil, err
 		}
 
