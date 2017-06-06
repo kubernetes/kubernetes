@@ -3299,6 +3299,7 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 // Refer to docs/design/resources.md for more details.
 func validateContainerResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
+
 	if len(strings.Split(value, "/")) == 1 {
 		if !helper.IsStandardContainerResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
