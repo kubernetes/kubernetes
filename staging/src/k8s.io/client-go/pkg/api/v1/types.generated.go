@@ -34973,7 +34973,7 @@ func (x *PodSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq2[9] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("serviceAccount"))
+					r.EncodeString(codecSelferC_UTF81234, string("deprecatedServiceAccount"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					yym36 := z.EncBinary()
 					_ = yym36
@@ -35505,7 +35505,7 @@ func (x *PodSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 					*((*string)(yyv18)) = r.DecodeString()
 				}
 			}
-		case "serviceAccount":
+		case "deprecatedServiceAccount":
 			if r.TryDecodeAsNil() {
 				x.DeprecatedServiceAccount = ""
 			} else {
