@@ -22,7 +22,7 @@ import (
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 func DefaultMemorySwap() int64 {
