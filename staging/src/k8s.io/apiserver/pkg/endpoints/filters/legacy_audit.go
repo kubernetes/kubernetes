@@ -43,12 +43,15 @@ type legacyAuditResponseWriter struct {
 	id  string
 }
 
-func (a *legacyAuditResponseWriter) WriteHeader(code int) {
+func (a *legacyAuditResponseWriter) printResponse(code int) {
 	line := fmt.Sprintf("%s AUDIT: id=%q response=\"%d\"\n", time.Now().Format(time.RFC3339Nano), a.id, code)
 	if _, err := fmt.Fprint(a.out, line); err != nil {
 		glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
 	}
+}
 
+func (a *legacyAuditResponseWriter) WriteHeader(code int) {
+	a.printResponse(code)
 	a.ResponseWriter.WriteHeader(code)
 }
 
@@ -68,6 +71,8 @@ func (f *fancyLegacyResponseWriterDelegator) Flush() {
 }
 
 func (f *fancyLegacyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	// fake a response status before protocol switch happens
+	f.printResponse(http.StatusSwitchingProtocols)
 	return f.ResponseWriter.(http.Hijacker).Hijack()
 }
 
