@@ -65,6 +65,7 @@ func (az *Cloud) AttachDisk(diskName, diskURI string, nodeName types.NodeName, l
 	}
 	vmName := mapNodeNameToVMName(nodeName)
 	glog.V(2).Infof("create(%s): vm(%s)", az.ResourceGroup, vmName)
+	az.operationPollRateLimiter.Accept()
 	resp, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
 	if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
 		glog.V(2).Infof("create(%s) backing off: vm(%s)", az.ResourceGroup, vmName)
@@ -145,6 +146,7 @@ func (az *Cloud) DetachDiskByName(diskName, diskURI string, nodeName types.NodeN
 	}
 	vmName := mapNodeNameToVMName(nodeName)
 	glog.V(2).Infof("create(%s): vm(%s)", az.ResourceGroup, vmName)
+	az.operationPollRateLimiter.Accept()
 	resp, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
 	if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
 		glog.V(2).Infof("create(%s) backing off: vm(%s)", az.ResourceGroup, vmName)
