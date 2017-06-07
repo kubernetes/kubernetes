@@ -163,7 +163,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			clusters = f.GetRegisteredClusters()
 			ns = f.FederationNamespace.Name
 			// create backend service
-			service = createServiceOrFail(f.FederationClientset, ns, FederatedIngressServiceName)
+			service = createLBServiceOrFail(f.FederationClientset, ns, FederatedIngressServiceName)
 			// create the TLS secret
 			secret = createTLSSecretOrFail(f.FederationClientset, ns, FederatedIngressTLSSecretName)
 			// wait for services objects sync
