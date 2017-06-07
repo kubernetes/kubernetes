@@ -39,6 +39,9 @@ type loadBalancer struct {
 	rules     map[string]*cloudstack.LoadBalancerRule
 }
 
+// InitializeLoadBalancer provides the load balancer with an interface which lists all cached services
+func (cs *CSCloud) InitializeLoadBalancer(lister cloudprovider.ServiceLister) {}
+
 // GetLoadBalancer returns whether the specified load balancer exists, and if so, what its status is.
 func (cs *CSCloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	glog.V(4).Infof("GetLoadBalancer(%v, %v, %v)", clusterName, service.Namespace, service.Name)

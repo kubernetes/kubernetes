@@ -216,6 +216,9 @@ func (s *ServiceController) init() error {
 	if !ok {
 		return fmt.Errorf("the cloud provider does not support external load balancers.")
 	}
+
+	balancer.InitializeLoadBalancer(s.cache)
+
 	s.balancer = balancer
 
 	return nil
@@ -376,6 +379,11 @@ func (s *serviceCache) ListKeys() []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// List implements the interface cloudprovider.ServiceLister and returns the list of cached services
+func (s *serviceCache) List() []*v1.Service {
+	return s.allServices()
 }
 
 // GetByKey returns the value stored in the serviceMap under the given key

@@ -132,6 +132,9 @@ func (f *FakeCloud) Routes() (cloudprovider.Routes, bool) {
 	return f, true
 }
 
+// InitializeLoadBalancer provides the load balancer with an interface which lists all cached services
+func (f *FakeCloud) InitializeLoadBalancer(lister cloudprovider.ServiceLister) {}
+
 // GetLoadBalancer is a stub implementation of LoadBalancer.GetLoadBalancer.
 func (f *FakeCloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	status := &v1.LoadBalancerStatus{}
