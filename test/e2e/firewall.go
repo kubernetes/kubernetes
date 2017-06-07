@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -59,6 +60,8 @@ var _ = framework.KubeDescribe("Firewall rule", func() {
 		framework.Logf("Got cluster ID: %v", clusterID)
 
 		jig := framework.NewServiceTestJig(cs, serviceName)
+		nodeList := jig.GetNodes(framework.MaxNodesForEndpointsTests)
+		Expect(nodeList).NotTo(BeNil())
 		nodesNames := jig.GetNodesNames(framework.MaxNodesForEndpointsTests)
 		if len(nodesNames) <= 0 {
 			framework.Failf("Expect at least 1 node, got: %v", nodesNames)
@@ -84,14 +87,13 @@ var _ = framework.KubeDescribe("Firewall rule", func() {
 		svcExternalIP := svc.Status.LoadBalancer.Ingress[0].IP
 
 		By("Checking if service's firewall rule is correct")
-		nodeTags := framework.GetInstanceTags(cloudConfig, nodesNames[0])
-		lbFw := framework.ConstructFirewallForLBService(svc, nodeTags.Items)
+		lbFw := framework.ConstructFirewallForLBService(svc, cloudConfig.NodeTag)
 		fw, err := gceCloud.GetFirewall(lbFw.Name)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(framework.VerifyFirewallRule(fw, lbFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
 
 		By("Checking if service's nodes health check firewall rule is correct")
-		nodesHCFw := framework.ConstructHealthCheckFirewallForLBService(clusterID, svc, nodeTags.Items, true)
+		nodesHCFw := framework.ConstructHealthCheckFirewallForLBService(clusterID, svc, cloudConfig.NodeTag, true)
 		fw, err = gceCloud.GetFirewall(nodesHCFw.Name)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(framework.VerifyFirewallRule(fw, nodesHCFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
@@ -107,7 +109,7 @@ var _ = framework.KubeDescribe("Firewall rule", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Waiting for the correct local traffic health check firewall rule to be created")
-		localHCFw := framework.ConstructHealthCheckFirewallForLBService(clusterID, svc, nodeTags.Items, false)
+		localHCFw := framework.ConstructHealthCheckFirewallForLBService(clusterID, svc, cloudConfig.NodeTag, false)
 		fw, err = framework.WaitForFirewallRule(gceCloud, localHCFw.Name, true, framework.LoadBalancerCreateTimeoutDefault)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(framework.VerifyFirewallRule(fw, localHCFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
@@ -132,11 +134,17 @@ var _ = framework.KubeDescribe("Firewall rule", func() {
 		// that's much harder to do in the current e2e framework.
 		By(fmt.Sprintf("Removing tags from one of the nodes: %v", nodesNames[0]))
 		nodesSet.Delete(nodesNames[0])
-		removedTags := framework.SetInstanceTags(cloudConfig, nodesNames[0], []string{})
+		// Instance could run in a different zone in multi-zone test. Figure out which zone
+		// it is in before proceeding.
+		zone := cloudConfig.Zone
+		if zoneInLabel, ok := nodeList.Items[0].Labels[kubeletapis.LabelZoneFailureDomain]; ok {
+			zone = zoneInLabel
+		}
+		removedTags := framework.SetInstanceTags(cloudConfig, nodesNames[0], zone, []string{})
 		defer func() {
 			By("Adding tags back to the node and wait till the traffic is recovered")
 			nodesSet.Insert(nodesNames[0])
-			framework.SetInstanceTags(cloudConfig, nodesNames[0], removedTags)
+			framework.SetInstanceTags(cloudConfig, nodesNames[0], zone, removedTags)
 			// Make sure traffic is recovered before exit
 			Expect(framework.TestHitNodesFromOutside(svcExternalIP, framework.FirewallTestHttpPort, framework.FirewallTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
 		}()
@@ -146,19 +154,13 @@ var _ = framework.KubeDescribe("Firewall rule", func() {
 	})
 
 	It("should have correct firewall rules for e2e cluster", func() {
-		By("Gathering firewall related information")
-		masterTags := framework.GetInstanceTags(cloudConfig, cloudConfig.MasterName)
-		Expect(len(masterTags.Items)).Should(Equal(1))
-
 		nodes := framework.GetReadySchedulableNodesOrDie(cs)
 		if len(nodes.Items) <= 0 {
 			framework.Failf("Expect at least 1 node, got: %v", len(nodes.Items))
 		}
-		nodeTags := framework.GetInstanceTags(cloudConfig, nodes.Items[0].Name)
-		Expect(len(nodeTags.Items)).Should(Equal(1))
 
 		By("Checking if e2e firewall rules are correct")
-		for _, expFw := range framework.GetE2eFirewalls(cloudConfig.MasterName, masterTags.Items[0], nodeTags.Items[0], cloudConfig.Network) {
+		for _, expFw := range framework.GetE2eFirewalls(cloudConfig.MasterName, cloudConfig.MasterTag, cloudConfig.NodeTag, cloudConfig.Network) {
 			fw, err := gceCloud.GetFirewall(expFw.Name)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(framework.VerifyFirewallRule(fw, expFw, cloudConfig.Network, false)).NotTo(HaveOccurred())

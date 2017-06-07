@@ -36,6 +36,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		ns               string
 		jig              *framework.IngressTestJig
 		conformanceTests []framework.IngressConformanceTests
+		cloudConfig      framework.CloudConfig
 	)
 	f := framework.NewDefaultFramework("ingress")
 
@@ -43,6 +44,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		f.BeforeEach()
 		jig = framework.NewIngressTestJig(f.ClientSet)
 		ns = f.Namespace.Name
+		cloudConfig = framework.TestContext.CloudConfig
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
@@ -122,7 +124,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 
 			By("should have correct firewall rule for ingress")
 			fw := gceController.GetFirewallRule()
-			expFw := jig.ConstructFirewallForIngress(gceController)
+			expFw := jig.ConstructFirewallForIngress(gceController, cloudConfig.NodeTag)
 			// Passed the last argument as `true` to verify the backend ports is a subset
 			// of the allowed ports in firewall rule, given there may be other existing
 			// ingress resources and backends we are not aware of.
