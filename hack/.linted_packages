@@ -324,6 +324,7 @@ plugin/pkg/scheduler/algorithmprovider
 plugin/pkg/scheduler/algorithmprovider/defaults
 plugin/pkg/scheduler/api/validation
 staging/src/k8s.io/apiextensions-apiserver
+staging/src/k8s.io/apiextensions-apiserver/examples/client-go
 staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install
 staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation
 staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions
@@ -384,7 +385,7 @@ staging/src/k8s.io/client-go/discovery
 staging/src/k8s.io/client-go/examples/create-update-delete-deployment
 staging/src/k8s.io/client-go/examples/in-cluster
 staging/src/k8s.io/client-go/examples/out-of-cluster
-staging/src/k8s.io/client-go/examples/third-party-resources
+staging/src/k8s.io/client-go/examples/third-party-resources-deprecated
 staging/src/k8s.io/client-go/informers
 staging/src/k8s.io/client-go/informers/admissionregistration
 staging/src/k8s.io/client-go/informers/admissionregistration/v1alpha1

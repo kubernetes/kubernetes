@@ -22,9 +22,9 @@ import (
 	"flag"
 	"fmt"
 
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -32,9 +32,9 @@ import (
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
-	tprv1 "k8s.io/client-go/examples/third-party-resources/apis/tpr/v1"
-	exampleclient "k8s.io/client-go/examples/third-party-resources/client"
-	examplecontroller "k8s.io/client-go/examples/third-party-resources/controller"
+	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/apis/cr/v1"
+	exampleclient "k8s.io/apiextensions-apiserver/examples/client-go/client"
+	examplecontroller "k8s.io/apiextensions-apiserver/examples/client-go/controller"
 )
 
 func main() {
@@ -47,16 +47,17 @@ func main() {
 		panic(err)
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	apiextensionsclientset, err := apiextensionsclient.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
 
-	// initialize third party resource if it does not exist
-	err = exampleclient.CreateTPR(clientset)
+	// initialize custom resource using a CustomResourceDefinition if it does not exist
+	crd, err := exampleclient.CreateCustomResourceDefinition(apiextensionsclientset)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		panic(err)
 	}
+	defer apiextensionsclientset.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(crd.Name, nil)
 
 	// make a new config for our extension's API group, using the first config as a baseline
 	exampleClient, exampleScheme, err := exampleclient.NewClient(config)
@@ -64,13 +65,7 @@ func main() {
 		panic(err)
 	}
 
-	// wait until TPR gets processed
-	err = exampleclient.WaitForExampleResource(exampleClient)
-	if err != nil {
-		panic(err)
-	}
-
-	// start a controller on instances of our TPR
+	// start a controller on instances of our custom resource
 	controller := examplecontroller.ExampleController{
 		ExampleClient: exampleClient,
 		ExampleScheme: exampleScheme,
@@ -80,23 +75,23 @@ func main() {
 	defer cancelFunc()
 	go controller.Run(ctx)
 
-	// Create an instance of our TPR
-	example := &tprv1.Example{
+	// Create an instance of our custom resource
+	example := &crv1.Example{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "example1",
 		},
-		Spec: tprv1.ExampleSpec{
+		Spec: crv1.ExampleSpec{
 			Foo: "hello",
 			Bar: true,
 		},
-		Status: tprv1.ExampleStatus{
-			State:   tprv1.ExampleStateCreated,
+		Status: crv1.ExampleStatus{
+			State:   crv1.ExampleStateCreated,
 			Message: "Created, not processed yet",
 		},
 	}
-	var result tprv1.Example
+	var result crv1.Example
 	err = exampleClient.Post().
-		Resource(tprv1.ExampleResourcePlural).
+		Resource(crv1.ExampleResourcePlural).
 		Namespace(apiv1.NamespaceDefault).
 		Body(example).
 		Do().Into(&result)
@@ -116,8 +111,8 @@ func main() {
 	fmt.Print("PROCESSED\n")
 
 	// Fetch a list of our TPRs
-	exampleList := tprv1.ExampleList{}
-	err = exampleClient.Get().Resource(tprv1.ExampleResourcePlural).Do().Into(&exampleList)
+	exampleList := crv1.ExampleList{}
+	err = exampleClient.Get().Resource(crv1.ExampleResourcePlural).Do().Into(&exampleList)
 	if err != nil {
 		panic(err)
 	}
