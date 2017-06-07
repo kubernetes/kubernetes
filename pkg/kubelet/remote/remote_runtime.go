@@ -25,10 +25,10 @@ import (
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 
+	utilexec "k8s.io/client-go/tools/remotecommand"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
 // RemoteRuntimeService is a gRPC implementation of internalapi.RuntimeService.

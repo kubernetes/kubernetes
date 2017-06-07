@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package exec
+package remotecommand
 
 // ExitError is an interface that presents an API similar to os.ProcessState, which is
 // what ExitError from os/exec is.  This is designed to make testing a bit easier and
