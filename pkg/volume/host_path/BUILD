@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "doc.go",
         "host_path.go",
+        "host_path_unix.go",
     ],
     deps = [
         "//pkg/volume:go_default_library",

@@ -43,6 +43,12 @@ const (
 	envVarNameErrMsg        = "a valid environment variable name must consist of"
 )
 
+func newHostPathType(pathType string) *api.HostPathType {
+	hostPathType := new(api.HostPathType)
+	*hostPathType = api.HostPathType(pathType)
+	return hostPathType
+}
+
 func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
 	objMeta := metav1.ObjectMeta{Name: name}
 	if namespace != "" {
@@ -86,7 +92,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				StorageClassName: "valid",
 			}),
@@ -99,7 +108,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRetain,
 			}),
@@ -112,7 +124,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{"fakemode"},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 			}),
 		},
@@ -124,7 +139,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				PersistentVolumeReclaimPolicy: "fakeReclaimPolicy",
 			}),
@@ -137,7 +155,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 			}),
 		},
@@ -149,7 +170,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 			}),
 		},
@@ -173,7 +197,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 			}),
 		},
@@ -184,7 +211,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 					api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath:          &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "foo", FSType: "ext4"},
 				},
 			}),
@@ -197,7 +227,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
 			}),
@@ -210,7 +243,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/a/.."},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/a/..",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
 			}),
@@ -223,7 +259,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				StorageClassName: "-invalid-",
 			}),
@@ -272,7 +311,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo/.."},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo/..",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				StorageClassName: "backstep-hostpath",
 			}),
@@ -1109,6 +1151,7 @@ func TestValidateVolumes(t *testing.T) {
 					EmptyDir: &api.EmptyDirVolumeSource{},
 					HostPath: &api.HostPathVolumeSource{
 						Path: "/mnt/path",
+						Type: newHostPathType(string(api.HostPathDirectory)),
 					},
 				},
 			},
@@ -1116,7 +1159,20 @@ func TestValidateVolumes(t *testing.T) {
 			errfield:  "hostPath",
 			errdetail: "may not specify more than 1 volume",
 		},
-		// HostPath
+		// HostPath Default
+		{
+			name: "default HostPath",
+			vol: api.Volume{
+				Name: "hostpath",
+				VolumeSource: api.VolumeSource{
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/mnt/path",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
+				},
+			},
+		},
+		// HostPath Supported
 		{
 			name: "valid HostPath",
 			vol: api.Volume{
@@ -1124,9 +1180,25 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: api.VolumeSource{
 					HostPath: &api.HostPathVolumeSource{
 						Path: "/mnt/path",
+						Type: newHostPathType(string(api.HostPathSocket)),
 					},
 				},
 			},
+		},
+		// HostPath Invalid
+		{
+			name: "invalid HostPath",
+			vol: api.Volume{
+				Name: "hostpath",
+				VolumeSource: api.VolumeSource{
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/mnt/path",
+						Type: newHostPathType("invalid"),
+					},
+				},
+			},
+			errtype:  field.ErrorTypeNotSupported,
+			errfield: "type",
 		},
 		{
 			name: "invalid HostPath backsteps",
@@ -1135,6 +1207,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: api.VolumeSource{
 					HostPath: &api.HostPathVolumeSource{
 						Path: "/mnt/path/..",
+						Type: newHostPathType(string(api.HostPathDirectory)),
 					},
 				},
 			},
