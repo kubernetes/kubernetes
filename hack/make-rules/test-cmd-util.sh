@@ -1769,6 +1769,20 @@ run_non_native_resource_tests() {
   # Make sure it's gone
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # Test 'kubectl create' with namespace, and namespace cleanup.
+  kubectl "${kube_flags[@]}" create namespace non-native-resources
+  kubectl "${kube_flags[@]}" create -f hack/testdata/TPR/bar.yaml --namespace=non-native-resources
+  kube::test::get_object_assert bars '{{len .items}}' '1' --namespace=non-native-resources
+  kubectl "${kube_flags[@]}" delete namespace non-native-resources
+  # Make sure objects go away.
+  kube::test::wait_object_assert bars '{{len .items}}' '0' --namespace=non-native-resources
+  # Make sure namespace goes away.
+  local tries=0
+  while kubectl "${kube_flags[@]}" get namespace non-native-resources && [ ${tries} -lt 10 ]; do
+    tries=$((tries+1))
+    sleep ${tries}
+  done
 }
 
 run_recursive_resources_tests() {
