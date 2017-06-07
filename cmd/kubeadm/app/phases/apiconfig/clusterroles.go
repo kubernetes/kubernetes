@@ -105,8 +105,14 @@ func createRoles(clientset *clientset.Clientset) error {
 		},
 	}
 	for _, role := range roles {
-		if _, err := clientset.RbacV1beta1().Roles(metav1.NamespacePublic).Create(&role); err != nil {
-			return err
+		if _, err := clientset.RbacV1beta1().Roles(role.ObjectMeta.Namespace).Create(&role); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return fmt.Errorf("unable to create RBAC role: %v", err)
+			}
+
+			if _, err := clientset.RbacV1beta1().Roles(role.ObjectMeta.Namespace).Update(&role); err != nil {
+				return fmt.Errorf("unable to update RBAC role: %v", err)
+			}
 		}
 	}
 	return nil
@@ -134,8 +140,14 @@ func createRoleBindings(clientset *clientset.Clientset) error {
 	}
 
 	for _, roleBinding := range roleBindings {
-		if _, err := clientset.RbacV1beta1().RoleBindings(metav1.NamespacePublic).Create(&roleBinding); err != nil {
-			return err
+		if _, err := clientset.RbacV1beta1().RoleBindings(roleBinding.ObjectMeta.Namespace).Create(&roleBinding); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return fmt.Errorf("unable to create RBAC rolebinding: %v", err)
+			}
+
+			if _, err := clientset.RbacV1beta1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(&roleBinding); err != nil {
+				return fmt.Errorf("unable to update RBAC rolebinding: %v", err)
+			}
 		}
 	}
 	return nil
@@ -155,7 +167,13 @@ func createClusterRoles(clientset *clientset.Clientset) error {
 
 	for _, roleBinding := range clusterRoles {
 		if _, err := clientset.RbacV1beta1().ClusterRoles().Create(&roleBinding); err != nil {
-			return err
+			if !apierrors.IsAlreadyExists(err) {
+				return fmt.Errorf("unable to create RBAC clusterrole: %v", err)
+			}
+
+			if _, err := clientset.RbacV1beta1().ClusterRoles().Update(&roleBinding); err != nil {
+				return fmt.Errorf("unable to update RBAC clusterrole: %v", err)
+			}
 		}
 	}
 	return nil
@@ -216,7 +234,13 @@ func createClusterRoleBindings(clientset *clientset.Clientset) error {
 
 	for _, clusterRoleBinding := range clusterRoleBindings {
 		if _, err := clientset.RbacV1beta1().ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
-			return err
+			if !apierrors.IsAlreadyExists(err) {
+				return fmt.Errorf("unable to create RBAC clusterrolebinding: %v", err)
+			}
+
+			if _, err := clientset.RbacV1beta1().ClusterRoleBindings().Update(&clusterRoleBinding); err != nil {
+				return fmt.Errorf("unable to update RBAC clusterrolebinding: %v", err)
+			}
 		}
 	}
 	return nil
