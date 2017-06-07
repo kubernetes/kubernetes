@@ -839,6 +839,44 @@ func TestStoreDelete(t *testing.T) {
 	}
 }
 
+func TestStoreDeleteUninitialized(t *testing.T) {
+	podA := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "Testing"}}}},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	// test failure condition
+	_, _, err := registry.Delete(testContext, podA.Name, nil)
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// create pod
+	_, err = registry.Create(testContext, podA, true)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// delete object
+	_, wasDeleted, err := registry.Delete(testContext, podA.Name, nil)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if !wasDeleted {
+		t.Errorf("unexpected, pod %s should have been deleted immediately", podA.Name)
+	}
+
+	// try to get a item which should be deleted
+	_, err = registry.Get(testContext, podA.Name, &metav1.GetOptions{})
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
 // TestGracefulStoreCanDeleteIfExistingGracePeriodZero tests recovery from
 // race condition where the graceful delete is unable to complete
 // in prior operation, but the pod remains with deletion timestamp
@@ -1546,6 +1584,14 @@ func TestStoreDeletionPropagation(t *testing.T) {
 func TestStoreDeleteCollection(t *testing.T) {
 	podA := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	podB := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+	podC := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "baz",
+			Initializers: &metav1.Initializers{
+				Pending: []metav1.Initializer{{Name: "Test"}},
+			},
+		},
+	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
@@ -1557,6 +1603,9 @@ func TestStoreDeleteCollection(t *testing.T) {
 	if _, err := registry.Create(testContext, podB, false); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
+	if _, err := registry.Create(testContext, podC, true); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 
 	// Delete all pods.
 	deleted, err := registry.DeleteCollection(testContext, nil, &metainternalversion.ListOptions{})
@@ -1564,14 +1613,17 @@ func TestStoreDeleteCollection(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	deletedPods := deleted.(*example.PodList)
-	if len(deletedPods.Items) != 2 {
-		t.Errorf("Unexpected number of pods deleted: %d, expected: 2", len(deletedPods.Items))
+	if len(deletedPods.Items) != 3 {
+		t.Errorf("Unexpected number of pods deleted: %d, expected: 3", len(deletedPods.Items))
 	}
 
 	if _, err := registry.Get(testContext, podA.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if _, err := registry.Get(testContext, podB.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if _, err := registry.Get(testContext, podC.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }

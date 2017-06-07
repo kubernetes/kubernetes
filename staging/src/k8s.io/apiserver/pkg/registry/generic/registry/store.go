@@ -998,6 +998,18 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	return out, true, err
 }
 
+// copyListOptions copies list options for mutation.
+func copyListOptions(options *metainternalversion.ListOptions) *metainternalversion.ListOptions {
+	if options == nil {
+		return &metainternalversion.ListOptions{}
+	}
+	copied, err := metainternalversion.Copier.Copy(options)
+	if err != nil {
+		panic(err)
+	}
+	return copied.(*metainternalversion.ListOptions)
+}
+
 // DeleteCollection removes all items returned by List with a given ListOptions from storage.
 //
 // DeleteCollection is currently NOT atomic. It can happen that only subset of objects
@@ -1009,6 +1021,12 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 // possibly with storage API, but watch is not delivered correctly then).
 // It will be possible to fix it with v3 etcd API.
 func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+	// DeleteCollection must remain backwards compatible with old clients that expect it to
+	// remove all resources, initialized or not, within the type. It is also consistent with
+	// Delete which does not require IncludeUninitialized
+	listOptions = copyListOptions(listOptions)
+	listOptions.IncludeUninitialized = true
+
 	listObj, err := e.List(ctx, listOptions)
 	if err != nil {
 		return nil, err
