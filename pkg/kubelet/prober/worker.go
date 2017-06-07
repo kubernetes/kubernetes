@@ -56,6 +56,8 @@ type worker struct {
 	resultsManager results.Manager
 	probeManager   *manager
 
+	readinessManager results.Manager
+
 	// The last known container ID for this worker.
 	containerID kubecontainer.ContainerID
 	// The last probe result for this worker.
@@ -90,6 +92,9 @@ func newWorker(
 	case liveness:
 		w.spec = container.LivenessProbe
 		w.resultsManager = m.livenessManager
+		if container.ReadinessProbe != nil && container.LivenessProbe.InitialDelaySeconds == 0 {
+			w.readinessManager = m.readinessManager
+		}
 		w.initialValue = results.Success
 	}
 
@@ -188,6 +193,12 @@ func (w *worker) doProbe() (keepGoing bool) {
 		// Abort if the container will not be restarted.
 		return c.State.Terminated == nil ||
 			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
+	}
+
+	if w.readinessManager != nil {
+		if status, found := w.readinessManager.Get(w.containerID); !found || status == results.Failure {
+			return true
+		}
 	}
 
 	if int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
