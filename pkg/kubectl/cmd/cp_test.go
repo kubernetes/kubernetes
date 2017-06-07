@@ -57,11 +57,9 @@ func TestExtractFileSpec(t *testing.T) {
 		spec, err := extractFileSpec(test.spec)
 		if test.expectErr && err == nil {
 			t.Errorf("unexpected non-error")
-			continue
 		}
 		if err != nil && !test.expectErr {
 			t.Errorf("unexpected error: %v", err)
-			continue
 		}
 		if spec.PodName != test.expectedPod {
 			t.Errorf("expected: %s, saw: %s", test.expectedPod, spec.PodName)
