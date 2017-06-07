@@ -249,7 +249,7 @@ func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, error) {
 
 	nicID, err := getPrimaryInterfaceID(machine)
 	if err != nil {
-		glog.Errorf("error: az.getIPForMachine(%s), getPrimaryInterfaceID(%s), err=%v", nodeName, machine, err)
+		glog.Errorf("error: az.getIPForMachine(%s), getPrimaryInterfaceID(%v), err=%v", nodeName, machine, err)
 		return "", err
 	}
 
@@ -268,7 +268,7 @@ func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, error) {
 
 	ipConfig, err := getPrimaryIPConfig(nic)
 	if err != nil {
-		glog.Errorf("error: az.getIPForMachine(%s), getPrimaryIPConfig(%s), err=%v", nodeName, nic, err)
+		glog.Errorf("error: az.getIPForMachine(%s), getPrimaryIPConfig(%v), err=%v", nodeName, nic, err)
 		return "", err
 	}
 
