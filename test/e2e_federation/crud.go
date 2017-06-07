@@ -32,7 +32,9 @@ var _ = framework.KubeDescribe("Federated types [Feature:Federation][Experimenta
 
 	f := fedframework.NewDefaultFederatedFramework("federated-types")
 
-	for name, fedType := range federatedtypes.FederatedTypes() {
+	fedTypes := federatedtypes.FederatedTypes()
+	for name := range fedTypes {
+		fedType := fedTypes[name]
 		Describe(fmt.Sprintf("Federated %q resources", name), func() {
 			It("should be created, read, updated and deleted successfully", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)

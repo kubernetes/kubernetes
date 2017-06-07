@@ -40,6 +40,7 @@ import (
 	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/history"
 
 	"github.com/golang/glog"
 )
@@ -80,6 +81,7 @@ func NewStatefulSetController(
 	podInformer coreinformers.PodInformer,
 	setInformer appsinformers.StatefulSetInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
+	revInformer appsinformers.ControllerRevisionInformer,
 	kubeClient clientset.Interface,
 ) *StatefulSetController {
 	eventBroadcaster := record.NewBroadcaster()
@@ -95,8 +97,9 @@ func NewStatefulSetController(
 				setInformer.Lister(),
 				podInformer.Lister(),
 				pvcInformer.Lister(),
-				recorder,
-			),
+				recorder),
+			NewRealStatefulSetStatusUpdater(kubeClient, setInformer.Lister()),
+			history.NewHistory(kubeClient, revInformer.Lister()),
 		),
 		pvcListerSynced: pvcInformer.Informer().HasSynced,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
@@ -305,6 +308,32 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, s
 	return cm.ClaimPods(pods, filter)
 }
 
+// adoptOrphanRevisions adopts any orphaned ControllerRevisions matched by set's Selector.
+func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) error {
+	revisions, err := ssc.control.ListRevisions(set)
+	if err != nil {
+		return err
+	}
+	hasOrphans := false
+	for i := range revisions {
+		if controller.GetControllerOf(revisions[i]) == nil {
+			hasOrphans = true
+			break
+		}
+	}
+	if hasOrphans {
+		fresh, err := ssc.kubeClient.AppsV1beta1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if fresh.UID != set.UID {
+			return fmt.Errorf("original StatefulSet %v/%v is gone: got uid %v, wanted %v", set.Namespace, set.Name, fresh.UID, set.UID)
+		}
+		return ssc.control.AdoptOrphanRevisions(set, revisions)
+	}
+	return nil
+}
+
 // getStatefulSetsForPod returns a list of StatefulSets that potentially match
 // a given pod.
 func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*apps.StatefulSet {
@@ -404,6 +433,10 @@ func (ssc *StatefulSetController) sync(key string) error {
 		utilruntime.HandleError(fmt.Errorf("error converting StatefulSet %v selector: %v", key, err))
 		// This is a non-transient error, so don't retry.
 		return nil
+	}
+
+	if err := ssc.adoptOrphanRevisions(set); err != nil {
+		return err
 	}
 
 	pods, err := ssc.getPodsForStatefulSet(set, selector)

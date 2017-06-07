@@ -312,6 +312,22 @@ func (s *StatefulSetTester) waitForRunning(numStatefulPods int32, ss *apps.State
 	}
 }
 
+// WaitForState periodically polls for the ss and its pods until the until function returns either true or an error
+func (s *StatefulSetTester) WaitForState(ss *apps.StatefulSet, until func(*apps.StatefulSet, *v1.PodList) (bool, error)) {
+	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
+		func() (bool, error) {
+			ssGet, err := s.c.Apps().StatefulSets(ss.Namespace).Get(ss.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			podList := s.GetPodList(ssGet)
+			return until(ssGet, podList)
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for pods to enter running: %v", pollErr)
+	}
+}
+
 // WaitForRunningAndReady waits for numStatefulPods in ss to be Running and Ready.
 func (s *StatefulSetTester) WaitForRunningAndReady(numStatefulPods int32, ss *apps.StatefulSet) {
 	s.waitForRunning(numStatefulPods, ss, true)
@@ -365,8 +381,33 @@ func (s *StatefulSetTester) SetHealthy(ss *apps.StatefulSet) {
 	}
 }
 
-// WaitForStatus waits for the ss.Status.Replicas to be equal to expectedReplicas
-func (s *StatefulSetTester) WaitForStatus(ss *apps.StatefulSet, expectedReplicas int32) {
+// WaitForStatusReadyReplicas waits for the ss.Status.ReadyReplicas to be equal to expectedReplicas
+func (s *StatefulSetTester) WaitForStatusReadyReplicas(ss *apps.StatefulSet, expectedReplicas int32) {
+	Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
+
+	ns, name := ss.Namespace, ss.Name
+	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
+		func() (bool, error) {
+			ssGet, err := s.c.Apps().StatefulSets(ns).Get(name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if *ssGet.Status.ObservedGeneration < ss.Generation {
+				return false, nil
+			}
+			if ssGet.Status.ReadyReplicas != expectedReplicas {
+				Logf("Waiting for stateful set status to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
+				return false, nil
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for stateful set status.readyReplicas updated to %d: %v", expectedReplicas, pollErr)
+	}
+}
+
+// WaitForStatusReplicas waits for the ss.Status.Replicas to be equal to expectedReplicas
+func (s *StatefulSetTester) WaitForStatusReplicas(ss *apps.StatefulSet, expectedReplicas int32) {
 	Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
@@ -416,7 +457,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		if err := sst.Scale(&ss, 0); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
-		sst.WaitForStatus(&ss, 0)
+		sst.WaitForStatusReplicas(&ss, 0)
 		Logf("Deleting statefulset %v", ss.Name)
 		// Use OrphanDependents=false so it's deleted synchronously.
 		// We already made sure the Pods are gone inside Scale().
@@ -561,6 +602,7 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 					Volumes: vols,
 				},
 			},
+			UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			VolumeClaimTemplates: claims,
 			ServiceName:          governingSvcName,
 		},

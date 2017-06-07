@@ -79,14 +79,6 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		c = f.ClientSet
 		framework.SkipUnlessProviderIs("gce", "gke")
 
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		nodeCount = len(nodes.Items)
-		Expect(nodeCount).NotTo(BeZero())
-		cpu := nodes.Items[0].Status.Capacity[v1.ResourceCPU]
-		mem := nodes.Items[0].Status.Capacity[v1.ResourceMemory]
-		coresPerNode = int((&cpu).MilliValue() / 1000)
-		memCapacityMb = int((&mem).Value() / 1024 / 1024)
-
 		originalSizes = make(map[string]int)
 		sum := 0
 		for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
@@ -96,6 +88,17 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			originalSizes[mig] = size
 			sum += size
 		}
+		// Give instances time to spin up
+		framework.ExpectNoError(framework.WaitForClusterSize(c, sum, scaleUpTimeout))
+
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		nodeCount = len(nodes.Items)
+		Expect(nodeCount).NotTo(BeZero())
+		cpu := nodes.Items[0].Status.Capacity[v1.ResourceCPU]
+		mem := nodes.Items[0].Status.Capacity[v1.ResourceMemory]
+		coresPerNode = int((&cpu).MilliValue() / 1000)
+		memCapacityMb = int((&mem).Value() / 1024 / 1024)
+
 		Expect(nodeCount).Should(Equal(sum))
 
 		if framework.ProviderIs("gke") {

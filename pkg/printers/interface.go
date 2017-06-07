@@ -100,3 +100,13 @@ type ErrNoDescriber struct {
 func (e ErrNoDescriber) Error() string {
 	return fmt.Sprintf("no describer has been defined for %v", e.Types)
 }
+
+// OutputOptions represents resource output options which is used to generate a resource printer.
+type OutputOptions struct {
+	// supported Format types can be found in pkg/printers/printers.go
+	FmtType string
+	FmtArg  string
+
+	// indicates if it is OK to ignore missing keys for rendering an output template.
+	AllowMissingKeys bool
+}

@@ -591,9 +591,31 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"securityGroupName": "--security-group-name--",
 		"vnetName": "--vnet-name--",
 		"routeTableName": "--route-table-name--",
-		"primaryAvailabilitySetName": "--primary-availability-set-name--"
+		"primaryAvailabilitySetName": "--primary-availability-set-name--",
+		"cloudProviderBackoff": true,
+		"cloudProviderBackoffRetries": 6,
+		"cloudProviderBackoffExponent": 1.5,
+		"cloudProviderBackoffDuration": 5,
+		"cloudProviderBackoffJitter": 1.0,
+		"cloudProviderRatelimit": true,
+		"cloudProviderRateLimitQPS": 0.5,
+		"cloudProviderRateLimitBucket": 5
 	}`
 	validateConfig(t, config)
+}
+
+// Test Backoff and Rate Limit defaults (json)
+func TestCloudDefaultConfigFromJSON(t *testing.T) {
+	config := `{}`
+
+	validateEmptyConfig(t, config)
+}
+
+// Test Backoff and Rate Limit defaults (yaml)
+func TestCloudDefaultConfigFromYAML(t *testing.T) {
+	config := ``
+
+	validateEmptyConfig(t, config)
 }
 
 // Test Configuration deserialization (yaml)
@@ -610,21 +632,20 @@ securityGroupName: --security-group-name--
 vnetName: --vnet-name--
 routeTableName: --route-table-name--
 primaryAvailabilitySetName: --primary-availability-set-name--
+cloudProviderBackoff: true
+cloudProviderBackoffRetries: 6
+cloudProviderBackoffExponent: 1.5
+cloudProviderBackoffDuration: 5
+cloudProviderBackoffJitter: 1.0
+cloudProviderRatelimit: true
+cloudProviderRateLimitQPS: 0.5
+cloudProviderRateLimitBucket: 5
 `
 	validateConfig(t, config)
 }
 
 func validateConfig(t *testing.T, config string) {
-	configReader := strings.NewReader(config)
-	cloud, err := NewCloud(configReader)
-	if err != nil {
-		t.Error(err)
-	}
-
-	azureCloud, ok := cloud.(*Cloud)
-	if !ok {
-		t.Error("NewCloud returned incorrect type")
-	}
+	azureCloud := getCloudFromConfig(t, config)
 
 	if azureCloud.TenantID != "--tenant-id--" {
 		t.Errorf("got incorrect value for TenantID")
@@ -658,6 +679,58 @@ func validateConfig(t *testing.T, config string) {
 	}
 	if azureCloud.PrimaryAvailabilitySetName != "--primary-availability-set-name--" {
 		t.Errorf("got incorrect value for PrimaryAvailabilitySetName")
+	}
+	if azureCloud.CloudProviderBackoff != true {
+		t.Errorf("got incorrect value for CloudProviderBackoff")
+	}
+	if azureCloud.CloudProviderBackoffRetries != 6 {
+		t.Errorf("got incorrect value for CloudProviderBackoffRetries")
+	}
+	if azureCloud.CloudProviderBackoffExponent != 1.5 {
+		t.Errorf("got incorrect value for CloudProviderBackoffExponent")
+	}
+	if azureCloud.CloudProviderBackoffDuration != 5 {
+		t.Errorf("got incorrect value for CloudProviderBackoffDuration")
+	}
+	if azureCloud.CloudProviderBackoffJitter != 1.0 {
+		t.Errorf("got incorrect value for CloudProviderBackoffJitter")
+	}
+	if azureCloud.CloudProviderRateLimit != true {
+		t.Errorf("got incorrect value for CloudProviderRateLimit")
+	}
+	if azureCloud.CloudProviderRateLimitQPS != 0.5 {
+		t.Errorf("got incorrect value for CloudProviderRateLimitQPS")
+	}
+	if azureCloud.CloudProviderRateLimitBucket != 5 {
+		t.Errorf("got incorrect value for CloudProviderRateLimitBucket")
+	}
+}
+
+func getCloudFromConfig(t *testing.T, config string) *Cloud {
+	configReader := strings.NewReader(config)
+	cloud, err := NewCloud(configReader)
+	if err != nil {
+		t.Error(err)
+	}
+	azureCloud, ok := cloud.(*Cloud)
+	if !ok {
+		t.Error("NewCloud returned incorrect type")
+	}
+	return azureCloud
+}
+
+// TODO include checks for other appropriate default config parameters
+func validateEmptyConfig(t *testing.T, config string) {
+	azureCloud := getCloudFromConfig(t, config)
+
+	// backoff should be disabled by default if not explicitly enabled in config
+	if azureCloud.CloudProviderBackoff != false {
+		t.Errorf("got incorrect value for CloudProviderBackoff")
+	}
+
+	// rate limits should be disabled by default if not explicitly enabled in config
+	if azureCloud.CloudProviderRateLimit != false {
+		t.Errorf("got incorrect value for CloudProviderRateLimit")
 	}
 }
 

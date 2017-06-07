@@ -29,7 +29,13 @@ import (
 // a printer or an error. The printer is agnostic to schema versions, so you must
 // send arguments to PrintObj in the version you wish them to be shown using a
 // VersionedPrinter (typically when generic is true).
-func GetStandardPrinter(format, formatArgument string, noHeaders, allowMissingTemplateKeys bool, mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options PrintOptions) (ResourcePrinter, error) {
+func GetStandardPrinter(outputOpts *OutputOptions, noHeaders bool, mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options PrintOptions) (ResourcePrinter, error) {
+	if outputOpts == nil {
+		return nil, fmt.Errorf("no output options specified")
+	}
+
+	format, formatArgument, allowMissingTemplateKeys := outputOpts.FmtType, outputOpts.FmtArg, outputOpts.AllowMissingKeys
+
 	var printer ResourcePrinter
 	switch format {
 

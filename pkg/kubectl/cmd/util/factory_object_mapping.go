@@ -27,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/emicklei/go-restful-swagger12"
+	swagger "github.com/emicklei/go-restful-swagger12"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

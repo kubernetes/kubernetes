@@ -438,6 +438,10 @@ func (storage *SimpleRESTStorage) Export(ctx request.Context, name string, opts 
 	return obj, storage.errors["export"]
 }
 
+func (storage *SimpleRESTStorage) ConvertToTable(ctx request.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error) {
+	return rest.NewDefaultTableConvertor(schema.GroupResource{Resource: "simple"}).ConvertToTable(ctx, obj, tableOptions)
+}
+
 func (storage *SimpleRESTStorage) List(ctx request.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &genericapitesting.SimpleList{
@@ -1867,12 +1871,11 @@ func TestGetTable(t *testing.T) {
 			expected: &metav1alpha1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
 				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
-					{Name: "Namespace", Type: "string", Description: metaDoc["namespace"]},
 					{Name: "Name", Type: "string", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
 				Rows: []metav1alpha1.TableRow{
-					{Cells: []interface{}{"ns1", "foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 				},
 			},
 		},
@@ -1897,7 +1900,7 @@ func TestGetTable(t *testing.T) {
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			t.Fatal(err)
+			t.Errorf("%d: unexpected response: %#v", resp)
 		}
 		var itemOut metav1alpha1.Table
 		if _, err = extractBody(resp, &itemOut); err != nil {

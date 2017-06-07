@@ -21,6 +21,7 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/metrics:go_default_library",
+        "//test/e2e/api:go_default_library",
         "//test/e2e/autoscaling:go_default_library",
         "//test/e2e/cluster-logging:go_default_library",
         "//test/e2e/extension:go_default_library",
@@ -232,6 +233,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/e2e/api:all-srcs",
         "//test/e2e/autoscaling:all-srcs",
         "//test/e2e/chaosmonkey:all-srcs",
         "//test/e2e/cluster-logging:all-srcs",

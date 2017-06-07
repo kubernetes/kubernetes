@@ -67,8 +67,7 @@ runTests() {
   kube::etcd::start
   kube::log::status "Running integration test cases"
 
-  # TODO: Re-enable race detection when we switch to a thread-safe etcd client
-  # KUBE_RACE="-race"
+  KUBE_RACE="-race"
   make -C "${KUBE_ROOT}" test \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       KUBE_GOFLAGS="${KUBE_GOFLAGS:-}" \

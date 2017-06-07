@@ -224,6 +224,14 @@ message DeploymentStrategy {
   optional RollingUpdateDeployment rollingUpdate = 2;
 }
 
+// PartitionStatefulSetStrategy contains the parameters used with the
+// PartitionStatefulSetStrategyType.
+message PartitionStatefulSetStrategy {
+  // Ordinal indicates the ordinal at which the StatefulSet should be
+  // partitioned.
+  optional int32 ordinal = 1;
+}
+
 message RollbackConfig {
   // The revision to rollback to. If set to 0, rollback to the last revision.
   // +optional
@@ -378,15 +386,60 @@ message StatefulSetSpec {
   // all pods at once.
   // +optional
   optional string podManagementPolicy = 6;
+
+  // updateStrategy indicates the StatefulSetUpdateStrategy that will be
+  // employed to update Pods in the StatefulSet when a revision is made to
+  // Template.
+  optional StatefulSetUpdateStrategy updateStrategy = 7;
+
+  // revisionHistoryLimit is the maximum number of revisions that will
+  // be maintained in the StatefulSet's revision history. The revision history
+  // consists of all revisions not represented by a currently applied
+  // StatefulSetSpec version. The default value is 10.
+  optional int32 revisionHistoryLimit = 8;
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
 message StatefulSetStatus {
-  // observedGeneration is the most recent generation observed by this StatefulSet.
+  // observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the
+  // StatefulSet's generation, which is updated on mutation by the API Server.
   // +optional
   optional int64 observedGeneration = 1;
 
-  // replicas is the number of actual replicas.
+  // replicas is the number of Pods created by the StatefulSet controller.
   optional int32 replicas = 2;
+
+  // readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.
+  optional int32 readyReplicas = 3;
+
+  // currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
+  // indicated by currentRevision.
+  optional int32 currentReplicas = 4;
+
+  // updatedReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
+  // indicated by updateRevision.
+  optional int32 updatedReplicas = 5;
+
+  // currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the
+  // sequence [0,currentReplicas).
+  optional string currentRevision = 6;
+
+  // updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence
+  // [replicas-updatedReplicas,replicas)
+  optional string updateRevision = 7;
+}
+
+// StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
+// controller will use to perform updates. It includes any additional parameters
+// necessary to perform the update for the indicated strategy.
+message StatefulSetUpdateStrategy {
+  // Type indicates the type of the StatefulSetUpdateStrategy.
+  optional string type = 1;
+
+  // Partition is used to communicate the ordinal at which to partition
+  // the StatefulSet when Type is PartitionStatefulSetStrategyType. This
+  // value must be set when Type is PartitionStatefulSetStrategyType,
+  // and it must be nil otherwise.
+  optional PartitionStatefulSetStrategy partition = 2;
 }
 

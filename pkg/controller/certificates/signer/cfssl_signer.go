@@ -64,16 +64,16 @@ type cfsslSigner struct {
 func newCFSSLSigner(caFile, caKeyFile string, client clientset.Interface, certificateDuration time.Duration) (*cfsslSigner, error) {
 	ca, err := ioutil.ReadFile(caFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading CA cert file %q: %v", caFile, err)
 	}
 	cakey, err := ioutil.ReadFile(caKeyFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading CA key file %q: %v", caKeyFile, err)
 	}
 
 	parsedCa, err := helpers.ParseCertificatePEM(ca)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing CA cert file %q: %v", caFile, err)
 	}
 
 	strPassword := os.Getenv("CFSSL_CA_PK_PASSWORD")

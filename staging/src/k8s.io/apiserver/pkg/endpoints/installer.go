@@ -375,10 +375,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		shortNames = shortNamesProvider.ShortNames()
 	}
 
-	tableProvider, ok := storage.(rest.TableConvertor)
-	if !ok {
-		tableProvider = rest.DefaultTableConvertor
-	}
+	tableProvider, _ := storage.(rest.TableConvertor)
 
 	var categories []string
 	categoriesProvider, ok := storage.(rest.CategoriesProvider)

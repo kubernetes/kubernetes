@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/history"
 )
 
 func alwaysReady() bool { return true }
@@ -578,15 +579,18 @@ func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSe
 	client := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
+	ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewStatefulSetController(
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Apps().V1beta1().ControllerRevisions(),
 		client,
 	)
+	ssh := history.NewFakeHistory(informerFactory.Apps().V1beta1().ControllerRevisions())
 	ssc.podListerSynced = alwaysReady
 	ssc.setListerSynced = alwaysReady
-	ssc.control = NewDefaultStatefulSetControl(fpc)
+	ssc.control = NewDefaultStatefulSetControl(fpc, ssu, ssh)
 
 	return ssc, fpc
 }
@@ -614,7 +618,7 @@ func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetControl
 	if err != nil {
 		return err
 	}
-	for set.Status.Replicas < *set.Spec.Replicas {
+	for set.Status.ReadyReplicas < *set.Spec.Replicas {
 		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
 		ord := len(pods) - 1
 		pod := getPodAtOrdinal(pods, ord)
