@@ -1341,7 +1341,7 @@ func TestPrintPodTable(t *testing.T) {
 			t.Fatal(err)
 		}
 		buf := &bytes.Buffer{}
-		p := printers.NewHumanReadablePrinter(nil, nil, test.opts).With(AddHandlers)
+		p := printers.NewHumanReadablePrinter(nil, nil, test.opts).With(AddHandlers).AddTabWriter(false)
 		if err := p.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
