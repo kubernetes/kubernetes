@@ -46,6 +46,9 @@ const (
 	operationFinishInitDealy = 1 * time.Second
 	operationFinishFactor    = 1.1
 	operationFinishSteps     = 10
+	diskAttachInitDealy      = 1 * time.Second
+	diskAttachFactor         = 1.2
+	diskAttachSteps          = 15
 	diskDetachInitDealy      = 1 * time.Second
 	diskDetachFactor         = 1.2
 	diskDetachSteps          = 13
@@ -67,6 +70,53 @@ func (plugin *cinderPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
+func (attacher *cinderDiskAttacher) waitOperationFinished(volumeID string) error {
+	backoff := wait.Backoff{
+		Duration: operationFinishInitDealy,
+		Factor:   operationFinishFactor,
+		Steps:    operationFinishSteps,
+	}
+
+	var volumeStatus string
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		var pending bool
+		var err error
+		pending, volumeStatus, err = attacher.cinderProvider.OperationPending(volumeID)
+		if err != nil {
+			return false, err
+		}
+		return !pending, nil
+	})
+
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("Volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
+	}
+
+	return err
+}
+
+func (attacher *cinderDiskAttacher) waitDiskAttached(instanceID, volumeID string) error {
+	backoff := wait.Backoff{
+		Duration: diskAttachInitDealy,
+		Factor:   diskAttachFactor,
+		Steps:    diskAttachSteps,
+	}
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		attached, err := attacher.cinderProvider.DiskIsAttached(instanceID, volumeID)
+		if err != nil {
+			return false, err
+		}
+		return attached, nil
+	})
+
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("Volume %q failed to be attached within the alloted time", volumeID)
+	}
+
+	return err
+}
+
 func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
@@ -80,13 +130,8 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 		return "", err
 	}
 
-	pending, volumeStatus, err := attacher.cinderProvider.OperationPending(volumeID)
-	if err != nil {
+	if err := attacher.waitOperationFinished(volumeID); err != nil {
 		return "", err
-	}
-	if pending {
-		glog.Infof("status of volume %q is %s, wait it to be finished", volumeID, volumeStatus)
-		return "", nil
 	}
 
 	attached, err := attacher.cinderProvider.DiskIsAttached(instanceID, volumeID)
@@ -103,6 +148,10 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 	} else {
 		_, err = attacher.cinderProvider.AttachDisk(instanceID, volumeID)
 		if err == nil {
+			if err = attacher.waitDiskAttached(instanceID, volumeID); err != nil {
+				glog.Errorf("Error waiting for volume %q to be attached from node %q: %v", volumeID, nodeName, err)
+				return "", err
+			}
 			glog.Infof("Attach operation successful: volume %q attached to instance %q.", volumeID, instanceID)
 		} else {
 			glog.Infof("Attach volume %q to instance %q failed with: %v", volumeID, instanceID, err)
@@ -110,19 +159,10 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 		}
 	}
 
-	// When volume's status is 'attaching', DiskIsAttached() return <false, nil>, and can't get device path.
-	// We should get device path next time and do not return err.
-	devicePath := ""
-	pending, _, err = attacher.cinderProvider.OperationPending(volumeID)
+	devicePath, err := attacher.cinderProvider.GetAttachmentDiskPath(instanceID, volumeID)
 	if err != nil {
+		glog.Infof("Can not get device path of volume %q which be attached to instance %q, failed with: %v", volumeID, instanceID, err)
 		return "", err
-	}
-	if !pending {
-		devicePath, err = attacher.cinderProvider.GetAttachmentDiskPath(instanceID, volumeID)
-		if err != nil {
-			glog.Infof("Can not get device path of volume %q which be attached to instance %q, failed with: %v", volumeID, instanceID, err)
-			return "", err
-		}
 	}
 
 	return devicePath, nil
@@ -286,15 +326,10 @@ func (detacher *cinderDiskDetacher) waitOperationFinished(volumeID string) error
 		var pending bool
 		var err error
 		pending, volumeStatus, err = detacher.cinderProvider.OperationPending(volumeID)
-		if err == nil {
-			if pending == false {
-				return true, nil
-			} else {
-				return false, nil
-			}
-		} else {
+		if err != nil {
 			return false, err
 		}
+		return !pending, nil
 	})
 
 	if err == wait.ErrWaitTimeout {
@@ -313,15 +348,10 @@ func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string
 
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		attached, err := detacher.cinderProvider.DiskIsAttached(instanceID, volumeID)
-		if err == nil {
-			if attached == false {
-				return true, nil
-			} else {
-				return false, nil
-			}
-		} else {
+		if err != nil {
 			return false, err
 		}
+		return !attached, nil
 	})
 
 	if err == wait.ErrWaitTimeout {
