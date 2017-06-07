@@ -653,7 +653,11 @@ func (factory *ConfigFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, pod
 		if err == core.ErrNoNodesAvailable {
 			glog.V(4).Infof("Unable to schedule %v %v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
 		} else {
-			glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
+			if _, ok := err.(*core.FitError); ok {
+				glog.V(4).Infof("Unable to schedule %v %v: no fit: %v; waiting", pod.Namespace, pod.Name, err)
+			} else {
+				glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
+			}
 		}
 		backoff.Gc()
 		// Retry asynchronously.
