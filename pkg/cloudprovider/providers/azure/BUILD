@@ -53,7 +53,6 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/service:go_default_library",
-        "//vendor:github.com/Azure/azure-sdk-for-go/arm/compute",
         "//vendor:github.com/Azure/azure-sdk-for-go/arm/network",
         "//vendor:github.com/Azure/go-autorest/autorest/to",
         "//vendor:k8s.io/apimachinery/pkg/types",

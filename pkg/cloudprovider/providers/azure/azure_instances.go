@@ -18,7 +18,6 @@ package azure
 
 import (
 	"fmt"
-	"regexp"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -106,24 +105,6 @@ func (az *Cloud) listAllNodesInResourceGroup() ([]compute.VirtualMachine, error)
 
 	return allNodes, nil
 
-}
-
-func filterNodes(nodes []compute.VirtualMachine, filter string) ([]compute.VirtualMachine, error) {
-	filteredNodes := []compute.VirtualMachine{}
-
-	re, err := regexp.Compile(filter)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, node := range nodes {
-		// search tags
-		if re.MatchString(*node.Name) {
-			filteredNodes = append(filteredNodes, node)
-		}
-	}
-
-	return filteredNodes, nil
 }
 
 // mapNodeNameToVMName maps a k8s NodeName to an Azure VM Name
