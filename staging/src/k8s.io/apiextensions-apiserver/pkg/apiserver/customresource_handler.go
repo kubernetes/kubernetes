@@ -431,7 +431,7 @@ func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (gen
 		Decorator:               generic.UndecoratedStorage,
 		EnableGarbageCollection: t.EnableGarbageCollection,
 		DeleteCollectionWorkers: t.DeleteCollectionWorkers,
-		ResourcePrefix:          t.StoragePrefix + "/" + resource.Group + "/" + resource.Resource,
+		ResourcePrefix:          resource.Group + "/" + resource.Resource,
 	}
 	if t.EnableWatchCache {
 		ret.Decorator = genericregistry.StorageWithCacher(t.DefaultWatchCacheSize)
