@@ -61,10 +61,11 @@ const (
 
 	// Some well-known users and groups in the core Kubernetes authorization system
 
-	ControllerManagerUser = "system:kube-controller-manager"
-	SchedulerUser         = "system:kube-scheduler"
-	MastersGroup          = "system:masters"
-	NodesGroup            = "system:nodes"
+	ControllerManagerUser   = "system:kube-controller-manager"
+	SchedulerUser           = "system:kube-scheduler"
+	MastersGroup            = "system:masters"
+	NodesGroup              = "system:nodes"
+	NodesClusterRoleBinding = "system:node"
 
 	// Constants for what we name our ServiceAccounts with limited access to the cluster in case of RBAC
 	KubeDNSServiceAccountName   = "kube-dns"
@@ -89,9 +90,6 @@ const (
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.0.14"
-
-	// DefaultAdmissionControl specifies the default admission control options that will be used
-	DefaultAdmissionControl = "Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds"
 )
 
 var (
@@ -116,4 +114,7 @@ var (
 
 	// MinimumAPIAggregationVersion specifies the minimum kubernetes version that can be used enabling the API aggregation in the apiserver and the front proxy flags
 	MinimumAPIAggregationVersion = version.MustParseSemantic("v1.7.0-alpha.1")
+
+	// MinimumNodeAuthorizerVersion specifies the minimum kubernetes version that can be used for enabling the node authorizer
+	MinimumNodeAuthorizerVersion = version.MustParseSemantic("v1.7.0-beta.1")
 )
