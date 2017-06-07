@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "extensions.go",
         "openapi.go",
         "openapi_cache.go",
         "openapi_getter.go",

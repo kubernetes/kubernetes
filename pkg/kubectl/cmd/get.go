@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
@@ -90,6 +92,10 @@ var (
 		kubectl get all`))
 )
 
+const (
+	useOpenAPIPrintColumnFlagLabel = "experimental-use-openapi-print-columns"
+)
+
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
 func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
@@ -128,6 +134,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", false, "Treat \"resource not found\" as a successful retrieval.")
 	cmd.Flags().StringSliceP("label-columns", "L", []string{}, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...")
 	cmd.Flags().Bool("export", false, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
+	addOpenAPIPrintColumnFlags(cmd)
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
@@ -219,7 +226,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()
-		printer, err := f.PrinterForMapping(cmd, mapping, allNamespaces)
+		printer, err := f.PrinterForMapping(cmd, nil, mapping, allNamespaces)
 		if err != nil {
 			return err
 		}
@@ -299,7 +306,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return err
 	}
 
-	printer, err := f.PrinterForCommand(cmd, printers.PrintOptions{})
+	printer, err := f.PrinterForCommand(cmd, nil, printers.PrintOptions{})
 	if err != nil {
 		return err
 	}
@@ -418,6 +425,8 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	var lastMapping *meta.RESTMapping
 	w := printers.GetNewTabWriter(out)
 
+	useOpenAPIPrintColumns := cmdutil.GetFlagBool(cmd, useOpenAPIPrintColumnFlagLabel)
+
 	if resource.MultipleTypesRequested(args) || cmdutil.MustPrintWithKinds(objs, infos, sorter) {
 		showKind = true
 	}
@@ -426,6 +435,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	for ix := range objs {
 		var mapping *meta.RESTMapping
 		var original runtime.Object
+
 		if sorter != nil {
 			mapping = infos[sorter.OriginalPosition(ix)].Mapping
 			original = infos[sorter.OriginalPosition(ix)].Object
@@ -437,7 +447,15 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			if printer != nil {
 				w.Flush()
 			}
-			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
+
+			var outputOpts *printers.OutputOptions
+			// if cmd does not specify output format and useOpenAPIPrintColumnFlagLabel flag is true,
+			// then get the default output options for this mapping from OpenAPI schema.
+			if !cmdSpecifiesOutputFmt(cmd) && useOpenAPIPrintColumns {
+				outputOpts, _ = outputOptsForMappingFromOpenAPI(f, cmdutil.GetOpenAPICacheDir(cmd), mapping)
+			}
+
+			printer, err = f.PrinterForMapping(cmd, outputOpts, mapping, allNamespaces)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
@@ -498,7 +516,13 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			}
 			continue
 		}
-		if err := printer.PrintObj(decodedObj, w); err != nil {
+		objToPrint := decodedObj
+		if printer.IsGeneric() {
+			// use raw object as recieved from the builder when using generic
+			// printer instead of decodedObj
+			objToPrint = original
+		}
+		if err := printer.PrintObj(objToPrint, w); err != nil {
 			if !errs.Has(err.Error()) {
 				errs.Insert(err.Error())
 				allErrs = append(allErrs, err)
@@ -511,6 +535,59 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	return utilerrors.NewAggregate(allErrs)
 }
 
+func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool(useOpenAPIPrintColumnFlagLabel, false, "If true, use x-kubernetes-print-column metadata (if present) from openapi schema for displaying a resource.")
+	// marking it deprecated so that it is hidden from usage/help text.
+	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "its an experimental feature.")
+}
+
 func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
 	return printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource
+}
+
+func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
+	return cmdutil.GetFlagString(cmd, "output") != ""
+}
+
+// outputOptsForMappingFromOpenAPI looks for the output format metatadata in the
+// openapi schema and returns the output options for the mapping if found.
+func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, openAPIcacheDir string, mapping *meta.RESTMapping) (*printers.OutputOptions, bool) {
+
+	// user has not specified any output format, check if OpenAPI has
+	// default specification to print this resource type
+	api, err := f.OpenAPISchema(openAPIcacheDir)
+	if err != nil {
+		// Error getting schema
+		return nil, false
+	}
+	// Found openapi metadata for this resource
+	kind, found := api.LookupResource(mapping.GroupVersionKind)
+	if !found {
+		// Kind not found, return empty columns
+		return nil, false
+	}
+
+	columns, found := openapi.GetPrintColumns(kind.Extensions)
+	if !found {
+		// Extension not found, return empty columns
+		return nil, false
+	}
+
+	return outputOptsFromStr(columns)
+}
+
+// outputOptsFromStr parses the print-column metadata and generates printer.OutputOptions object.
+func outputOptsFromStr(columnStr string) (*printers.OutputOptions, bool) {
+	if columnStr == "" {
+		return nil, false
+	}
+	parts := strings.SplitN(columnStr, "=", 2)
+	if len(parts) < 2 {
+		return nil, false
+	}
+	return &printers.OutputOptions{
+		FmtType:          parts[0],
+		FmtArg:           parts[1],
+		AllowMissingKeys: true,
+	}, true
 }
