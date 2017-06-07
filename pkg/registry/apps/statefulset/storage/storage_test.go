@@ -76,7 +76,8 @@ func validNewStatefulSet() *apps.StatefulSet {
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
-			Replicas: 7,
+			Replicas:       7,
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
 		Status: apps.StatefulSetStatus{},
 	}

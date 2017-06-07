@@ -17,31 +17,38 @@ limitations under the License.
 package rest
 
 import (
+	"fmt"
+	"net/http"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
-var DefaultTableConvertor TableConvertor = defaultTableConvertor{}
+type defaultTableConvertor struct {
+	qualifiedResource schema.GroupResource
+}
 
-type defaultTableConvertor struct{}
+// NewDefaultTableConvertor creates a default convertor for the provided resource.
+func NewDefaultTableConvertor(resource schema.GroupResource) TableConvertor {
+	return defaultTableConvertor{qualifiedResource: resource}
+}
 
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
-func (defaultTableConvertor) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error) {
+func (c defaultTableConvertor) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error) {
 	var table metav1alpha1.Table
 	fn := func(obj runtime.Object) error {
 		m, err := meta.Accessor(obj)
 		if err != nil {
-			// TODO: skip objects we don't recognize
-			return nil
+			return errNotAcceptable{resource: c.qualifiedResource}
 		}
 		table.Rows = append(table.Rows, metav1alpha1.TableRow{
-			Cells:  []interface{}{m.GetClusterName(), m.GetNamespace(), m.GetName(), m.GetCreationTimestamp().Time.UTC().Format(time.RFC3339)},
+			Cells:  []interface{}{m.GetName(), m.GetCreationTimestamp().Time.UTC().Format(time.RFC3339)},
 			Object: runtime.RawExtension{Object: obj},
 		})
 		return nil
@@ -57,50 +64,26 @@ func (defaultTableConvertor) ConvertToTable(ctx genericapirequest.Context, objec
 		}
 	}
 	table.ColumnDefinitions = []metav1alpha1.TableColumnDefinition{
-		{Name: "Cluster Name", Type: "string", Description: swaggerMetadataDescriptions["clusterName"]},
-		{Name: "Namespace", Type: "string", Description: swaggerMetadataDescriptions["namespace"]},
 		{Name: "Name", Type: "string", Description: swaggerMetadataDescriptions["name"]},
 		{Name: "Created At", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"]},
-	}
-	// trim the left two columns if completely empty
-	if trimColumn(0, &table) {
-		trimColumn(0, &table)
-	} else {
-		trimColumn(1, &table)
 	}
 	return &table, nil
 }
 
-func trimColumn(column int, table *metav1alpha1.Table) bool {
-	for _, item := range table.Rows {
-		switch t := item.Cells[column].(type) {
-		case string:
-			if len(t) > 0 {
-				return false
-			}
-		case interface{}:
-			if t == nil {
-				return false
-			}
-		}
+// errNotAcceptable indicates the resource doesn't support Table conversion
+type errNotAcceptable struct {
+	resource schema.GroupResource
+}
+
+func (e errNotAcceptable) Error() string {
+	return fmt.Sprintf("the resource %s does not support being converted to a Table", e.resource)
+}
+
+func (e errNotAcceptable) Status() metav1.Status {
+	return metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    http.StatusNotAcceptable,
+		Reason:  metav1.StatusReason("NotAcceptable"),
+		Message: e.Error(),
 	}
-	if column == 0 {
-		table.ColumnDefinitions = table.ColumnDefinitions[1:]
-	} else {
-		for j := column; j < len(table.ColumnDefinitions); j++ {
-			table.ColumnDefinitions[j] = table.ColumnDefinitions[j+1]
-		}
-	}
-	for i := range table.Rows {
-		cells := table.Rows[i].Cells
-		if column == 0 {
-			table.Rows[i].Cells = cells[1:]
-			continue
-		}
-		for j := column; j < len(cells); j++ {
-			cells[j] = cells[j+1]
-		}
-		table.Rows[i].Cells = cells[:len(cells)-1]
-	}
-	return true
 }

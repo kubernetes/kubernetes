@@ -135,7 +135,7 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 		Decorator:               generic.UndecoratedStorage,
 		EnableGarbageCollection: f.Options.EnableGarbageCollection,
 		DeleteCollectionWorkers: f.Options.DeleteCollectionWorkers,
-		ResourcePrefix:          f.Options.StorageConfig.Prefix + "/" + resource.Group + "/" + resource.Resource,
+		ResourcePrefix:          resource.Group + "/" + resource.Resource,
 	}
 	if f.Options.EnableWatchCache {
 		ret.Decorator = genericregistry.StorageWithCacher(f.Options.DefaultWatchCacheSize)

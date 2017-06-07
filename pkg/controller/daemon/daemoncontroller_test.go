@@ -273,9 +273,10 @@ func (f *fakePodControl) DeletePod(namespace string, podID string, object runtim
 type daemonSetsController struct {
 	*DaemonSetsController
 
-	dsStore   cache.Store
-	podStore  cache.Store
-	nodeStore cache.Store
+	dsStore      cache.Store
+	podStore     cache.Store
+	nodeStore    cache.Store
+	fakeRecorder *record.FakeRecorder
 }
 
 func newTestController(initialObjects ...runtime.Object) (*daemonSetsController, *fakePodControl, *fake.Clientset) {
@@ -289,7 +290,9 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 		informerFactory.Core().V1().Nodes(),
 		clientset,
 	)
-	manager.eventRecorder = record.NewFakeRecorder(100)
+
+	fakeRecorder := record.NewFakeRecorder(100)
+	manager.eventRecorder = fakeRecorder
 
 	manager.podStoreSynced = alwaysReady
 	manager.nodeStoreSynced = alwaysReady
@@ -303,6 +306,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 		informerFactory.Extensions().V1beta1().DaemonSets().Informer().GetStore(),
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Core().V1().Nodes().Informer().GetStore(),
+		fakeRecorder,
 	}, podControl, clientset
 }
 
@@ -486,6 +490,16 @@ func resourcePodSpec(nodeName, memory, cpu string) v1.PodSpec {
 	}
 }
 
+func resourcePodSpecWithoutNodeName(memory, cpu string) v1.PodSpec {
+	return v1.PodSpec{
+		Containers: []v1.Container{{
+			Resources: v1.ResourceRequirements{
+				Requests: allocatableResources(memory, cpu),
+			},
+		}},
+	}
+}
+
 func allocatableResources(memory, cpu string) v1.ResourceList {
 	return v1.ResourceList{
 		v1.ResourceMemory: resource.MustParse(memory),
@@ -530,6 +544,27 @@ func TestInsufficientCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T)
 		})
 		manager.dsStore.Add(ds)
 		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+	}
+}
+
+// DaemonSets should only place onto nodes with sufficient free resource and matched node selector
+func TestInsufficientCapacityNodeSufficientCapacityWithNodeLabelDaemonLaunchPod(t *testing.T) {
+	podSpec := resourcePodSpecWithoutNodeName("50M", "75m")
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec = podSpec
+	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+	manager, podControl, _ := newTestController(ds)
+	node1 := newNode("not-enough-resource", nil)
+	node1.Status.Allocatable = allocatableResources("10M", "20m")
+	node2 := newNode("enough-resource", simpleNodeLabel)
+	node2.Status.Allocatable = allocatableResources("100M", "200m")
+	manager.nodeStore.Add(node1)
+	manager.nodeStore.Add(node2)
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0)
+	// we do not expect any event for insufficient free resource
+	if len(manager.fakeRecorder.Events) != 0 {
+		t.Fatalf("unexpected events, got %v, expected %v: %+v", len(manager.fakeRecorder.Events), 0, manager.fakeRecorder.Events)
 	}
 }
 

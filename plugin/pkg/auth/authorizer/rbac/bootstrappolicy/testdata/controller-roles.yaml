@@ -976,6 +976,18 @@ items:
     - patch
     - update
   - apiGroups:
+    - apps
+    resources:
+    - controllerrevisions
+    verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
     - ""
     resources:
     - persistentvolumeclaims
