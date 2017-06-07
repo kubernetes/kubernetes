@@ -2592,9 +2592,9 @@
       "type": "string",
       "description": "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/"
      },
-     "serviceAccount": {
+     "deprecatedServiceAccount": {
       "type": "string",
-      "description": "DeprecatedServiceAccount is a depreciated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead."
+      "description": "DeprecatedServiceAccount is a deprecated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead."
      },
      "automountServiceAccountToken": {
       "type": "boolean",
