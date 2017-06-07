@@ -26,7 +26,7 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: calico/node:v1.2.1
+          image: calico/node:v1.3.0-rc1
           env:
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
@@ -34,6 +34,8 @@ spec:
               value: "none"
             - name: DATASTORE_TYPE
               value: "kubernetes"
+            - name: FELIX_TYPHAK8SSERVICENAME
+              value: "calico-typha"
             - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
               value: "ACCEPT"
             - name: FELIX_IPV6SUPPORT
@@ -67,7 +69,7 @@ spec:
         # This container installs the Calico CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: calico/cni:v1.8.3-hostport
+          image: calico/cni:v1.9.1
           command: ["/install-cni.sh"]
           env:
             - name: CNI_CONF_NAME
@@ -130,5 +132,5 @@ spec:
           hostPath:
             path: /etc/cni/net.d
       tolerations:
-      - key: "CriticalAddonsOnly"
-        operator: "Exists"
+        - key: "CriticalAddonsOnly"
+          operator: "Exists"
