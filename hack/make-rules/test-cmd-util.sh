@@ -3380,6 +3380,16 @@ runTests() {
   fi
 
   ###########################
+  # Delete collection body  #
+  ###########################
+  # test the old way with a version
+  curl -k -H "Content-Type:" http://localhost:8080/apis/apps/v1beta1/namespaces/default/deployments -XDELETE -d'{"apiVersion":"v1","kind":"DeleteOptions","orphanDependents":false}'
+  # test the new way without a version
+  curl -k -H "Content-Type:" http://localhost:8080/apis/apps/v1beta1/namespaces/default/deployments -XDELETE -d'{"orphanDependents":false}'
+  # test the old way with a version
+  curl -k -H "Content-Type:" http://localhost:8080/apis/apps/v1beta1/namespaces/default/deployments -XDELETE -d'{"apiVersion":"apps/v1beta1","kind":"DeleteOptions","orphanDependents":false}'
+
+  ###########################
   # POD creation / deletion #
   ###########################
 
