@@ -36,6 +36,9 @@ func ImageLocalityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *scheduler
 	}
 
 	var sumSize int64
+	for i := range pod.Spec.InitContainers {
+		sumSize += checkContainerImageOnNode(node, &pod.Spec.InitContainers[i])
+	}
 	for i := range pod.Spec.Containers {
 		sumSize += checkContainerImageOnNode(node, &pod.Spec.Containers[i])
 	}
