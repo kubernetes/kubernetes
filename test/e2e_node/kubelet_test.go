@@ -19,6 +19,7 @@ package e2e_node
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -114,6 +115,51 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		It("should be possible to delete", func() {
 			err := podClient.Delete(podName, &metav1.DeleteOptions{})
 			Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
+		})
+	})
+	Context("when scheduling a busybox Pod with hostAliases", func() {
+		podName := "busybox-host-aliases" + string(uuid.NewUUID())
+
+		It("it should write entries to /etc/hosts", func() {
+			podClient.CreateSync(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					// Don't restart the Pod since it is expected to exit
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Image:   "gcr.io/google_containers/busybox:1.24",
+							Name:    podName,
+							Command: []string{"/bin/sh", "-c", "cat /etc/hosts; sleep 6000"},
+						},
+					},
+					HostAliases: []v1.HostAlias{
+						{
+							IP:        "123.45.67.89",
+							Hostnames: []string{"foo", "bar"},
+						},
+					},
+				},
+			})
+
+			Eventually(func() error {
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream()
+				defer rc.Close()
+				if err != nil {
+					return err
+				}
+				buf := new(bytes.Buffer)
+				buf.ReadFrom(rc)
+				hostsFileContent := buf.String()
+
+				if !strings.Contains(hostsFileContent, "123.45.67.89\tfoo") || !strings.Contains(hostsFileContent, "123.45.67.89\tbar") {
+					return fmt.Errorf("expected hosts file to contain entries from HostAliases. Got:\n%+v", hostsFileContent)
+				}
+
+				return nil
+			}, time.Minute, time.Second*4).Should(BeNil())
 		})
 	})
 	Context("when scheduling a read only busybox container", func() {
