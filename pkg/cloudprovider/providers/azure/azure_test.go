@@ -598,7 +598,7 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"cloudProviderBackoffDuration": 5,
 		"cloudProviderBackoffJitter": 1.0,
 		"cloudProviderRatelimit": true,
-		"cloudProviderRateLimitQPS": 1,
+		"cloudProviderRateLimitQPS": 0.5,
 		"cloudProviderRateLimitBucket": 5
 	}`
 	validateConfig(t, config)
@@ -638,7 +638,7 @@ cloudProviderBackoffExponent: 1.5
 cloudProviderBackoffDuration: 5
 cloudProviderBackoffJitter: 1.0
 cloudProviderRatelimit: true
-cloudProviderRateLimitQPS: 1
+cloudProviderRateLimitQPS: 0.5
 cloudProviderRateLimitBucket: 5
 `
 	validateConfig(t, config)
@@ -698,7 +698,7 @@ func validateConfig(t *testing.T, config string) {
 	if azureCloud.CloudProviderRateLimit != true {
 		t.Errorf("got incorrect value for CloudProviderRateLimit")
 	}
-	if azureCloud.CloudProviderRateLimitQPS != 1 {
+	if azureCloud.CloudProviderRateLimitQPS != 0.5 {
 		t.Errorf("got incorrect value for CloudProviderRateLimitQPS")
 	}
 	if azureCloud.CloudProviderRateLimitBucket != 5 {

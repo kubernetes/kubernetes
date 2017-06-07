@@ -40,7 +40,7 @@ import (
 const (
 	// CloudProviderName is the value used for the --cloud-provider flag
 	CloudProviderName      = "azure"
-	rateLimitQPSDefault    = 1
+	rateLimitQPSDefault    = 1.0
 	rateLimitBucketDefault = 5
 	backoffRetriesDefault  = 6
 	backoffExponentDefault = 1.5
@@ -93,7 +93,7 @@ type Config struct {
 	// Enable rate limiting
 	CloudProviderRateLimit bool `json:"cloudProviderRateLimit" yaml:"cloudProviderRateLimit"`
 	// Rate limit QPS
-	CloudProviderRateLimitQPS int `json:"cloudProviderRateLimitQPS" yaml:"cloudProviderRateLimitQPS"`
+	CloudProviderRateLimitQPS float32 `json:"cloudProviderRateLimitQPS" yaml:"cloudProviderRateLimitQPS"`
 	// Rate limit Bucket Size
 	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket" yaml:"cloudProviderRateLimitBucket"`
 }
@@ -216,7 +216,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			az.CloudProviderRateLimitBucket = rateLimitBucketDefault
 		}
 		az.operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
-			float32(az.CloudProviderRateLimitQPS),
+			az.CloudProviderRateLimitQPS,
 			az.CloudProviderRateLimitBucket)
 		glog.V(2).Infof("Azure cloudprovider using rate limit config: QPS=%d, bucket=%d",
 			az.CloudProviderRateLimitQPS,
