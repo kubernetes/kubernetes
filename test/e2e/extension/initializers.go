@@ -127,6 +127,9 @@ var _ = framework.KubeDescribe("Initializers", func() {
 				},
 			},
 		})
+		if errors.IsNotFound(err) {
+			framework.Skipf("dynamic configuration of initializers requires the alpha admissionregistration.k8s.io group to be enabled")
+		}
 		Expect(err).NotTo(HaveOccurred())
 
 		// we must remove the initializer when the test is complete and ensure no pods are pending for that initializer

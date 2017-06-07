@@ -556,7 +556,6 @@ var _ = framework.KubeDescribe("Services", func() {
 			By("creating a static load balancer IP")
 			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunId)
 			requestedIP, err = framework.CreateGCEStaticIP(staticIPName)
-			Expect(err).NotTo(HaveOccurred())
 			defer func() {
 				if staticIPName != "" {
 					// Release GCE static IP - this is not kube-managed and will not be automatically released.
@@ -565,6 +564,7 @@ var _ = framework.KubeDescribe("Services", func() {
 					}
 				}
 			}()
+			Expect(err).NotTo(HaveOccurred())
 			framework.Logf("Allocated static load balancer IP: %s", requestedIP)
 		}
 

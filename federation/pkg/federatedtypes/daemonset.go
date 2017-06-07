@@ -72,6 +72,31 @@ func (a *DaemonSetAdapter) Copy(obj pkgruntime.Object) pkgruntime.Object {
 func (a *DaemonSetAdapter) Equivalent(obj1, obj2 pkgruntime.Object) bool {
 	daemonset1 := obj1.(*extensionsv1.DaemonSet)
 	daemonset2 := obj2.(*extensionsv1.DaemonSet)
+
+	// Kubernetes daemonset controller writes a daemonset's hash to
+	// the object label as an optimization to avoid recomputing it every
+	// time. Adding a new label to the object that the federation is
+	// unaware of causes problems because federated controllers compare
+	// the objects in federation and their equivalents in clusters and
+	// try to reconcile them. This leads to a constant fight between the
+	// federated daemonset controller and the cluster controllers, and
+	// they never reach a stable state.
+	//
+	// Ideally, cluster components should not update an object's spec or
+	// metadata in a way federation cannot replicate. They can update an
+	// object's status though. Therefore, this daemonset hash should
+	// be a field in daemonset's status, not a label in object meta.
+	// @janetkuo says that this label is only a short term solution. In
+	// the near future, they are going to replace it with revision numbers
+	// in daemonset status. We can then rip this bandaid out.
+	//
+	// We are deleting the keys here and that should be fine since we are
+	// working on object copies. Also, propagating the deleted labels
+	// should also be fine because we don't support daemonset rolling
+	// update in federation yet.
+	delete(daemonset1.ObjectMeta.Labels, extensionsv1.DefaultDaemonSetUniqueLabelKey)
+	delete(daemonset2.ObjectMeta.Labels, extensionsv1.DefaultDaemonSetUniqueLabelKey)
+
 	return util.ObjectMetaEquivalent(daemonset1.ObjectMeta, daemonset2.ObjectMeta) && reflect.DeepEqual(daemonset1.Spec, daemonset2.Spec)
 }
 

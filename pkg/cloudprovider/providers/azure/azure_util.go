@@ -25,6 +25,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -242,26 +243,32 @@ func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, error) {
 		return "", cloudprovider.InstanceNotFound
 	}
 	if err != nil {
+		glog.Errorf("error: az.getIPForMachine(%s), az.getVirtualMachine(%s), err=%v", nodeName, nodeName, err)
 		return "", err
 	}
 
 	nicID, err := getPrimaryInterfaceID(machine)
 	if err != nil {
+		glog.Errorf("error: az.getIPForMachine(%s), getPrimaryInterfaceID(%v), err=%v", nodeName, machine, err)
 		return "", err
 	}
 
 	nicName, err := getLastSegment(nicID)
 	if err != nil {
+		glog.Errorf("error: az.getIPForMachine(%s), getLastSegment(%s), err=%v", nodeName, nicID, err)
 		return "", err
 	}
 
+	az.operationPollRateLimiter.Accept()
 	nic, err := az.InterfacesClient.Get(az.ResourceGroup, nicName, "")
 	if err != nil {
+		glog.Errorf("error: az.getIPForMachine(%s), az.InterfacesClient.Get(%s, %s, %s), err=%v", nodeName, az.ResourceGroup, nicName, "", err)
 		return "", err
 	}
 
 	ipConfig, err := getPrimaryIPConfig(nic)
 	if err != nil {
+		glog.Errorf("error: az.getIPForMachine(%s), getPrimaryIPConfig(%v), err=%v", nodeName, nic, err)
 		return "", err
 	}
 
