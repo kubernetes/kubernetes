@@ -151,6 +151,7 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 		// to nil. This is a workaround until https://github.com/Azure/go-autorest/issues/112 is fixed
 		sg.SecurityGroupPropertiesFormat.NetworkInterfaces = nil
 		sg.SecurityGroupPropertiesFormat.Subnets = nil
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
 		if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
 			glog.V(2).Infof("ensure(%s) backing off: sg(%s) - updating", serviceName, *sg.Name)
@@ -229,6 +230,7 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	}
 	if !existsLb || lbNeedsUpdate {
 		glog.V(3).Infof("ensure(%s): lb(%s) - updating", serviceName, lbName)
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
 		if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
 			glog.V(2).Infof("ensure(%s) backing off: lb(%s) - updating", serviceName, lbName)
@@ -328,6 +330,7 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 			// to nil. This is a workaround until https://github.com/Azure/go-autorest/issues/112 is fixed
 			sg.SecurityGroupPropertiesFormat.NetworkInterfaces = nil
 			sg.SecurityGroupPropertiesFormat.Subnets = nil
+			az.operationPollRateLimiter.Accept()
 			resp, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *reconciledSg.Name, reconciledSg, nil)
 			if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
 				glog.V(2).Infof("delete(%s) backing off: sg(%s) - updating", serviceName, az.SecurityGroupName)
@@ -365,6 +368,7 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 		if lbNeedsUpdate {
 			if len(*lb.FrontendIPConfigurations) > 0 {
 				glog.V(3).Infof("delete(%s): lb(%s) - updating", serviceName, lbName)
+				az.operationPollRateLimiter.Accept()
 				resp, err := az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
 				if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
 					glog.V(2).Infof("delete(%s) backing off: sg(%s) - updating", serviceName, az.SecurityGroupName)
@@ -380,6 +384,7 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 			} else {
 				glog.V(3).Infof("delete(%s): lb(%s) - deleting; no remaining frontendipconfigs", serviceName, lbName)
 
+				az.operationPollRateLimiter.Accept()
 				resp, err := az.LoadBalancerClient.Delete(az.ResourceGroup, lbName, nil)
 				if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
 					glog.V(2).Infof("delete(%s) backing off: lb(%s) - deleting; no remaining frontendipconfigs", serviceName, lbName)
@@ -434,6 +439,7 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.Pub
 	pip.Tags = &map[string]*string{"service": &serviceName}
 
 	glog.V(3).Infof("ensure(%s): pip(%s) - creating", serviceName, *pip.Name)
+	az.operationPollRateLimiter.Accept()
 	resp, err := az.PublicIPAddressesClient.CreateOrUpdate(az.ResourceGroup, *pip.Name, pip, nil)
 	if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
 		glog.V(2).Infof("ensure(%s) backing off: pip(%s) - creating", serviceName, *pip.Name)
@@ -459,6 +465,7 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.Pub
 
 func (az *Cloud) ensurePublicIPDeleted(serviceName, pipName string) error {
 	glog.V(2).Infof("ensure(%s): pip(%s) - deleting", serviceName, pipName)
+	az.operationPollRateLimiter.Accept()
 	resp, deleteErr := az.PublicIPAddressesClient.Delete(az.ResourceGroup, pipName, nil)
 	if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, deleteErr) {
 		glog.V(2).Infof("ensure(%s) backing off: pip(%s) - deleting", serviceName, pipName)
@@ -910,6 +917,7 @@ func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, b
 		primaryIPConfig.LoadBalancerBackendAddressPools = &newBackendPools
 
 		glog.V(3).Infof("nicupdate(%s): nic(%s) - updating", serviceName, nicName)
+		az.operationPollRateLimiter.Accept()
 		resp, err := az.InterfacesClient.CreateOrUpdate(az.ResourceGroup, *nic.Name, nic, nil)
 		if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
 			glog.V(2).Infof("nicupdate(%s) backing off: nic(%s) - updating, err=%v", serviceName, nicName, err)
