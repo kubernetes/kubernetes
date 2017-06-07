@@ -75,6 +75,40 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) fi
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("podManagementPolicy"), spec.PodManagementPolicy, fmt.Sprintf("must be '%s' or '%s'", apps.OrderedReadyPodManagement, apps.ParallelPodManagement)))
 	}
 
+	switch spec.UpdateStrategy.Type {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), ""))
+	case apps.OnDeleteStatefulSetStrategyType, apps.RollingUpdateStatefulSetStrategyType:
+		if spec.UpdateStrategy.Partition != nil {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath.Child("updateStrategy").Child("partition"),
+					spec.UpdateStrategy.Partition.Ordinal,
+					fmt.Sprintf("only allowed for updateStrategy '%s'", apps.PartitionStatefulSetStrategyType)))
+		}
+	case apps.PartitionStatefulSetStrategyType:
+		if spec.UpdateStrategy.Partition == nil {
+			allErrs = append(
+				allErrs,
+				field.Required(
+					fldPath.Child("updateStrategy").Child("partition"),
+					fmt.Sprintf("required for updateStrategy '%s'", apps.PartitionStatefulSetStrategyType)))
+			break
+		}
+		allErrs = append(allErrs,
+			apivalidation.ValidateNonnegativeField(
+				int64(spec.UpdateStrategy.Partition.Ordinal),
+				fldPath.Child("updateStrategy").Child("partition").Child("ordinal"))...)
+	default:
+		allErrs = append(allErrs,
+			field.Invalid(fldPath.Child("updateStrategy"), spec.UpdateStrategy,
+				fmt.Sprintf("must be '%s', '%s', or '%s'",
+					apps.RollingUpdateStatefulSetStrategyType,
+					apps.OnDeleteStatefulSetStrategyType,
+					apps.PartitionStatefulSetStrategyType)))
+	}
+
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
@@ -113,20 +147,21 @@ func ValidateStatefulSet(statefulSet *apps.StatefulSet) field.ErrorList {
 func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
 
-	// TODO: For now we're taking the safe route and disallowing all updates to
-	// spec except for Replicas, for scaling, and Template.Spec.containers.image
-	// for rolling-update. Enable others on a case by case basis.
 	restoreReplicas := statefulSet.Spec.Replicas
 	statefulSet.Spec.Replicas = oldStatefulSet.Spec.Replicas
 
-	restoreContainers := statefulSet.Spec.Template.Spec.Containers
-	statefulSet.Spec.Template.Spec.Containers = oldStatefulSet.Spec.Template.Spec.Containers
+	restoreTemplate := statefulSet.Spec.Template
+	statefulSet.Spec.Template = oldStatefulSet.Spec.Template
+
+	restoreStrategy := statefulSet.Spec.UpdateStrategy
+	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
 
 	if !reflect.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas' and 'containers' are forbidden."))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden."))
 	}
 	statefulSet.Spec.Replicas = restoreReplicas
-	statefulSet.Spec.Template.Spec.Containers = restoreContainers
+	statefulSet.Spec.Template = restoreTemplate
+	statefulSet.Spec.UpdateStrategy = restoreStrategy
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
 	containerErrs, _ := apivalidation.ValidateContainerUpdates(statefulSet.Spec.Template.Spec.Containers, oldStatefulSet.Spec.Template.Spec.Containers, field.NewPath("spec").Child("template").Child("containers"))

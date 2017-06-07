@@ -111,6 +111,7 @@ filegroup(
         "//pkg/controller/disruption:all-srcs",
         "//pkg/controller/endpoint:all-srcs",
         "//pkg/controller/garbagecollector:all-srcs",
+        "//pkg/controller/history:all-srcs",
         "//pkg/controller/job:all-srcs",
         "//pkg/controller/namespace:all-srcs",
         "//pkg/controller/node:all-srcs",

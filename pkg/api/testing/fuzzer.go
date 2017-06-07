@@ -723,6 +723,13 @@ func appsFuncs(t apitesting.TestingCommon) []interface{} {
 			if len(s.Spec.PodManagementPolicy) == 0 {
 				s.Spec.PodManagementPolicy = apps.OrderedReadyPodManagement
 			}
+			if len(s.Spec.UpdateStrategy.Type) == 0 {
+				s.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
+			}
+			if s.Spec.RevisionHistoryLimit == nil {
+				s.Spec.RevisionHistoryLimit = new(int32)
+				*s.Spec.RevisionHistoryLimit = 10
+			}
 		},
 	}
 }

@@ -194,6 +194,7 @@ pkg/client/unversioned
 pkg/cloudprovider/providers
 pkg/cloudprovider/providers/azure
 pkg/cloudprovider/providers/cloudstack
+pkg/controller/history
 pkg/controller/volume/attachdetach/cache
 pkg/controller/volume/attachdetach/populator
 pkg/controller/volume/attachdetach/reconciler

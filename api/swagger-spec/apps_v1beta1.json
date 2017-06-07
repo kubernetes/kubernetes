@@ -5915,6 +5915,15 @@
      "podManagementPolicy": {
       "type": "string",
       "description": "podManagementPolicy controls how pods are created during initial scale up, when replacing pods on nodes, or when scaling down. The default policy is `OrderedReady`, where pods are created in increasing order (pod-0, then pod-1, etc) and the controller will wait until each pod is ready before continuing. When scaling down, the pods are removed in the opposite order. The alternative policy is `Parallel` which will create pods in parallel to match the desired scale without waiting, and on scale down will delete all pods at once."
+     },
+     "updateStrategy": {
+      "$ref": "v1beta1.StatefulSetUpdateStrategy",
+      "description": "updateStrategy indicates the StatefulSetUpdateStrategy that will be employed to update Pods in the StatefulSet when a revision is made to Template."
+     },
+     "revisionHistoryLimit": {
+      "type": "integer",
+      "format": "int32",
+      "description": "revisionHistoryLimit is the maximum number of revisions that will be maintained in the StatefulSet's revision history. The revision history consists of all revisions not represented by a currently applied StatefulSetSpec version. The default value is 10."
      }
     }
    },
@@ -5998,6 +6007,34 @@
      }
     }
    },
+   "v1beta1.StatefulSetUpdateStrategy": {
+    "id": "v1beta1.StatefulSetUpdateStrategy",
+    "description": "StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type indicates the type of the StatefulSetUpdateStrategy."
+     },
+     "partition": {
+      "$ref": "v1beta1.PartitionStatefulSetStrategy",
+      "description": "Partition is used to communicate the ordinal at which to partition the StatefulSet when Type is PartitionStatefulSetStrategyType. This value must be set when Type is PartitionStatefulSetStrategyType, and it must be nil otherwise."
+     }
+    }
+   },
+   "v1beta1.PartitionStatefulSetStrategy": {
+    "id": "v1beta1.PartitionStatefulSetStrategy",
+    "description": "PartitionStatefulSetStrategy contains the parameters used with the PartitionStatefulSetStrategyType.",
+    "required": [
+     "ordinal"
+    ],
+    "properties": {
+     "ordinal": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Ordinal indicates the ordinal at which the StatefulSet should be partitioned."
+     }
+    }
+   },
    "v1beta1.StatefulSetStatus": {
     "id": "v1beta1.StatefulSetStatus",
     "description": "StatefulSetStatus represents the current state of a StatefulSet.",
@@ -6008,12 +6045,35 @@
      "observedGeneration": {
       "type": "integer",
       "format": "int64",
-      "description": "observedGeneration is the most recent generation observed by this StatefulSet."
+      "description": "observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the StatefulSet's generation, which is updated on mutation by the API Server."
      },
      "replicas": {
       "type": "integer",
       "format": "int32",
-      "description": "replicas is the number of actual replicas."
+      "description": "replicas is the number of Pods created by the StatefulSet controller."
+     },
+     "readyReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition."
+     },
+     "currentReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by currentRevision."
+     },
+     "updatedReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "updatedReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by updateRevision."
+     },
+     "currentRevision": {
+      "type": "string",
+      "description": "currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [0,currentReplicas)."
+     },
+     "updateRevision": {
+      "type": "string",
+      "description": "updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)"
      }
     }
    },

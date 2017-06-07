@@ -32,6 +32,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/history"
 )
 
 func TestGetParentNameAndOrdinal(t *testing.T) {
@@ -287,6 +288,26 @@ func TestNewPodControllerRef(t *testing.T) {
 	}
 }
 
+func TestCreateApplyRevision(t *testing.T) {
+	set := newStatefulSet(1)
+	revision, err := newRevision(set, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set.Spec.Template.Spec.Containers[0].Name = "foo"
+	restoredSet, err := applyRevision(set, revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restoredRevision, err := newRevision(restoredSet, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !history.EqualRevision(revision, restoredRevision) {
+		t.Errorf("wanted %v got %v", string(revision.Data.Raw), string(restoredRevision.Data.Raw))
+	}
+}
+
 func newPVC(name string) v1.PersistentVolumeClaim {
 	return v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -354,6 +375,11 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 			Template:             template,
 			VolumeClaimTemplates: claims,
 			ServiceName:          "governingsvc",
+			UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			RevisionHistoryLimit: func() *int32 {
+				limit := int32(2)
+				return &limit
+			}(),
 		},
 	}
 }
