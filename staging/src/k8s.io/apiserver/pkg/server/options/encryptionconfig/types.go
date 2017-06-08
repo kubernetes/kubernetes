@@ -37,8 +37,12 @@ type ResourceConfig struct {
 
 // ProviderConfig stores the provided configuration for an encryption provider.
 type ProviderConfig struct {
-	// aes is the configuration for the AEAD-GCM transformer.
-	AES *AESConfig `json:"aes,omitempty"`
+	// aesgcm is the configuration for the AES-GCM transformer.
+	AESGCM *AESConfig `json:"aesgcm,omitempty"`
+	// aescbc is the configuration for the AES-CBC transformer.
+	AESCBC *AESConfig `json:"aescbc,omitempty"`
+	// secretbox is the configuration for the Secretbox based transformer.
+	Secretbox *SecretboxConfig `json:"secretbox,omitempty"`
 	// identity is the (empty) configuration for the identity transformer.
 	Identity *IdentityConfig `json:"identity,omitempty"`
 }
@@ -46,6 +50,12 @@ type ProviderConfig struct {
 // AESConfig contains the API configuration for an AES transformer.
 type AESConfig struct {
 	// keys is a list of keys to be used for creating the AES transformer.
+	Keys []Key `json:"keys"`
+}
+
+// SECRETBOXConfig contains the API configuration for an Secretbox transformer.
+type SecretboxConfig struct {
+	// keys is a list of keys to be used for creating the Secretbox transformer.
 	Keys []Key `json:"keys"`
 }
 
