@@ -51,8 +51,8 @@ func SetDefaults_DaemonSet(obj *DaemonSet) {
 			updateStrategy.RollingUpdate = &rollingUpdate
 		}
 		if updateStrategy.RollingUpdate.MaxUnavailable == nil {
-			// Set default MaxUnavailable as 1 by default.
-			maxUnavailable := intstr.FromInt(1)
+			// Set default MaxUnavailable as 0 by default.
+			maxUnavailable := intstr.FromInt(0)
 			updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 		}
 	}
@@ -90,8 +90,8 @@ func SetDefaults_Deployment(obj *Deployment) {
 			strategy.RollingUpdate = &rollingUpdate
 		}
 		if strategy.RollingUpdate.MaxUnavailable == nil {
-			// Set default MaxUnavailable as 1 by default.
-			maxUnavailable := intstr.FromInt(1)
+			// Set default MaxUnavailable as 0 by default.
+			maxUnavailable := intstr.FromInt(0)
 			strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 		}
 		if strategy.RollingUpdate.MaxSurge == nil {

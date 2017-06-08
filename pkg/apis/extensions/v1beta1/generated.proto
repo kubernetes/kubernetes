@@ -879,14 +879,14 @@ message RollingUpdateDeployment {
   // Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
   // Absolute number is calculated from percentage by rounding down.
   // This can not be 0 if MaxSurge is 0.
-  // By default, a fixed value of 1 is used.
+  // By default, a fixed value of 0 is used.
   // Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods
   // immediately when the rolling update starts. Once new pods are ready, old RC
   // can be scaled down further, followed by scaling up the new RC, ensuring
   // that the total number of pods available at all times during the update is at
   // least 70% of desired pods.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 0;
 
   // The maximum number of pods that can be scheduled above the desired number of
   // pods.
