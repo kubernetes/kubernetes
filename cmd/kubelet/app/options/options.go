@@ -59,9 +59,6 @@ type KubeletFlags struct {
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
 
-	// TODO(mtaufen): It is increasingly looking like nobody actually uses the
-	//                Kubelet's runonce mode anymore, so it may be a candidate
-	//                for deprecation and removal.
 	// If runOnce is true, the Kubelet will check the API server once for pods,
 	// run those in addition to the pods specified by the local manifest, and exit.
 	RunOnce bool
@@ -134,6 +131,7 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.Float64Var(&f.ChaosChance, "chaos-chance", f.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing.")
 
 	fs.BoolVar(&f.RunOnce, "runonce", f.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --enable-server")
+	fs.MarkDeprecated("runonce", "This flag is deprecated in 1.8, and will be removed in a future version")
 
 	fs.StringVar(&f.HostnameOverride, "hostname-override", f.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 
