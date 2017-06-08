@@ -64,7 +64,8 @@ func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
 			return
 		}
 	}
-	glog.V(4).Infof("updatePod %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
+	glog.V(2).Infof("updatePod > %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
+	defer glog.V(2).Infof("updatePod < %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
 	g.graph.AddPod(pod)
 }
 
@@ -81,7 +82,8 @@ func (g *graphPopulator) deletePod(obj interface{}) {
 		glog.V(5).Infof("deletePod %s/%s, no node", pod.Namespace, pod.Name)
 		return
 	}
-	glog.V(4).Infof("deletePod %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
+	glog.V(2).Infof("deletePod > %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
+	defer glog.V(2).Infof("deletePod < %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
 	g.graph.DeletePod(pod.Name, pod.Namespace)
 }
 

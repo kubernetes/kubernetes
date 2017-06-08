@@ -18,11 +18,13 @@ package node
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/kubernetes/pkg/api"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
@@ -106,6 +108,9 @@ func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, 
 		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return false, "cannot get subresource", nil
 	}
+
+	trace := utiltrace.New(fmt.Sprintf("NodeAuthorizer.authorizeGet: node=%s,type=%s,namespace=%s,name=%s", nodeName, vertexTypes[startingType], attrs.GetNamespace(), attrs.GetName()))
+	defer trace.LogIfLong(100 * time.Millisecond)
 
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
 	if err != nil {
