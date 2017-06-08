@@ -104,11 +104,11 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
-	tunneler, proxyTransport, err := CreateDialer(runOptions)
+	nodeTunneler, proxyTransport, err := CreateNodeDialer(runOptions)
 	if err != nil {
 		return err
 	}
-	kubeAPIServerConfig, sharedInformers, insecureServingOptions, err := CreateKubeAPIServerConfig(runOptions, tunneler, proxyTransport)
+	kubeAPIServerConfig, sharedInformers, insecureServingOptions, err := CreateKubeAPIServerConfig(runOptions, nodeTunneler, proxyTransport)
 	if err != nil {
 		return err
 	}
@@ -147,11 +147,11 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	kubeAPIServer.GenericAPIServer.PrepareRun()
 
 	// aggregator comes last in the chain
-	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, runOptions)
+	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, runOptions, proxyTransport)
 	if err != nil {
 		return err
 	}
-	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers, apiExtensionsServer.Informers, proxyTransport)
+	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers, apiExtensionsServer.Informers)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return err
@@ -181,8 +181,8 @@ func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, delegateAPIServer g
 	return kubeAPIServer, nil
 }
 
-// CreateDialer creates the dialer infrastructure and makes it available to APIServer and Aggregator
-func CreateDialer(s *options.ServerRunOptions) (tunneler.Tunneler, *http.Transport, error) {
+// CreateNodeDialer creates the dialer infrastructure to connect to the nodes.
+func CreateNodeDialer(s *options.ServerRunOptions) (tunneler.Tunneler, *http.Transport, error) {
 	// Setup nodeTunneler if needed
 	var nodeTunneler tunneler.Tunneler
 	var proxyDialerFn utilnet.DialFunc
@@ -214,8 +214,6 @@ func CreateDialer(s *options.ServerRunOptions) (tunneler.Tunneler, *http.Transpo
 		}
 		nodeTunneler = tunneler.New(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSHKey)
 
-		// Use the nodeTunneler's dialer to connect to the kubelet
-		s.KubeletConfig.Dial = nodeTunneler.Dial
 		// Use the nodeTunneler's dialer when proxying to pods, services, and nodes
 		proxyDialerFn = nodeTunneler.Dial
 	}
@@ -313,6 +311,11 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 		KubernetesServiceNodePort: s.KubernetesServiceNodePort,
 
 		MasterCount: s.MasterCount,
+	}
+
+	if nodeTunneler != nil {
+		// Use the nodeTunneler's dialer to connect to the kubelet
+		config.KubeletClientConfig.Dial = nodeTunneler.Dial
 	}
 
 	return config, sharedInformers, insecureServingOptions, nil
