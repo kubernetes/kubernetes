@@ -250,7 +250,7 @@ func (plugin *glusterfsPlugin) ConstructVolumeSpec(volumeName, mountPath string)
 		VolumeSource: v1.VolumeSource{
 			Glusterfs: &v1.GlusterfsVolumeSource{
 				EndpointsName: volumeName,
-				Path:          volumeName,
+				Path:          mountPath,
 			},
 		},
 	}
