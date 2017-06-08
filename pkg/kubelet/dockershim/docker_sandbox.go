@@ -317,9 +317,15 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 	if r.State.Running {
 		state = runtimeapi.PodSandboxState_SANDBOX_READY
 	}
-	IP, err := ds.getIP(r)
-	if err != nil {
-		return nil, err
+
+	var IP string
+	// TODO: Remove this when sandbox is available on windows
+	// This is a workaround for windows, where sandbox is not in use, and pod IP is determined through containers belonging to the Pod.
+	if IP = ds.determinePodIPBySandboxID(podSandboxID); IP == "" {
+		IP, err = ds.getIP(r)
+		if err != nil {
+			return nil, err
+		}
 	}
 	network := &runtimeapi.PodSandboxNetworkStatus{Ip: IP}
 	hostNetwork := sharesHostNetwork(r)
@@ -537,7 +543,7 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	}
 
 	// Set security options.
-	securityOpts, err := getSeccompSecurityOpts(sandboxContainerName, c, ds.seccompProfileRoot, securityOptSep)
+	securityOpts, err := ds.getSecurityOpts(sandboxContainerName, c, securityOptSep)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.Name, err)
 	}

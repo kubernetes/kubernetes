@@ -337,6 +337,7 @@ filegroup(
         "//vendor/golang.org/x/net/websocket:all-srcs",
         "//vendor/golang.org/x/oauth2:all-srcs",
         "//vendor/golang.org/x/sys/unix:all-srcs",
+        "//vendor/golang.org/x/sys/windows:all-srcs",
         "//vendor/golang.org/x/text/cases:all-srcs",
         "//vendor/golang.org/x/text/encoding:all-srcs",
         "//vendor/golang.org/x/text/internal/tag:all-srcs",
