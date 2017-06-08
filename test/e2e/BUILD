@@ -128,6 +128,7 @@ go_library(
         "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
+        "//pkg/apis/networking:go_default_library",
         "//pkg/apis/rbac/v1beta1:go_default_library",
         "//pkg/apis/settings/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
