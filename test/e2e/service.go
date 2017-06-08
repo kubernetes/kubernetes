@@ -57,7 +57,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		}
 		for _, lb := range serviceLBNames {
 			framework.Logf("cleaning gce resource for %s", lb)
-			framework.CleanupServiceGCEResources(lb)
+			framework.CleanupServiceGCEResources(lb, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
@@ -1266,7 +1266,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 		}
 		for _, lb := range serviceLBNames {
 			framework.Logf("cleaning gce resource for %s", lb)
-			framework.CleanupServiceGCEResources(lb)
+			framework.CleanupServiceGCEResources(lb, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
