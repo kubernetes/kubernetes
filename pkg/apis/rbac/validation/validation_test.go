@@ -453,6 +453,27 @@ func TestValidateRoleNonResourceURLNoVerbs(t *testing.T) {
 	}.test(t)
 }
 
+func TestValidateRoleMultiResourcesAndMultiResourceNames(t *testing.T) {
+	ValidateClusterRoleTest{
+		role: rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "default",
+			},
+			Rules: []rbac.PolicyRule{
+				{
+					Verbs:         []string{"get"},
+					APIGroups:     []string{"v1"},
+					Resources:     []string{"pods", "configmaps"},
+					ResourceNames: []string{"name-1", "name-2"},
+				},
+			},
+		},
+		wantErr: true,
+		errType: field.ErrorTypeRequired,
+		field:   "rules[0].resourceNames",
+	}.test(t)
+}
+
 func TestValidateRoleMixedNonResourceAndResource(t *testing.T) {
 	ValidateRoleTest{
 		role: rbac.Role{
