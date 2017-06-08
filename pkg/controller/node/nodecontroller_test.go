@@ -1275,22 +1275,14 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 			}
 		}
 		zones := testutil.GetZones(fakeNodeHandler)
+		podEvicted := false
 		for _, zone := range zones {
-			// Time for rate-limiter reloading per node.
-			time.Sleep(50 * time.Millisecond)
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
 				uid, _ := value.UID.(string)
 				deletePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, nodeController.daemonSetStore)
+				podEvicted = true
 				return true, 0
 			})
-		}
-
-		podEvicted := false
-		for _, action := range fakeNodeHandler.Actions() {
-			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
-				podEvicted = true
-				break
-			}
 		}
 
 		if item.expectedEvictPods != podEvicted {
