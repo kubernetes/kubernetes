@@ -435,7 +435,7 @@ func TestPodFitsResources(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 10, Memory: 10, StorageOverlay: 20})),
 			fits: false,
-			test: "due to init container scratch disk",
+			test: "due to container scratch disk",
 			reasons: []algorithm.PredicateFailureReason{
 				NewInsufficientResourceError(v1.ResourceCPU, 1, 10, 10),
 				NewInsufficientResourceError(v1.ResourceStorageScratch, 1, 20, 20),
@@ -450,6 +450,16 @@ func TestPodFitsResources(t *testing.T) {
 		},
 		{
 			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1, StorageOverlay: 18}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2, StorageOverlay: 5})),
+			fits: false,
+			test: "request exceeds allocatable",
+			reasons: []algorithm.PredicateFailureReason{
+				NewInsufficientResourceError(v1.ResourceStorageScratch, 18, 5, 20),
+			},
+		},
+		{
+			pod: newResourcePod(schedulercache.Resource{StorageOverlay: 18}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2, StorageOverlay: 5})),
 			fits: false,
