@@ -224,7 +224,7 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 	if notMnt {
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
 		mountOptions := volume.MountOptionFromSpec(spec, options...)
-		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, *volumeSource.FSType, mountOptions)
+		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, *volumeSource.FSType, mountOptions, []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F"})
 		if err != nil {
 			os.Remove(deviceMountPath)
 			return err

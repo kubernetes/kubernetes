@@ -308,7 +308,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) error {
 	}
 
 	// mount it
-	if err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil); err != nil {
+	if err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil, nil); err != nil {
 		err = fmt.Errorf("rbd: failed to mount rbd volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}
 	return err

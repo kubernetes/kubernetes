@@ -129,7 +129,7 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 		Interface: v.plugin.mounter,
 		Runner:    exec.New(),
 	}
-	err = diskMounter.FormatAndMount(devicePath, dir, v.fsType, options)
+	err = diskMounter.FormatAndMount(devicePath, dir, v.fsType, options, nil)
 
 	if err != nil {
 		glog.Error(log("mount operation failed during setup: %v", err))

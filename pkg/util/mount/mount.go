@@ -84,14 +84,14 @@ type SafeFormatAndMount struct {
 // read-only it will format it first then mount it. Otherwise, if the
 // disk is already formatted or it is being mounted as read-only, it
 // will be mounted without formatting.
-func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, fstype string, options []string) error {
+func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, fstype string, options []string, mountArgs []string) error {
 	// Don't attempt to format if mounting as readonly. Go straight to mounting.
 	for _, option := range options {
 		if option == "ro" {
 			return mounter.Interface.Mount(source, target, fstype, options)
 		}
 	}
-	return mounter.formatAndMount(source, target, fstype, options)
+	return mounter.formatAndMount(source, target, fstype, options, mountArgs)
 }
 
 // New returns a mount.Interface for the current system.
