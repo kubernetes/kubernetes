@@ -125,7 +125,7 @@ func nonResourceURLCovers(ownerPath, subPath string) bool {
 	if ownerPath == subPath {
 		return true
 	}
-	return strings.HasSuffix(ownerPath, "*") && strings.HasPrefix(subPath, strings.TrimRight(ownerPath, "*"))
+	return strings.HasSuffix(ownerPath, "/*") && strings.HasPrefix(subPath, strings.TrimRight(ownerPath, "*"))
 }
 
 // ruleCovers determines whether the ownerRule (which may have multiple verbs, resources, and resourceNames) covers
