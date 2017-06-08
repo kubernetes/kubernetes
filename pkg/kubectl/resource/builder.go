@@ -51,8 +51,9 @@ type Builder struct {
 	stream bool
 	dir    bool
 
-	selector  labels.Selector
-	selectAll bool
+	selector            labels.Selector
+	selectAll           bool
+	selectAllFlagEnable bool
 
 	resources []string
 
@@ -318,6 +319,7 @@ func (b *Builder) SelectAllParam(selectAll bool) *Builder {
 		return b
 	}
 	b.selectAll = selectAll
+	b.selectAllFlagEnable = true
 	return b
 }
 
@@ -571,7 +573,12 @@ func (b *Builder) visitorResult() *Result {
 	}
 
 	if len(b.resources) != 0 {
-		return &Result{err: fmt.Errorf("resource(s) were provided, but no name, label selector, or --all flag specified")}
+		errMsg := "resource(s) were provided, but no name, label selector"
+		if b.selectAllFlagEnable {
+			errMsg = errMsg + ", or --all flag"
+		}
+		errMsg = errMsg + " specified"
+		return &Result{err: fmt.Errorf(errMsg)}
 	}
 	return &Result{err: missingResourceError}
 }
