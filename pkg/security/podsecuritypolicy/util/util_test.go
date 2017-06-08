@@ -174,6 +174,15 @@ func TestPSPAllowsHostVolumePath(t *testing.T) {
 			path:   "/foo",
 			allows: false,
 		},
+		"non-matching inner .. directory": {
+			psp: &extensions.PodSecurityPolicy{
+				Spec: extensions.PodSecurityPolicySpec{
+					AllowedHostPaths: []string{"/foo/bar"},
+				},
+			},
+			path:   "/foo/bar/../",
+			allows: false,
+		},
 	}
 
 	for k, v := range tests {

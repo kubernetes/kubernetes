@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -182,8 +183,9 @@ func PSPAllowsHostVolumePath(psp *extensions.PodSecurityPolicy, hostPath string)
 		return true
 	}
 
+	path := filepath.Clean(hostPath)
 	for _, allowedPath := range psp.Spec.AllowedHostPaths {
-		if hasPathPrefix(hostPath, allowedPath) {
+		if hasPathPrefix(path, allowedPath) {
 			return true
 		}
 	}
