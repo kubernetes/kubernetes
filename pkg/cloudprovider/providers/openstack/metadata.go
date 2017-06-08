@@ -85,6 +85,8 @@ func getMetadataFromConfigDrive() (*Metadata, error) {
 			return nil, err
 		}
 		dev = strings.TrimSpace(string(out))
+	} else if err != nil {
+		return nil, err
 	}
 
 	mntdir, err := ioutil.TempDir("", "configdrive")
