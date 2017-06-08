@@ -105,7 +105,6 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	if containerStatus != nil {
 		restartCount = containerStatus.RestartCount + 1
 	}
-
 	containerConfig, err := m.generateContainerConfig(container, pod, restartCount, podIP, imageRef)
 	if err != nil {
 		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
@@ -116,8 +115,8 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
 		return grpc.ErrorDesc(err), ErrCreateContainer
 	}
+	m.cpusetManager.RegisterContainer(pod, container, containerID)
 	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, "Created container")
-
 	if ref != nil {
 		m.containerRefManager.SetRef(kubecontainer.ContainerID{
 			Type: m.runtimeName,
@@ -248,6 +247,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
 	}
 	lc.Resources.CpuShares = cpuShares
+	// SETH set initial cpuset here maybe?
 	if memoryLimit != 0 {
 		lc.Resources.MemoryLimitInBytes = memoryLimit
 	}
@@ -810,6 +810,7 @@ func (m *kubeGenericRuntimeManager) removeContainer(containerID string) error {
 	if err := m.removeContainerLog(containerID); err != nil {
 		return err
 	}
+	m.cpusetManager.UnregisterContainer(containerID)
 	// Remove the container.
 	return m.runtimeService.RemoveContainer(containerID)
 }
