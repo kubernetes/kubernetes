@@ -559,6 +559,8 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
 		return nil, fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
+	} else if len(netnsPath) == 0 {
+		return nil, fmt.Errorf("Kubenet cannot retrieve pod IP with empty network namespace for %s/%s. This is usually because sandbox container has been torn down.", namespace, name)
 	}
 	if netnsPath == "" {
 		return nil, fmt.Errorf("Cannot find the network namespace, skipping pod network status for container %q", id)

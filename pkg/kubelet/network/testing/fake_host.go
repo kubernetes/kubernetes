@@ -57,11 +57,11 @@ func (nh *fakeNetworkHost) SupportsLegacyFeatures() bool {
 }
 
 type fakeNamespaceGetter struct {
-	ns string
+	NetNs string
 }
 
 func (nh *fakeNamespaceGetter) GetNetNS(containerID string) (string, error) {
-	return nh.ns, nil
+	return nh.NetNs, nil
 }
 
 type FakePortMappingGetter struct {
