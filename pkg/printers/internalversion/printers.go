@@ -745,7 +745,14 @@ func printService(svc *api.Service, w io.Writer, options printers.PrintOptions) 
 	namespace := svc.Namespace
 	svcType := svc.Spec.Type
 	internalIP := svc.Spec.ClusterIP
+	if len(internalIP) == 0 {
+		internalIP = "<none>"
+	}
 	externalIP := getServiceExternalIP(svc, options.Wide)
+	svcPorts := makePortString(svc.Spec.Ports)
+	if len(svcPorts) == 0 {
+		svcPorts = "<none>"
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -757,7 +764,7 @@ func printService(svc *api.Service, w io.Writer, options printers.PrintOptions) 
 		string(svcType),
 		internalIP,
 		externalIP,
-		makePortString(svc.Spec.Ports),
+		svcPorts,
 		translateTimestamp(svc.CreationTimestamp),
 	); err != nil {
 		return err
