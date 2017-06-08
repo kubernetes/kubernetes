@@ -867,11 +867,22 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 func TestUpdateNodeStatusError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
+	// Note that by default this is a fake clock.
 	kubelet := testKubelet.kubelet
 	// No matching node for the kubelet
 	testKubelet.fakeKubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{}}).ReactionChain
+
+	// Now start a timer on the fake clock and wait for it to trip.
+	start := testKubelet.fakeClock.Now()
+
 	assert.Error(t, kubelet.updateNodeStatus())
-	assert.Len(t, testKubelet.fakeKubeClient.Actions(), nodeStatusUpdateRetry)
+
+	retriedOverTime := kubelet.clock.Since(start).Minutes() > 15
+	stoppedSoonEnough := kubelet.clock.Since(start).Minutes() < 21
+
+	assert.Len(t, testKubelet.fakeKubeClient.Actions(), 10, "retries are logartihmic WRT to the max time.")
+	assert.True(t, retriedOverTime, "retried until %v minutes", nodeStatusUpdateRetryMaximumTime.Minutes())
+	assert.True(t, stoppedSoonEnough, "stopped before %v minutes", nodeStatusUpdateRetryMaximumTime.Minutes())
 }
 
 func TestRegisterWithApiServer(t *testing.T) {
@@ -958,7 +969,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		return node
 	}
 
-	cases := []struct {
+	type testCase struct {
 		name            string
 		newNode         *v1.Node
 		existingNode    *v1.Node
@@ -971,7 +982,8 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		testSavedNode   bool
 		savedNodeIndex  int
 		savedNodeCMAD   bool
-	}{
+	}
+	cases := []testCase{
 		{
 			name:            "success case - new node",
 			newNode:         &v1.Node{},
@@ -1055,10 +1067,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	}
 
-	for _, tc := range cases {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
-		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
+	reactorSetup := func(testKubelet *TestKubelet, tc testCase) *fake.Clientset {
 		kubeClient := testKubelet.fakeKubeClient
 
 		kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
@@ -1080,6 +1089,15 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 			return notImplemented(action)
 		})
+		return kubeClient
+	}
+	for _, tc := range cases {
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
+		defer testKubelet.Cleanup()
+		kubelet := testKubelet.kubelet
+
+		// Setup a kubelet client that returns preset defaults that match the test expectations.
+		kubeClient := reactorSetup(testKubelet, tc)
 
 		result := kubelet.tryRegisterWithApiServer(tc.newNode)
 		require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
