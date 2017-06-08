@@ -30,7 +30,7 @@ const (
 	UnsafeDisabled = false
 
 	// ptrSize is the size of a pointer on the current arch.
-	ptrSize = unsafe.Sizeof((*byte)(nil))
+	ptrSize = uintptr(unsafe.Sizeof((*byte)(nil)))
 )
 
 var (
@@ -40,9 +40,9 @@ var (
 	// after commit 82f48826c6c7 which changed the format again to mirror
 	// the original format.  Code in the init function updates these offsets
 	// as necessary.
-	offsetPtr    = uintptr(ptrSize)
+	offsetPtr    = ptrSize
 	offsetScalar = uintptr(0)
-	offsetFlag   = uintptr(ptrSize * 2)
+	offsetFlag   = ptrSize * 2
 
 	// flagKindWidth and flagKindShift indicate various bits that the
 	// reflect package uses internally to track kind information.
@@ -74,7 +74,7 @@ func init() {
 	// and checks if the size of the reflect.Value struct indicates it has
 	// the scalar field. When it does, the offsets are updated accordingly.
 	vv := reflect.ValueOf(0xf00)
-	if unsafe.Sizeof(vv) == (ptrSize * 4) {
+	if uintptr(unsafe.Sizeof(vv)) == (ptrSize * 4) {
 		offsetScalar = ptrSize * 2
 		offsetFlag = ptrSize * 3
 	}
