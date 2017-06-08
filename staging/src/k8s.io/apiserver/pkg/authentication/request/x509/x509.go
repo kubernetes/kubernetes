@@ -73,6 +73,10 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 
 	chains, err := req.TLS.PeerCertificates[0].Verify(optsCopy)
 	if err != nil {
+		switch err.(type) {
+		case x509.UnknownAuthorityError:
+			return nil, false, nil
+		}
 		return nil, false, err
 	}
 
