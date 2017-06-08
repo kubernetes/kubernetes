@@ -26,6 +26,7 @@ import (
 	rbac "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -74,7 +75,7 @@ func CreateServiceAccounts(clientset clientset.Interface) error {
 }
 
 // CreateRBACRules creates the essential RBAC rules for a minimally set-up cluster
-func CreateRBACRules(clientset *clientset.Clientset) error {
+func CreateRBACRules(clientset *clientset.Clientset, k8sVersion *version.Version) error {
 	if err := createRoles(clientset); err != nil {
 		return err
 	}
@@ -86,6 +87,9 @@ func CreateRBACRules(clientset *clientset.Clientset) error {
 	}
 	if err := createClusterRoleBindings(clientset); err != nil {
 		return err
+	}
+	if err := deletePermissiveNodesBindingWhenUsingNodeAuthorization(clientset, k8sVersion); err != nil {
+		return fmt.Errorf("failed to remove the permissive 'system:nodes' Group Subject in the 'system:node' ClusterRoleBinding: %v", err)
 	}
 
 	fmt.Println("[apiconfig] Created RBAC rules")
@@ -243,5 +247,39 @@ func createClusterRoleBindings(clientset *clientset.Clientset) error {
 			}
 		}
 	}
+	return nil
+}
+
+func deletePermissiveNodesBindingWhenUsingNodeAuthorization(clientset *clientset.Clientset, k8sVersion *version.Version) error {
+
+	// If the server version is higher than the Node Authorizer's minimum, try to delete the Group=system:nodes->ClusterRole=system:node binding
+	// which is much more permissive than the Node Authorizer
+	if k8sVersion.AtLeast(kubeadmconstants.MinimumNodeAuthorizerVersion) {
+
+		nodesRoleBinding, err := clientset.RbacV1beta1().ClusterRoleBindings().Get(kubeadmconstants.NodesClusterRoleBinding, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				// Nothing to do; the RoleBinding doesn't exist
+				return nil
+			}
+			return err
+		}
+
+		newSubjects := []rbac.Subject{}
+		for _, subject := range nodesRoleBinding.Subjects {
+			// Skip the subject that binds to the system:nodes group
+			if subject.Name == kubeadmconstants.NodesGroup && subject.Kind == "Group" {
+				continue
+			}
+			newSubjects = append(newSubjects, subject)
+		}
+
+		nodesRoleBinding.Subjects = newSubjects
+
+		if _, err := clientset.RbacV1beta1().ClusterRoleBindings().Update(nodesRoleBinding); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
