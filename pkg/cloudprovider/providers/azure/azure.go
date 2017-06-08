@@ -17,6 +17,8 @@ limitations under the License.
 package azure
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -34,6 +36,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
+	"golang.org/x/crypto/pkcs12"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -80,6 +83,10 @@ type Config struct {
 	AADClientID string `json:"aadClientId" yaml:"aadClientId"`
 	// The ClientSecret for an AAD application with RBAC access to talk to Azure RM APIs
 	AADClientSecret string `json:"aadClientSecret" yaml:"aadClientSecret"`
+	// The path of a client certificate for an AAD application with RBAC access to talk to Azure RM APIs
+	AADClientCertPath string `json:"aadClientCertPath" yaml:"aadClientCertPath"`
+	// The password of the client certificate for an AAD application with RBAC access to talk to Azure RM APIs
+	AADClientCertPassword string `json:"aadClientCertPassword" yaml:"aadClientCertPassword"`
 	// Enable exponential backoff to manage resource request retries
 	CloudProviderBackoff bool `json:"cloudProviderBackoff" yaml:"cloudProviderBackoff"`
 	// Backoff retry limit
@@ -119,6 +126,54 @@ func init() {
 	cloudprovider.RegisterCloudProvider(CloudProviderName, NewCloud)
 }
 
+// decodePkcs12 decodes a PKCS#12 client certificate by extracting the public certificate and
+// the private RSA key
+func decodePkcs12(pkcs []byte, password string) (*x509.Certificate, *rsa.PrivateKey, error) {
+	privateKey, certificate, err := pkcs12.Decode(pkcs, password)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decoding the PKCS#12 client certificate: %v", err)
+	}
+	rsaPrivateKey, isRsaKey := privateKey.(*rsa.PrivateKey)
+	if !isRsaKey {
+		return nil, nil, fmt.Errorf("PKCS#12 certificate must contain a RSA private key")
+	}
+
+	return certificate, rsaPrivateKey, nil
+}
+
+// newServicePrincipalToken creates a new service principal token based on the configuration
+func newServicePrincipalToken(az *Cloud) (*azure.ServicePrincipalToken, error) {
+	oauthConfig, err := az.Environment.OAuthConfigForTenant(az.TenantID)
+	if err != nil {
+		return nil, fmt.Errorf("creating the OAuth config: %v", err)
+	}
+
+	if len(az.AADClientSecret) > 0 {
+		return azure.NewServicePrincipalToken(
+			*oauthConfig,
+			az.AADClientID,
+			az.AADClientSecret,
+			az.Environment.ServiceManagementEndpoint)
+	} else if len(az.AADClientCertPath) > 0 && len(az.AADClientCertPassword) > 0 {
+		certData, err := ioutil.ReadFile(az.AADClientCertPath)
+		if err != nil {
+			return nil, fmt.Errorf("reading the client certificate from file %s: %v", az.AADClientCertPath, err)
+		}
+		certificate, privateKey, err := decodePkcs12(certData, az.AADClientSecret)
+		if err != nil {
+			return nil, fmt.Errorf("decoding the client certificate: %v", err)
+		}
+		return azure.NewServicePrincipalTokenFromCertificate(
+			*oauthConfig,
+			az.AADClientID,
+			certificate,
+			privateKey,
+			az.Environment.ServiceManagementEndpoint)
+	} else {
+		return nil, fmt.Errorf("No credentials provided for AAD application %s", az.AADClientID)
+	}
+}
+
 // NewCloud returns a Cloud with initialized clients
 func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	var az Cloud
@@ -141,16 +196,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		}
 	}
 
-	oauthConfig, err := az.Environment.OAuthConfigForTenant(az.TenantID)
-	if err != nil {
-		return nil, err
-	}
-
-	servicePrincipalToken, err := azure.NewServicePrincipalToken(
-		*oauthConfig,
-		az.AADClientID,
-		az.AADClientSecret,
-		az.Environment.ServiceManagementEndpoint)
+	servicePrincipalToken, err := newServicePrincipalToken(&az)
 	if err != nil {
 		return nil, err
 	}
