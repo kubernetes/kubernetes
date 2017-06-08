@@ -525,6 +525,32 @@ rules:
 EOF
 }
 
+# Writes the configuration file used by the webhook advanced auditing backend.
+function create-master-audit-webhook-config {
+  local -r path="${1}"
+
+  if [[ -n "${GCP_AUDIT_URL:-}" ]]; then
+    # The webhook config file is a kubeconfig file describing the webhook endpoint.
+    cat <<EOF >"${path}"
+clusters:
+  - name: gcp-audit-server
+    cluster:
+      server: ${GCP_AUDIT_URL}
+users:
+  - name: kube-apiserver
+    user:
+      auth-provider:
+        name: gcp
+current-context: webhook
+contexts:
+- context:
+    cluster: gcp-audit-server
+    user: kube-apiserver
+  name: webhook
+EOF
+  fi
+}
+
 function create-kubelet-kubeconfig {
   echo "Creating kubelet kubeconfig file"
   cat <<EOF >/var/lib/kubelet/bootstrap-kubeconfig
@@ -1167,6 +1193,8 @@ function start-kube-apiserver {
 
   local audit_policy_config_mount=""
   local audit_policy_config_volume=""
+  local audit_webhook_config_mount=""
+  local audit_webhook_config_volume=""
   if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" == "true" ]]; then
     # We currently only support enabling with a fixed path and with built-in log
     # rotation "disabled" (large value) so it behaves like kube-apiserver.log.
@@ -1181,26 +1209,35 @@ function start-kube-apiserver {
     # never restarts. Please manually restart apiserver before this time.
     params+=" --audit-log-maxsize=2000000000"
   elif [[ "${ENABLE_APISERVER_ADVANCED_AUDIT:-}" == "true" ]]; then
-    # We currently only support enabling with a fixed path and with built-in log
-    # rotation "disabled" (large value) so it behaves like kube-apiserver.log.
-    # External log rotation should be set up the same as for kube-apiserver.log.
-    params+=" --audit-log-path=/var/log/kube-apiserver-audit.log"
-    params+=" --audit-log-maxage=0"
-    params+=" --audit-log-maxbackup=0"
-    # Lumberjack doesn't offer any way to disable size-based rotation. It also
-    # has an in-memory counter that doesn't notice if you truncate the file.
-    # 2000000000 (in MiB) is a large number that fits in 31 bits. If the log
-    # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
-    # never restarts. Please manually restart apiserver before this time.
-    params+=" --audit-log-maxsize=2000000000"
-
-    local audit_policy_file="/etc/audit_policy.config"
+    local -r audit_policy_file="/etc/audit_policy.config"
     params+=" --audit-policy-file=${audit_policy_file}"
-
     # Create the audit policy file, and mount it into the apiserver pod.
     create-master-audit-policy "${audit_policy_file}"
-    audit_policy_config_mount="{\"name\": \"auditpolicyconfigmount\",\"mountPath\": \"${audit_policy_file}\", \"readOnly\": false},"
+    audit_policy_config_mount="{\"name\": \"auditpolicyconfigmount\",\"mountPath\": \"${audit_policy_file}\", \"readOnly\": true},"
     audit_policy_config_volume="{\"name\": \"auditpolicyconfigmount\",\"hostPath\": {\"path\": \"${audit_policy_file}\"}},"
+
+    if [[ "${ADVANCED_AUDIT_BACKEND:-log}" == *"log"* ]]; then
+      # The advanced audit log backend config matches the basic audit log config.
+      params+=" --audit-log-path=/var/log/kube-apiserver-audit.log"
+      params+=" --audit-log-maxage=0"
+      params+=" --audit-log-maxbackup=0"
+      # Lumberjack doesn't offer any way to disable size-based rotation. It also
+      # has an in-memory counter that doesn't notice if you truncate the file.
+      # 2000000000 (in MiB) is a large number that fits in 31 bits. If the log
+      # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
+      # never restarts. Please manually restart apiserver before this time.
+      params+=" --audit-log-maxsize=2000000000"
+    fi
+    if [[ "${ADVANCED_AUDIT_BACKEND:-}" == *"webhook"* ]]; then
+      params+=" --audit-webhook-mode=batch"
+
+      # Create the audit webhook config file, and mount it into the apiserver pod.
+      local -r audit_webhook_config_file="/etc/audit_webhook.config"
+      params+=" --audit-webhook-config-file=${audit_webhook_config_file}"
+      create-master-audit-webhook-config "${audit_webhook_config_file}"
+      audit_webhook_config_mount="{\"name\": \"auditwebhookconfigmount\",\"mountPath\": \"${audit_webhook_config_file}\", \"readOnly\": true},"
+      audit_webhook_config_volume="{\"name\": \"auditwebhookconfigmount\",\"hostPath\": {\"path\": \"${audit_webhook_config_file}\"}},"
+    fi
   fi
 
   if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
@@ -1311,6 +1348,8 @@ function start-kube-apiserver {
   sed -i -e "s@{{webhook_config_volume}}@${webhook_config_volume}@g" "${src_file}"
   sed -i -e "s@{{audit_policy_config_mount}}@${audit_policy_config_mount}@g" "${src_file}"
   sed -i -e "s@{{audit_policy_config_volume}}@${audit_policy_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{audit_webhook_config_mount}}@${audit_webhook_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{audit_webhook_config_volume}}@${audit_webhook_config_volume}@g" "${src_file}"
   sed -i -e "s@{{admission_controller_config_mount}}@${admission_controller_config_mount}@g" "${src_file}"
   sed -i -e "s@{{admission_controller_config_volume}}@${admission_controller_config_volume}@g" "${src_file}"
   sed -i -e "s@{{image_policy_webhook_config_mount}}@${image_policy_webhook_config_mount}@g" "${src_file}"
