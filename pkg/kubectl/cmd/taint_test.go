@@ -376,7 +376,7 @@ func TestValidateFlags(t *testing.T) {
 		}
 		if test.expectFatal {
 			if !sawFatal {
-				t.Fatalf("%s expected not to fail", test.description)
+				t.Fatalf("%s: expected not to fail", test.description)
 			}
 		}
 	}
