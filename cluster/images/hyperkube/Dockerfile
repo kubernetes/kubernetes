@@ -30,6 +30,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
     git \
     jq \
     nfs-common \
+    ceph-common \
     glusterfs-client \
     cifs-utils \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
