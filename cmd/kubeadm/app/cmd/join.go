@@ -22,11 +22,14 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
+	"text/template"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	apivalidation "k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
@@ -38,6 +41,9 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/util/initsystem"
+	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
 
 var (
@@ -49,6 +55,15 @@ var (
 
 		Run 'kubectl get nodes' on the master to see this machine join.
 		`)
+	kubeletDropIn = template.Must(template.New("dropIn").Parse(dedent.Dedent(`
+		[Service]
+		Environment="KUBELET_EXTRA_ARGS={{if .Labels}}--node-labels={{.Labels}} {{end}}{{if .Taints}}--register-with-taints={{.Taints}}{{end}}"
+		`)))
+	kubeletManualSettings = template.Must(template.New("dropIn").Parse(dedent.Dedent(`
+		Kubelet should be started manually with following options:
+		{{if .Labels}} --node-labels={{.Labels}}{{end}}
+		{{if .Taints}} --register-with-taints={{.Taints}}{{end}}"
+		`)))
 )
 
 // NewCmdJoin returns "kubeadm join" command.
@@ -58,6 +73,8 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 
 	var skipPreFlight bool
 	var cfgPath string
+	var taints []string
+	var labels []string
 
 	cmd := &cobra.Command{
 		Use:   "join <flags> [DiscoveryTokenAPIServers]",
@@ -95,7 +112,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 			internalcfg := &kubeadmapi.NodeConfiguration{}
 			api.Scheme.Convert(cfg, internalcfg, nil)
 
-			j, err := NewJoin(cfgPath, args, internalcfg, skipPreFlight)
+			j, err := NewJoin(cfgPath, args, internalcfg, skipPreFlight, labels, taints)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(j.Validate())
 			kubeadmutil.CheckErr(j.Run(out))
@@ -118,7 +135,14 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	cmd.PersistentFlags().StringVar(
 		&cfg.Token, "token", "",
 		"Use this token for both discovery-token and tls-bootstrap-token")
-
+	cmd.PersistentFlags().StringSliceVar(
+		&taints, "register-with-taints", taints,
+		`Optional taints to add to the node when the node registers itself.`,
+	)
+	cmd.PersistentFlags().StringSliceVar(
+		&labels, "node-labels", labels,
+		`Optional labels to add to the node when the node registers itself.`,
+	)
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
 		"Skip preflight checks normally run before modifying the system",
@@ -131,7 +155,7 @@ type Join struct {
 	cfg *kubeadmapi.NodeConfiguration
 }
 
-func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
+func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool, labels []string, taints []string) (*Join, error) {
 	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
 
 	if cfgPath != "" {
@@ -143,6 +167,18 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}
+
+	labelObj, err := parseLabels(labels)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse labels %s [%v]", cfgPath, err)
+	}
+	cfg.Labels = labelObj
+
+	taintsObj, err := parseTaints(taints)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse taints %s [%v]", cfgPath, err)
+	}
+	cfg.Taints = taintsObj
 
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks")
@@ -172,6 +208,7 @@ func (j *Join) Validate() error {
 
 // Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
+
 	cfg, err := discovery.For(j.cfg)
 	if err != nil {
 		return err
@@ -188,6 +225,11 @@ func (j *Join) Run(out io.Writer) error {
 	if err := kubenode.ValidateAPIServer(client); err != nil {
 		return err
 	}
+
+	if err := updateKubeletConfig(out, j.cfg); err != nil {
+		return err
+	}
+
 	if err := kubenode.PerformTLSBootstrap(cfg, hostname); err != nil {
 		return err
 	}
@@ -201,9 +243,135 @@ func (j *Join) Run(out io.Writer) error {
 	cluster := cfg.Contexts[cfg.CurrentContext].Cluster
 	err = certutil.WriteCert(j.cfg.CACertPath, cfg.Clusters[cluster].CertificateAuthorityData)
 	if err != nil {
-		return fmt.Errorf("couldn't save the CA certificate to disk: %v", err)
+		return fmt.Errorf("couldn't save the CA certificate to disk [%v]", err)
 	}
 
 	fmt.Fprintf(out, joinDoneMsgf)
+	return nil
+}
+
+func parseLabels(spec []string) (map[string]string, error) {
+	labels := map[string]string{}
+	for _, labelSpec := range spec {
+		if strings.Index(labelSpec, "=") != -1 {
+			parts := strings.Split(labelSpec, "=")
+			if len(parts) != 2 {
+				return nil, fmt.Errorf("invalid label spec: %v", labelSpec)
+			}
+			if errs := apivalidation.IsValidLabelValue(parts[1]); len(errs) != 0 {
+				return nil, fmt.Errorf("invalid label value: %q: %s", labelSpec, strings.Join(errs, ";"))
+			}
+			labels[parts[0]] = parts[1]
+		} else {
+			return nil, fmt.Errorf("unknown label spec: %v", labelSpec)
+		}
+	}
+	return labels, nil
+}
+
+func parseTaints(spec []string) ([]v1.Taint, error) {
+	var taints []v1.Taint
+
+	for _, taintSpec := range spec {
+		if strings.Index(taintSpec, "=") != -1 && strings.Index(taintSpec, ":") != -1 {
+			newTaint, err := utiltaints.ParseTaint(taintSpec)
+			if err != nil {
+				return nil, err
+			}
+			taints = append(taints, newTaint)
+		} else {
+			return nil, fmt.Errorf("unknown taint spec: %v", taintSpec)
+		}
+	}
+	return taints, nil
+}
+
+// TODO: move into a separate file e.g. app/node/kubelet.go
+func updateKubeletConfig(out io.Writer, cfg *kubeadmapi.NodeConfiguration) error {
+
+	// it si required to updateKubeletConfig only if labels or taints should be applied
+	if len(cfg.Labels) > 0 || len(cfg.Taints) > 0 {
+
+		//converts label and taints back to strings
+		var labels, taints []string
+
+		for label, value := range cfg.Labels {
+			labels = append(labels, fmt.Sprintf("%s=%s", label, value))
+		}
+
+		for _, taint := range cfg.Taints {
+			taints = append(taints, fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect))
+		}
+
+		ctx := map[string]string{
+			"Labels": strings.Join(labels, ","),
+			"Taints": strings.Join(taints, ","),
+		}
+
+		// check if there is a supported init system
+		initSystem, err := initsystem.GetInitSystem()
+		if err != nil {
+			// if not, prints a message with instructions for manual configuration
+			fmt.Println("[kubelet] WARNING: No supported init system detected, won't ensure kubelet is set with taints and labels.")
+			err = kubeletManualSettings.Execute(out, ctx)
+			if err != nil {
+				return fmt.Errorf("failed to printing kubelet manual settings instructions [%v]", err)
+			}
+		} else {
+			// if there is a managed init system,
+			// checks if kubelet service is in place
+			if !initSystem.ServiceExists("kubelet") {
+				return fmt.Errorf("failure to set kubelet labels and taints, kubelet service is not installed")
+			}
+
+			// creates a new dop-in configuration file into the kubelet service configuration
+			filename := "/etc/systemd/system/kubelet.service.d/20-labels-taints.conf"
+			fmt.Printf("[kubelet] Creating %s\n", filename)
+			err := createKubeletDropIn(filename, ctx)
+			if err != nil {
+				return fmt.Errorf("failure saving kubelet configuration in %s [%v]", filename, err)
+			}
+
+			// forces reloading of the init system configuration
+			fmt.Println("[kubelet] Reloading init system configuration")
+			err = initSystem.DaemonReload()
+			if err != nil {
+				return fmt.Errorf("failure reloading init system configuration [%v]", err)
+			}
+
+			// if the kubelet service is active, force restarts in order to make new settings effective
+			// NB. this is considered safe, because this command is issued before kubelet providing
+			// the kubeconfig file (and thus before the node joining the cluster)
+			if initSystem.ServiceIsActive("kubelet") {
+				fmt.Println("[kubelet] Restarting the kubelet service")
+				if err := initSystem.ServiceRestart("kubelet"); err != nil {
+					fmt.Printf("[kubelet] WARNING: Unable to restart start the kubelet service: [%v]\n", err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func createKubeletDropIn(filename string, ctx map[string]string) error {
+	if err := os.MkdirAll(filepath.Dir(filename), os.FileMode(0755)); err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0600))
+	if err != nil {
+		return err
+	}
+
+	err = kubeletDropIn.Execute(f, ctx)
+	if err != nil {
+		return err
+	}
+
+	if err = f.Close(); err == nil {
+		return err
+	}
+
 	return nil
 }

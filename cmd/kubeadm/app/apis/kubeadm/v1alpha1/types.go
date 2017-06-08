@@ -20,6 +20,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 type MasterConfiguration struct {
@@ -81,10 +82,12 @@ type Etcd struct {
 type NodeConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	CACertPath               string   `json:"caCertPath"`
-	DiscoveryFile            string   `json:"discoveryFile"`
-	DiscoveryToken           string   `json:"discoveryToken"`
-	DiscoveryTokenAPIServers []string `json:"discoveryTokenAPIServers"`
-	TLSBootstrapToken        string   `json:"tlsBootstrapToken"`
-	Token                    string   `json:"token"`
+	CACertPath               string            `json:"caCertPath"`
+	DiscoveryFile            string            `json:"discoveryFile"`
+	DiscoveryToken           string            `json:"discoveryToken"`
+	DiscoveryTokenAPIServers []string          `json:"discoveryTokenAPIServers"`
+	TLSBootstrapToken        string            `json:"tlsBootstrapToken"`
+	Token                    string            `json:"token"`
+	Labels                   map[string]string `json:"labels"`
+	Taints                   []v1.Taint        `json:"taints"`
 }

@@ -26,6 +26,9 @@ type InitSystem interface {
 	// ServiceStart tries to start a specific service
 	ServiceStart(service string) error
 
+	// ServiceRestart tries to restart a specific service
+	ServiceRestart(service string) error
+
 	// ServiceStop tries to stop a specific service
 	ServiceStop(service string) error
 
@@ -37,12 +40,21 @@ type InitSystem interface {
 
 	// ServiceIsActive ensures the service is running, or attempting to run. (crash looping in the case of kubelet)
 	ServiceIsActive(service string) bool
+
+	// DaemonReload tries to reload init system configuration
+	DaemonReload() error
 }
 
 type SystemdInitSystem struct{}
 
 func (sysd SystemdInitSystem) ServiceStart(service string) error {
 	args := []string{"start", service}
+	_, err := exec.Command("systemctl", args...).Output()
+	return err
+}
+
+func (sysd SystemdInitSystem) ServiceRestart(service string) error {
+	args := []string{"restart", service}
 	_, err := exec.Command("systemctl", args...).Output()
 	return err
 }
@@ -84,6 +96,13 @@ func (sysd SystemdInitSystem) ServiceIsActive(service string) bool {
 		return true
 	}
 	return false
+}
+
+// DaemonReload wiil try to force the init system to reload its configuration
+func (sysd SystemdInitSystem) DaemonReload() error {
+	args := []string{"daemon-reload"}
+	_, err := exec.Command("systemctl", args...).Output()
+	return err
 }
 
 // getInitSystem returns an InitSystem for the current system, or nil
