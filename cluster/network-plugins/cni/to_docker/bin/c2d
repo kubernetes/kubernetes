@@ -1,0 +1,20 @@
+#!/bin/bash
+
+INPUT=/tmp/c2d-$$-in
+RESULT=/tmp/c2d-$$-out
+LOG=/tmp/c2d-$$-log
+cat > "${INPUT}"
+"${0}-inner" "${INPUT}" "${RESULT}" &> "${LOG}"
+RC=$?
+if [ "${RC}" == "0" ]; then
+    cat "${RESULT}"
+else
+    echo '{'
+    echo '  "cniVersion": "0.1.0",'
+    echo '  "code": ' "${RC},"
+    echo '  "msg": "'"${0}-inner returned ${RC}"'",'
+    echo -n '  "details": '
+    echo $(jq -R -s . < "${LOG}")
+    echo '}'
+    exit "${RC}"
+fi

@@ -1,0 +1,49 @@
+#!/bin/bash
+
+if [ $# -ne 2 ]; then
+   echo Usage: $0 INPUT_FILE_NAME OUTPUT_FILE_NAME >& 2
+   exit 1
+fi
+INPFN="$1"
+OUTFN="$2"
+
+if [ "${DEBUG:-}" == "true" ]; then
+    echo
+    printenv | grep CNI
+    set -x
+fi
+
+set -e
+
+case "${CNI_COMMAND}" in
+    (ADD)
+        thenet="$(jq -r .name < "${INPFN}")"
+        docker network disconnect     none "${CNI_CONTAINERID}"
+        docker network connect "${thenet}" "${CNI_CONTAINERID}"
+        CTR_INFO=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}} {{range .NetworkSettings.Networks}}{{.Gateway}}{{end}} {{range .NetworkSettings.Networks}}{{.IPPrefixLen}}{{end}}' $CNI_CONTAINERID)
+        CTR_IP=$(echo "${CTR_INFO}" | cut '-d ' -f1)
+        CTR_GW=$(echo "${CTR_INFO}" | cut '-d ' -f2)
+        CTR_PF=$(echo "${CTR_INFO}" | cut '-d ' -f3)
+        (
+          echo '{'
+          echo '  "cniVersion": "0.1.0",'
+          echo '  "ip4": {'
+          echo '    "ip": "'"${CTR_IP}/${CTR_PF}"'",'
+          echo '    "gateway": "'"${CTR_GW}"'"'
+          echo '  }'
+          echo '}'
+        ) > "${OUTFN}"
+        ;;
+    (DEL)
+        docker network disconnect "${thenet}" "${CNI_CONTAINERID}"
+        (
+          echo '{'
+          echo '  "cniVersion": "0.1.0"'
+          echo '}'
+        ) > "${OUTFN}"
+        ;;
+    (*)
+        echo "Unexpected CNI_COMMAND ($CNI_COMMAND)!" >& 2
+        exit 2
+        ;;
+esac
