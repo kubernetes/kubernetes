@@ -45,4 +45,4 @@ spec:
             value: "kubernetes"
         resources:
           requests:
-            cpu: 1000m
+            cpu: 200m

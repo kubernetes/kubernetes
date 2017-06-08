@@ -34,6 +34,22 @@ function create-dirs {
   fi
 }
 
+# Vars assumed:
+#   NUM_NODES
+function get-calico-cpu {
+  local suggested_calico_cpus=100m
+  if [[ "${NUM_NODES}" -gt "10" ]]; then
+    suggested_calico_cpus=250m
+  fi
+  if [[ "${NUM_NODES}" -gt "100" ]]; then
+    suggested_calico_cpus=500m
+  fi
+  if [[ "${NUM_NODES}" -gt "500" ]]; then
+    suggested_calico_cpus=1000m
+  fi
+  echo "${suggested_calico_cpus}"
+}
+
 # Create directories referenced in the kube-controller-manager manifest for
 # bindmounts. This is used under the rkt runtime to work around
 # https://github.com/kubernetes/kubernetes/issues/26816
@@ -1212,6 +1228,10 @@ function start-kube-addons {
   fi
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
+
+    # Configure Calico resource requests based on cluster size.
+    local -r calico_file="${dst_dir}/calico-policy-controller/calico-node-daemonset.yaml"
+    sed -i -e "s@__CALICO_NODE_CPU__@$(get-calico-cpu)@g" "${calico_file}"
   fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"

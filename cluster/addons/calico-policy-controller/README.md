@@ -6,6 +6,7 @@ Calico is an implementation of the Kubernetes network policy API.  The provided 
 - A DaemonSet which runs Calico on each node in the cluster.
 - A Deployment which installs the Calico Typha agent.
 - A Service for the Calico Typha agent.
+- A HorizontalPodAutoscaler to dynamically adjust the Typha Deployment.
 
 ### Learn More
 

@@ -1,0 +1,17 @@
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: calico-typha
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    k8s-app: calico-typha
+spec:
+  scaleTargetRef:
+    apiVersion: extensions/v1beta1
+    kind: Deployment
+    name: calico-typha
+  minReplicas: 1
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 75

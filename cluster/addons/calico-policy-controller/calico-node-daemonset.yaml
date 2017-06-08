@@ -11,6 +11,8 @@ spec:
   selector:
     matchLabels:
       k8s-app: calico-node
+  updateStrategy:
+    type: RollingUpdate
   template:
     metadata:
       labels:
@@ -58,7 +60,7 @@ spec:
             privileged: true
           resources:
             requests:
-              cpu: 250m
+              cpu: __CALICO_NODE_CPU__
           volumeMounts:
             - mountPath: /lib/modules
               name: lib-modules
