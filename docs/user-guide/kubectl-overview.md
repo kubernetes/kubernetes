@@ -102,7 +102,7 @@ Resource type	| Abbreviated alias
 -------------------- | --------------------
 `componentstatuses`	|	`cs`
 `daemonsets` | `ds`
-`deployments` |
+`deployments` | `deploy`
 `events` | `ev`
 `endpoints` | `ep`
 `horizontalpodautoscalers` | `hpa`
@@ -117,7 +117,7 @@ Resource type	| Abbreviated alias
 `resourcequotas` | `quota`
 `replicationcontrollers` | `rc`
 `secrets` |
-`serviceaccounts` |
+`serviceaccounts` | `sa`
 `services` | `svc`
 
 ## Output options
