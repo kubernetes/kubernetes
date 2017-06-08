@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	federationapi "k8s.io/kubernetes/federation/apis/federation"
+	fedv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclient "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -207,7 +208,7 @@ func GetClientsetFromSecret(secret *api.Secret, serverAddress string) (*client.C
 	return nil, err
 }
 
-func GetServerAddress(c *federationapi.Cluster) (string, error) {
+func GetServerAddress(c *fedv1beta1.Cluster) (string, error) {
 	hostIP, err := utilnet.ChooseHostInterface()
 	if err != nil {
 		return "", err
