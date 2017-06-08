@@ -19,6 +19,7 @@ package errors
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -259,6 +260,42 @@ func TestFlatten(t *testing.T) {
 		if !reflect.DeepEqual(testCase.expected, agg) {
 			t.Errorf("%d: expected %v, got %v", i, testCase.expected, agg)
 		}
+	}
+}
+
+func TestCreateAggregateFromMessageCountMap(t *testing.T) {
+	testCases := []struct {
+		name     string
+		mcp      MessageCountMap
+		expected Aggregate
+	}{
+		{
+			"input has single instance of one message",
+			MessageCountMap{"abc": 1},
+			aggregate{fmt.Errorf("abc")},
+		},
+		{
+			"input has multiple messages",
+			MessageCountMap{"abc": 2, "ghi": 1},
+			aggregate{fmt.Errorf("abc (repeated 2 times)"), fmt.Errorf("ghi")},
+		},
+	}
+
+	var expected, agg []error
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if testCase.expected != nil {
+				expected = testCase.expected.Errors()
+				sort.Slice(expected, func(i, j int) bool { return expected[i].Error() < expected[j].Error() })
+			}
+			if testCase.mcp != nil {
+				agg = CreateAggregateFromMessageCountMap(testCase.mcp).Errors()
+				sort.Slice(agg, func(i, j int) bool { return agg[i].Error() < agg[j].Error() })
+			}
+			if !reflect.DeepEqual(expected, agg) {
+				t.Errorf("expected %v, got %v", expected, agg)
+			}
+		})
 	}
 }
 

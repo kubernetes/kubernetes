@@ -68,11 +68,11 @@ func dial(addr string, timeout time.Duration) (net.Conn, error) {
 }
 
 func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string) (protocol string, addr string, err error) {
-	if protocol, addr, err = parseEndpoint(endpoint); err != nil {
+	if protocol, addr, err = parseEndpoint(endpoint); err != nil && protocol == "" {
 		fallbackEndpoint := fallbackProtocol + "://" + endpoint
 		protocol, addr, err = parseEndpoint(fallbackEndpoint)
 		if err == nil {
-			glog.Warningf("Using %q as endpoint is depercated, please consider using full url format %q.", endpoint, fallbackEndpoint)
+			glog.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
 		}
 	}
 	return

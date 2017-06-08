@@ -538,7 +538,7 @@ func (tc *testCase) verifyResults(t *testing.T) {
 	}
 }
 
-func (tc *testCase) runTest(t *testing.T) {
+func (tc *testCase) setupController(t *testing.T) (*HorizontalController, informers.SharedInformerFactory) {
 	testClient, testMetricsClient, testCMClient := tc.prepareTestClient(t)
 	if tc.testClient != nil {
 		testClient = tc.testClient
@@ -598,6 +598,10 @@ func (tc *testCase) runTest(t *testing.T) {
 	)
 	hpaController.hpaListerSynced = alwaysReady
 
+	return hpaController, informerFactory
+}
+
+func (tc *testCase) runTestWithController(t *testing.T, hpaController *HorizontalController, informerFactory informers.SharedInformerFactory) {
 	stop := make(chan struct{})
 	defer close(stop)
 	informerFactory.Start(stop)
@@ -614,6 +618,11 @@ func (tc *testCase) runTest(t *testing.T) {
 	// Wait for HPA to be processed.
 	<-tc.processed
 	tc.verifyResults(t)
+}
+
+func (tc *testCase) runTest(t *testing.T) {
+	hpaController, informerFactory := tc.setupController(t)
+	tc.runTestWithController(t, hpaController, informerFactory)
 }
 
 func TestScaleUp(t *testing.T) {
@@ -1592,6 +1601,75 @@ func TestScaleDownRCImmediately(t *testing.T) {
 		},
 	}
 	tc.runTest(t)
+}
+
+func TestAvoidUncessaryUpdates(t *testing.T) {
+	tc := testCase{
+		minReplicas:          2,
+		maxReplicas:          6,
+		initialReplicas:      3,
+		desiredReplicas:      3,
+		CPUTarget:            30,
+		CPUCurrent:           40,
+		verifyCPUCurrent:     true,
+		reportedLevels:       []uint64{400, 500, 700},
+		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		useMetricsApi:        true,
+	}
+	testClient, _, _ := tc.prepareTestClient(t)
+	tc.testClient = testClient
+	var savedHPA *autoscalingv1.HorizontalPodAutoscaler
+	testClient.PrependReactor("list", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		tc.Lock()
+		defer tc.Unlock()
+
+		if savedHPA != nil {
+			// fake out the verification logic and mark that we're done processing
+			go func() {
+				// wait a tick and then mark that we're finished (otherwise, we have no
+				// way to indicate that we're finished, because the function decides not to do anything)
+				time.Sleep(1 * time.Second)
+				tc.statusUpdated = true
+				tc.processed <- "test-hpa"
+			}()
+			return true, &autoscalingv1.HorizontalPodAutoscalerList{
+				Items: []autoscalingv1.HorizontalPodAutoscaler{*savedHPA},
+			}, nil
+		}
+
+		// fallthrough
+		return false, nil, nil
+	})
+	testClient.PrependReactor("update", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		tc.Lock()
+		defer tc.Unlock()
+
+		if savedHPA == nil {
+			// save the HPA and return it
+			savedHPA = action.(core.UpdateAction).GetObject().(*autoscalingv1.HorizontalPodAutoscaler)
+			return true, savedHPA, nil
+		}
+
+		assert.Fail(t, "should not have attempted to update the HPA when nothing changed")
+		// mark that we've processed this HPA
+		tc.processed <- ""
+		return true, nil, fmt.Errorf("unexpected call")
+	})
+
+	controller, informerFactory := tc.setupController(t)
+
+	// fake an initial processing loop to populate savedHPA
+	initialHPAs, err := testClient.Autoscaling().HorizontalPodAutoscalers("test-namespace").List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := controller.reconcileAutoscaler(&initialHPAs.Items[0]); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// actually run the test
+	tc.runTestWithController(t, controller, informerFactory)
 }
 
 // TODO: add more tests
