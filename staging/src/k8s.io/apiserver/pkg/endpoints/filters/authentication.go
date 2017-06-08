@@ -55,7 +55,8 @@ func WithAuthentication(handler http.Handler, mapper genericapirequest.RequestCo
 			user, ok, err := auth.AuthenticateRequest(req)
 			if err != nil || !ok {
 				if err != nil {
-					glog.Errorf("Unable to authenticate the request due to an error: %v", err)
+					glog.Errorf("Unable to authenticate the request, from %v for %v, due to an error: %v",
+						req.UserAgent(), req.URL, err)
 				}
 				failed.ServeHTTP(w, req)
 				return
