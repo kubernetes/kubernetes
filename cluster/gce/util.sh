@@ -519,7 +519,9 @@ function create-node-template() {
   # VMs with Accelerators cannot be live migrated.
   # More details here - https://cloud.google.com/compute/docs/gpus/add-gpus#create-new-gpu-instance
   if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    accelerator_args="--maintenance-policy TERMINATE --restart-on-failure --accelerator ${NODE_ACCELERATORS}"
+    local accelerator_config=$(echo ${NODE_ACCELERATORS} | tr -d '[:space:]')
+    accelerator_args="--maintenance-policy TERMINATE --restart-on-failure --accelerator=${accelerator_config}"
+    echo "Setting up Hardware Accelerators with args ${accelerator_args}"
     gcloud="gcloud beta"
   fi
 
