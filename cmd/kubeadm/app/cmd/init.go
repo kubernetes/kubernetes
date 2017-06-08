@@ -158,13 +158,12 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 	}
 
 	// Set defaults dynamically that the API group defaulting can't (by fetching information from the internet, looking up network interfaces, etc.)
-	err := setInitDynamicDefaults(cfg)
-	if err != nil {
+	if err := setInitDynamicDefaults(cfg); err != nil {
 		return nil, err
 	}
 
 	if !skipPreFlight {
-		fmt.Println("[preflight] Running pre-flight checks")
+		fmt.Println("[preflight] Running pre-flight checks.")
 
 		// First, check if we're root separately from the other preflight checks and fail fast
 		if err := preflight.RunRootCheckOnly(); err != nil {
@@ -179,7 +178,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 		// Try to start the kubelet service in case it's inactive
 		preflight.TryStartKubelet()
 	} else {
-		fmt.Println("[preflight] Skipping pre-flight checks")
+		fmt.Println("[preflight] Skipping pre-flight checks.")
 	}
 
 	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint}, nil
@@ -199,8 +198,7 @@ func (i *Init) Validate() error {
 func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 1: Generate certificates
-	err := certphase.CreatePKIAssets(i.cfg)
-	if err != nil {
+	if err := certphase.CreatePKIAssets(i.cfg); err != nil {
 		return err
 	}
 
@@ -254,13 +252,11 @@ func (i *Init) Run(out io.Writer) error {
 	// PHASE 5: Install and deploy all addons, and configure things as necessary
 
 	// Create the necessary ServiceAccounts
-	err = apiconfigphase.CreateServiceAccounts(client)
-	if err != nil {
+	if err = apiconfigphase.CreateServiceAccounts(client); err != nil {
 		return err
 	}
 
-	err = apiconfigphase.CreateRBACRules(client)
-	if err != nil {
+	if  err = apiconfigphase.CreateRBACRules(client); err != nil {
 		return err
 	}
 
