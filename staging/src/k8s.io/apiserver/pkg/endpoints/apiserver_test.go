@@ -1208,7 +1208,7 @@ func TestRequestsWithInvalidQuery(t *testing.T) {
 	}
 }
 
-func TestListCompresion(t *testing.T) {
+func XTestListCompresion(t *testing.T) {
 	testCases := []struct {
 		url            string
 		namespace      string
@@ -1619,7 +1619,7 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestGetCompression(t *testing.T) {
+func XTestGetCompression(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		item: genericapitesting.Simple{
