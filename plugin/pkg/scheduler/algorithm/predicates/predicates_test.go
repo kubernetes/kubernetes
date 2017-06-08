@@ -3417,10 +3417,7 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeUnderMemoryPressure}
 
 	for _, test := range tests {
-		fits, reasons, err := CheckNodeMemoryPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.name, err)
-		}
+		fits, reasons := CheckNodeMemoryPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
 			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.name, reasons, expectedFailureReasons)
 		}
@@ -3489,10 +3486,7 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}
 
 	for _, test := range tests {
-		fits, reasons, err := CheckNodeDiskPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.name, err)
-		}
+		fits, reasons := CheckNodeDiskPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
 			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.name, reasons, expectedFailureReasons)
 		}
