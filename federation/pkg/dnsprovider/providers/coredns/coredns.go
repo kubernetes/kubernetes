@@ -105,15 +105,15 @@ func newCoreDNSProviderInterface(config io.Reader) (*Interface, error) {
 		etcdEndpoints = cfg.Global.EtcdEndpoints
 		dnsZones = cfg.Global.DNSZones
 		certFile = cfg.Global.CertFile
-		keyFile = cfg.Global.KeyFile
 		caFile = cfg.Global.CAFile
+		keyFile = cfg.Global.KeyFile
 	}
 	glog.Infof("Using CoreDNS DNS provider")
 
 	if dnsZones == "" {
 		return nil, fmt.Errorf("Need to provide at least one DNS Zone")
 	}
-
+	glog.Infof("Creating etcd transport with %s, %s, %s", certFile, keyFile, caFile)
 	etcdTransport, err := newTransportForETCD2(certFile, keyFile, caFile)
 	if err != nil {
 		return nil, fmt.Errorf("error creating transport for etcd: %v", err)
