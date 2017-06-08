@@ -306,8 +306,8 @@ func (u *Unstructured) GetOwnerReferences() []metav1.OwnerReference {
 
 func (u *Unstructured) SetOwnerReferences(references []metav1.OwnerReference) {
 	var newReferences = make([]map[string]interface{}, 0, len(references))
-	for i := 0; i < len(references); i++ {
-		newReferences = append(newReferences, setOwnerReference(references[i]))
+	for _, reference := range references {
+		newReferences = append(newReferences, setOwnerReference(reference))
 	}
 	u.setNestedField(newReferences, "metadata", "ownerReferences")
 }
@@ -729,7 +729,7 @@ func (UnstructuredObjectConverter) Convert(in, out, context interface{}) error {
 
 	// maybe deep copy the map? It is documented in the
 	// ObjectConverter interface that this function is not
-	// guaranteeed to not mutate the input. Or maybe set the input
+	// guaranteed to not mutate the input. Or maybe set the input
 	// object to nil.
 	unstructOut.Object = unstructIn.Object
 	return nil
