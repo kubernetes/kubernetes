@@ -997,11 +997,11 @@ func deleteNS(c clientset.Interface, clientPool dynamic.ClientPool, namespace st
 		if remainingContent {
 			// pods remain
 			if remainingPods > 0 {
-				// but they were all undergoing deletion (kubelet is probably culprit)
-				if missingTimestamp == 0 {
+				if missingTimestamp != 0 {
+					// pods remained, but were not undergoing deletion (namespace controller is probably culprit)
 					return fmt.Errorf("namespace %v was not deleted with limit: %v, pods remaining: %v, pods missing deletion timestamp: %v", namespace, err, remainingPods, missingTimestamp)
 				}
-				// pods remained, but were not undergoing deletion (namespace controller is probably culprit)
+				// but they were all undergoing deletion (kubelet is probably culprit, check NodeLost)
 				return fmt.Errorf("namespace %v was not deleted with limit: %v, pods remaining: %v", namespace, err, remainingPods)
 			}
 			// other content remains (namespace controller is probably screwed up)
