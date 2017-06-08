@@ -308,6 +308,12 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 	err = cniNet.DelNetworkList(netConf, rt)
 	if err != nil {
 		glog.Errorf("Error deleting network: %v", err)
+		if network.NetworkConfig.Network.Type == "flannel" {
+			subStr := "no such file or directory"
+			if strings.Contains(err.Error(), subStr) {
+				return nil
+			}
+		}
 		return err
 	}
 	return nil
