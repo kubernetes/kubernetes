@@ -49,24 +49,26 @@ DNS_PROVIDER="${FEDERATION_DNS_PROVIDER:-google-clouddns}"
 function get_version() {
   local -r versions_file="${KUBE_ROOT}/_output/federation/versions"
 
+  if [[ -f "${versions_file}" ]]; then
+    # Read the version from the versions file.
+    local -r kube_version="$(cat "${versions_file}" | python -c '\
+import json, sys;\
+print json.load(sys.stdin)["KUBE_VERSION"]')"
+
+    echo "${kube_version//+/_}"
+    return
+  fi
+
   if [[ -n "${KUBERNETES_RELEASE:-}" ]]; then
+    # Read the version from the KUBERNETES_RELEASE if no version file exist.
     echo "${KUBERNETES_RELEASE//+/_}"
     return
   fi
 
-  if [[ ! -f "${versions_file}" ]]; then
-    echo "Couldn't determine the release version: neither the " \
-     "KUBERNETES_RELEASE environment variable is set, nor does " \
-     "the versions file exist at ${versions_file}"
-    exit 1
-  fi
-
-  # Read the version back from the versions file if no version is given.
-  local -r kube_version="$(cat "${versions_file}" | python -c '\
-import json, sys;\
-print json.load(sys.stdin)["KUBE_VERSION"]')"
-
-  echo "${kube_version//+/_}"
+  echo "Couldn't determine the release version: neither the " \
+    "versions file exist at ${versions_file}, nor does " \
+    "the KUBERNETES_RELEASE environment variable is set"
+  exit 1
 }
 
 # Initializes the control plane.
