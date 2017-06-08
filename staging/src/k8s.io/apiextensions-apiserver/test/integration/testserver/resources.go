@@ -29,8 +29,28 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
 )
+
+//NewRandomNameCustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
+func NewRandomNameCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+	gName := names.SimpleNameGenerator.GenerateName("foo")
+	return &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: gName + "s.mygroup.example.com"},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   "mygroup.example.com",
+			Version: "v1beta1",
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:   gName + "s",
+				Singular: gName,
+				Kind:     gName,
+				ListKind: gName + "List",
+			},
+			Scope: scope,
+		},
+	}
+}
 
 func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
@@ -155,7 +175,7 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceD
 	// can get a different RV because etcd can be touched in between the initial list operation (if that's what you're doing first)
 	// and the storage cache reflector starting.
 	// Later, you can issue a watch with the REST apis list.RV and end up earlier than the storage cacher.
-	// The general working model is that if you get a "resourceVersion to old" message, you re-list and rewatch.
+	// The general working model is that if you get a "resourceVersion too old" message, you re-list and rewatch.
 	// For this test, we'll actually cycle, "list/watch/create/delete" until we get an RV from list that observes the create and not an error.
 	// This way all the tests that are checking for watches don't have to worry about RV too old problems because crazy things *could* happen
 	// before like the created RV could be too old to watch.
