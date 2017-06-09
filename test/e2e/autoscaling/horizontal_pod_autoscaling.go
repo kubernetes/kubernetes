@@ -116,7 +116,8 @@ type HPAScaleTest struct {
 func (scaleTest *HPAScaleTest) run(name, kind string, rc *common.ResourceConsumer, f *framework.Framework) {
 	rc = common.NewDynamicResourceConsumer(name, kind, int(scaleTest.initPods), int(scaleTest.totalInitialCPUUsage), 0, 0, scaleTest.perPodCPURequest, 200, f)
 	defer rc.CleanUp()
-	common.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
+	hpa := common.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
+	defer common.DeleteHorizontalPodAutoscaler(rc, hpa.Name)
 	rc.WaitForReplicas(int(scaleTest.firstScale))
 	if scaleTest.firstScaleStasis > 0 {
 		rc.EnsureDesiredReplicas(int(scaleTest.firstScale), scaleTest.firstScaleStasis)
