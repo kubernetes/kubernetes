@@ -41,11 +41,11 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 	}, nil)
 	tk.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	tk.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
-	tk.kubelet.nodeInfo = &testNodeInfo{
+	tk.kubelet[0].nodeInfo = &testNodeInfo{
 		nodes: []*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: string(tk.kubelet.nodeName),
+					Name: string(tk.kubelet[0].nodeName),
 				},
 				Status: v1.NodeStatus{
 					Allocatable: v1.ResourceList{
@@ -79,7 +79,7 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 	}
 	as := assert.New(t)
 	for idx, tc := range cases {
-		actual, _, err := tk.kubelet.defaultPodLimitsForDownwardApi(tc.pod, nil)
+		actual, _, err := tk.kubelet[0].defaultPodLimitsForDownwardApi(tc.pod, nil)
 		as.Nil(err, "failed to default pod limits: %v", err)
 		if !apiequality.Semantic.DeepEqual(tc.expected, actual) {
 			as.Fail("test case [%d] failed.  Expected: %+v, Got: %+v", idx, tc.expected, actual)

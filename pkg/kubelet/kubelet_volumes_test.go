@@ -34,7 +34,7 @@ import (
 func TestListVolumesForPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 
 	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
@@ -82,7 +82,7 @@ func TestListVolumesForPod(t *testing.T) {
 func TestPodVolumesExist(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 
 	pods := []*v1.Pod{
 		{
@@ -161,7 +161,7 @@ func TestPodVolumesExist(t *testing.T) {
 func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 
 	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
@@ -207,7 +207,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 
 	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
@@ -278,7 +278,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {
@@ -347,7 +347,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {

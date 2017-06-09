@@ -268,7 +268,7 @@ fe00::2	ip6-allrouters
 func TestRunInContainerNoSuchPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	fakeRuntime := testKubelet.fakeRuntime
 	fakeRuntime.PodList = []*containertest.FakePod{}
 
@@ -288,7 +288,7 @@ func TestRunInContainer(t *testing.T) {
 	for _, testError := range []error{nil, errors.New("bar")} {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
+		kubelet := testKubelet.kubelet[0]
 		fakeRuntime := testKubelet.fakeRuntime
 		fakeCommandRunner := containertest.FakeContainerCommandRunner{
 			Err:    testError,
@@ -322,7 +322,7 @@ func TestRunInContainer(t *testing.T) {
 func TestGenerateRunContainerOptions_DNSConfigurationParams(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 
 	clusterNS := "203.0.113.1"
 	kubelet.clusterDomain = "kubernetes.io"
@@ -1261,9 +1261,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	for _, tc := range testCases {
 		fakeRecorder := record.NewFakeRecorder(1)
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		testKubelet.kubelet.recorder = fakeRecorder
+		testKubelet.kubelet[0].recorder = fakeRecorder
 		defer testKubelet.Cleanup()
-		kl := testKubelet.kubelet
+		kl := testKubelet.kubelet[0]
 		kl.masterServiceNamespace = tc.masterServiceNs
 		if tc.nilLister {
 			kl.serviceLister = nil
@@ -1750,7 +1750,7 @@ func TestExec(t *testing.T) {
 	for _, tc := range testcases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
+		kubelet := testKubelet.kubelet[0]
 		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
 			{Pod: &kubecontainer.Pod{
 				ID:        podUID,
@@ -1841,7 +1841,7 @@ func TestPortForward(t *testing.T) {
 	for _, tc := range testcases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
+		kubelet := testKubelet.kubelet[0]
 		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
 			{Pod: &kubecontainer.Pod{
 				ID:        podUID,
@@ -1992,7 +1992,7 @@ func TestHasHostMountPVC(t *testing.T) {
 			return true, volumeToReturn, v.pvError
 		})
 
-		actual := testKubelet.kubelet.hasHostMountPVC(pod)
+		actual := testKubelet.kubelet[0].hasHostMountPVC(pod)
 		if actual != v.expected {
 			t.Errorf("%s expected %t but got %t", k, v.expected, actual)
 		}

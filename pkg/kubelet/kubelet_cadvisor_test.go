@@ -186,7 +186,7 @@ func TestGetContainerInfo(t *testing.T) {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnablec */)
 		defer testKubelet.Cleanup()
 		fakeRuntime := testKubelet.fakeRuntime
-		kubelet := testKubelet.kubelet
+		kubelet := testKubelet.kubelet[0]
 		cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
 		mockCadvisor := testKubelet.fakeCadvisor
 		if tc.expectDockerContainerCall {
@@ -214,7 +214,7 @@ func TestGetRawContainerInfoRoot(t *testing.T) {
 	}
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
@@ -240,7 +240,7 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 	}
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
 	mockCadvisor.On("SubcontainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)

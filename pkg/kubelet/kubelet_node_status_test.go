@@ -132,7 +132,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	testKubelet := newTestKubeletWithImageList(
 		t, inputImageList, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
@@ -259,7 +259,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
@@ -333,7 +333,7 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
@@ -527,7 +527,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
@@ -688,7 +688,7 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{
@@ -899,7 +899,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 func TestUpdateNodeStatusError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	// No matching node for the kubelet
 	testKubelet.fakeKubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{}}).ReactionChain
 	assert.Error(t, kubelet.updateNodeStatus())
@@ -909,7 +909,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 func TestRegisterWithApiServer(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		// Return an error on create.
@@ -1090,7 +1090,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 	for _, tc := range cases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
 		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
+		kubelet := testKubelet.kubelet[0]
 		kubeClient := testKubelet.fakeKubeClient
 
 		kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
@@ -1148,7 +1148,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	testKubelet := newTestKubeletWithImageList(
 		t, inputImageList, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatable: v1.ResourceList{

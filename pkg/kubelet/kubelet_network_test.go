@@ -31,7 +31,7 @@ import (
 func TestNodeIPParam(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	tests := []struct {
 		nodeIP   string
 		success  bool
@@ -101,7 +101,7 @@ func TestParseResolvConf(t *testing.T) {
 	}
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	for i, tc := range testCases {
 		ns, srch, err := kubelet.parseResolvConf(strings.NewReader(tc.data))
 		require.NoError(t, err)
@@ -113,7 +113,7 @@ func TestParseResolvConf(t *testing.T) {
 func TestComposeDNSSearch(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 
 	recorder := record.NewFakeRecorder(20)
 	kubelet.recorder = recorder
