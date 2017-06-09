@@ -40,8 +40,9 @@ func TestParseEndpoint(t *testing.T) {
 			expectedAddr:     "localhost:15880",
 		},
 		{
-			endpoint:    "tcp1://abc",
-			expectError: true,
+			endpoint:         "tcp1://abc",
+			expectedProtocol: "tcp1",
+			expectError:      true,
 		},
 		{
 			endpoint:    "a b c",
@@ -51,12 +52,12 @@ func TestParseEndpoint(t *testing.T) {
 
 	for _, test := range tests {
 		protocol, addr, err := parseEndpoint(test.endpoint)
+		assert.Equal(t, test.expectedProtocol, protocol)
 		if test.expectError {
 			assert.NotNil(t, err, "Expect error during parsing %q", test.endpoint)
 			continue
 		}
 		assert.Nil(t, err, "Expect no error during parsing %q", test.endpoint)
-		assert.Equal(t, test.expectedProtocol, protocol)
 		assert.Equal(t, test.expectedAddr, addr)
 	}
 

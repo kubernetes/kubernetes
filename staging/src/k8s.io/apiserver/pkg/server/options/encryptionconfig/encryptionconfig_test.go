@@ -39,7 +39,69 @@ resources:
     - namespaces
     providers:
     - identity: {}
-    - aes:
+    - aesgcm:
+        keys:
+        - name: key1
+          secret: c2VjcmV0IGlzIHNlY3VyZQ==
+        - name: key2
+          secret: dGhpcyBpcyBwYXNzd29yZA==
+    - aescbc:
+        keys:
+        - name: key1
+          secret: c2VjcmV0IGlzIHNlY3VyZQ==
+        - name: key2
+          secret: dGhpcyBpcyBwYXNzd29yZA==
+    - secretbox:
+        keys:
+        - name: key1
+          secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+`
+
+	correctConfigWithAesGcmFirst = `
+kind: EncryptionConfig
+apiVersion: v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - aesgcm:
+        keys:
+        - name: key1
+          secret: c2VjcmV0IGlzIHNlY3VyZQ==
+        - name: key2
+          secret: dGhpcyBpcyBwYXNzd29yZA==
+    - secretbox:
+        keys:
+        - name: key1
+          secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+    - aescbc:
+        keys:
+        - name: key1
+          secret: c2VjcmV0IGlzIHNlY3VyZQ==
+        - name: key2
+          secret: dGhpcyBpcyBwYXNzd29yZA==
+    - identity: {}
+`
+
+	correctConfigWithAesCbcFirst = `
+kind: EncryptionConfig
+apiVersion: v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - aescbc:
+        keys:
+        - name: key1
+          secret: c2VjcmV0IGlzIHNlY3VyZQ==
+        - name: key2
+          secret: dGhpcyBpcyBwYXNzd29yZA==
+    - identity: {}
+    - secretbox:
+        keys:
+        - name: key1
+          secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+    - aesgcm:
         keys:
         - name: key1
           secret: c2VjcmV0IGlzIHNlY3VyZQ==
@@ -47,20 +109,30 @@ resources:
           secret: dGhpcyBpcyBwYXNzd29yZA==
 `
 
-	correctConfigWithAesFirst = `
+	correctConfigWithSecretboxFirst = `
 kind: EncryptionConfig
 apiVersion: v1
 resources:
   - resources:
     - secrets
     providers:
-    - aes:
+    - secretbox:
+        keys:
+        - name: key1
+          secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+    - aescbc:
         keys:
         - name: key1
           secret: c2VjcmV0IGlzIHNlY3VyZQ==
         - name: key2
           secret: dGhpcyBpcyBwYXNzd29yZA==
     - identity: {}
+    - aesgcm:
+        keys:
+        - name: key1
+          secret: c2VjcmV0IGlzIHNlY3VyZQ==
+        - name: key2
+          secret: dGhpcyBpcyBwYXNzd29yZA==
 `
 
 	incorrectConfigNoSecretForKey = `
@@ -71,7 +143,7 @@ resources:
     - namespaces
     - secrets
     providers:
-    - aes:
+    - aesgcm:
         keys:
         - name: key1
 `
@@ -84,7 +156,7 @@ resources:
     - namespaces
     - secrets
     providers:
-    - aes:
+    - aesgcm:
         keys:
         - name: key1
           secret: c2VjcmV0IGlzIHNlY3VyZQ==
@@ -103,58 +175,60 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithIdentityFirst)
 	}
 
-	aesFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithAesFirst))
+	aesGcmFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithAesGcmFirst))
 	if err != nil {
-		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesFirst)
+		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesGcmFirst)
+	}
+
+	aesCbcFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithAesCbcFirst))
+	if err != nil {
+		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesCbcFirst)
+	}
+
+	secretboxFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithSecretboxFirst))
+	if err != nil {
+		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithSecretboxFirst)
 	}
 
 	// Pick the transformer for any of the returned resources.
 	identityFirstTransformer := identityFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
-	aesFirstTransformer := aesFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
+	aesGcmFirstTransformer := aesGcmFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
+	aesCbcFirstTransformer := aesCbcFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
+	secretboxFirstTransformer := secretboxFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 
 	context := value.DefaultContext([]byte(sampleContextText))
 	originalText := []byte(sampleText)
 
-	testCases := []struct {
-		WritingTransformer value.Transformer
-		Name               string
-		AesStale           bool
-		IdentityStale      bool
+	transformers := []struct {
+		Transformer value.Transformer
+		Name        string
 	}{
-		{aesFirstTransformer, "aesFirst", false, true},
-		{identityFirstTransformer, "identityFirst", true, false},
+		{aesGcmFirstTransformer, "aesGcmFirst"},
+		{aesCbcFirstTransformer, "aesCbcFirst"},
+		{secretboxFirstTransformer, "secretboxFirst"},
+		{identityFirstTransformer, "identityFirst"},
 	}
 
-	for _, testCase := range testCases {
-		transformedData, err := testCase.WritingTransformer.TransformToStorage(originalText, context)
+	for _, testCase := range transformers {
+		transformedData, err := testCase.Transformer.TransformToStorage(originalText, context)
 		if err != nil {
 			t.Fatalf("%s: error while transforming data to storage: %s", testCase.Name, err)
 		}
 
-		aesUntransformedData, stale, err := aesFirstTransformer.TransformFromStorage(transformedData, context)
-		if err != nil {
-			t.Fatalf("%s: error while reading using aesFirst transformer: %s", testCase.Name, err)
-		}
-		if stale != testCase.AesStale {
-			t.Fatalf("%s: wrong stale information on reading using aesFirst transformer, should be %v", testCase.Name, testCase.AesStale)
-		}
-
-		identityUntransformedData, stale, err := identityFirstTransformer.TransformFromStorage(transformedData, context)
-		if err != nil {
-			t.Fatalf("%s: error while reading using identityFirst transformer: %s", testCase.Name, err)
-		}
-		if stale != testCase.IdentityStale {
-			t.Fatalf("%s: wrong stale information on reading using identityFirst transformer, should be %v", testCase.Name, testCase.IdentityStale)
-		}
-
-		if bytes.Compare(aesUntransformedData, originalText) != 0 {
-			t.Fatalf("%s: aesFirst transformer transformed data incorrectly. Expected: %v, got %v", testCase.Name, originalText, aesUntransformedData)
-		}
-
-		if bytes.Compare(identityUntransformedData, originalText) != 0 {
-			t.Fatalf("%s: identityFirst transformer transformed data incorrectly. Expected: %v, got %v", testCase.Name, originalText, aesUntransformedData)
+		for _, transformer := range transformers {
+			untransformedData, stale, err := transformer.Transformer.TransformFromStorage(transformedData, context)
+			if err != nil {
+				t.Fatalf("%s: error while reading using %s transformer: %s", testCase.Name, transformer.Name, err)
+			}
+			if stale != (transformer.Name != testCase.Name) {
+				t.Fatalf("%s: wrong stale information on reading using %s transformer, should be %v", testCase.Name, transformer.Name, testCase.Name == transformer.Name)
+			}
+			if bytes.Compare(untransformedData, originalText) != 0 {
+				t.Fatalf("%s: %s transformer transformed data incorrectly. Expected: %v, got %v", testCase.Name, transformer.Name, originalText, untransformedData)
+			}
 		}
 	}
+
 }
 
 // Throw error if key has no secret

@@ -575,6 +575,18 @@
 			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
 		},
 		{
+			"ImportPath": "golang.org/x/crypto/nacl/secretbox",
+			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/poly1305",
+			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/salsa20/salsa",
+			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
+		},
+		{
 			"ImportPath": "golang.org/x/crypto/ssh/terminal",
 			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
 		},

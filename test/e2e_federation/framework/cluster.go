@@ -18,6 +18,7 @@ package framework
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -230,4 +231,10 @@ func restConfigForCluster(clusterConf *clusterConfig) *restclient.Config {
 	restConfig, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
 	framework.ExpectNoError(err, fmt.Sprintf("Error creating client for cluster %q: %+v", clusterConf.name, err))
 	return restConfig
+}
+
+func GetZoneFromClusterName(clusterName string) string {
+	// Ref: https://github.com/kubernetes/kubernetes/blob/master/cluster/kube-util.sh#L55
+	prefix := "federation-e2e-" + framework.TestContext.Provider + "-"
+	return strings.TrimPrefix(clusterName, prefix)
 }

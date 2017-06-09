@@ -997,11 +997,11 @@ func deleteNS(c clientset.Interface, clientPool dynamic.ClientPool, namespace st
 		if remainingContent {
 			// pods remain
 			if remainingPods > 0 {
-				// but they were all undergoing deletion (kubelet is probably culprit)
-				if missingTimestamp == 0 {
+				if missingTimestamp != 0 {
+					// pods remained, but were not undergoing deletion (namespace controller is probably culprit)
 					return fmt.Errorf("namespace %v was not deleted with limit: %v, pods remaining: %v, pods missing deletion timestamp: %v", namespace, err, remainingPods, missingTimestamp)
 				}
-				// pods remained, but were not undergoing deletion (namespace controller is probably culprit)
+				// but they were all undergoing deletion (kubelet is probably culprit, check NodeLost)
 				return fmt.Errorf("namespace %v was not deleted with limit: %v, pods remaining: %v", namespace, err, remainingPods)
 			}
 			// other content remains (namespace controller is probably screwed up)
@@ -5158,21 +5158,25 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 // CleanupGCEResources cleans up GCE Service Type=LoadBalancer resources with
 // the given name. The name is usually the UUID of the Service prefixed with an
 // alpha-numeric character ('a') to work around cloudprovider rules.
-func CleanupGCEResources(loadBalancerName string) (retErr error) {
+func CleanupGCEResources(loadBalancerName, zone string) (retErr error) {
 	gceCloud, err := GetGCECloud()
 	if err != nil {
 		return err
+	}
+	region, err := gcecloud.GetGCERegion(zone)
+	if err != nil {
+		return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
 	}
 	if err := gceCloud.DeleteFirewall(loadBalancerName); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = err
 	}
-	if err := gceCloud.DeleteRegionForwardingRule(loadBalancerName, gceCloud.Region()); err != nil &&
+	if err := gceCloud.DeleteRegionForwardingRule(loadBalancerName, region); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 
 	}
-	if err := gceCloud.DeleteRegionAddress(loadBalancerName, gceCloud.Region()); err != nil &&
+	if err := gceCloud.DeleteRegionAddress(loadBalancerName, region); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 	}
@@ -5185,7 +5189,7 @@ func CleanupGCEResources(loadBalancerName string) (retErr error) {
 	if hc != nil {
 		hcNames = append(hcNames, hc.Name)
 	}
-	if err := gceCloud.DeleteExternalTargetPoolAndChecks(loadBalancerName, gceCloud.Region(), hcNames...); err != nil &&
+	if err := gceCloud.DeleteExternalTargetPoolAndChecks(loadBalancerName, region, hcNames...); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 	}

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,6 +87,7 @@ type ResourceConsumer struct {
 	stopCPU                  chan int
 	stopMem                  chan int
 	stopCustomMetric         chan int
+	stopWaitGroup            sync.WaitGroup
 	consumptionTimeInSeconds int
 	sleepTime                time.Duration
 	requestSizeInMillicores  int
@@ -167,6 +169,8 @@ func (rc *ResourceConsumer) ConsumeCustomMetric(amount int) {
 
 func (rc *ResourceConsumer) makeConsumeCPURequests() {
 	defer GinkgoRecover()
+	rc.stopWaitGroup.Add(1)
+	defer rc.stopWaitGroup.Done()
 	sleepTime := time.Duration(0)
 	millicores := 0
 	for {
@@ -186,6 +190,8 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 
 func (rc *ResourceConsumer) makeConsumeMemRequests() {
 	defer GinkgoRecover()
+	rc.stopWaitGroup.Add(1)
+	defer rc.stopWaitGroup.Done()
 	sleepTime := time.Duration(0)
 	megabytes := 0
 	for {
@@ -205,6 +211,8 @@ func (rc *ResourceConsumer) makeConsumeMemRequests() {
 
 func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 	defer GinkgoRecover()
+	rc.stopWaitGroup.Add(1)
+	defer rc.stopWaitGroup.Done()
 	sleepTime := time.Duration(0)
 	delta := 0
 	for {
@@ -364,6 +372,7 @@ func (rc *ResourceConsumer) Pause() {
 	rc.stopCPU <- 0
 	rc.stopMem <- 0
 	rc.stopCustomMetric <- 0
+	rc.stopWaitGroup.Wait()
 }
 
 // Pause starts background goroutines responsible for consuming resources.
@@ -379,6 +388,7 @@ func (rc *ResourceConsumer) CleanUp() {
 	close(rc.stopCPU)
 	close(rc.stopMem)
 	close(rc.stopCustomMetric)
+	rc.stopWaitGroup.Wait()
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)
 	kind, err := kindOf(rc.kind)

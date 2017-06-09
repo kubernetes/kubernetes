@@ -308,7 +308,7 @@ func (config *NetworkingTestConfig) GetSelfURL(port int32, path string, expected
 	}
 }
 
-func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node string) *v1.Pod {
+func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname string) *v1.Pod {
 	probe := &v1.Probe{
 		InitialDelaySeconds: 10,
 		TimeoutSeconds:      30,
@@ -358,7 +358,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node s
 				},
 			},
 			NodeSelector: map[string]string{
-				"kubernetes.io/hostname": node,
+				"kubernetes.io/hostname": hostname,
 			},
 		},
 	}
@@ -539,7 +539,8 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	createdPods := make([]*v1.Pod, 0, len(nodes))
 	for i, n := range nodes {
 		podName := fmt.Sprintf("%s-%d", podName, i)
-		pod := config.createNetShellPodSpec(podName, n.Name)
+		hostname, _ := n.Labels["kubernetes.io/hostname"]
+		pod := config.createNetShellPodSpec(podName, hostname)
 		pod.ObjectMeta.Labels = selector
 		createdPod := config.createPod(pod)
 		createdPods = append(createdPods, createdPod)

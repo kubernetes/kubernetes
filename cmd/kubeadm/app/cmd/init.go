@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 var (
@@ -253,13 +254,18 @@ func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 5: Install and deploy all addons, and configure things as necessary
 
+	k8sVersion, err := version.ParseSemantic(i.cfg.KubernetesVersion)
+	if err != nil {
+		return fmt.Errorf("couldn't parse kubernetes version %q: %v", i.cfg.KubernetesVersion, err)
+	}
+
 	// Create the necessary ServiceAccounts
 	err = apiconfigphase.CreateServiceAccounts(client)
 	if err != nil {
 		return err
 	}
 
-	err = apiconfigphase.CreateRBACRules(client)
+	err = apiconfigphase.CreateRBACRules(client, k8sVersion)
 	if err != nil {
 		return err
 	}
