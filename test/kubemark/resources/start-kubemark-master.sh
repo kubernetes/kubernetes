@@ -351,7 +351,7 @@ function compute-kube-apiserver-params {
 	params+=" --storage-backend=${STORAGE_BACKEND}"
 	params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 	params+=" --admission-control=${CUSTOM_ADMISSION_PLUGINS}"
-	params+=" --authorization-mode=RBAC"
+	params+=" --authorization-mode=Node,RBAC"
 	echo "${params}"
 }
 
