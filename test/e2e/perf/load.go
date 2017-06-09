@@ -60,7 +60,7 @@ const (
 	// depending on the number of nodes in the underlying cluster.
 	nodeCountPerNamespace = 100
 	// How many threads will be used to create/delete services during this test.
-	serviceOperationsParallelism = 5
+	serviceOperationsParallelism = 1
 )
 
 var randomKind = schema.GroupKind{Kind: "Random"}
