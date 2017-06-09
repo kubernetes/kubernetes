@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -97,7 +96,6 @@ func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService) *m
 	var discoveryGroup *metav1.APIGroup
 
 	for _, apiService := range apiServicesByGroup {
-		fmt.Printf("#### %#v\n", apiService)
 		if !apiregistrationapi.IsAPIServiceConditionTrue(apiService, apiregistrationapi.Available) {
 			continue
 		}

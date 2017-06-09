@@ -84,10 +84,10 @@ func TestHandleVersionUpdate(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.group.com"},
 					Spec: apiregistration.APIServiceSpec{
-						Group:           "group.com",
-						Version:         "v1",
-						GroupPriority:   5000,
-						VersionPriority: 20,
+						Group:                "group.com",
+						Version:              "v1",
+						GroupPriorityMinimum: 1000,
+						VersionPriority:      100,
 					},
 				},
 			},
@@ -122,10 +122,10 @@ func TestHandleVersionUpdate(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "v1.group.com"},
 					Spec: apiregistration.APIServiceSpec{
-						Group:           "group.com",
-						Version:         "v1",
-						GroupPriority:   5000,
-						VersionPriority: 20,
+						Group:                "group.com",
+						Version:              "v1",
+						GroupPriorityMinimum: 1000,
+						VersionPriority:      100,
 					},
 				},
 			},

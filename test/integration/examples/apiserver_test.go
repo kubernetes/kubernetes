@@ -315,10 +315,11 @@ func TestAggregatedAPIServer(t *testing.T) {
 				Namespace: "kube-wardle",
 				Name:      "api",
 			},
-			Group:    "wardle.k8s.io",
-			Version:  "v1alpha1",
-			CABundle: wardleCA,
-			Priority: 200,
+			Group:                "wardle.k8s.io",
+			Version:              "v1alpha1",
+			CABundle:             wardleCA,
+			GroupPriorityMinimum: 200,
+			VersionPriority:      200,
 		},
 	})
 	if err != nil {
@@ -337,9 +338,10 @@ func TestAggregatedAPIServer(t *testing.T) {
 		Spec: apiregistrationv1beta1.APIServiceSpec{
 			// register this as a loca service so it doesn't try to lookup the default kubernetes service
 			// which will have an unroutable IP address since its fake.
-			Group:    "",
-			Version:  "v1",
-			Priority: 100,
+			Group:                "",
+			Version:              "v1",
+			GroupPriorityMinimum: 100,
+			VersionPriority:      100,
 		},
 	})
 	if err != nil {

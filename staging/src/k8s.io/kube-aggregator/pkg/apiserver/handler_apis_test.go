@@ -62,7 +62,7 @@ func TestAPIs(t *testing.T) {
 						},
 						Group:                "foo",
 						Version:              "v1",
-						GroupPriorityMinimum: 10,
+						GroupPriorityMinimum: 11,
 					},
 					Status: apiregistration.APIServiceStatus{
 						Conditions: []apiregistration.APIServiceCondition{
@@ -79,7 +79,7 @@ func TestAPIs(t *testing.T) {
 						},
 						Group:                "bar",
 						Version:              "v1",
-						GroupPriorityMinimum: 11,
+						GroupPriorityMinimum: 10,
 					},
 					Status: apiregistration.APIServiceStatus{
 						Conditions: []apiregistration.APIServiceCondition{
@@ -133,8 +133,8 @@ func TestAPIs(t *testing.T) {
 						},
 						Group:                "foo",
 						Version:              "v1",
-						GroupPriorityMinimum: 1,
-						VersionPriority:      15,
+						GroupPriorityMinimum: 20,
+						VersionPriority:      10,
 					},
 					Status: apiregistration.APIServiceStatus{
 						Conditions: []apiregistration.APIServiceCondition{
@@ -168,8 +168,8 @@ func TestAPIs(t *testing.T) {
 						},
 						Group:                "foo",
 						Version:              "v2",
-						GroupPriorityMinimum: 20,
-						VersionPriority:      10,
+						GroupPriorityMinimum: 1,
+						VersionPriority:      15,
 					},
 					Status: apiregistration.APIServiceStatus{
 						Conditions: []apiregistration.APIServiceCondition{
@@ -340,8 +340,8 @@ func TestAPIGroup(t *testing.T) {
 						},
 						Group:                "foo",
 						Version:              "v1",
-						GroupPriorityMinimum: 1,
-						VersionPriority:      15,
+						GroupPriorityMinimum: 20,
+						VersionPriority:      10,
 					},
 					Status: apiregistration.APIServiceStatus{
 						Conditions: []apiregistration.APIServiceCondition{
@@ -375,8 +375,8 @@ func TestAPIGroup(t *testing.T) {
 						},
 						Group:                "foo",
 						Version:              "v2",
-						GroupPriorityMinimum: 20,
-						VersionPriority:      10,
+						GroupPriorityMinimum: 1,
+						VersionPriority:      15,
 					},
 					Status: apiregistration.APIServiceStatus{
 						Conditions: []apiregistration.APIServiceCondition{
