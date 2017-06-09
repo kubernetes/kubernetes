@@ -42,7 +42,7 @@ const (
 // Eviction Policy is described here:
 // https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/kubelet-eviction.md
 
-var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolation]", func() {
+var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Serial] [Disruptive] [Flaky] [Feature:LocalStorageCapacityIsolation]", func() {
 
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
 
@@ -60,7 +60,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 							Command: []string{
 								"sh",
 								"-c",
-								"dd if=/dev/urandom of=target-file of=/cache/target-file bs=50000 count=1; while true; do sleep 5; done",
+								"sleep 5; dd if=/dev/urandom of=target-file of=/cache/target-file bs=50000 count=1; while true; do sleep 5; done",
 							},
 							VolumeMounts: []v1.VolumeMount{
 								{
@@ -96,7 +96,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 							Command: []string{
 								"sh",
 								"-c",
-								"dd if=/dev/urandom of=target-file of=/cache/target-file bs=50000 count=1; while true; do sleep 5; done",
+								"sleep 5; dd if=/dev/urandom of=target-file of=/cache/target-file bs=50000 count=1; while true; do sleep 5; done",
 							},
 							VolumeMounts: []v1.VolumeMount{
 								{
@@ -133,7 +133,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 							Command: []string{
 								"sh",
 								"-c",
-								"dd if=/dev/urandom of=target-file of=/cache/target-file bs=50000 count=1; while true; do sleep 5; done",
+								"sleep 5; dd if=/dev/urandom of=target-file of=/cache/target-file bs=50000 count=1; while true; do sleep 5; done",
 							},
 							VolumeMounts: []v1.VolumeMount{
 								{
@@ -169,7 +169,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 							Command: []string{
 								"sh",
 								"-c",
-								"dd if=/dev/urandom of=target-file bs=50000 count=1; while true; do sleep 5; done",
+								"sleep 5; dd if=/dev/urandom of=target-file bs=50000 count=1; while true; do sleep 5; done",
 							},
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
@@ -185,7 +185,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 		},
 	}
 
-	evictionTestTimeout := 4 * time.Minute
+	evictionTestTimeout := 10 * time.Minute
 	testCondition := "EmptyDir/ContainerOverlay usage limit violation"
 	Context(fmt.Sprintf("EmptyDirEviction when we run containers that should cause %s", testCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
