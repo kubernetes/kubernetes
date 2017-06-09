@@ -56,6 +56,7 @@ go_test(
         "cache_test.go",
         "helpers_test.go",
         "ref_test.go",
+        "runtime_test.go",
         "sync_result_test.go",
     ],
     library = ":go_default_library",
