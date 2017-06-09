@@ -69,7 +69,6 @@ func GetLoadBalancerName(service *v1.Service) string {
 }
 
 // GetInstanceProviderID builds a ProviderID for a node in a cloud.
-// TODO: The name and placement of this method suggests that it is a canonical definition of ProviderID. This doesn't seem to be true. e.g. The AWS implementation uses undecorated InstanceID as the ProviderID.
 func GetInstanceProviderID(cloud Interface, nodeName types.NodeName) (string, error) {
 	instances, ok := cloud.Instances()
 	if !ok {

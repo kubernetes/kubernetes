@@ -1037,8 +1037,11 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (c *Cloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	// In AWS, we're using the instanceID as the providerID.
-	instanceID := providerID
+	instanceID, error := instanceIDFromProviderID(providerID)
+
+	if error != nil {
+		return nil, error
+	}
 
 	addresses, error := c.describeAddressesByInstanceID(instanceID)
 
@@ -1111,8 +1114,11 @@ func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (c *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
-	// In AWS, we're using the instanceID as the providerID.
-	instanceID := providerID
+	instanceID, error := instanceIDFromProviderID(providerID)
+
+	if error != nil {
+		return "", error
+	}
 
 	instance, error := c.describeInstanceByInstanceID(instanceID)
 
@@ -3571,6 +3577,17 @@ func convertAwsAddress(address *ec2.Address) ([]v1.NodeAddress, error) {
 	}
 
 	return nodeAddresses, nil
+}
+
+var providerIDRegexp = regexp.MustCompile(`^aws://([^/]+)$`)
+
+func instanceIDFromProviderID(providerID string) (instanceID string, err error) {
+	matches := providerIDRegexp.FindStringSubmatch(providerID)
+	if len(matches) != 1 {
+		return "", fmt.Errorf("ProviderID \"%s\" didn't match expected format \"aws://InstanceID\"", providerID)
+	}
+
+	return matches[1], nil
 }
 
 func setNodeDisk(
