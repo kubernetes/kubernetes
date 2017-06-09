@@ -487,7 +487,10 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		if config.BindAddress != "0.0.0.0" {
 			nodeIP = net.ParseIP(config.BindAddress)
 		} else {
-			nodeIP = getNodeIP(client, hostname)
+			nodeIP, err = getNodeIP(client, hostname)
+			if err != nil {
+				return nil, fmt.Errorf("unable to fetch node IP for hostname %q: %v", hostname, err)
+			}
 		}
 		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
@@ -780,17 +783,31 @@ func (s *ProxyServer) birthCry() {
 	s.Recorder.Eventf(s.NodeRef, api.EventTypeNormal, "Starting", "Starting kube-proxy.")
 }
 
-func getNodeIP(client clientset.Interface, hostname string) net.IP {
+func getNodeIP(client clientset.Interface, hostname string) (net.IP, error) {
 	var nodeIP net.IP
-	node, err := client.Core().Nodes().Get(hostname, metav1.GetOptions{})
-	if err != nil {
-		glog.Warningf("Failed to retrieve node info: %v", err)
-		return nil
+	var complained bool
+	tryGet := func() (bool, error) {
+		node, err := client.Core().Nodes().Get(hostname, metav1.GetOptions{})
+		if err != nil {
+			glog.Warningf("Failed one attempt to retrieve node info: %v", err)
+			complained = true
+			return false, nil
+		}
+		nodeIP, err = utilnode.InternalGetNodeHostIP(node)
+		if err != nil {
+			return false, fmt.Errorf("Failed to retrieve IP of node: %v", err)
+		}
+		return true, nil
 	}
-	nodeIP, err = utilnode.InternalGetNodeHostIP(node)
-	if err != nil {
-		glog.Warningf("Failed to retrieve node IP: %v", err)
-		return nil
+	backoff := wait.Backoff{
+		Duration: time.Second * 10,
+		Factor:   2.0,
+		Jitter:   0.25,
+		Steps:    6,
 	}
-	return nodeIP
+	err := wait.ExponentialBackoff(backoff, tryGet)
+	if complained && err == nil {
+		glog.Info("Eventually succeeded to retrieve node info")
+	}
+	return nodeIP, err
 }
