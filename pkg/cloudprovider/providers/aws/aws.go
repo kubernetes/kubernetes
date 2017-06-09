@@ -3583,7 +3583,7 @@ var providerIDRegexp = regexp.MustCompile(`^aws://([^/]+)$`)
 
 func instanceIDFromProviderID(providerID string) (instanceID string, err error) {
 	matches := providerIDRegexp.FindStringSubmatch(providerID)
-	if len(matches) != 1 {
+	if len(matches) != 2 {
 		return "", fmt.Errorf("ProviderID \"%s\" didn't match expected format \"aws://InstanceID\"", providerID)
 	}
 
