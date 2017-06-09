@@ -17,10 +17,12 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -133,4 +135,43 @@ func TestPortForward(t *testing.T) {
 
 func TestPortForwardWithPFlag(t *testing.T) {
 	testPortForward(t, map[string]string{"pod": "foo"}, []string{":5000", ":1000"})
+}
+
+func TestValidate(t *testing.T) {
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	tf.Client = &fake.RESTClient{}
+	tf.ClientConfig = defaultClientConfig()
+
+	tests := []struct {
+		name     string
+		args     []string
+		expected string
+	}{
+		{
+			name:     "Test for pod name is null",
+			args:     []string{""},
+			expected: "pod name must be specified",
+		},
+		{
+			name:     "Test for port is null",
+			args:     []string{"my-pod"},
+			expected: "at least 1 PORT is required for port-forward",
+		},
+	}
+	for _, test := range tests {
+		buf := bytes.NewBuffer([]byte{})
+		cmd := NewCmdPortForward(f, buf, buf)
+		out := ""
+
+		o := &PortForwardOptions{}
+		cmd.Run = func(cmd *cobra.Command, args []string) {
+			o.Complete(f, cmd, args)
+			out = o.Validate().Error()
+		}
+		cmd.Run(cmd, test.args)
+
+		if !strings.Contains(out, test.expected) {
+			t.Errorf("%s: expected to find:\n\t%s\nfound:\n\t%s\n", test.name, test.expected, out)
+		}
+	}
 }
