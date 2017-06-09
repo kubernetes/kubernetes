@@ -123,10 +123,10 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 		iscsiDisk: &iscsiDisk{
 			podUID:  podUID,
 			volName: spec.Name(),
-			portals: bkportal,
-			iqn:     iscsi.IQN,
+			Portals: bkportal,
+			Iqn:     iscsi.IQN,
 			lun:     lun,
-			iface:   iface,
+			Iface:   iface,
 			manager: manager,
 			plugin:  plugin},
 		fsType:       iscsi.FSType,
@@ -175,10 +175,10 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 type iscsiDisk struct {
 	volName string
 	podUID  types.UID
-	portals []string
-	iqn     string
+	Portals []string
+	Iqn     string
 	lun     string
-	iface   string
+	Iface   string
 	plugin  *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
