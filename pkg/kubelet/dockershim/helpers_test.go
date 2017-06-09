@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 
@@ -30,8 +29,6 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"k8s.io/api/core/v1"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -48,99 +45,6 @@ func TestLabelsAndAnnotationsRoundTrip(t *testing.T) {
 	actualLabels, actualAnnotations := extractLabels(dockerLabels)
 	assert.Equal(t, expectedLabels, actualLabels)
 	assert.Equal(t, expectedAnnotations, actualAnnotations)
-}
-
-func TestGetSeccompSecurityOpts(t *testing.T) {
-	containerName := "bar"
-	makeConfig := func(annotations map[string]string) *runtimeapi.PodSandboxConfig {
-		return makeSandboxConfigWithLabelsAndAnnotations("pod", "ns", "1234", 1, nil, annotations)
-	}
-
-	tests := []struct {
-		msg          string
-		config       *runtimeapi.PodSandboxConfig
-		expectedOpts []string
-	}{{
-		msg:          "No security annotations",
-		config:       makeConfig(nil),
-		expectedOpts: []string{"seccomp=unconfined"},
-	}, {
-		msg: "Seccomp unconfined",
-		config: makeConfig(map[string]string{
-			v1.SeccompContainerAnnotationKeyPrefix + containerName: "unconfined",
-		}),
-		expectedOpts: []string{"seccomp=unconfined"},
-	}, {
-		msg: "Seccomp default",
-		config: makeConfig(map[string]string{
-			v1.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
-		}),
-		expectedOpts: nil,
-	}, {
-		msg: "Seccomp pod default",
-		config: makeConfig(map[string]string{
-			v1.SeccompPodAnnotationKey: "docker/default",
-		}),
-		expectedOpts: nil,
-	}}
-
-	for i, test := range tests {
-		opts, err := getSeccompSecurityOpts(containerName, test.config, "test/seccomp/profile/root", '=')
-		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
-		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
-		for _, opt := range test.expectedOpts {
-			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)
-		}
-	}
-}
-
-func TestLoadSeccompLocalhostProfiles(t *testing.T) {
-	containerName := "bar"
-	makeConfig := func(annotations map[string]string) *runtimeapi.PodSandboxConfig {
-		return makeSandboxConfigWithLabelsAndAnnotations("pod", "ns", "1234", 1, nil, annotations)
-	}
-
-	tests := []struct {
-		msg          string
-		config       *runtimeapi.PodSandboxConfig
-		expectedOpts []string
-		expectErr    bool
-	}{{
-		msg: "Seccomp localhost/test profile",
-		config: makeConfig(map[string]string{
-			v1.SeccompPodAnnotationKey: "localhost/test",
-		}),
-		expectedOpts: []string{`seccomp={"foo":"bar"}`},
-		expectErr:    false,
-	}, {
-		msg: "Seccomp localhost/sub/subtest profile",
-		config: makeConfig(map[string]string{
-			v1.SeccompPodAnnotationKey: "localhost/sub/subtest",
-		}),
-		expectedOpts: []string{`seccomp={"abc":"def"}`},
-		expectErr:    false,
-	}, {
-		msg: "Seccomp non-existent",
-		config: makeConfig(map[string]string{
-			v1.SeccompPodAnnotationKey: "localhost/non-existent",
-		}),
-		expectedOpts: nil,
-		expectErr:    true,
-	}}
-
-	profileRoot := path.Join("fixtures", "seccomp")
-	for i, test := range tests {
-		opts, err := getSeccompSecurityOpts(containerName, test.config, profileRoot, '=')
-		if test.expectErr {
-			assert.Error(t, err, fmt.Sprintf("TestCase[%d]: %s", i, test.msg))
-			continue
-		}
-		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
-		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
-		for _, opt := range test.expectedOpts {
-			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)
-		}
-	}
 }
 
 // TestGetApparmorSecurityOpts tests the logic of generating container apparmor options from sandbox annotations.
