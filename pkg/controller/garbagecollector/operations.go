@@ -69,7 +69,7 @@ func (gc *GarbageCollector) getObject(item objectReference) (*unstructured.Unstr
 	if err != nil {
 		return nil, err
 	}
-	return client.Resource(resource, item.Namespace).Get(item.Name)
+	return client.Resource(resource, item.Namespace).Get(item.Name, metav1.GetOptions{})
 }
 
 func (gc *GarbageCollector) updateObject(item objectReference, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {

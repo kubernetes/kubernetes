@@ -192,7 +192,7 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings pr
 		Namespaced: g.mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 		Kind:       g.mapping.GroupVersionKind.Kind,
 	}
-	obj, err := g.dynamic.Resource(apiResource, namespace).Get(name)
+	obj, err := g.dynamic.Resource(apiResource, namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

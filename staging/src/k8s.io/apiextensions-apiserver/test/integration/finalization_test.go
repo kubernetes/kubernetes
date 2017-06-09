@@ -55,7 +55,7 @@ func TestFinalization(t *testing.T) {
 
 	// Deleting something with a finalizer sets deletion timestamp to a not-nil value but does not
 	// remove the object from the API server. Here we read it to confirm this.
-	gottenNoxuInstance, err := noxuResourceClient.Get(name)
+	gottenNoxuInstance, err := noxuResourceClient.Get(name, metav1.GetOptions{})
 	require.NoError(t, err)
 
 	require.NotNil(t, gottenNoxuInstance.GetDeletionTimestamp())
@@ -79,7 +79,7 @@ func TestFinalization(t *testing.T) {
 		if !errors.IsConflict(err) {
 			require.NoError(t, err) // Fail on unexpected error
 		}
-		gottenNoxuInstance, err = noxuResourceClient.Get(name)
+		gottenNoxuInstance, err = noxuResourceClient.Get(name, metav1.GetOptions{})
 		require.NoError(t, err)
 	}
 
@@ -92,7 +92,7 @@ func TestFinalization(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that the object is actually gone.
-	_, err = noxuResourceClient.Get(name)
+	_, err = noxuResourceClient.Get(name, metav1.GetOptions{})
 	require.Error(t, err)
 	require.True(t, errors.IsNotFound(err), "%#v", err)
 }
