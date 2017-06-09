@@ -4,4 +4,4 @@
 
 For a client-go example using CustomResourceDefinitions, go to
 
-  http://github.com/kubernetes/apiextensions-apiserver/examples/client-go.
+  [k8s.io/apiextensions-apiserver/examples/client-go](https://git.k8s.io/apiextentions-apiserver/examples/client-go).
