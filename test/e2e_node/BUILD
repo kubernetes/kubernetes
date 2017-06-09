@@ -32,7 +32,7 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
-        "//pkg/kubelet/apis/cri/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/remote:go_default_library",

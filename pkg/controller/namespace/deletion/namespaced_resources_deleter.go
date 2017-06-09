@@ -340,8 +340,9 @@ func (d *namespacedResourcesDeleter) deleteCollection(
 	// namespace controller does not want the garbage collector to insert the orphan finalizer since it calls
 	// resource deletions generically.  it will ensure all resources in the namespace are purged prior to releasing
 	// namespace itself.
-	orphanDependents := false
-	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(&metav1.DeleteOptions{OrphanDependents: &orphanDependents}, metav1.ListOptions{})
+	background := metav1.DeletePropagationBackground
+	opts := &metav1.DeleteOptions{PropagationPolicy: &background}
+	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(opts, metav1.ListOptions{})
 
 	if err == nil {
 		return true, nil
@@ -417,7 +418,9 @@ func (d *namespacedResourcesDeleter) deleteEachItem(
 	}
 	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
 	for _, item := range unstructuredList.Items {
-		if err = dynamicClient.Resource(&apiResource, namespace).Delete(item.GetName(), nil); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
+		background := metav1.DeletePropagationBackground
+		opts := &metav1.DeleteOptions{PropagationPolicy: &background}
+		if err = dynamicClient.Resource(&apiResource, namespace).Delete(item.GetName(), opts); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
 			return err
 		}
 	}

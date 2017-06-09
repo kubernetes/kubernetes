@@ -140,7 +140,7 @@ var _ = framework.KubeDescribe("PodPreset", func() {
 		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
 
 		// check the annotation is there
-		if _, ok := pod.Annotations["podpreset.admission.kubernetes.io/hello"]; !ok {
+		if _, ok := pod.Annotations["podpreset.admission.kubernetes.io/podpreset-hello"]; !ok {
 			framework.Failf("Annotation not found in pod annotations: \n%v\n", pod.Annotations)
 		}
 
@@ -246,7 +246,7 @@ var _ = framework.KubeDescribe("PodPreset", func() {
 		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
 
 		// check the annotation is not there
-		if _, ok := pod.Annotations["podpreset.admission.kubernetes.io/hello"]; ok {
+		if _, ok := pod.Annotations["podpreset.admission.kubernetes.io/podpreset-hello"]; ok {
 			framework.Failf("Annotation found in pod annotations and should not be: \n%v\n", pod.Annotations)
 		}
 
