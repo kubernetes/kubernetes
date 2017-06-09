@@ -507,6 +507,16 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	glog.Infof("Hairpin mode set to %q", hairpinMode)
 
+	// TODO(#36485) Remove this workaround once we fix the init-container issue.
+	// Touch iptables lock file, which will be shared among all processes accessing
+	// the iptables.
+	f, err := os.OpenFile(utilipt.LockfilePath16x, os.O_CREATE, 0600)
+	if err != nil {
+		glog.Warningf("Failed to open iptables lock file: %v", err)
+	} else if err = f.Close(); err != nil {
+		glog.Warningf("Failed to close iptables lock file: %v", err)
+	}
+
 	if plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, crOptions.NetworkPluginName, &criNetworkHost{&networkHost{klet}, &network.NoopPortMappingGetter{}}, hairpinMode, kubeCfg.NonMasqueradeCIDR, int(crOptions.NetworkPluginMTU)); err != nil {
 		return nil, err
 	} else {
