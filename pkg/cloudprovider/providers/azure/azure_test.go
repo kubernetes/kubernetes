@@ -556,7 +556,7 @@ func TestProtocolTranslationTCP(t *testing.T) {
 	if *transportProto != network.TransportProtocolTCP {
 		t.Errorf("Expected TCP LoadBalancer Rule Protocol. Got %v", transportProto)
 	}
-	if *securityGroupProto != network.TCP {
+	if *securityGroupProto != network.SecurityRuleProtocolTCP {
 		t.Errorf("Expected TCP SecurityGroup Protocol. Got %v", transportProto)
 	}
 	if *probeProto != network.ProbeProtocolTCP {
@@ -570,7 +570,7 @@ func TestProtocolTranslationUDP(t *testing.T) {
 	if *transportProto != network.TransportProtocolUDP {
 		t.Errorf("Expected UDP LoadBalancer Rule Protocol. Got %v", transportProto)
 	}
-	if *securityGroupProto != network.UDP {
+	if *securityGroupProto != network.SecurityRuleProtocolUDP {
 		t.Errorf("Expected UDP SecurityGroup Protocol. Got %v", transportProto)
 	}
 	if probeProto != nil {
