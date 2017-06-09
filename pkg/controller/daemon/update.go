@@ -146,20 +146,6 @@ func (dsc *DaemonSetsController) constructHistory(ds *extensions.DaemonSet) (cur
 			}
 		}
 	}
-	// Label ds with current history's unique label as well
-	if ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey] != cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey] {
-		var clone interface{}
-		clone, err = api.Scheme.DeepCopy(ds)
-		if err != nil {
-			return nil, nil, err
-		}
-		toUpdate := clone.(*extensions.DaemonSet)
-		if toUpdate.Labels == nil {
-			toUpdate.Labels = make(map[string]string)
-		}
-		toUpdate.Labels[extensions.DefaultDaemonSetUniqueLabelKey] = cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
-		_, err = dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).UpdateStatus(toUpdate)
-	}
 	return cur, old, err
 }
 
