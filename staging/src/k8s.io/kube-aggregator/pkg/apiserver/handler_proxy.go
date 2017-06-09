@@ -19,10 +19,11 @@ package apiserver
 import (
 	"context"
 	"fmt"
-	"github.com/golang/glog"
 	"net/http"
 	"net/url"
 	"sync/atomic"
+
+	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -124,15 +125,13 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	newReq.Header = utilnet.CloneHeader(req.Header)
 	newReq.URL = location
 
-	var proxyRoundTripper http.RoundTripper
-	upgrade := false
-	proxyRoundTripper = handlingInfo.proxyRoundTripper
-	if proxyRoundTripper == nil {
+	if handlingInfo.proxyRoundTripper == nil {
 		http.Error(w, "", http.StatusNotFound)
 		return
 	}
+
 	// we need to wrap the roundtripper in another roundtripper which will apply the front proxy headers
-	proxyRoundTripper, upgrade, err = maybeWrapForConnectionUpgrades(handlingInfo.restConfig, proxyRoundTripper, req)
+	proxyRoundTripper, upgrade, err := maybeWrapForConnectionUpgrades(handlingInfo.restConfig, handlingInfo.proxyRoundTripper, req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -213,7 +212,7 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 		case *http.Transport:
 			transport.Dial = r.proxyTransport.Dial
 		default:
-			newInfo.transportBuildingError = fmt.Errorf("Unable to set dialer for %s as rest transport is of type %T", apiService.Spec.Service.Name, newInfo.proxyRoundTripper)
+			newInfo.transportBuildingError = fmt.Errorf("unable to set dialer for %s/%s as rest transport is of type %T", apiService.Spec.Service.Namespace, apiService.Spec.Service.Name, newInfo.proxyRoundTripper)
 			glog.Warning(newInfo.transportBuildingError.Error())
 		}
 	}
