@@ -69,6 +69,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet"
+	apitype "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -208,14 +209,14 @@ func getRemoteKubeletConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletD
 				return nil, err
 			}
 			// look for kubelet-<node-name> configmap from "kube-system"
-			configmap, err := kubeClient.CoreV1Client.ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", nodename), metav1.GetOptions{})
+			configmap, err := kubeClient.CoreV1Client.ConfigMaps(apitype.NamespaceSystem).Get(fmt.Sprintf("%s-%s",componentKubelet, nodename), metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
 			return configmap, nil
 		}
 		// No cloud provider yet, so can't get the nodename via Cloud.Instances().CurrentNodeName(hostname), try just using the hostname
-		configmap, err := kubeClient.CoreV1Client.ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", hostname), metav1.GetOptions{})
+		configmap, err := kubeClient.CoreV1Client.ConfigMaps(apitype.NamespaceSystem).Get(fmt.Sprintf("%s-%s",componentKubelet, hostname), metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("cloud provider was nil, and attempt to use hostname to find config resulted in: %v", err)
 		}
@@ -441,7 +442,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		if err != nil {
 			return err
 		}
-
+		
 		if s.BootstrapKubeconfig != "" {
 			if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
 				return err
