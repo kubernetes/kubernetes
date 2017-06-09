@@ -364,7 +364,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": `
                                 [
@@ -390,7 +390,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": `
                                 [
@@ -437,7 +437,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": `
                                 [
@@ -460,8 +460,8 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 				{
 					Ports: []v1.ContainerPort{
 						{
-							Name:        "default",
-							v1.Protocol: v1.ProtocolTCP,
+							Name:     "default",
+							Protocol: v1.ProtocolTCP,
 						},
 					},
 				},
@@ -545,7 +545,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			expected: []v1.Container{
 				{
 					LivenessProbe: &v1.Probe{
-						v1.Handler: v1.Handler{
+						Handler: v1.Handler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path:   "/",
 								Scheme: v1.URISchemeHTTP,
@@ -557,7 +557,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 						FailureThreshold: 3,
 					},
 					ReadinessProbe: &v1.Probe{
-						v1.Handler: v1.Handler{
+						Handler: v1.Handler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path:   "/",
 								Scheme: v1.URISchemeHTTP,
@@ -577,7 +577,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						v1.ObjectMeta: metav1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": `
                                 [
@@ -605,7 +605,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			},
 			expected: []v1.Container{
 				{
-					v1.Lifecycle: &v1.Lifecycle{
+					Lifecycle: &v1.Lifecycle{
 						PostStart: &v1.Handler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path:   "/",
@@ -899,7 +899,7 @@ func TestSetDefaulServiceExternalTraffic(t *testing.T) {
 
 	in = &v1.Service{
 		Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
-		v1.ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficLocal},
 		},
 	}
