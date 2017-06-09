@@ -175,6 +175,7 @@ pkg/cloudprovider/providers/cloudstack
 pkg/controller/volume/attachdetach/cache
 pkg/controller/volume/attachdetach/populator
 pkg/controller/volume/attachdetach/reconciler
+pkg/controller/volume/attachdetach/util
 pkg/conversion
 pkg/conversion/queryparams
 pkg/credentialprovider/aws
