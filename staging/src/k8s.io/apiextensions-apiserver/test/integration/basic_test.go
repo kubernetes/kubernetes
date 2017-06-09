@@ -142,7 +142,7 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 		t.Errorf("missing watch event")
 	}
 
-	gottenNoxuInstance, err := noxuResourceClient.Get("foo")
+	gottenNoxuInstance, err := noxuResourceClient.Get("foo", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
