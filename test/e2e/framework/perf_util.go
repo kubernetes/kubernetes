@@ -71,9 +71,10 @@ func PodStartupLatencyToPerfData(latency *PodStartupLatency) *perftype.PerfData 
 	return perfData
 }
 
-// currentKubeletPerfMetricsVersion is the current kubelet performance metrics version. We should
-// bump up the version each time we make incompatible change to the metrics.
-const currentKubeletPerfMetricsVersion = "v2"
+// CurrentKubeletPerfMetricsVersion is the current kubelet performance metrics
+// version. This is used by mutiple perf related data structures. We should
+// bump up the version each time we make an incompatible change to the metrics.
+const CurrentKubeletPerfMetricsVersion = "v2"
 
 // ResourceUsageToPerfData transforms ResourceUsagePerNode to PerfData. Notice that this function
 // only cares about memory usage, because cpu usage information will be extracted from NodesCPUSummary.
@@ -119,7 +120,7 @@ func ResourceUsageToPerfDataWithLabels(usagePerNode ResourceUsagePerNode, labels
 		}
 	}
 	return &perftype.PerfData{
-		Version:   currentKubeletPerfMetricsVersion,
+		Version:   CurrentKubeletPerfMetricsVersion,
 		DataItems: items,
 		Labels:    labels,
 	}
@@ -149,7 +150,7 @@ func CPUUsageToPerfDataWithLabels(usagePerNode NodesCPUSummary, labels map[strin
 		}
 	}
 	return &perftype.PerfData{
-		Version:   currentKubeletPerfMetricsVersion,
+		Version:   CurrentKubeletPerfMetricsVersion,
 		DataItems: items,
 		Labels:    labels,
 	}
