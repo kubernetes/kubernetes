@@ -32,10 +32,6 @@ spec:
               value: "true"
             - name: CALICO_NETWORKING_BACKEND
               value: "none"
-            - name: CALICO_IPV4POOL_CIDR
-              value: "__CLUSTER_CIDR__"
-            - name: CALICO_IPV4POOL_IPIP
-              value: "off"
             - name: DATASTORE_TYPE
               value: "kubernetes"
             - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
@@ -48,6 +44,8 @@ spec:
               value: "true"
             - name: IP
               value: ""
+            - name: NO_DEFAULT_POOLS
+              value: "true"
             - name: NODENAME
               valueFrom:
                 fieldRef:
