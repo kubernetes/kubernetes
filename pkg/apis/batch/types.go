@@ -244,6 +244,11 @@ type CronJobSpec struct {
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	Schedule string
 
+	// The time zone to be used when scheduling the job given the schedule specified above.
+	// Valid options include anything in the IANA Time Zone database.
+	// +optional
+	TimeZone string
+
 	// Optional deadline in seconds for starting the job if it misses scheduled
 	// time for any reason.  Missed jobs executions will be counted as failed ones.
 	// +optional

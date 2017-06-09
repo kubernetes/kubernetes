@@ -376,3 +376,69 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		}
 	}
 }
+
+func TestGetCurrentTimeInZone(t *testing.T) {
+	var one int64 = 1
+	var no bool = false
+
+	sj := batchv2alpha1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mycronjob",
+			Namespace: "snazzycats",
+			UID:       types.UID("1a2b3c"),
+			SelfLink:  "/apis/batch/v1/namespaces/snazzycats/jobs/mycronjob",
+		},
+		Spec: batchv2alpha1.CronJobSpec{
+			Schedule:          "* * * * ?",
+			ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
+			JobTemplate: batchv2alpha1.JobTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{"a": "b"},
+					Annotations: map[string]string{"x": "y"},
+				},
+				Spec: batchv1.JobSpec{
+					ActiveDeadlineSeconds: &one,
+					ManualSelector:        &no,
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{Image: "foo/bar"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	timeInZone, err := getCurrentTimeInZone(&sj)
+	if err != nil {
+		t.Error("Unexpected error ", err)
+	}
+	tz, _ := timeInZone.Zone()
+	localTZ, _ := time.Now().Zone()
+	if tz != localTZ {
+		t.Errorf("TimeZone = %#v, want %#v", tz, localTZ)
+	}
+
+	sj.Spec.TimeZone = "America/Chicago"
+	timeInZone, err = getCurrentTimeInZone(&sj)
+	if err != nil {
+		t.Error("Unexpected error ", err)
+	}
+	tz, _ = timeInZone.Zone()
+	if tz != "CST" && tz != "CDT" {
+		t.Errorf("TimeZone = %#v, want %#v", tz, "CST/CDT")
+	}
+
+	sj.Spec.TimeZone = "Mars/Olympus_Mons"
+	_, err = getCurrentTimeInZone(&sj)
+	if err == nil {
+		t.Error("Expected error, but got none")
+	}
+}
