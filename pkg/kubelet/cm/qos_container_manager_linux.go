@@ -148,10 +148,7 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 			// we only care about the burstable qos tier
 			continue
 		}
-		req, _, err := resource.PodRequestsAndLimits(pod)
-		if err != nil {
-			return err
-		}
+		req, _ := resource.PodRequestsAndLimits(pod)
 		if request, found := req[v1.ResourceCPU]; found {
 			burstablePodCPURequest += request.MilliValue()
 		}
@@ -188,11 +185,7 @@ func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*C
 			// limits are not set for Best Effort pods
 			continue
 		}
-		req, _, err := resource.PodRequestsAndLimits(pod)
-		if err != nil {
-			glog.V(2).Infof("[Container Manager] Pod resource requests/limits could not be determined.  Not setting QOS memory limts.")
-			return
-		}
+		req, _ := resource.PodRequestsAndLimits(pod)
 		if request, found := req[v1.ResourceMemory]; found {
 			podMemoryRequest += request.Value()
 		}
