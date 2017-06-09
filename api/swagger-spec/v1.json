@@ -18502,11 +18502,11 @@
     "properties": {
      "machineID": {
       "type": "string",
-      "description": "MachineID reported by the node. For unique machine identification in the cluster this field is prefered. Learn more from man(5) machine-id: http://man7.org/linux/man-pages/man5/machine-id.5.html"
+      "description": "MachineID reported by the node. For unique machine identification in the cluster this field is preferred. Learn more from man(5) machine-id: http://man7.org/linux/man-pages/man5/machine-id.5.html"
      },
      "systemUUID": {
       "type": "string",
-      "description": "SystemUUID reported by the node. For unique machine identification MachineID is prefered. This field is specific to Red Hat hosts https://access.redhat.com/documentation/en-US/Red_Hat_Subscription_Management/1/html/RHSM/getting-system-uuid.html"
+      "description": "SystemUUID reported by the node. For unique machine identification MachineID is preferred. This field is specific to Red Hat hosts https://access.redhat.com/documentation/en-US/Red_Hat_Subscription_Management/1/html/RHSM/getting-system-uuid.html"
      },
      "bootID": {
       "type": "string",
@@ -20889,7 +20889,7 @@
       "items": {
        "type": "string"
       },
-      "description": "Hostnames for the the above IP address."
+      "description": "Hostnames for the above IP address."
      }
     }
    },
