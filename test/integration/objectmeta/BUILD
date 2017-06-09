@@ -9,7 +9,11 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["objectmeta_test.go"],
+    size = "large",
+    srcs = [
+        "main_test.go",
+        "objectmeta_test.go",
+    ],
     tags = [
         "automanaged",
         "integration",
