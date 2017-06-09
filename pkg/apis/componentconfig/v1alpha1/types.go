@@ -139,11 +139,6 @@ type KubeProxyConfiguration struct {
 // userspace proxy.
 type ProxyMode string
 
-const (
-	ProxyModeUserspace ProxyMode = "userspace"
-	ProxyModeIPTables  ProxyMode = "iptables"
-)
-
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -575,8 +570,6 @@ type KubeletAuthorizationMode string
 const (
 	// KubeletAuthorizationModeAlwaysAllow authorizes all authenticated requests
 	KubeletAuthorizationModeAlwaysAllow KubeletAuthorizationMode = "AlwaysAllow"
-	// KubeletAuthorizationModeWebhook uses the SubjectAccessReview API to determine authorization
-	KubeletAuthorizationModeWebhook KubeletAuthorizationMode = "Webhook"
 )
 
 type KubeletAuthorization struct {
