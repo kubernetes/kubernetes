@@ -32,24 +32,24 @@ import (
 var groupResource = rbac.Resource("rolebindings")
 
 type Storage struct {
-	rest.StandardStorage
+	rbacregistry.Registry
 
 	authorizer authorizer.Authorizer
 
 	ruleResolver rbacregistryvalidation.AuthorizationRuleResolver
 }
 
-func NewStorage(s rest.StandardStorage, authorizer authorizer.Authorizer, ruleResolver rbacregistryvalidation.AuthorizationRuleResolver) *Storage {
-	return &Storage{s, authorizer, ruleResolver}
+func NewStorage(r rbacregistry.Registry, authorizer authorizer.Authorizer, ruleResolver rbacregistryvalidation.AuthorizationRuleResolver) *Storage {
+	return &Storage{r, authorizer, ruleResolver}
 }
 
 func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
-		return s.StandardStorage.Create(ctx, obj, includeUninitialized)
+		return s.Registry.Create(ctx, obj, includeUninitialized)
 	}
 
 	// Get the namespace from the context (populated from the URL).
-	// The namespace in the object can be empty until StandardStorage.Create()->BeforeCreate() populates it from the context.
+	// The namespace in the object can be empty until store.Create()->BeforeCreate() populates it from the context.
 	namespace, ok := genericapirequest.NamespaceFrom(ctx)
 	if !ok {
 		return nil, errors.NewBadRequest("namespace is required")
@@ -57,7 +57,7 @@ func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object, incl
 
 	roleBinding := obj.(*rbac.RoleBinding)
 	if rbacregistry.BindingAuthorized(ctx, roleBinding.RoleRef, namespace, s.authorizer) {
-		return s.StandardStorage.Create(ctx, obj, includeUninitialized)
+		return s.Registry.Create(ctx, obj, includeUninitialized)
 	}
 
 	rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, namespace)
@@ -67,17 +67,17 @@ func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object, incl
 	if err := rbacregistryvalidation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
 		return nil, errors.NewForbidden(groupResource, roleBinding.Name, err)
 	}
-	return s.StandardStorage.Create(ctx, obj, includeUninitialized)
+	return s.Registry.Create(ctx, obj, includeUninitialized)
 }
 
 func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
-		return s.StandardStorage.Update(ctx, name, obj)
+		return s.Registry.Update(ctx, name, obj)
 	}
 
 	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
 		// Get the namespace from the context (populated from the URL).
-		// The namespace in the object can be empty until StandardStorage.Update()->BeforeUpdate() populates it from the context.
+		// The namespace in the object can be empty until store.Update()->BeforeUpdate() populates it from the context.
 		namespace, ok := genericapirequest.NamespaceFrom(ctx)
 		if !ok {
 			return nil, errors.NewBadRequest("namespace is required")
@@ -106,5 +106,5 @@ func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.Up
 		return obj, nil
 	})
 
-	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo)
+	return s.Registry.Update(ctx, name, nonEscalatingInfo)
 }
