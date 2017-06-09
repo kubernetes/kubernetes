@@ -18,7 +18,7 @@ FROM ubuntu:16.04
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get -qq update
-RUN apt-get install -qq pciutils gcc g++ git make dpkg-dev bc module-init-tools curl 
+RUN apt-get install -qq pciutils gcc g++ git make dpkg-dev bc module-init-tools curl
 
 RUN mkdir /lakitu-kernel
 RUN git clone https://chromium.googlesource.com/chromiumos/third_party/kernel /lakitu-kernel

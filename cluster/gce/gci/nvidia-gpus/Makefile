@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG?=v0.1
+TAG?=v0.2
 REGISTRY?=gcr.io/google_containers
 IMAGE=cos-nvidia-driver-install
 
@@ -21,7 +21,7 @@ all: container
 container:
 	docker build --pull -t ${REGISTRY}/${IMAGE}:${TAG} .
 
-push: 
+push:
 	gcloud docker -- push ${REGISTRY}/${IMAGE}:${TAG}
 
 .PHONY: all container push
