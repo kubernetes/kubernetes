@@ -42,7 +42,7 @@ The Workspace ID and Primary Key can be found inside the OMS Portal under Settin
 Run the following command to deploy the OMS agent to your Kubernetes nodes:
 
 ```
-kubectl -f omsagent-daemonset.yaml 
+kubectl create -f omsagent-daemonset.yaml 
 ```
 
 ## Step 4
