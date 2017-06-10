@@ -141,7 +141,7 @@ func TestMultipleResourceInstances(t *testing.T) {
 	}
 
 	for key, val := range instances {
-		gottenNoxuInstace, err := noxuNamespacedResourceClient.Get(key)
+		gottenNoxuInstace, err := noxuNamespacedResourceClient.Get(key, metav1.GetOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -217,7 +217,7 @@ func TestMultipleRegistration(t *testing.T) {
 		t.Fatalf("unable to create noxu Instance:%v", err)
 	}
 
-	gottenNoxuInstance, err := noxuNamespacedResourceClient.Get(sameInstanceName)
+	gottenNoxuInstance, err := noxuNamespacedResourceClient.Get(sameInstanceName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ func TestMultipleRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create noxu Instance:%v", err)
 	}
-	gottenCurletInstance, err := curletNamespacedResourceClient.Get(sameInstanceName)
+	gottenCurletInstance, err := curletNamespacedResourceClient.Get(sameInstanceName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +244,7 @@ func TestMultipleRegistration(t *testing.T) {
 	}
 
 	// now re-GET noxu
-	gottenNoxuInstance2, err := noxuNamespacedResourceClient.Get(sameInstanceName)
+	gottenNoxuInstance2, err := noxuNamespacedResourceClient.Get(sameInstanceName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +280,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		if _, err = noxuNamespacedResourceClient.List(metav1.ListOptions{}); err == nil || !errors.IsNotFound(err) {
 			t.Fatalf("expected a NotFound error, got:%v", err)
 		}
-		if _, err = noxuNamespacedResourceClient.Get("foo"); err == nil || !errors.IsNotFound(err) {
+		if _, err = noxuNamespacedResourceClient.Get("foo", metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
 			t.Fatalf("expected a NotFound error, got:%v", err)
 		}
 	}()
@@ -298,7 +298,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = noxuNamespacedResourceClient.Get(sameInstanceName); err == nil || !errors.IsNotFound(err) {
+		if _, err = noxuNamespacedResourceClient.Get(sameInstanceName, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
 			t.Fatalf("expected a NotFound error, got:%v", err)
 		}
 		if e, a := 0, len(initialList.(*unstructured.UnstructuredList).Items); e != a {
@@ -308,7 +308,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		gottenNoxuInstance, err := noxuNamespacedResourceClient.Get(sameInstanceName)
+		gottenNoxuInstance, err := noxuNamespacedResourceClient.Get(sameInstanceName, metav1.GetOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -329,7 +329,7 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		if err := noxuNamespacedResourceClient.Delete(sameInstanceName, nil); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = noxuNamespacedResourceClient.Get(sameInstanceName); err == nil || !errors.IsNotFound(err) {
+		if _, err = noxuNamespacedResourceClient.Get(sameInstanceName, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
 			t.Fatalf("expected a NotFound error, got:%v", err)
 		}
 		listWithoutItem, err := noxuNamespacedResourceClient.List(metav1.ListOptions{})

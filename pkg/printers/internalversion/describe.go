@@ -192,7 +192,7 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings pr
 		Namespaced: g.mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 		Kind:       g.mapping.GroupVersionKind.Kind,
 	}
-	obj, err := g.dynamic.Resource(apiResource, namespace).Get(name)
+	obj, err := g.dynamic.Resource(apiResource, namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -742,6 +742,8 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printScaleIOVolumeSource(volume.VolumeSource.ScaleIO, w)
 		case volume.VolumeSource.CephFS != nil:
 			printCephFSVolumeSource(volume.VolumeSource.CephFS, w)
+		case volume.VolumeSource.StorageOS != nil:
+			printStorageOSVolumeSource(volume.VolumeSource.StorageOS, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -940,6 +942,24 @@ func printCephFSVolumeSource(cephfs *api.CephFSVolumeSource, w PrefixWriter) {
 		cephfs.Monitors, cephfs.Path, cephfs.User, cephfs.SecretFile, cephfs.SecretRef, cephfs.ReadOnly)
 }
 
+func printStorageOSVolumeSource(storageos *api.StorageOSVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tStorageOS (a StorageOS Persistent Disk resource)\n"+
+		"    VolumeName:\t%v\n"+
+		"    VolumeNamespace:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		storageos.VolumeName, storageos.VolumeNamespace, storageos.FSType, storageos.ReadOnly)
+}
+
+func printStorageOSPersistentVolumeSource(storageos *api.StorageOSPersistentVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tStorageOS (a StorageOS Persistent Disk resource)\n"+
+		"    VolumeName:\t%v\n"+
+		"    VolumeNamespace:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		storageos.VolumeName, storageos.VolumeNamespace, storageos.FSType, storageos.ReadOnly)
+}
+
 type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
@@ -1013,6 +1033,8 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 			printLocalVolumeSource(pv.Spec.Local, w)
 		case pv.Spec.CephFS != nil:
 			printCephFSVolumeSource(pv.Spec.CephFS, w)
+		case pv.Spec.StorageOS != nil:
+			printStorageOSPersistentVolumeSource(pv.Spec.StorageOS, w)
 		}
 
 		if events != nil {

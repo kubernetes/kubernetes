@@ -191,7 +191,7 @@ func TestGet(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource, tc.namespace).Get(tc.name)
+		got, err := cl.Resource(resource, tc.namespace).Get(tc.name, metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when getting %q: %v", tc.name, err)
 			continue

@@ -73,11 +73,13 @@ func fakePodWithVol(namespace string) *v1.Pod {
 	return fakePod
 }
 
+type podCountFunc func(int) bool
+
 // Via integration test we can verify that if pod delete
 // event is somehow missed by AttachDetach controller - it still
 // gets cleaned up by Desired State of World populator.
 func TestPodDeletionWithDswp(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(nil)
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer closeFn()
 	namespaceName := "test-pod-deletion"
 
@@ -94,7 +96,6 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, server, t)
 
 	testClient, ctrl, informers := createAdClients(ns, t, server, defaultSyncPeriod)
-
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
@@ -130,7 +131,6 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	}
 
 	waitForPodsInDSWP(t, ctrl.GetDesiredStateOfWorld())
-
 	// let's stop pod events from getting triggered
 	close(podStopCh)
 	err = podInformer.GetStore().Delete(podInformerObj)
@@ -140,17 +140,12 @@ func TestPodDeletionWithDswp(t *testing.T) {
 
 	waitToObservePods(t, podInformer, 0)
 	// the populator loop turns every 1 minute
-	time.Sleep(80 * time.Second)
-	podsToAdd := ctrl.GetDesiredStateOfWorld().GetPodToAdd()
-	if len(podsToAdd) != 0 {
-		t.Fatalf("All pods should have been removed")
-	}
-
+	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 80*time.Second, "expected 0 pods in dsw after pod delete", 0)
 	close(stopCh)
 }
 
 func TestPodUpdateWithWithADC(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(nil)
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer closeFn()
 	namespaceName := "test-pod-update"
 
@@ -210,18 +205,14 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
-	time.Sleep(20 * time.Second)
-	podsToAdd := ctrl.GetDesiredStateOfWorld().GetPodToAdd()
-	if len(podsToAdd) != 0 {
-		t.Fatalf("All pods should have been removed")
-	}
+	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 20*time.Second, "expected 0 pods in dsw after pod completion", 0)
 
 	close(podStopCh)
 	close(stopCh)
 }
 
 func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(nil)
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer closeFn()
 	namespaceName := "test-pod-update"
 
@@ -282,11 +273,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
-	time.Sleep(20 * time.Second)
-	podsToAdd := ctrl.GetDesiredStateOfWorld().GetPodToAdd()
-	if len(podsToAdd) == 0 {
-		t.Fatalf("The pod should not be removed if KeepTerminatedPodVolumesAnnotation is set")
-	}
+	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 20*time.Second, "expected non-zero pods in dsw if KeepTerminatedPodVolumesAnnotation is set", 1)
 
 	close(podStopCh)
 	close(stopCh)
@@ -318,6 +305,19 @@ func waitForPodsInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld) {
 		return false, nil
 	}); err != nil {
 		t.Fatalf("Pod not added to desired state of world : %v", err)
+	}
+}
+
+// wait for pods to be observed in desired state of world
+func waitForPodFuncInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld, checkTimeout time.Duration, failMessage string, podCount int) {
+	if err := wait.Poll(time.Millisecond*500, checkTimeout, func() (bool, error) {
+		pods := dswp.GetPodToAdd()
+		if len(pods) == podCount {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("%s but got error %v", failMessage, err)
 	}
 }
 
@@ -368,7 +368,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 // event is somehow missed by AttachDetach controller - it still
 // gets added by Desired State of World populator.
 func TestPodAddedByDswp(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(nil)
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer closeFn()
 	namespaceName := "test-pod-deletion"
 
@@ -440,12 +440,9 @@ func TestPodAddedByDswp(t *testing.T) {
 	}
 
 	waitToObservePods(t, podInformer, 2)
+
 	// the findAndAddActivePods loop turns every 3 minute
-	time.Sleep(200 * time.Second)
-	podsToAdd := ctrl.GetDesiredStateOfWorld().GetPodToAdd()
-	if len(podsToAdd) != 2 {
-		t.Fatalf("DSW should have two pods")
-	}
+	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 200*time.Second, "expected 2 pods in dsw after pod addition", 2)
 
 	close(stopCh)
 }
