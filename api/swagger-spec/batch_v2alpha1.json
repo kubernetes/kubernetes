@@ -3670,7 +3670,8 @@
     "id": "v1.Container",
     "description": "A single application container that you want to run within a pod.",
     "required": [
-     "name"
+     "name",
+     "image"
     ],
     "properties": {
      "name": {
