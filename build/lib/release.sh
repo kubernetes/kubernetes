@@ -324,7 +324,7 @@ function kube::release::create_docker_images_for_server() {
 
         kube::log::status "Deleting docker image ${docker_image_tag}"
         "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
-      ) &
+      )
     done
 
     kube::util::wait-for-jobs || { kube::log::error "previous Docker build failed"; return 1; }
