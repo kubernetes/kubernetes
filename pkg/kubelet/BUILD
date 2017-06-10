@@ -111,6 +111,7 @@ go_library(
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
+        "//pkg/volume/validation:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",

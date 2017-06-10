@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -627,7 +627,10 @@ func validateHostPathVolumeSource(hostPath *api.HostPathVolumeSource, fldPath *f
 	allErrs := field.ErrorList{}
 	if len(hostPath.Path) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+		return allErrs
 	}
+
+	allErrs = append(allErrs, validatePathNoBacksteps(hostPath.Path, fldPath.Child("path"))...)
 	return allErrs
 }
 
@@ -958,8 +961,18 @@ func validateLocalDescendingPath(targetPath string, fldPath *field.Path) field.E
 		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must be a relative path"))
 	}
 
-	// TODO: this assumes the OS of apiserver & nodes are the same
-	parts := strings.Split(targetPath, string(os.PathSeparator))
+	allErrs = append(allErrs, validatePathNoBacksteps(targetPath, fldPath)...)
+
+	return allErrs
+}
+
+// validatePathNoBacksteps makes sure the targetPath does not have any `..` path elements when split
+//
+// This assumes the OS of the apiserver and the nodes are the same. The same check should be done
+// on the node to ensure there are no backsteps.
+func validatePathNoBacksteps(targetPath string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	parts := strings.Split(filepath.ToSlash(targetPath), "/")
 	for _, item := range parts {
 		if item == ".." {
 			allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not contain '..'"))
