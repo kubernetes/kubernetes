@@ -342,8 +342,7 @@ func (rc *ResourceConsumer) GetReplicas() int {
 	return 0
 }
 
-func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) {
-	duration := 15 * time.Minute
+func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int, duration time.Duration) {
 	interval := 20 * time.Second
 	err := wait.PollImmediate(interval, duration, func() (bool, error) {
 		replicas := rc.GetReplicas()
