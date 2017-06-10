@@ -94,6 +94,30 @@ parameters:
 
 For a complete example refer ([Portworx Volume docs](../volumes/portworx/README.md))
 
+#### StorageOS
+
+```yaml
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: sc-fast
+provisioner: kubernetes.io/storageos
+parameters:
+  pool: default
+  description: Kubernetes volume
+  fsType: ext4
+  adminSecretNamespace: default
+  adminSecretName: storageos-secret
+```
+
+*  `pool`: The name of the StorageOS distributed capacity pool to provision the volume from.  Uses the `default` pool which is normally present if not specified.
+*  `description`: The description to assign to volumes that were created dynamically.  All volume descriptions will be the same for the storage class, but different storage classes can be used to allow descriptions for different use cases.  Defaults to `Kubernetes volume`.
+*  `fsType`: The default filesystem type to request.  Note that user-defined rules within StorageOS may override this value.  Defaults to `ext4`.
+*  `adminSecretNamespace`: The namespace where the API configuration secret is located. Required if adminSecretName set.
+*  `adminSecretName`: The name of the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted.
+
+For a complete example refer to the ([StorageOS example](../../volumes/storageos/README.md))
+
 #### GLUSTERFS
 
 ```yaml

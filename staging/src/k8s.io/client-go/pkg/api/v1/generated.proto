@@ -2222,6 +2222,11 @@ message PersistentVolumeSource {
   // Local represents directly-attached storage with node affinity
   // +optional
   optional LocalVolumeSource local = 20;
+
+  // StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
+  // +optional
+  optional StorageOSPersistentVolumeSource storageos = 21;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -3760,6 +3765,70 @@ message ServiceStatus {
   optional LoadBalancerStatus loadBalancer = 1;
 }
 
+// Represents a StorageOS persistent volume resource.
+message StorageOSPersistentVolumeSource {
+  // VolumeName is the human-readable name of the StorageOS volume.  Volume
+  // names are only unique within a namespace.
+  optional string volumeName = 1;
+
+  // VolumeNamespace specifies the scope of the volume within StorageOS.  If no
+  // namespace is specified then the Pod's namespace will be used.  This allows the
+  // Kubernetes name scoping to be mirrored within StorageOS for tighter integration.
+  // Set VolumeName to any name to override the default behaviour.
+  // Set to "default" if you are not using namespaces within StorageOS.
+  // Namespaces that do not pre-exist within StorageOS will be created.
+  // +optional
+  optional string volumeNamespace = 2;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
+  optional string fsType = 3;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  optional bool readOnly = 4;
+
+  // SecretRef specifies the secret to use for obtaining the StorageOS API
+  // credentials.  If not specified, default values will be attempted.
+  // +optional
+  optional ObjectReference secretRef = 5;
+}
+
+// Represents a StorageOS persistent volume resource.
+message StorageOSVolumeSource {
+  // VolumeName is the human-readable name of the StorageOS volume.  Volume
+  // names are only unique within a namespace.
+  optional string volumeName = 1;
+
+  // VolumeNamespace specifies the scope of the volume within StorageOS.  If no
+  // namespace is specified then the Pod's namespace will be used.  This allows the
+  // Kubernetes name scoping to be mirrored within StorageOS for tighter integration.
+  // Set VolumeName to any name to override the default behaviour.
+  // Set to "default" if you are not using namespaces within StorageOS.
+  // Namespaces that do not pre-exist within StorageOS will be created.
+  // +optional
+  optional string volumeNamespace = 2;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
+  optional string fsType = 3;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  optional bool readOnly = 4;
+
+  // SecretRef specifies the secret to use for obtaining the StorageOS API
+  // credentials.  If not specified, default values will be attempted.
+  // +optional
+  optional LocalObjectReference secretRef = 5;
+}
+
 // Sysctl defines a kernel parameter to be set
 message Sysctl {
   // Name of a property to set
@@ -4011,6 +4080,10 @@ message VolumeSource {
   // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
   // +optional
   optional ScaleIOVolumeSource scaleIO = 25;
+
+  // StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
+  // +optional
+  optional StorageOSVolumeSource storageos = 27;
 }
 
 // Represents a vSphere volume resource.
