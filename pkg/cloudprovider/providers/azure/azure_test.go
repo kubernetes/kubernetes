@@ -608,15 +608,20 @@ func TestNewCloudFromJSON(t *testing.T) {
 
 // Test Backoff and Rate Limit defaults (json)
 func TestCloudDefaultConfigFromJSON(t *testing.T) {
-	config := `{}`
+	config := `{
+                "aadClientId": "--aad-client-id--",
+                "aadClientSecret": "--aad-client-secret--"
+        }`
 
 	validateEmptyConfig(t, config)
 }
 
 // Test Backoff and Rate Limit defaults (yaml)
 func TestCloudDefaultConfigFromYAML(t *testing.T) {
-	config := ``
-
+	config := `
+aadClientId: --aad-client-id--
+aadClientSecret: --aad-client-secret--
+`
 	validateEmptyConfig(t, config)
 }
 
