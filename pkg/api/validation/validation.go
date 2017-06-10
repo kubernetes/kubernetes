@@ -2865,6 +2865,22 @@ func ValidateService(service *api.Service) field.ErrorList {
 		nodePorts[key] = true
 	}
 
+	// Check for duplicate TargetPort
+	portsPath = specPath.Child("ports")
+	targetPorts := make(map[api.ServicePort]bool)
+	for i, port := range service.Spec.Ports {
+		if (port.TargetPort.Type == intstr.Int && port.TargetPort.IntVal == 0) || (port.TargetPort.Type == intstr.String && port.TargetPort.StrVal == "") {
+			continue
+		}
+		portPath := portsPath.Index(i)
+		key := api.ServicePort{Protocol: port.Protocol, TargetPort: port.TargetPort}
+		_, found := targetPorts[key]
+		if found {
+			allErrs = append(allErrs, field.Duplicate(portPath.Child("targetPort"), port.TargetPort))
+		}
+		targetPorts[key] = true
+	}
+
 	// Validate SourceRange field and annotation
 	_, ok := service.Annotations[api.AnnotationLoadBalancerSourceRangesKey]
 	if len(service.Spec.LoadBalancerSourceRanges) > 0 || ok {
