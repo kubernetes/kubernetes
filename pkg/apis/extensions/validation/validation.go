@@ -19,6 +19,7 @@ package validation
 import (
 	"fmt"
 	"net"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -718,6 +719,7 @@ func ValidatePodSecurityPolicySpec(spec *extensions.PodSecurityPolicySpec, fldPa
 	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(fldPath, spec.Volumes)...)
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.DefaultAddCapabilities, field.NewPath("defaultAddCapabilities"))...)
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.AllowedCapabilities, field.NewPath("allowedCapabilities"))...)
+	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
 
 	return allErrs
 }
@@ -912,6 +914,24 @@ func validatePSPCapsAgainstDrops(requiredDrops []api.Capability, capsToCheck []a
 				fmt.Sprintf("capability is listed in %s and requiredDropCapabilities", fldPath.String())))
 		}
 	}
+	return allErrs
+}
+
+// validatePSPAllowedHostPaths makes sure all allowed host paths follow:
+// 1. does not have any element which is ".."
+func validatePSPAllowedHostPaths(fldPath *field.Path, allowedHostPaths []string) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for i, targetPath := range allowedHostPaths {
+		parts := strings.Split(filepath.ToSlash(targetPath), "/")
+		for _, item := range parts {
+			if item == ".." {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), targetPath, "must not contain '..'"))
+				break // even for `../../..`, one error is sufficient to make the point
+			}
+		}
+	}
+
 	return allErrs
 }
 
