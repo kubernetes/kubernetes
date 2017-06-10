@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutil "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -60,10 +61,19 @@ var (
 )
 
 var _ = framework.KubeDescribe("Deployment", func() {
+	var ns string
+	var c clientset.Interface
+
+	AfterEach(func() {
+		failureTrap(c, ns)
+	})
+
 	f := framework.NewDefaultFramework("deployment")
 
-	// TODO: Add failure traps once we have JustAfterEach
-	// See https://github.com/onsi/ginkgo/issues/303
+	BeforeEach(func() {
+		c = f.ClientSet
+		ns = f.Namespace.Name
+	})
 
 	It("deployment reaping should cascade to its replica sets and pods", func() {
 		testDeleteDeployment(f)
@@ -116,6 +126,30 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
 })
+
+func failureTrap(c clientset.Interface, ns string) {
+	deployments, err := c.Extensions().Deployments(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	if err != nil {
+		framework.Logf("Could not list Deployments in namespace %q: %v", ns, err)
+		return
+	}
+	for i := range deployments.Items {
+		d := deployments.Items[i]
+
+		framework.Logf(spew.Sprintf("Deployment %q:\n%+v\n", d.Name, d))
+		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(&d, c)
+		if err != nil {
+			framework.Logf("Could not list ReplicaSets for Deployment %q: %v", d.Name, err)
+			return
+		}
+		testutil.LogReplicaSetsOfDeployment(&d, allOldRSs, newRS, framework.Logf)
+		rsList := allOldRSs
+		if newRS != nil {
+			rsList = append(rsList, newRS)
+		}
+		testutil.LogPodsOfDeployment(c, &d, rsList, framework.Logf)
+	}
+}
 
 func intOrStrP(num int) *intstr.IntOrString {
 	intstr := intstr.FromInt(num)

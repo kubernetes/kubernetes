@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -34,15 +36,15 @@ type LogfFn func(format string, args ...interface{})
 
 func LogReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, logf LogfFn) {
 	if newRS != nil {
-		logf("New ReplicaSet of Deployment %s:\n%+v", deployment.Name, *newRS)
+		logf(spew.Sprintf("New ReplicaSet %q of Deployment %q:\n%+v", newRS.Name, deployment.Name, *newRS))
 	} else {
-		logf("New ReplicaSet of Deployment %s is nil.", deployment.Name)
+		logf("New ReplicaSet of Deployment %q is nil.", deployment.Name)
 	}
 	if len(allOldRSs) > 0 {
-		logf("All old ReplicaSets of Deployment %s:", deployment.Name)
+		logf("All old ReplicaSets of Deployment %q:", deployment.Name)
 	}
 	for i := range allOldRSs {
-		logf("%+v", *allOldRSs[i])
+		logf(spew.Sprintf("%+v", *allOldRSs[i]))
 	}
 }
 
@@ -53,9 +55,8 @@ func LogPodsOfDeployment(c clientset.Interface, deployment *extensions.Deploymen
 	}
 
 	podList, err := deploymentutil.ListPods(deployment, rsList, podListFunc)
-
 	if err != nil {
-		logf("Failed to list Pods of Deployment %s: %v", deployment.Name, err)
+		logf("Failed to list Pods of Deployment %q: %v", deployment.Name, err)
 		return
 	}
 	for _, pod := range podList.Items {
@@ -63,7 +64,7 @@ func LogPodsOfDeployment(c clientset.Interface, deployment *extensions.Deploymen
 		if podutil.IsPodAvailable(&pod, minReadySeconds, metav1.Now()) {
 			availability = "available"
 		}
-		logf("Pod %s is %s:\n%+v", pod.Name, availability, pod)
+		logf(spew.Sprintf("Pod %q is %s:\n%+v", pod.Name, availability, pod))
 	}
 }
 

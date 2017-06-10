@@ -124,10 +124,7 @@ func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restcli
 }
 
 func (g *gcpAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
-	return &oauth2.Transport{
-		Source: g.tokenSource,
-		Base:   rt,
-	}
+	return &conditionalTransport{&oauth2.Transport{Source: g.tokenSource, Base: rt}}
 }
 
 func (g *gcpAuthProvider) Login() error { return nil }
@@ -283,4 +280,15 @@ func parseJSONPath(input interface{}, name, template string) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+type conditionalTransport struct {
+	oauthTransport *oauth2.Transport
+}
+
+func (t *conditionalTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if len(req.Header.Get("Authorization")) != 0 {
+		return t.oauthTransport.Base.RoundTrip(req)
+	}
+	return t.oauthTransport.RoundTrip(req)
 }

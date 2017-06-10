@@ -19,6 +19,7 @@ package upgrades
 import (
 	"fmt"
 
+	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -27,7 +28,8 @@ import (
 
 // HPAUpgradeTest tests that HPA rescales target resource correctly before and after a cluster upgrade.
 type HPAUpgradeTest struct {
-	rc *common.ResourceConsumer
+	rc  *common.ResourceConsumer
+	hpa *autoscalingv1.HorizontalPodAutoscaler
 }
 
 func (HPAUpgradeTest) Name() string { return "hpa-upgrade" }
@@ -44,7 +46,7 @@ func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
 		500, /* cpuLimit */
 		200, /* memLimit */
 		f)
-	common.CreateCPUHorizontalPodAutoscaler(
+	t.hpa = common.CreateCPUHorizontalPodAutoscaler(
 		t.rc,
 		20, /* targetCPUUtilizationPercent */
 		1,  /* minPods */
@@ -65,6 +67,7 @@ func (t *HPAUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgr
 // Teardown cleans up any remaining resources.
 func (t *HPAUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
+	common.DeleteHorizontalPodAutoscaler(t.rc, t.hpa.Name)
 	t.rc.CleanUp()
 }
 

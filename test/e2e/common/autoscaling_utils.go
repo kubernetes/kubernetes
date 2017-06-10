@@ -343,27 +343,33 @@ func (rc *ResourceConsumer) GetReplicas() int {
 }
 
 func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) {
-	timeout := 15 * time.Minute
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
-		if desiredReplicas == rc.GetReplicas() {
-			framework.Logf("%s: current replicas number is equal to desired replicas number: %d", rc.kind, desiredReplicas)
-			return
-		} else {
-			framework.Logf("%s: current replicas number %d waiting to be %d", rc.kind, rc.GetReplicas(), desiredReplicas)
-		}
-	}
-	framework.Failf("timeout waiting %v for pods size to be %d", timeout, desiredReplicas)
+	duration := 15 * time.Minute
+	interval := 20 * time.Second
+	err := wait.PollImmediate(interval, duration, func() (bool, error) {
+		replicas := rc.GetReplicas()
+		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
+		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
+	})
+	framework.ExpectNoErrorWithOffset(1, err, "timeout waiting %v for %d replicas", duration, desiredReplicas)
 }
 
-func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, timeout time.Duration) {
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
-		actual := rc.GetReplicas()
-		if desiredReplicas != actual {
-			framework.Failf("Number of replicas has changed: expected %v, got %v", desiredReplicas, actual)
+func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, duration time.Duration) {
+	interval := 10 * time.Second
+	err := wait.PollImmediate(interval, duration, func() (bool, error) {
+		replicas := rc.GetReplicas()
+		framework.Logf("expecting there to be %d replicas (are: %d)", desiredReplicas, replicas)
+		if replicas != desiredReplicas {
+			return false, fmt.Errorf("number of replicas changed unexpectedly")
+		} else {
+			return false, nil // Expected number of replicas found. Continue polling until timeout.
 		}
-		framework.Logf("Number of replicas is as expected")
+	})
+	// The call above always returns an error, but if it is timeout, it's OK (condition satisfied all the time).
+	if err == wait.ErrWaitTimeout {
+		framework.Logf("Number of replicas was stable over %v", duration)
+		return
 	}
-	framework.Logf("Number of replicas was stable over %v", timeout)
+	framework.ExpectNoErrorWithOffset(1, err)
 }
 
 // Pause stops background goroutines responsible for consuming resources.
@@ -503,7 +509,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalCli
 		c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
 }
 
-func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) {
+func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) *autoscalingv1.HorizontalPodAutoscaler {
 	hpa := &autoscalingv1.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rc.name,
@@ -519,6 +525,11 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 			TargetCPUUtilizationPercentage: &cpu,
 		},
 	}
-	_, errHPA := rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
+	hpa, errHPA := rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
 	framework.ExpectNoError(errHPA)
+	return hpa
+}
+
+func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) {
+	rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Delete(autoscalerName, nil)
 }

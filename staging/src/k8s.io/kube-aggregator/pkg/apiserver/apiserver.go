@@ -42,10 +42,11 @@ import (
 
 	"bytes"
 	"fmt"
+	"io"
+
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
-	"io"
 	"k8s.io/apiserver/pkg/server/openapi"
 	"k8s.io/client-go/transport"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
@@ -109,6 +110,7 @@ type Config struct {
 	// this to confirm the proxy's identity
 	ProxyClientCert []byte
 	ProxyClientKey  []byte
+	ProxyTransport  *http.Transport
 
 	// Indicates if the Aggregator should send to the cluster IP (false) or route to the endpoints IP (true)
 	EnableAggregatorRouting bool
@@ -193,7 +195,7 @@ func (r *aggregatorClusterRouting) ResolveEndpoint(namespace, name string) (*url
 }
 
 // New returns a new instance of APIAggregator from the given config.
-func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget, proxyTransport *http.Transport) (*APIAggregator, error) {
+func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
 	genericServer, err := c.Config.GenericConfig.SkipComplete().New("kube-aggregator", delegationTarget) // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
@@ -228,7 +230,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		contextMapper:    c.GenericConfig.RequestContextMapper,
 		proxyClientCert:  c.ProxyClientCert,
 		proxyClientKey:   c.ProxyClientKey,
-		proxyTransport:   proxyTransport,
+		proxyTransport:   c.ProxyTransport,
 		proxyHandlers:    map[string]*proxyHandler{},
 		apiServiceSpecs:  map[string]*spec.Swagger{},
 		toLoadAPISpec:    map[string]int{},

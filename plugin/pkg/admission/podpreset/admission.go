@@ -104,6 +104,14 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 	}
 
 	list, err := c.lister.PodPresets(pod.GetNamespace()).List(labels.Everything())
+
+	// Ignore if exclusion annotation is present
+	if podAnnotations := pod.GetAnnotations(); podAnnotations != nil {
+		glog.V(5).Infof("Looking at pod annotations, found: %v", podAnnotations)
+		if podAnnotations[api.PodPresetOptOutAnnotationKey] == "true" {
+			return nil
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("listing pod presets failed: %v", err)
 	}
@@ -182,7 +190,8 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 		if pod.ObjectMeta.Annotations == nil {
 			pod.ObjectMeta.Annotations = map[string]string{}
 		}
-		pod.ObjectMeta.Annotations[fmt.Sprintf("%s/%s", annotationPrefix, pip.GetName())] = pip.GetResourceVersion()
+
+		pod.ObjectMeta.Annotations[fmt.Sprintf("%s/podpreset-%s", annotationPrefix, pip.GetName())] = pip.GetResourceVersion()
 	}
 
 	return nil

@@ -54,11 +54,21 @@ func TestPVSecrets(t *testing.T) {
 			ISCSI: &api.ISCSIVolumeSource{
 				SecretRef: &api.LocalObjectReference{
 					Name: "Spec.PersistentVolumeSource.ISCSI.SecretRef"}}}}},
+		{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{
+			StorageOS: &api.StorageOSPersistentVolumeSource{
+				SecretRef: &api.ObjectReference{
+					Name:      "Spec.PersistentVolumeSource.StorageOS.SecretRef",
+					Namespace: "Spec.PersistentVolumeSource.StorageOS.SecretRef"}}}}},
 	}
+
 	extractedNames := sets.NewString()
+	extractedNamespaces := sets.NewString()
 	for _, pv := range pvs {
-		VisitPVSecretNames(pv, func(name string) bool {
+		VisitPVSecretNames(pv, func(namespace, name string) bool {
 			extractedNames.Insert(name)
+			if namespace != "" {
+				extractedNamespaces.Insert(namespace)
+			}
 			return true
 		})
 	}
@@ -76,6 +86,7 @@ func TestPVSecrets(t *testing.T) {
 		"Spec.PersistentVolumeSource.RBD.SecretRef",
 		"Spec.PersistentVolumeSource.ScaleIO.SecretRef",
 		"Spec.PersistentVolumeSource.ISCSI.SecretRef",
+		"Spec.PersistentVolumeSource.StorageOS.SecretRef",
 	)
 	secretPaths := collectSecretPaths(t, nil, "", reflect.TypeOf(&api.PersistentVolume{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)
@@ -95,6 +106,14 @@ func TestPVSecrets(t *testing.T) {
 	if extraNames := extractedNames.Difference(expectedSecretPaths); len(extraNames) > 0 {
 		t.Logf("Extra secret names:\n%s", strings.Join(extraNames.List(), "\n"))
 		t.Error("Extra secret names extracted. Verify VisitPVSecretNames() is correctly extracting secret names")
+	}
+
+	expectedSecretNamespaces := sets.NewString(
+		"Spec.PersistentVolumeSource.StorageOS.SecretRef",
+	)
+
+	if len(expectedSecretNamespaces.Difference(extractedNamespaces)) > 0 {
+		t.Errorf("Missing expected secret namespace")
 	}
 }
 

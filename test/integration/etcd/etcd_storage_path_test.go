@@ -604,7 +604,7 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 
 			kubeAPIServerOptions.SecureServing.BindPort = kubePort
 
-			tunneler, proxyTransport, err := app.CreateDialer(kubeAPIServerOptions)
+			tunneler, proxyTransport, err := app.CreateNodeDialer(kubeAPIServerOptions)
 			if err != nil {
 				t.Fatal(err)
 			}

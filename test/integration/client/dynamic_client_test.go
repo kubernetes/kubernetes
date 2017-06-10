@@ -114,7 +114,7 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	// check dynamic get
-	unstruct, err := dynamicClient.Resource(&resource, ns.Name).Get(actual.Name)
+	unstruct, err := dynamicClient.Resource(&resource, ns.Name).Get(actual.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when getting pod %q: %v", actual.Name, err)
 	}

@@ -174,6 +174,10 @@ func VisitPodSecretNames(pod *v1.Pod, visitor Visitor) bool {
 			if source.ISCSI.SecretRef != nil && !visitor(source.ISCSI.SecretRef.Name) {
 				return false
 			}
+		case source.StorageOS != nil:
+			if source.StorageOS.SecretRef != nil && !visitor(source.StorageOS.SecretRef.Name) {
+				return false
+			}
 		}
 	}
 	return true
