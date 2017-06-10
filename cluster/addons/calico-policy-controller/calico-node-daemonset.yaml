@@ -28,7 +28,7 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: calico/node:v1.3.0-rc1
+          image: calico/node:v1.3.0
           env:
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
@@ -128,7 +128,7 @@ spec:
         # Used to install CNI binaries.
         - name: cni-bin-dir
           hostPath:
-            path: /home/kubernetes/bin
+            path: __CALICO_CNI_DIR__
         # Used to install CNI network config.
         - name: cni-net-dir
           hostPath:
