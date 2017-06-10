@@ -65,7 +65,7 @@ func TestServiceAccountLocal(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	out := bytes.NewBuffer([]byte{})
-	cmd := NewCmdServiceaccount(f, out, out)
+	cmd := NewCmdServiceAccount(f, out, out)
 	cmd.SetOutput(out)
 	cmd.Flags().Set("output", "yaml")
 	cmd.Flags().Set("local", "true")
@@ -176,7 +176,7 @@ func TestServiceAccountRemote(t *testing.T) {
 			GroupName:        input.apiGroup,
 		}
 		out := bytes.NewBuffer([]byte{})
-		cmd := NewCmdServiceaccount(f, out, out)
+		cmd := NewCmdServiceAccount(f, out, out)
 		cmd.SetOutput(out)
 		cmd.Flags().Set("output", "yaml")
 
@@ -211,7 +211,7 @@ func TestServiceAccountValidation(t *testing.T) {
 		}
 		tf.Namespace = "test"
 		out := bytes.NewBuffer([]byte{})
-		cmd := NewCmdServiceaccount(f, out, out)
+		cmd := NewCmdServiceAccount(f, out, out)
 		cmd.SetOutput(out)
 
 		saConfig := &ServiceAccountConfig{}

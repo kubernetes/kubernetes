@@ -17,9 +17,8 @@ limitations under the License.
 package set
 
 import (
-	"io"
-
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -40,18 +39,18 @@ var (
 	serviceaccount_long = templates.LongDesc(`
 	Update ServiceAccount of pod template resources.
 
-	Possible resources (case insensitive) can be : 
+	Possible resources (case insensitive) can be: 
 	` + serviceaccount_resources)
 
 	serviceaccount_example = templates.Examples(`
 	# Set ReplicationController nginx-controller's ServiceAccount to serviceaccount1
-	kubectl set serviceaccount replicationcontroller nginx-controller serviceaccount1
+	$kubectl set serviceaccount deployment nginx-deployment serviceaccount1
 
 	# Short form of the above command
-	kubectl set sa rc nginx-controller serviceaccount1
+	$kubectl set sa deploy nginx-deployment serviceaccount1
 
 	# Print result in yaml format of updated nginx controller from local file, without hitting apiserver
-	kubectl set sa -f nginx-rc.yaml serviceaccount1 --local --dry-run -o yaml
+	$kubectl set sa -f nginx-deployment.yaml serviceaccount1 --local --dry-run -o yaml
 	`)
 )
 
@@ -80,7 +79,7 @@ type ServiceAccountConfig struct {
 	updatePodSpecForObject func(runtime.Object, func(*api.PodSpec) error) (bool, error)
 }
 
-func NewCmdServiceaccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
+func NewCmdServiceAccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	saConfig := &ServiceAccountConfig{
 		out: out,
 		err: err,
@@ -106,7 +105,7 @@ func NewCmdServiceaccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command 
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &saConfig.fileNameOptions, usage)
-	cmd.Flags().BoolVar(&saConfig.all, "all", false, "select all resources in the namespace of the specified resource types")
+	cmd.Flags().BoolVar(&saConfig.all, "all", false, "Select all resources in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&saConfig.local, "local", false, "If true, set image will NOT contact api-server but run locally.")
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
@@ -123,16 +122,13 @@ func (saConfig *ServiceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	saConfig.dryRun = cmdutil.GetDryRunFlag(cmd)
 	saConfig.output = cmdutil.GetFlagString(cmd, "output")
 	saConfig.args = args
-
 	saConfig.decoder = f.Decoder(true)
-
 	saConfig.updatePodSpecForObject = f.UpdatePodSpecForObject
 	saConfig.clientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	saConfig.categoryExpander = f.CategoryExpander()
 	saConfig.print = func(obj runtime.Object) error {
 		return f.PrintObject(cmd, saConfig.mapper, obj, saConfig.out)
 	}
-
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -142,7 +138,6 @@ func (saConfig *ServiceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 }
 
 func (saConfig *ServiceAccountConfig) Validate() error {
-
 	if len(saConfig.args) == 0 {
 		return fmt.Errorf("serviceaccount is required")
 	}
@@ -150,7 +145,6 @@ func (saConfig *ServiceAccountConfig) Validate() error {
 }
 
 func (saConfig *ServiceAccountConfig) Run() error {
-
 	serviceAccountName := saConfig.args[len(saConfig.args)-1]
 	resources := saConfig.args[:len(saConfig.args)-1]
 	builder := resource.NewBuilder(saConfig.mapper, saConfig.categoryExpander, saConfig.typer, saConfig.clientMapper, saConfig.decoder).
@@ -206,7 +200,6 @@ func (saConfig *ServiceAccountConfig) Run() error {
 			return saConfig.print(patched)
 		}
 		cmdutil.PrintSuccess(saConfig.mapper, saConfig.shortOutput, saConfig.out, info.Mapping.Resource, info.Name, saConfig.dryRun, "serviceaccount updated")
-
 	}
 	return utilerrors.NewAggregate(patchErrs)
 }
