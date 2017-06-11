@@ -118,12 +118,15 @@ kube::version::ldflag() {
   local key=${1}
   local val=${2}
 
+  # If you update these, also update the list pkg/version/def.bzl.
   echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}"
   echo "-X ${KUBE_GO_PACKAGE}/vendor/k8s.io/client-go/pkg/version.${key}=${val}"
 }
 
 # Prints the value that needs to be passed to the -ldflags parameter of go build
 # in order to set the Kubernetes based on the git tree status.
+# IMPORTANT: if you update any of these, also update the lists in
+# pkg/version/def.bzl and hack/print-workspace-status.sh.
 kube::version::ldflags() {
   kube::version::get_version_vars
 

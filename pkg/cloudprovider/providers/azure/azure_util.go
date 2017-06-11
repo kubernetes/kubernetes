@@ -17,7 +17,9 @@ limitations under the License.
 package azure
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -41,6 +43,8 @@ const (
 	loadBalancerProbeIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/probes/%s"
 	securityRuleIDTemplate      = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkSecurityGroups/%s/securityRules/%s"
 )
+
+var providerIDRE = regexp.MustCompile(`^` + CloudProviderName + `://(.+)$`)
 
 // returns the full identifier of a machine
 func (az *Cloud) getMachineID(machineName string) string {
@@ -274,4 +278,13 @@ func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, error) {
 
 	targetIP := *ipConfig.PrivateIPAddress
 	return targetIP, nil
+}
+
+// splitProviderID converts a providerID to a NodeName.
+func splitProviderID(providerID string) (types.NodeName, error) {
+	matches := providerIDRE.FindStringSubmatch(providerID)
+	if len(matches) != 2 {
+		return "", errors.New("error splitting providerID")
+	}
+	return types.NodeName(matches[1]), nil
 }
