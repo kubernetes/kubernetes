@@ -68,15 +68,13 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	mounterPath := ""
 	bind, bindRemountOpts := isBind(options)
 	if bind {
-		err := doMount(mounterPath, defaultMountCommand, source, target, fstype, []string{"bind"})
-		if err != nil {
+		if err := doMount(mounterPath, defaultMountCommand, source, target, fstype, []string{"bind"}); err != nil {
 			return err
 		}
 		return doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
-	fsTypesNeedMounter := sets.NewString("nfs", "glusterfs", "ceph", "cifs")
-	if fsTypesNeedMounter.Has(fstype) {
+	if fsTypesNeedMounter := sets.NewString("nfs", "glusterfs", "ceph", "cifs"); fsTypesNeedMounter.Has(fstype) {
 		mounterPath = mounter.mounterPath
 	}
 	return doMount(mounterPath, defaultMountCommand, source, target, fstype, options)
