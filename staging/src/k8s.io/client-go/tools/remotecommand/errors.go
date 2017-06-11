@@ -43,10 +43,12 @@ func (e CodeExitError) String() string {
 	return e.Err.Error()
 }
 
+// Exited reports whether the program has exited.
 func (e CodeExitError) Exited() bool {
 	return true
 }
 
+// ExitStatus returns exit code of the program.
 func (e CodeExitError) ExitStatus() int {
 	return e.Code
 }
