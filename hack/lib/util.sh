@@ -313,7 +313,27 @@ kube::util::analytics-link() {
 # * Special handling for groups suffixed with ".k8s.io": foo.k8s.io/v1 -> apis/foo/v1
 # * Very special handling for when both group and version are "": / -> api
 kube::util::group-version-to-pkg-path() {
+  staging_apis=(
+  $(
+    pushd ${KUBE_ROOT}/staging/src/k8s.io/api > /dev/null
+      find . -name types.go | xargs -n1 dirname | sed "s|\./||g" | sort
+    popd > /dev/null
+  )
+  )
+
   local group_version="$1"
+
+  if [[ " ${staging_apis[@]} " =~ " ${group_version/.*k8s.io/} " ]]; then
+    echo "vendor/k8s.io/api/${group_version/.*k8s.io/}"
+    return
+  fi
+
+  # "v1" is the API GroupVersion 
+  if [[ "${group_version}" == "v1" ]]; then
+    echo "vendor/k8s.io/api/core/v1"
+    return
+  fi
+
   # Special cases first.
   # TODO(lavalamp): Simplify this by moving pkg/api/v1 and splitting pkg/api,
   # moving the results to pkg/apis/api.
@@ -321,9 +341,6 @@ kube::util::group-version-to-pkg-path() {
     # both group and version are "", this occurs when we generate deep copies for internal objects of the legacy v1 API.
     __internal)
       echo "pkg/api"
-      ;;
-    v1)
-      echo "pkg/api/v1"
       ;;
     federation/v1beta1)
       echo "federation/apis/federation/v1beta1"
