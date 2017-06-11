@@ -750,3 +750,54 @@ func TestDecodeInstanceInfo(t *testing.T) {
 		t.Error("got incorrect fault domain")
 	}
 }
+
+func TestSplitProviderID(t *testing.T) {
+	providers := []struct {
+		providerID string
+		name       types.NodeName
+
+		fail bool
+	}{
+		{
+			providerID: CloudProviderName + ":///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			fail:       false,
+		},
+		{
+			providerID: CloudProviderName + ":/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "",
+			fail:       true,
+		},
+		{
+			providerID: CloudProviderName + "://",
+			name:       "",
+			fail:       true,
+		},
+		{
+			providerID: ":///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "",
+			fail:       true,
+		},
+		{
+			providerID: "aws:///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "",
+			fail:       true,
+		},
+	}
+
+	for _, test := range providers {
+		name, err := splitProviderID(test.providerID)
+		if (err != nil) != test.fail {
+			t.Errorf("Expected to failt=%t, with pattern %v", test.fail, test)
+		}
+
+		if test.fail {
+			continue
+		}
+
+		if name != test.name {
+			t.Errorf("Expected %v, but got %v", test.name, name)
+		}
+
+	}
+}

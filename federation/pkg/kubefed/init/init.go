@@ -385,7 +385,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		return err
 	}
 	glog.V(4).Info("Successfully created federation controller manager deployment")
-	fmt.Println(cmdOut, " done")
+	fmt.Fprintln(cmdOut, " done")
 
 	fmt.Fprint(cmdOut, "Updating kubeconfig...")
 	glog.V(4).Info("Updating kubeconfig")
