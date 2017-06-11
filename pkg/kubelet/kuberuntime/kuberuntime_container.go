@@ -386,11 +386,11 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			return nil, err
 		}
 		cStatus := toKubeContainerStatus(status, m.runtimeName)
-		if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
+		if status.State == runtimeapi.ContainerState_CONTAINER_EXITED || status.State == runtimeapi.ContainerState_CONTAINER_OOMKILLED {
 			// Populate the termination message if needed.
 			annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 			labeledInfo := getContainerInfoFromLabels(status.Labels)
-			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError && (cStatus.ExitCode != 0 || cStatus.Reason == "OOMKilled")
+			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError && (cStatus.ExitCode != 0 || status.State == runtimeapi.ContainerState_CONTAINER_OOMKILLED)
 			tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
 			if checkLogs {
 				path := buildFullContainerLogsPath(uid, labeledInfo.ContainerName, annotatedInfo.RestartCount)

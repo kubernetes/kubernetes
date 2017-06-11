@@ -335,9 +335,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 			state = runtimeapi.ContainerState_CONTAINER_EXITED
 			switch {
 			case r.State.OOMKilled:
-				// TODO: consider exposing OOMKilled via the runtimeAPI.
-				// Note: if an application handles OOMKilled gracefully, the
-				// exit code could be zero.
+				state = runtimeapi.ContainerState_CONTAINER_OOMKILLED
 				reason = "OOMKilled"
 			case r.State.ExitCode == 0:
 				reason = "Completed"
