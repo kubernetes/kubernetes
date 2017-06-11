@@ -17,7 +17,6 @@ limitations under the License.
 package azure
 
 import (
-	"errors"
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -46,7 +45,12 @@ func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (az *Cloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	return []v1.NodeAddress{}, errors.New("unimplemented")
+	name, err := splitProviderID(providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return az.NodeAddresses(name)
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
@@ -83,7 +87,12 @@ func (az *Cloud) InstanceID(name types.NodeName) (string, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (az *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
-	return "", errors.New("unimplemented")
+	name, err := splitProviderID(providerID)
+	if err != nil {
+		return "", err
+	}
+
+	return az.InstanceID(name)
 }
 
 // InstanceType returns the type of the specified instance.
