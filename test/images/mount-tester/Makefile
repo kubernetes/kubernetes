@@ -12,20 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 0.8
-PREFIX = gcr.io/google_containers
+BIN=mounttest
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
 
-all: push
+bin:
+	docker run --rm -it -v $(TARGET):$(TARGET):Z -v `pwd`/../../../:/go/src/k8s.io/kubernetes:Z \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+		cd /go/src/k8s.io/kubernetes/test/images/mount-tester && \
+		CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(TARGET)/$(BIN) ."
 
-mt: mt.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./mt.go && \
-	chmod a+rx mt
-
-image: mt
-	sudo docker build --pull -t $(PREFIX)/mounttest:$(TAG) .
-
-push: image
-	gcloud docker -- push $(PREFIX)/mounttest:$(TAG)
-
-clean:
-	rm -f mt
+.PHONY: bin

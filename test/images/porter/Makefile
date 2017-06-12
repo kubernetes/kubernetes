@@ -12,36 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Use:
-#
-# `make porter` will build porter.
-# `make tag` will suggest a tag.
-# `make image` will build an image-- you must supply a tag.
-# `make push` will push the image-- you must supply a tag.
+BIN=porter
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
 
-# This image does not tag in the normal way
-# TAG =
-PREFIX = gcr.io/google_containers
-SUGGESTED_TAG = $(shell git rev-parse --verify HEAD)
+bin:
+	docker run --rm -it -v $(TARGET):$(TARGET):Z -v `pwd`/../../../:/go/src/k8s.io/kubernetes:Z \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+		cd /go/src/k8s.io/kubernetes/test/images/porter && \
+		CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(TARGET)/$(BIN) ."
 
-porter: porter.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./porter.go
-
-tag:
-	@echo "If all relevant changes are committed, suggest using TAG=$(SUGGESTED_TAG)"
-	@echo "$$ make container TAG=$(SUGGESTED_TAG)"
-	@echo "or"
-	@echo "$$ make push TAG=$(SUGGESTED_TAG)"
-
-container: image
-
-image:
-	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' after committing changes to see a suggestion))
-	docker build --pull -t $(PREFIX)/porter:$(TAG) .
-
-push:
-	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' after committing changes to see a suggestion))
-	gcloud docker -- push $(PREFIX)/porter:$(TAG)
-
-clean:
-	rm -f porter
+.PHONY: bin

@@ -12,19 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 1.2
-PREFIX = gcr.io/google_containers
+BIN=portforwardtester
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
 
-all: push
+bin:
+	docker run --rm -it -v $(TARGET):$(TARGET):Z -v `pwd`/../../../:/go/src/k8s.io/kubernetes:Z \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+		cd /go/src/k8s.io/kubernetes/test/images/port-forward-tester && \
+		CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(TARGET)/$(BIN) ."
 
-portforwardtester: portforwardtester.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./portforwardtester.go
-
-image: portforwardtester
-	docker build --pull -t $(PREFIX)/portforwardtester:$(TAG) .
-
-push: image
-	gcloud docker -- push $(PREFIX)/portforwardtester:$(TAG)
-
-clean:
-	rm -f portforwardtester
+.PHONY: bin

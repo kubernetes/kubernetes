@@ -12,22 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all netexec image push clean
+BIN=netexec
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
 
-TAG = 1.7
-PREFIX = gcr.io/google_containers
+bin:
+	docker run --rm -it -v $(TARGET):$(TARGET):Z -v `pwd`/../../../:/go/src/k8s.io/kubernetes:Z \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+		cd /go/src/k8s.io/kubernetes/test/images/netexec && \
+		CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(TARGET)/$(BIN) ."
 
-
-all: push
-
-netexec: netexec.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./netexec.go
-
-image: netexec
-	docker build --pull -t $(PREFIX)/netexec:$(TAG) .
-
-push: image
-	gcloud docker -- push $(PREFIX)/netexec:$(TAG)
-
-clean:
-	rm -f netexec
+.PHONY: bin

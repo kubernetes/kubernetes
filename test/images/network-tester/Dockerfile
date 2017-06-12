@@ -13,6 +13,6 @@
 # limitations under the License.
 
 FROM scratch
-ADD webserver webserver
+COPY nettest /
 EXPOSE 8080
-ENTRYPOINT ["/webserver"]
+ENTRYPOINT ["/nettest"]

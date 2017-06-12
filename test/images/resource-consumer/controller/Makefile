@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,19 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all image push clean
+BIN=controller
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
 
-TAG = 1.2
-PREFIX = gcr.io/google_containers
-
-
-all: push
-
-image:
-	docker build --pull -t $(PREFIX)/hostexec:$(TAG) .
-
-push: image
-	gcloud docker -- push $(PREFIX)/hostexec:$(TAG)
-
-clean:
-	rm -f hostexec
+bin:
+	docker run --rm -it -v $(TARGET):$(TARGET):Z -v `pwd`/../../../../:/go/src/k8s.io/kubernetes:Z \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+		cd /go/src/k8s.io/kubernetes/test/images/resource-consumer/controller && \
+		CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(TARGET)/$(BIN) ."

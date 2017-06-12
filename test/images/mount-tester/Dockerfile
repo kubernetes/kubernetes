@@ -13,5 +13,5 @@
 # limitations under the License.
 
 FROM scratch
-ADD mt mt
-ENTRYPOINT ["/mt"]
+COPY mounttest /
+ENTRYPOINT ["/mounttest"]

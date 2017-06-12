@@ -12,19 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 0.1
-PREFIX = kubernetes
+BIN=ep
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
 
-all: push
+bin:
+	docker run --rm -it -v $(TARGET):$(TARGET):Z -v `pwd`/../../../:/go/src/k8s.io/kubernetes:Z \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+		cd /go/src/k8s.io/kubernetes/test/images/entrypoint-tester && \
+		CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(TARGET)/$(BIN) ."
 
-ep: ep.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./ep.go
-
-image: ep
-	sudo docker build --pull -t $(PREFIX)/eptest:$(TAG) .
-
-push: image
-	sudo docker push $(PREFIX)/eptest:$(TAG)
-
-clean:
-	rm -f ep
+.PHONY: bin

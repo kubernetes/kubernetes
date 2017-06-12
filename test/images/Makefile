@@ -1,6 +1,4 @@
-#!/bin/bash
-
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,13 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
-set -x
+REGISTRY ?= gcr.io/k8s-e2e-images
+GOARM=7
+QEMUVERSION=v2.7.0
+GOLANG_VERSION=1.8.3
+export
 
-ARCH=$1
+ifndef WHAT
+$(error WHAT is a required variable, ex: make all WHAT=net)
+endif
 
-# Build the binary.
-CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} go build -a -installsuffix cgo -ldflags '-w' ./gitserver.go
+# Build code.
+#
+# Args:
+#   WHAT: Directory names to build.
+#
+# Example:
+#   make all WHAT=clusterapi-tester
+all: all-container
 
-# Write down the current commit hash.
-echo $(git rev-parse HEAD) >> GITHASH.txt
+all-container:
+	./image-util.sh build $(WHAT)
+
+all-push: all-container
+	./image-util.sh push $(WHAT)
+
+.PHONY: all all-push all-container

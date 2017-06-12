@@ -12,20 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: push
+BIN=clusterapi-tester
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
 
-# 0.0 shouldn't clobber any released builds
-TAG = 1.0
-PREFIX = gcr.io/google_containers/clusterapi-tester
+bin:
+	docker run --rm -it -v $(TARGET):$(TARGET):Z -v `pwd`/../../../:/go/src/k8s.io/kubernetes:Z \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+		cd /go/src/k8s.io/kubernetes/test/images/clusterapi-tester && \
+		CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(TARGET)/$(BIN)" 
 
-main: main.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' -o main ./main.go
-
-container: main
-	docker build --pull -t $(PREFIX):$(TAG) .
-
-push: container
-	gcloud docker -- push $(PREFIX):$(TAG)
-
-clean:
-	rm -f main
+.PHONY: bin

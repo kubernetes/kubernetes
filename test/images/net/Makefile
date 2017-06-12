@@ -12,28 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARCH   := amd64
-PREFIX ?= gcr.io/google_containers
-TAG    ?= 1.0
-IMAGE  ?= e2e-net-$(ARCH)
+BIN=net
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
 
-SRCS := $(shell find . -name \*.go)
+bin:
+	docker run --rm -it -v $(TARGET):$(TARGET):Z -v `pwd`/../../../:/go/src/k8s.io/kubernetes:Z \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+		cd /go/src/k8s.io/kubernetes/test/images/net && \
+		CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(TARGET)/$(BIN) ."
 
-all: image
-
-net: $(SRCS)
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w'
-
-image: test net
-	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
-
-push: image
-	gcloud docker -- push $(PREFIX)/$(IMAGE):$(TAG)
-
-clean:
-	rm -f net
-
-test:
-	go test ./...
-
-.PHONY: all clean image push test
+.PHONY: bin

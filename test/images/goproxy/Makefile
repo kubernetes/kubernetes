@@ -12,19 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 0.1
-PREFIX = gcr.io/google_containers
+BIN=goproxy
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
 
-all: push
+bin:
+	docker run --rm -it -v $(TARGET):$(TARGET):Z -v `pwd`/../../../:/go/src/k8s.io/kubernetes:Z \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+		cd /go/src/k8s.io/kubernetes/test/images/goproxy && \
+		CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(TARGET)/$(BIN) ."
 
-goproxy: goproxy.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./goproxy.go
-
-image: goproxy
-	docker build --pull -t $(PREFIX)/goproxy:$(TAG) .
-
-push: image
-	gcloud docker -- push $(PREFIX)/goproxy:$(TAG)
-
-clean:
-	rm -f goproxy
+.PHONY: bin

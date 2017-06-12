@@ -16,7 +16,7 @@ go_binary(
 
 go_library(
     name = "go_default_library",
-    srcs = ["webserver.go"],
+    srcs = ["nettest.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/client/clientset_generated/internalclientset:go_default_library",

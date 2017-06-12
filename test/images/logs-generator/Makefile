@@ -12,21 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = v0.1.1
-PREFIX = gcr.io/google_containers
+BIN=logs-generator
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
 
-all: build
+bin:
+	docker run --rm -it -v $(TARGET):$(TARGET):Z -v `pwd`/../../../:/go/src/k8s.io/kubernetes:Z \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+		cd /go/src/k8s.io/kubernetes/test/images/logs-generator && \
+		CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(TARGET)/$(BIN) ."
 
-build: binary container
-
-binary:
-	go build -a --ldflags '-w' -o logs-generator .
-
-container:
-	docker build --pull -t $(PREFIX)/logs-generator:$(TAG) .
-
-push:
-	gcloud docker -- push $(PREFIX)/logs-generator:$(TAG)
-
-clean:
-	rm -f logs-generator
+.PHONY: bin

@@ -13,6 +13,6 @@
 # limitations under the License.
 
 FROM BASEIMAGE
-ADD serve_hostname /serve_hostname
+COPY serve_hostname /
 EXPOSE 9376
 ENTRYPOINT ["/serve_hostname"]

@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM jess/stress
+FROM BASEIMAGE
+
+CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
+
+RUN apt-get update && apt-get install -y --no-install-recommends stress && \
+    rm -rf /var/lib/apt/lists/*
+
 ADD consumer /consumer
 ADD consume-cpu /consume-cpu
 EXPOSE 8080
