@@ -263,8 +263,7 @@ func (sched *Scheduler) scheduleOne() {
 
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
-	err = sched.assume(pod, suggestedHost)
-	if err != nil {
+	if err = sched.assume(pod, suggestedHost); err != nil {
 		return
 	}
 
