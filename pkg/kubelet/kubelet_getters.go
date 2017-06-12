@@ -214,7 +214,7 @@ func (kl *Kubelet) GetNodeConfig() cm.NodeConfig {
 	return kl.containerManager.GetNodeConfig()
 }
 
-// Returns host IP or nil in case of error.
+// GetHostIP returns host IP or nil in case of error.
 func (kl *Kubelet) GetHostIP() (net.IP, error) {
 	node, err := kl.GetNode()
 	if err != nil {

@@ -116,10 +116,10 @@ const (
 	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
 	nodeStatusUpdateRetry = 5
 
-	// Location of container logs.
+	// ContainerLogsDir is the location of container logs.
 	ContainerLogsDir = "/var/log/containers"
 
-	// max backoff period, exported for the e2e test
+	// MaxContainerBackOff is the max backoff period, exported for the e2e test
 	MaxContainerBackOff = 300 * time.Second
 
 	// Capacity of the channel for storing pods to kill. A small number should
@@ -156,9 +156,9 @@ const (
 	// container restarts and image pulls.
 	backOffPeriod = time.Second * 10
 
-	// Period for performing container garbage collection.
+	// ContainerGCPeriod is the period for performing container garbage collection.
 	ContainerGCPeriod = time.Minute
-	// Period for performing image garbage collection.
+	// ImageGCPeriod is the period for performing image garbage collection.
 	ImageGCPeriod = 5 * time.Minute
 
 	// Minimum number of dead containers to keep in a pod
@@ -178,8 +178,8 @@ type SyncHandler interface {
 // Option is a functional option type for Kubelet
 type Option func(*Kubelet)
 
-// bootstrapping interface for kubelet, targets the initialization protocol
-type KubeletBootstrap interface {
+// Bootstrap is a bootstrapping interface for kubelet, targets the initialization protocol
+type Bootstrap interface {
 	GetConfiguration() componentconfig.KubeletConfiguration
 	BirthCry()
 	StartGarbageCollection()
@@ -189,13 +189,13 @@ type KubeletBootstrap interface {
 	RunOnce(<-chan kubetypes.PodUpdate) ([]RunPodResult, error)
 }
 
-// create and initialize a Kubelet instance
-type KubeletBuilder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, crOptions *options.ContainerRuntimeOptions, standaloneMode bool, hostnameOverride, nodeIP, providerID string) (KubeletBootstrap, error)
+// Builder creates and initializes a Kubelet instance
+type Builder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dependencies, crOptions *options.ContainerRuntimeOptions, standaloneMode bool, hostnameOverride, nodeIP, providerID string) (Bootstrap, error)
 
-// KubeletDeps is a bin for things we might consider "injected dependencies" -- objects constructed
+// Dependencies is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
 // these objects while we figure out a more comprehensive dependency injection story for the Kubelet.
-type KubeletDeps struct {
+type Dependencies struct {
 	// TODO(mtaufen): KubeletBuilder:
 	//                Mesos currently uses this as a hook to let them make their own call to
 	//                let them wrap the KubeletBootstrap that CreateAndInitKubelet returns with
@@ -203,7 +203,7 @@ type KubeletDeps struct {
 	//                a nice home for it would be. There seems to be a trend, between this and
 	//                the Options fields below, of providing hooks where you can add extra functionality
 	//                to the Kubelet for your solution. Maybe we should centralize these sorts of things?
-	Builder KubeletBuilder
+	Builder Builder
 
 	// TODO(mtaufen): ContainerRuntimeOptions and Options:
 	//                Arrays of functions that can do arbitrary things to the Kubelet and the Runtime
@@ -240,7 +240,7 @@ type KubeletDeps struct {
 
 // makePodSourceConfig creates a config.PodConfig from the given
 // KubeletConfiguration or returns an error.
-func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, nodeName types.NodeName) (*config.PodConfig, error) {
+func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName) (*config.PodConfig, error) {
 	manifestURLHeader := make(http.Header)
 	if kubeCfg.ManifestURLHeader != "" {
 		pieces := strings.Split(kubeCfg.ManifestURLHeader, ":")
@@ -285,7 +285,7 @@ func getRuntimeAndImageServices(config *componentconfig.KubeletConfiguration) (i
 
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
-func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, crOptions *options.ContainerRuntimeOptions, standaloneMode bool, hostnameOverride, nodeIP, providerID string) (*Kubelet, error) {
+func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dependencies, crOptions *options.ContainerRuntimeOptions, standaloneMode bool, hostnameOverride, nodeIP, providerID string) (*Kubelet, error) {
 	if kubeCfg.RootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", kubeCfg.RootDirectory)
 	}
@@ -512,11 +512,11 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		glog.Warningf("Failed to close iptables lock file: %v", err)
 	}
 
-	if plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, crOptions.NetworkPluginName, &criNetworkHost{&networkHost{klet}, &network.NoopPortMappingGetter{}}, hairpinMode, kubeCfg.NonMasqueradeCIDR, int(crOptions.NetworkPluginMTU)); err != nil {
+	plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, crOptions.NetworkPluginName, &criNetworkHost{&networkHost{klet}, &network.NoopPortMappingGetter{}}, hairpinMode, kubeCfg.NonMasqueradeCIDR, int(crOptions.NetworkPluginMTU))
+	if err != nil {
 		return nil, err
-	} else {
-		klet.networkPlugin = plug
 	}
+	klet.networkPlugin = plug
 
 	machineInfo, err := klet.GetCachedMachineInfo()
 	if err != nil {
@@ -696,14 +696,15 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		var ips []net.IP
 		cfgAddress := net.ParseIP(kubeCfg.Address)
 		if cfgAddress == nil || cfgAddress.IsUnspecified() {
-			if localIPs, err := allLocalIPsWithoutLoopback(); err != nil {
+			localIPs, err := allLocalIPsWithoutLoopback()
+			if err != nil {
 				return nil, err
-			} else {
-				ips = localIPs
 			}
+			ips = localIPs
 		} else {
 			ips = []net.IP{cfgAddress}
 		}
+
 		ips = append(ips, cloudIPs...)
 		names := append([]string{klet.GetHostname(), hostnameOverride}, cloudNames...)
 		klet.serverCertificateManager, err = certificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, ips, names)
@@ -1116,7 +1117,7 @@ func allLocalIPsWithoutLoopback() ([]net.IP, error) {
 	for _, i := range interfaces {
 		addresses, err := i.Addrs()
 		if err != nil {
-			return nil, fmt.Errorf("could not list the addresses for network interface %v: %v\n", i, err)
+			return nil, fmt.Errorf("could not list the addresses for network interface %v: %v", i, err)
 		}
 		for _, address := range addresses {
 			switch v := address.(type) {
@@ -1148,7 +1149,7 @@ func (kl *Kubelet) setupDataDirs() error {
 	return nil
 }
 
-// Starts garbage collection threads.
+// StartGarbageCollection starts garbage collection threads.
 func (kl *Kubelet) StartGarbageCollection() {
 	loggedContainerGCFailure := false
 	go wait.Until(func() {
@@ -2126,10 +2127,10 @@ func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
-func (kl *Kubelet) cleanUpContainersInPod(podId types.UID, exitedContainerID string) {
-	if podStatus, err := kl.podCache.Get(podId); err == nil {
+func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID string) {
+	if podStatus, err := kl.podCache.Get(podID); err == nil {
 		removeAll := false
-		if syncedPod, ok := kl.podManager.GetPodByUID(podId); ok {
+		if syncedPod, ok := kl.podManager.GetPodByUID(podID); ok {
 			// When an evicted pod has already synced, all containers can be removed.
 			removeAll = eviction.PodIsEvicted(syncedPod.Status)
 		}
@@ -2144,7 +2145,7 @@ func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 }
 
 // Gets the streaming server configuration to use with in-process CRI shims.
-func getStreamingConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps) *streaming.Config {
+func getStreamingConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dependencies) *streaming.Config {
 	config := &streaming.Config{
 		// Use a relative redirect (no scheme or host).
 		BaseURL: &url.URL{

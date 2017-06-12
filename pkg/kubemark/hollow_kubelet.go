@@ -44,7 +44,7 @@ import (
 type HollowKubelet struct {
 	KubeletFlags         *options.KubeletFlags
 	KubeletConfiguration *componentconfig.KubeletConfiguration
-	KubeletDeps          *kubelet.KubeletDeps
+	KubeletDeps          *kubelet.Dependencies
 }
 
 func NewHollowKubelet(
@@ -66,7 +66,7 @@ func NewHollowKubelet(
 	// -----------------
 	volumePlugins := empty_dir.ProbeVolumePlugins()
 	volumePlugins = append(volumePlugins, secret.ProbeVolumePlugins()...)
-	d := &kubelet.KubeletDeps{
+	d := &kubelet.Dependencies{
 		KubeClient:        client,
 		DockerClient:      dockerClient,
 		CAdvisorInterface: cadvisorInterface,

@@ -40,10 +40,10 @@ type ReasonCache struct {
 	cache *lru.Cache
 }
 
-// reasonInfo is the cached item in ReasonCache
-type reasonInfo struct {
-	reason  error
-	message string
+// Reason is the cached item in ReasonCache
+type reasonItem struct {
+	Err     error
+	Message string
 }
 
 // maxReasonCacheEntries is the cache entry number in lru cache. 1000 is a proper number
@@ -51,6 +51,7 @@ type reasonInfo struct {
 // may want to increase the number.
 const maxReasonCacheEntries = 1000
 
+// NewReasonCache creates an instance of 'ReasonCache'.
 func NewReasonCache() *ReasonCache {
 	return &ReasonCache{cache: lru.New(maxReasonCacheEntries)}
 }
@@ -63,7 +64,7 @@ func (c *ReasonCache) composeKey(uid types.UID, name string) string {
 func (c *ReasonCache) add(uid types.UID, name string, reason error, message string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.cache.Add(c.composeKey(uid, name), reasonInfo{reason, message})
+	c.cache.Add(c.composeKey(uid, name), reasonItem{reason, message})
 }
 
 // Update updates the reason cache with the SyncPodResult. Only SyncResult with
@@ -92,13 +93,13 @@ func (c *ReasonCache) Remove(uid types.UID, name string) {
 // Get gets error reason from the cache. The return values are error reason, error message and
 // whether an error reason is found in the cache. If no error reason is found, empty string will
 // be returned for error reason and error message.
-func (c *ReasonCache) Get(uid types.UID, name string) (error, string, bool) {
+func (c *ReasonCache) Get(uid types.UID, name string) (*reasonItem, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	value, ok := c.cache.Get(c.composeKey(uid, name))
 	if !ok {
-		return nil, "", ok
+		return nil, false
 	}
-	info := value.(reasonInfo)
-	return info.reason, info.message, ok
+	info := value.(reasonItem)
+	return &info, true
 }
