@@ -304,9 +304,9 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 		{
 			name:       "partition update completes when all replicas above the partition are updated",
 			generation: 1,
-			strategy: apps.StatefulSetUpdateStrategy{Type: apps.PartitionStatefulSetStrategyType,
-				Partition: func() *apps.PartitionStatefulSetStrategy {
-					return &apps.PartitionStatefulSetStrategy{Ordinal: 2}
+			strategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+					return &apps.RollingUpdateStatefulSetStrategy{Partition: 2}
 				}()},
 			status: apps.StatefulSetStatus{
 				ObservedGeneration: func() *int64 {
@@ -326,9 +326,9 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 		{
 			name:       "partition update is in progress if all pods above the partition have not been updated",
 			generation: 1,
-			strategy: apps.StatefulSetUpdateStrategy{Type: apps.PartitionStatefulSetStrategyType,
-				Partition: func() *apps.PartitionStatefulSetStrategy {
-					return &apps.PartitionStatefulSetStrategy{Ordinal: 2}
+			strategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+					return &apps.RollingUpdateStatefulSetStrategy{Partition: 2}
 				}()},
 			status: apps.StatefulSetStatus{
 				ObservedGeneration: func() *int64 {
