@@ -2913,6 +2913,19 @@ func ValidateService(service *api.Service) field.ErrorList {
 		nodePorts[key] = true
 	}
 
+	// Check for duplicate Ports, considering (protocol,port) pairs
+	portsPath = specPath.Child("ports")
+	ports := make(map[api.ServicePort]bool)
+	for i, port := range service.Spec.Ports {
+		portPath := portsPath.Index(i)
+		key := api.ServicePort{Protocol: port.Protocol, Port: port.Port}
+		_, found := ports[key]
+		if found {
+			allErrs = append(allErrs, field.Duplicate(portPath, key))
+		}
+		ports[key] = true
+	}
+
 	// Check for duplicate TargetPort
 	portsPath = specPath.Child("ports")
 	targetPorts := make(map[api.ServicePort]bool)
