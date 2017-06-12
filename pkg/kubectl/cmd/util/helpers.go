@@ -433,6 +433,8 @@ type ValidateOptions struct {
 	EnableValidation bool
 }
 
+// ReadConfigDataFromReader is not used and may be deprecated in further releases
+// TODO: deprecate this function
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
