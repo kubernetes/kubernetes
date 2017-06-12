@@ -68,6 +68,7 @@ func GetLoadBalancerName(service *v1.Service) string {
 	return ret
 }
 
+// GetInstanceProviderID builds a ProviderID for a node in a cloud.
 func GetInstanceProviderID(cloud Interface, nodeName types.NodeName) (string, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
