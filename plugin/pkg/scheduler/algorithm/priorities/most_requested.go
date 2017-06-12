@@ -60,7 +60,7 @@ func calculateUsedScore(requested int64, capacity int64, node string) int64 {
 	return (requested * 10) / capacity
 }
 
-// Calculate the resource used on a node.  'node' has information about the resources on the node.
+// Calculate the resource used on a node. 'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
 func calculateUsedPriority(pod *v1.Pod, podRequests *schedulercache.Resource, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()

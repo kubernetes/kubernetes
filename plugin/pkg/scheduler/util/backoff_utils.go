@@ -35,7 +35,7 @@ func (realClock) Now() time.Time {
 	return time.Now()
 }
 
-// backoffEntry is single threaded.  in particular, it only allows a single action to be waiting on backoff at a time.
+// backoffEntry is single threaded. in particular, it only allows a single action to be waiting on backoff at a time.
 // It is expected that all users will only use the public TryWait(...) method
 // It is also not safe to copy this object.
 type backoffEntry struct {
@@ -50,7 +50,7 @@ func (b *backoffEntry) tryLock() bool {
 	return atomic.CompareAndSwapInt32(&b.reqInFlight, 0, 1)
 }
 
-// unlock returns the lock.  panics if the lock isn't held
+// unlock returns the lock. panics if the lock isn't held
 func (b *backoffEntry) unlock() {
 	if !atomic.CompareAndSwapInt32(&b.reqInFlight, 1, 0) {
 		panic(fmt.Sprintf("unexpected state on unlocking: %+v", b))

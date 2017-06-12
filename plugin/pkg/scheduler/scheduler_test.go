@@ -456,7 +456,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 		"PodFitsResources": predicates.PodFitsResources,
 	}
 
-	// Create expected failure reasons for all the nodes.  Hopefully they will get rolled up into a non-spammy summary.
+	// Create expected failure reasons for all the nodes. Hopefully they will get rolled up into a non-spammy summary.
 	failedPredicatesMap := core.FailedPredicateMap{}
 	for _, node := range nodes {
 		failedPredicatesMap[node.Name] = []algorithm.PredicateFailureReason{

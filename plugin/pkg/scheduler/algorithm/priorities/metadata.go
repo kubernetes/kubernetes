@@ -28,7 +28,7 @@ type priorityMetadata struct {
 	affinity       *v1.Affinity
 }
 
-// PriorityMetadata is a MetadataProducer.  Node info can be nil.
+// PriorityMetadata is a MetadataProducer. Node info can be nil.
 func PriorityMetadata(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
