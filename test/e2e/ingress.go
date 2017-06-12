@@ -144,7 +144,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 	})
 
 	// Time: borderline 5m, slow by design
-	framework.KubeDescribe("Nginx", func() {
+	framework.KubeDescribe("[Slow] Nginx", func() {
 		var nginxController *framework.NginxIngressController
 
 		BeforeEach(func() {
