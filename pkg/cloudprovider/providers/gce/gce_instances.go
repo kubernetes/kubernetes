@@ -76,11 +76,17 @@ func (gce *GCECloud) ToInstanceReferences(zone string, instanceNames []string) (
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (gce *GCECloud) NodeAddresses(_ types.NodeName) ([]v1.NodeAddress, error) {
-	internalIP, err := metadata.Get("instance/network-interfaces/0/ip")
+	path := "instance/network-interfaces/0/ip"
+	glog.V(4).Infof("metadata.Get(%s): start", path)
+	internalIP, err := metadata.Get(path)
+	glog.V(4).Infof("metadata.Get(%s): end", path)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get internal IP: %v", err)
 	}
-	externalIP, err := metadata.Get("instance/network-interfaces/0/access-configs/0/external-ip")
+	path = "instance/network-interfaces/0/access-configs/0/external-ip"
+	glog.V(4).Infof("metadata.Get(%s): start", path)
+	externalIP, err := metadata.Get(path)
+	glog.V(4).Infof("metadata.Get(%s): end", path)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get external IP: %v", err)
 	}
@@ -98,7 +104,9 @@ func (gce *GCECloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddr
 		return []v1.NodeAddress{}, err
 	}
 
+	glog.V(4).Infof("Instances.Get(%s, %s, %s): start", project, zone, canonicalizeInstanceName(name))
 	instance, err := gce.service.Instances.Get(project, zone, canonicalizeInstanceName(name)).Do()
+	glog.V(4).Infof("Instances.Get(%s, %s, %s): end", project, zone, canonicalizeInstanceName(name))
 	if err != nil {
 		return []v1.NodeAddress{}, fmt.Errorf("error while querying for providerID %q: %v", providerID, err)
 	}
@@ -199,7 +207,9 @@ func (gce *GCECloud) InstanceType(nodeName types.NodeName) (string, error) {
 
 func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return wait.Poll(2*time.Second, 30*time.Second, func() (bool, error) {
+		glog.V(4).Infof("Projects.Get(%s): start", gce.projectID)
 		project, err := gce.service.Projects.Get(gce.projectID).Do()
+		glog.V(4).Infof("Projects.Get(%s): end", gce.projectID)
 		if err != nil {
 			glog.Errorf("Could not get project: %v", err)
 			return false, nil
@@ -230,8 +240,10 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 		}
 
 		mc := newInstancesMetricContext("add_ssh_key", "")
+		glog.V(4).Infof("Projects.SetCommonInstanceMetadata(%s, %v): start", gce.projectID, project.CommonInstanceMetadata)
 		op, err := gce.service.Projects.SetCommonInstanceMetadata(
 			gce.projectID, project.CommonInstanceMetadata).Do()
+		glog.V(4).Infof("Projects.SetCommonInstanceMetadata(%s, %v): end", gce.projectID, project.CommonInstanceMetadata)
 
 		if err != nil {
 			glog.Errorf("Could not Set Metadata: %v", err)
@@ -264,7 +276,9 @@ func (gce *GCECloud) GetAllZones() (sets.String, error) {
 	for _, zone := range gce.managedZones {
 		mc := newInstancesMetricContext("list", zone)
 		// We only retrieve one page in each zone - we only care about existence
+		glog.V(4).Infof("Instances.List(%s, %s): start", gce.projectID, zone)
 		listCall := gce.service.Instances.List(gce.projectID, zone)
+		glog.V(4).Infof("Instances.List(%s, %s): end", gce.projectID, zone)
 
 		// No filter: We assume that a zone is either used or unused
 		// We could only consider running nodes (like we do in List above),
@@ -327,8 +341,10 @@ func (gce *GCECloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err e
 	}
 
 	var res *computebeta.Instance
+	glog.V(4).Infof("Beta Instances.Get(%s, %s, %s): start", gce.projectID, instance.Zone, instance.Name)
 	res, err = gce.serviceBeta.Instances.Get(
 		gce.projectID, instance.Zone, instance.Name).Do()
+	glog.V(4).Infof("Beta Instances.Get(%s, %s, %s): end", gce.projectID, instance.Zone, instance.Name)
 	if err != nil {
 		return
 	}
@@ -349,7 +365,9 @@ func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNe
 	if err != nil {
 		return err
 	}
+	glog.V(4).Infof("Alpha Instances.Get(%s, %s, %s): start", gce.projectID, v1instance.Zone, v1instance.Name)
 	instance, err := gce.serviceAlpha.Instances.Get(gce.projectID, v1instance.Zone, v1instance.Name).Do()
+	glog.V(4).Infof("Alpha Instances.Get(%s, %s, %s): end", gce.projectID, v1instance.Zone, v1instance.Name)
 	if err != nil {
 		return err
 	}
@@ -370,8 +388,10 @@ func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNe
 	})
 
 	mc := newInstancesMetricContext("addalias", v1instance.Zone)
+	glog.V(4).Infof("Alpha Instances.UpdateNetworkInterface(%s, %s, %s, %s, %v): start", gce.projectID, instance.Zone, instance.Name, iface.Name, iface)
 	op, err := gce.serviceAlpha.Instances.UpdateNetworkInterface(
 		gce.projectID, instance.Zone, instance.Name, iface.Name, iface).Do()
+	glog.V(4).Infof("Alpha Instances.UpdateNetworkInterface(%s, %s, %s, %s, %v): end", gce.projectID, instance.Zone, instance.Name, iface.Name, iface)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -401,7 +421,9 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 		pageToken := ""
 		page := 0
 		for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
+			glog.V(4).Infof("Instances.List(%s, %s): start", gce.projectID, zone)
 			listCall := gce.service.Instances.List(gce.projectID, zone)
+			glog.V(4).Infof("Instances.List(%s, %s): end", gce.projectID, zone)
 
 			if nodeInstancePrefix != "" {
 				// Add the filter for hosts
@@ -475,7 +497,9 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 func (gce *GCECloud) getInstanceFromProjectInZoneByName(project, zone, name string) (*gceInstance, error) {
 	name = canonicalizeInstanceName(name)
 	mc := newInstancesMetricContext("get", zone)
+	glog.V(4).Infof("Instances.Get(%s, %s, %s): start", project, zone, name)
 	res, err := gce.service.Instances.Get(project, zone, name).Do()
+	glog.V(4).Infof("Instances.Get(%s, %s, %s): end", project, zone, name)
 	mc.Observe(err)
 	if err != nil {
 		glog.Errorf("getInstanceFromProjectInZoneByName: failed to get instance %s; err: %v", name, err)
@@ -492,7 +516,10 @@ func (gce *GCECloud) getInstanceFromProjectInZoneByName(project, zone, name stri
 }
 
 func getInstanceIDViaMetadata() (string, error) {
-	result, err := metadata.Get("instance/hostname")
+	path := "instance/hostname"
+	glog.V(4).Infof("metadata.Get(%s): start", path)
+	result, err := metadata.Get(path)
+	glog.V(4).Infof("metadata.Get(%s): end", path)
 	if err != nil {
 		return "", err
 	}
@@ -504,7 +531,10 @@ func getInstanceIDViaMetadata() (string, error) {
 }
 
 func getCurrentExternalIDViaMetadata() (string, error) {
-	externalID, err := metadata.Get("instance/id")
+	path := "instance/id"
+	glog.V(4).Infof("metadata.Get(%s): start", path)
+	externalID, err := metadata.Get(path)
+	glog.V(4).Infof("metadata.Get(%s): end", path)
 	if err != nil {
 		return "", fmt.Errorf("couldn't get external ID: %v", err)
 	}
@@ -512,7 +542,10 @@ func getCurrentExternalIDViaMetadata() (string, error) {
 }
 
 func getCurrentMachineTypeViaMetadata() (string, error) {
-	mType, err := metadata.Get("instance/machine-type")
+	path := "instance/machine-type"
+	glog.V(4).Infof("metadata.Get(%s): start", path)
+	mType, err := metadata.Get(path)
+	glog.V(4).Infof("metadata.Get(%s): end", path)
 	if err != nil {
 		return "", fmt.Errorf("couldn't get machine type: %v", err)
 	}
@@ -567,7 +600,9 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 		pageToken := ""
 		page := 0
 		for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
+			glog.V(4).Infof("Instances.List(%s, %s): start", gce.projectID, zone)
 			listCall := gce.service.Instances.List(gce.projectID, zone)
+			glog.V(4).Infof("Instances.List(%s, %s): end", gce.projectID, zone)
 
 			if nodeInstancePrefix != "" {
 				// Add the filter for hosts

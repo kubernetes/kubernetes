@@ -38,7 +38,9 @@ func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, err
 	page := 0
 	for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
 		mc := newRoutesMetricContext("list_page")
+		glog.V(4).Infof("Routes.List(%s): start", gce.NetworkProjectID())
 		listCall := gce.service.Routes.List(gce.NetworkProjectID())
+		glog.V(4).Infof("Routes.List(%s): end", gce.NetworkProjectID())
 
 		prefix := truncateClusterName(clusterName)
 		// Filter for routes starting with clustername AND belonging to the
@@ -80,14 +82,17 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 	}
 
 	mc := newRoutesMetricContext("create")
-	insertOp, err := gce.service.Routes.Insert(gce.NetworkProjectID(), &compute.Route{
+	rt := compute.Route{
 		Name:            routeName,
 		DestRange:       route.DestinationCIDR,
 		NextHopInstance: fmt.Sprintf("zones/%s/instances/%s", targetInstance.Zone, targetInstance.Name),
 		Network:         gce.NetworkURL(),
 		Priority:        1000,
 		Description:     k8sNodeRouteTag,
-	}).Do()
+	}
+	glog.V(4).Infof("Routes.Insert(%s, %v): start", gce.NetworkProjectID(), rt)
+	insertOp, err := gce.service.Routes.Insert(gce.NetworkProjectID(), &rt).Do()
+	glog.V(4).Infof("Routes.Insert(%s, %v): end", gce.NetworkProjectID(), rt)
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusConflict) {
 			glog.Infof("Route %v already exists.", routeName)
@@ -101,7 +106,9 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 
 func (gce *GCECloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
 	mc := newRoutesMetricContext("delete")
+	glog.V(4).Infof("Routes.Delete(%s, %s): start", gce.NetworkProjectID(), route.Name)
 	deleteOp, err := gce.service.Routes.Delete(gce.NetworkProjectID(), route.Name).Do()
+	glog.V(4).Infof("Routes.Delete(%s, %s): end", gce.NetworkProjectID(), route.Name)
 	if err != nil {
 		return mc.Observe(err)
 	}

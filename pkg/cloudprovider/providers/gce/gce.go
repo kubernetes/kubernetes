@@ -668,7 +668,10 @@ func getRegionInURL(urlStr string) string {
 }
 
 func getNetworkNameViaMetadata() (string, error) {
-	result, err := metadata.Get("instance/network-interfaces/0/network")
+	path := "instance/network-interfaces/0/network"
+	glog.V(4).Infof("metadata.Get(%s): start", path)
+	result, err := metadata.Get(path)
+	glog.V(4).Infof("metadata.Get(%s): end", path)
 	if err != nil {
 		return "", err
 	}
@@ -681,12 +684,17 @@ func getNetworkNameViaMetadata() (string, error) {
 
 // getNetwork returns a GCP network
 func getNetwork(svc *compute.Service, networkProjectID, networkID string) (*compute.Network, error) {
-	return svc.Networks.Get(networkProjectID, networkID).Do()
+	glog.V(4).Infof("Networks.Get(%s, %s): start", networkProjectID, networkID)
+	network, err := svc.Networks.Get(networkProjectID, networkID).Do()
+	glog.V(4).Infof("Networks.Get(%s, %s): end", networkProjectID, networkID)
+	return network, err
 }
 
 // getProjectID returns the project's string ID given a project number or string
 func getProjectID(svc *compute.Service, projectNumberOrID string) (string, error) {
+	glog.V(4).Infof("Projects.Get(%s): start", projectNumberOrID)
 	proj, err := svc.Projects.Get(projectNumberOrID).Do()
+	glog.V(4).Infof("Projects.Get(%s): end", projectNumberOrID)
 	if err != nil {
 		return "", err
 	}
@@ -696,7 +704,9 @@ func getProjectID(svc *compute.Service, projectNumberOrID string) (string, error
 
 func getZonesForRegion(svc *compute.Service, projectID, region string) ([]string, error) {
 	// TODO: use PageToken to list all not just the first 500
+	glog.V(4).Infof("Zones.List(%s): start", projectID)
 	listCall := svc.Zones.List(projectID)
+	glog.V(4).Infof("Zones.List(%s): end", projectID)
 
 	// Filtering by region doesn't seem to work
 	// (tested in https://cloud.google.com/compute/docs/reference/latest/zones/list)

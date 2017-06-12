@@ -54,14 +54,18 @@ func newHealthcheckMetricContextWithVersion(request, version string) *metricCont
 // GetHttpHealthCheck returns the given HttpHealthCheck by name.
 func (gce *GCECloud) GetHttpHealthCheck(name string) (*compute.HttpHealthCheck, error) {
 	mc := newHealthcheckMetricContext("get_legacy")
+	glog.V(4).Infof("HttpHealthChecks.Get(%s, %s): start", gce.projectID, name)
 	v, err := gce.service.HttpHealthChecks.Get(gce.projectID, name).Do()
+	glog.V(4).Infof("HttpHealthChecks.Get(%s, %s): end", gce.projectID, name)
 	return v, mc.Observe(err)
 }
 
 // UpdateHttpHealthCheck applies the given HttpHealthCheck as an update.
 func (gce *GCECloud) UpdateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
 	mc := newHealthcheckMetricContext("update_legacy")
+	glog.V(4).Infof("HttpHealthChecks.Update(%s, %s, %v): start", gce.projectID, hc.Name, hc)
 	op, err := gce.service.HttpHealthChecks.Update(gce.projectID, hc.Name, hc).Do()
+	glog.V(4).Infof("HttpHealthChecks.Update(%s, %s, %v): end", gce.projectID, hc.Name, hc)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -72,7 +76,9 @@ func (gce *GCECloud) UpdateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
 // DeleteHttpHealthCheck deletes the given HttpHealthCheck by name.
 func (gce *GCECloud) DeleteHttpHealthCheck(name string) error {
 	mc := newHealthcheckMetricContext("delete_legacy")
+	glog.V(4).Infof("HttpHealthChecks.Delete(%s, %s): start", gce.projectID, name)
 	op, err := gce.service.HttpHealthChecks.Delete(gce.projectID, name).Do()
+	glog.V(4).Infof("HttpHealthChecks.Delete(%s, %s): end", gce.projectID, name)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -83,7 +89,9 @@ func (gce *GCECloud) DeleteHttpHealthCheck(name string) error {
 // CreateHttpHealthCheck creates the given HttpHealthCheck.
 func (gce *GCECloud) CreateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
 	mc := newHealthcheckMetricContext("create_legacy")
+	glog.V(4).Infof("HttpHealthChecks.Insert(%s, %v): start", gce.projectID, hc)
 	op, err := gce.service.HttpHealthChecks.Insert(gce.projectID, hc).Do()
+	glog.V(4).Infof("HttpHealthChecks.Insert(%s, %v): end", gce.projectID, hc)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -95,7 +103,9 @@ func (gce *GCECloud) CreateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
 func (gce *GCECloud) ListHttpHealthChecks() (*compute.HttpHealthCheckList, error) {
 	mc := newHealthcheckMetricContext("list_legacy")
 	// TODO: use PageToken to list all not just the first 500
+	glog.V(4).Infof("HttpHealthChecks.List(%s): start", gce.projectID)
 	v, err := gce.service.HttpHealthChecks.List(gce.projectID).Do()
+	glog.V(4).Infof("HttpHealthChecks.List(%s): end", gce.projectID)
 	return v, mc.Observe(err)
 }
 
@@ -104,7 +114,9 @@ func (gce *GCECloud) ListHttpHealthChecks() (*compute.HttpHealthCheckList, error
 // GetHttpsHealthCheck returns the given HttpsHealthCheck by name.
 func (gce *GCECloud) GetHttpsHealthCheck(name string) (*compute.HttpsHealthCheck, error) {
 	mc := newHealthcheckMetricContext("get_legacy")
+	glog.V(4).Infof("HttpsHealthChecks.Get(%s, %s): start", gce.projectID, name)
 	v, err := gce.service.HttpsHealthChecks.Get(gce.projectID, name).Do()
+	glog.V(4).Infof("HttpsHealthChecks.Get(%s, %s): end", gce.projectID, name)
 	mc.Observe(err)
 	return v, err
 }
@@ -112,7 +124,9 @@ func (gce *GCECloud) GetHttpsHealthCheck(name string) (*compute.HttpsHealthCheck
 // UpdateHttpsHealthCheck applies the given HttpsHealthCheck as an update.
 func (gce *GCECloud) UpdateHttpsHealthCheck(hc *compute.HttpsHealthCheck) error {
 	mc := newHealthcheckMetricContext("update_legacy")
+	glog.V(4).Infof("HttpsHealthChecks.Update(%s, %s, %v): start", gce.projectID, hc.Name, hc)
 	op, err := gce.service.HttpsHealthChecks.Update(gce.projectID, hc.Name, hc).Do()
+	glog.V(4).Infof("HttpsHealthChecks.Update(%s, %s, %v): end", gce.projectID, hc.Name, hc)
 	if err != nil {
 		mc.Observe(err)
 		return err
@@ -124,7 +138,9 @@ func (gce *GCECloud) UpdateHttpsHealthCheck(hc *compute.HttpsHealthCheck) error 
 // DeleteHttpsHealthCheck deletes the given HttpsHealthCheck by name.
 func (gce *GCECloud) DeleteHttpsHealthCheck(name string) error {
 	mc := newHealthcheckMetricContext("delete_legacy")
+	glog.V(4).Infof("HttpsHealthChecks.Delete(%s, %s): start", gce.projectID, name)
 	op, err := gce.service.HttpsHealthChecks.Delete(gce.projectID, name).Do()
+	glog.V(4).Infof("HttpsHealthChecks.Delete(%s, %s): end", gce.projectID, name)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -135,7 +151,9 @@ func (gce *GCECloud) DeleteHttpsHealthCheck(name string) error {
 // CreateHttpsHealthCheck creates the given HttpsHealthCheck.
 func (gce *GCECloud) CreateHttpsHealthCheck(hc *compute.HttpsHealthCheck) error {
 	mc := newHealthcheckMetricContext("create_legacy")
+	glog.V(4).Infof("HttpsHealthChecks.Insert(%s, %v): start", gce.projectID, hc)
 	op, err := gce.service.HttpsHealthChecks.Insert(gce.projectID, hc).Do()
+	glog.V(4).Infof("HttpsHealthChecks.Insert(%s, %v): end", gce.projectID, hc)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -147,7 +165,9 @@ func (gce *GCECloud) CreateHttpsHealthCheck(hc *compute.HttpsHealthCheck) error 
 func (gce *GCECloud) ListHttpsHealthChecks() (*compute.HttpsHealthCheckList, error) {
 	mc := newHealthcheckMetricContext("list_legacy")
 	// TODO: use PageToken to list all not just the first 500
+	glog.V(4).Infof("HttpsHealthChecks.List(%s): start", gce.projectID)
 	v, err := gce.service.HttpsHealthChecks.List(gce.projectID).Do()
+	glog.V(4).Infof("HttpsHealthChecks.List(%s): end", gce.projectID)
 	return v, mc.Observe(err)
 }
 
@@ -156,7 +176,9 @@ func (gce *GCECloud) ListHttpsHealthChecks() (*compute.HttpsHealthCheckList, err
 // GetHealthCheck returns the given HealthCheck by name.
 func (gce *GCECloud) GetHealthCheck(name string) (*compute.HealthCheck, error) {
 	mc := newHealthcheckMetricContext("get")
+	glog.V(4).Infof("HttpsHealthChecks.List(%s, %v): start", gce.projectID, name)
 	v, err := gce.service.HealthChecks.Get(gce.projectID, name).Do()
+	glog.V(4).Infof("HttpsHealthChecks.List(%s, %v): end", gce.projectID, name)
 	return v, mc.Observe(err)
 }
 
@@ -170,7 +192,9 @@ func (gce *GCECloud) GetAlphaHealthCheck(name string) (*computealpha.HealthCheck
 // UpdateHealthCheck applies the given HealthCheck as an update.
 func (gce *GCECloud) UpdateHealthCheck(hc *compute.HealthCheck) error {
 	mc := newHealthcheckMetricContext("update")
+	glog.V(4).Infof("HealthChecks.Update(%s, %s, %v): start", gce.projectID, hc.Name, hc)
 	op, err := gce.service.HealthChecks.Update(gce.projectID, hc.Name, hc).Do()
+	glog.V(4).Infof("HealthChecks.Update(%s, %s, %v): end", gce.projectID, hc.Name, hc)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -192,7 +216,9 @@ func (gce *GCECloud) UpdateAlphaHealthCheck(hc *computealpha.HealthCheck) error 
 // DeleteHealthCheck deletes the given HealthCheck by name.
 func (gce *GCECloud) DeleteHealthCheck(name string) error {
 	mc := newHealthcheckMetricContext("delete")
+	glog.V(4).Infof("HealthChecks.Delete(%s, %s): start", gce.projectID, name)
 	op, err := gce.service.HealthChecks.Delete(gce.projectID, name).Do()
+	glog.V(4).Infof("HealthChecks.Delete(%s, %s): end", gce.projectID, name)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -203,7 +229,9 @@ func (gce *GCECloud) DeleteHealthCheck(name string) error {
 // CreateHealthCheck creates the given HealthCheck.
 func (gce *GCECloud) CreateHealthCheck(hc *compute.HealthCheck) error {
 	mc := newHealthcheckMetricContext("create")
+	glog.V(4).Infof("HealthChecks.Insert(%s, %v): start", gce.projectID, hc)
 	op, err := gce.service.HealthChecks.Insert(gce.projectID, hc).Do()
+	glog.V(4).Infof("HealthChecks.Insert(%s, %v): end", gce.projectID, hc)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -226,7 +254,9 @@ func (gce *GCECloud) CreateAlphaHealthCheck(hc *computealpha.HealthCheck) error 
 func (gce *GCECloud) ListHealthChecks() (*compute.HealthCheckList, error) {
 	mc := newHealthcheckMetricContext("list")
 	// TODO: use PageToken to list all not just the first 500
+	glog.V(4).Infof("HealthChecks.List(%s): start", gce.projectID)
 	v, err := gce.service.HealthChecks.List(gce.projectID).Do()
+	glog.V(4).Infof("HealthChecks.List(%s): end", gce.projectID)
 	return v, mc.Observe(err)
 }
 

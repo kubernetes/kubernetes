@@ -127,8 +127,11 @@ func (manager *gceServiceManager) CreateDiskOnCloudProvider(
 			Type:        diskTypeURI,
 		}
 
-		return manager.gce.serviceAlpha.Disks.Insert(
+		glog.V(4).Infof("Alpha Disks.Insert(%s, %s, %v): start", manager.gce.projectID, zone, diskToCreateAlpha)
+		obj, err := manager.gce.serviceAlpha.Disks.Insert(
 			manager.gce.projectID, zone, diskToCreateAlpha).Do()
+		glog.V(4).Infof("Alpha Disks.Insert(%s, %s, %v): end", manager.gce.projectID, zone, diskToCreateAlpha)
+		return obj, err
 	}
 
 	diskToCreateV1 := &compute.Disk{
@@ -137,8 +140,11 @@ func (manager *gceServiceManager) CreateDiskOnCloudProvider(
 		Description: tagsStr,
 		Type:        diskTypeURI,
 	}
-	return manager.gce.service.Disks.Insert(
+	glog.V(4).Infof("Disks.Insert(%s, %s, %v): start", manager.gce.projectID, zone, diskToCreateV1)
+	obj, err := manager.gce.service.Disks.Insert(
 		manager.gce.projectID, zone, diskToCreateV1).Do()
+	glog.V(4).Infof("Disks.Insert(%s, %s, %v): start", manager.gce.projectID, zone, diskToCreateV1)
+	return obj, err
 }
 
 func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
@@ -165,8 +171,11 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 			Type:         diskTypeURI,
 			ReplicaZones: fullyQualifiedReplicaZones,
 		}
-		return manager.gce.serviceAlpha.RegionDisks.Insert(
+		glog.V(4).Infof("Alpha RegionDisks.Insert(%s, %s, %v): start", manager.gce.projectID, manager.gce.region, diskToCreateAlpha)
+		obj, err := manager.gce.serviceAlpha.RegionDisks.Insert(
 			manager.gce.projectID, manager.gce.region, diskToCreateAlpha).Do()
+		glog.V(4).Infof("Alpha RegionDisks.Insert(%s, %s, %v): end", manager.gce.projectID, manager.gce.region, diskToCreateAlpha)
+		return obj, err
 	}
 
 	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
@@ -190,8 +199,11 @@ func (manager *gceServiceManager) AttachDiskOnCloudProvider(
 			Source:     source,
 			Type:       diskTypePersistent,
 		}
-		return manager.gce.serviceAlpha.Instances.AttachDisk(
+		glog.V(4).Infof("Alpha Instances.AttachDisk(%s, %s, %s, %v): start", manager.gce.projectID, instanceZone, instanceName, attachedDiskAlpha)
+		obj, err := manager.gce.serviceAlpha.Instances.AttachDisk(
 			manager.gce.projectID, instanceZone, instanceName, attachedDiskAlpha).Do()
+		glog.V(4).Infof("Alpha Instances.AttachDisk(%s, %s, %s, %v): end", manager.gce.projectID, instanceZone, instanceName, attachedDiskAlpha)
+		return obj, err
 	}
 
 	attachedDiskV1 := &compute.AttachedDisk{
@@ -201,8 +213,11 @@ func (manager *gceServiceManager) AttachDiskOnCloudProvider(
 		Source:     source,
 		Type:       disk.Type,
 	}
-	return manager.gce.service.Instances.AttachDisk(
+	glog.V(4).Infof("Instances.AttachDisk(%s, %s, %s, %v): start", manager.gce.projectID, instanceZone, instanceName, attachedDiskV1)
+	obj, err := manager.gce.service.Instances.AttachDisk(
 		manager.gce.projectID, instanceZone, instanceName, attachedDiskV1).Do()
+	glog.V(4).Infof("Instances.AttachDisk(%s, %s, %s, %v): end", manager.gce.projectID, instanceZone, instanceName, attachedDiskV1)
+	return obj, err
 }
 
 func (manager *gceServiceManager) DetachDiskOnCloudProvider(
@@ -210,12 +225,17 @@ func (manager *gceServiceManager) DetachDiskOnCloudProvider(
 	instanceName string,
 	devicePath string) (gceObject, error) {
 	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
+		glog.V(4).Infof("Alpha Instances.DetachDisk(%s, %s, %s, %s): start", manager.gce.projectID, instanceZone, instanceName, devicePath)
 		manager.gce.serviceAlpha.Instances.DetachDisk(
 			manager.gce.projectID, instanceZone, instanceName, devicePath).Do()
+		glog.V(4).Infof("Alpha Instances.DetachDisk(%s, %s, %s, %s): end", manager.gce.projectID, instanceZone, instanceName, devicePath)
 	}
 
-	return manager.gce.service.Instances.DetachDisk(
+	glog.V(4).Infof("Instances.DetachDisk(%s, %s, %s, %s): start", manager.gce.projectID, instanceZone, instanceName, devicePath)
+	obj, err := manager.gce.service.Instances.DetachDisk(
 		manager.gce.projectID, instanceZone, instanceName, devicePath).Do()
+	glog.V(4).Infof("Instances.DetachDisk(%s, %s, %s, %s): end", manager.gce.projectID, instanceZone, instanceName, devicePath)
+	return obj, err
 }
 
 func (manager *gceServiceManager) GetDiskFromCloudProvider(
@@ -230,8 +250,10 @@ func (manager *gceServiceManager) GetDiskFromCloudProvider(
 	}
 
 	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
+		glog.V(4).Infof("Alpha Disks.Get(%s, %s, %s): start", manager.gce.projectID, zone, diskName)
 		diskAlpha, err := manager.gce.serviceAlpha.Disks.Get(
 			manager.gce.projectID, zone, diskName).Do()
+		glog.V(4).Infof("Alpha Disks.Get(%s, %s, %s): end", manager.gce.projectID, zone, diskName)
 		if err != nil {
 			return nil, err
 		}
@@ -267,8 +289,10 @@ func (manager *gceServiceManager) GetDiskFromCloudProvider(
 		}, nil
 	}
 
+	glog.V(4).Infof("Disks.Get(%s, %s, %s): start", manager.gce.projectID, zone, diskName)
 	diskStable, err := manager.gce.service.Disks.Get(
 		manager.gce.projectID, zone, diskName).Do()
+	glog.V(4).Infof("Disks.Get(%s, %s, %s): end", manager.gce.projectID, zone, diskName)
 	if err != nil {
 		return nil, err
 	}
@@ -296,8 +320,10 @@ func (manager *gceServiceManager) GetRegionalDiskFromCloudProvider(
 	diskName string) (*GCEDisk, error) {
 
 	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
+		glog.V(4).Infof("Alpha RegionDisks.Get(%s, %s, %s): start", manager.gce.projectID, manager.gce.region, diskName)
 		diskAlpha, err := manager.gce.serviceAlpha.RegionDisks.Get(
 			manager.gce.projectID, manager.gce.region, diskName).Do()
+		glog.V(4).Infof("Alpha RegionDisks.Get(%s, %s, %s): end", manager.gce.projectID, manager.gce.region, diskName)
 		if err != nil {
 			return nil, err
 		}
@@ -324,19 +350,28 @@ func (manager *gceServiceManager) DeleteDiskOnCloudProvider(
 	diskName string) (gceObject, error) {
 
 	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
-		return manager.gce.serviceAlpha.Disks.Delete(
+		glog.V(4).Infof("Alpha Disks.Delete(%s, %s, %s): start", manager.gce.projectID, zone, diskName)
+		obj, err := manager.gce.serviceAlpha.Disks.Delete(
 			manager.gce.projectID, zone, diskName).Do()
+		glog.V(4).Infof("Alpha Disks.Delete(%s, %s, %s): end", manager.gce.projectID, zone, diskName)
+		return obj, err
 	}
 
-	return manager.gce.service.Disks.Delete(
+	glog.V(4).Infof("Disks.Delete(%s, %s, %s): start", manager.gce.projectID, zone, diskName)
+	obj, err := manager.gce.service.Disks.Delete(
 		manager.gce.projectID, zone, diskName).Do()
+	glog.V(4).Infof("Disks.Delete(%s, %s, %s): end", manager.gce.projectID, zone, diskName)
+	return obj, err
 }
 
 func (manager *gceServiceManager) DeleteRegionalDiskOnCloudProvider(
 	diskName string) (gceObject, error) {
 	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
-		return manager.gce.serviceAlpha.RegionDisks.Delete(
+		glog.V(4).Infof("Alpha RegionDisks.Delete(%s, %s, %s): start", manager.gce.projectID, manager.gce.region, diskName)
+		obj, err := manager.gce.serviceAlpha.RegionDisks.Delete(
 			manager.gce.projectID, manager.gce.region, diskName).Do()
+		glog.V(4).Infof("Alpha RegionDisks.Delete(%s, %s, %s): end", manager.gce.projectID, manager.gce.region, diskName)
+		return obj, err
 	}
 
 	return nil, fmt.Errorf("DeleteRegionalDiskOnCloudProvider is a regional PD feature and is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")

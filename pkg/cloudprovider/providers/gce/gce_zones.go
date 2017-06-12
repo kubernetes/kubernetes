@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v1"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -73,7 +74,9 @@ func (gce *GCECloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Z
 func (gce *GCECloud) ListZonesInRegion(region string) ([]*compute.Zone, error) {
 	mc := newZonesMetricContext("list", region)
 	filter := fmt.Sprintf("region eq %v", gce.getRegionLink(region))
+	glog.V(4).Infof("Zones.List(%s): start", gce.projectID)
 	list, err := gce.service.Zones.List(gce.projectID).Filter(filter).Do()
+	glog.V(4).Infof("Zones.List(%s): end", gce.projectID)
 	if err != nil {
 		return nil, mc.Observe(err)
 	}

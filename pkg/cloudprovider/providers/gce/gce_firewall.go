@@ -18,6 +18,8 @@ package gce
 
 import (
 	compute "google.golang.org/api/compute/v1"
+
+	"github.com/golang/glog"
 )
 
 func newFirewallMetricContext(request string) *metricContext {
@@ -27,14 +29,18 @@ func newFirewallMetricContext(request string) *metricContext {
 // GetFirewall returns the Firewall by name.
 func (gce *GCECloud) GetFirewall(name string) (*compute.Firewall, error) {
 	mc := newFirewallMetricContext("get")
+	glog.V(4).Infof("Firewalls.Get(%s, %s): start", gce.NetworkProjectID(), name)
 	v, err := gce.service.Firewalls.Get(gce.NetworkProjectID(), name).Do()
+	glog.V(4).Infof("Firewalls.Get(%s, %s): end", gce.NetworkProjectID(), name)
 	return v, mc.Observe(err)
 }
 
 // CreateFirewall creates the passed firewall
 func (gce *GCECloud) CreateFirewall(f *compute.Firewall) error {
 	mc := newFirewallMetricContext("create")
+	glog.V(4).Infof("Firewalls.Insert(%s, %v): start", gce.NetworkProjectID(), f)
 	op, err := gce.service.Firewalls.Insert(gce.NetworkProjectID(), f).Do()
+	glog.V(4).Infof("Firewalls.Insert(%s, %v): end", gce.NetworkProjectID(), f)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -45,7 +51,9 @@ func (gce *GCECloud) CreateFirewall(f *compute.Firewall) error {
 // DeleteFirewall deletes the given firewall rule.
 func (gce *GCECloud) DeleteFirewall(name string) error {
 	mc := newFirewallMetricContext("delete")
+	glog.V(4).Infof("Firewalls.Delete(%s, %s): start", gce.NetworkProjectID(), name)
 	op, err := gce.service.Firewalls.Delete(gce.NetworkProjectID(), name).Do()
+	glog.V(4).Infof("Firewalls.Delete(%s, %s): end", gce.NetworkProjectID(), name)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -55,7 +63,9 @@ func (gce *GCECloud) DeleteFirewall(name string) error {
 // UpdateFirewall applies the given firewall as an update to an existing service.
 func (gce *GCECloud) UpdateFirewall(f *compute.Firewall) error {
 	mc := newFirewallMetricContext("update")
+	glog.V(4).Infof("Firewalls.Update(%s, %s, %v): start", gce.NetworkProjectID(), f.Name, f)
 	op, err := gce.service.Firewalls.Update(gce.NetworkProjectID(), f.Name, f).Do()
+	glog.V(4).Infof("Firewalls.Update(%s, %s, %v): end", gce.NetworkProjectID(), f.Name, f)
 	if err != nil {
 		return mc.Observe(err)
 	}

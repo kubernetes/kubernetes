@@ -21,6 +21,8 @@ import (
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
+
+	"github.com/golang/glog"
 )
 
 func newBackendServiceMetricContext(request, region string) *metricContext {
@@ -34,7 +36,9 @@ func newBackendServiceMetricContextWithVersion(request, region, version string) 
 // GetGlobalBackendService retrieves a backend by name.
 func (gce *GCECloud) GetGlobalBackendService(name string) (*compute.BackendService, error) {
 	mc := newBackendServiceMetricContext("get", "")
+	glog.V(4).Infof("BackendServices.Get(%s, %s): start", gce.projectID, name)
 	v, err := gce.service.BackendServices.Get(gce.projectID, name).Do()
+	glog.V(4).Infof("BackendServices.Get(%s, %s): end", gce.projectID, name)
 	return v, mc.Observe(err)
 }
 
@@ -48,7 +52,9 @@ func (gce *GCECloud) GetAlphaGlobalBackendService(name string) (*computealpha.Ba
 // UpdateGlobalBackendService applies the given BackendService as an update to an existing service.
 func (gce *GCECloud) UpdateGlobalBackendService(bg *compute.BackendService) error {
 	mc := newBackendServiceMetricContext("update", "")
+	glog.V(4).Infof("BackendServices.Update(%s, %s, %v): start", gce.projectID, bg.Name, bg)
 	op, err := gce.service.BackendServices.Update(gce.projectID, bg.Name, bg).Do()
+	glog.V(4).Infof("BackendServices.Update(%s, %s, %v): end", gce.projectID, bg.Name, bg)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -70,7 +76,9 @@ func (gce *GCECloud) UpdateAlphaGlobalBackendService(bg *computealpha.BackendSer
 // DeleteGlobalBackendService deletes the given BackendService by name.
 func (gce *GCECloud) DeleteGlobalBackendService(name string) error {
 	mc := newBackendServiceMetricContext("delete", "")
+	glog.V(4).Infof("BackendServices.Delete(%s, %s): start", gce.projectID, name)
 	op, err := gce.service.BackendServices.Delete(gce.projectID, name).Do()
+	glog.V(4).Infof("BackendServices.Delete(%s, %s): end", gce.projectID, name)
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return nil
@@ -84,7 +92,9 @@ func (gce *GCECloud) DeleteGlobalBackendService(name string) error {
 // CreateGlobalBackendService creates the given BackendService.
 func (gce *GCECloud) CreateGlobalBackendService(bg *compute.BackendService) error {
 	mc := newBackendServiceMetricContext("create", "")
+	glog.V(4).Infof("BackendServices.Insert(%s, %v): start", gce.projectID, bg)
 	op, err := gce.service.BackendServices.Insert(gce.projectID, bg).Do()
+	glog.V(4).Infof("BackendServices.Insert(%s, %v): end", gce.projectID, bg)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -107,7 +117,9 @@ func (gce *GCECloud) CreateAlphaGlobalBackendService(bg *computealpha.BackendSer
 func (gce *GCECloud) ListGlobalBackendServices() (*compute.BackendServiceList, error) {
 	mc := newBackendServiceMetricContext("list", "")
 	// TODO: use PageToken to list all not just the first 500
+	glog.V(4).Infof("BackendServices.List(%s): start", gce.projectID)
 	v, err := gce.service.BackendServices.List(gce.projectID).Do()
+	glog.V(4).Infof("BackendServices.List(%s): end", gce.projectID)
 	return v, mc.Observe(err)
 }
 
@@ -117,21 +129,27 @@ func (gce *GCECloud) ListGlobalBackendServices() (*compute.BackendServiceList, e
 func (gce *GCECloud) GetGlobalBackendServiceHealth(name string, instanceGroupLink string) (*compute.BackendServiceGroupHealth, error) {
 	mc := newBackendServiceMetricContext("get_health", "")
 	groupRef := &compute.ResourceGroupReference{Group: instanceGroupLink}
+	glog.V(4).Infof("BackendServices.GetHealth(%s, %s, %v): start", gce.projectID, name, groupRef)
 	v, err := gce.service.BackendServices.GetHealth(gce.projectID, name, groupRef).Do()
+	glog.V(4).Infof("BackendServices.GetHealth(%s, %s, %v): end", gce.projectID, name, groupRef)
 	return v, mc.Observe(err)
 }
 
 // GetRegionBackendService retrieves a backend by name.
 func (gce *GCECloud) GetRegionBackendService(name, region string) (*compute.BackendService, error) {
 	mc := newBackendServiceMetricContext("get", region)
+	glog.V(4).Infof("RegionBackendServices.Get(%s, %s, %s): start", gce.projectID, region, name)
 	v, err := gce.service.RegionBackendServices.Get(gce.projectID, region, name).Do()
+	glog.V(4).Infof("RegionBackendServices.Get(%s, %s, %s): end", gce.projectID, region, name)
 	return v, mc.Observe(err)
 }
 
 // UpdateRegionBackendService applies the given BackendService as an update to an existing service.
 func (gce *GCECloud) UpdateRegionBackendService(bg *compute.BackendService, region string) error {
 	mc := newBackendServiceMetricContext("update", region)
+	glog.V(4).Infof("RegionBackendServices.Update(%s, %s, %v): start", gce.projectID, region, bg.Name)
 	op, err := gce.service.RegionBackendServices.Update(gce.projectID, region, bg.Name, bg).Do()
+	glog.V(4).Infof("RegionBackendServices.Update(%s, %s, %v): end", gce.projectID, region, bg.Name)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -142,7 +160,9 @@ func (gce *GCECloud) UpdateRegionBackendService(bg *compute.BackendService, regi
 // DeleteRegionBackendService deletes the given BackendService by name.
 func (gce *GCECloud) DeleteRegionBackendService(name, region string) error {
 	mc := newBackendServiceMetricContext("delete", region)
+	glog.V(4).Infof("RegionBackendServices.Delete(%s, %s, %s): start", gce.projectID, region, name)
 	op, err := gce.service.RegionBackendServices.Delete(gce.projectID, region, name).Do()
+	glog.V(4).Infof("RegionBackendServices.Delete(%s, %s, %s): end", gce.projectID, region, name)
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return nil
@@ -156,7 +176,9 @@ func (gce *GCECloud) DeleteRegionBackendService(name, region string) error {
 // CreateRegionBackendService creates the given BackendService.
 func (gce *GCECloud) CreateRegionBackendService(bg *compute.BackendService, region string) error {
 	mc := newBackendServiceMetricContext("create", region)
+	glog.V(4).Infof("RegionBackendServices.Insert(%s, %s, %v): start", gce.projectID, region, bg)
 	op, err := gce.service.RegionBackendServices.Insert(gce.projectID, region, bg).Do()
+	glog.V(4).Infof("RegionBackendServices.Insert(%s, %s, %v): end", gce.projectID, region, bg)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -168,7 +190,9 @@ func (gce *GCECloud) CreateRegionBackendService(bg *compute.BackendService, regi
 func (gce *GCECloud) ListRegionBackendServices(region string) (*compute.BackendServiceList, error) {
 	mc := newBackendServiceMetricContext("list", region)
 	// TODO: use PageToken to list all not just the first 500
+	glog.V(4).Infof("RegionBackendServices.List(%s, %s): start", gce.projectID, region)
 	v, err := gce.service.RegionBackendServices.List(gce.projectID, region).Do()
+	glog.V(4).Infof("RegionBackendServices.List(%s, %s): end", gce.projectID, region)
 	return v, mc.Observe(err)
 }
 
@@ -178,6 +202,8 @@ func (gce *GCECloud) ListRegionBackendServices(region string) (*compute.BackendS
 func (gce *GCECloud) GetRegionalBackendServiceHealth(name, region string, instanceGroupLink string) (*compute.BackendServiceGroupHealth, error) {
 	mc := newBackendServiceMetricContext("get_health", region)
 	groupRef := &compute.ResourceGroupReference{Group: instanceGroupLink}
+	glog.V(4).Infof("RegionBackendServices.GetHealth(%s, %s, %s, %v): start", gce.projectID, region, name, groupRef)
 	v, err := gce.service.RegionBackendServices.GetHealth(gce.projectID, region, name, groupRef).Do()
+	glog.V(4).Infof("RegionBackendServices.GetHealth(%s, %s, %s, %v): end", gce.projectID, region, name, groupRef)
 	return v, mc.Observe(err)
 }
