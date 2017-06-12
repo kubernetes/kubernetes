@@ -668,6 +668,7 @@ enum ContainerState {
     CONTAINER_RUNNING = 1;
     CONTAINER_EXITED  = 2;
     CONTAINER_UNKNOWN = 3;
+    CONTAINER_OOMKILLED = 4;
 }
 
 // ContainerStateValue is the wrapper of ContainerState.
