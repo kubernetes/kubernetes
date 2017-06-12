@@ -27,6 +27,7 @@ type accountWithLocation struct {
 
 // getStorageAccounts gets the storage accounts' name, type, location in a resource group
 func (az *Cloud) getStorageAccounts() ([]accountWithLocation, error) {
+	az.operationPollRateLimiter.Accept()
 	result, err := az.StorageAccountClient.ListByResourceGroup(az.ResourceGroup)
 	if err != nil {
 		return nil, err
@@ -56,6 +57,7 @@ func (az *Cloud) getStorageAccounts() ([]accountWithLocation, error) {
 
 // getStorageAccesskey gets the storage account access key
 func (az *Cloud) getStorageAccesskey(account string) (string, error) {
+	az.operationPollRateLimiter.Accept()
 	result, err := az.StorageAccountClient.ListKeys(az.ResourceGroup, account)
 	if err != nil {
 		return "", err
