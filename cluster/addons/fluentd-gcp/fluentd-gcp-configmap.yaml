@@ -278,6 +278,14 @@ data:
       read_from_head true
       tag kubelet
     </source>
+
+    <source>
+      type systemd
+      filters [{ "_SYSTEMD_UNIT": "node-problem-detector.service" }]
+      pos_file /var/log/gcp-journald-node-problem-detector.pos
+      read_from_head true
+      tag node-problem-detector
+    </source>
   monitoring.conf: |-
     # Prometheus monitoring
     <source>
