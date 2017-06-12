@@ -207,7 +207,7 @@ type VolumeFilter struct {
 }
 
 // NewMaxPDVolumeCountPredicate creates a predicate which evaluates whether a pod can fit based on the
-// number of volumes which match a filter that it requests, and those that are already present.  The
+// number of volumes which match a filter that it requests, and those that are already present. The
 // maximum number is configurable to accommodate different systems.
 //
 // The predicate looks for both volumes used directly, as well as PVC volumes that are backed by relevant volume
@@ -379,8 +379,8 @@ type VolumeZoneChecker struct {
 }
 
 // VolumeZonePredicate evaluates if a pod can fit due to the volumes it requests, given
-// that some volumes may have zone scheduling constraints.  The requirement is that any
-// volume zone-labels must match the equivalent zone-labels on the node.  It is OK for
+// that some volumes may have zone scheduling constraints. The requirement is that any
+// volume zone-labels must match the equivalent zone-labels on the node. It is OK for
 // the node to have more zone-label constraints (for example, a hypothetical replicated
 // volume might allow region-wide access)
 //
@@ -390,7 +390,7 @@ type VolumeZoneChecker struct {
 // Working with volumes declared inline in the pod specification (i.e. not
 // using a PersistentVolume) is likely to be harder, as it would require
 // determining the zone of a volume during scheduling, and that is likely to
-// require calling out to the cloud provider.  It seems that we are moving away
+// require calling out to the cloud provider. It seems that we are moving away
 // from inline volume declarations anyway.
 func NewVolumeZonePredicate(pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
 	c := &VolumeZoneChecker{
@@ -766,7 +766,7 @@ type ServiceAffinity struct {
 	labels        []string
 }
 
-// serviceAffinityPrecomputation should be run once by the scheduler before looping through the Predicate.  It is a helper function that
+// serviceAffinityPrecomputation should be run once by the scheduler before looping through the Predicate. It is a helper function that
 // only should be referenced by NewServiceAffinityPredicate.
 func (s *ServiceAffinity) serviceAffinityPrecomputation(pm *predicateMetadata) {
 	if pm.pod == nil {

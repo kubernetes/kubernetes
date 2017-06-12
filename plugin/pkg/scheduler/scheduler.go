@@ -76,7 +76,7 @@ type Configurator interface {
 	GetSchedulerName() string
 	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue *cache.FIFO) func(pod *v1.Pod, err error)
 
-	// Probably doesn't need to be public.  But exposed for now in case.
+	// Probably doesn't need to be public. But exposed for now in case.
 	ResponsibleForPod(pod *v1.Pod) bool
 
 	// Needs to be exposed for things like integration tests where we want to make fake nodes.
@@ -128,7 +128,7 @@ type Config struct {
 	StopEverything chan struct{}
 }
 
-// NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
+// NewFromConfigurator returns a new scheduler that is created entirely by the Configurator. Assumes Create() is implemented.
 // Supports intermediate Config mutation for now if you provide modifier functions which will run after Config is created.
 func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Scheduler, error) {
 	cfg, err := c.Create()
@@ -213,7 +213,7 @@ func (sched *Scheduler) assume(pod *v1.Pod, host string) error {
 	return nil
 }
 
-// bind binds a pod to a given node defined in a binding object.  We expect this to run asynchronously, so we
+// bind binds a pod to a given node defined in a binding object. We expect this to run asynchronously, so we
 // handle binding metrics internally.
 func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	bindingStart := time.Now()
@@ -242,7 +242,7 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	return nil
 }
 
-// scheduleOne does the entire scheduling workflow for a single pod.  It is serialized on the scheduling algorithm's host fitting.
+// scheduleOne does the entire scheduling workflow for a single pod. It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) scheduleOne() {
 	pod := sched.config.NextPod()
 	if pod.DeletionTimestamp != nil {
