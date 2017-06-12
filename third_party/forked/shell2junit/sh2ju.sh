@@ -174,4 +174,5 @@ EOF
 EOF
   fi
 
+  return $err
 }
