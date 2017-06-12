@@ -89,32 +89,39 @@ func updateISCSINode(b iscsiDiskMounter, tp string) error {
 type StatFunc func(string) (os.FileInfo, error)
 type GlobFunc func(string) ([]string, error)
 
-func waitForPathToExist(devicePath string, maxRetries int, deviceTransport string) bool {
+func waitForPathToExist(devicePath *string, maxRetries int, deviceTransport string) bool {
 	// This makes unit testing a lot easier
 	return waitForPathToExistInternal(devicePath, maxRetries, deviceTransport, os.Stat, filepath.Glob)
 }
 
-func waitForPathToExistInternal(devicePath string, maxRetries int, deviceTransport string, osStat StatFunc, filepathGlob GlobFunc) bool {
-	for i := 0; i < maxRetries; i++ {
-		var err error
-		if deviceTransport == "tcp" {
-			_, err = osStat(devicePath)
-		} else {
-			fpath, _ := filepathGlob(devicePath)
-			if fpath == nil {
-				err = os.ErrNotExist
+func waitForPathToExistInternal(devicePath *string, maxRetries int, deviceTransport string, osStat StatFunc, filepathGlob GlobFunc) bool {
+	if devicePath != nil {
+		for i := 0; i < maxRetries; i++ {
+			var err error
+			if deviceTransport == "tcp" {
+				_, err = osStat(*devicePath)
+			} else {
+				fpath, _ := filepathGlob(*devicePath)
+				if fpath == nil {
+					err = os.ErrNotExist
+				} else {
+					// There might be a case that fpath contains multiple device paths if
+					// multiple PCI devices connect to same iscsi target. We handle this
+					// case at subsequent logic. Pick up only first path here.
+					*devicePath = fpath[0]
+				}
 			}
+			if err == nil {
+				return true
+			}
+			if err != nil && !os.IsNotExist(err) {
+				return false
+			}
+			if i == maxRetries-1 {
+				break
+			}
+			time.Sleep(time.Second)
 		}
-		if err == nil {
-			return true
-		}
-		if err != nil && !os.IsNotExist(err) {
-			return false
-		}
-		if i == maxRetries-1 {
-			break
-		}
-		time.Sleep(time.Second)
 	}
 	return false
 }
@@ -214,7 +221,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 		} else {
 			devicePath = strings.Join([]string{"/dev/disk/by-path/pci", "*", "ip", tp, "iscsi", b.Iqn, "lun", b.lun}, "-")
 		}
-		exist := waitForPathToExist(devicePath, 1, iscsiTransport)
+		exist := waitForPathToExist(&devicePath, 1, iscsiTransport)
 		if exist == false {
 			// build discoverydb and discover iscsi target
 			b.plugin.execCommand("iscsiadm", []string{"-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "new"})
@@ -245,7 +252,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 				lastErr = fmt.Errorf("iscsi: failed to attach disk: Error: %s (%v)", string(out), err)
 				continue
 			}
-			exist = waitForPathToExist(devicePath, 10, iscsiTransport)
+			exist = waitForPathToExist(&devicePath, 10, iscsiTransport)
 			if !exist {
 				glog.Errorf("Could not attach disk: Timeout after 10s")
 				// update last error

@@ -1721,8 +1721,7 @@ type Container struct {
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Docker image name.
 	// More info: https://kubernetes.io/docs/concepts/containers/images
-	// +optional
-	Image string `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
+	Image string `json:"image" protobuf:"bytes,2,opt,name=image"`
 	// Entrypoint array. Not executed within a shell.
 	// The docker image's ENTRYPOINT is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
