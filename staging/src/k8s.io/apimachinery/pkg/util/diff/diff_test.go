@@ -17,10 +17,13 @@ limitations under the License.
 package diff
 
 import (
+	"strings"
 	"testing"
 )
 
 func TestObjectReflectDiff(t *testing.T) {
+	// create a longString to test character limits
+	longString := strings.Repeat("0123456789", 8)
 	type struct1 struct{ A []int }
 
 	testCases := map[string]struct {
@@ -75,6 +78,11 @@ object.A:
   a: []int(nil)
   b: []int{}`,
 		},
+		"trim to 80 char diffs": {a: longString, b: "", out: `
+object:
+  a: "01234567890123456789012345678901234567890123456789012345678901234567890123
+  b: ""`,
+		},
 	}
 	for name, test := range testCases {
 		expect := test.out
@@ -82,7 +90,27 @@ object.A:
 			expect = "<no diffs>"
 		}
 		if actual := ObjectReflectDiff(test.a, test.b); actual != expect {
-			t.Errorf("%s: unexpected output: %s", name, actual)
+			t.Errorf("%s: unexpected output: %s\nexpected: %s", name, actual, expect)
 		}
+	}
+}
+
+func TestObjectReflectDiffWithLimit(t *testing.T) {
+	longString := strings.Repeat("0123456789", 10)
+	expect := `
+object:
+  a: "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+  b: ""`
+	// test the whole string gets printed when there is no limit
+	if actual := ObjectReflectDiffWithLimit(longString, "", -1); actual != expect {
+		t.Errorf("%s: unexpected output: %s\nexpected: %s", "Diff with no limit", actual, expect)
+	}
+	expect2 := `
+object:
+  a: "0
+  b: ""`
+	// test that values other than 80 can set
+	if actual2 := ObjectReflectDiffWithLimit(longString, "", 7); actual2 != expect2 {
+		t.Errorf("%s: unexpected output: %s\nexpected: %s", "Diff with limit", actual2, expect2)
 	}
 }
