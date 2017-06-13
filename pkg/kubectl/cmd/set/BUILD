@@ -52,6 +52,7 @@ go_test(
     ],
     data = [
         "//examples:config",
+        "//test/fixtures",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
