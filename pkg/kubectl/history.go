@@ -26,14 +26,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	externalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/daemon"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	sliceutil "k8s.io/kubernetes/pkg/util/slice"
@@ -149,13 +152,10 @@ type DaemonSetHistoryViewer struct {
 // ViewHistory returns a revision-to-history map as the revision history of a deployment
 // TODO: this should be a describer
 func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	ds, err := h.c.Extensions().DaemonSets(namespace).Get(name, metav1.GetOptions{})
+	versionedClient := versionedClientsetForDaemonSet(h.c)
+	ds, allHistory, err := controlledHistories(versionedClient, namespace, name)
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve DaemonSet %s: %v", name, err)
-	}
-	allHistory, err := controlledHistories(h.c, ds)
-	if err != nil {
-		return "", fmt.Errorf("unable to find history controlled by DaemonSet %s: %v", ds.Name, err)
+		return "", fmt.Errorf("unable to find history controlled by DaemonSet %s: %v", name, err)
 	}
 	historyInfo := make(map[int64]*appsv1beta1.ControllerRevision)
 	for _, history := range allHistory {
@@ -173,11 +173,11 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 		if !ok {
 			return "", fmt.Errorf("unable to find the specified revision")
 		}
-		template, err := daemon.DecodeHistory(history)
+		dsOfHistory, err := applyHistory(ds, history)
 		if err != nil {
-			return "", fmt.Errorf("unable to decode history %s", history.Name)
+			return "", fmt.Errorf("unable to parse history %s", history.Name)
 		}
-		return printTemplate(template)
+		return printTemplate(&dsOfHistory.Spec.Template)
 	}
 
 	// Print an overview of all Revisions
@@ -255,17 +255,19 @@ func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision 
 }
 
 // controlledHistories returns all ControllerRevisions controlled by the given DaemonSet
-// TODO: Use external version DaemonSet instead when #3955 is fixed
-func controlledHistories(c clientset.Interface, ds *extensions.DaemonSet) ([]*appsv1beta1.ControllerRevision, error) {
+func controlledHistories(c externalclientset.Interface, namespace, name string) (*extensionsv1beta1.DaemonSet, []*appsv1beta1.ControllerRevision, error) {
+	ds, err := c.ExtensionsV1beta1().DaemonSets(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to retrieve DaemonSet %s: %v", name, err)
+	}
 	var result []*appsv1beta1.ControllerRevision
 	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	versionedClient := versionedClientsetForDaemonSet(c)
-	historyList, err := versionedClient.AppsV1beta1().ControllerRevisions(ds.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	historyList, err := c.AppsV1beta1().ControllerRevisions(ds.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for i := range historyList.Items {
 		history := historyList.Items[i]
@@ -275,7 +277,29 @@ func controlledHistories(c clientset.Interface, ds *extensions.DaemonSet) ([]*ap
 		}
 		result = append(result, &history)
 	}
-	return result, nil
+	return ds, result, nil
+}
+
+// applyHistory returns a specific revision of DaemonSet by applying the given history to a copy of the given DaemonSet
+func applyHistory(ds *extensionsv1beta1.DaemonSet, history *appsv1beta1.ControllerRevision) (*extensionsv1beta1.DaemonSet, error) {
+	obj, err := api.Scheme.New(ds.GroupVersionKind())
+	if err != nil {
+		return nil, err
+	}
+	clone := obj.(*extensionsv1beta1.DaemonSet)
+	cloneBytes, err := json.Marshal(clone)
+	if err != nil {
+		return nil, err
+	}
+	patched, err := strategicpatch.StrategicMergePatch(cloneBytes, history.Data.Raw, clone)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(patched, clone)
+	if err != nil {
+		return nil, err
+	}
+	return clone, nil
 }
 
 // TODO: copied here until this becomes a describer

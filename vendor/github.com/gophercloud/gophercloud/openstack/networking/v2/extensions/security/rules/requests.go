@@ -47,13 +47,31 @@ type RuleEtherType string
 
 // Constants useful for CreateOpts
 const (
-	DirIngress   RuleDirection = "ingress"
-	DirEgress    RuleDirection = "egress"
-	ProtocolTCP  RuleProtocol  = "tcp"
-	ProtocolUDP  RuleProtocol  = "udp"
-	ProtocolICMP RuleProtocol  = "icmp"
-	EtherType4   RuleEtherType = "IPv4"
-	EtherType6   RuleEtherType = "IPv6"
+	DirIngress        RuleDirection = "ingress"
+	DirEgress         RuleDirection = "egress"
+	EtherType4        RuleEtherType = "IPv4"
+	EtherType6        RuleEtherType = "IPv6"
+	ProtocolAH        RuleProtocol  = "ah"
+	ProtocolDCCP      RuleProtocol  = "dccp"
+	ProtocolEGP       RuleProtocol  = "egp"
+	ProtocolESP       RuleProtocol  = "esp"
+	ProtocolGRE       RuleProtocol  = "gre"
+	ProtocolICMP      RuleProtocol  = "icmp"
+	ProtocolIGMP      RuleProtocol  = "igmp"
+	ProtocolIPv6Encap RuleProtocol  = "ipv6-encap"
+	ProtocolIPv6Frag  RuleProtocol  = "ipv6-frag"
+	ProtocolIPv6ICMP  RuleProtocol  = "ipv6-icmp"
+	ProtocolIPv6NoNxt RuleProtocol  = "ipv6-nonxt"
+	ProtocolIPv6Opts  RuleProtocol  = "ipv6-opts"
+	ProtocolIPv6Route RuleProtocol  = "ipv6-route"
+	ProtocolOSPF      RuleProtocol  = "ospf"
+	ProtocolPGM       RuleProtocol  = "pgm"
+	ProtocolRSVP      RuleProtocol  = "rsvp"
+	ProtocolSCTP      RuleProtocol  = "sctp"
+	ProtocolTCP       RuleProtocol  = "tcp"
+	ProtocolUDP       RuleProtocol  = "udp"
+	ProtocolUDPLite   RuleProtocol  = "udplite"
+	ProtocolVRRP      RuleProtocol  = "vrrp"
 )
 
 // CreateOptsBuilder is what types must satisfy to be used as Create
