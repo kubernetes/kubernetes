@@ -429,9 +429,13 @@ func (nc *NamespaceController) delete(namespace *apiv1.Namespace) error {
 
 	if nc.hasFinalizerFuncInSpec(updatedNamespace, apiv1.FinalizerKubernetes) {
 		// Delete resources in this namespace.
-		err = nc.namespacedResourcesDeleter.Delete(updatedNamespace.Name)
+		// TODO: remember remaining resources and pass back in on the next sync
+		remaining, err := nc.namespacedResourcesDeleter.Delete(updatedNamespace.Name, nil)
 		if err != nil {
 			return fmt.Errorf("error in deleting resources in namespace %s: %v", namespace.Name, err)
+		}
+		if len(remaining) > 0 {
+			return fmt.Errorf("remaining resources in namespace %s: %v", namespace.Name, remaining)
 		}
 		glog.V(2).Infof("Removed kubernetes finalizer from ns %s", namespace.Name)
 		// Fetch the updated Namespace.

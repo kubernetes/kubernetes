@@ -179,9 +179,12 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 			return resources, nil
 		}
 		d := NewNamespacedResourcesDeleter(mockClient.Core().Namespaces(), clientPool, mockClient.Core(), fn, v1.FinalizerKubernetes, true)
-		err := d.Delete(testInput.testNamespace.Name)
+		remaining, err := d.Delete(testInput.testNamespace.Name, nil)
 		if err != nil {
 			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
+		}
+		if len(remaining) > 0 {
+			t.Errorf("scenario %s - Unexpected remaining gvrs when synching namespace %v", scenario, remaining)
 		}
 
 		// validate traffic from kube client
@@ -256,9 +259,12 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 	}
 	d := NewNamespacedResourcesDeleter(mockClient.Core().Namespaces(), nil, mockClient.Core(),
 		fn, v1.FinalizerKubernetes, true)
-	err := d.Delete(testNamespace.Name)
+	remaining, err := d.Delete(testNamespace.Name, nil)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
+	}
+	if len(remaining) > 0 {
+		t.Errorf("Unexpected remaining gvrs when synching namespace %v", remaining)
 	}
 	if len(mockClient.Actions()) != 1 {
 		t.Errorf("Expected only one action from controller, but got: %d %v", len(mockClient.Actions()), mockClient.Actions())

@@ -38,7 +38,11 @@ import (
 
 // Interface to delete a namespace with all resources in it.
 type NamespacedResourcesDeleterInterface interface {
-	Delete(nsName string) error
+	// Delete deletes the specified resources inside the specified namespace.
+	// If gvrsToDelete is nil, deletes all resources.
+	// Returns an error if the namespace could not be deleted.
+	// If an error is returned, the remaining resources may also be returned, and can be passed to Delete on the next retry as an optimization.
+	Delete(nsName string, gvrsToDelete []schema.GroupVersionResource) ([]schema.GroupVersionResource, error)
 }
 
 func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
@@ -97,19 +101,19 @@ type namespacedResourcesDeleter struct {
 // Returns ResourcesRemainingError if it deleted some resources but needs
 // to wait for them to go away.
 // Caller is expected to keep calling this until it succeeds.
-func (d *namespacedResourcesDeleter) Delete(nsName string) error {
+func (d *namespacedResourcesDeleter) Delete(nsName string, gvrsToDelete []schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
 	// Multiple controllers may edit a namespace during termination
 	// first get the latest state of the namespace before proceeding
 	// if the namespace was deleted already, don't do anything
 	namespace, err := d.nsClient.Get(nsName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return nil
+			return gvrsToDelete, nil
 		}
-		return err
+		return gvrsToDelete, err
 	}
 	if namespace.DeletionTimestamp == nil {
-		return nil
+		return gvrsToDelete, nil
 	}
 
 	glog.V(5).Infof("namespace controller - syncNamespace - namespace: %s, finalizerToken: %s", namespace.Name, d.finalizerToken)
@@ -119,28 +123,28 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 	namespace, err = d.retryOnConflictError(namespace, d.updateNamespaceStatusFunc)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return nil
+			return gvrsToDelete, nil
 		}
-		return err
+		return gvrsToDelete, err
 	}
 
 	// the latest view of the namespace asserts that namespace is no longer deleting..
 	if namespace.DeletionTimestamp.IsZero() {
-		return nil
+		return gvrsToDelete, nil
 	}
 
 	// Delete the namespace if it is already finalized.
 	if d.deleteNamespaceWhenDone && finalized(namespace) {
-		return d.deleteNamespace(namespace)
+		return []schema.GroupVersionResource{}, d.deleteNamespace(namespace)
 	}
 
 	// there may still be content for us to remove
-	estimate, err := d.deleteAllContent(namespace.Name, *namespace.DeletionTimestamp)
+	estimate, remainingGVRs, err := d.deleteAllContent(namespace.Name, *namespace.DeletionTimestamp, gvrsToDelete)
 	if err != nil {
-		return err
+		return remainingGVRs, err
 	}
-	if estimate > 0 {
-		return &ResourcesRemainingError{estimate}
+	if estimate > 0 || len(remainingGVRs) > 0 {
+		return remainingGVRs, &ResourcesRemainingError{estimate}
 	}
 
 	// we have removed content, so mark it finalized by us
@@ -150,16 +154,16 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 		// two controllers to do namespace deletion that share a common finalizer token it's
 		// possible that a not found could occur since the other controller would have finished the delete.
 		if errors.IsNotFound(err) {
-			return nil
+			return remainingGVRs, nil
 		}
-		return err
+		return remainingGVRs, err
 	}
 
 	// Check if we can delete now.
 	if d.deleteNamespaceWhenDone && finalized(namespace) {
-		return d.deleteNamespace(namespace)
+		return []schema.GroupVersionResource{}, d.deleteNamespace(namespace)
 	}
-	return nil
+	return []schema.GroupVersionResource{}, nil
 }
 
 func (d *namespacedResourcesDeleter) initOpCache() {
@@ -497,21 +501,29 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 // It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
 func (d *namespacedResourcesDeleter) deleteAllContent(
-	namespace string, namespaceDeletedAt metav1.Time) (int64, error) {
+	namespace string, namespaceDeletedAt metav1.Time, gvrsToDelete []schema.GroupVersionResource) (int64, []schema.GroupVersionResource, error) {
 	estimate := int64(0)
 	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s", namespace)
-	resources, err := d.discoveryCache.get(namespaceDeletedAt.Time)
-	if err != nil {
-		return estimate, err
+	if gvrsToDelete == nil {
+		// If we haven't been told what to delete, get resources from discovery at least as recent as the namespace's deletion timestamp
+		resources, err := d.discoveryCache.get(namespaceDeletedAt.Time)
+		if err != nil {
+			return estimate, nil, err
+		}
+		// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
+		deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, resources)
+		groupVersionResources, err := discovery.GroupVersionResources(deletableResources)
+		if err != nil {
+			return estimate, nil, err
+		}
+		for gvr := range groupVersionResources {
+			gvrsToDelete = append(gvrsToDelete, gvr)
+		}
 	}
-	// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
-	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, resources)
-	groupVersionResources, err := discovery.GroupVersionResources(deletableResources)
-	if err != nil {
-		return estimate, err
-	}
+
 	var errs []error
-	for gvr := range groupVersionResources {
+	var remainingGVRs = []schema.GroupVersionResource{}
+	for _, gvr := range gvrsToDelete {
 		gvrEstimate, err := d.deleteAllContentForGroupVersionResource(gvr, namespace, namespaceDeletedAt)
 		if err != nil {
 			// If there is an error, hold on to it but proceed with all the remaining
@@ -521,12 +533,15 @@ func (d *namespacedResourcesDeleter) deleteAllContent(
 		if gvrEstimate > estimate {
 			estimate = gvrEstimate
 		}
+		if err != nil || gvrEstimate > 0 {
+			remainingGVRs = append(remainingGVRs, gvr)
+		}
 	}
 	if len(errs) > 0 {
-		return estimate, utilerrors.NewAggregate(errs)
+		return estimate, remainingGVRs, utilerrors.NewAggregate(errs)
 	}
 	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, estimate: %v", namespace, estimate)
-	return estimate, nil
+	return estimate, remainingGVRs, nil
 }
 
 // estimateGrracefulTermination will estimate the graceful termination required for the specific entity in the namespace

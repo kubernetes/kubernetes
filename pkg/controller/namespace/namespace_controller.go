@@ -18,10 +18,12 @@ package namespace
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -58,6 +60,23 @@ type NamespaceController struct {
 	queue workqueue.RateLimitingInterface
 	// helper to delete all resources in the namespace when the namespace is deleted.
 	namespacedResourcesDeleter deletion.NamespacedResourcesDeleterInterface
+
+	gvrsToDeleteLock sync.Mutex
+	gvrsToDelete     map[string][]schema.GroupVersionResource
+}
+
+func (nm *NamespaceController) popGVRsToDelete(namespace string) []schema.GroupVersionResource {
+	nm.gvrsToDeleteLock.Lock()
+	defer nm.gvrsToDeleteLock.Unlock()
+	gvrs := nm.gvrsToDelete[namespace]
+	delete(nm.gvrsToDelete, namespace)
+	return gvrs
+}
+
+func (nm *NamespaceController) pushGVRsToDelete(namespace string, gvrs []schema.GroupVersionResource) {
+	nm.gvrsToDeleteLock.Lock()
+	defer nm.gvrsToDeleteLock.Unlock()
+	nm.gvrsToDelete[namespace] = gvrs
 }
 
 // NewNamespaceController creates a new NamespaceController
@@ -167,6 +186,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 	}()
 
 	namespace, err := nm.lister.Get(key)
+	gvrsToDelete := nm.popGVRsToDelete(key)
 	if errors.IsNotFound(err) {
 		glog.Infof("Namespace has been deleted %v", key)
 		return nil
@@ -175,7 +195,11 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		utilruntime.HandleError(fmt.Errorf("Unable to retrieve namespace %v from store: %v", key, err))
 		return err
 	}
-	return nm.namespacedResourcesDeleter.Delete(namespace.Name)
+	remainingGVRs, err := nm.namespacedResourcesDeleter.Delete(namespace.Name, gvrsToDelete)
+	if err != nil && remainingGVRs != nil {
+		nm.pushGVRsToDelete(key, remainingGVRs)
+	}
+	return err
 }
 
 // Run starts observing the system with the specified number of workers.
