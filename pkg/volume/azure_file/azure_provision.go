@@ -132,6 +132,10 @@ type azureFileProvisioner struct {
 var _ volume.Provisioner = &azureFileProvisioner{}
 
 func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if !volume.AccessModesContainedInAll(a.plugin.GetAccessModes(), a.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", a.options.PVC.Spec.AccessModes, a.plugin.GetAccessModes())
+	}
+
 	var sku, location, account string
 
 	name := volume.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 75)

@@ -587,6 +587,40 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
+<h3 id="_v1beta1_rollingupdatestatefulsetstrategy">v1beta1.RollingUpdateStatefulSetStrategy</h3>
+<div class="paragraph">
+<p>RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">partition</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Partition indicates the ordinal at which the StatefulSet should be partitioned.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_nodeselectorterm">v1.NodeSelectorTerm</h3>
 <div class="paragraph">
 <p>A null or empty node selector term matches no objects.</p>
@@ -1827,40 +1861,6 @@ When an object is created, the system will populate this list with the current s
 <td class="tableblock halign-left valign-top"><p class="tableblock">Most recently observed status of the Deployment.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_deploymentstatus">v1beta1.DeploymentStatus</a></p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect2">
-<h3 id="_v1beta1_partitionstatefulsetstrategy">v1beta1.PartitionStatefulSetStrategy</h3>
-<div class="paragraph">
-<p>PartitionStatefulSetStrategy contains the parameters used with the PartitionStatefulSetStrategyType.</p>
-</div>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ordinal</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Ordinal indicates the ordinal at which the StatefulSet should be partitioned.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -6648,10 +6648,10 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">partition</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Partition is used to communicate the ordinal at which to partition the StatefulSet when Type is PartitionStatefulSetStrategyType. This value must be set when Type is PartitionStatefulSetStrategyType, and it must be nil otherwise.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rollingUpdate</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_partitionstatefulsetstrategy">v1beta1.PartitionStatefulSetStrategy</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_rollingupdatestatefulsetstrategy">v1beta1.RollingUpdateStatefulSetStrategy</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -6807,7 +6807,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-06-10 04:36:47 UTC
+Last updated 2017-06-12 15:33:31 UTC
 </div>
 </div>
 </body>

@@ -57,7 +57,7 @@ var _ = framework.KubeDescribe("LocalStorageAllocatableEviction [Slow] [Serial] 
 			podTestSpecs = []podTestSpec{
 				{
 					evictionPriority: 1, // This pod should be evicted before the innocent pod
-					pod: v1.Pod{
+					pod: &v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{Name: "container-disk-hog-pod"},
 						Spec: v1.PodSpec{
 							RestartPolicy: v1.RestartPolicyNever,
@@ -74,7 +74,7 @@ var _ = framework.KubeDescribe("LocalStorageAllocatableEviction [Slow] [Serial] 
 
 				{
 					evictionPriority: 0, // This pod should never be evicted
-					pod: v1.Pod{
+					pod: &v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{Name: "idle-pod"},
 						Spec: v1.PodSpec{
 							RestartPolicy: v1.RestartPolicyNever,
@@ -151,7 +151,7 @@ func runLocalStorageEvictionTest(f *framework.Framework, conditionType v1.NodeCo
 		By("seting up pods to be used by tests")
 		for _, spec := range *podTestSpecsP {
 			By(fmt.Sprintf("creating pod with container: %s", spec.pod.Name))
-			f.PodClient().CreateSync(&spec.pod)
+			f.PodClient().CreateSync(spec.pod)
 		}
 	})
 

@@ -137,15 +137,6 @@ func (DeploymentStrategy) SwaggerDoc() map[string]string {
 	return map_DeploymentStrategy
 }
 
-var map_PartitionStatefulSetStrategy = map[string]string{
-	"":        "PartitionStatefulSetStrategy contains the parameters used with the PartitionStatefulSetStrategyType.",
-	"ordinal": "Ordinal indicates the ordinal at which the StatefulSet should be partitioned.",
-}
-
-func (PartitionStatefulSetStrategy) SwaggerDoc() map[string]string {
-	return map_PartitionStatefulSetStrategy
-}
-
 var map_RollbackConfig = map[string]string{
 	"revision": "The revision to rollback to. If set to 0, rollback to the last revision.",
 }
@@ -162,6 +153,15 @@ var map_RollingUpdateDeployment = map[string]string{
 
 func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 	return map_RollingUpdateDeployment
+}
+
+var map_RollingUpdateStatefulSetStrategy = map[string]string{
+	"":          "RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
+	"partition": "Partition indicates the ordinal at which the StatefulSet should be partitioned.",
+}
+
+func (RollingUpdateStatefulSetStrategy) SwaggerDoc() map[string]string {
+	return map_RollingUpdateStatefulSetStrategy
 }
 
 var map_Scale = map[string]string{
@@ -245,9 +245,9 @@ func (StatefulSetStatus) SwaggerDoc() map[string]string {
 }
 
 var map_StatefulSetUpdateStrategy = map[string]string{
-	"":          "StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
-	"type":      "Type indicates the type of the StatefulSetUpdateStrategy.",
-	"partition": "Partition is used to communicate the ordinal at which to partition the StatefulSet when Type is PartitionStatefulSetStrategyType. This value must be set when Type is PartitionStatefulSetStrategyType, and it must be nil otherwise.",
+	"":              "StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
+	"type":          "Type indicates the type of the StatefulSetUpdateStrategy.",
+	"rollingUpdate": "RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.",
 }
 
 func (StatefulSetUpdateStrategy) SwaggerDoc() map[string]string {

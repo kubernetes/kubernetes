@@ -167,22 +167,23 @@ func Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSe
 
 func Convert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *StatefulSetUpdateStrategy, out *apps.StatefulSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = apps.StatefulSetUpdateStrategyType(in.Type)
-	if in.Partition != nil {
-		out.Partition = new(apps.PartitionStatefulSetStrategy)
-		out.Partition.Ordinal = in.Partition.Ordinal
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = new(apps.RollingUpdateStatefulSetStrategy)
+		out.RollingUpdate.Partition = *in.RollingUpdate.Partition
 	} else {
-		out.Partition = nil
+		out.RollingUpdate = nil
 	}
 	return nil
 }
 
 func Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy(in *apps.StatefulSetUpdateStrategy, out *StatefulSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = StatefulSetUpdateStrategyType(in.Type)
-	if in.Partition != nil {
-		out.Partition = new(PartitionStatefulSetStrategy)
-		out.Partition.Ordinal = in.Partition.Ordinal
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = new(RollingUpdateStatefulSetStrategy)
+		out.RollingUpdate.Partition = new(int32)
+		*out.RollingUpdate.Partition = in.RollingUpdate.Partition
 	} else {
-		out.Partition = nil
+		out.RollingUpdate = nil
 	}
 	return nil
 }

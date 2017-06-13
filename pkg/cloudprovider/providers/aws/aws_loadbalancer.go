@@ -190,10 +190,10 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 				found := -1
 				for i, expected := range listeners {
-					if orEmpty(actual.Protocol) != orEmpty(expected.Protocol) {
+					if elbProtocolsAreEqual(actual.Protocol, expected.Protocol) {
 						continue
 					}
-					if orEmpty(actual.InstanceProtocol) != orEmpty(expected.InstanceProtocol) {
+					if elbProtocolsAreEqual(actual.InstanceProtocol, expected.InstanceProtocol) {
 						continue
 					}
 					if orZero(actual.InstancePort) != orZero(expected.InstancePort) {
@@ -202,7 +202,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 					if orZero(actual.LoadBalancerPort) != orZero(expected.LoadBalancerPort) {
 						continue
 					}
-					if orEmpty(actual.SSLCertificateId) != orEmpty(expected.SSLCertificateId) {
+					if awsArnEquals(actual.SSLCertificateId, expected.SSLCertificateId) {
 						continue
 					}
 					found = i
@@ -353,6 +353,24 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 	}
 
 	return loadBalancer, nil
+}
+
+// elbProtocolsAreEqual checks if two ELB protocol strings are considered the same
+// Comparison is case insensitive
+func elbProtocolsAreEqual(l, r *string) bool {
+	if l == nil || r == nil {
+		return l == r
+	}
+	return strings.EqualFold(aws.StringValue(l), aws.StringValue(r))
+}
+
+// awsArnEquals checks if two ARN strings are considered the same
+// Comparison is case insensitive
+func awsArnEquals(l, r *string) bool {
+	if l == nil || r == nil {
+		return l == r
+	}
+	return strings.EqualFold(aws.StringValue(l), aws.StringValue(r))
 }
 
 // Makes sure that the health check for an ELB matches the configured health check node port

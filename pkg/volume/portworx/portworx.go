@@ -351,6 +351,10 @@ type portworxVolumeProvisioner struct {
 var _ volume.Provisioner = &portworxVolumeProvisioner{}
 
 func (c *portworxVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if !volume.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
+	}
+
 	volumeID, sizeGB, labels, err := c.manager.CreateVolume(c)
 	if err != nil {
 		return nil, err

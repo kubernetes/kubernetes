@@ -472,6 +472,12 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	proxyMode := getProxyMode(string(config.Mode), iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")
+		var nodeIP net.IP
+		if config.BindAddress != "0.0.0.0" {
+			nodeIP = net.ParseIP(config.BindAddress)
+		} else {
+			nodeIP = getNodeIP(client, hostname)
+		}
 		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
 			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
@@ -488,7 +494,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 			int(*config.IPTables.MasqueradeBit),
 			config.ClusterCIDR,
 			hostname,
-			getNodeIP(client, hostname),
+			nodeIP,
 			recorder,
 			healthzServer,
 		)

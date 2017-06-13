@@ -6046,23 +6046,20 @@
       "type": "string",
       "description": "Type indicates the type of the StatefulSetUpdateStrategy."
      },
-     "partition": {
-      "$ref": "v1beta1.PartitionStatefulSetStrategy",
-      "description": "Partition is used to communicate the ordinal at which to partition the StatefulSet when Type is PartitionStatefulSetStrategyType. This value must be set when Type is PartitionStatefulSetStrategyType, and it must be nil otherwise."
+     "rollingUpdate": {
+      "$ref": "v1beta1.RollingUpdateStatefulSetStrategy",
+      "description": "RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType."
      }
     }
    },
-   "v1beta1.PartitionStatefulSetStrategy": {
-    "id": "v1beta1.PartitionStatefulSetStrategy",
-    "description": "PartitionStatefulSetStrategy contains the parameters used with the PartitionStatefulSetStrategyType.",
-    "required": [
-     "ordinal"
-    ],
+   "v1beta1.RollingUpdateStatefulSetStrategy": {
+    "id": "v1beta1.RollingUpdateStatefulSetStrategy",
+    "description": "RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
     "properties": {
-     "ordinal": {
+     "partition": {
       "type": "integer",
       "format": "int32",
-      "description": "Ordinal indicates the ordinal at which the StatefulSet should be partitioned."
+      "description": "Partition indicates the ordinal at which the StatefulSet should be partitioned."
      }
     }
    },

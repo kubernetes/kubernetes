@@ -483,8 +483,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// we compute the minimum ordinal of the target sequence for a destructive update based on the strategy.
 	updateMin := 0
-	if set.Spec.UpdateStrategy.Type == apps.PartitionStatefulSetStrategyType {
-		updateMin = int(set.Spec.UpdateStrategy.Partition.Ordinal)
+	if set.Spec.UpdateStrategy.RollingUpdate != nil {
+		updateMin = int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
 	}
 	// we terminate the Pod with the largest ordinal that does not match the update revision.
 	for target := len(replicas) - 1; target >= updateMin; target-- {

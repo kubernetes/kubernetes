@@ -788,6 +788,10 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 }
 
 func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if !volume.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
+	}
+
 	var err error
 	if p.options.PVC.Spec.Selector != nil {
 		glog.V(4).Infof("glusterfs: not able to parse your claim Selector")

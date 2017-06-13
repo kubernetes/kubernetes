@@ -72,7 +72,7 @@ func ObservePolicyLevel(level auditinternal.Level) {
 
 // HandlePluginError handles an error that occurred in an audit plugin. This method should only be
 // used if the error may have prevented the audit event from being properly recorded. The events are
-// modified.
+// logged to the debug log.
 func HandlePluginError(plugin string, err error, impacted ...*auditinternal.Event) {
 	// Count the error.
 	errorCounter.WithLabelValues(plugin).Add(float64(len(impacted)))

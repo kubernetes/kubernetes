@@ -107,6 +107,10 @@ type azureDiskProvisioner struct {
 var _ volume.Provisioner = &azureDiskProvisioner{}
 
 func (a *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if !volume.AccessModesContainedInAll(a.plugin.GetAccessModes(), a.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", a.options.PVC.Spec.AccessModes, a.plugin.GetAccessModes())
+	}
+
 	var sku, location, account string
 
 	// maxLength = 79 - (4 for ".vhd") = 75
