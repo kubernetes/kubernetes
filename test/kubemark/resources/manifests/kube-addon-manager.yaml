@@ -9,7 +9,7 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-addon-manager
-    image: {{kube_docker_registry}}/kube-addon-manager:v6.4-alpha.3
+    image: {{kube_docker_registry}}/kube-addon-manager:v6.4-beta.2
     command:
     - /bin/bash
     - -c
