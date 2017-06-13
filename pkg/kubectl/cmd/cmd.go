@@ -92,7 +92,7 @@ __kubectl_config_get_users()
 }
 
 # $1 has to be "contexts", "clusters" or "users"
-__kubectl_config_get()
+__kubectl_parse_config()
 {
     local template kubectl_out
     template="{{ range .$1  }}{{ .name }} {{ end }}"
