@@ -326,32 +326,6 @@ func newTestPods(count int) []*v1.Pod {
 
 var emptyPodUIDs map[types.UID]kubetypes.SyncPodType
 
-func TestSyncLoopTimeUpdate(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	kubelet := testKubelet.kubelet
-
-	loopTime1 := kubelet.LatestLoopEntryTime()
-	require.True(t, loopTime1.IsZero(), "Expect sync loop time to be zero")
-
-	// Start sync ticker.
-	syncCh := make(chan time.Time, 1)
-	housekeepingCh := make(chan time.Time, 1)
-	plegCh := make(chan *pleg.PodLifecycleEvent)
-	syncCh <- time.Now()
-	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh, plegCh)
-	loopTime2 := kubelet.LatestLoopEntryTime()
-	require.False(t, loopTime2.IsZero(), "Expect sync loop time to be non-zero")
-
-	syncCh <- time.Now()
-	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh, plegCh)
-	loopTime3 := kubelet.LatestLoopEntryTime()
-	require.True(t, loopTime3.After(loopTime1),
-		"Sync Loop Time was not updated correctly. Second update timestamp %v should be greater than first update timestamp %v",
-		loopTime3, loopTime1)
-}
-
 func TestSyncLoopAbort(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
