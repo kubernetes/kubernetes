@@ -72,11 +72,15 @@ spec:
         - /usr/local/bin/kube-proxy
         - --kubeconfig=/var/lib/kube-proxy/kubeconfig.conf
         {{ .ClusterCIDR }}
-        securityContext:
-          privileged: true
         volumeMounts:
         - mountPath: /var/lib/kube-proxy
           name: kube-proxy
+        # TODO: Make this a file hostpath mount
+        - mountPath: /run/xtables.lock
+          name: xtables-lock
+          readOnly: false
+      securityContext:
+        privileged: true
       hostNetwork: true
       serviceAccountName: kube-proxy
       # TODO: Why doesn't the Decoder recognize this new field and decode it properly? Right now it's ignored
@@ -87,6 +91,9 @@ spec:
       - name: kube-proxy
         configMap:
           name: kube-proxy
+      - name: xtables-lock
+        hostPath:
+          path: /run/xtables.lock
 `
 
 	KubeDNSVersion = "1.14.2"
