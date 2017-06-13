@@ -55,6 +55,9 @@ type flockerVolumeProvisioner struct {
 var _ volume.Provisioner = &flockerVolumeProvisioner{}
 
 func (c *flockerVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if !volume.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
+	}
 
 	if len(c.options.Parameters) > 0 {
 		return nil, fmt.Errorf("Provisioning failed: Specified at least one unsupported parameter")
