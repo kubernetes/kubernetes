@@ -1037,39 +1037,36 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (c *Cloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	instanceID, error := instanceIDFromProviderID(providerID)
-
-	if error != nil {
-		return nil, error
+	instanceID, err := instanceIDFromProviderID(providerID)
+	if err != nil {
+		return nil, err
 	}
 
-	addresses, error := c.describeAddressesByInstanceID(instanceID)
-
-	if error != nil {
-		return nil, error
+	addresses, err := c.describeAddressesByInstanceID(instanceID)
+	if err != nil {
+		return nil, err
 	}
 
-	instances, error := c.describeInstancesByInstanceID(instanceID)
-
-	if error != nil {
-		return nil, error
+	instances, err := c.describeInstancesByInstanceID(instanceID)
+	if err != nil {
+		return nil, err
 	}
 
 	nodeAddresses := []v1.NodeAddress{}
 
 	for _, address := range addresses {
-		convertedAddress, error := convertAwsAddress(address)
-		if error != nil {
-			return nil, error
+		convertedAddress, err := convertAwsAddress(address)
+		if err != nil {
+			return nil, err
 		}
 
 		nodeAddresses = append(nodeAddresses, convertedAddress...)
 	}
 
 	for _, instance := range instances {
-		addresses, error := instanceAddresses(instance)
-		if error != nil {
-			return nil, error
+		addresses, err := instanceAddresses(instance)
+		if err != nil {
+			return nil, err
 		}
 
 		nodeAddresses = append(nodeAddresses, addresses...)
@@ -1114,16 +1111,14 @@ func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (c *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
-	instanceID, error := instanceIDFromProviderID(providerID)
-
-	if error != nil {
-		return "", error
+	instanceID, err := instanceIDFromProviderID(providerID)
+	if err != nil {
+		return "", err
 	}
 
-	instance, error := c.describeInstanceByInstanceID(instanceID)
-
-	if error != nil {
-		return "", error
+	instance, err := c.describeInstanceByInstanceID(instanceID)
+	if err != nil {
+		return "", err
 	}
 
 	return aws.StringValue(instance.InstanceType), nil
@@ -3452,10 +3447,9 @@ func (c *Cloud) describeAddressesByInstanceID(instanceID string) ([]*ec2.Address
 		Filters: filters,
 	}
 
-	addresses, error := c.ec2.DescribeAddresses(params)
-
-	if error != nil {
-		return nil, error
+	addresses, err := c.ec2.DescribeAddresses(params)
+	if err != nil {
+		return nil, err
 	}
 
 	return addresses, nil
