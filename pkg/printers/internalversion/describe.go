@@ -750,6 +750,8 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printStorageOSVolumeSource(volume.VolumeSource.StorageOS, w)
 		case volume.VolumeSource.FC != nil:
 			printFCVolumeSource(volume.VolumeSource.FC, w)
+		case volume.VolumeSource.HugePages != nil:
+			printHugePagesVolumeSource(volume.VolumeSource.HugePages, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -977,6 +979,14 @@ func printFCVolumeSource(fc *api.FCVolumeSource, w PrefixWriter) {
 		"    FSType:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		strings.Join(fc.TargetWWNs, ", "), lun, fc.FSType, fc.ReadOnly)
+}
+
+func printHugePagesVolumeSource(hp *api.HugePagesVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tHugePages (pseudo filesystem of type hugetlbfs representing HugePages)\n"+
+		"    PageSize:\t%v\n"+
+		"    Size:\t%v\n"+
+		"    MinSize:\t%v\n",
+		hp.PageSize, hp.MaxSize, hp.MinSize)
 }
 
 type PersistentVolumeDescriber struct {
