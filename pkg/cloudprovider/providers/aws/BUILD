@@ -57,6 +57,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "aws_loadbalancer_test.go",
         "aws_test.go",
         "device_allocator_test.go",
         "instances_test.go",
