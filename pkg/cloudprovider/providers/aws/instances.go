@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
 // awsInstanceID represents the ID of the instance in the AWS API, e.g. i-12345678
@@ -77,4 +78,23 @@ func (name kubernetesInstanceID) mapToAWSInstanceID() (awsInstanceID, error) {
 	}
 
 	return awsInstanceID(awsID), nil
+}
+
+// Gets the full information about this instance from the EC2 API
+func describeInstance(ec2Client EC2, instanceID awsInstanceID) (*ec2.Instance, error) {
+	request := &ec2.DescribeInstancesInput{
+		InstanceIds: []*string{instanceID.awsString()},
+	}
+
+	instances, err := ec2Client.DescribeInstances(request)
+	if err != nil {
+		return nil, err
+	}
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no instances found for instance: %s", instanceID)
+	}
+	if len(instances) > 1 {
+		return nil, fmt.Errorf("multiple instances found for instance: %s", instanceID)
+	}
+	return instances[0], nil
 }
