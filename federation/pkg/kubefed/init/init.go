@@ -149,6 +149,7 @@ type initFederationOptions struct {
 	apiServerServiceType             v1.ServiceType
 	apiServerAdvertiseAddress        string
 	apiServerNodePortPort            int32
+	apiServerNodePortPortPtr         *int32
 	apiServerEnableHTTPBasicAuth     bool
 	apiServerEnableTokenAuth         bool
 }
@@ -236,6 +237,9 @@ func (i *initFederation) Complete(cmd *cobra.Command, args []string) error {
 		if i.options.apiServerServiceType != v1.ServiceTypeNodePort {
 			return fmt.Errorf("%s should be passed only with '%s=NodePort'", apiserverPortFlag, apiserverServiceTypeFlag)
 		}
+		i.options.apiServerNodePortPortPtr = &i.options.apiServerNodePortPort
+	} else {
+		i.options.apiServerNodePortPortPtr = nil
 	}
 	if i.options.apiServerNodePortPort < 0 || i.options.apiServerNodePortPort > 65535 {
 		return fmt.Errorf("Please provide a valid port number for %s", apiserverPortFlag)
@@ -304,7 +308,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 
 	fmt.Fprint(cmdOut, "Creating federation control plane service...")
 	glog.V(4).Info("Creating federation control plane service")
-	svc, ips, hostnames, err := createService(cmdOut, hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.commonOptions.Name, i.options.apiServerAdvertiseAddress, i.options.apiServerNodePortPort, i.options.apiServerServiceType, i.options.dryRun)
+	svc, ips, hostnames, err := createService(cmdOut, hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.commonOptions.Name, i.options.apiServerAdvertiseAddress, i.options.apiServerNodePortPortPtr, i.options.apiServerServiceType, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -454,15 +458,15 @@ func createNamespace(clientset client.Interface, federationName, namespace strin
 	return clientset.Core().Namespaces().Create(ns)
 }
 
-func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcName, federationName, apiserverAdvertiseAddress string, apiserverPort int32, apiserverServiceType v1.ServiceType, dryRun bool) (*api.Service, []string, []string, error) {
+func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcName, federationName, apiserverAdvertiseAddress string, apiserverPort *int32, apiserverServiceType v1.ServiceType, dryRun bool) (*api.Service, []string, []string, error) {
 	port := api.ServicePort{
 		Name:       "https",
 		Protocol:   "TCP",
 		Port:       443,
 		TargetPort: intstr.FromString(apiServerSecurePortName),
 	}
-	if apiserverServiceType == v1.ServiceTypeNodePort && apiserverPort > 0 {
-		port.NodePort = apiserverPort
+	if apiserverServiceType == v1.ServiceTypeNodePort && apiserverPort != nil {
+		port.NodePort = *apiserverPort
 	}
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
