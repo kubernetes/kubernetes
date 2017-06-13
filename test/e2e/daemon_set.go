@@ -387,6 +387,8 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetPodsOrphaned(c, ns, label))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet pods to be orphaned")
+		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetHistoryOrphaned(c, ns, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet history to be orphaned")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetDeleted(f, ns, ds.Name))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet to be deleted")
 
@@ -402,7 +404,9 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 
 		By(fmt.Sprintf("Wait for all pods to be adopted by DaemonSet %s", newDSName))
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetPodsAdopted(c, ns, newDS.UID, label))
-		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet pods to be orphaned")
+		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet pods to be adopted")
+		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetHistoryAdopted(c, ns, newDS.UID, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet history to be adopted")
 
 		By(fmt.Sprintf("Make sure no daemon pod updated its template generation %d", templateGeneration))
 		err = checkDaemonPodsTemplateGeneration(c, ns, label, fmt.Sprint(templateGeneration))
@@ -418,6 +422,8 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetPodsOrphaned(c, ns, label))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet pods to be orphaned")
+		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetHistoryOrphaned(c, ns, label))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet history to be orphaned")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetDeleted(f, ns, newDSName))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet to be deleted")
 
@@ -705,12 +711,38 @@ func checkDaemonSetPodsOrphaned(c clientset.Interface, ns string, label map[stri
 	}
 }
 
+func checkDaemonSetHistoryOrphaned(c clientset.Interface, ns string, label map[string]string) func() (bool, error) {
+	return func() (bool, error) {
+		histories := listDaemonHistories(c, ns, label)
+		for _, history := range histories.Items {
+			// This history is orphaned only when controller ref is cleared
+			if controllerRef := controller.GetControllerOf(&history); controllerRef != nil {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+}
+
 func checkDaemonSetPodsAdopted(c clientset.Interface, ns string, dsUID types.UID, label map[string]string) func() (bool, error) {
 	return func() (bool, error) {
 		pods := listDaemonPods(c, ns, label)
 		for _, pod := range pods.Items {
 			// This pod is adopted only when its controller ref is update
 			if controllerRef := controller.GetControllerOf(&pod); controllerRef == nil || controllerRef.UID != dsUID {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+}
+
+func checkDaemonSetHistoryAdopted(c clientset.Interface, ns string, dsUID types.UID, label map[string]string) func() (bool, error) {
+	return func() (bool, error) {
+		histories := listDaemonHistories(c, ns, label)
+		for _, history := range histories.Items {
+			// This history is adopted only when its controller ref is update
+			if controllerRef := controller.GetControllerOf(&history); controllerRef == nil || controllerRef.UID != dsUID {
 				return false, nil
 			}
 		}
