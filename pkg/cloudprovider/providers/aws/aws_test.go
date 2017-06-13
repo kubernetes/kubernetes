@@ -17,6 +17,7 @@ limitations under the License.
 package aws
 
 import (
+	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -1065,6 +1066,33 @@ func TestFindInstancesByNodeNameCached(t *testing.T) {
 	if *returnedInstances[0].PrivateDnsName != nodeNameOne {
 		t.Errorf("Expected node name %v but got %v", nodeNameOne, returnedInstances[0].PrivateDnsName)
 	}
+}
+
+func TestGetInstanceByNodeNameBatching(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	assert.Nil(t, err, "Error building aws cloud: %v", err)
+	var tag ec2.Tag
+	tag.Key = aws.String(TagNameKubernetesClusterPrefix + TestClusterId)
+	tag.Value = aws.String("")
+	tags := []*ec2.Tag{&tag}
+	nodeNames := []string{}
+	for i := 0; i < 200; i++ {
+		nodeName := fmt.Sprintf("ip-171-20-42-%d.ec2.internal", i)
+		nodeNames = append(nodeNames, nodeName)
+		ec2Instance := &ec2.Instance{}
+		instanceId := fmt.Sprintf("i-abcedf%d", i)
+		ec2Instance.InstanceId = aws.String(instanceId)
+		ec2Instance.PrivateDnsName = aws.String(nodeName)
+		ec2Instance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("running")}
+		ec2Instance.Tags = tags
+		awsServices.instances = append(awsServices.instances, ec2Instance)
+
+	}
+
+	instances, err := c.getInstancesByNodeNames(nodeNames)
+	assert.NotEmpty(t, instances)
+	assert.Equal(t, 200, len(instances), "Expected 200 but got less")
 }
 
 func TestGetVolumeLabels(t *testing.T) {
