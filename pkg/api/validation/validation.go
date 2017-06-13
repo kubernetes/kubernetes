@@ -615,6 +615,14 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 			allErrs = append(allErrs, validateScaleIOVolumeSource(source.ScaleIO, fldPath.Child("scaleIO"))...)
 		}
 	}
+	if source.HugePages != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hugePages"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateHugePagesVolumeSource(source.HugePages, fldPath.Child("hugePages"))...)
+		}
+	}
 
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
@@ -731,6 +739,32 @@ func validateConfigMapVolumeSource(configMapSource *api.ConfigMapVolumeSource, f
 	for i, kp := range configMapSource.Items {
 		itemPath := itemsPath.Index(i)
 		allErrs = append(allErrs, validateKeyToPath(&kp, itemPath)...)
+	}
+	return allErrs
+}
+
+func validateHugePagesVolumeSource(hugePages *api.HugePagesVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// TODO(pprokop): add support for other PageSizes
+	if hugePages.PageSize != "2M" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("pageSize"), hugePages.PageSize, "Not supported page size"))
+	}
+	maxSize, err := resource.ParseQuantity(hugePages.MaxSize)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSize"), hugePages.MaxSize, "Not a valid quantity"))
+	} else {
+		if maxSize.ScaledValue(resource.Mega) < 2 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSize"), hugePages.MaxSize, "MaxSize lower than pageSize"))
+		}
+	}
+	minSize, err := resource.ParseQuantity(hugePages.MinSize)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("minSize"), hugePages.MinSize, "Not a valid quantity"))
+	} else {
+		if minSize.ScaledValue(resource.Mega) < 2 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("minSize"), hugePages.MinSize, "MaxSize lower than pageSize"))
+		}
 	}
 	return allErrs
 }

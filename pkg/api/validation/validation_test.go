@@ -2335,6 +2335,35 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "scaleIO.system",
 		},
+		// HugePages
+		{
+			name: "valid hugepages volume",
+			vol: api.Volume{
+				Name: "hugepages-volume",
+				VolumeSource: api.VolumeSource{
+					HugePages: &api.HugePagesVolumeSource{
+						PageSize: "2M",
+						MaxSize:  "100M",
+						MinSize:  "2M",
+					},
+				},
+			},
+		},
+		{
+			name: "invalid pageSize",
+			vol: api.Volume{
+				Name: "hugepages-volume",
+				VolumeSource: api.VolumeSource{
+					HugePages: &api.HugePagesVolumeSource{
+						PageSize: "111M",
+						MaxSize:  "200M",
+						MinSize:  "120M",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "hugePages.pageSize",
+		},
 	}
 
 	for i, tc := range testCases {
