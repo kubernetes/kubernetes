@@ -35,14 +35,35 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/group"
+	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	clienttypedv1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
+
+const (
+	AliceToken string = "abc123" // username: alice.  Present in token file.
+	BobToken   string = "xyz987" // username: bob.  Present in token file.
+)
+
+type allowAliceAuthorizer struct{}
+
+func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
+	if a.GetUser() != nil && a.GetUser().GetName() == "alice" {
+		return true, "", nil
+	}
+	return false, "I can't allow that.  Go ask alice.", nil
+}
 
 func testPrefix(t *testing.T, prefix string) {
 	_, s, closeFn := framework.RunAMaster(nil)
@@ -101,38 +122,96 @@ func TestEmptyList(t *testing.T) {
 	}
 }
 
+func initStatusForbiddenMasterCongfig() *master.Config {
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig.GenericConfig.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
+	return masterConfig
+}
+
+func initUnauthorizedMasterCongfig() *master.Config {
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	tokenAuthenticator := tokentest.New()
+	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
+	tokenAuthenticator.Tokens[BobToken] = &user.DefaultInfo{Name: "bob", UID: "2"}
+	masterConfig.GenericConfig.Authenticator = group.NewGroupAdder(bearertoken.New(tokenAuthenticator), []string{user.AllAuthenticated})
+	masterConfig.GenericConfig.Authorizer = allowAliceAuthorizer{}
+	return masterConfig
+}
+
 func TestStatus(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	testCases := []struct {
+		name         string
+		masterConfig *master.Config
+		statusCode   int
+		reqPath      string
+		reason       string
+		message      string
+	}{
+		{
+			name:         "404",
+			masterConfig: nil,
+			statusCode:   http.StatusNotFound,
+			reqPath:      "/apis/batch/v1/namespaces/default/jobs/foo",
+			reason:       "NotFound",
+			message:      `jobs.batch "foo" not found`,
+		},
+		{
+			name:         "403",
+			masterConfig: initStatusForbiddenMasterCongfig(),
+			statusCode:   http.StatusForbidden,
+			reqPath:      "/apis",
+			reason:       "Forbidden",
+			message:      ` "" is forbidden: User "" cannot get path "/apis".: "Everything is forbidden."`,
+		},
+		{
+			name:         "401",
+			masterConfig: initUnauthorizedMasterCongfig(),
+			statusCode:   http.StatusUnauthorized,
+			reqPath:      "/apis",
+			reason:       "Unauthorized",
+			message:      `Unauthorized`,
+		},
+	}
 
-	u := s.URL + "/apis/batch/v1/namespaces/default/jobs/foo"
-	resp, err := http.Get(u)
-	if err != nil {
-		t.Fatalf("unexpected error getting %s: %v", u, err)
-	}
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("got status %v instead of 404", resp.StatusCode)
-	}
-	defer resp.Body.Close()
-	data, _ := ioutil.ReadAll(resp.Body)
-	decodedData := map[string]interface{}{}
-	if err := json.Unmarshal(data, &decodedData); err != nil {
+	for _, tc := range testCases {
+		_, s, closeFn := framework.RunAMaster(tc.masterConfig)
+		defer closeFn()
+
+		u := s.URL + tc.reqPath
+		resp, err := http.Get(u)
+		if err != nil {
+			t.Fatalf("unexpected error getting %s: %v", u, err)
+		}
+		if resp.StatusCode != tc.statusCode {
+			t.Fatalf("got status %v instead of %s", resp.StatusCode, tc.name)
+		}
+		defer resp.Body.Close()
+		data, _ := ioutil.ReadAll(resp.Body)
+		decodedData := map[string]interface{}{}
+		if err := json.Unmarshal(data, &decodedData); err != nil {
+			t.Logf("body: %s", string(data))
+			t.Fatalf("got error decoding data: %v", err)
+		}
 		t.Logf("body: %s", string(data))
-		t.Fatalf("got error decoding data: %v", err)
-	}
-	t.Logf("body: %s", string(data))
 
-	if got, expected := decodedData["apiVersion"], "v1"; got != expected {
-		t.Errorf("unexpected apiVersion %q, expected %q", got, expected)
-	}
-	if got, expected := decodedData["kind"], "Status"; got != expected {
-		t.Errorf("unexpected kind %q, expected %q", got, expected)
-	}
-	if got, expected := decodedData["status"], "Failure"; got != expected {
-		t.Errorf("unexpected status %q, expected %q", got, expected)
-	}
-	if got, expected := decodedData["code"], float64(404); got != expected {
-		t.Errorf("unexpected code %v, expected %v", got, expected)
+		if got, expected := decodedData["apiVersion"], "v1"; got != expected {
+			t.Errorf("unexpected apiVersion %q, expected %q", got, expected)
+		}
+		if got, expected := decodedData["kind"], "Status"; got != expected {
+			t.Errorf("unexpected kind %q, expected %q", got, expected)
+		}
+		if got, expected := decodedData["status"], "Failure"; got != expected {
+			t.Errorf("unexpected status %q, expected %q", got, expected)
+		}
+		if got, expected := decodedData["code"], float64(tc.statusCode); got != expected {
+			t.Errorf("unexpected code %v, expected %v", got, expected)
+		}
+		if got, expected := decodedData["reason"], tc.reason; got != expected {
+			t.Errorf("unexpected reason %v, expected %v", got, expected)
+		}
+		if got, expected := decodedData["message"], tc.message; got != expected {
+			t.Errorf("unexpected message %v, expected %v", got, expected)
+		}
 	}
 }
 
