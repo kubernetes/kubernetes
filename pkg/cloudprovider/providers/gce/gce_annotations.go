@@ -55,6 +55,8 @@ func GetLoadBalancerAnnotationType(service *v1.Service) (LoadBalancerType, bool)
 	}
 }
 
+// GetLoadBalancerAnnotationBackendShare returns whether this service's backend service should be
+// shared with other load balancers. Health checks and the healthcheck firewall will be shared regardless.
 func GetLoadBalancerAnnotationBackendShare(service *v1.Service) bool {
 	l, exists := service.Annotations[ServiceAnnotationILBBackendShare]
 	if exists && l == "true" {

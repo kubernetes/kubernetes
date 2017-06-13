@@ -43,7 +43,14 @@ func makeBackendServiceName(loadBalancerName, clusterID string, shared bool, sch
 		hashed := hex.EncodeToString(hash.Sum(nil))
 		hashed = hashed[:16]
 
-		// 3 + 1 + 16 + 1 + 8 + 1 + 3 + 16
+		// k8s-          4
+		// {clusterid}-  17
+		// {scheme}-     9   (internal/external)
+		// {protocol}-   4   (tcp/udp)
+		// nmv1-         5   (naming convention version)
+		// {suffix}      16  (hash of settings)
+		// -----------------
+		//               55  characters used
 		return fmt.Sprintf("k8s-%s-%s-%s-nmv1-%s", clusterID, strings.ToLower(string(scheme)), strings.ToLower(string(protocol)), hashed)
 	}
 	return loadBalancerName
@@ -72,7 +79,7 @@ func makeBackendServiceDescription(nm types.NamespacedName, shared bool) string 
 	if shared {
 		return ""
 	}
-	return fmt.Sprintf(`{"kubernetes.io/service-name":"%s"`, nm.String())
+	return fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, nm.String())
 }
 
 // External Load Balancer
