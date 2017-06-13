@@ -18,6 +18,7 @@ go_library(
         "aws_routes.go",
         "aws_utils.go",
         "device_allocator.go",
+        "instances.go",
         "log_handler.go",
         "regions.go",
         "retry_handler.go",
@@ -58,6 +59,7 @@ go_test(
     srcs = [
         "aws_test.go",
         "device_allocator_test.go",
+        "instances_test.go",
         "regions_test.go",
         "retry_handler_test.go",
         "tags_test.go",
