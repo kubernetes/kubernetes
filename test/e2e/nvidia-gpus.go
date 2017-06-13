@@ -163,8 +163,17 @@ func dsFromManifest(url string) *extensions.DaemonSet {
 	var controller extensions.DaemonSet
 	framework.Logf("Parsing ds from %v", url)
 
-	response, err := http.Get(url)
+	var response *http.Response
+	var err error
+	for i := 1; i <= 5; i++ {
+		response, err = http.Get(url)
+		if err == nil && response.StatusCode == 200 {
+			break
+		}
+		time.Sleep(time.Duration(i) * time.Second)
+	}
 	Expect(err).NotTo(HaveOccurred())
+	Expect(response.StatusCode).To(Equal(200))
 	defer response.Body.Close()
 
 	data, err := ioutil.ReadAll(response.Body)
