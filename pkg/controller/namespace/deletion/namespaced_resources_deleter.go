@@ -52,9 +52,11 @@ func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
 		opCache: &operationNotSupportedCache{
 			m: make(map[operationKey]bool),
 		},
-		discoverResourcesFn:     discoverResourcesFn,
 		finalizerToken:          finalizerToken,
 		deleteNamespaceWhenDone: deleteNamespaceWhenDone,
+		discoveryCache: &discoveryCache{
+			discoverResourcesFn: discoverResourcesFn,
+		},
 	}
 	d.initOpCache()
 	return d
@@ -71,13 +73,14 @@ type namespacedResourcesDeleter struct {
 	// Interface to get PodInterface.
 	podsGetter v1clientset.PodsGetter
 	// Cache of what operations are not supported on each group version resource.
-	opCache             *operationNotSupportedCache
-	discoverResourcesFn func() ([]*metav1.APIResourceList, error)
+	opCache *operationNotSupportedCache
 	// The finalizer token that should be removed from the namespace
 	// when all resources in that namespace have been deleted.
 	finalizerToken v1.FinalizerName
 	// Also delete the namespace when all resources in the namespace have been deleted.
 	deleteNamespaceWhenDone bool
+	// discoveryCache caches calls to the discover resource fn
+	discoveryCache *discoveryCache
 }
 
 // Delete deletes all resources in the given namespace.
@@ -163,7 +166,7 @@ func (d *namespacedResourcesDeleter) initOpCache() {
 	// pre-fill opCache with the discovery info
 	//
 	// TODO(sttts): get rid of opCache and http 405 logic around it and trust discovery info
-	resources, err := d.discoverResourcesFn()
+	resources, err := d.discoveryCache.get(time.Now())
 	if err != nil {
 		glog.Fatalf("Failed to get supported resources: %v", err)
 	}
@@ -497,7 +500,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(
 	namespace string, namespaceDeletedAt metav1.Time) (int64, error) {
 	estimate := int64(0)
 	glog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s", namespace)
-	resources, err := d.discoverResourcesFn()
+	resources, err := d.discoveryCache.get(namespaceDeletedAt.Time)
 	if err != nil {
 		return estimate, err
 	}
@@ -575,4 +578,39 @@ func (d *namespacedResourcesDeleter) estimateGracefulTerminationForPods(ns strin
 		}
 	}
 	return estimate, nil
+}
+
+// Optimistically cache calls to resource discovery which takes five to ten
+// seconds. The cache is valid if the discovery cache has been synced since
+// the namespace deletion timestamp. Namespace syncs after the first will
+// always get a cache hit.
+type discoveryCache struct {
+	discoverResourcesFn func() ([]*metav1.APIResourceList, error)
+
+	sync.RWMutex
+	lastSync time.Time
+	val      []*metav1.APIResourceList
+}
+
+func (d *discoveryCache) get(nsDeletionTime time.Time) ([]*metav1.APIResourceList, error) {
+	d.RLock()
+	if d.lastSync.After(nsDeletionTime) {
+		defer d.RUnlock()
+		return d.val, nil
+	}
+	d.RUnlock()
+
+	now := time.Now()
+	val, err := d.discoverResourcesFn()
+	if err != nil {
+		return nil, err
+	}
+
+	d.Lock()
+	defer d.Unlock()
+	if d.lastSync.Before(now) {
+		d.lastSync = now
+		d.val = val
+	}
+	return d.val, nil
 }

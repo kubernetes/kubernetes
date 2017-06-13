@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -341,4 +342,49 @@ func testResources() []*metav1.APIResourceList {
 		},
 	}
 	return results
+}
+
+func TestDiscoveryCache(t *testing.T) {
+	now := time.Now()
+	before := now.Add(-1 * time.Second)
+	after := now.Add(1 * time.Second)
+
+	cases := []struct {
+		times         []time.Time
+		callsExpected int
+	}{
+		{
+			times:         []time.Time{now},
+			callsExpected: 1,
+		},
+		{
+			times:         []time.Time{now, before},
+			callsExpected: 1,
+		},
+		{
+			times:         []time.Time{now, after},
+			callsExpected: 2,
+		},
+		{
+			times:         []time.Time{now, after, before, now},
+			callsExpected: 2,
+		},
+	}
+
+	for i, c := range cases {
+		var calls int
+		d := &discoveryCache{
+			discoverResourcesFn: func() ([]*metav1.APIResourceList, error) {
+				calls += 1
+				return testResources(), nil
+			},
+		}
+		for _, callTime := range c.times {
+			d.get(callTime)
+		}
+		if calls != c.callsExpected {
+			t.Errorf("[%d] expected %d discovery calls but got %d", i, c.callsExpected, calls)
+		}
+	}
+
 }
