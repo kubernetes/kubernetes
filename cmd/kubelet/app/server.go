@@ -333,7 +333,6 @@ func validateConfig(s *options.KubeletServer) error {
 		case cm.NodeAllocatableEnforcementKey:
 		case cm.SystemReservedEnforcementKey:
 		case cm.KubeReservedEnforcementKey:
-			continue
 		default:
 			return fmt.Errorf("invalid option %q specified for EnforceNodeAllocatable setting. Valid options are %q, %q or %q", val, cm.NodeAllocatableEnforcementKey, cm.SystemReservedEnforcementKey, cm.KubeReservedEnforcementKey)
 		}
