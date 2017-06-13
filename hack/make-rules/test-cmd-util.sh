@@ -43,6 +43,7 @@ IMAGE_DEPLOYMENT_R2="$IMAGE_NGINX"  # deployment-revision2.yaml
 IMAGE_PERL="gcr.io/google-containers/perl"
 IMAGE_DAEMONSET_R1="gcr.io/google-containers/pause:2.0"
 IMAGE_DAEMONSET_R2="gcr.io/google-containers/pause:latest"
+IMAGE_DAEMONSET_R2_2="gcr.io/google-containers/nginx:test-cmd"  # rollingupdate-daemonset-rv2.yaml
 
 # Expose kubectl directly for readability
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
@@ -2900,23 +2901,32 @@ run_daemonset_history_tests() {
   kubectl apply -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
   # Rollback to revision 1 - should be no-op
   kubectl rollout undo daemonset --to-revision=1 "${kube_flags[@]}"
-  kube::test::get_object_assert daemonset "{{range.items}}{{$daemonset_image_field}}:{{end}}" "${IMAGE_DAEMONSET_R1}:"
+  kube::test::get_object_assert daemonset "{{range.items}}{{$daemonset_image_field0}}:{{end}}" "${IMAGE_DAEMONSET_R1}:"
+  kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "1"
   # Update the DaemonSet (revision 2)
   kubectl apply -f hack/testdata/rollingupdate-daemonset-rv2.yaml "${kube_flags[@]}"
-  kube::test::wait_object_assert daemonset "{{range.items}}{{$daemonset_image_field}}:{{end}}" "${IMAGE_DAEMONSET_R2}:"
+  kube::test::wait_object_assert daemonset "{{range.items}}{{$daemonset_image_field0}}:{{end}}" "${IMAGE_DAEMONSET_R2}:"
+  kube::test::wait_object_assert daemonset "{{range.items}}{{$daemonset_image_field1}}:{{end}}" "${IMAGE_DAEMONSET_R2_2}:"
+  kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "2"
   # Rollback to revision 1 with dry-run - should be no-op
   kubectl rollout undo daemonset --dry-run=true "${kube_flags[@]}"
-  kube::test::get_object_assert daemonset "{{range.items}}{{$daemonset_image_field}}:{{end}}" "${IMAGE_DAEMONSET_R2}:"
+  kube::test::get_object_assert daemonset "{{range.items}}{{$daemonset_image_field0}}:{{end}}" "${IMAGE_DAEMONSET_R2}:"
+  kube::test::get_object_assert daemonset "{{range.items}}{{$daemonset_image_field1}}:{{end}}" "${IMAGE_DAEMONSET_R2_2}:"
+  kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "2"
   # Rollback to revision 1
   kubectl rollout undo daemonset --to-revision=1 "${kube_flags[@]}"
-  kube::test::wait_object_assert daemonset "{{range.items}}{{$daemonset_image_field}}:{{end}}" "${IMAGE_DAEMONSET_R1}:"
+  kube::test::wait_object_assert daemonset "{{range.items}}{{$daemonset_image_field0}}:{{end}}" "${IMAGE_DAEMONSET_R1}:"
+  kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "1"
   # Rollback to revision 1000000 - should fail
   output_message=$(! kubectl rollout undo daemonset --to-revision=1000000 "${kube_flags[@]}" 2>&1)
   kube::test::if_has_string "${output_message}" "unable to find specified revision"
-  kube::test::get_object_assert daemonset "{{range.items}}{{$daemonset_image_field}}:{{end}}" "${IMAGE_DAEMONSET_R1}:"
+  kube::test::get_object_assert daemonset "{{range.items}}{{$daemonset_image_field0}}:{{end}}" "${IMAGE_DAEMONSET_R1}:"
+  kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "1"
   # Rollback to last revision
   kubectl rollout undo daemonset "${kube_flags[@]}"
-  kube::test::wait_object_assert daemonset "{{range.items}}{{$daemonset_image_field}}:{{end}}" "${IMAGE_DAEMONSET_R2}:"
+  kube::test::wait_object_assert daemonset "{{range.items}}{{$daemonset_image_field0}}:{{end}}" "${IMAGE_DAEMONSET_R2}:"
+  kube::test::wait_object_assert daemonset "{{range.items}}{{$daemonset_image_field1}}:{{end}}" "${IMAGE_DAEMONSET_R2_2}:"
+  kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "2"
   # Clean up
   kubectl delete -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
 }
@@ -3153,7 +3163,9 @@ runTests() {
   pdb_min_available=".spec.minAvailable"
   pdb_max_unavailable=".spec.maxUnavailable"
   template_generation_field=".spec.templateGeneration"
-  daemonset_image_field="(index .spec.template.spec.containers 0).image"
+  container_len="(len .spec.template.spec.containers)"
+  daemonset_image_field0="(index .spec.template.spec.containers 0).image"
+  daemonset_image_field1="(index .spec.template.spec.containers 1).image"
 
   # Make sure "default" namespace exists.
   if kube::test::if_supports_resource "${namespaces}" ; then

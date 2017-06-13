@@ -24,10 +24,10 @@ import (
 	"sort"
 	"syscall"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	externalextensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -221,7 +220,8 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 	if !ok {
 		return "", fmt.Errorf("passed object is not a DaemonSet: %#v", obj)
 	}
-	allHistory, err := controlledHistories(r.c, ds)
+	versionedClient := versionedClientsetForDaemonSet(r.c)
+	versionedDS, allHistory, err := controlledHistories(versionedClient, ds.Namespace, ds.Name)
 	if err != nil {
 		return "", fmt.Errorf("unable to find history controlled by DaemonSet %s: %v", ds.Name, err)
 	}
@@ -249,55 +249,36 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 		return "", revisionNotFoundErr(toRevision)
 	}
 
-	// Get the template of the history to rollback to
-	toTemplate, err := getInternalTemplate(toHistory)
-	if err != nil {
-		return "", err
-	}
-
 	if dryRun {
+		appliedDS, err := applyHistory(versionedDS, toHistory)
+		if err != nil {
+			return "", err
+		}
 		content := bytes.NewBuffer([]byte{})
 		w := printersinternal.NewPrefixWriter(content)
-		printersinternal.DescribePodTemplate(toTemplate, w)
+		internalTemplate := &api.PodTemplateSpec{}
+		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&appliedDS.Spec.Template, internalTemplate, nil); err != nil {
+			return "", fmt.Errorf("failed to convert podtemplate while printing: %v", err)
+		}
+		printersinternal.DescribePodTemplate(internalTemplate, w)
 		return fmt.Sprintf("will roll back to %s", content.String()), nil
 	}
 
-	// Update DaemonSet template, and retry on conflict
-	skipUpdate := false
-	retryErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		var err error
-		ds, err = r.c.Extensions().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if apiequality.Semantic.DeepEqual(toTemplate, &ds.Spec.Template) {
-			skipUpdate = true
-			return nil
-		}
-		ds.Spec.Template = *toTemplate
-		_, err = r.c.Extensions().DaemonSets(ds.Namespace).Update(ds)
-		return err
-	})
-	if retryErr != nil {
-		return "", retryErr
+	// Skip if the revision already matches current DaemonSet
+	done, err := daemon.Match(versionedDS, toHistory)
+	if err != nil {
+		return "", err
 	}
-	if skipUpdate {
+	if done {
 		return fmt.Sprintf("%s (current template already matches revision %d)", rollbackSkipped, toRevision), nil
 	}
 
-	return rollbackSuccess, nil
-}
+	// Restore revision
+	if _, err = versionedClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).Patch(ds.Name, types.StrategicMergePatchType, toHistory.Data.Raw); err != nil {
+		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
+	}
 
-func getInternalTemplate(toHistory *appsv1beta1.ControllerRevision) (*api.PodTemplateSpec, error) {
-	template, err := daemon.DecodeHistory(toHistory)
-	if err != nil {
-		return nil, err
-	}
-	internalTemplate := &api.PodTemplateSpec{}
-	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
-		return nil, fmt.Errorf("failed to convert podtemplate, %v", err)
-	}
-	return internalTemplate, nil
+	return rollbackSuccess, nil
 }
 
 func revisionNotFoundErr(r int64) error {

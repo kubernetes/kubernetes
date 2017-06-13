@@ -25,3 +25,5 @@ spec:
       containers:
       - name: kubernetes-pause
         image: gcr.io/google-containers/pause:latest
+      - name: app
+        image: gcr.io/google-containers/nginx:test-cmd
