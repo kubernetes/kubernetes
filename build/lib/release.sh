@@ -320,10 +320,10 @@ function kube::release::create_docker_images_for_server() {
             "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
             "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
           fi
+        else
+          kube::log::status "Not a release, so deleting docker image ${docker_image_tag}"
+          "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
         fi
-
-        kube::log::status "Deleting docker image ${docker_image_tag}"
-        "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
       ) &
     done
 
