@@ -28,6 +28,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 const ProxyProtocolPolicyName = "k8s-proxyprotocol-enabled"
@@ -417,10 +418,10 @@ func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDesc
 }
 
 // Makes sure that exactly the specified hosts are registered as instances with the load balancer
-func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances []*elb.Instance, instances []*ec2.Instance) error {
+func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances []*elb.Instance, instanceIDs map[awsInstanceID]*ec2.Instance) error {
 	expected := sets.NewString()
-	for _, instance := range instances {
-		expected.Insert(orEmpty(instance.InstanceId))
+	for id := range instanceIDs {
+		expected.Insert(string(id))
 	}
 
 	actual := sets.NewString()
@@ -518,4 +519,26 @@ func proxyProtocolEnabled(backend *elb.BackendServerDescription) bool {
 	}
 
 	return false
+}
+
+// findInstancesForELB gets the EC2 instances corresponding to the Nodes, for setting up an ELB
+// We ignore Nodes (with a log message) where the instanceid cannot be determined from the provider,
+// and we ignore instances which are not found
+func (c *Cloud) findInstancesForELB(nodes []*v1.Node) (map[awsInstanceID]*ec2.Instance, error) {
+	// Map to instance ids ignoring Nodes where we cannot find the id (but logging)
+	instanceIDs := mapToAWSInstanceIDsTolerant(nodes)
+
+	cacheCriteria := cacheCriteria{
+		// MaxAge not required, because we only care about security groups, which should not change
+		HasInstances: instanceIDs, // Refresh if any of the instance ids are missing
+	}
+	snapshot, err := c.instanceCache.describeAllInstancesCached(cacheCriteria)
+	if err != nil {
+		return nil, err
+	}
+
+	instances := snapshot.FindInstances(instanceIDs)
+	// We ignore instances that cannot be found
+
+	return instances, nil
 }
