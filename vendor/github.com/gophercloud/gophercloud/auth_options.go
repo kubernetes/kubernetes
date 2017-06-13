@@ -139,14 +139,6 @@ func (opts *AuthOptions) ToTokenV3CreateMap(scope map[string]interface{}) (map[s
 	// if insufficient or incompatible information is present.
 	var req request
 
-	// Test first for unrecognized arguments.
-	if opts.TenantID != "" {
-		return nil, ErrTenantIDProvided{}
-	}
-	if opts.TenantName != "" {
-		return nil, ErrTenantNameProvided{}
-	}
-
 	if opts.Password == "" {
 		if opts.TokenID != "" {
 			// Because we aren't using password authentication, it's an error to also provide any of the user-based authentication
@@ -259,15 +251,12 @@ func (opts *AuthOptions) ToTokenV3ScopeMap() (map[string]interface{}, error) {
 
 	if opts.TenantID != "" {
 		scope.ProjectID = opts.TenantID
-		opts.TenantID = ""
-		opts.TenantName = ""
 	} else {
 		if opts.TenantName != "" {
 			scope.ProjectName = opts.TenantName
 			scope.DomainID = opts.DomainID
 			scope.DomainName = opts.DomainName
 		}
-		opts.TenantName = ""
 	}
 
 	if scope.ProjectName != "" {
