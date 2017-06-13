@@ -158,11 +158,17 @@ function copy-to-staging() {
 
   #check whether this tar alread exists and has the same hash
   #if it matches, then don't bother uploading it again
-  local -r remote_tar_hash=$(gsutil hash -h -m ${staging_path}/${basename_tar} 2>/dev/null | grep "Hash (md5):" | awk -F ':' '{print $2}')
-  if [[ -n ${remote_tar_hash} ]]; then
-    local -r local_tar_hash=$(gsutil hash -h -m ${tar} 2>/dev/null | grep "Hash (md5):" | awk -F ':' '{print $2}')
-    if [[ "${remote_tar_hash}" == "${local_tar_hash}" ]]; then
-      echo "+++ ${basename_tar} uploaded earlier and hash matches"
+
+  #remote_tar_md5 checks the remote location for the existing tarball and its md5
+  #staging_path example gs://kubernetes-staging-PROJECT/kubernetes-devel
+  #basename_tar example kubernetes-server-linux-amd64.tar.gz
+  local -r remote_tar_md5=$(gsutil_get_tar_md5 "${staging_path}/${basename_tar}")
+  if [[ -n ${remote_tar_md5} ]]; then
+    #local_tar_md5 checks the remote location for the existing tarball and its md5 hash
+    #tar example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
+    local -r local_tar_md5=$(gsutil_get_tar_md5 "${tar}")
+    if [[ "${remote_tar_md5}" == "${local_tar_md5}" ]]; then
+      echo "+++ ${basename_tar} uploaded earlier, cloud and local file md5 match (md5 = ${local_tar_md5})"
       return 0
     fi
   fi
@@ -171,6 +177,18 @@ function copy-to-staging() {
   gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha1" "${staging_path}"
   gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha1" >/dev/null 2>&1
   echo "+++ ${basename_tar} uploaded (sha1 = ${hash})"
+}
+
+# Use gsutil to get the md5 hash for a particular tar
+function gsutil_get_tar_md5() {
+  # location_tar could be local or in the cloud
+  # local tar_location example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
+  # cloud tar_location example gs://kubernetes-staging-PROJECT/kubernetes-devel/kubernetes-server-linux-amd64.tar.gz
+  local -r tar_location=$1
+  #parse the output and return the md5 hash
+  #the sed command at the end removes whitespace
+  local -r tar_md5=$(gsutil hash -h -m ${tar_location} 2>/dev/null | grep "Hash (md5):" | awk -F ':' '{print $2}' | sed 's/^[[:space:]]*//g')
+  echo "${tar_md5}"
 }
 
 # Given the cluster zone, return the list of regional GCS release
