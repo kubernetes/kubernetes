@@ -1356,7 +1356,7 @@ function start-kube-apiserver {
   fi
 
 
-  local authorization_mode="RBAC"
+  local authorization_mode="Node,RBAC"
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
 
   # Enable ABAC mode unless the user explicitly opts out with ENABLE_LEGACY_ABAC=false
