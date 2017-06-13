@@ -175,7 +175,6 @@ func DescriberFor(kind schema.GroupKind, c clientset.Interface) (printers.Descri
 }
 
 // GenericDescriberFor returns a generic describer for the specified mapping
-// that uses only information available from runtime.Unstructured
 func GenericDescriberFor(mapping *meta.RESTMapping, dynamic *dynamic.Client, events coreclient.EventsGetter) printers.Describer {
 	return &genericDescriber{mapping, dynamic, events}
 }
