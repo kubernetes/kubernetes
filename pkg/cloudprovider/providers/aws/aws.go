@@ -1949,15 +1949,17 @@ func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolume
 		return attached, nil
 	}
 
-	dnsNameSlice := []string{}
+	nodeNames := []string{}
 	for nodeName, diskNames := range nodeDisks {
 		for _, diskName := range diskNames {
 			setNodeDisk(attached, diskName, nodeName, false)
 		}
-		dnsNameSlice = append(dnsNameSlice, mapNodeNameToPrivateDNSName(nodeName))
+		nodeNames = append(nodeNames, mapNodeNameToPrivateDNSName(nodeName))
 	}
 
-	awsInstances, err := c.getInstancesByNodeNames(dnsNameSlice)
+	// Note that we get instances regardless of state.
+	// This means there might be multiple nodes with the same node names.
+	awsInstances, err := c.getInstancesByNodeNames(nodeNames)
 	if err != nil {
 		// When there is an error fetching instance information
 		// it is safer to return nil and let volume information not be touched.
@@ -1965,24 +1967,26 @@ func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolume
 	}
 
 	if len(awsInstances) == 0 {
-		glog.V(2).Infof("DisksAreAttached will assume no disks are attached to any node on AWS cluster.")
+		glog.V(2).Infof("DisksAreAttached found no instances matching node names; will assume disks not attached")
 		return attached, nil
 	}
 
-	awsInstanceMap := make(map[types.NodeName]*ec2.Instance)
-	for _, awsInstance := range awsInstances {
-		awsInstanceMap[mapInstanceToNodeName(awsInstance)] = awsInstance
-	}
-
 	// Note that we check that the volume is attached to the correct node, not that it is attached to _a_ node
-	for nodeName, diskNames := range nodeDisks {
-		awsInstance := awsInstanceMap[nodeName]
-		if awsInstance == nil {
-			// If instance no longer exists, safe to assume volume is not attached.
-			glog.Warningf(
-				"Node %q does not exist. DisksAreAttached will assume disks %v are not attached to it.",
-				nodeName,
-				diskNames)
+	for _, awsInstance := range awsInstances {
+		nodeName := mapInstanceToNodeName(awsInstance)
+
+		diskNames := nodeDisks[nodeName]
+		if len(diskNames) == 0 {
+			continue
+		}
+
+		awsInstanceState := "<nil>"
+		if awsInstance != nil && awsInstance.State != nil {
+			awsInstanceState = aws.StringValue(awsInstance.State.Name)
+		}
+		if awsInstanceState == "terminated" {
+			// Instance is terminated, safe to assume volumes not attached
+			// Note that we keep volumes attached to instances in other states (most notably, stopped)
 			continue
 		}
 
