@@ -51639,19 +51639,6 @@
      }
     }
    },
-   "io.k8s.kubernetes.pkg.apis.apps.v1beta1.PartitionStatefulSetStrategy": {
-    "description": "PartitionStatefulSetStrategy contains the parameters used with the PartitionStatefulSetStrategyType.",
-    "required": [
-     "ordinal"
-    ],
-    "properties": {
-     "ordinal": {
-      "description": "Ordinal indicates the ordinal at which the StatefulSet should be partitioned.",
-      "type": "integer",
-      "format": "int32"
-     }
-    }
-   },
    "io.k8s.kubernetes.pkg.apis.apps.v1beta1.RollbackConfig": {
     "properties": {
      "revision": {
@@ -51671,6 +51658,16 @@
      "maxUnavailable": {
       "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. Defaults to 25%. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.apis.apps.v1beta1.RollingUpdateStatefulSetStrategy": {
+    "description": "RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
+    "properties": {
+     "partition": {
+      "description": "Partition indicates the ordinal at which the StatefulSet should be partitioned.",
+      "type": "integer",
+      "format": "int32"
      }
     }
    },
@@ -51893,9 +51890,9 @@
    "io.k8s.kubernetes.pkg.apis.apps.v1beta1.StatefulSetUpdateStrategy": {
     "description": "StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
     "properties": {
-     "partition": {
-      "description": "Partition is used to communicate the ordinal at which to partition the StatefulSet when Type is PartitionStatefulSetStrategyType. This value must be set when Type is PartitionStatefulSetStrategyType, and it must be nil otherwise.",
-      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.apps.v1beta1.PartitionStatefulSetStrategy"
+     "rollingUpdate": {
+      "description": "RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.",
+      "$ref": "#/definitions/io.k8s.kubernetes.pkg.apis.apps.v1beta1.RollingUpdateStatefulSetStrategy"
      },
      "type": {
       "description": "Type indicates the type of the StatefulSetUpdateStrategy.",

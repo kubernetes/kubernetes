@@ -78,35 +78,29 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) fi
 	switch spec.UpdateStrategy.Type {
 	case "":
 		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), ""))
-	case apps.OnDeleteStatefulSetStrategyType, apps.RollingUpdateStatefulSetStrategyType:
-		if spec.UpdateStrategy.Partition != nil {
+	case apps.OnDeleteStatefulSetStrategyType:
+		if spec.UpdateStrategy.RollingUpdate != nil {
 			allErrs = append(
 				allErrs,
 				field.Invalid(
-					fldPath.Child("updateStrategy").Child("partition"),
-					spec.UpdateStrategy.Partition.Ordinal,
-					fmt.Sprintf("only allowed for updateStrategy '%s'", apps.PartitionStatefulSetStrategyType)))
+					fldPath.Child("updateStrategy").Child("rollingUpdate"),
+					spec.UpdateStrategy.RollingUpdate,
+					fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
 		}
-	case apps.PartitionStatefulSetStrategyType:
-		if spec.UpdateStrategy.Partition == nil {
-			allErrs = append(
-				allErrs,
-				field.Required(
-					fldPath.Child("updateStrategy").Child("partition"),
-					fmt.Sprintf("required for updateStrategy '%s'", apps.PartitionStatefulSetStrategyType)))
-			break
+	case apps.RollingUpdateStatefulSetStrategyType:
+		if spec.UpdateStrategy.RollingUpdate != nil {
+			allErrs = append(allErrs,
+				apivalidation.ValidateNonnegativeField(
+					int64(spec.UpdateStrategy.RollingUpdate.Partition),
+					fldPath.Child("updateStrategy").Child("rollingUpdate").Child("partition"))...)
 		}
-		allErrs = append(allErrs,
-			apivalidation.ValidateNonnegativeField(
-				int64(spec.UpdateStrategy.Partition.Ordinal),
-				fldPath.Child("updateStrategy").Child("partition").Child("ordinal"))...)
+
 	default:
 		allErrs = append(allErrs,
 			field.Invalid(fldPath.Child("updateStrategy"), spec.UpdateStrategy,
-				fmt.Sprintf("must be '%s', '%s', or '%s'",
+				fmt.Sprintf("must be '%s' or '%s'",
 					apps.RollingUpdateStatefulSetStrategyType,
-					apps.OnDeleteStatefulSetStrategyType,
-					apps.PartitionStatefulSetStrategyType)))
+					apps.OnDeleteStatefulSetStrategyType)))
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)

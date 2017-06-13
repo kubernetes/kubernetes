@@ -1053,7 +1053,7 @@ func TestStatefulSetControlOnDeleteUpdate(t *testing.T) {
 	}
 }
 
-func TestStatefulSetControlPartitionUpdate(t *testing.T) {
+func TestStatefulSetControlRollingUpdateWithPartition(t *testing.T) {
 	type testcase struct {
 		name       string
 		partition  int32
@@ -1066,9 +1066,9 @@ func TestStatefulSetControlPartitionUpdate(t *testing.T) {
 	testFn := func(test *testcase, t *testing.T) {
 		set := test.initial()
 		set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
-			Type: apps.PartitionStatefulSetStrategyType,
-			Partition: func() *apps.PartitionStatefulSetStrategy {
-				return &apps.PartitionStatefulSetStrategy{Ordinal: test.partition}
+			Type: apps.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+				return &apps.RollingUpdateStatefulSetStrategy{Partition: &test.partition}
 			}(),
 		}
 		client := fake.NewSimpleClientset(set)
@@ -2068,28 +2068,28 @@ func updateComplete(set *apps.StatefulSet, pods []*v1.Pod) bool {
 		return false
 	}
 
-	if set.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType {
-		if set.Status.CurrentReplicas < *set.Spec.Replicas {
-			return false
-		}
-		for i := range pods {
-			if getPodRevision(pods[i]) != set.Status.CurrentRevision {
+	switch set.Spec.UpdateStrategy.Type {
+	case apps.OnDeleteStatefulSetStrategyType:
+		return true
+	case apps.RollingUpdateStatefulSetStrategyType:
+		if set.Spec.UpdateStrategy.RollingUpdate == nil || *set.Spec.UpdateStrategy.RollingUpdate.Partition <= 0 {
+			if set.Status.CurrentReplicas < *set.Spec.Replicas {
 				return false
 			}
-		}
-	}
-	if set.Spec.UpdateStrategy.Type == apps.PartitionStatefulSetStrategyType {
-		if set.Status.UpdatedReplicas < (*set.Spec.Replicas - set.Spec.UpdateStrategy.Partition.Ordinal) {
-			return false
-		}
-		for i := 0; i < int(set.Spec.UpdateStrategy.Partition.Ordinal); i++ {
-			if getPodRevision(pods[i]) != set.Status.CurrentRevision {
+			for i := range pods {
+				if getPodRevision(pods[i]) != set.Status.CurrentRevision {
+					return false
+				}
+			}
+		} else {
+			partition := int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
+			if len(pods) < partition {
 				return false
 			}
-		}
-		for i := int(set.Spec.UpdateStrategy.Partition.Ordinal); i < int(*set.Spec.Replicas); i++ {
-			if getPodRevision(pods[i]) != set.Status.UpdateRevision {
-				return false
+			for i := partition; i < len(pods); i++ {
+				if getPodRevision(pods[i]) != set.Status.UpdateRevision {
+					return false
+				}
 			}
 		}
 	}

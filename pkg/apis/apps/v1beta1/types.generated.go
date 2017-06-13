@@ -1386,7 +1386,7 @@ func (x *StatefulSetUpdateStrategy) CodecEncodeSelf(e *codec1978.Encoder) {
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
 			yyq2[0] = x.Type != ""
-			yyq2[1] = x.Partition != nil
+			yyq2[1] = x.RollingUpdate != nil
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(2)
@@ -1418,10 +1418,10 @@ func (x *StatefulSetUpdateStrategy) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[1] {
-					if x.Partition == nil {
+					if x.RollingUpdate == nil {
 						r.EncodeNil()
 					} else {
-						x.Partition.CodecEncodeSelf(e)
+						x.RollingUpdate.CodecEncodeSelf(e)
 					}
 				} else {
 					r.EncodeNil()
@@ -1429,12 +1429,12 @@ func (x *StatefulSetUpdateStrategy) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq2[1] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("partition"))
+					r.EncodeString(codecSelferC_UTF81234, string("rollingUpdate"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					if x.Partition == nil {
+					if x.RollingUpdate == nil {
 						r.EncodeNil()
 					} else {
-						x.Partition.CodecEncodeSelf(e)
+						x.RollingUpdate.CodecEncodeSelf(e)
 					}
 				}
 			}
@@ -1506,16 +1506,16 @@ func (x *StatefulSetUpdateStrategy) codecDecodeSelfFromMap(l int, d *codec1978.D
 				yyv4 := &x.Type
 				yyv4.CodecDecodeSelf(d)
 			}
-		case "partition":
+		case "rollingUpdate":
 			if r.TryDecodeAsNil() {
-				if x.Partition != nil {
-					x.Partition = nil
+				if x.RollingUpdate != nil {
+					x.RollingUpdate = nil
 				}
 			} else {
-				if x.Partition == nil {
-					x.Partition = new(PartitionStatefulSetStrategy)
+				if x.RollingUpdate == nil {
+					x.RollingUpdate = new(RollingUpdateStatefulSetStrategy)
 				}
-				x.Partition.CodecDecodeSelf(d)
+				x.RollingUpdate.CodecDecodeSelf(d)
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -1560,14 +1560,14 @@ func (x *StatefulSetUpdateStrategy) codecDecodeSelfFromArray(l int, d *codec1978
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		if x.Partition != nil {
-			x.Partition = nil
+		if x.RollingUpdate != nil {
+			x.RollingUpdate = nil
 		}
 	} else {
-		if x.Partition == nil {
-			x.Partition = new(PartitionStatefulSetStrategy)
+		if x.RollingUpdate == nil {
+			x.RollingUpdate = new(RollingUpdateStatefulSetStrategy)
 		}
-		x.Partition.CodecDecodeSelf(d)
+		x.RollingUpdate.CodecDecodeSelf(d)
 	}
 	for {
 		yyj6++
@@ -1611,7 +1611,7 @@ func (x *StatefulSetUpdateStrategyType) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *PartitionStatefulSetStrategy) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *RollingUpdateStatefulSetStrategy) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -1628,11 +1628,12 @@ func (x *PartitionStatefulSetStrategy) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq2 [1]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
+			yyq2[0] = x.Partition != nil
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(1)
 			} else {
-				yynn2 = 1
+				yynn2 = 0
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -1643,21 +1644,37 @@ func (x *PartitionStatefulSetStrategy) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				yym4 := z.EncBinary()
-				_ = yym4
-				if false {
+				if yyq2[0] {
+					if x.Partition == nil {
+						r.EncodeNil()
+					} else {
+						yy4 := *x.Partition
+						yym5 := z.EncBinary()
+						_ = yym5
+						if false {
+						} else {
+							r.EncodeInt(int64(yy4))
+						}
+					}
 				} else {
-					r.EncodeInt(int64(x.Ordinal))
+					r.EncodeNil()
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("ordinal"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				yym5 := z.EncBinary()
-				_ = yym5
-				if false {
-				} else {
-					r.EncodeInt(int64(x.Ordinal))
+				if yyq2[0] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("partition"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.Partition == nil {
+						r.EncodeNil()
+					} else {
+						yy6 := *x.Partition
+						yym7 := z.EncBinary()
+						_ = yym7
+						if false {
+						} else {
+							r.EncodeInt(int64(yy6))
+						}
+					}
 				}
 			}
 			if yyr2 || yy2arr2 {
@@ -1669,7 +1686,7 @@ func (x *PartitionStatefulSetStrategy) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *PartitionStatefulSetStrategy) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *RollingUpdateStatefulSetStrategy) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -1699,7 +1716,7 @@ func (x *PartitionStatefulSetStrategy) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *PartitionStatefulSetStrategy) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *RollingUpdateStatefulSetStrategy) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -1721,16 +1738,20 @@ func (x *PartitionStatefulSetStrategy) codecDecodeSelfFromMap(l int, d *codec197
 		yys3 := string(yys3Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
 		switch yys3 {
-		case "ordinal":
+		case "partition":
 			if r.TryDecodeAsNil() {
-				x.Ordinal = 0
+				if x.Partition != nil {
+					x.Partition = nil
+				}
 			} else {
-				yyv4 := &x.Ordinal
+				if x.Partition == nil {
+					x.Partition = new(int32)
+				}
 				yym5 := z.DecBinary()
 				_ = yym5
 				if false {
 				} else {
-					*((*int32)(yyv4)) = int32(r.DecodeInt(32))
+					*((*int32)(x.Partition)) = int32(r.DecodeInt(32))
 				}
 			}
 		default:
@@ -1740,7 +1761,7 @@ func (x *PartitionStatefulSetStrategy) codecDecodeSelfFromMap(l int, d *codec197
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *PartitionStatefulSetStrategy) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *RollingUpdateStatefulSetStrategy) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -1759,14 +1780,18 @@ func (x *PartitionStatefulSetStrategy) codecDecodeSelfFromArray(l int, d *codec1
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Ordinal = 0
+		if x.Partition != nil {
+			x.Partition = nil
+		}
 	} else {
-		yyv7 := &x.Ordinal
+		if x.Partition == nil {
+			x.Partition = new(int32)
+		}
 		yym8 := z.DecBinary()
 		_ = yym8
 		if false {
 		} else {
-			*((*int32)(yyv7)) = int32(r.DecodeInt(32))
+			*((*int32)(x.Partition)) = int32(r.DecodeInt(32))
 		}
 	}
 	for {

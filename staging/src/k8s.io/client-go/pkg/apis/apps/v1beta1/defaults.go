@@ -53,6 +53,12 @@ func SetDefaults_StatefulSet(obj *StatefulSet) {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
+	if obj.Spec.UpdateStrategy.Type == RollingUpdateStatefulSetStrategyType &&
+		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
+		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
+		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
+		*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+	}
 
 }
 

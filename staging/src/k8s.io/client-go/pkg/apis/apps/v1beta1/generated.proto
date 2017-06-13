@@ -224,14 +224,6 @@ message DeploymentStrategy {
   optional RollingUpdateDeployment rollingUpdate = 2;
 }
 
-// PartitionStatefulSetStrategy contains the parameters used with the
-// PartitionStatefulSetStrategyType.
-message PartitionStatefulSetStrategy {
-  // Ordinal indicates the ordinal at which the StatefulSet should be
-  // partitioned.
-  optional int32 ordinal = 1;
-}
-
 message RollbackConfig {
   // The revision to rollback to. If set to 0, rollback to the last revision.
   // +optional
@@ -266,6 +258,13 @@ message RollingUpdateDeployment {
   // at any time during the update is atmost 130% of desired pods.
   // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
+}
+
+// RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
+message RollingUpdateStatefulSetStrategy {
+  // Partition indicates the ordinal at which the StatefulSet should be
+  // partitioned.
+  optional int32 partition = 1;
 }
 
 // Scale represents a scaling request for a resource.
@@ -436,10 +435,7 @@ message StatefulSetUpdateStrategy {
   // Type indicates the type of the StatefulSetUpdateStrategy.
   optional string type = 1;
 
-  // Partition is used to communicate the ordinal at which to partition
-  // the StatefulSet when Type is PartitionStatefulSetStrategyType. This
-  // value must be set when Type is PartitionStatefulSetStrategyType,
-  // and it must be nil otherwise.
-  optional PartitionStatefulSetStrategy partition = 2;
+  // RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
+  optional RollingUpdateStatefulSetStrategy rollingUpdate = 2;
 }
 

@@ -66,11 +66,8 @@ const (
 type StatefulSetUpdateStrategy struct {
 	// Type indicates the type of the StatefulSetUpdateStrategy.
 	Type StatefulSetUpdateStrategyType
-	// Partition is used to communicate the ordinal at which to partition
-	// the StatefulSet when Type is PartitionStatefulSetStrategyType. This
-	// value must be set when Type is PartitionStatefulSetStrategyType,
-	// and it must be nil otherwise.
-	Partition *PartitionStatefulSetStrategy
+	// RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
+	RollingUpdate *RollingUpdateStatefulSetStrategy
 }
 
 // StatefulSetUpdateStrategyType is a string enumeration type that enumerates
@@ -78,14 +75,6 @@ type StatefulSetUpdateStrategy struct {
 type StatefulSetUpdateStrategyType string
 
 const (
-	// PartitionStatefulSetStrategyType indicates that updates will only be
-	// applied to a partition of the StatefulSet. This is useful for canaries
-	// and phased roll outs. When a scale operation is performed with this
-	// strategy, new Pods will be created from the specification version indicated
-	// by the StatefulSet's currentRevision if there ordinal is less than the supplied
-	// Partition's ordinal. Otherwise, they will be created from the specification
-	// version indicated by the StatefulSet's updateRevision.
-	PartitionStatefulSetStrategyType StatefulSetUpdateStrategyType = "Partition"
 	// RollingUpdateStatefulSetStrategyType indicates that update will be
 	// applied to all Pods in the StatefulSet with respect to the StatefulSet
 	// ordering constraints. When a scale operation is performed with this
@@ -100,12 +89,11 @@ const (
 	OnDeleteStatefulSetStrategyType = "OnDelete"
 )
 
-// PartitionStatefulSetStrategy contains the parameters used with the
-// PartitionStatefulSetStrategyType.
-type PartitionStatefulSetStrategy struct {
-	// Ordinal indicates the ordinal at which the StatefulSet should be
+// RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
+type RollingUpdateStatefulSetStrategy struct {
+	// Partition indicates the ordinal at which the StatefulSet should be
 	// partitioned.
-	Ordinal int32
+	Partition int32
 }
 
 // A StatefulSetSpec is the specification of a StatefulSet.
