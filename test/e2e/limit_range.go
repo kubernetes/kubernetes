@@ -112,10 +112,7 @@ func equalResourceRequirement(expected v1.ResourceRequirements, actual v1.Resour
 	}
 	framework.Logf("Verifying limits: expected %v with actual %v", expected.Limits, actual.Limits)
 	err = equalResourceList(expected.Limits, actual.Limits)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func equalResourceList(expected v1.ResourceList, actual v1.ResourceList) error {
