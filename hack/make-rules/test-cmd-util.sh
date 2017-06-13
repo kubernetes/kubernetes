@@ -1759,8 +1759,8 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" describe foos | grep listlabel=true
   kubectl "${kube_flags[@]}" describe foos | grep itemlabel=true
 
-  # Delete the resource
-  kubectl "${kube_flags[@]}" delete foos test
+  # Delete the resource with cascade.
+  kubectl "${kube_flags[@]}" delete foos test --cascade=true
 
   # Make sure it's gone
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -1797,8 +1797,8 @@ run_non_native_resource_tests() {
   kill -9 ${patch_pid}
   kube::test::if_has_string "${watch_output}" 'bars/test'
 
-  # Delete the resource
-  kubectl "${kube_flags[@]}" delete bars test
+  # Delete the resource without cascade.
+  kubectl "${kube_flags[@]}" delete bars test --cascade=false
 
   # Make sure it's gone
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
