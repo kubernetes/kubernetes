@@ -116,6 +116,10 @@ type bicycle struct {
 	IsNew bool
 }
 
+type nested struct {
+	Name string
+}
+
 type empName string
 type job string
 type store struct {
@@ -124,6 +128,7 @@ type store struct {
 	Name      string
 	Labels    map[string]int
 	Employees map[empName]job
+	Nested    nested
 }
 
 func TestStructInput(t *testing.T) {
@@ -131,7 +136,7 @@ func TestStructInput(t *testing.T) {
 	storeData := store{
 		Name: "jsonpath",
 		Book: []book{
-			{"reference", "Nigel Rees", "Sayings of the Centurey", 8.95},
+			{"reference", "Nigel Rees", "Sayings of the Century", 8.95},
 			{"fiction", "Evelyn Waugh", "Sword of Honour", 12.99},
 			{"fiction", "Herman Melville", "Moby Dick", 8.99},
 		},
@@ -140,13 +145,16 @@ func TestStructInput(t *testing.T) {
 			{"green", 20.01, false},
 		},
 		Labels: map[string]int{
-			"engieer":  10,
+			"engineer": 10,
 			"web/html": 15,
 			"k8s-app":  20,
 		},
 		Employees: map[empName]job{
 			"jason": "manager",
 			"dan":   "clerk",
+		},
+		Nested: nested{
+			Name: "nested-name",
 		},
 	}
 
