@@ -355,7 +355,9 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 		defaultArguments["proxy-client-cert-file"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientCertName)
 		defaultArguments["proxy-client-key-file"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName)
 	}
-	if k8sVersion.AtLeast(kubeadmconstants.MinimumNodeAuthorizerVersion) {
+	// TODO: That we have to exclude v1.8.0-alpha.0 here is based on the way kubernetes branches work
+	// v1.7.0-beta.0 == v1.8.0.alpha.0 but they are sorted/compared differently
+	if k8sVersion.AtLeast(kubeadmconstants.MinimumNodeAuthorizerVersion) && cfg.KubernetesVersion != "v1.8.0-alpha.0" {
 		// enable the NodeRestriction admission plugin
 		defaultArguments["admission-control"] = defaultv17AdmissionControl
 	}

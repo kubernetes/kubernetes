@@ -254,7 +254,9 @@ func deletePermissiveNodesBindingWhenUsingNodeAuthorization(clientset *clientset
 
 	// If the server version is higher than the Node Authorizer's minimum, try to delete the Group=system:nodes->ClusterRole=system:node binding
 	// which is much more permissive than the Node Authorizer
-	if k8sVersion.AtLeast(kubeadmconstants.MinimumNodeAuthorizerVersion) {
+	// TODO: That we have to exclude v1.8.0-alpha.0 here is based on the way kubernetes branches work
+	// v1.7.0-beta.0 == v1.8.0.alpha.0 but they are sorted/compared differently
+	if k8sVersion.AtLeast(kubeadmconstants.MinimumNodeAuthorizerVersion) && cfg.KubernetesVersion != "v1.8.0-alpha.0" {
 
 		nodesRoleBinding, err := clientset.RbacV1beta1().ClusterRoleBindings().Get(kubeadmconstants.NodesClusterRoleBinding, metav1.GetOptions{})
 		if err != nil {
