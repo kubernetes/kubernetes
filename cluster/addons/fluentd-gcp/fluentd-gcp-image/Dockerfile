@@ -20,7 +20,7 @@
 # scope and that the Logging API has been enabled for the project
 # in the Google Developer Console.
 
-FROM gcr.io/google-containers/ubuntu-slim:0.8
+FROM gcr.io/google-containers/ubuntu-slim:0.12
 
 MAINTAINER Mik Vyatskov "vmik@google.com"
 
