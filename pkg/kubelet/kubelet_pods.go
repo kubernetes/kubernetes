@@ -121,26 +121,52 @@ func (kl *Kubelet) parseDeviceSpec(deviceSpec string) (deviceInfo kubecontainer.
 
 // Device spec:
 //  - PathOnHost:PathInContainer:Permissions
-//  - /dev/kvm:/dev/kvm:mrw  (full spec)
-//  - /dev/kvm::mrw          (device will be mapped as one to one)
-//  - /dev/kvm               (device will be mapped as one to one, and will be applied default permissions: "mrw")
+//  - /dev/kvm:/dev/kvm:mrw     (full spec)
+//  - /dev/kvm:/dev/kvm-new:rw  (/dev/kvm -> /dev/kvm-new without mknod)
+//  - /dev/kvm::mrw             (device will be mapped as one to one)
+//  - /dev/kvm                  (device will be mapped as one to one, and will be applied default permissions: "mrw")
 // Annotations example:
 //  - Full spec:
-//     ["devices":"/dev/kvm:/dev/kvm:mrw;/dev/fuse:/dev/fuse:mrw"]
+//      device.beta.kubernetes.io/allow-list: "/dev/kvm:/dev/kvm:mrw;/dev/fuse:/dev/fuse:mrw"
 //  - Short spec:
-//     ["devices":"/dev/kvm;/dev/fuse"]
+//      device.beta.kubernetes.io/allow-list: "/dev/kvm;/dev/fuse"
+
+/*
+apiVersion: v1
+kind: Pod
+metadata:
+  name: alpine
+  labels:
+    app: alpine
+  annotations:
+    device.beta.kubernetes.io/allow-list: "/dev/kvm;/dev/fuse"
+spec:
+  containers:
+  - name: alpine
+    image: alpine
+    command: ["ls"]
+    args: ["-la", "/dev"]
+
+kubectl logs alpine
+*/
+
+const BetaAllowDeviceListAnnotation = "device.beta.kubernetes.io/allow-list"
+
 func (kl *Kubelet) extractDevicesFromPodAnnotations(pod *v1.Pod) ([]kubecontainer.DeviceInfo, error) {
-	if devicesVal, ok := pod.ObjectMeta.Annotations["devices"]; ok {
+	if deviceList, found := pod.ObjectMeta.Annotations[BetaAllowDeviceListAnnotation]; found {
 		var devices []kubecontainer.DeviceInfo
 
-		devicesArr := strings.Split(devicesVal, ";")
-		for i := range devicesArr {
-			if device, err := kl.parseDeviceSpec(devicesArr[i]); err != nil {
+		deviceListArr := strings.Split(deviceList, ";")
+		for i := range deviceListArr {
+			if device, err := kl.parseDeviceSpec(deviceListArr[i]); err != nil {
 				return nil, err
 			} else {
 				devices = append(devices, device)
 			}
 		}
+
+		// glog.V(3).Infof("POD: %v/%v devices: %v", pod.Namespace, pod.Name, devices)
+		return devices, nil
 	}
 
 	return nil, nil
