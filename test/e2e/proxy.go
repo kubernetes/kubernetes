@@ -269,7 +269,7 @@ var _ = framework.KubeDescribe("Proxy", func() {
 					framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
 				}
 
-				Fail(strings.Join(errs, "\n"))
+				framework.Failf(strings.Join(errs, "\n"))
 			}
 		})
 	})
