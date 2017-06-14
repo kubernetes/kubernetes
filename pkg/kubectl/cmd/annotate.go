@@ -117,10 +117,10 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: annotateExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := options.Complete(out, cmd, args); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
 			}
 			if err := options.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
 			}
 			cmdutil.CheckErr(options.RunAnnotate(f, cmd))
 		},
@@ -167,7 +167,7 @@ func (o *AnnotateOptions) Complete(out io.Writer, cmd *cobra.Command, args []str
 
 // Validate checks to the AnnotateOptions to see if there is sufficient information run the command.
 func (o AnnotateOptions) Validate() error {
-	if len(o.resources) < 1 && cmdutil.IsFilenameEmpty(o.Filenames) {
+	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if len(o.newAnnotations) < 1 && len(o.removeAnnotations) < 1 {

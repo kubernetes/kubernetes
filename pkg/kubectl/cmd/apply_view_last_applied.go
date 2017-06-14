@@ -166,6 +166,6 @@ func (o *ViewLastAppliedOptions) ValidateOutputArgs(cmd *cobra.Command) error {
 		o.OutputFormat = "yaml"
 		return nil
 	default:
-		return cmdutil.UsageError(cmd, "Unexpected -o output mode: %s, the flag 'output' must be one of yaml|json", format)
+		return cmdutil.UsageErrorf(cmd, "Unexpected -o output mode: %s, the flag 'output' must be one of yaml|json", format)
 	}
 }

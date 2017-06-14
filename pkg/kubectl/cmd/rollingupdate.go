@@ -114,26 +114,26 @@ func validateArguments(cmd *cobra.Command, filenames, args []string) error {
 
 	errors := []error{}
 	if len(deploymentKey) == 0 {
-		errors = append(errors, cmdutil.UsageError(cmd, "--deployment-label-key can not be empty"))
+		errors = append(errors, cmdutil.UsageErrorf(cmd, "--deployment-label-key can not be empty"))
 	}
 	if len(filenames) > 1 {
-		errors = append(errors, cmdutil.UsageError(cmd, "May only specify a single filename for new controller"))
+		errors = append(errors, cmdutil.UsageErrorf(cmd, "May only specify a single filename for new controller"))
 	}
 
 	if !rollback {
 		if len(filenames) == 0 && len(image) == 0 {
-			errors = append(errors, cmdutil.UsageError(cmd, "Must specify --filename or --image for new controller"))
+			errors = append(errors, cmdutil.UsageErrorf(cmd, "Must specify --filename or --image for new controller"))
 		} else if len(filenames) != 0 && len(image) != 0 {
-			errors = append(errors, cmdutil.UsageError(cmd, "--filename and --image can not both be specified"))
+			errors = append(errors, cmdutil.UsageErrorf(cmd, "--filename and --image can not both be specified"))
 		}
 	} else {
 		if len(filenames) != 0 || len(image) != 0 {
-			errors = append(errors, cmdutil.UsageError(cmd, "Don't specify --filename or --image on rollback"))
+			errors = append(errors, cmdutil.UsageErrorf(cmd, "Don't specify --filename or --image on rollback"))
 		}
 	}
 
 	if len(args) < 1 {
-		errors = append(errors, cmdutil.UsageError(cmd, "Must specify the controller to update"))
+		errors = append(errors, cmdutil.UsageErrorf(cmd, "Must specify the controller to update"))
 	}
 
 	return utilerrors.NewAggregate(errors)
@@ -213,20 +213,20 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 		// when creating resource(s) from a stream.
 		if list, ok := obj.(*api.List); ok {
 			if len(list.Items) > 1 {
-				return cmdutil.UsageError(cmd, "%s specifies multiple items", filename)
+				return cmdutil.UsageErrorf(cmd, "%s specifies multiple items", filename)
 			}
 			if len(list.Items) == 0 {
-				return cmdutil.UsageError(cmd, "please make sure %s exists and is not empty", filename)
+				return cmdutil.UsageErrorf(cmd, "please make sure %s exists and is not empty", filename)
 			}
 			obj = list.Items[0]
 		}
 		newRc, ok = obj.(*api.ReplicationController)
 		if !ok {
 			if gvks, _, err := typer.ObjectKinds(obj); err == nil {
-				return cmdutil.UsageError(cmd, "%s contains a %v not a ReplicationController", filename, gvks[0])
+				return cmdutil.UsageErrorf(cmd, "%s contains a %v not a ReplicationController", filename, gvks[0])
 			}
 			glog.V(4).Infof("Object %#v is not a ReplicationController", obj)
-			return cmdutil.UsageError(cmd, "%s does not specify a valid ReplicationController", filename)
+			return cmdutil.UsageErrorf(cmd, "%s does not specify a valid ReplicationController", filename)
 		}
 		infos, err := request.Infos()
 		if err != nil || len(infos) != 1 {
@@ -247,7 +247,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 		}
 		if newRc != nil {
 			if inProgressImage := newRc.Spec.Template.Spec.Containers[0].Image; inProgressImage != image {
-				return cmdutil.UsageError(cmd, "Found existing in-progress update to image (%s).\nEither continue in-progress update with --image=%s or rollback with --rollback", inProgressImage, inProgressImage)
+				return cmdutil.UsageErrorf(cmd, "Found existing in-progress update to image (%s).\nEither continue in-progress update with --image=%s or rollback with --rollback", inProgressImage, inProgressImage)
 			}
 			fmt.Fprintf(out, "Found existing update in progress (%s), resuming.\n", newRc.Name)
 		} else {
@@ -261,7 +261,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 			}
 			if oldRc.Spec.Template.Spec.Containers[0].Image == image {
 				if len(pullPolicy) == 0 {
-					return cmdutil.UsageError(cmd, "--image-pull-policy (Always|Never|IfNotPresent) must be provided when --image is the same as existing container image")
+					return cmdutil.UsageErrorf(cmd, "--image-pull-policy (Always|Never|IfNotPresent) must be provided when --image is the same as existing container image")
 				}
 				config.PullPolicy = api.PullPolicy(pullPolicy)
 			}
@@ -292,12 +292,12 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 		}
 
 		if newRc == nil {
-			return cmdutil.UsageError(cmd, "Could not find %s to rollback.\n", newName)
+			return cmdutil.UsageErrorf(cmd, "Could not find %s to rollback.\n", newName)
 		}
 	}
 
 	if oldName == newRc.Name {
-		return cmdutil.UsageError(cmd, "%s cannot have the same name as the existing ReplicationController %s",
+		return cmdutil.UsageErrorf(cmd, "%s cannot have the same name as the existing ReplicationController %s",
 			filename, oldName)
 	}
 
@@ -314,7 +314,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 		}
 	}
 	if !hasLabel {
-		return cmdutil.UsageError(cmd, "%s must specify a matching key with non-equal value in Selector for %s",
+		return cmdutil.UsageErrorf(cmd, "%s must specify a matching key with non-equal value in Selector for %s",
 			filename, oldName)
 	}
 	// TODO: handle scales during rolling update

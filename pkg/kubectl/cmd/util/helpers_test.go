@@ -284,7 +284,7 @@ func testCheckError(t *testing.T, tests []checkErrTestCase) {
 	}
 
 	for _, test := range tests {
-		checkErr("", test.err, errHandle)
+		checkErr(test.err, errHandle)
 
 		if errReturned != test.expectedErr {
 			t.Fatalf("Got: %s, expected: %s", errReturned, test.expectedErr)

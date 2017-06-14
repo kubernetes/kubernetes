@@ -136,13 +136,14 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		ok := false
 		patchType, ok = patchTypes[patchTypeString]
 		if !ok {
-			return cmdutil.UsageError(cmd, fmt.Sprintf("--type must be one of %v, not %q", sets.StringKeySet(patchTypes).List(), patchTypeString))
+			return cmdutil.UsageErrorf(cmd, "--type must be one of %v, not %q",
+				sets.StringKeySet(patchTypes).List(), patchTypeString)
 		}
 	}
 
 	patch := cmdutil.GetFlagString(cmd, "patch")
 	if len(patch) == 0 {
-		return cmdutil.UsageError(cmd, "Must specify -p to patch")
+		return cmdutil.UsageErrorf(cmd, "Must specify -p to patch")
 	}
 	patchBytes, err := yaml.ToJSON([]byte(patch))
 	if err != nil {

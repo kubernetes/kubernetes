@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -136,7 +135,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		Do()
 	err = r.Err()
 	if err != nil {
-		return cmdutil.UsageError(cmd, err.Error())
+		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 
 	// Get the generator, setup and validate all required parameters
@@ -144,7 +143,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	generators := f.Generators("expose")
 	generator, found := generators[generatorName]
 	if !found {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
+		return cmdutil.UsageErrorf(cmd, "generator %q not found.", generatorName)
 	}
 	names := generator.ParamNames()
 
@@ -170,7 +169,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if s, found := params["selector"]; found && kubectl.IsZero(s) {
 			s, err := f.MapBasedSelectorForObject(info.Object)
 			if err != nil {
-				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't retrieve selectors via --selector flag or introspection: %s", err))
+				return cmdutil.UsageErrorf(cmd, "couldn't retrieve selectors via --selector flag or introspection: %v", err)
 			}
 			params["selector"] = s
 		}
@@ -182,12 +181,12 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if port, found := params["port"]; found && kubectl.IsZero(port) {
 			ports, err := f.PortsForObject(info.Object)
 			if err != nil {
-				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find port via --port flag or introspection: %s", err))
+				return cmdutil.UsageErrorf(cmd, "couldn't find port via --port flag or introspection: %v", err)
 			}
 			switch len(ports) {
 			case 0:
 				if !isHeadlessService {
-					return cmdutil.UsageError(cmd, "couldn't find port via --port flag or introspection")
+					return cmdutil.UsageErrorf(cmd, "couldn't find port via --port flag or introspection")
 				}
 			case 1:
 				params["port"] = ports[0]
@@ -201,7 +200,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if _, found := params["protocol"]; found {
 			protocolsMap, err := f.ProtocolsForObject(info.Object)
 			if err != nil {
-				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find protocol via introspection: %s", err))
+				return cmdutil.UsageErrorf(cmd, "couldn't find protocol via introspection: %v", err)
 			}
 			if protocols := kubectl.MakeProtocols(protocolsMap); !kubectl.IsZero(protocols) {
 				params["protocols"] = protocols
