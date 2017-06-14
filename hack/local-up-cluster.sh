@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+export API_HOST=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
+export API_HOST_IP=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
+export PATH=/home/yqguo/project/src/k8s.io/kubernetes/third_party/etcd:${PATH}
+export KUBE_ENABLE_CLUSTER_DNS=true
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 # This command builds and runs a local kubernetes cluster.

@@ -26,9 +26,34 @@ import (
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
+
+var (
+	argApiserverHost = flag.String("apiserver-host", "", "The address of the Kubernetes Apiserver "+
+		"to connect to in the format of protocol://address:port, e.g., "+
+		"http://localhost:8080. If not specified, the assumption is that the binary runs inside a "+
+		"Kubernetes cluster and local discovery is attempted.")
+	argKubeConfigFile = flag.String("kubeconfig", "", "Path to kubeconfig file with authorization and master location information.")
+)
+
+func buildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config, error) {
+	if kubeconfigPath == "" && masterUrl == "" {
+		kubeconfig, err := restclient.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		return kubeconfig, nil
+	}
+
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientapi.Cluster{Server: masterUrl}}).ClientConfig()
+}
 
 func flattenSubsets(subsets []api.EndpointSubset) []string {
 	ips := []string{}
@@ -42,9 +67,10 @@ func flattenSubsets(subsets []api.EndpointSubset) []string {
 
 func main() {
 	flag.Parse()
+
 	glog.Info("Kubernetes Elasticsearch logging discovery")
 
-	cc, err := restclient.InClusterConfig()
+	cc, err := buildConfigFromFlags(*argApiserverHost, *argKubeConfigFile)
 	if err != nil {
 		glog.Fatalf("Failed to make client: %v", err)
 	}
