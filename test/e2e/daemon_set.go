@@ -270,8 +270,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		first := curHistory(listDaemonHistories(c, ns, label), ds)
-		firstHash := ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
-		Expect(first.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).To(Equal(firstHash))
+		firstHash := first.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(first.Revision).To(Equal(int64(1)))
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash, templateGeneration)
 
@@ -297,9 +296,8 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		cur := curHistory(listDaemonHistories(c, ns, label), ds)
-		curHash := ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
-		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).To(Equal(curHash))
 		Expect(cur.Revision).To(Equal(int64(2)))
+		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).NotTo(Equal(firstHash))
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash, templateGeneration)
 	})
 
@@ -327,8 +325,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		cur := curHistory(listDaemonHistories(c, ns, label), ds)
-		hash := ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
-		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).To(Equal(hash))
+		hash := cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(cur.Revision).To(Equal(int64(1)))
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash, fmt.Sprint(templateGeneration))
 
@@ -355,8 +352,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		cur = curHistory(listDaemonHistories(c, ns, label), ds)
-		hash = ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
-		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).To(Equal(hash))
+		hash = cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(cur.Revision).To(Equal(int64(2)))
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash, fmt.Sprint(templateGeneration))
 	})
