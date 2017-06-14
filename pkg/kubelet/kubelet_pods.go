@@ -442,7 +442,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	return opts, useClusterFirstPolicy, nil
 }
 
-var masterServices = sets.NewString("kubernetes")
+var masterServiceName string = "kubernetes"
 
 // getServiceEnvVarMap makes a map[string]string of env vars for services a
 // pod in namespace ns should see.
@@ -466,8 +466,8 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 	// project the services in namespace ns onto the master services
 	for i := range services {
 		service := services[i]
-		// ignore services where ClusterIP is "None" or empty
-		if !v1helper.IsServiceIPSet(service) {
+		// ignore services where ClusterIP is "None" or empty but always add the master service
+		if !v1helper.IsServiceIPSet(service) && !(service.Namespace == kl.masterServiceNamespace && service.Name == masterServiceName) {
 			continue
 		}
 		serviceName := service.Name
@@ -480,7 +480,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 		case ns:
 			serviceMap[serviceName] = service
 		case kl.masterServiceNamespace:
-			if masterServices.Has(serviceName) {
+			if masterServiceName == serviceName {
 				if _, exists := serviceMap[serviceName]; !exists {
 					serviceMap[serviceName] = service
 				}

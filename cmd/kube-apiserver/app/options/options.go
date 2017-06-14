@@ -53,16 +53,18 @@ type ServerRunOptions struct {
 	StorageSerialization    *kubeoptions.StorageSerializationOptions
 	APIEnablement           *kubeoptions.APIEnablementOptions
 
-	AllowPrivileged           bool
-	EnableLogsHandler         bool
-	EventTTL                  time.Duration
-	KubeletConfig             kubeletclient.KubeletClientConfig
-	KubernetesServiceNodePort int
-	MaxConnectionBytesPerSec  int64
-	ServiceClusterIPRange     net.IPNet // TODO: make this a list
-	ServiceNodePortRange      utilnet.PortRange
-	SSHKeyfile                string
-	SSHUser                   string
+	AllowPrivileged               bool
+	EnableLogsHandler             bool
+	EventTTL                      time.Duration
+	KubeletConfig                 kubeletclient.KubeletClientConfig
+	KubernetesServicePort         int
+	KubernetesServiceNodePort     int
+	KubernetesServiceExternalName string
+	MaxConnectionBytesPerSec      int64
+	ServiceClusterIPRange         net.IPNet // TODO: make this a list
+	ServiceNodePortRange          utilnet.PortRange
+	SSHKeyfile                    string
+	SSHUser                       string
 
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
@@ -111,7 +113,7 @@ func NewServerRunOptions() *ServerRunOptions {
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
 		},
-		ServiceNodePortRange: kubeoptions.DefaultServiceNodePortRange,
+		ServiceNodePortRange: kubeoptions.DefaultServiceNodePortRange, KubernetesServicePort: 443,
 	}
 	// Overwrite the default for storage data format.
 	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
@@ -175,6 +177,14 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"If non-zero, the Kubernetes master service (which apiserver creates/maintains) will be "+
 		"of type NodePort, using this as the value of the port. If zero, the Kubernetes master "+
 		"service will be of type ClusterIP.")
+
+	fs.StringVar(&s.KubernetesServiceExternalName, "kubernetes-service-external-name", s.KubernetesServiceExternalName, ""+
+		"If non-empty, the Kubernetes master service (which apiserver creates/maintains) will be "+
+		"of type ExternalName, using this as the value of the externalName. "+
+		"Useful if the apiserver(s) is/are running behind a load balancer which does not have a static ip")
+
+	fs.IntVar(&s.KubernetesServicePort, "apiserver-service-port", s.KubernetesServicePort, ""+
+		"Port of the apiserver service.")
 
 	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, ""+
 		"A CIDR notation IP range from which to assign service cluster IPs. This must not "+
