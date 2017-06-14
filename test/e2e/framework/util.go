@@ -3587,6 +3587,30 @@ func UpdateJobWithRetries(c clientset.Interface, namespace, name string, applyUp
 	return job, pollErr
 }
 
+type updateDSFunc func(*extensions.DaemonSet)
+
+func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDSFunc) (ds *extensions.DaemonSet, err error) {
+	daemonsets := c.ExtensionsV1beta1().DaemonSets(namespace)
+	var updateErr error
+	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		if ds, err = daemonsets.Get(name, metav1.GetOptions{}); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(ds)
+		if ds, err = daemonsets.Update(ds); err == nil {
+			Logf("Updating DaemonSet %s", name)
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to DaemonSet %q: %v", name, updateErr)
+	}
+	return ds, pollErr
+}
+
 // NodeAddresses returns the first address of the given type of each node.
 func NodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string {
 	hosts := []string{}
