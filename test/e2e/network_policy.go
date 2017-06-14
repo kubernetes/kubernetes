@@ -77,7 +77,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 
 			// Create a pod with name 'client-cannot-connect', which will attempt to comunicate with the server,
 			// but should not be able to now that isolation is on.
-			testCannotConnect(f, f.Namespace, "client-cannot-connect", service, 80)
+			testCanConnect(f, f.Namespace, "client-cannot-connect", service, 80)
 		})
 
 		It("should enforce policy based on PodSelector [Feature:NetworkPolicy]", func() {
@@ -307,7 +307,13 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 
 	framework.Logf("Waiting for %s to complete.", podClient.Name)
 	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("checking %s could communicate with server.", podClient.Name))
+	if err != nil {
+		logs, logErr := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, fmt.Sprintf("%s-container", podName))
+		if logErr != nil {
+			framework.Failf("Error getting container logs: %s", logErr)
+		}
+		framework.Failf("failure: %s", logs)
+	}
 }
 
 func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string, service *v1.Service, targetPort int) {
@@ -337,12 +343,8 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 		// Build the containers for the server pod.
 		containers = append(containers, v1.Container{
 			Name:  fmt.Sprintf("%s-container-%d", podName, port),
-			Image: "gcr.io/google_containers/redis:e2e",
-			Args: []string{
-				"/bin/sh",
-				"-c",
-				fmt.Sprintf("/bin/nc -kl %d", port),
-			},
+			Image: "gcr.io/google_containers/porter:4524579c0eb935c056c8e75563b4e1eda31587e0",
+			Env:   []v1.EnvVar{{Name: fmt.Sprintf("SERVE_PORT_%d", port)}},
 			Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
 		})
 
@@ -416,11 +418,13 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 			Containers: []v1.Container{
 				{
 					Name:  fmt.Sprintf("%s-container", podName),
-					Image: "gcr.io/google_containers/redis:e2e",
+					Image: "gcr.io/google_containers/busybox:1.24",
 					Args: []string{
-						"/bin/sh",
-						"-c",
-						fmt.Sprintf("/usr/bin/printf dummy-data | /bin/nc -w 8 %s.%s %d", targetService.Name, targetService.Namespace, targetPort),
+						"/bin/wget",
+						"-T", "8",
+						fmt.Sprintf("%s.%s:%d", targetService.Name, targetService.Namespace, targetPort),
+						"-O",
+						"-",
 					},
 				},
 			},
