@@ -17,7 +17,9 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
+        "//pkg/util/version:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],
 )
@@ -31,7 +33,10 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//cmd/kubeadm/app/preflight:go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app/preflight:go_default_library",
+        "//pkg/util/version:go_default_library",
+    ],
 )
 
 filegroup(
