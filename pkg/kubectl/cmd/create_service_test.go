@@ -48,7 +48,7 @@ func TestCreateService(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateServiceClusterIP(f, buf)
 	cmd.Flags().Set("output", "name")
-	cmd.Flags().Set("tcp", "8080:8000")
+	cmd.Flags().Set("ports", "tcp:8080:8000")
 	cmd.Run(cmd, []string{service.Name})
 	expectedOutput := "service/" + service.Name + "\n"
 	if buf.String() != expectedOutput {
@@ -78,7 +78,7 @@ func TestCreateServiceNodePort(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateServiceNodePort(f, buf)
 	cmd.Flags().Set("output", "name")
-	cmd.Flags().Set("tcp", "30000:8000")
+	cmd.Flags().Set("ports", "tcp:30000:8000")
 	cmd.Run(cmd, []string{service.Name})
 	expectedOutput := "service/" + service.Name + "\n"
 	if buf.String() != expectedOutput {
