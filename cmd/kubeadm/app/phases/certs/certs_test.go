@@ -37,27 +37,29 @@ func TestNewCACertAndKey(t *testing.T) {
 func TestNewAPIServerCertAndKey(t *testing.T) {
 	hostname := "valid-hostname"
 
-	advertiseIP := "1.2.3.4"
-	cfg := &kubeadmapi.MasterConfiguration{
-		API:        kubeadmapi.API{AdvertiseAddress: advertiseIP},
-		Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-		NodeName:   "valid-hostname",
-	}
-	caCert, caKey, err := NewCACertAndKey()
+	advertiseAddresses := []string{"1.2.3.4", "1:2:3::4"}
+	for _, addr := range advertiseAddresses {
+		cfg := &kubeadmapi.MasterConfiguration{
+			API:        kubeadmapi.API{AdvertiseAddress: addr},
+			Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			NodeName:   "valid-hostname",
+		}
+		caCert, caKey, err := NewCACertAndKey()
 
-	apiServerCert, _, err := NewAPIServerCertAndKey(cfg, caCert, caKey)
-	if err != nil {
-		t.Fatalf("failed creation of cert and key: %v", err)
-	}
+		apiServerCert, _, err := NewAPIServerCertAndKey(cfg, caCert, caKey)
+		if err != nil {
+			t.Fatalf("failed creation of cert and key: %v", err)
+		}
 
-	assertIsSignedByCa(t, apiServerCert, caCert)
-	assertHasServerAuth(t, apiServerCert)
+		assertIsSignedByCa(t, apiServerCert, caCert)
+		assertHasServerAuth(t, apiServerCert)
 
-	for _, DNSName := range []string{hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local"} {
-		assertHasDNSNames(t, apiServerCert, DNSName)
-	}
-	for _, IPAddress := range []string{"10.96.0.1", advertiseIP} {
-		assertHasIPAddresses(t, apiServerCert, net.ParseIP(IPAddress))
+		for _, DNSName := range []string{hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local"} {
+			assertHasDNSNames(t, apiServerCert, DNSName)
+		}
+		for _, IPAddress := range []string{"10.96.0.1", addr} {
+			assertHasIPAddresses(t, apiServerCert, net.ParseIP(IPAddress))
+		}
 	}
 }
 
