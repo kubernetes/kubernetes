@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["writer.go"],
-    "//vendor/k8s.io/api/core/v1:go_default_library",
     tags = ["automanaged"],
     deps = ["//vendor/github.com/golang/glog:go_default_library"],
 )
