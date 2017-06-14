@@ -253,9 +253,8 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
-	var versionStrings []string
 	err = wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
-		if versionStrings, err = restclient.ServerAPIVersions(kubeconfig); err == nil {
+		if _, err = restclient.ServerAPIVersions(kubeconfig); err == nil {
 			return true, nil
 		}
 		glog.Errorf("Failed to get api versions from server: %v", err)
