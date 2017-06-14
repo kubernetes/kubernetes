@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -231,6 +232,39 @@ func (f *Framework) BeforeEach() {
 			f.logsSizeWaitGroup.Done()
 		}()
 	}
+
+	if TestContext.ReportDir != "" {
+		select {
+		case <-getProfileLimiter():
+			file, err := os.Create(filepath.Join(TestContext.ReportDir, fmt.Sprintf("e2e-%s.cpu.profile", time.Now().Format("15:04:05"), f.BaseName)))
+			if err == nil {
+				go func() {
+					defer file.Close()
+					data, err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/debug/pprof/profile").Do().Raw()
+					if err != nil {
+						Logf("error getting cpu profile: %v", err)
+						return
+					}
+					file.Write(data)
+				}()
+			} else {
+				Logf("error writing cpu profile: %v", err)
+			}
+		default:
+		}
+	}
+}
+
+var (
+	profileLimiter      <-chan time.Time
+	profileLimiterSetup sync.Once
+)
+
+func getProfileLimiter() <-chan time.Time {
+	profileLimiterSetup.Do(func() {
+		profileLimiter = time.Tick(2 * time.Minute)
+	})
+	return profileLimiter
 }
 
 // AfterEach deletes the namespace, after reading its events.
@@ -240,6 +274,28 @@ func (f *Framework) AfterEach() {
 	// DeleteNamespace at the very end in defer, to avoid any
 	// expectation failures preventing deleting the namespace.
 	defer func() {
+
+		if TestContext.ReportDir != "" {
+			select {
+			case <-getProfileLimiter():
+				file, err := os.Create(filepath.Join(TestContext.ReportDir, fmt.Sprintf("e2e-%s.mem.profile", time.Now().Format("15:04:05"), f.BaseName)))
+				if err == nil {
+					go func() {
+						defer file.Close()
+						data, err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/debug/pprof/heap").Do().Raw()
+						if err != nil {
+							Logf("error getting heap profile: %v", err)
+							return
+						}
+						file.Write(data)
+					}()
+				} else {
+					Logf("error writing heap profile: %v", err)
+				}
+			default:
+			}
+		}
+
 		nsDeletionErrors := map[string]error{}
 		// Whether to delete namespace is determined by 3 factors: delete-namespace flag, delete-namespace-on-failure flag and the test result
 		// if delete-namespace set to false, namespace will always be preserved.
