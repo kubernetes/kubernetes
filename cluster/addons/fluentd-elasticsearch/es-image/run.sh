@@ -23,7 +23,7 @@ export HTTP_PORT=${HTTP_PORT:-9200}
 export TRANSPORT_PORT=${TRANSPORT_PORT:-9300}
 export MINIMUM_MASTER_NODES=${MINIMUM_MASTER_NODES:-2}
 
-/elasticsearch_logging_discovery >> /elasticsearch/config/elasticsearch.yml
+/elasticsearch_logging_discovery $* >> /elasticsearch/config/elasticsearch.yml
 
 chown -R elasticsearch:elasticsearch /data
 
