@@ -545,6 +545,24 @@ message IngressTLS {
   optional string secretName = 2;
 }
 
+// Network is a network resource in container.
+message Network {
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec defines the attributes on a network
+  // +optional
+  optional NetworkSpec spec = 2;
+}
+
+// NetworkList is a list of network resource in container.
+message NetworkList {
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  repeated Network items = 2;
+}
+
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 message NetworkPolicy {
   // Standard object's metadata.
@@ -634,6 +652,13 @@ message NetworkPolicySpec {
   // (and serves solely to ensure that the pods it selects are isolated by default).
   // +optional
   repeated NetworkPolicyIngressRule ingress = 2;
+}
+
+// NetworkSpec describes the attributes on a network resource.
+message NetworkSpec {
+  optional string plugin = 1;
+
+  optional string hostaccessible = 2;
 }
 
 // Pod Security Policy governs the ability to make requests that affect the Security Context

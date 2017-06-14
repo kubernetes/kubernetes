@@ -332,6 +332,23 @@ func (IngressTLS) SwaggerDoc() map[string]string {
 	return map_IngressTLS
 }
 
+var map_Network = map[string]string{
+	"":     "Network is a network resource in container.",
+	"spec": "Spec defines the attributes on a network",
+}
+
+func (Network) SwaggerDoc() map[string]string {
+	return map_Network
+}
+
+var map_NetworkList = map[string]string{
+	"": "NetworkList is a list of network resource in container.",
+}
+
+func (NetworkList) SwaggerDoc() map[string]string {
+	return map_NetworkList
+}
+
 var map_NetworkPolicy = map[string]string{
 	"":         "NetworkPolicy describes what network traffic is allowed for a set of Pods",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
@@ -387,6 +404,14 @@ var map_NetworkPolicySpec = map[string]string{
 
 func (NetworkPolicySpec) SwaggerDoc() map[string]string {
 	return map_NetworkPolicySpec
+}
+
+var map_NetworkSpec = map[string]string{
+	"": "NetworkSpec describes the attributes on a network resource.",
+}
+
+func (NetworkSpec) SwaggerDoc() map[string]string {
+	return map_NetworkSpec
 }
 
 var map_PodSecurityPolicy = map[string]string{
