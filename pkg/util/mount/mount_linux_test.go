@@ -19,6 +19,7 @@ limitations under the License.
 package mount
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -75,20 +76,8 @@ func TestReadProcMountsFrom(t *testing.T) {
 }
 
 func mountPointsEqual(a, b *MountPoint) bool {
-	if a.Device != b.Device || a.Path != b.Path || a.Type != b.Type || !slicesEqual(a.Opts, b.Opts) || a.Pass != b.Pass || a.Freq != b.Freq {
+	if a.Device != b.Device || a.Path != b.Path || a.Type != b.Type || !reflect.DeepEqual(a.Opts, b.Opts) || a.Pass != b.Pass || a.Freq != b.Freq {
 		return false
-	}
-	return true
-}
-
-func slicesEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
 	}
 	return true
 }
