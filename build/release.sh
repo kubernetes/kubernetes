@@ -25,6 +25,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+if ! [[ "$0" =~ "build/release.sh" ]]; then
+	echo "must be run from repository root"
+	exit 255
+fi
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/build/common.sh"
 source "${KUBE_ROOT}/build/lib/release.sh"
