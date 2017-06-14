@@ -91,7 +91,7 @@ CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.100.0.0/14}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # NODE_IP_RANGE is used when ENABLE_IP_ALIASES=true. It is the primary range in
 # the subnet and is the range used for node instance IPs.
-NODE_IP_RANGE="${NODE_IP_RANGE:-10.40.0.0/22}"
+NODE_IP_RANGE="$(get-node-ip-range)"
 
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
@@ -315,3 +315,5 @@ ENABLE_APISERVER_ADVANCED_AUDIT="${ENABLE_APISERVER_ADVANCED_AUDIT:-true}" # tru
 if [[ "${ENABLE_APISERVER_ADVANCED_AUDIT}" == "true" ]]; then
   FEATURE_GATES="${FEATURE_GATES},AdvancedAuditing=true"
 fi
+
+ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
