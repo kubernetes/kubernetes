@@ -566,13 +566,13 @@ func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, openAPIcacheDir string, 
 		return nil, false
 	}
 	// Found openapi metadata for this resource
-	kind, found := api.LookupResource(mapping.GroupVersionKind)
-	if !found {
-		// Kind not found, return empty columns
+	schema := api.LookupResource(mapping.GroupVersionKind)
+	if schema == nil {
+		// Schema not found, return empty columns
 		return nil, false
 	}
 
-	columns, found := openapi.GetPrintColumns(kind.Extensions)
+	columns, found := openapi.GetPrintColumns(schema.GetExtensions())
 	if !found {
 		// Extension not found, return empty columns
 		return nil, false

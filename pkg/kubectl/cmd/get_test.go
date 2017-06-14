@@ -26,8 +26,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-openapi/spec"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -218,20 +216,27 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	}
 }
 
-func testOpenAPISchemaData() (*openapi.Resources, error) {
-	return &openapi.Resources{
-		GroupVersionKindToName: map[schema.GroupVersionKind]string{
+type FakeResources struct {
+	resources map[schema.GroupVersionKind]openapi.Schema
+}
+
+func (f FakeResources) LookupResource(s schema.GroupVersionKind) openapi.Schema {
+	return f.resources[s]
+}
+
+var _ openapi.Resources = &FakeResources{}
+
+func testOpenAPISchemaData() (openapi.Resources, error) {
+	return &FakeResources{
+		resources: map[schema.GroupVersionKind]openapi.Schema{
 			{
 				Version: "v1",
 				Kind:    "Pod",
-			}: "io.k8s.kubernetes.pkg.api.v1.Pod",
-		},
-		NameToDefinition: map[string]openapi.Kind{
-			"io.k8s.kubernetes.pkg.api.v1.Pod": {
-				Name:       "io.k8s.kubernetes.pkg.api.v1.Pod",
-				IsResource: false,
-				Extensions: spec.Extensions{
-					"x-kubernetes-print-columns": "custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion",
+			}: &openapi.Primitive{
+				BaseSchema: openapi.BaseSchema{
+					Extensions: map[string]interface{}{
+						"x-kubernetes-print-columns": "custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion",
+					},
 				},
 			},
 		},

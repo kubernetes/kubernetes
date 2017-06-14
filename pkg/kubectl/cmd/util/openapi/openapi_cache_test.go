@@ -17,7 +17,6 @@ limitations under the License.
 package openapi_test
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -32,91 +31,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
-
-var _ = Describe("When reading openAPIData", func() {
-	var tmpDir string
-	var err error
-	var client *fakeOpenAPIClient
-	var instance *openapi.CachingOpenAPIClient
-	var expectedData *openapi.Resources
-
-	BeforeEach(func() {
-		tmpDir, err = ioutil.TempDir("", "openapi_cache_test")
-		Expect(err).To(BeNil())
-		client = &fakeOpenAPIClient{}
-		instance = openapi.NewCachingOpenAPIClient(client, "v1.6", tmpDir)
-
-		d, err := data.OpenAPISchema()
-		Expect(err).To(BeNil())
-
-		expectedData, err = openapi.NewOpenAPIData(d)
-		Expect(err).To(BeNil())
-	})
-
-	AfterEach(func() {
-		os.RemoveAll(tmpDir)
-	})
-
-	It("should write to the cache", func() {
-		By("getting the live openapi spec from the server")
-		result, err := instance.OpenAPIData()
-		Expect(err).To(BeNil())
-		expectEqual(result, expectedData)
-		Expect(client.calls).To(Equal(1))
-
-		By("writing the live openapi spec to a local cache file")
-		names, err := getFilenames(tmpDir)
-		Expect(err).To(BeNil())
-		Expect(names).To(ConsistOf("v1.6"))
-
-		names, err = getFilenames(filepath.Join(tmpDir, "v1.6"))
-		Expect(err).To(BeNil())
-		Expect(names).To(HaveLen(1))
-		clientVersion := names[0]
-
-		names, err = getFilenames(filepath.Join(tmpDir, "v1.6", clientVersion))
-		Expect(err).To(BeNil())
-		Expect(names).To(ContainElement("openapi_cache"))
-	})
-
-	It("should read from the cache", func() {
-		// First call should use the client
-		result, err := instance.OpenAPIData()
-		Expect(err).To(BeNil())
-		expectEqual(result, expectedData)
-		Expect(client.calls).To(Equal(1))
-
-		// Second call shouldn't use the client
-		result, err = instance.OpenAPIData()
-		Expect(err).To(BeNil())
-		expectEqual(result, expectedData)
-		Expect(client.calls).To(Equal(1))
-
-		names, err := getFilenames(tmpDir)
-		Expect(err).To(BeNil())
-		Expect(names).To(ConsistOf("v1.6"))
-	})
-
-	It("propagate errors that are encountered", func() {
-		// Expect an error
-		client.err = fmt.Errorf("expected error")
-		result, err := instance.OpenAPIData()
-		Expect(err.Error()).To(Equal(client.err.Error()))
-		Expect(result).To(BeNil())
-		Expect(client.calls).To(Equal(1))
-
-		// No cache file is written
-		files, err := ioutil.ReadDir(tmpDir)
-		Expect(err).To(BeNil())
-		Expect(files).To(HaveLen(0))
-
-		// Client error is not cached
-		result, err = instance.OpenAPIData()
-		Expect(err.Error()).To(Equal(client.err.Error()))
-		Expect(result).To(BeNil())
-		Expect(client.calls).To(Equal(2))
-	})
-})
 
 var _ = Describe("Reading openAPIData", func() {
 	var tmpDir string
@@ -153,7 +67,7 @@ var _ = Describe("Reading openAPIData", func() {
 			By("getting the live openapi schema")
 			result, err := instance.OpenAPIData()
 			Expect(err).To(BeNil())
-			expectEqual(result, expectedData)
+			Expect(result).To(Equal(expectedData))
 			Expect(client.calls).To(Equal(1))
 
 			files, err := ioutil.ReadDir(tmpDir)
@@ -181,7 +95,7 @@ var _ = Describe("Reading openAPIData", func() {
 			By("getting the live openapi schema")
 			result, err := instance.OpenAPIData()
 			Expect(err).To(BeNil())
-			expectEqual(result, expectedData)
+			Expect(result).To(Equal(expectedData))
 			Expect(client.calls).To(Equal(1))
 
 			files, err := ioutil.ReadDir(tmpDir)
@@ -202,19 +116,6 @@ func getFilenames(path string) ([]string, error) {
 		result = append(result, n.Name())
 	}
 	return result, nil
-}
-
-func expectEqual(a *openapi.Resources, b *openapi.Resources) {
-	Expect(a.NameToDefinition).To(HaveLen(len(b.NameToDefinition)))
-	for k, v := range a.NameToDefinition {
-		Expect(v).To(Equal(b.NameToDefinition[k]),
-			fmt.Sprintf("Names for GVK do not match %v", k))
-	}
-	Expect(a.GroupVersionKindToName).To(HaveLen(len(b.GroupVersionKindToName)))
-	for k, v := range a.GroupVersionKindToName {
-		Expect(v).To(Equal(b.GroupVersionKindToName[k]),
-			fmt.Sprintf("Values for name do not match %v", k))
-	}
 }
 
 type fakeOpenAPIClient struct {
@@ -276,5 +177,6 @@ func (d *apiData) OpenAPISchema() (*openapi_v2.Document, error) {
 		}
 		d.data, d.err = openapi_v2.NewDocument(info, compiler.NewContext("$root", nil))
 	})
+
 	return d.data, d.err
 }

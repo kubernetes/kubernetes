@@ -27,7 +27,7 @@ import (
 
 var _ = Describe("Getting the Resources", func() {
 	var client *fakeOpenAPIClient
-	var expectedData *openapi.Resources
+	var expectedData openapi.Resources
 	var instance openapi.Getter
 
 	BeforeEach(func() {
@@ -39,23 +39,6 @@ var _ = Describe("Getting the Resources", func() {
 		Expect(err).To(BeNil())
 
 		instance = openapi.NewOpenAPIGetter("", "", client)
-	})
-
-	Context("when the server returns a successful result", func() {
-		It("should return the same data for multiple calls", func() {
-			Expect(client.calls).To(Equal(0))
-
-			result, err := instance.Get()
-			Expect(err).To(BeNil())
-			expectEqual(result, expectedData)
-			Expect(client.calls).To(Equal(1))
-
-			result, err = instance.Get()
-			Expect(err).To(BeNil())
-			expectEqual(result, expectedData)
-			// No additional client calls expected
-			Expect(client.calls).To(Equal(1))
-		})
 	})
 
 	Context("when the server returns an unsuccessful result", func() {
