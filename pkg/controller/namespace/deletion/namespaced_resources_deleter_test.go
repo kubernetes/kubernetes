@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -178,9 +179,12 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 			return resources, nil
 		}
 		d := NewNamespacedResourcesDeleter(mockClient.Core().Namespaces(), clientPool, mockClient.Core(), fn, v1.FinalizerKubernetes, true)
-		err := d.Delete(testInput.testNamespace.Name)
+		remaining, err := d.Delete(testInput.testNamespace.Name, nil)
 		if err != nil {
 			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
+		}
+		if len(remaining) > 0 {
+			t.Errorf("scenario %s - Unexpected remaining gvrs when synching namespace %v", scenario, remaining)
 		}
 
 		// validate traffic from kube client
@@ -255,9 +259,12 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 	}
 	d := NewNamespacedResourcesDeleter(mockClient.Core().Namespaces(), nil, mockClient.Core(),
 		fn, v1.FinalizerKubernetes, true)
-	err := d.Delete(testNamespace.Name)
+	remaining, err := d.Delete(testNamespace.Name, nil)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
+	}
+	if len(remaining) > 0 {
+		t.Errorf("Unexpected remaining gvrs when synching namespace %v", remaining)
 	}
 	if len(mockClient.Actions()) != 1 {
 		t.Errorf("Expected only one action from controller, but got: %d %v", len(mockClient.Actions()), mockClient.Actions())
@@ -341,4 +348,49 @@ func testResources() []*metav1.APIResourceList {
 		},
 	}
 	return results
+}
+
+func TestDiscoveryCache(t *testing.T) {
+	now := time.Now()
+	before := now.Add(-1 * time.Second)
+	after := now.Add(1 * time.Second)
+
+	cases := []struct {
+		times         []time.Time
+		callsExpected int
+	}{
+		{
+			times:         []time.Time{now},
+			callsExpected: 1,
+		},
+		{
+			times:         []time.Time{now, before},
+			callsExpected: 1,
+		},
+		{
+			times:         []time.Time{now, after},
+			callsExpected: 2,
+		},
+		{
+			times:         []time.Time{now, after, before, now},
+			callsExpected: 2,
+		},
+	}
+
+	for i, c := range cases {
+		var calls int
+		d := &discoveryCache{
+			discoverResourcesFn: func() ([]*metav1.APIResourceList, error) {
+				calls += 1
+				return testResources(), nil
+			},
+		}
+		for _, callTime := range c.times {
+			d.get(callTime)
+		}
+		if calls != c.callsExpected {
+			t.Errorf("[%d] expected %d discovery calls but got %d", i, c.callsExpected, calls)
+		}
+	}
+
 }
