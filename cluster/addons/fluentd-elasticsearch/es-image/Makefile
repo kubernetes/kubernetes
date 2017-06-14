@@ -16,7 +16,7 @@
 
 # The current value of the tag to be used for building and
 # pushing an image to gcr.io
-TAG = v5.4.0
+TAG = v5.4.0-1
 
 build:	elasticsearch_logging_discovery
 	docker build --pull -t gcr.io/google_containers/elasticsearch:$(TAG) .
