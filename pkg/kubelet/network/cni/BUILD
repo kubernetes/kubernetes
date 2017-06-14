@@ -8,7 +8,15 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["cni.go"],
+    srcs = [
+        "cni.go",
+        "cni_others.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "cni_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     importpath = "k8s.io/kubernetes/pkg/kubelet/network/cni",
     deps = [
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
@@ -18,7 +26,12 @@ go_library(
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//vendor/github.com/containernetworking/cni/pkg/types/020:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
