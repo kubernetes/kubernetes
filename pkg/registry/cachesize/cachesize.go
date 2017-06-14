@@ -45,6 +45,7 @@ const (
 	LimitRanges                Resource = "limitranges"
 	Namespaces                 Resource = "namespaces"
 	NetworkPolicys             Resource = "networkpolicies"
+	Networks                   Resource = "networks"
 	Nodes                      Resource = "nodes"
 	PersistentVolumes          Resource = "persistentvolumes"
 	PersistentVolumeClaims     Resource = "persistentvolumeclaims"

@@ -1172,3 +1172,29 @@ type NetworkPolicyList struct {
 	// Items is a list of schema objects.
 	Items []NetworkPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// NetworkList is a list of network resource in container.
+type NetworkList struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items           []Network `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient=true
+
+// Network is a network resource in container.
+type Network struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// Spec defines the attributes on a network
+	// +optional
+	Spec NetworkSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+}
+
+// NetworkSpec describes the attributes on a network resource.
+type NetworkSpec struct {
+	Plugin         string `json:"plugin" protobuf:"bytes,1,opt,name=plugin"`
+	HostAccessible string `json:"hostaccessible" protobuf:"bytes,2,opt,name=hostaccessible"`
+}

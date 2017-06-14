@@ -1003,3 +1003,32 @@ func ValidateNetworkPolicyUpdate(update, old *extensions.NetworkPolicy) field.Er
 	}
 	return allErrs
 }
+
+// ValidateNetwork validates a network.
+func ValidateNetwork(pn *extensions.Network) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&pn.ObjectMeta, true, ValidateNetworkName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateNetworkSpec(&pn.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateNetworkUpdate tests if an update to a network is valid.
+func ValidateNetworkUpdate(update, old *extensions.Network) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
+	if !reflect.DeepEqual(update.Spec, old.Spec) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to network spec are forbidden."))
+	}
+	return allErrs
+}
+
+// ValidateNetworkName can be used to check whether the given network
+// name is valid.
+func ValidateNetworkName(name string, prefix bool) []string {
+	return apivalidation.NameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateNetworkSpec tests if required fields in the network spec are set.
+func ValidateNetworkSpec(spec *extensions.NetworkSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	return allErrs
+}
