@@ -128,7 +128,6 @@ func (f fileProcessor) visit(path string) error {
 				fmt.Println("contents were modified")
 				modificationsMade = true
 			}
-			fmt.Println("")
 		}
 		mungeLines = after
 	}
