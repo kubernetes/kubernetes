@@ -165,7 +165,7 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 	// if we're using the non-root strategy set the marker that this container should not be
 	// run as root which will signal to the kubelet to do a final check either on the runAsUser
 	// or, if runAsUser is not set, the image UID will be checked.
-	if s.psp.Spec.RunAsUser.Rule == extensions.RunAsUserStrategyMustRunAsNonRoot {
+	if sc.RunAsNonRoot == nil && s.psp.Spec.RunAsUser.Rule == extensions.RunAsUserStrategyMustRunAsNonRoot {
 		nonRoot := true
 		sc.RunAsNonRoot = &nonRoot
 	}
