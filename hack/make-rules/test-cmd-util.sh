@@ -1635,6 +1635,32 @@ run_non_native_resource_tests() {
   # Test that we can list this new third party resource
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test:'
 
+  # Test that we can watch the resource.
+  # Start watcher in background with process substitution,
+  # so we can read from stdout asynchronously.
+  kube::log::status "Testing ThirdPartyResource watching"
+  exec 3< <(kubectl "${kube_flags[@]}" get bars --request-timeout=1m --watch-only -o name & echo $! ; wait)
+  local watch_pid
+  read <&3 watch_pid
+
+  # We can't be sure when the watch gets established,
+  # so keep triggering events (in the background) until something comes through.
+  local tries=0
+  while [ ${tries} -lt 10 ]; do
+    tries=$((tries+1))
+    kubectl "${kube_flags[@]}" patch bars/test -p "{\"patched\":\"${tries}\"}" --type=merge
+    sleep 1
+  done &
+  local patch_pid=$!
+
+  # Wait up to 30s for a complete line of output.
+  local watch_output
+  read <&3 -t 30 watch_output
+  # Stop the watcher and the patch loop.
+  kill -9 ${watch_pid}
+  kill -9 ${patch_pid}
+  kube::test::if_has_string "${watch_output}" 'bars/test'
+
   # Delete the resource
   kubectl "${kube_flags[@]}" delete bars test
 
