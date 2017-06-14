@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "document.go",
         "extensions.go",
         "openapi.go",
         "openapi_cache.go",
@@ -21,11 +22,9 @@ go_library(
     deps = [
         "//pkg/version:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
     ],
 )
@@ -43,13 +42,14 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
-        "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/googleapis/gnostic/compiler:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/github.com/onsi/gomega/gstruct:go_default_library",
+        "//vendor/github.com/onsi/gomega/types:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
