@@ -56,7 +56,8 @@ type ActualStateOfWorld interface {
 	// added.
 	// If no node with the name nodeName exists in list of attached nodes for
 	// the specified volume, the node is added.
-	AddVolumeNode(uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) (v1.UniqueVolumeName, error)
+	AddVolumeNode(uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec,
+		nodeName types.NodeName, devicePath string, isAttched bool) (v1.UniqueVolumeName, error)
 
 	// SetVolumeMountedByNode sets the MountedByNode value for the given volume
 	// and node. When set to true the mounted parameter indicates the volume
@@ -196,6 +197,10 @@ type attachedVolume struct {
 
 	// devicePath contains the path on the node where the volume is attached
 	devicePath string
+
+	// isAttached denotes whether the attach process has successfully finished
+	// (it may take time) and the volume is ready to be mounted
+	isAttached bool
 }
 
 // The nodeAttachedTo object represents a node that has volumes attached to it.
@@ -239,9 +244,15 @@ type nodeToUpdateStatusFor struct {
 	volumesToReportAsAttached map[v1.UniqueVolumeName]v1.UniqueVolumeName
 }
 
+func (asw *actualStateOfWorld) MarkVolumeAsBeingAttached(
+	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName) error {
+	_, err := asw.AddVolumeNode(uniqueName, volumeSpec, nodeName, "" /* devicePath */, false /* isAttached */)
+	return err
+}
+
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
 	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error {
-	_, err := asw.AddVolumeNode(uniqueName, volumeSpec, nodeName, devicePath)
+	_, err := asw.AddVolumeNode(uniqueName, volumeSpec, nodeName, devicePath, true /* isAttached */)
 	return err
 }
 
@@ -278,7 +289,8 @@ func (asw *actualStateOfWorld) RemoveNodeFromAttachUpdates(nodeName types.NodeNa
 }
 
 func (asw *actualStateOfWorld) AddVolumeNode(
-	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) (v1.UniqueVolumeName, error) {
+	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec,
+	nodeName types.NodeName, devicePath string, isAttached bool) (v1.UniqueVolumeName, error) {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -315,16 +327,22 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 			spec:            volumeSpec,
 			nodesAttachedTo: make(map[types.NodeName]nodeAttachedTo),
 			devicePath:      devicePath,
+			isAttached:      isAttached,
 		}
 	} else {
 		// If volume object already exists, it indicates that the information would be out of date.
 		// Update the fields for volume object except the nodes attached to the volumes.
 		volumeObj.devicePath = devicePath
 		volumeObj.spec = volumeSpec
-		glog.V(2).Infof("Volume %q is already added to attachedVolume list to node %q, update device path %q",
+		volumeObj.isAttached = isAttached
+		glog.V(2).Infof("Volume %q is already added to attachedVolume list to node %q, update device path %q, attaching finished: %v",
 			volumeName,
 			nodeName,
-			devicePath)
+			devicePath,
+			isAttached)
+		if err := asw.updateNodeStatusUpdateNeeded(nodeName, true /* need */); err != nil {
+			glog.Errorf("Failed to update statusUpdateNeeded field in actual state of world: %v", err)
+		}
 	}
 	asw.attachedVolumes[volumeName] = volumeObj
 
@@ -636,6 +654,7 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][
 				attachedVolumes[i] = v1.AttachedVolume{
 					Name:       volume,
 					DevicePath: asw.attachedVolumes[volume].devicePath,
+					IsAttached: asw.attachedVolumes[volume].isAttached,
 				}
 				i++
 			}

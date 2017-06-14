@@ -465,6 +465,7 @@ func createTestClient() *fake.Clientset {
 						{
 							Name:       "fake-plugin/volume-name",
 							DevicePath: "fake/path",
+							IsAttached: true,
 						},
 					}},
 				Spec: v1.NodeSpec{ExternalID: string(nodeName)},

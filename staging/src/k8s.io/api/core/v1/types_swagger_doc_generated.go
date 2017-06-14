@@ -54,6 +54,7 @@ var map_AttachedVolume = map[string]string{
 	"":           "AttachedVolume describes a volume attached to a node",
 	"name":       "Name of the attached volume",
 	"devicePath": "DevicePath represents the device path where the volume should be available",
+	"isAttached": "Has the process of attaching the volume finished already?",
 }
 
 func (AttachedVolume) SwaggerDoc() map[string]string {

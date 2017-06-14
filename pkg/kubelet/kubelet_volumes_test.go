@@ -289,6 +289,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 						{
 							Name:       "fake/vol1",
 							DevicePath: "fake/path",
+							IsAttached: true,
 						},
 					}},
 				Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
@@ -358,6 +359,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 						{
 							Name:       "fake/vol1",
 							DevicePath: "fake/path",
+							IsAttached: true,
 						},
 					}},
 				Spec: v1.NodeSpec{ExternalID: testKubeletHostname},

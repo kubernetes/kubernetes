@@ -209,6 +209,7 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 				{
 					Name:       "fake/pvA",
 					DevicePath: "fake/path",
+					IsAttached: true,
 				},
 			}},
 		Spec: v1.NodeSpec{ExternalID: testHostname},
