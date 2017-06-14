@@ -339,7 +339,7 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 		timeout = Timeout + time.Duration(10*numReplicas)*time.Second
 	}
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
-	waitForStatefulSet := NewRetryParams(reaper.pollInterval, reaper.timeout)
+	waitForStatefulSet := NewRetryParams(reaper.pollInterval, timeout)
 	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForStatefulSet); err != nil {
 		return err
 	}
