@@ -208,14 +208,14 @@ func getRemoteKubeletConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletD
 				return nil, err
 			}
 			// look for kubelet-<node-name> configmap from "kube-system"
-			configmap, err := kubeClient.CoreV1Client.ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", nodename), metav1.GetOptions{})
+			configmap, err := kubeClient.CoreV1Client.ConfigMaps(api.NamespaceSystem).Get(fmt.Sprintf("%s-%s", componentKubelet, nodename), metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
 			return configmap, nil
 		}
 		// No cloud provider yet, so can't get the nodename via Cloud.Instances().CurrentNodeName(hostname), try just using the hostname
-		configmap, err := kubeClient.CoreV1Client.ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", hostname), metav1.GetOptions{})
+		configmap, err := kubeClient.CoreV1Client.ConfigMaps(api.NamespaceSystem).Get(fmt.Sprintf("%s-%s", componentKubelet, hostname), metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("cloud provider was nil, and attempt to use hostname to find config resulted in: %v", err)
 		}
