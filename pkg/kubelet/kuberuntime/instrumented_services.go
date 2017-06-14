@@ -17,7 +17,10 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"time"
+
+	"google.golang.org/grpc"
 
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -59,11 +62,26 @@ func recordError(operation string, err error) {
 	}
 }
 
+// transformError lets us distinguish an error that was specific to grpc versus actual operation.
+// for example, if the grpc protocol did not fail, but the operation did, errors appear in the form:
+//   rpc error: code = 2 desc = <actual error>
+// if the error was not produced by the rpc system itself, we return an error with just desc
+func transformError(err error) error {
+	if err == nil {
+		return nil
+	}
+	// if we have an actual error, filter out code unknown
+	errorDesc := grpc.ErrorDesc(err)
+	// and give a new event with actually useful information
+	return fmt.Errorf(errorDesc)
+}
+
 func (in instrumentedRuntimeService) Version(apiVersion string) (*runtimeapi.VersionResponse, error) {
 	const operation = "version"
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.Version(apiVersion)
+	err = transformError(err)
 	recordError(operation, err)
 	return out, err
 }
@@ -73,6 +91,7 @@ func (in instrumentedRuntimeService) Status() (*runtimeapi.RuntimeStatus, error)
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.Status()
+	err = transformError(err)
 	recordError(operation, err)
 	return out, err
 }
@@ -82,6 +101,7 @@ func (in instrumentedRuntimeService) CreateContainer(podSandboxID string, config
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.CreateContainer(podSandboxID, config, sandboxConfig)
+	err = transformError(err)
 	recordError(operation, err)
 	return out, err
 }
@@ -91,6 +111,7 @@ func (in instrumentedRuntimeService) StartContainer(containerID string) error {
 	defer recordOperation(operation, time.Now())
 
 	err := in.service.StartContainer(containerID)
+	err = transformError(err)
 	recordError(operation, err)
 	return err
 }
@@ -100,6 +121,7 @@ func (in instrumentedRuntimeService) StopContainer(containerID string, timeout i
 	defer recordOperation(operation, time.Now())
 
 	err := in.service.StopContainer(containerID, timeout)
+	err = transformError(err)
 	recordError(operation, err)
 	return err
 }
@@ -109,6 +131,7 @@ func (in instrumentedRuntimeService) RemoveContainer(containerID string) error {
 	defer recordOperation(operation, time.Now())
 
 	err := in.service.RemoveContainer(containerID)
+	err = transformError(err)
 	recordError(operation, err)
 	return err
 }
@@ -118,6 +141,7 @@ func (in instrumentedRuntimeService) ListContainers(filter *runtimeapi.Container
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.ListContainers(filter)
+	err = transformError(err)
 	recordError(operation, err)
 	return out, err
 }
@@ -127,6 +151,7 @@ func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runti
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.ContainerStatus(containerID)
+	err = transformError(err)
 	recordError(operation, err)
 	return out, err
 }
@@ -136,6 +161,7 @@ func (in instrumentedRuntimeService) ExecSync(containerID string, cmd []string, 
 	defer recordOperation(operation, time.Now())
 
 	stdout, stderr, err := in.service.ExecSync(containerID, cmd, timeout)
+	err = transformError(err)
 	recordError(operation, err)
 	return stdout, stderr, err
 }
@@ -145,6 +171,7 @@ func (in instrumentedRuntimeService) Exec(req *runtimeapi.ExecRequest) (*runtime
 	defer recordOperation(operation, time.Now())
 
 	resp, err := in.service.Exec(req)
+	err = transformError(err)
 	recordError(operation, err)
 	return resp, err
 }
@@ -163,6 +190,7 @@ func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandbox
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.RunPodSandbox(config)
+	err = transformError(err)
 	recordError(operation, err)
 	return out, err
 }
@@ -172,6 +200,7 @@ func (in instrumentedRuntimeService) StopPodSandbox(podSandboxID string) error {
 	defer recordOperation(operation, time.Now())
 
 	err := in.service.StopPodSandbox(podSandboxID)
+	err = transformError(err)
 	recordError(operation, err)
 	return err
 }
@@ -181,6 +210,7 @@ func (in instrumentedRuntimeService) RemovePodSandbox(podSandboxID string) error
 	defer recordOperation(operation, time.Now())
 
 	err := in.service.RemovePodSandbox(podSandboxID)
+	err = transformError(err)
 	recordError(operation, err)
 	return err
 }
@@ -190,6 +220,7 @@ func (in instrumentedRuntimeService) PodSandboxStatus(podSandboxID string) (*run
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.PodSandboxStatus(podSandboxID)
+	err = transformError(err)
 	recordError(operation, err)
 	return out, err
 }
@@ -199,6 +230,7 @@ func (in instrumentedRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandbo
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.ListPodSandbox(filter)
+	err = transformError(err)
 	recordError(operation, err)
 	return out, err
 }
@@ -208,6 +240,7 @@ func (in instrumentedRuntimeService) ContainerStats(req *runtimeapi.ContainerSta
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.ContainerStats(req)
+	err = transformError(err)
 	recordError(operation, err)
 	return out, err
 }
@@ -217,6 +250,7 @@ func (in instrumentedRuntimeService) ListContainerStats(req *runtimeapi.ListCont
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.ListContainerStats(req)
+	err = transformError(err)
 	recordError(operation, err)
 	return out, err
 }
@@ -226,6 +260,7 @@ func (in instrumentedRuntimeService) PortForward(req *runtimeapi.PortForwardRequ
 	defer recordOperation(operation, time.Now())
 
 	resp, err := in.service.PortForward(req)
+	err = transformError(err)
 	recordError(operation, err)
 	return resp, err
 }
@@ -235,6 +270,7 @@ func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimea
 	defer recordOperation(operation, time.Now())
 
 	err := in.service.UpdateRuntimeConfig(runtimeConfig)
+	err = transformError(err)
 	recordError(operation, err)
 	return err
 }
@@ -244,6 +280,7 @@ func (in instrumentedImageManagerService) ListImages(filter *runtimeapi.ImageFil
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.ListImages(filter)
+	err = transformError(err)
 	recordError(operation, err)
 	return out, err
 }
@@ -253,6 +290,7 @@ func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpe
 	defer recordOperation(operation, time.Now())
 
 	out, err := in.service.ImageStatus(image)
+	err = transformError(err)
 	recordError(operation, err)
 	return out, err
 }
@@ -262,6 +300,7 @@ func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec,
 	defer recordOperation(operation, time.Now())
 
 	imageRef, err := in.service.PullImage(image, auth)
+	err = transformError(err)
 	recordError(operation, err)
 	return imageRef, err
 }
@@ -271,6 +310,7 @@ func (in instrumentedImageManagerService) RemoveImage(image *runtimeapi.ImageSpe
 	defer recordOperation(operation, time.Now())
 
 	err := in.service.RemoveImage(image)
+	err = transformError(err)
 	recordError(operation, err)
 	return err
 }
@@ -280,6 +320,7 @@ func (in instrumentedImageManagerService) ImageFsInfo(req *runtimeapi.ImageFsInf
 	defer recordOperation(operation, time.Now())
 
 	fsInfo, err := in.service.ImageFsInfo(req)
+	err = transformError(err)
 	recordError(operation, err)
 	return fsInfo, nil
 }
