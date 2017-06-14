@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -1107,56 +1106,6 @@ func (c *Cloud) InstanceType(nodeName types.NodeName) (string, error) {
 		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %v", nodeName, err)
 	}
 	return aws.StringValue(inst.InstanceType), nil
-}
-
-// Return a list of instances matching regex string.
-func (c *Cloud) getInstancesByRegex(regex string) ([]types.NodeName, error) {
-	filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
-
-	instances, err := c.describeInstances(filters)
-	if err != nil {
-		return []types.NodeName{}, err
-	}
-
-	if len(instances) == 0 {
-		return []types.NodeName{}, fmt.Errorf("no instances returned")
-	}
-
-	if strings.HasPrefix(regex, "'") && strings.HasSuffix(regex, "'") {
-		glog.Infof("Stripping quotes around regex (%s)", regex)
-		regex = regex[1 : len(regex)-1]
-	}
-
-	re, err := regexp.Compile(regex)
-	if err != nil {
-		return []types.NodeName{}, err
-	}
-
-	matchingInstances := []types.NodeName{}
-	for _, instance := range instances {
-		// Only return fully-ready instances when listing instances
-		// (vs a query by name, where we will return it if we find it)
-		if orEmpty(instance.State.Name) == "pending" {
-			glog.V(2).Infof("Skipping EC2 instance (pending): %s", *instance.InstanceId)
-			continue
-		}
-
-		nodeName := mapInstanceToNodeName(instance)
-		if nodeName == "" {
-			glog.V(2).Infof("Skipping EC2 instance (no PrivateDNSName): %s",
-				aws.StringValue(instance.InstanceId))
-			continue
-		}
-
-		for _, tag := range instance.Tags {
-			if orEmpty(tag.Key) == "Name" && re.MatchString(orEmpty(tag.Value)) {
-				matchingInstances = append(matchingInstances, nodeName)
-				break
-			}
-		}
-	}
-	glog.V(2).Infof("Matched EC2 instances: %s", matchingInstances)
-	return matchingInstances, nil
 }
 
 // getCandidateZonesForDynamicVolume retrieves  a list of all the zones in which nodes are running
