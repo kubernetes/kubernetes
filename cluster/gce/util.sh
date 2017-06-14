@@ -148,6 +148,18 @@ function detect-project() {
   fi
 }
 
+# Use gsutil to get the md5 hash for a particular tar
+function gsutil_get_tar_md5() {
+  # location_tar could be local or in the cloud
+  # local tar_location example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
+  # cloud tar_location example gs://kubernetes-staging-PROJECT/kubernetes-devel/kubernetes-server-linux-amd64.tar.gz
+  local -r tar_location=$1
+  #parse the output and return the md5 hash
+  #the sed command at the end removes whitespace
+  local -r tar_md5=$(gsutil hash -h -m ${tar_location} 2>/dev/null | grep "Hash (md5):" | awk -F ':' '{print $2}' | sed 's/^[[:space:]]*//g')
+  echo "${tar_md5}"
+}
+
 # Copy a release tar and its accompanying hash.
 function copy-to-staging() {
   local -r staging_path=$1
@@ -179,17 +191,6 @@ function copy-to-staging() {
   echo "+++ ${basename_tar} uploaded (sha1 = ${hash})"
 }
 
-# Use gsutil to get the md5 hash for a particular tar
-function gsutil_get_tar_md5() {
-  # location_tar could be local or in the cloud
-  # local tar_location example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
-  # cloud tar_location example gs://kubernetes-staging-PROJECT/kubernetes-devel/kubernetes-server-linux-amd64.tar.gz
-  local -r tar_location=$1
-  #parse the output and return the md5 hash
-  #the sed command at the end removes whitespace
-  local -r tar_md5=$(gsutil hash -h -m ${tar_location} 2>/dev/null | grep "Hash (md5):" | awk -F ':' '{print $2}' | sed 's/^[[:space:]]*//g')
-  echo "${tar_md5}"
-}
 
 # Given the cluster zone, return the list of regional GCS release
 # bucket suffixes for the release in preference order. GCS doesn't
