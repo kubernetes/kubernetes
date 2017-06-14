@@ -521,7 +521,7 @@ rules:
     # Ingress controller reads `configmaps/ingress-uid` through the unsecured port.
     # TODO(#46983): Change this to the ingress controller service account.
     users: ["system:unsecured"]
-    namespaces: ["kube-sytem"]
+    namespaces: ["kube-system"]
     verbs: ["get"]
     resources:
       - group: "" # core
@@ -533,7 +533,7 @@ rules:
       - group: "" # core
         resources: ["nodes"]
   - level: None
-    groups: ["system:nodes"]
+    userGroups: ["system:nodes"]
     verbs: ["get"]
     resources:
       - group: "" # core
@@ -544,7 +544,7 @@ rules:
       - system:kube-scheduler
       - system:serviceaccount:kube-system:endpoint-controller
     verbs: ["get", "update"]
-    namespaces: ["kube-sytem"]
+    namespaces: ["kube-system"]
     resources:
       - group: "" # core
         resources: ["endpoints"]
