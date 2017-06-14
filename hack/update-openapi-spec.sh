@@ -60,6 +60,7 @@ kube::log::status "Starting kube-apiserver"
   --insecure-bind-address="${API_HOST}" \
   --bind-address="${API_HOST}" \
   --insecure-port="${API_PORT}" \
+  --storage-backend=etcd3 \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
