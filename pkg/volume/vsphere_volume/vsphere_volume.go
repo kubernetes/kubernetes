@@ -345,6 +345,10 @@ func (plugin *vsphereVolumePlugin) newProvisionerInternal(options volume.VolumeO
 }
 
 func (v *vsphereVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if !volume.AccessModesContainedInAll(v.plugin.GetAccessModes(), v.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", v.options.PVC.Spec.AccessModes, v.plugin.GetAccessModes())
+	}
+
 	volSpec, err := v.manager.CreateVolume(v)
 	if err != nil {
 		return nil, err

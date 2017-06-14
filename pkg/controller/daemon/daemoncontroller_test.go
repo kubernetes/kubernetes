@@ -274,6 +274,7 @@ type daemonSetsController struct {
 	*DaemonSetsController
 
 	dsStore      cache.Store
+	historyStore cache.Store
 	podStore     cache.Store
 	nodeStore    cache.Store
 	fakeRecorder *record.FakeRecorder
@@ -297,6 +298,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	manager.podStoreSynced = alwaysReady
 	manager.nodeStoreSynced = alwaysReady
 	manager.dsStoreSynced = alwaysReady
+	manager.historyStoreSynced = alwaysReady
 	podControl := newFakePodControl()
 	manager.podControl = podControl
 	podControl.podStore = informerFactory.Core().V1().Pods().Informer().GetStore()
@@ -304,6 +306,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	return &daemonSetsController{
 		manager,
 		informerFactory.Extensions().V1beta1().DaemonSets().Informer().GetStore(),
+		informerFactory.Apps().V1beta1().ControllerRevisions().Informer().GetStore(),
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Core().V1().Nodes().Informer().GetStore(),
 		fakeRecorder,

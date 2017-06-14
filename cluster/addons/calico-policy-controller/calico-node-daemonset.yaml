@@ -11,6 +11,8 @@ spec:
   selector:
     matchLabels:
       k8s-app: calico-node
+  updateStrategy:
+    type: RollingUpdate
   template:
     metadata:
       labels:
@@ -26,18 +28,16 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: calico/node:v1.2.1
+          image: calico/node:v1.3.0
           env:
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
             - name: CALICO_NETWORKING_BACKEND
               value: "none"
-            - name: CALICO_IPV4POOL_CIDR
-              value: "__CLUSTER_CIDR__"
-            - name: CALICO_IPV4POOL_IPIP
-              value: "off"
             - name: DATASTORE_TYPE
               value: "kubernetes"
+            - name: FELIX_TYPHAK8SSERVICENAME
+              value: "calico-typha"
             - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
               value: "ACCEPT"
             - name: FELIX_IPV6SUPPORT
@@ -48,6 +48,8 @@ spec:
               value: "true"
             - name: IP
               value: ""
+            - name: NO_DEFAULT_POOLS
+              value: "true"
             - name: NODENAME
               valueFrom:
                 fieldRef:
@@ -58,7 +60,7 @@ spec:
             privileged: true
           resources:
             requests:
-              cpu: 250m
+              cpu: __CALICO_NODE_CPU__
           volumeMounts:
             - mountPath: /lib/modules
               name: lib-modules
@@ -69,7 +71,7 @@ spec:
         # This container installs the Calico CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: calico/cni:v1.8.3-hostport
+          image: calico/cni:v1.9.1
           command: ["/install-cni.sh"]
           env:
             - name: CNI_CONF_NAME
@@ -126,11 +128,11 @@ spec:
         # Used to install CNI binaries.
         - name: cni-bin-dir
           hostPath:
-            path: /home/kubernetes/bin
+            path: __CALICO_CNI_DIR__
         # Used to install CNI network config.
         - name: cni-net-dir
           hostPath:
             path: /etc/cni/net.d
       tolerations:
-      - key: "CriticalAddonsOnly"
-        operator: "Exists"
+        - key: "CriticalAddonsOnly"
+          operator: "Exists"

@@ -97,9 +97,9 @@ func TestValidateStatefulSet(t *testing.T) {
 				Template:            validPodTemplate.Template,
 				Replicas:            3,
 				UpdateStrategy: apps.StatefulSetUpdateStrategy{
-					Type: apps.PartitionStatefulSetStrategyType,
-					Partition: func() *apps.PartitionStatefulSetStrategy {
-						return &apps.PartitionStatefulSetStrategy{Ordinal: 2}
+					Type: apps.RollingUpdateStatefulSetStrategyType,
+					RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+						return &apps.RollingUpdateStatefulSetStrategy{Partition: 2}
 					}()},
 			},
 		},
@@ -259,7 +259,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: "foo"},
 			},
 		},
-		"partitioned rolling update": {
+		"negative parition": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				PodManagementPolicy: apps.OrderedReadyPodManagement,
@@ -267,21 +267,9 @@ func TestValidateStatefulSet(t *testing.T) {
 				Template:            validPodTemplate.Template,
 				Replicas:            3,
 				UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
-					Partition: func() *apps.PartitionStatefulSetStrategy {
-						return &apps.PartitionStatefulSetStrategy{Ordinal: 2}
+					RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+						return &apps.RollingUpdateStatefulSetStrategy{Partition: -1}
 					}()},
-			},
-		},
-		"empty partition": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-			Spec: apps.StatefulSetSpec{
-				PodManagementPolicy: apps.OrderedReadyPodManagement,
-				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-				Template:            validPodTemplate.Template,
-				Replicas:            3,
-				UpdateStrategy: apps.StatefulSetUpdateStrategy{
-					Type:      apps.PartitionStatefulSetStrategyType,
-					Partition: nil},
 			},
 		},
 	}
@@ -304,8 +292,8 @@ func TestValidateStatefulSet(t *testing.T) {
 				field != "metadata.labels" &&
 				field != "status.replicas" &&
 				field != "spec.updateStrategy" &&
-				field != "spec.updateStrategy.partition" &&
-				field != "spec.updateStrategy.partition.ordinal" {
+				field != "spec.updateStrategy.rollingUpate" &&
+				field != "spec.updateStrategy.rollingUpdate.partition" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}

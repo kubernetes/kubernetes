@@ -553,6 +553,9 @@ type storageosProvisioner struct {
 var _ volume.Provisioner = &storageosProvisioner{}
 
 func (c *storageosProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if !volume.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
+	}
 
 	var adminSecretName, adminSecretNamespace string
 

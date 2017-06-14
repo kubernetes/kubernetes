@@ -322,12 +322,6 @@ func (self *FakeEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*
 	return matches, nil
 }
 
-func (self *FakeEC2) DescribeAddresses(request *ec2.DescribeAddressesInput) ([]*ec2.Address, error) {
-	addresses := []*ec2.Address{}
-
-	return addresses, nil
-}
-
 type FakeMetadata struct {
 	aws *FakeAWSServices
 }
@@ -1353,40 +1347,6 @@ func TestGetLoadBalancerAdditionalTags(t *testing.T) {
 				t.Errorf("%s != %s", tagTest.Tags[k], v)
 				continue
 			}
-		}
-	}
-}
-
-func TestInstanceIDFromProviderID(t *testing.T) {
-	testCases := []struct {
-		providerID string
-		instanceID string
-		fail       bool
-	}{
-		{
-			providerID: "aws://i-0194bbdb81a49b169",
-			instanceID: "i-0194bbdb81a49b169",
-			fail:       false,
-		},
-		{
-			providerID: "i-0194bbdb81a49b169",
-			instanceID: "",
-			fail:       true,
-		},
-	}
-
-	for _, test := range testCases {
-		instanceID, err := instanceIDFromProviderID(test.providerID)
-		if (err != nil) != test.fail {
-			t.Errorf("%s yielded `err != nil` as %t. expected %t", test.providerID, (err != nil), test.fail)
-		}
-
-		if test.fail {
-			continue
-		}
-
-		if instanceID != test.instanceID {
-			t.Errorf("%s yielded %s. expected %s", test.providerID, instanceID, test.instanceID)
 		}
 	}
 }

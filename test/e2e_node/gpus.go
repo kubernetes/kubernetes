@@ -161,7 +161,7 @@ func makePod(gpus int64, name string) *v1.Pod {
 			v1.ResourceNvidiaGPU: *resource.NewQuantity(gpus, resource.DecimalSI),
 		},
 	}
-	gpuverificationCmd := fmt.Sprintf("if [[ %d -ne $(ls /dev/ | egrep '^nvidia[0-9]+$') ]]; then exit 1; fi; echo Success", gpus)
+	gpuverificationCmd := fmt.Sprintf("if [[ %d -ne $(ls /dev/ | egrep '^nvidia[0-9]+$' | wc -l) ]]; then exit 1; else echo Success; fi", gpus)
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

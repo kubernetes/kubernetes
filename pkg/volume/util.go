@@ -434,3 +434,23 @@ func ValidateZone(zone string) error {
 	}
 	return nil
 }
+
+// AccessModesContains returns whether the requested mode is contained by modes
+func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
+}
+
+// AccessModesContainedInAll returns whether all of the requested modes are contained by modes
+func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, requestedModes []v1.PersistentVolumeAccessMode) bool {
+	for _, mode := range requestedModes {
+		if !AccessModesContains(indexedModes, mode) {
+			return false
+		}
+	}
+	return true
+}

@@ -67,7 +67,7 @@ func NewCMServer() *CMServer {
 			ConcurrentJobSyncs:                              5,
 			ConcurrentResourceQuotaSyncs:                    5,
 			ConcurrentDeploymentSyncs:                       5,
-			ConcurrentNamespaceSyncs:                        5,
+			ConcurrentNamespaceSyncs:                        10,
 			ConcurrentSATokenSyncs:                          5,
 			LookupCacheSizeForRC:                            4096,
 			LookupCacheSizeForRS:                            4096,
