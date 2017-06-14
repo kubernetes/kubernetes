@@ -1837,7 +1837,8 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 
 func TestFinalizeDelete(t *testing.T) {
 	// Verify that it returns the expected Status.
-	_, s := NewTestGenericStoreRegistry(t)
+	destroyFunc, s := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 	obj := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "random-uid"},
 	}

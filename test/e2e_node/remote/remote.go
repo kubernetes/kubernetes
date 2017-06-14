@@ -143,6 +143,13 @@ func getTestArtifacts(host, testDir string) error {
 	if err != nil {
 		return err
 	}
+	// Copy json files (if any) to artifacts.
+	if _, err = SSH(host, "ls", fmt.Sprintf("%s/results/*.json", testDir)); err == nil {
+		_, err = runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.json", GetHostnameOrIp(host), testDir), *resultsDir)
+		if err != nil {
+			return err
+		}
+	}
 	// Copy junit to the top of artifacts
 	_, err = runSSHCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIp(host), testDir), *resultsDir)
 	if err != nil {

@@ -496,6 +496,7 @@ func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcN
 func getClusterNodeIPs(clientset client.Interface) ([]string, error) {
 	preferredAddressTypes := []api.NodeAddressType{
 		api.NodeExternalIP,
+		api.NodeInternalIP,
 	}
 	nodeList, err := clientset.Core().Nodes().List(metav1.ListOptions{})
 	if err != nil {

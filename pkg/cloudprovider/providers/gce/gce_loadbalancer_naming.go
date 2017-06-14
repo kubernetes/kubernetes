@@ -17,6 +17,8 @@ limitations under the License.
 package gce
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -33,15 +35,23 @@ func makeInstanceGroupName(clusterID string) string {
 
 func makeBackendServiceName(loadBalancerName, clusterID string, shared bool, scheme lbScheme, protocol v1.Protocol, svcAffinity v1.ServiceAffinity) string {
 	if shared {
-		affinity := ""
-		switch svcAffinity {
-		case v1.ServiceAffinityClientIP:
-			affinity = "clientip"
-		default:
-			affinity = "noaffinity"
-		}
+		hash := sha1.New()
 
-		return fmt.Sprintf("k8s-%s-%s-%s-%s", clusterID, strings.ToLower(string(scheme)), strings.ToLower(string(protocol)), affinity)
+		// For every non-nil option, hash its value. Currently, only service affinity is relevant.
+		hash.Write([]byte(string(svcAffinity)))
+
+		hashed := hex.EncodeToString(hash.Sum(nil))
+		hashed = hashed[:16]
+
+		// k8s-          4
+		// {clusterid}-  17
+		// {scheme}-     9   (internal/external)
+		// {protocol}-   4   (tcp/udp)
+		// nmv1-         5   (naming convention version)
+		// {suffix}      16  (hash of settings)
+		// -----------------
+		//               55  characters used
+		return fmt.Sprintf("k8s-%s-%s-%s-nmv1-%s", clusterID, strings.ToLower(string(scheme)), strings.ToLower(string(protocol)), hashed)
 	}
 	return loadBalancerName
 }
@@ -54,11 +64,11 @@ func makeHealthCheckName(loadBalancerName, clusterID string, shared bool) string
 	return loadBalancerName
 }
 
-func makeHealthCheckFirewallkNameFromHC(healthCheckName string) string {
+func makeHealthCheckFirewallNameFromHC(healthCheckName string) string {
 	return healthCheckName + "-hc"
 }
 
-func makeHealthCheckFirewallkName(loadBalancerName, clusterID string, shared bool) string {
+func makeHealthCheckFirewallName(loadBalancerName, clusterID string, shared bool) string {
 	if shared {
 		return fmt.Sprintf("k8s-%s-node-hc", clusterID)
 	}
@@ -69,7 +79,7 @@ func makeBackendServiceDescription(nm types.NamespacedName, shared bool) string 
 	if shared {
 		return ""
 	}
-	return fmt.Sprintf(`{"kubernetes.io/service-name":"%s"`, nm.String())
+	return fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, nm.String())
 }
 
 // External Load Balancer

@@ -196,7 +196,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				framework.Failf("Failed to observe pod creation: %v", event)
 			}
 		case <-time.After(framework.PodStartTimeout):
-			Fail("Timeout while waiting for pod creation")
+			framework.Failf("Timeout while waiting for pod creation")
 		}
 
 		// We need to wait for the pod to be running, otherwise the deletion
@@ -245,14 +245,14 @@ var _ = framework.KubeDescribe("Pods", func() {
 					deleted = true
 				case watch.Error:
 					framework.Logf("received a watch error: %v", event.Object)
-					Fail("watch closed with error")
+					framework.Failf("watch closed with error")
 				}
 			case <-timer:
-				Fail("timed out waiting for pod deletion")
+				framework.Failf("timed out waiting for pod deletion")
 			}
 		}
 		if !deleted {
-			Fail("Failed to observe pod deletion")
+			framework.Failf("Failed to observe pod deletion")
 		}
 
 		Expect(lastPod.DeletionTimestamp).ToNot(BeNil())

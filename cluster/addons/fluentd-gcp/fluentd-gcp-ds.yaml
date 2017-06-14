@@ -94,6 +94,7 @@ spec:
         command:
           - /monitor
           - --component=fluentd
+          - --target-port=31337
           - --stackdriver-prefix=container.googleapis.com/internal/addons
           - --whitelisted-metrics=logging_line_count,logging_entry_count
         volumeMounts:

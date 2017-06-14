@@ -17,6 +17,8 @@ limitations under the License.
 package e2e
 
 import (
+	"io/ioutil"
+	"net/http"
 	"strings"
 	"time"
 
@@ -29,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/generated"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -42,7 +43,7 @@ const (
 	// Nvidia driver installation can take upwards of 5 minutes.
 	driverInstallTimeout = 10 * time.Minute
 	// Nvidia COS driver installer daemonset.
-	cosNvidiaDriverInstallerPath = "cluster/gce/gci/nvidia-gpus/cos-installer-daemonset.yaml"
+	cosNvidiaDriverInstallerUrl = "https://raw.githubusercontent.com/ContainerEngine/accelerators/stable/cos-nvidia-gpu-installer/daemonset.yaml"
 )
 
 func makeCudaAdditionTestPod() *v1.Pod {
@@ -135,7 +136,7 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 	// GPU drivers might have already been installed.
 	if !areGPUsAvailableOnAllSchedulableNodes(f) {
 		// Install Nvidia Drivers.
-		ds := dsFromManifest(cosNvidiaDriverInstallerPath)
+		ds := dsFromManifest(cosNvidiaDriverInstallerUrl)
 		ds.Namespace = f.Namespace.Name
 		_, err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Create(ds)
 		framework.ExpectNoError(err, "failed to create daemonset")
@@ -158,10 +159,25 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 }
 
 // dsFromManifest reads a .json/yaml file and returns the daemonset in it.
-func dsFromManifest(fileName string) *extensions.DaemonSet {
+func dsFromManifest(url string) *extensions.DaemonSet {
 	var controller extensions.DaemonSet
-	framework.Logf("Parsing ds from %v", fileName)
-	data := generated.ReadOrDie(fileName)
+	framework.Logf("Parsing ds from %v", url)
+
+	var response *http.Response
+	var err error
+	for i := 1; i <= 5; i++ {
+		response, err = http.Get(url)
+		if err == nil && response.StatusCode == 200 {
+			break
+		}
+		time.Sleep(time.Duration(i) * time.Second)
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(response.StatusCode).To(Equal(200))
+	defer response.Body.Close()
+
+	data, err := ioutil.ReadAll(response.Body)
+	Expect(err).NotTo(HaveOccurred())
 
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())

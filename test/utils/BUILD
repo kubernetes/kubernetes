@@ -59,6 +59,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//test/utils/junit:all-srcs",
+    ],
     tags = ["automanaged"],
 )
