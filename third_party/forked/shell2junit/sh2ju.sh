@@ -137,11 +137,6 @@ function juLog() {
   content="$content
     <testcase assertions=\"1\" name=\"$name\" time=\"$time\" classname=\"$class\">
     $failure
-    <system-out>
-<![CDATA[
-$out
-]]>
-    </system-out>
     <system-err>
 <![CDATA[
 $errMsg
@@ -168,9 +163,12 @@ EOF
   else
     # no file exists. Adding a new file
     cat <<EOF > "$juDIR/junit-$suite.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
     <testsuite failures="$errors" assertions="$assertions" name="$suite" tests="1" errors="$errors" time="$total">
     $content
     </testsuite>
+</testsuites>
 EOF
   fi
 
