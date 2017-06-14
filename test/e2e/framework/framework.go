@@ -51,8 +51,10 @@ import (
 )
 
 const (
-	maxKubectlExecRetries           = 5
-	DefaultNamespaceDeletionTimeout = 5 * time.Minute
+	maxKubectlExecRetries = 5
+	// TODO(mikedanese): reset this to 5 minutes once #47135 is resolved.
+	// ref https://github.com/kubernetes/kubernetes/issues/47135
+	DefaultNamespaceDeletionTimeout = 10 * time.Minute
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
