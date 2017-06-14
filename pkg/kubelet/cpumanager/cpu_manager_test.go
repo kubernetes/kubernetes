@@ -14,15 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cpuset
+package cpumanager
 
 import (
 	"io/ioutil"
 	"reflect"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topo"
 )
 
-func Test_discoverCPUInfo(t *testing.T) {
+func Test_discoverTopology(t *testing.T) {
+	// TODO(CD): Need to provide canned input to make this test portable
+	//           across systems and architectures.
 	cpuInfoFile, err := ioutil.ReadFile("/proc/cpuinfo")
 	if err != nil {
 		t.Errorf("couldn't read /proc/cpuinfo: %v", err)
@@ -34,25 +38,25 @@ func Test_discoverCPUInfo(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *cpuInfo
+		want    *topo.CPUTopology
 		wantErr bool
 	}{
 		{
 			name:    "test",
 			args:    args{cpuinfo: cpuInfoFile},
-			want:    &cpuInfo{numCores: 4, hyperthreading: false},
+			want:    &topo.CPUTopology{NumCPUs: 4, Hyperthreading: false},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := discoverCPUInfo(tt.args.cpuinfo)
+			got, err := discoverTopology(tt.args.cpuinfo)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("discoverCPUInfo() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("discoverTopology() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("discoverCPUInfo() = %v, want %v", got, tt.want)
+				t.Errorf("discoverTopology() = %v, want %v", got, tt.want)
 			}
 		})
 	}

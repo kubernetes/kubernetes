@@ -66,7 +66,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
@@ -621,10 +621,19 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		if err != nil {
 			return nil, err
 		}
-		klet.cpusetManager, err = cpuset.NewStaticManager(klet, klet.statusManager, runtimeService)
+
+		klet.cpuManager, err = cpumanager.NewManager(
+			// TODO(CD): Make the CPU Manager policy configurable.
+			// cpumanager.NewNoopPolicy(),
+			cpumanager.NewStaticPolicy(), // policy
+			runtimeService,               // runtime service
+			klet,                         // pod lister
+			klet.statusManager)
 		if err != nil {
+			glog.Infof("[cpumanager] cpu manager instantiation yielded error: %v", err)
 			return nil, err
 		}
+
 		runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 			klet.livenessManager,
@@ -642,7 +651,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			kubeCfg.CPUCFSQuota,
 			runtimeService,
 			imageService,
-			klet.cpusetManager,
+			klet.cpuManager,
 		)
 		if err != nil {
 			return nil, err
@@ -1112,8 +1121,8 @@ type Kubelet struct {
 	// It should be set only when docker is using non json-file logging driver.
 	dockerLegacyService dockershim.DockerLegacyService
 
-	// cpuset Manager
-	cpusetManager cpuset.Manager
+	// CPU Manager
+	cpuManager cpumanager.Manager
 }
 
 func allLocalIPsWithoutLoopback() ([]net.IP, error) {
@@ -1248,8 +1257,8 @@ func (kl *Kubelet) initializeModules() error {
 	// Start resource analyzer
 	kl.resourceAnalyzer.Start()
 
-	// Step 9: Start the cpuset manager
-	kl.cpusetManager.Start()
+	// Step 9: Start the CPU manager
+	kl.cpuManager.Start()
 
 	return nil
 }
