@@ -88,6 +88,8 @@ NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 NODE_TAGS="${NODE_TAG}"
 
 ALLOCATE_NODE_CIDRS=true
+PREEXISTING_NETWORK=false
+PREEXISTING_NETWORK_MODE=""
 
 KUBE_PROMPT_FOR_UPDATE=${KUBE_PROMPT_FOR_UPDATE:-"n"}
 # How long (in seconds) to wait for cluster initialization.
@@ -477,7 +479,11 @@ function make-gcloud-network-argument() {
     ret="${ret},aliases=pods-default:${alias_size}"
     ret="${ret} --no-can-ip-forward"
   else
-    ret="--network ${network}"
+    if [[ ${PREEXISTING_NETWORK} = "true" && "${PREEXISTING_NETWORK_MODE}" != "custom" ]]; then
+      ret="--network ${network}"
+    else
+      ret="--subnet=${network}"
+    fi
     ret="${ret} --can-ip-forward"
     if [[ -n ${address:-} ]]; then
       ret="${ret} --address ${address}"
@@ -715,6 +721,10 @@ function create-network() {
     # The network needs to be created synchronously or we have a race. The
     # firewalls can be added concurrent with instance creation.
     gcloud compute networks create --project "${PROJECT}" "${NETWORK}" --mode=auto
+  else
+    PREEXISTING_NETWORK=true
+    PREEXISTING_NETWORK_MODE="$(gcloud compute networks list ${NETWORK} --format='value(x_gcloud_mode)' || true)"
+    echo "Found existing network ${NETWORK} in ${PREEXISTING_NETWORK_MODE} mode."
   fi
 
   if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${CLUSTER_NAME}-default-internal-master" &>/dev/null; then
@@ -744,10 +754,31 @@ function create-network() {
   fi
 }
 
+function expand-default-subnetwork() {
+  gcloud compute networks switch-mode "${NETWORK}" \
+    --mode custom \
+    --project "${PROJECT}" \
+    --quiet || true
+  gcloud compute networks subnets expand-ip-range "${NETWORK}" \
+    --region="${REGION}" \
+    --project "${PROJECT}" \
+    --prefix-length=19 \
+    --quiet
+}
+
 function create-subnetworks() {
   case ${ENABLE_IP_ALIASES} in
-    true) ;;
-    false) return;;
+    true) echo "IP aliases are enabled. Creating subnetworks.";;
+    false)
+      echo "IP aliases are disabled."
+      if [[ "${ENABLE_BIG_CLUSTER_SUBNETS}" = "true" ]]; then 
+        if [[  "${PREEXISTING_NETWORK}" != "true" ]]; then
+          expand-default-subnetwork
+        else
+          echo "${color_yellow}Using pre-existing network ${NETWORK}, subnets won't be expanded to /19!${color_norm}"
+        fi
+      fi
+      return;;
     *) echo "${color_red}Invalid argument to ENABLE_IP_ALIASES${color_norm}"
        exit 1;;
   esac
@@ -836,6 +867,17 @@ function delete-network() {
 
 function delete-subnetworks() {
   if [[ ${ENABLE_IP_ALIASES:-} != "true" ]]; then
+    if [[ "${ENABLE_BIG_CLUSTER_SUBNETS}" = "true" ]]; then
+      # If running in custom mode network we need to delete subnets
+      mode="$(gcloud compute networks list ${NETWORK} --format='value(x_gcloud_mode)' || true)"
+      if [[ "${mode}" == "custom" ]]; then
+        echo "Deleting default subnets..."
+        # This value should be kept in sync with number of regions.
+        local parallelism=9
+        gcloud compute networks subnets list --network="${NETWORK}" --format='value(region.basename())' | \
+          xargs -i -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --region="{}" || true
+      fi
+    fi
     return
   fi
 
@@ -1581,9 +1623,8 @@ function kube-down() {
       "${NETWORK}-default-ssh" \
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
 
-    delete-subnetworks
-
     if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
+      delete-subnetworks || true
       delete-network || true  # might fail if there are leaked firewall rules
     fi
 
