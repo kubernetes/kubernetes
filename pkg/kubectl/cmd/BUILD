@@ -217,7 +217,6 @@ go_test(
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/util/i18n:go_default_library",
         "//pkg/util/strings:go_default_library",
-        "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
