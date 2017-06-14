@@ -2519,7 +2519,7 @@ type PodSpec struct {
 	// +optional
 	// +patchMergeKey=IP
 	// +patchStrategy=merge
-	HostAliases []HostAlias `json:"hostMappings,omitempty" patchStrategy:"merge" patchMergeKey:"IP" protobuf:"bytes,23,rep,name=hostMappings"`
+	HostAliases []HostAlias `json:"hostAliases,omitempty" patchStrategy:"merge" patchMergeKey:"IP" protobuf:"bytes,23,rep,name=hostAliases"`
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
