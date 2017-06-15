@@ -166,9 +166,27 @@ func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]
 func newPod(podName string, nodeName string, label map[string]string, ds *extensions.DaemonSet) *v1.Pod {
 	// Add hash unique label to the pod
 	newLabels := label
+	var podSpec v1.PodSpec
+	// Copy pod spec from DaemonSet template, or use a default one if DaemonSet is nil
 	if ds != nil {
 		hash := fmt.Sprint(controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount))
 		newLabels = labelsutil.CloneAndAddLabel(label, extensions.DefaultDaemonSetUniqueLabelKey, hash)
+		podSpec = ds.Spec.Template.Spec
+	} else {
+		podSpec = v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Image: "foo/bar",
+					TerminationMessagePath: v1.TerminationMessagePathDefault,
+					ImagePullPolicy:        v1.PullIfNotPresent,
+					SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
+				},
+			},
+		}
+	}
+	// Add node name to the pod
+	if len(nodeName) > 0 {
+		podSpec.NodeName = nodeName
 	}
 
 	pod := &v1.Pod{
@@ -178,18 +196,7 @@ func newPod(podName string, nodeName string, label map[string]string, ds *extens
 			Labels:       newLabels,
 			Namespace:    metav1.NamespaceDefault,
 		},
-		Spec: v1.PodSpec{
-			NodeName: nodeName,
-			Containers: []v1.Container{
-				{
-					Image: "foo/bar",
-					TerminationMessagePath: v1.TerminationMessagePathDefault,
-					ImagePullPolicy:        v1.PullIfNotPresent,
-					SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
-				},
-			},
-			DNSPolicy: v1.DNSDefault,
-		},
+		Spec: podSpec,
 	}
 	pod.Name = names.SimpleNameGenerator.GenerateName(podName)
 	if ds != nil {
@@ -718,14 +725,8 @@ func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec = podSpec
 		manager.dsStore.Add(ds)
-		manager.podStore.Add(&v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels:          simpleDaemonSetLabel,
-				Namespace:       metav1.NamespaceDefault,
-				OwnerReferences: []metav1.OwnerReference{*newControllerRef(ds)},
-			},
-			Spec: podSpec,
-		})
+		pod := newPod(ds.Name+"-", node.Name, simpleDaemonSetLabel, ds)
+		manager.podStore.Add(pod)
 		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 	}
 }

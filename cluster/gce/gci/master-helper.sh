@@ -76,7 +76,7 @@ function replicate-master-instance() {
 function create-master-instance-internal() {
   local gcloud="gcloud"
   if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
-    gcloud="gcloud alpha"
+    gcloud="gcloud beta"
   fi
 
   local -r master_name="${1}"

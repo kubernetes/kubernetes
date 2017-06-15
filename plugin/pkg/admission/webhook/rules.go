@@ -21,11 +21,11 @@ import (
 	"strings"
 
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
 )
 
 type RuleMatcher struct {
-	Rule admissionregistration.RuleWithOperations
+	Rule v1alpha1.RuleWithOperations
 	Attr admission.Attributes
 }
 
@@ -60,12 +60,12 @@ func (r *RuleMatcher) version() bool {
 func (r *RuleMatcher) operation() bool {
 	attrOp := r.Attr.GetOperation()
 	for _, op := range r.Rule.Operations {
-		if op == admissionregistration.OperationAll {
+		if op == v1alpha1.OperationAll {
 			return true
 		}
 		// The constants are the same such that this is a valid cast (and this
 		// is tested).
-		if op == admissionregistration.OperationType(attrOp) {
+		if op == v1alpha1.OperationType(attrOp) {
 			return true
 		}
 	}

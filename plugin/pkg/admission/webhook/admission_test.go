@@ -32,22 +32,24 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/admission/v1alpha1"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	registrationv1alpha1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
 
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 )
 
 type fakeHookSource struct {
-	hooks []admissionregistration.ExternalAdmissionHook
+	hooks []registrationv1alpha1.ExternalAdmissionHook
 	err   error
 }
 
-func (f *fakeHookSource) List() ([]admissionregistration.ExternalAdmissionHook, error) {
+func (f *fakeHookSource) ExternalAdmissionHooks() (*registrationv1alpha1.ExternalAdmissionHookConfiguration, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	return f.hooks, nil
+	return &registrationv1alpha1.ExternalAdmissionHookConfiguration{ExternalAdmissionHooks: f.hooks}, nil
 }
+
+func (f *fakeHookSource) Run(stopCh <-chan struct{}) {}
 
 type fakeServiceResolver struct {
 	base url.URL
@@ -124,17 +126,17 @@ func TestAdmit(t *testing.T) {
 		expectAllow   bool
 		errorContains string
 	}
-	ccfg := func(result string) admissionregistration.AdmissionHookClientConfig {
-		return admissionregistration.AdmissionHookClientConfig{
-			Service: admissionregistration.ServiceReference{
+	ccfg := func(result string) registrationv1alpha1.AdmissionHookClientConfig {
+		return registrationv1alpha1.AdmissionHookClientConfig{
+			Service: registrationv1alpha1.ServiceReference{
 				Name: result,
 			},
 			CABundle: caCert,
 		}
 	}
-	matchEverythingRules := []admissionregistration.RuleWithOperations{{
-		Operations: []admissionregistration.OperationType{admissionregistration.OperationAll},
-		Rule: admissionregistration.Rule{
+	matchEverythingRules := []registrationv1alpha1.RuleWithOperations{{
+		Operations: []registrationv1alpha1.OperationType{registrationv1alpha1.OperationAll},
+		Rule: registrationv1alpha1.Rule{
 			APIGroups:   []string{"*"},
 			APIVersions: []string{"*"},
 			Resources:   []string{"*/*"},
@@ -144,11 +146,11 @@ func TestAdmit(t *testing.T) {
 	table := map[string]test{
 		"no match": {
 			hookSource: fakeHookSource{
-				hooks: []admissionregistration.ExternalAdmissionHook{{
+				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:         "nomatch",
 					ClientConfig: ccfg("disallow"),
-					Rules: []admissionregistration.RuleWithOperations{{
-						Operations: []admissionregistration.OperationType{admissionregistration.Create},
+					Rules: []registrationv1alpha1.RuleWithOperations{{
+						Operations: []registrationv1alpha1.OperationType{registrationv1alpha1.Create},
 					}},
 				}},
 			},
@@ -156,7 +158,7 @@ func TestAdmit(t *testing.T) {
 		},
 		"match & allow": {
 			hookSource: fakeHookSource{
-				hooks: []admissionregistration.ExternalAdmissionHook{{
+				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:         "allow",
 					ClientConfig: ccfg("allow"),
 					Rules:        matchEverythingRules,
@@ -166,7 +168,7 @@ func TestAdmit(t *testing.T) {
 		},
 		"match & disallow": {
 			hookSource: fakeHookSource{
-				hooks: []admissionregistration.ExternalAdmissionHook{{
+				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:         "disallow",
 					ClientConfig: ccfg("disallow"),
 					Rules:        matchEverythingRules,
@@ -176,7 +178,7 @@ func TestAdmit(t *testing.T) {
 		},
 		"match & disallow ii": {
 			hookSource: fakeHookSource{
-				hooks: []admissionregistration.ExternalAdmissionHook{{
+				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:         "disallowReason",
 					ClientConfig: ccfg("disallowReason"),
 					Rules:        matchEverythingRules,
@@ -186,7 +188,7 @@ func TestAdmit(t *testing.T) {
 		},
 		"match & fail (but allow because fail open)": {
 			hookSource: fakeHookSource{
-				hooks: []admissionregistration.ExternalAdmissionHook{{
+				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:         "internalErr A",
 					ClientConfig: ccfg("internalErr"),
 					Rules:        matchEverythingRules,

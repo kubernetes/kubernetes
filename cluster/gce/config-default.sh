@@ -83,7 +83,6 @@ NETWORK=${KUBE_GCE_NETWORK:-default}
 INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-kubernetes}"
 CLUSTER_NAME="${CLUSTER_NAME:-${INSTANCE_PREFIX}}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
-AGGREGATOR_MASTER_NAME="${INSTANCE_PREFIX}-aggregator"
 INITIAL_ETCD_CLUSTER="${MASTER_NAME}"
 ETCD_QUORUM_READ="${ENABLE_ETCD_QUORUM_READ:-false}"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
@@ -212,7 +211,7 @@ ENABLE_RESCHEDULER="${KUBE_ENABLE_RESCHEDULER:-true}"
 #   new subnetwork will be created for the cluster.
 ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-false}
 if [ ${ENABLE_IP_ALIASES} = true ]; then
-  # Size of ranges allocated to each node. gcloud alpha supports only /32 and /24.
+  # Size of ranges allocated to each node. Currently supports only /32 and /24.
   IP_ALIAS_SIZE=${KUBE_GCE_IP_ALIAS_SIZE:-/24}
   IP_ALIAS_SUBNETWORK=${KUBE_GCE_IP_ALIAS_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-default}
   # Reserve the services IP space to avoid being allocated for other GCP resources.
