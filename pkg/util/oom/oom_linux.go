@@ -67,7 +67,10 @@ func applyOOMScoreAdj(pid int, oomScoreAdj int) error {
 	for i := 0; i < maxTries; i++ {
 		err = ioutil.WriteFile(oomScoreAdjPath, []byte(value), 0700)
 		if err != nil {
-			if os.IsNotExist(err) {
+			// User namespaces prohibit write access to this file: https://github.com/lxc/lxd/issues/2994
+			if os.IsPermission(err) {
+				glog.Warningf("Failed to adjust OOM setting, assuming unprivileged system container execution, ignoring: %v", err)
+			} else if os.IsNotExist(err) {
 				glog.V(2).Infof("%q does not exist", oomScoreAdjPath)
 				return os.ErrNotExist
 			}
