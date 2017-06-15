@@ -675,16 +675,17 @@ items:
   - apiGroups:
     - ""
     resources:
-    - secrets
-    verbs:
-    - get
-  - apiGroups:
-    - ""
-    resources:
     - nodes
     verbs:
     - get
     - list
+  - apiGroups:
+    - ""
+    resources:
+    - secrets
+    verbs:
+    - create
+    - get
   - apiGroups:
     - ""
     resources:

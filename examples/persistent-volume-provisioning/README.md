@@ -336,9 +336,11 @@ parameters:
   skuName: Standard_LRS
   location: eastus
   storageAccount: azure_storage_account_name
+  secretNamespace: kube-system
 ```
 
-The parameters are the same as those used by [Azure Disk](#azure-disk)
+* `secretNamespace`: Namespace to store Azure storage account secret. Default is the same namespace that the PersistentVolumeClaim is in.
+Other parameters are the same as those used by [Azure Disk](#azure-disk)
 
 ### User provisioning requests
 
