@@ -300,6 +300,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 			Name:            d.Name + "-" + podTemplateSpecHash,
 			Namespace:       d.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*newControllerRef(d)},
+			Finalizers:      []string{metav1.FinalizerDeleteDependents},
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas:        new(int32),
