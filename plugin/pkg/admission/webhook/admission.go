@@ -27,16 +27,20 @@ import (
 	"github.com/golang/glog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	admissionv1alpha1 "k8s.io/kubernetes/pkg/apis/admission/v1alpha1"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	admissioninit "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/configuration"
 
 	// install the clientgo admission API for use with api registry
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
@@ -72,6 +76,12 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
+// WebhookSource can list dynamic webhook plugins.
+type WebhookSource interface {
+	Run(stopCh <-chan struct{})
+	ExternalAdmissionHooks() (*v1alpha1.ExternalAdmissionHookConfiguration, error)
+}
+
 // NewGenericAdmissionWebhook returns a generic admission webhook plugin.
 func NewGenericAdmissionWebhook() (*GenericAdmissionWebhook, error) {
 	return &GenericAdmissionWebhook{
@@ -90,7 +100,7 @@ func NewGenericAdmissionWebhook() (*GenericAdmissionWebhook, error) {
 // GenericAdmissionWebhook is an implementation of admission.Interface.
 type GenericAdmissionWebhook struct {
 	*admission.Handler
-	hookSource           admissioninit.WebhookSource
+	hookSource           WebhookSource
 	serviceResolver      admissioninit.ServiceResolver
 	negotiatedSerializer runtime.NegotiatedSerializer
 	clientCert           []byte
@@ -100,7 +110,7 @@ type GenericAdmissionWebhook struct {
 var (
 	_ = admissioninit.WantsServiceResolver(&GenericAdmissionWebhook{})
 	_ = admissioninit.WantsClientCert(&GenericAdmissionWebhook{})
-	_ = admissioninit.WantsWebhookSource(&GenericAdmissionWebhook{})
+	_ = admissioninit.WantsExternalKubeClientSet(&GenericAdmissionWebhook{})
 )
 
 func (a *GenericAdmissionWebhook) SetServiceResolver(sr admissioninit.ServiceResolver) {
@@ -112,23 +122,51 @@ func (a *GenericAdmissionWebhook) SetClientCert(cert, key []byte) {
 	a.clientKey = key
 }
 
-func (a *GenericAdmissionWebhook) SetWebhookSource(ws admissioninit.WebhookSource) {
-	a.hookSource = ws
+func (a *GenericAdmissionWebhook) SetExternalKubeClientSet(client clientset.Interface) {
+	a.hookSource = configuration.NewExternalAdmissionHookConfigurationManager(client.Admissionregistration().ExternalAdmissionHookConfigurations())
+}
+
+func (a *GenericAdmissionWebhook) Validate() error {
+	if a.hookSource == nil {
+		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a Kubernetes client to be provided")
+	}
+	go a.hookSource.Run(wait.NeverStop)
+	return nil
+}
+
+func (a *GenericAdmissionWebhook) loadConfiguration(attr admission.Attributes) (*v1alpha1.ExternalAdmissionHookConfiguration, error) {
+	hookConfig, err := a.hookSource.ExternalAdmissionHooks()
+	// if ExternalAdmissionHook configuration is disabled, fail open
+	if err == configuration.ErrDisabled {
+		return &v1alpha1.ExternalAdmissionHookConfiguration{}, nil
+	}
+	if err != nil {
+		e := apierrors.NewServerTimeout(attr.GetResource().GroupResource(), string(attr.GetOperation()), 1)
+		e.ErrStatus.Message = fmt.Sprintf("Unable to refresh the ExternalAdmissionHook configuration: %v", err)
+		e.ErrStatus.Reason = "LoadingConfiguration"
+		e.ErrStatus.Details.Causes = append(e.ErrStatus.Details.Causes, metav1.StatusCause{
+			Type:    "ExternalAdmissionHookConfigurationFailure",
+			Message: "An error has occurred while refreshing the externalAdmissionHook configuration, no resources can be created/updated/deleted/connected until a refresh succeeds.",
+		})
+		return nil, e
+	}
+	return hookConfig, nil
 }
 
 // Admit makes an admission decision based on the request attributes.
 func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
-	hooks, err := a.hookSource.List()
+	hookConfig, err := a.loadConfiguration(attr)
 	if err != nil {
-		return fmt.Errorf("failed listing hooks: %v", err)
+		return err
 	}
+	hooks := hookConfig.ExternalAdmissionHooks
 	ctx := context.TODO()
 
 	errCh := make(chan error, len(hooks))
 	wg := sync.WaitGroup{}
 	wg.Add(len(hooks))
 	for i := range hooks {
-		go func(hook *admissionregistration.ExternalAdmissionHook) {
+		go func(hook *v1alpha1.ExternalAdmissionHook) {
 			defer wg.Done()
 			if err := a.callHook(ctx, hook, attr); err == nil {
 				return
@@ -161,7 +199,7 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 	return errs[0]
 }
 
-func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *admissionregistration.ExternalAdmissionHook, attr admission.Attributes) error {
+func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.ExternalAdmissionHook, attr admission.Attributes) error {
 	matches := false
 	for _, r := range h.Rules {
 		m := RuleMatcher{Rule: r, Attr: attr}
@@ -197,7 +235,7 @@ func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *admissionregi
 	}
 }
 
-func (a *GenericAdmissionWebhook) hookClient(h *admissionregistration.ExternalAdmissionHook) (*rest.RESTClient, error) {
+func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.ExternalAdmissionHook) (*rest.RESTClient, error) {
 	u, err := a.serviceResolver.ResolveEndpoint(h.ClientConfig.Service.Namespace, h.ClientConfig.Service.Name)
 	if err != nil {
 		return nil, err
