@@ -559,7 +559,7 @@ func (rs *REST) allocateHealthCheckNodePort(service *api.Service) error {
 	return nil
 }
 
-// The return bool value indicates if the caller should release clusterIP before return
+// The return bool value indicates if a cluster IP is allocated successfully.
 func (rs *REST) initClusterIP(service *api.Service) (bool, error) {
 	switch {
 	case service.Spec.ClusterIP == "":
@@ -586,19 +586,19 @@ func (rs *REST) initClusterIP(service *api.Service) (bool, error) {
 	return false, nil
 }
 
-func (rs *REST) updateNodePort(oldService, service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
+func (rs *REST) updateNodePort(oldService, newService *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
 	oldNodePorts := CollectServiceNodePorts(oldService)
 
 	newNodePorts := []int{}
-	for i := range service.Spec.Ports {
-		servicePort := &service.Spec.Ports[i]
+	for i := range newService.Spec.Ports {
+		servicePort := &newService.Spec.Ports[i]
 		nodePort := int(servicePort.NodePort)
 		if nodePort != 0 {
 			if !contains(oldNodePorts, nodePort) {
 				err := nodePortOp.Allocate(nodePort)
 				if err != nil {
 					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), nodePort, err.Error())}
-					return errors.NewInvalid(api.Kind("Service"), service.Name, el)
+					return errors.NewInvalid(api.Kind("Service"), newService.Name, el)
 				}
 			}
 		} else {
