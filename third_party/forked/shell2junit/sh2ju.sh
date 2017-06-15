@@ -137,11 +137,6 @@ function juLog() {
   content="$content
     <testcase assertions=\"1\" name=\"$name\" time=\"$time\" classname=\"$class\">
     $failure
-    <system-out>
-<![CDATA[
-$out
-]]>
-    </system-out>
     <system-err>
 <![CDATA[
 $errMsg
@@ -160,18 +155,24 @@ $errMsg
 
     # file exists. Need to append to it. If we remove the testsuite end tag, we can just add it in after.
     sed -i "s^</testsuite>^^g" $juDIR/junit-$suite.xml ## remove testSuite so we can add it later
+    sed -i "s^</testsuites>^^g" $juDIR/junit-$suite.xml
     cat <<EOF >> "$juDIR/junit-$suite.xml"
      $content
     </testsuite>
+</testsuites>
 EOF
 
   else
     # no file exists. Adding a new file
     cat <<EOF > "$juDIR/junit-$suite.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
     <testsuite failures="$errors" assertions="$assertions" name="$suite" tests="1" errors="$errors" time="$total">
     $content
     </testsuite>
+</testsuites>
 EOF
   fi
 
+  return $err
 }
