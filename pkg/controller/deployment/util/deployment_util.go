@@ -65,11 +65,6 @@ const (
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
-	// OverlapAnnotation marks deployments with overlapping selector with other deployments
-	// TODO: Delete this annotation when we no longer need to support a client
-	//       talking to a server older than v1.6.
-	OverlapAnnotation = "deployment.kubernetes.io/error-selector-overlapping-with"
-
 	// Reasons for deployment conditions
 	//
 	// Progressing:
@@ -289,7 +284,6 @@ var annotationsToSkip = map[string]bool{
 	RevisionHistoryAnnotation:      true,
 	DesiredReplicasAnnotation:      true,
 	MaxReplicasAnnotation:          true,
-	OverlapAnnotation:              true,
 }
 
 // skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
