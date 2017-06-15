@@ -45,15 +45,18 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 
 	Context("Single-port servers", func() {
 		BeforeEach(func() {
-			By("Creating a simple server.")
+			framework.Logf("Creating a simple server.")
 			podServer, service = createServerPodAndService(f, f.Namespace, "server", []int{80})
 			framework.Logf("Waiting for Server to come up.")
-			err := framework.WaitForPodRunningInNamespace(f.ClientSet, podServer)
-			Expect(err).NotTo(HaveOccurred())
+			if err := framework.WaitForPodRunningInNamespace(f.ClientSet, podServer); err != nil {
+				framework.Failf("Base server pod didn't come up: %v", err)
+			}
 
 			// Create a pod with name 'client-can-connect', which should be able to communicate with server.
-			By("Creating client which will be able to contact the server since no policies are present.")
-			testCanConnect(f, f.Namespace, "client-can-connect", service, 80)
+			framework.Logf("Ensuring base connectivity by creating a client which will be able to contact the server (since no policies are present.)")
+			if err := ensureCanConnect(f, f.Namespace, "base-client-can-connect", service, 80); err != nil {
+				framework.Failf("Base connectivity connection failed: %v", err)
+			}
 		})
 
 		AfterEach(func() {
@@ -72,17 +75,17 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			}
 
 			policy, err := f.InternalClientset.Networking().NetworkPolicies(f.Namespace.Name).Create(policy)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Test Panic: could not create NetworkPolicy.")
 			defer cleanupNetworkPolicy(f, policy)
 
 			// Create a pod with name 'client-cannot-connect', which will attempt to comunicate with the server,
 			// but should not be able to now that isolation is on.
-			testCanConnect(f, f.Namespace, "client-cannot-connect", service, 80)
+			err = ensureCanConnect(f, f.Namespace, "client-cannot-connect", service, 80)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("should enforce policy based on PodSelector [Feature:NetworkPolicy]", func() {
 			By("Creating a network policy for the server which allows traffic from the pod 'client-a'.")
-
 			policy := &networking.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "allow-client-a-via-pod-selector",
@@ -112,8 +115,10 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			defer cleanupNetworkPolicy(f, policy)
 
 			By("Creating client-a which should be able to contact the server.")
-			testCanConnect(f, f.Namespace, "client-a", service, 80)
-			testCannotConnect(f, f.Namespace, "client-b", service, 80)
+			err = ensureCanConnect(f, f.Namespace, "client-a", service, 80)
+			Expect(err).NotTo(HaveOccurred(), "client-a unexpectedly unable to connect to server")
+			err = ensureCanConnect(f, f.Namespace, "client-b", service, 80)
+			Expect(err).To(HaveOccurred(), "client-b unexpectedly able to connect to server")
 		})
 
 		It("should enforce policy based on NamespaceSelector [Feature:NetworkPolicy]", func() {
@@ -125,12 +130,12 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Test panic: couldn't create additional namespace")
 
 			// Create Server with Service in NS-B
-			framework.Logf("Waiting for server to come up.")
+			framework.Logf("Waiting for server-b to come up.")
 			err = framework.WaitForPodRunningInNamespace(f.ClientSet, podServer)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Test panic: server-b did not come up.")
 
 			// Create Policy for that service that allows traffic only via namespace B
 			By("Creating a network policy for the server which allows traffic from namespace-b.")
@@ -161,8 +166,11 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			Expect(err).NotTo(HaveOccurred())
 			defer cleanupNetworkPolicy(f, policy)
 
-			testCannotConnect(f, nsA, "client-a", service, 80)
-			testCanConnect(f, nsB, "client-b", service, 80)
+			err = ensureCanConnect(f, nsA, "client-a", service, 80)
+			Expect(err).To(HaveOccurred(), "client-a unexpectedly unable to connect to server-b")
+
+			err = ensureCanConnect(f, nsB, "client-b", service, 80)
+			Expect(err).To(HaveOccurred(), "client-b unexpectedly unable to connect to server-b")
 		})
 	})
 
@@ -176,7 +184,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Testing pods can connect to both ports when no policy is present.")
-			testCanConnect(f, f.Namespace, "basecase-reachable-80", service, 80)
+			err = ensureCanConnect(f, f.Namespace, "basecase-reachable-80", service, 80)
 			testCanConnect(f, f.Namespace, "basecase-reachable-81", service, 81)
 		})
 		AfterEach(func() {
@@ -291,7 +299,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 	})
 })
 
-func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, service *v1.Service, targetPort int) {
+func ensureCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, service *v1.Service, targetPort int) error {
 	By(fmt.Sprintf("Creating client pod %s that should successfully connect to %s.", podName, service.Name))
 	podClient := createNetworkClientPod(f, ns, podName, service, targetPort)
 	defer func() {
@@ -303,32 +311,17 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 
 	framework.Logf("Waiting for %s to complete.", podClient.Name)
 	err := framework.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podClient.Name, ns.Name)
-	Expect(err).NotTo(HaveOccurred(), "Pod did not finish as expected.")
+	Expect(err).NotTo(HaveOccurred(), "Test panic: Client Pod did not complete as expected.")
 
 	framework.Logf("Waiting for %s to complete.", podClient.Name)
 	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 	if err != nil {
 		logs, logErr := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, fmt.Sprintf("%s-container", podName))
 		if logErr != nil {
-			framework.Failf("Error getting container logs: %s", logErr)
+			return fmt.Errorf("Client connection failed: %v. Unable to gather pod logs: %v", err, logErr)
 		}
-		framework.Failf("failure: %s", logs)
+		return fmt.Errorf("Client connection failed: %v. Client logs: %s", err, logs)
 	}
-}
-
-func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string, service *v1.Service, targetPort int) {
-	By(fmt.Sprintf("Creating client pod %s that should not be able to connect to %s.", podName, service.Name))
-	podClient := createNetworkClientPod(f, ns, podName, service, targetPort)
-	defer func() {
-		By(fmt.Sprintf("Cleaning up the pod %s", podName))
-		if err := f.ClientSet.Core().Pods(ns.Name).Delete(podClient.Name, nil); err != nil {
-			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
-		}
-	}()
-
-	framework.Logf("Waiting for %s to complete.", podClient.Name)
-	err := framework.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
-	Expect(err).To(HaveOccurred(), fmt.Sprintf("checking %s could not communicate with server.", podName))
 }
 
 // Create a server pod with a listening container for each port in ports[].
