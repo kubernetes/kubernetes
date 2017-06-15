@@ -46746,7 +46746,8 @@
     "required": [
      "service",
      "caBundle",
-     "priority"
+     "groupPriorityMinimum",
+     "versionPriority"
     ],
     "properties": {
      "caBundle": {
@@ -46758,14 +46759,14 @@
       "description": "Group is the API group name this server hosts",
       "type": "string"
      },
+     "groupPriorityMinimum": {
+      "description": "GroupPriorityMininum is the priority this group should have at least. Higher priority means that the group is prefered by clients over lower priority ones. Note that other versions of this group might specify even higher GroupPriorityMininum values such that the whole group gets a higher priority. The primary sort is based on GroupPriorityMinimum, ordered highest number to lowest (20 before 10). The secondary sort is based on the alphabetical comparison of the name of the object.  (v1.bar before v1.foo) We'd recommend something like: *.k8s.io (except extensions) at 18000 and PaaSes (OpenShift, Deis) are recommended to be in the 2000s",
+      "type": "integer",
+      "format": "int32"
+     },
      "insecureSkipTLSVerify": {
       "description": "InsecureSkipTLSVerify disables TLS certificate verification when communicating with this server. This is strongly discouraged.  You should use the CABundle instead.",
       "type": "boolean"
-     },
-     "priority": {
-      "description": "Priority controls the ordering of this API group in the overall discovery document that gets served. Client tools like `kubectl` use this ordering to derive preference, so this ordering mechanism is important. Values must be between 1 and 1000 The primary sort is based on priority, ordered lowest number to highest (10 before 20). The secondary sort is based on the alphabetical comparison of the name of the object.  (v1.bar before v1.foo) We'd recommend something like: *.k8s.io (except extensions) at 100, extensions at 150 PaaSes (OpenShift, Deis) are recommended to be in the 200s",
-      "type": "integer",
-      "format": "int64"
      },
      "service": {
       "description": "Service is a reference to the service for this API server.  It must communicate on port 443 If the Service is nil, that means the handling for the API groupversion is handled locally on this server. The call will simply delegate to the normal handler chain to be fulfilled.",
@@ -46774,6 +46775,11 @@
      "version": {
       "description": "Version is the API version this server hosts.  For example, \"v1\"",
       "type": "string"
+     },
+     "versionPriority": {
+      "description": "VersionPriority controls the ordering of this API version inside of its group.  Must be greater than zero. The primary sort is based on VersionPriority, ordered highest to lowest (20 before 10). The secondary sort is based on the alphabetical comparison of the name of the object.  (v1.bar before v1.foo) Since it's inside of a group, the number can be small, probably in the 10s.",
+      "type": "integer",
+      "format": "int32"
      }
     }
    },
