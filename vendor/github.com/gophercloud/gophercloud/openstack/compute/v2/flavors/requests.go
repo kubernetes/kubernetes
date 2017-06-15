@@ -11,6 +11,24 @@ type ListOptsBuilder interface {
 	ToFlavorListQuery() (string, error)
 }
 
+// AccessType maps to OpenStack's Flavor.is_public field. Although the is_public field is boolean, the
+// request options are ternary, which is why AccessType is a string. The following values are
+// allowed:
+//
+//      PublicAccess (the default):  Returns public flavors and private flavors associated with that project.
+//      PrivateAccess (admin only):  Returns private flavors, across all projects.
+//      AllAccess (admin only):      Returns public and private flavors across all projects.
+//
+// The AccessType arguement is optional, and if it is not supplied, OpenStack returns the PublicAccess
+// flavors.
+type AccessType string
+
+const (
+	PublicAccess  AccessType = "true"
+	PrivateAccess AccessType = "false"
+	AllAccess     AccessType = "None"
+)
+
 // ListOpts helps control the results returned by the List() function.
 // For example, a flavor with a minDisk field of 10 will not be returned if you specify MinDisk set to 20.
 // Typically, software will use the last ID of the previous call to List to set the Marker for the current call.
@@ -29,6 +47,10 @@ type ListOpts struct {
 
 	// Limit instructs List to refrain from sending excessively large lists of flavors.
 	Limit int `q:"limit"`
+
+	// AccessType, if provided, instructs List which set of flavors to return. If IsPublic not provided,
+	// flavors for the current project are returned.
+	AccessType AccessType `q:"is_public"`
 }
 
 // ToFlavorListQuery formats a ListOpts into a query string.
