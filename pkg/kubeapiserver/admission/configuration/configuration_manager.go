@@ -26,8 +26,10 @@ import (
 )
 
 const (
-	defaultInterval         = 1 * time.Second
-	defaultFailureThreshold = 5
+	defaultInterval             = 1 * time.Second
+	defaultFailureThreshold     = 5
+	defaultBootstrapRetries     = 5
+	defaultBootstrapGraceperiod = 5 * time.Second
 )
 
 var (
@@ -47,26 +49,43 @@ type poller struct {
 	// a function to consistently read the latest configuration
 	get getFunc
 	// consistent read interval
+	// read-only
 	interval time.Duration
 	// if the number of consecutive read failure equals or exceeds the failureThreshold , the
 	// configuration is regarded as not ready.
+	// read-only
 	failureThreshold int
 	// number of consecutive failures so far.
 	failures int
+	// If the poller has passed the bootstrap phase. The poller is considered
+	// bootstrapped either bootstrapGracePeriod after the first call of
+	// configuration(), or when setConfigurationAndReady() is called, whichever
+	// comes first.
+	bootstrapped bool
+	// configuration() retries bootstrapRetries times if poller is not bootstrapped
+	// read-only
+	bootstrapRetries int
+	// Grace period for bootstrapping
+	// read-only
+	bootstrapGracePeriod time.Duration
+	once                 sync.Once
 	// if the configuration is regarded as ready.
 	ready               bool
 	mergedConfiguration runtime.Object
-	// lock much be hold when reading ready or mergedConfiguration
-	lock    sync.RWMutex
-	lastErr error
+	lastErr             error
+	// lock must be hold when reading/writing the data fields of poller.
+	lock sync.RWMutex
 }
 
 func newPoller(get getFunc) *poller {
-	return &poller{
-		get:              get,
-		interval:         defaultInterval,
-		failureThreshold: defaultFailureThreshold,
+	p := poller{
+		get:                  get,
+		interval:             defaultInterval,
+		failureThreshold:     defaultFailureThreshold,
+		bootstrapRetries:     defaultBootstrapRetries,
+		bootstrapGracePeriod: defaultBootstrapGraceperiod,
 	}
+	return &p
 }
 
 func (a *poller) lastError(err error) {
@@ -81,21 +100,47 @@ func (a *poller) notReady() {
 	a.ready = false
 }
 
+func (a *poller) bootstrapping() {
+	// bootstrapGracePeriod is read-only, so no lock is required
+	timer := time.NewTimer(a.bootstrapGracePeriod)
+	go func() {
+		<-timer.C
+		a.lock.Lock()
+		defer a.lock.Unlock()
+		a.bootstrapped = true
+	}()
+}
+
+// If the poller is not bootstrapped yet, the configuration() gets a few chances
+// to retry. This hides transient failures during system startup.
 func (a *poller) configuration() (runtime.Object, error) {
+	a.once.Do(a.bootstrapping)
 	a.lock.RLock()
 	defer a.lock.RUnlock()
-	if !a.ready {
-		if a.lastErr != nil {
-			return nil, a.lastErr
-		}
-		return nil, ErrNotReady
+	retries := 1
+	if !a.bootstrapped {
+		retries = a.bootstrapRetries
 	}
-	return a.mergedConfiguration, nil
+	for count := 0; count < retries; count++ {
+		if count > 0 {
+			a.lock.RUnlock()
+			time.Sleep(a.interval)
+			a.lock.RLock()
+		}
+		if a.ready {
+			return a.mergedConfiguration, nil
+		}
+	}
+	if a.lastErr != nil {
+		return nil, a.lastErr
+	}
+	return nil, ErrNotReady
 }
 
 func (a *poller) setConfigurationAndReady(value runtime.Object) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
+	a.bootstrapped = true
 	a.mergedConfiguration = value
 	a.ready = true
 	a.lastErr = nil

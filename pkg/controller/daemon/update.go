@@ -79,7 +79,9 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *extensions.DaemonSet, hash st
 	return dsc.syncNodes(ds, oldPodsToDelete, []string{}, hash)
 }
 
-// constructHistory returns current history and a list of old histories of a given DaemonSet.
+// constructHistory finds all histories controlled by the given DaemonSet, and
+// update current history revision number, or create current history if need to.
+// It also deduplicates current history, and adds missing unique labels to existing histories.
 func (dsc *DaemonSetsController) constructHistory(ds *extensions.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
 	var histories []*apps.ControllerRevision
 	var currentHistories []*apps.ControllerRevision
@@ -144,31 +146,13 @@ func (dsc *DaemonSetsController) constructHistory(ds *extensions.DaemonSet) (cur
 			}
 		}
 	}
-	// Label ds with current history's unique label as well
-	if ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey] != cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey] {
-		var clone interface{}
-		clone, err = api.Scheme.DeepCopy(ds)
-		if err != nil {
-			return nil, nil, err
-		}
-		toUpdate := clone.(*extensions.DaemonSet)
-		if toUpdate.Labels == nil {
-			toUpdate.Labels = make(map[string]string)
-		}
-		toUpdate.Labels[extensions.DefaultDaemonSetUniqueLabelKey] = cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
-		_, err = dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).UpdateStatus(toUpdate)
-	}
 	return cur, old, err
 }
 
-func (dsc *DaemonSetsController) cleanupHistory(ds *extensions.DaemonSet) error {
+func (dsc *DaemonSetsController) cleanupHistory(ds *extensions.DaemonSet, old []*apps.ControllerRevision) error {
 	nodesToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
-	}
-	_, old, err := dsc.constructHistory(ds)
-	if err != nil {
-		return fmt.Errorf("failed to construct revisions of DaemonSet: %v", err)
 	}
 
 	toKeep := int(*ds.Spec.RevisionHistoryLimit)

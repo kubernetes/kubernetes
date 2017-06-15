@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/logs"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	"k8s.io/kubernetes/test/e2e/generated"
 	federationtest "k8s.io/kubernetes/test/e2e_federation"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -318,7 +319,7 @@ func RunE2ETests(t *testing.T) {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	gomega.RegisterFailHandler(ginkgo.Fail)
+	gomega.RegisterFailHandler(ginkgowrapper.Fail)
 	// Disable skipped tests unless they are explicitly requested.
 	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
 		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`

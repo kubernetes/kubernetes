@@ -457,7 +457,9 @@ staging/src/k8s.io/metrics/pkg/apis/custom_metrics/install
 staging/src/k8s.io/metrics/pkg/apis/metrics/install
 staging/src/k8s.io/sample-apiserver
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/install
+test/e2e/framework/ginkgowrapper
 test/e2e/perftype
+test/e2e_node/perftype
 test/e2e_node/runner/local
 test/images/clusterapi-tester
 test/images/entrypoint-tester
@@ -494,3 +496,4 @@ test/integration/thirdparty
 test/integration/ttlcontroller
 test/soak/cauldron
 test/soak/serve_hostnames
+test/utils/junit

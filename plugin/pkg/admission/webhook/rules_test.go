@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	adreg "k8s.io/kubernetes/pkg/apis/admissionregistration"
+	adreg "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
 )
 
 type ruleTest struct {

@@ -21,12 +21,17 @@ import "k8s.io/kubernetes/pkg/api/v1"
 type LoadBalancerType string
 
 const (
-	// ServiceAnnotationLoadBalancerType is the annotation used on a service with type LoadBalancer
+	// ServiceAnnotationLoadBalancerType is annotated on a service with type LoadBalancer
 	// dictates what specific kind of GCP LB should be assembled.
 	// Currently, only "internal" is supported.
 	ServiceAnnotationLoadBalancerType = "cloud.google.com/load-balancer-type"
 
 	LBTypeInternal LoadBalancerType = "internal"
+
+	// ServiceAnnotationInternalBackendShare is annotated on a service with "true" when users
+	// want to share GCP Backend Services for a set of internal load balancers.
+	// ALPHA feature - this may be removed in a future release.
+	ServiceAnnotationILBBackendShare = "cloud.google.com/load-balancer-backend-share"
 )
 
 // GetLoadBalancerAnnotationType returns the type of GCP load balancer which should be assembled.
@@ -48,4 +53,15 @@ func GetLoadBalancerAnnotationType(service *v1.Service) (LoadBalancerType, bool)
 	default:
 		return v, false
 	}
+}
+
+// GetLoadBalancerAnnotationBackendShare returns whether this service's backend service should be
+// shared with other load balancers. Health checks and the healthcheck firewall will be shared regardless.
+func GetLoadBalancerAnnotationBackendShare(service *v1.Service) bool {
+	l, exists := service.Annotations[ServiceAnnotationILBBackendShare]
+	if exists && l == "true" {
+		return true
+	}
+
+	return false
 }

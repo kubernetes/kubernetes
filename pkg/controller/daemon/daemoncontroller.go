@@ -714,18 +714,18 @@ func (dsc *DaemonSetsController) resolveControllerRef(namespace string, controll
 	return ds
 }
 
-func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) (string, error) {
+func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) error {
 	// Find out which nodes are running the daemon pods controlled by ds.
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
-		return "", fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
+		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
 
 	// For each node, if the node is running the daemon pod but isn't supposed to, kill the daemon
 	// pod. If the node is supposed to run the daemon pod, but isn't, create the daemon pod on the node.
 	nodeList, err := dsc.nodeLister.List(labels.Everything())
 	if err != nil {
-		return "", fmt.Errorf("couldn't get list of nodes when syncing daemon set %#v: %v", ds, err)
+		return fmt.Errorf("couldn't get list of nodes when syncing daemon set %#v: %v", ds, err)
 	}
 	var nodesNeedingDaemonPods, podsToDelete []string
 	var failedPodsObserved int
@@ -773,23 +773,17 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) (string, error
 		}
 	}
 
-	// Find current history of the DaemonSet, and label new pods using the hash label value of the current history when creating them
-	cur, _, err := dsc.constructHistory(ds)
-	if err != nil {
-		return "", fmt.Errorf("failed to construct revisions of DaemonSet: %v", err)
-	}
-
-	hash := cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
+	// Label new pods using the hash label value of the current history when creating them
 	if err = dsc.syncNodes(ds, podsToDelete, nodesNeedingDaemonPods, hash); err != nil {
-		return "", err
+		return err
 	}
 
 	// Throw an error when the daemon pods fail, to use ratelimiter to prevent kill-recreate hot loop
 	if failedPodsObserved > 0 {
-		return "", fmt.Errorf("deleted %d failed pods of DaemonSet %s/%s", failedPodsObserved, ds.Namespace, ds.Name)
+		return fmt.Errorf("deleted %d failed pods of DaemonSet %s/%s", failedPodsObserved, ds.Namespace, ds.Name)
 	}
 
-	return hash, nil
+	return nil
 }
 
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes
@@ -902,7 +896,7 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 	return updateErr
 }
 
-func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet) error {
+func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet, hash string) error {
 	glog.V(4).Infof("Updating daemon set status")
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
@@ -937,7 +931,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 						numberAvailable++
 					}
 				}
-				if util.IsPodUpdated(ds.Spec.TemplateGeneration, pod, ds.Labels[extensions.DefaultDaemonSetUniqueLabelKey]) {
+				if util.IsPodUpdated(ds.Spec.TemplateGeneration, pod, hash) {
 					updatedNumberScheduled++
 				}
 			}
@@ -990,12 +984,20 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	if err != nil {
 		return fmt.Errorf("couldn't get key for object %#v: %v", ds, err)
 	}
+
+	// Construct histories of the DaemonSet, and get the hash of current history
+	cur, old, err := dsc.constructHistory(ds)
+	if err != nil {
+		return fmt.Errorf("failed to construct revisions of DaemonSet: %v", err)
+	}
+	hash := cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
+
 	if ds.DeletionTimestamp != nil || !dsc.expectations.SatisfiedExpectations(dsKey) {
 		// Only update status.
-		return dsc.updateDaemonSetStatus(ds)
+		return dsc.updateDaemonSetStatus(ds, hash)
 	}
 
-	hash, err := dsc.manage(ds)
+	err = dsc.manage(ds, hash)
 	if err != nil {
 		return err
 	}
@@ -1012,12 +1014,12 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		}
 	}
 
-	err = dsc.cleanupHistory(ds)
+	err = dsc.cleanupHistory(ds, old)
 	if err != nil {
 		return fmt.Errorf("failed to clean up revisions of DaemonSet: %v", err)
 	}
 
-	return dsc.updateDaemonSetStatus(ds)
+	return dsc.updateDaemonSetStatus(ds, hash)
 }
 
 // hasIntentionalPredicatesReasons checks if any of the given predicate failure reasons

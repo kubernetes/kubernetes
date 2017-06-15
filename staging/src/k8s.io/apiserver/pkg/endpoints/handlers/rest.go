@@ -442,7 +442,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		trace.Step("Conversion done")
 
 		ae := request.AuditEventFrom(ctx)
-		audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
+		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 
 		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := request.UserFrom(ctx)
@@ -876,7 +876,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		trace.Step("Conversion done")
 
 		ae := request.AuditEventFrom(ctx)
-		audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
+		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
 			scope.err(err, w, req)
@@ -969,7 +969,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				}
 
 				ae := request.AuditEventFrom(ctx)
-				audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
+				audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 			} else {
 				if values := req.URL.Query(); len(values) > 0 {
 					if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, options); err != nil {
@@ -1115,7 +1115,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 				}
 
 				ae := request.AuditEventFrom(ctx)
-				audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
+				audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 			}
 		}
 
