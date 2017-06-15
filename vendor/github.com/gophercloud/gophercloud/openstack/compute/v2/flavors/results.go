@@ -46,6 +46,8 @@ type Flavor struct {
 	Swap int `json:"swap"`
 	// VCPUs indicates how many (virtual) CPUs are available for this flavor.
 	VCPUs int `json:"vcpus"`
+	// IsPublic indicates whether the flavor is public.
+	IsPublic bool `json:"is_public"`
 }
 
 func (r *Flavor) UnmarshalJSON(b []byte) error {
