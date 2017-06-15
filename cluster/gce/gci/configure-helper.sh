@@ -923,6 +923,10 @@ function start-kubelet {
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
     flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
   fi
+  # FlexVolume plugin
+  if [[ -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
+    flags+=" --volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
+  fi
   if [[ "${ENABLE_MANIFEST_URL:-}" == "true" ]]; then
     flags+=" --manifest-url=${MANIFEST_URL}"
     flags+=" --manifest-url-header=${MANIFEST_URL_HEADER}"
