@@ -1972,6 +1972,9 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 		} else {
 			allNames.Insert(ctr.Name)
 		}
+		// TODO: do not validate leading and trailing whitespace to preserve backward compatibility.
+		// for example: https://github.com/openshift/origin/issues/14659 image = " " is special token in pod template
+		// others may have done similar
 		if len(ctr.Image) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("image"), ""))
 		}
@@ -2211,12 +2214,33 @@ func ValidateTolerations(tolerations []api.Toleration, fldPath *field.Path) fiel
 	return allErrors
 }
 
+// validateContainersOnlyForPod does additional validation for containers on a pod versus a pod template
+// it only does additive validation of fields not covered in validateContainers
+func validateContainersOnlyForPod(containers []api.Container, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, ctr := range containers {
+		idxPath := fldPath.Index(i)
+		if len(ctr.Image) != len(strings.TrimSpace(ctr.Image)) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("image"), ctr.Image, "must not have leading or trailing whitespace"))
+		}
+	}
+	return allErrs
+}
+
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, field.NewPath("spec"))...)
+
+	// we do additional validation only pertinent for pods and not pod templates
+	// this was done to preserve backwards compatibility
+	specPath := field.NewPath("spec")
+
+	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.Containers, specPath.Child("containers"))...)
+	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.InitContainers, specPath.Child("initContainers"))...)
+
 	return allErrs
 }
 
@@ -2604,6 +2628,10 @@ func ValidateContainerUpdates(newContainers, oldContainers []api.Container, fldP
 	for i, ctr := range newContainers {
 		if len(ctr.Image) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("image"), ""))
+		}
+		// this is only called from ValidatePodUpdate so its safe to check leading/trailing whitespace.
+		if len(strings.TrimSpace(ctr.Image)) != len(ctr.Image) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("image"), ctr.Image, "must not have leading or trailing whitespace"))
 		}
 	}
 	return allErrs, false
