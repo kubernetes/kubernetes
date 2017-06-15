@@ -267,6 +267,54 @@ func TestAccept(t *testing.T) {
 	}
 }
 
+func TestAuthorize(t *testing.T) {
+	tests := []struct {
+		acceptProxyAuthorization string
+		proxyAuthorizationHeader []string
+		expectAuthorize          bool
+	}{
+		{
+			acceptProxyAuthorization: "^Bearer 123abc$",
+			proxyAuthorizationHeader: []string{"Bearer 123abc"},
+			expectAuthorize:          true,
+		},
+		{
+			acceptProxyAuthorization: "^Bearer 123ab$",
+			proxyAuthorizationHeader: []string{"Bearer 123abc"},
+			expectAuthorize:          false,
+		},
+		{
+			acceptProxyAuthorization: "^Bearer 123abc$",
+			proxyAuthorizationHeader: []string{"Bearer invalid", "Bearer 123abc"},
+			expectAuthorize:          true,
+		},
+		{
+			acceptProxyAuthorization: "^.*",
+			proxyAuthorizationHeader: []string{"Bearer whatever"},
+			expectAuthorize:          true,
+		},
+		{
+			acceptProxyAuthorization: "^.*",
+			proxyAuthorizationHeader: []string{},
+			expectAuthorize:          true,
+		},
+		{
+			acceptProxyAuthorization: "^Bearer 123abc$",
+			proxyAuthorizationHeader: []string{},
+			expectAuthorize:          false,
+		},
+	}
+	for _, test := range tests {
+		filter := &FilterServer{
+			AcceptProxyAuthorization: MakeRegexpArrayOrDie(test.acceptProxyAuthorization),
+		}
+		authorize := filter.authorize(test.proxyAuthorizationHeader)
+		if authorize != test.expectAuthorize {
+			t.Errorf("expected: %v, got %v for %#v", test.expectAuthorize, authorize, test)
+		}
+	}
+}
+
 func TestRegexpMatch(t *testing.T) {
 	tests := []struct {
 		str         string

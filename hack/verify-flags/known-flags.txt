@@ -1,5 +1,6 @@
 accept-hosts
 accept-paths
+accept-proxy-authorizations
 admission-control
 admission-control-config-file
 advertise-address

@@ -33,10 +33,11 @@ import (
 )
 
 const (
-	DefaultHostAcceptRE   = "^localhost$,^127\\.0\\.0\\.1$,^\\[::1\\]$"
-	DefaultPathAcceptRE   = "^.*"
-	DefaultPathRejectRE   = "^/api/.*/pods/.*/exec,^/api/.*/pods/.*/attach"
-	DefaultMethodRejectRE = "^$"
+	DefaultHostAcceptRE               = "^localhost$,^127\\.0\\.0\\.1$,^\\[::1\\]$"
+	DefaultPathAcceptRE               = "^.*"
+	DefaultPathRejectRE               = "^/api/.*/pods/.*/exec,^/api/.*/pods/.*/attach"
+	DefaultMethodRejectRE             = "^$"
+	DefaultProxyAuthorizationAcceptRE = "^.*"
 )
 
 var (
@@ -59,6 +60,8 @@ type FilterServer struct {
 	AcceptHosts []*regexp.Regexp
 	// Methods that match this regexp are rejected
 	RejectMethods []*regexp.Regexp
+	// Proxy-Authorization headers that match any of these regexp will be accepted
+	AcceptProxyAuthorization []*regexp.Regexp
 	// The delegate to call to handle accepted requests.
 	delegate http.Handler
 }
@@ -108,6 +111,18 @@ func (f *FilterServer) accept(method, path, host string) bool {
 	return false
 }
 
+func (f *FilterServer) authorize(proxyAuthorizationHeader []string) bool {
+	if len(proxyAuthorizationHeader) == 0 {
+		proxyAuthorizationHeader = []string{""}
+	}
+	for _, header := range proxyAuthorizationHeader {
+		if matchesRegexp(header, f.AcceptProxyAuthorization) {
+			return true
+		}
+	}
+	return false
+}
+
 // HandlerFor makes a shallow copy of f which passes its requests along to the
 // new delegate.
 func (f *FilterServer) HandlerFor(delegate http.Handler) *FilterServer {
@@ -127,14 +142,20 @@ func extractHost(header string) (host string) {
 
 func (f *FilterServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	host := extractHost(req.Host)
-	if f.accept(req.Method, req.URL.Path, host) {
-		glog.V(3).Infof("Filter accepting %v %v %v", req.Method, req.URL.Path, host)
-		f.delegate.ServeHTTP(rw, req)
+	if !f.accept(req.Method, req.URL.Path, host) {
+		glog.V(3).Infof("Filter rejecting %v %v %v", req.Method, req.URL.Path, host)
+		rw.WriteHeader(http.StatusForbidden)
+		rw.Write([]byte("<h3>Unauthorized</h3>"))
 		return
 	}
-	glog.V(3).Infof("Filter rejecting %v %v %v", req.Method, req.URL.Path, host)
-	rw.WriteHeader(http.StatusForbidden)
-	rw.Write([]byte("<h3>Unauthorized</h3>"))
+	if header := req.Header["Proxy-Authorization"]; !f.authorize(header) {
+		glog.V(3).Infof("Filter rejecting Proxy-Authorization %v", header)
+		rw.WriteHeader(http.StatusProxyAuthRequired)
+		rw.Write([]byte("<h3>Proxy-Authorization required</h3>"))
+		return
+	}
+	glog.V(3).Infof("Filter accepting %v %v %v", req.Method, req.URL.Path, host)
+	f.delegate.ServeHTTP(rw, req)
 }
 
 // ProxyServer is a http.Handler which proxies Kubernetes APIs to remote API server.
