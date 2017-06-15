@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 const (
@@ -39,6 +40,13 @@ const (
 	// more than 10 times in a 10 minute period, aggregate the event
 	defaultAggregateMaxEvents         = 10
 	defaultAggregateIntervalInSeconds = 600
+
+	// by default, allow a source to send 25 events about an object
+	// but control the refill rate to 1 new event every 5 minutes
+	// this helps control the long-tail of events for things that are always
+	// unhealthy
+	defaultSpamBurst = 25
+	defaultSpamQPS   = 1. / 300.
 )
 
 // getEventKey builds unique event key based on source, involvedObject, reason, message
@@ -59,12 +67,89 @@ func getEventKey(event *v1.Event) string {
 		"")
 }
 
+// getSpamKey builds unique event key based on source, involvedObject
+func getSpamKey(event *v1.Event) string {
+	return strings.Join([]string{
+		event.Source.Component,
+		event.Source.Host,
+		event.InvolvedObject.Kind,
+		event.InvolvedObject.Namespace,
+		event.InvolvedObject.Name,
+		string(event.InvolvedObject.UID),
+		event.InvolvedObject.APIVersion,
+	},
+		"")
+}
+
 // EventFilterFunc is a function that returns true if the event should be skipped
 type EventFilterFunc func(event *v1.Event) bool
 
 // DefaultEventFilterFunc returns false for all incoming events
 func DefaultEventFilterFunc(event *v1.Event) bool {
 	return false
+}
+
+// EventSourceObjectSpamFilter is responsible for throttling
+// the amount of events a source and object can produce.
+type EventSourceObjectSpamFilter struct {
+	sync.RWMutex
+
+	// the cache that manages last synced state
+	cache *lru.Cache
+
+	// burst is the amount of events we allow per source + object
+	burst int
+
+	// qps is the refill rate of the token bucket in queries per second
+	qps float32
+
+	// clock is used to allow for testing over a time interval
+	clock clock.Clock
+}
+
+// NewEventSourceObjectSpamFilter allows burst events from a source about an object with the specified qps refill.
+func NewEventSourceObjectSpamFilter(lruCacheSize, burst int, qps float32, clock clock.Clock) *EventSourceObjectSpamFilter {
+	return &EventSourceObjectSpamFilter{
+		cache: lru.New(lruCacheSize),
+		burst: burst,
+		qps:   qps,
+		clock: clock,
+	}
+}
+
+// spamRecord holds data used to perform spam filtering decisions.
+type spamRecord struct {
+	// rateLimiter controls the rate of events about this object
+	rateLimiter flowcontrol.RateLimiter
+}
+
+// Filter controls that a given source+object are not exceeding the allowed rate.
+func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
+	var record spamRecord
+
+	// controls our cached information about this event (source+object)
+	eventKey := getSpamKey(event)
+
+	// do we have a record of similar events in our cache?
+	f.Lock()
+	defer f.Unlock()
+	value, found := f.cache.Get(eventKey)
+	if found {
+		record = value.(spamRecord)
+	}
+
+	// verify we have a rate limiter for this record
+	if record.rateLimiter == nil {
+		record.rateLimiter = flowcontrol.NewTokenBucketRateLimiterWithClock(f.qps, f.burst, f.clock)
+	}
+
+	// ensure we have available rate
+	filter := !record.rateLimiter.TryAccept()
+
+	// update the cache
+	f.cache.Add(eventKey, record)
+
+	return filter
 }
 
 // EventAggregatorKeyFunc is responsible for grouping events for aggregation
@@ -337,7 +422,6 @@ type EventCorrelateResult struct {
 // prior to interacting with the API server to record the event.
 //
 // The default behavior is as follows:
-//   * No events are filtered from being recorded
 //   * Aggregation is performed if a similar event is recorded 10 times in a
 //     in a 10 minute rolling interval.  A similar event is an event that varies only by
 //     the Event.Message field.  Rather than recording the precise event, aggregation
@@ -345,10 +429,13 @@ type EventCorrelateResult struct {
 //     the same reason.
 //   * Events are incrementally counted if the exact same event is encountered multiple
 //     times.
+//   * A source may burst 25 events about an object, but has a refill rate budget
+//     per object of 1 event every 5 minutes to control long-tail of spam.
 func NewEventCorrelator(clock clock.Clock) *EventCorrelator {
 	cacheSize := maxLruCacheEntries
+	spamFilter := NewEventSourceObjectSpamFilter(cacheSize, defaultSpamBurst, defaultSpamQPS, clock)
 	return &EventCorrelator{
-		filterFunc: DefaultEventFilterFunc,
+		filterFunc: spamFilter.Filter,
 		aggregator: NewEventAggregator(
 			cacheSize,
 			EventAggregatorByReasonFunc,
@@ -363,11 +450,14 @@ func NewEventCorrelator(clock clock.Clock) *EventCorrelator {
 
 // EventCorrelate filters, aggregates, counts, and de-duplicates all incoming events
 func (c *EventCorrelator) EventCorrelate(newEvent *v1.Event) (*EventCorrelateResult, error) {
-	if c.filterFunc(newEvent) {
-		return &EventCorrelateResult{Skip: true}, nil
+	if newEvent == nil {
+		return nil, fmt.Errorf("event is nil")
 	}
 	aggregateEvent, ckey := c.aggregator.EventAggregate(newEvent)
 	observedEvent, patch, err := c.logger.eventObserve(aggregateEvent, ckey)
+	if c.filterFunc(observedEvent) {
+		return &EventCorrelateResult{Skip: true}, nil
+	}
 	return &EventCorrelateResult{Event: observedEvent, Patch: patch}, err
 }
 

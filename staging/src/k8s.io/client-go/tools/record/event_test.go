@@ -412,7 +412,8 @@ func TestWriteEventError(t *testing.T) {
 		},
 	}
 
-	eventCorrelator := NewEventCorrelator(clock.RealClock{})
+	clock := clock.IntervalClock{Time: time.Now(), Duration: time.Second}
+	eventCorrelator := NewEventCorrelator(&clock)
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	for caseName, ent := range table {
@@ -435,7 +436,8 @@ func TestWriteEventError(t *testing.T) {
 }
 
 func TestUpdateExpiredEvent(t *testing.T) {
-	eventCorrelator := NewEventCorrelator(clock.RealClock{})
+	clock := clock.IntervalClock{Time: time.Now(), Duration: time.Second}
+	eventCorrelator := NewEventCorrelator(&clock)
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	var createdEvent *v1.Event
@@ -497,14 +499,15 @@ func TestLotsOfEvents(t *testing.T) {
 		loggerCalled <- struct{}{}
 	})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "eventTest"})
-	ref := &v1.ObjectReference{
-		Kind:       "Pod",
-		Name:       "foo",
-		Namespace:  "baz",
-		UID:        "bar",
-		APIVersion: "version",
-	}
 	for i := 0; i < maxQueuedEvents; i++ {
+		// we want a unique object to stop spam filtering
+		ref := &v1.ObjectReference{
+			Kind:       "Pod",
+			Name:       fmt.Sprintf("foo-%v", i),
+			Namespace:  "baz",
+			UID:        "bar",
+			APIVersion: "version",
+		}
 		// we need to vary the reason to prevent aggregation
 		go recorder.Eventf(ref, v1.EventTypeNormal, "Reason-"+string(i), strconv.Itoa(i))
 	}
