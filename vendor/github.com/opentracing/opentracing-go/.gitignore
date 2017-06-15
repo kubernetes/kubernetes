@@ -1,0 +1,13 @@
+# IntelliJ project files
+.idea/
+opentracing-go.iml
+opentracing-go.ipr
+opentracing-go.iws
+
+# Test results
+*.cov
+*.html
+test.log
+
+# Build dir
+build/

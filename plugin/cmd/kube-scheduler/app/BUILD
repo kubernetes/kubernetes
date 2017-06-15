@@ -26,6 +26,7 @@ go_library(
         "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/configz:go_default_library",
+        "//pkg/util/tracing:go_default_library",
         "//plugin/cmd/kube-scheduler/app/options:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",
         "//plugin/pkg/scheduler/algorithmprovider:go_default_library",

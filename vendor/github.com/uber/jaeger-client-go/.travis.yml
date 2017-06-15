@@ -1,0 +1,40 @@
+sudo: required
+
+language: go
+
+dist: trusty
+
+matrix:
+  include:
+  - go: 1.7
+    env:
+    - TESTS=true
+    - COVERAGE=true
+  - go: 1.7
+    env:
+    - CROSSDOCK=true
+
+services:
+  - docker
+
+env:
+  global:
+    - DOCKER_COMPOSE_VERSION=1.8.0
+    - GO15VENDOREXPERIMENT=1
+    - COMMIT=${TRAVIS_COMMIT::8}
+    - secure: cnVh5hOEa/UIBP1dJlZGpY7yyQlV+X3dXDuC7atePUVUTRNiRXtG96BGkz3l1mOb6R2s1We1e4SDoADP8NQfsn0TABXrAUu2ZuDW7NwMT5xoJ53aehpmXfRqO55Wau2m8X/kHl3V7eECsdekCXWua8ijmMfqYySUXwIZvuyT1tObqEpv4aItDIUFuv8app30dIZF1cE9hM91gl+0gu5N+FuwO7AAVt+Q0a3B1Ntv8mTb/rmz/lYkBBSaClgrBMQ2sjAuDDPOWfZla0SVMrymCI/F4JtR2eo82Enn6Z+JBwHRFZgMyc05EDoNh9m7hvQCqDVsvMExuf/qSVXTAlL1Tqzk6uOCyLoB1XM6SydEUIMukiNFN3h+v0WVczK9MyRaFuhN3CS6BAn1jwW9BAQKAXC4DZ8bQTCKzWT1Jd8+9x32HJrhB8ylBXA/ER8xghiIMv/Wk8bFW6tfnTYU/uiCtoFfSk5PI9cLLVhuSUxgyX/9KWBPGnA1/PhC2W3H4vs+uVHTisE5+LPBTWoSII7Z82u+UZTLH/wmAgOroNEHCULdSd82Efn8El9e4ebl6zR5MWOtgsK1zKd4wdq00oc19x0vLgAUeznTc+XwhLfSN7WwpR0mYEiZnOubvscc/rTo01FnPlIbn1vKdwUKw2GfXafqq2Vsa0p/q1Eo4pZfOzE=
+    - secure: BMpuCCm+z/sOAMZ5BDX7BDzI5y/H32KpwfJaVNL7womV5Mzxz9yPe1muQG+Z9cL6aCBQwToRTbvuFLdSzjPT9A+EBQuDuWUfVC3vkpbkXk1vdN73D1LeWkAsjI7OZ32fim3+xksHnGMs6VsWsObZrmq6QXeHl50MmXeeYqMnc+4g3TkhIyFnYeVCHUuiidMmVqikJm7ujLvoN89tXP3QZ4khw74nHd3IiT45h06GPkoYRs8euT9x8wNBkhm2RVNBkTeClbiqlhfywDbU2/O6otQ5+6A21QNBAk0rKH4OCc+lJ39hRV2bmPnqbw0vFhGk9YdIN3JmydpmOQW3vWr7eiBOrI8eMBXbsNzddYCISOzEtgApJnaK8tQIeEY8QvoqdgVwk2mEXUKn9EJii0BhkAwv3KF5Obi3x5jZcEo8YP5dn05gXzpjk2cFJB8npBlSSlkKcKYQKX605UYwEbs3XxOU90Mg03nwxNKwk26aFx0T1mUIzYcx0h/a99OLMFr/mK5BKRLQaFh03kp6HCS0q5j/fotN4ZW41QYPKIjvv+FyuMcGNtx5C5qTlEWZcECVJoM4dKxMa/z3REeKVqtQYq0azCSjG5Tje8cslUbLNF4N7NvNOJux6GHVGtmE29atzrw3Wsra4hARFm+kOAE9b/1Qfjnz3C3XDmFe07Sxntg=
+    - secure: tlWX/wnfuyvTTEBG6UwIrAugCLKKYuEZvcwrOYgaO27Q0SQmHOevGhsCOVDDJ2e01no60IR6Cu67O+JlRrZqOuZIkl9uvnf60SZWDbqCMhZraVh5b0iZD1li0XHXo56zj+ptDXc3fOmnUTT2PYnZ+4+sR76jBw2PnZKE/u6NNSm3KkKvEQGfFkFdId/17z6Lob++BwXqmIw1n2DG7Ts+VxyCVf5HBfe8RfDPWDlXfqQUE5x9hbl+VbwCR+4LDAAJmh9h7JTItX7nvNG91EzEGedKea8IWn7fkLcQSZWuMalpGADqMx0nsPyJk8fzc0X17w595P54ktatwcWWgVv+ZhzozoO3FPWOom7c35gx+WAlMeIBtpxYQtixP2xPpK1i4HJXjW4KS+zjTEkoqeGQrFXcIKHUM0YXQvRIp5rfRky/INDzm2AYTReGoLX+ZQ7O/tSVDaBfdvTd96hRP6M1t4zCGULaglQGdE7/RLQrz7S6j2ys0fhF5gFBmOSodGt5gG+YFjzKiu+5FYMICwpUaOO+h4mLTsP0t63vFKGfXt79eWFJ+pRaMyWb68geZqB5u+P64sTnEIa8LjP/Lhrgnh0vab0O0m2KgnRMKBVlc4modKLiTXbYn1KZUyk0dfKYR2lCQHxAZW94nBOXzynDu8qZE0nXemVokFkEETm1FB0=
+    - secure: aR7jrdGh3cXncHlIJ6FgVf5jqMiUHSWiGON3tocCUIAB3GyRoT4lFsHg4y86c4qDkpiTrFZT2mY7Iyqs/Y+Hi64V2pGP2FouN9cZK8b5IuBDboa//9nebAvTVuzsuUBLmRwtaQ2qvpS+Jg7ApXyLjF+Cdvfh4WRm4IcwxbvmMr/+zVxkPbEBNnnALx7h1kNiAtQVrCjiHJ1Q+p2RzER+OSTtdvJRqMzkwI741ttj7pvxElbexdPwiU+9lLC9IoW/lSOSwx29Ph8WAK2aF2VrxxrUbNiTd8o2U11Zc2ic44FhOadTrGk6bJBLHOerFnDt9ieoGpbocinviZJ2OGvSoXWaI9XNPaxCNSuA3woRRX4+j9SK/AFunSxUtC2gyUhCvMKLcz1WbVtto9kAXZKq+N1zBrA5zeFCArbKCLOidTdrv1iY5eC/mV6RPhvy2knpDRzFtk6UP/7oiTiUu1yI1CGDRrWRQaaguRcLdhSKFKfgjfRNksfO1QQ6rokZWZdc5kUchLEcb2QtCRWOAShfuvyr+j38l8Rgx5DwBAnd7zov0H4cXUZ1oBOzbHmejHQF7KMs6cnGgCvDT2mQYEwvMc9cueD8S3qWrkaLIm78pQesKLuKarYHeAF8pWivQPr9hwSSPnY944E9YT0odMbNmNrWruwF2YuyFKTMdIVhy3Q=
+
+install:
+  - make install_ci
+  - if [ "$CROSSDOCK" == true ]; then bash ./travis/install-crossdock-deps.sh ; fi
+
+script:
+  - if [ "$TESTS" == true ]; then make test_ci ; else echo 'skipping tests'; fi
+  - if [ "$COVERAGE" == true ]; then travis_retry goveralls -coverprofile=cover.out -service=travis-ci || true ; else echo 'skipping coverage'; fi
+  - if [ "$CROSSDOCK" == true ]; then bash ./travis/build-crossdock.sh ; else echo 'skipping crossdock'; fi
+
+after_failure:
+  - timeout 5 docker-compose -f crossdock/docker-compose.yml logs

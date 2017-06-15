@@ -18,6 +18,7 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/util/tracing"
 
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
@@ -70,6 +72,8 @@ type ServerRunOptions struct {
 	ProxyClientKeyFile  string
 
 	EnableAggregatorRouting bool
+	// Tracer is a name of OpenTracing Tracer implementation to start.
+	Tracer string
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
@@ -230,4 +234,6 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
 		"Turns on aggregator routing requests to endoints IP rather than cluster IP.")
 
+	fs.StringVar(&s.Tracer, "tracer", "",
+		fmt.Sprintf("Name of OpenTracing Tracer implementation to start. Default is empty which disables tracing, supported tracers: %v", tracing.SupportedTracers))
 }

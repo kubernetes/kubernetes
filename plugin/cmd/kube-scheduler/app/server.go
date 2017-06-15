@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/configz"
+	"k8s.io/kubernetes/pkg/util/tracing"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -91,6 +92,10 @@ func Run(s *options.SchedulerServer) error {
 	)
 	if err != nil {
 		return fmt.Errorf("error creating scheduler: %v", err)
+	}
+
+	if closer := tracing.InitGlobalTracer(s.Tracer, "scheduler"); closer != nil {
+		defer closer.Close()
 	}
 
 	go startHTTP(s)

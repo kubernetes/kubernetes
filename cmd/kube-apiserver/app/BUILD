@@ -44,6 +44,7 @@ go_library(
         "//pkg/quota/install:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/rbac/rest:go_default_library",
+        "//pkg/util/tracing:go_default_library",
         "//pkg/version:go_default_library",
         "//plugin/pkg/admission/admit:go_default_library",
         "//plugin/pkg/admission/alwayspullimages:go_default_library",

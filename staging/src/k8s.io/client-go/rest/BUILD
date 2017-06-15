@@ -62,6 +62,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/opentracing/opentracing-go:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",

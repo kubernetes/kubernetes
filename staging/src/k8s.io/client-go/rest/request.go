@@ -32,7 +32,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -43,10 +42,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
+
 	"k8s.io/client-go/pkg/api/v1"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
+
+	"github.com/golang/glog"
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
 )
 
 var (
@@ -116,6 +120,8 @@ type Request struct {
 
 	backoffMgr BackoffManager
 	throttle   flowcontrol.RateLimiter
+	// If set to true it will prevent client from creating a new trace span.
+	suppressTrace bool
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
@@ -565,7 +571,7 @@ func (r *Request) Body(obj interface{}) *Request {
 }
 
 // Context adds a context to the request. Contexts are only used for
-// timeouts, deadlines, and cancellations.
+// timeouts, deadlines, cancellations and tracing.
 func (r *Request) Context(ctx context.Context) *Request {
 	r.ctx = ctx
 	return r
@@ -642,6 +648,7 @@ func (r *Request) tryThrottle() {
 // Watch attempts to begin watching the requested location.
 // Returns a watch.Interface, or an error.
 func (r *Request) Watch() (watch.Interface, error) {
+	r.suppressTrace = true
 	// We specifically don't want to rate limit watches, so we
 	// don't use r.throttle here.
 	if r.err != nil {
@@ -717,6 +724,7 @@ func updateURLMetrics(req *Request, resp *http.Response, err error) {
 // Any non-2xx http status code causes an error.  If we get a non-2xx code, we try to convert the body into an APIStatus object.
 // If we can, we return that as an error.  Otherwise, we create an error that lists the http status and the content of the response.
 func (r *Request) Stream() (io.ReadCloser, error) {
+	r.suppressTrace = true
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -810,6 +818,16 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 			req = req.WithContext(r.ctx)
 		}
 		req.Header = r.headers
+		span := opentracing.SpanFromContext(r.ctx)
+		if span != nil {
+			ext.HTTPMethod.Set(span, req.Method)
+			ext.HTTPUrl.Set(span, req.URL.String())
+			ext.SpanKindRPCClient.Set(span)
+			opentracing.GlobalTracer().Inject(
+				span.Context(),
+				opentracing.HTTPHeaders,
+				opentracing.HTTPHeadersCarrier(req.Header))
+		}
 
 		r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 		if retries > 0 {
@@ -878,6 +896,15 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	}
 }
 
+func (r *Request) injectTrace() opentracing.Span {
+	if r.ctx == nil {
+		r.ctx = context.Background()
+	}
+	span, ctx := opentracing.StartSpanFromContext(r.ctx, fmt.Sprintf("%v %v", r.verb, r.resource))
+	r.ctx = ctx
+	return span
+}
+
 // Do formats and executes the request. Returns a Result object for easy response
 // processing.
 //
@@ -888,12 +915,19 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 //  * http.Client.Do errors are returned directly.
 func (r *Request) Do() Result {
 	r.tryThrottle()
+	var span opentracing.Span
+	if !r.suppressTrace {
+		span = r.injectTrace()
+		defer span.Finish()
+	}
 
 	var result Result
-	err := r.request(func(req *http.Request, resp *http.Response) {
+	if err := r.request(func(req *http.Request, resp *http.Response) {
+		if span != nil {
+			span.LogKV("Step", "Received response, starting transformation.")
+		}
 		result = r.transformResponse(resp, req)
-	})
-	if err != nil {
+	}); err != nil {
 		return Result{err: err}
 	}
 	return result
@@ -902,16 +936,20 @@ func (r *Request) Do() Result {
 // DoRaw executes the request but does not process the response body.
 func (r *Request) DoRaw() ([]byte, error) {
 	r.tryThrottle()
+	var span opentracing.Span
+	if !r.suppressTrace {
+		span = r.injectTrace()
+		defer span.Finish()
+	}
 
 	var result Result
-	err := r.request(func(req *http.Request, resp *http.Response) {
+	if err := r.request(func(req *http.Request, resp *http.Response) {
 		result.body, result.err = ioutil.ReadAll(resp.Body)
 		glogBody("Response Body", result.body)
 		if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent {
 			result.err = r.transformUnstructuredResponseError(resp, req, result.body)
 		}
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, err
 	}
 	return result.body, result.err

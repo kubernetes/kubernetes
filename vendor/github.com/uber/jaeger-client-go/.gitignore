@@ -1,0 +1,14 @@
+*.out
+*.test
+*.xml
+*.swp
+.idea/
+.tmp/
+*.iml
+*.cov
+*.html
+*.log
+gen/thrift/js
+gen/thrift/py
+vendor/
+crossdock-main
