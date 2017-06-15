@@ -37,7 +37,7 @@ import (
 const (
 	aesCBCTransformerPrefixV1    = "k8s:enc:aescbc:v1:"
 	aesGCMTransformerPrefixV1    = "k8s:enc:aesgcm:v1:"
-	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1"
+	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1:"
 )
 
 // GetTransformerOverrides returns the transformer overrides by reading and parsing the encryption provider configuration file
