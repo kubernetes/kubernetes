@@ -407,6 +407,10 @@ func (j *ServiceTestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceT
 		if svc.Spec.ClusterIP != api.ClusterIPNone && svc.Spec.ClusterIP == "" {
 			Failf("didn't get ClusterIP for non-ExternamName service")
 		}
+	} else {
+		if svc.Spec.ClusterIP != "" {
+			Failf("unexpected Spec.ClusterIP (%s) for ExternamName service, expected empty", svc.Spec.ClusterIP)
+		}
 	}
 
 	expectNodePorts := false

@@ -796,6 +796,11 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By("creating a service " + serviceName + " with the type=ExternalName in namespace " + ns)
 		externalNameService := jig.CreateExternalNameServiceOrFail(ns, nil)
+		defer func() {
+			framework.Logf("Cleaning up the ExternalName to ClusterIP test service")
+			err := cs.Core().Services(ns).Delete(serviceName, nil)
+			Expect(err).NotTo(HaveOccurred())
+		}()
 		jig.SanityCheckService(externalNameService, v1.ServiceTypeExternalName)
 		By("changing the ExternalName service to type=ClusterIP")
 		clusterIPService := jig.UpdateServiceOrFail(ns, externalNameService.Name, func(s *v1.Service) {
@@ -815,6 +820,11 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By("creating a service " + serviceName + " with the type=ExternalName in namespace " + ns)
 		externalNameService := jig.CreateExternalNameServiceOrFail(ns, nil)
+		defer func() {
+			framework.Logf("Cleaning up the ExternalName to NodePort test service")
+			err := cs.Core().Services(ns).Delete(serviceName, nil)
+			Expect(err).NotTo(HaveOccurred())
+		}()
 		jig.SanityCheckService(externalNameService, v1.ServiceTypeExternalName)
 		By("changing the ExternalName service to type=NodePort")
 		nodePortService := jig.UpdateServiceOrFail(ns, externalNameService.Name, func(s *v1.Service) {
@@ -827,25 +837,51 @@ var _ = framework.KubeDescribe("Services", func() {
 		jig.SanityCheckService(nodePortService, v1.ServiceTypeNodePort)
 	})
 
-	It("should be able to change the type from ExternalName to LoadBalancer", func() {
-		serviceName := "externalname-service"
+	It("should be able to change the type from ClusterIP to ExternalName", func() {
+		serviceName := "clusterip-service"
 		ns := f.Namespace.Name
-		loadBalancerCreateTimeout := framework.LoadBalancerCreateTimeoutDefault
 		jig := framework.NewServiceTestJig(cs, serviceName)
 
-		By("creating a service " + serviceName + " with the type=ExternalName in namespace " + ns)
-		externalNameService := jig.CreateExternalNameServiceOrFail(ns, nil)
-		jig.SanityCheckService(externalNameService, v1.ServiceTypeExternalName)
-		By("changing the ExternalName service to type=LoadBalancer")
-		loadBalancerIPService := jig.UpdateServiceOrFail(ns, externalNameService.Name, func(s *v1.Service) {
-			s.Spec.Type = v1.ServiceTypeLoadBalancer
-			s.Spec.ExternalName = ""
-			s.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: "TCP"},
-			}
+		By("creating a service " + serviceName + " with the type=ClusterIP in namespace " + ns)
+		clusterIPService := jig.CreateTCPServiceOrFail(ns, nil)
+		defer func() {
+			framework.Logf("Cleaning up the ClusterIP to ExternalName test service")
+			err := cs.Core().Services(ns).Delete(serviceName, nil)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+		jig.SanityCheckService(clusterIPService, v1.ServiceTypeClusterIP)
+		By("changing the ClusterIP service to type=ExternalName")
+		externalNameService := jig.UpdateServiceOrFail(ns, clusterIPService.Name, func(s *v1.Service) {
+			s.Spec.Type = v1.ServiceTypeExternalName
+			s.Spec.ExternalName = "foo.example.com"
+			s.Spec.ClusterIP = ""
 		})
-		loadBalancerIPService = jig.WaitForLoadBalancerOrFail(ns, loadBalancerIPService.Name, loadBalancerCreateTimeout)
-		jig.SanityCheckService(loadBalancerIPService, v1.ServiceTypeLoadBalancer)
+		jig.SanityCheckService(externalNameService, v1.ServiceTypeExternalName)
+	})
+
+	It("should be able to change the type from NodePort to ExternalName", func() {
+		serviceName := "nodeport-service"
+		ns := f.Namespace.Name
+		jig := framework.NewServiceTestJig(cs, serviceName)
+
+		By("creating a service " + serviceName + " with the type=NodePort in namespace " + ns)
+		nodePortService := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeNodePort
+		})
+		defer func() {
+			framework.Logf("Cleaning up the NodePort to ExternalName test service")
+			err := cs.Core().Services(ns).Delete(serviceName, nil)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+		jig.SanityCheckService(nodePortService, v1.ServiceTypeNodePort)
+		By("changing the NodePort service to type=ExternalName")
+		externalNameService := jig.UpdateServiceOrFail(ns, nodePortService.Name, func(s *v1.Service) {
+			s.Spec.Type = v1.ServiceTypeExternalName
+			s.Spec.ExternalName = "foo.example.com"
+			s.Spec.ClusterIP = ""
+			s.Spec.Ports[0].NodePort = 0
+		})
+		jig.SanityCheckService(externalNameService, v1.ServiceTypeExternalName)
 	})
 
 	It("should use same NodePort with same port but different protocols", func() {
