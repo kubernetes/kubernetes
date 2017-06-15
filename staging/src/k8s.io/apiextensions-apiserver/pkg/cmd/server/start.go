@@ -105,11 +105,13 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 
 func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregistry.RESTOptionsGetter {
 	ret := apiserver.CRDRESTOptionsGetter{
-		StorageConfig:           etcdOptions.StorageConfig,
-		StoragePrefix:           etcdOptions.StorageConfig.Prefix,
-		EnableWatchCache:        etcdOptions.EnableWatchCache,
-		DefaultWatchCacheSize:   etcdOptions.DefaultWatchCacheSize,
-		EnableGarbageCollection: etcdOptions.EnableGarbageCollection,
+		StorageConfig:         etcdOptions.StorageConfig,
+		StoragePrefix:         etcdOptions.StorageConfig.Prefix,
+		EnableWatchCache:      etcdOptions.EnableWatchCache,
+		DefaultWatchCacheSize: etcdOptions.DefaultWatchCacheSize,
+		// garbage collection for custom resources is forced off until GC works with CRs.
+		// When GC is enabled, this turns back into etcdOptions.EnableGarbageCollection
+		EnableGarbageCollection: false,
 		DeleteCollectionWorkers: etcdOptions.DeleteCollectionWorkers,
 	}
 	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
