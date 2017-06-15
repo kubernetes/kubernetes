@@ -171,6 +171,11 @@ func (o *SelectorOptions) RunSelector() error {
 		if patch.Err != nil {
 			return patch.Err
 		}
+
+		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
+			return nil
+		}
+
 		if o.local || o.dryrun {
 			o.PrintObject(info.Object)
 			return nil
