@@ -55,6 +55,10 @@ const (
 var (
 	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
 
+	// this is hacky, but extremely common.
+	// if a container starts but the executable file is not found, runc gives a message that matches
+	startRE = regexp.MustCompile(`\\\\\\\"(.*)\\\\\\\": executable file not found`)
+
 	// Docker changes the security option separator from ':' to '=' in the 1.23
 	// API version.
 	optsSeparatorChangeVersion = semver.MustParse(securityOptSeparatorChangeVersion)
@@ -357,6 +361,19 @@ func recoverFromCreationConflictIfNeeded(client libdocker.Interface, createConfi
 	createConfig.Name = randomizeName(createConfig.Name)
 	glog.V(2).Infof("Create the container with randomized name %s", createConfig.Name)
 	return client.CreateContainer(createConfig)
+}
+
+// transformStartContainerError does regex parsing on returned error
+// for where container runtimes are giving less than ideal error messages.
+func transformStartContainerError(err error) error {
+	if err == nil {
+		return nil
+	}
+	matches := startRE.FindStringSubmatch(err.Error())
+	if len(matches) > 0 {
+		return fmt.Errorf("executable not found in $PATH")
+	}
+	return err
 }
 
 // getSecurityOptSeparator returns the security option separator based on the
