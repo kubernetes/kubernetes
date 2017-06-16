@@ -30,12 +30,19 @@ import (
 func TestPVSecrets(t *testing.T) {
 	// Stub containing all possible secret references in a PV.
 	// The names of the referenced secrets match struct paths detected by reflection.
+	secretNamespace := "Spec.PersistentVolumeSource.AzureFile.SecretNamespace"
 	pvs := []*api.PersistentVolume{
 		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				AzureFile: &api.AzureFileVolumeSource{
+				AzureFile: &api.AzureFilePersistentVolumeSource{
 					SecretName: "Spec.PersistentVolumeSource.AzureFile.SecretName"}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				AzureFile: &api.AzureFilePersistentVolumeSource{
+					SecretName:      "Spec.PersistentVolumeSource.AzureFile.SecretName",
+					SecretNamespace: &secretNamespace}}}},
 		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: api.PersistentVolumeSource{
@@ -88,6 +95,7 @@ func TestPVSecrets(t *testing.T) {
 	// excludedSecretPaths holds struct paths to fields with "secret" in the name that are not actually references to secret API objects
 	excludedSecretPaths := sets.NewString(
 		"Spec.PersistentVolumeSource.CephFS.SecretFile",
+		"Spec.PersistentVolumeSource.AzureFile.SecretNamespace",
 	)
 	// expectedSecretPaths holds struct paths to fields with "secret" in the name that are references to secret API objects.
 	// every path here should be represented as an example in the PV stub above, with the secret name set to the path.
@@ -122,6 +130,7 @@ func TestPVSecrets(t *testing.T) {
 
 	expectedNamespacedNames := sets.NewString(
 		"claimrefns/Spec.PersistentVolumeSource.AzureFile.SecretName",
+		"Spec.PersistentVolumeSource.AzureFile.SecretNamespace/Spec.PersistentVolumeSource.AzureFile.SecretName",
 		"claimrefns/Spec.PersistentVolumeSource.CephFS.SecretRef",
 		"claimrefns/Spec.PersistentVolumeSource.FlexVolume.SecretRef",
 		"claimrefns/Spec.PersistentVolumeSource.RBD.SecretRef",
