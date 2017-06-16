@@ -16,7 +16,7 @@ images:
     image: e2e-node-containervm-v20161208-image # docker 1.11.2
     project: kubernetes-node-e2e-images
   gci:
-    image_regex: cos-stable-59-9460-60-0 # docker 1.11.2
+    image_regex: cos-stable-59-9460-64-0 # docker 1.11.2
     project: cos-cloud
     metadata: "user-data<test/e2e_node/jenkins/gci-init-gpu.yaml,gci-update-strategy=update_disabled"
     resources:
