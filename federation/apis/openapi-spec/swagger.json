@@ -11371,7 +11371,7 @@
     "description": "HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
     "properties": {
      "hostnames": {
-      "description": "Hostnames for the the above IP address.",
+      "description": "Hostnames for the above IP address.",
       "type": "array",
       "items": {
        "type": "string"

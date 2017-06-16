@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/v1"
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 )
 
 // describes the attributes of a scale subresource
@@ -544,7 +545,7 @@ const (
 	// DefaultDaemonSetUniqueLabelKey is the default label key that is added
 	// to existing DaemonSet pods to distinguish between old and new
 	// DaemonSet pods during DaemonSet template updates.
-	DefaultDaemonSetUniqueLabelKey string = "daemonset-controller-hash"
+	DefaultDaemonSetUniqueLabelKey = appsv1beta1.ControllerRevisionHashLabelKey
 )
 
 // DaemonSetList is a collection of daemon sets.
