@@ -54,7 +54,7 @@ spec:
   - name: test-volume
     hugePages:
       pageSize: "2M"
-      size: "200M"
+      maxSize: "200M"
       minSize: "100M"
 ```
 
