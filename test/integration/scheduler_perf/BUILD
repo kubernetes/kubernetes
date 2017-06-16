@@ -10,8 +10,13 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["util.go"],
-    tags = ["automanaged"],
+    srcs = [
+        "scheduler_perf_types.go",
+        "util.go",
+    ],
+    tags = [
+        "automanaged",
+    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
@@ -36,7 +41,10 @@ go_test(
         "scheduler_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "integration",
+    ],
     deps = [
         "//pkg/api/v1:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",

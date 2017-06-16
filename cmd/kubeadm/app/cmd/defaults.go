@@ -21,15 +21,14 @@ import (
 	"net"
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
-
-	"github.com/blang/semver"
+	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/pkg/util/version"
 )
-
-var minK8sVersion = semver.MustParse(kubeadmconstants.MinimumControlPlaneVersion)
 
 func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
@@ -48,17 +47,21 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 	cfg.KubernetesVersion = ver
 
-	// Omit the "v" in the beginning, otherwise semver will fail
-	k8sVersion, err := semver.Parse(cfg.KubernetesVersion[1:])
+	// Parse the given kubernetes version and make sure it's higher than the lowest supported
+	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
 	if err != nil {
 		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
 	}
-	if k8sVersion.LT(minK8sVersion) {
-		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= v%s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion, cfg.KubernetesVersion)
+	if k8sVersion.LessThan(kubeadmconstants.MinimumControlPlaneVersion) {
+		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
 	}
 
+	// Defaulting is made here because it's dependent on the version currently, which is determined above
+	// TODO(luxas): Cleanup this once we have dropped v1.6 support and move this code into the API group defaulting
+	cfg.AuthorizationModes = defaultAuthorizationModes(cfg.AuthorizationModes, k8sVersion)
+
 	fmt.Printf("[init] Using Kubernetes version: %s\n", cfg.KubernetesVersion)
-	fmt.Printf("[init] Using Authorization mode: %v\n", cfg.AuthorizationModes)
+	fmt.Printf("[init] Using Authorization modes: %v\n", cfg.AuthorizationModes)
 
 	// Warn about the limitations with the current cloudprovider solution.
 	if cfg.CloudProvider != "" {
@@ -75,4 +78,14 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 
 	return nil
+}
+
+func defaultAuthorizationModes(authzModes []string, k8sVersion *version.Version) []string {
+	if kubeadmutil.IsNodeAuthorizerSupported(k8sVersion) {
+		strset := sets.NewString(authzModes...)
+		if !strset.Has(authzmodes.ModeNode) {
+			return append([]string{authzmodes.ModeNode}, authzModes...)
+		}
+	}
+	return authzModes
 }

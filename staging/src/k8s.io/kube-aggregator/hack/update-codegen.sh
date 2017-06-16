@@ -47,20 +47,20 @@ PREFIX=k8s.io/kube-aggregator/pkg/apis
 INPUT_BASE="--input-base ${PREFIX}"
 INPUT_APIS=(
 apiregistration/
-apiregistration/v1alpha1
+apiregistration/v1beta1
 )
 INPUT="--input ${INPUT_APIS[@]}"
 CLIENTSET_PATH="--clientset-path k8s.io/kube-aggregator/pkg/client/clientset_generated"
 
 ${CLIENTGEN} ${INPUT_BASE} ${INPUT} ${CLIENTSET_PATH} --output-base ${KUBE_ROOT}/vendor
-${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input apiregistration/v1alpha1 ${CLIENTSET_PATH}  --output-base ${KUBE_ROOT}/vendor
+${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input apiregistration/v1beta1 ${CLIENTSET_PATH}  --output-base ${KUBE_ROOT}/vendor
 
 
 echo "Building lister-gen"
 listergen="${PWD}/lister-gen"
 go build -o "${listergen}" ./cmd/libs/go2idl/lister-gen
 
-LISTER_INPUT="--input-dirs k8s.io/kube-aggregator/pkg/apis/apiregistration --input-dirs k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
+LISTER_INPUT="--input-dirs k8s.io/kube-aggregator/pkg/apis/apiregistration --input-dirs k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 LISTER_PATH="--output-package k8s.io/kube-aggregator/pkg/client/listers"
 ${listergen} ${LISTER_INPUT} ${LISTER_PATH} --output-base ${KUBE_ROOT}/vendor
 
@@ -71,7 +71,7 @@ go build -o "${informergen}" ./cmd/libs/go2idl/informer-gen
 
 ${informergen} \
   --output-base ${KUBE_ROOT}/vendor \
-  --input-dirs k8s.io/kube-aggregator/pkg/apis/apiregistration --input-dirs k8s.io/kube-aggregator/pkg/apis/apiregistration/v1alpha1 \
+  --input-dirs k8s.io/kube-aggregator/pkg/apis/apiregistration --input-dirs k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1 \
   --versioned-clientset-package k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset \
   --internal-clientset-package k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset \
   --listers-package k8s.io/kube-aggregator/pkg/client/listers \

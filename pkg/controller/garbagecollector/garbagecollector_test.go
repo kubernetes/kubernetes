@@ -41,6 +41,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
@@ -55,7 +57,10 @@ func TestNewGarbageCollector(t *testing.T) {
 		// no monitor will be constructed for non-core resource, the GC construction will not fail.
 		{Group: "tpr.io", Version: "v1", Resource: "unknown"}: {},
 	}
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), podResource)
+
+	client := fake.NewSimpleClientset()
+	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), podResource, ignoredResources, sharedInformers)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,17 +118,26 @@ func testServerAndClientConfig(handler func(http.ResponseWriter, *http.Request))
 	return srv, config
 }
 
-func setupGC(t *testing.T, config *restclient.Config) *GarbageCollector {
+type garbageCollector struct {
+	*GarbageCollector
+	stop chan struct{}
+}
+
+func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
 	metaOnlyClientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
 	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	podResource := map[schema.GroupVersionResource]struct{}{{Version: "v1", Resource: "pods"}: {}}
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), podResource)
+	client := fake.NewSimpleClientset()
+	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), podResource, ignoredResources, sharedInformers)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return gc
+	stop := make(chan struct{})
+	go sharedInformers.Start(stop)
+	return garbageCollector{gc, stop}
 }
 
 func getPod(podName string, ownerReferences []metav1.OwnerReference) *v1.Pod {
@@ -172,7 +186,10 @@ func TestAttemptToDeleteItem(t *testing.T) {
 	}
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
+
 	gc := setupGC(t, clientConfig)
+	defer close(gc.stop)
+
 	item := &node{
 		identity: objectReference{
 			OwnerReference: metav1.OwnerReference{
@@ -320,6 +337,7 @@ func TestProcessEvent(t *testing.T) {
 // data race among in the dependents field.
 func TestDependentsRace(t *testing.T) {
 	gc := setupGC(t, &restclient.Config{})
+	defer close(gc.stop)
 
 	const updates = 100
 	owner := &node{dependents: make(map[*node]struct{})}
@@ -453,6 +471,7 @@ func TestAbsentUIDCache(t *testing.T) {
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
 	gc := setupGC(t, clientConfig)
+	defer close(gc.stop)
 	gc.absentOwnerCache = NewUIDCache(2)
 	gc.attemptToDeleteItem(podToGCNode(rc1Pod1))
 	gc.attemptToDeleteItem(podToGCNode(rc2Pod1))
@@ -565,5 +584,39 @@ func TestUnblockOwnerReference(t *testing.T) {
 		for _, ref := range got.OwnerReferences {
 			t.Errorf("ref.UID=%s, ref.BlockOwnerDeletion=%v", ref.UID, *ref.BlockOwnerDeletion)
 		}
+	}
+}
+
+func TestOrphanDependentsFailure(t *testing.T) {
+	testHandler := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"PATCH" + "/api/v1/namespaces/ns1/pods/pod": {
+				409,
+				[]byte{},
+			},
+		},
+	}
+	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+	defer srv.Close()
+
+	gc := setupGC(t, clientConfig)
+	defer close(gc.stop)
+
+	dependents := []*node{
+		{
+			identity: objectReference{
+				OwnerReference: metav1.OwnerReference{
+					Kind:       "Pod",
+					APIVersion: "v1",
+					Name:       "pod",
+				},
+				Namespace: "ns1",
+			},
+		},
+	}
+	err := gc.orphanDependents(objectReference{}, dependents)
+	expected := `the server reported a conflict (patch pods pod)`
+	if err == nil || !strings.Contains(err.Error(), expected) {
+		t.Errorf("expected error contains text %s, got %v", expected, err)
 	}
 }

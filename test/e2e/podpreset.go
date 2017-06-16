@@ -127,7 +127,7 @@ var _ = framework.KubeDescribe("PodPreset", func() {
 				framework.Failf("Failed to observe pod creation: %v", event)
 			}
 		case <-time.After(framework.PodStartTimeout):
-			Fail("Timeout while waiting for pod creation")
+			framework.Failf("Timeout while waiting for pod creation")
 		}
 
 		// We need to wait for the pod to be running, otherwise the deletion
@@ -140,7 +140,7 @@ var _ = framework.KubeDescribe("PodPreset", func() {
 		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
 
 		// check the annotation is there
-		if _, ok := pod.Annotations["podpreset.admission.kubernetes.io/hello"]; !ok {
+		if _, ok := pod.Annotations["podpreset.admission.kubernetes.io/podpreset-hello"]; !ok {
 			framework.Failf("Annotation not found in pod annotations: \n%v\n", pod.Annotations)
 		}
 
@@ -233,7 +233,7 @@ var _ = framework.KubeDescribe("PodPreset", func() {
 				framework.Failf("Failed to observe pod creation: %v", event)
 			}
 		case <-time.After(framework.PodStartTimeout):
-			Fail("Timeout while waiting for pod creation")
+			framework.Failf("Timeout while waiting for pod creation")
 		}
 
 		// We need to wait for the pod to be running, otherwise the deletion
@@ -246,7 +246,7 @@ var _ = framework.KubeDescribe("PodPreset", func() {
 		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
 
 		// check the annotation is not there
-		if _, ok := pod.Annotations["podpreset.admission.kubernetes.io/hello"]; ok {
+		if _, ok := pod.Annotations["podpreset.admission.kubernetes.io/podpreset-hello"]; ok {
 			framework.Failf("Annotation found in pod annotations and should not be: \n%v\n", pod.Annotations)
 		}
 

@@ -24,12 +24,12 @@ import (
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/client-go/pkg/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func NewCmdCerts() *cobra.Command {
@@ -65,9 +65,11 @@ func NewCmdSelfSign() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&cfg.Networking.DNSDomain, "dns-domain", cfg.Networking.DNSDomain, "The DNS Domain for the Kubernetes cluster.")
-	cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, "The path where to save and store the certificates")
+	cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, "The path where to save and store the certificates.")
 	cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, "The subnet for the Services in the cluster.")
 	cmd.Flags().StringSliceVar(&cfg.APIServerCertSANs, "cert-altnames", []string{}, "Optional extra altnames to use for the API Server serving cert. Can be both IP addresses and dns names.")
+	cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address the API Server will advertise it's listening on. 0.0.0.0 means the default network interface's address.")
+
 	return cmd
 }
 
@@ -83,8 +85,7 @@ func RunSelfSign(config *kubeadmapi.MasterConfiguration) error {
 		config.API.AdvertiseAddress = ip.String()
 	}
 
-	err = certphase.CreatePKIAssets(config)
-	if err != nil {
+	if err = certphase.CreatePKIAssets(config); err != nil {
 		return err
 	}
 	return nil
@@ -95,5 +96,7 @@ func validateArgs(config *kubeadmapi.MasterConfiguration) error {
 	allErrs = append(allErrs, validation.ValidateNetworking(&config.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, validation.ValidateAbsolutePath(config.CertificatesDir, field.NewPath("cert-dir"))...)
 	allErrs = append(allErrs, validation.ValidateAPIServerCertSANs(config.APIServerCertSANs, field.NewPath("cert-altnames"))...)
+	allErrs = append(allErrs, validation.ValidateIPFromString(config.API.AdvertiseAddress, field.NewPath("apiserver-advertise-address"))...)
+
 	return allErrs.ToAggregate()
 }

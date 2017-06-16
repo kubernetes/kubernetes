@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"runtime/pprof"
 	"sync"
+	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,10 +32,13 @@ import (
 	core "k8s.io/client-go/testing"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	finalizersutil "k8s.io/kubernetes/federation/pkg/federation-controller/util/finalizers"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 
 	"github.com/golang/glog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -177,6 +181,38 @@ func RegisterFakeList(resource string, client *core.Fake, obj runtime.Object) {
 	})
 }
 
+// RegisterFakeClusterGet registers a get response for the cluster resource inside the given fake client.
+func RegisterFakeClusterGet(client *core.Fake, obj runtime.Object) {
+	clusterList, ok := obj.(*federationapi.ClusterList)
+	client.AddReactor("get", "clusters", func(action core.Action) (bool, runtime.Object, error) {
+		name := action.(core.GetAction).GetName()
+		if ok {
+			for _, cluster := range clusterList.Items {
+				if cluster.Name == name {
+					return true, &cluster, nil
+				}
+			}
+		}
+		return false, nil, fmt.Errorf("could not find the requested cluster: %s", name)
+	})
+}
+
+// RegisterFakeOnCreate registers a reactor in the given fake client that passes
+// all created objects to the given watcher.
+func RegisterFakeOnCreate(resource string, client *core.Fake, watcher *WatcherDispatcher) {
+	client.AddReactor("create", resource, func(action core.Action) (bool, runtime.Object, error) {
+		createAction := action.(core.CreateAction)
+		originalObj := createAction.GetObject()
+		// Create a copy of the object here to prevent data races while reading the object in go routine.
+		obj := copy(originalObj)
+		watcher.orderExecution <- func() {
+			glog.V(4).Infof("Object created: %v", obj)
+			watcher.Add(obj)
+		}
+		return true, originalObj, nil
+	})
+}
+
 // RegisterFakeCopyOnCreate registers a reactor in the given fake client that passes
 // all created objects to the given watcher and also copies them to a channel for
 // in-test inspection.
@@ -195,6 +231,32 @@ func RegisterFakeCopyOnCreate(resource string, client *core.Fake, watcher *Watch
 		return true, originalObj, nil
 	})
 	return objChan
+}
+
+// RegisterFakeOnUpdate registers a reactor in the given fake client that passes
+// all updated objects to the given watcher.
+func RegisterFakeOnUpdate(resource string, client *core.Fake, watcher *WatcherDispatcher) {
+	client.AddReactor("update", resource, func(action core.Action) (bool, runtime.Object, error) {
+		updateAction := action.(core.UpdateAction)
+		originalObj := updateAction.GetObject()
+		glog.V(7).Infof("Updating %s: %v", resource, updateAction.GetObject())
+
+		// Create a copy of the object here to prevent data races while reading the object in go routine.
+		obj := copy(originalObj)
+		operation := func() {
+			glog.V(4).Infof("Object updated %v", obj)
+			watcher.Modify(obj)
+		}
+		select {
+		case watcher.orderExecution <- operation:
+			break
+		case <-time.After(pushTimeout):
+			glog.Errorf("Fake client execution channel blocked")
+			glog.Errorf("Tried to push %v", updateAction)
+		}
+		return true, originalObj, nil
+	})
+	return
 }
 
 // RegisterFakeCopyOnUpdate registers a reactor in the given fake client that passes
@@ -224,6 +286,32 @@ func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *Watch
 		return true, originalObj, nil
 	})
 	return objChan
+}
+
+// RegisterFakeOnDelete registers a reactor in the given fake client that passes
+// all deleted objects to the given watcher. Since we could get only name of the
+// deleted object from DeleteAction, this register function relies on the getObject
+// function passed to get the object by name and pass it watcher.
+func RegisterFakeOnDelete(resource string, client *core.Fake, watcher *WatcherDispatcher, getObject func(name, namespace string) runtime.Object) {
+	client.AddReactor("delete", resource, func(action core.Action) (bool, runtime.Object, error) {
+		deleteAction := action.(core.DeleteAction)
+		obj := getObject(deleteAction.GetName(), deleteAction.GetNamespace())
+		glog.V(7).Infof("Deleting %s: %v", resource, obj)
+
+		operation := func() {
+			glog.V(4).Infof("Object deleted %v", obj)
+			watcher.Delete(obj)
+		}
+		select {
+		case watcher.orderExecution <- operation:
+			break
+		case <-time.After(pushTimeout):
+			glog.Errorf("Fake client execution channel blocked")
+			glog.Errorf("Tried to push %v", deleteAction)
+		}
+		return true, obj, nil
+	})
+	return
 }
 
 // Adds an update reactor to the given fake client.
@@ -282,7 +370,7 @@ func CompareObjectMeta(a, b metav1.ObjectMeta) error {
 		return fmt.Errorf("Different namespace expected:%s observed:%s", a.Namespace, b.Namespace)
 	}
 	if a.Name != b.Name {
-		return fmt.Errorf("Different name expected:%s observed:%s", a.Namespace, b.Namespace)
+		return fmt.Errorf("Different name expected:%s observed:%s", a.Name, b.Name)
 	}
 	if !reflect.DeepEqual(a.Labels, b.Labels) && (len(a.Labels) != 0 || len(b.Labels) != 0) {
 		return fmt.Errorf("Labels are different expected:%v observed:%v", a.Labels, b.Labels)
@@ -304,11 +392,14 @@ func NewCluster(name string, readyStatus apiv1.ConditionStatus) *federationapi.C
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: map[string]string{},
+			Labels:      map[string]string{"cluster": name},
 		},
 		Status: federationapi.ClusterStatus{
 			Conditions: []federationapi.ClusterCondition{
 				{Type: federationapi.ClusterReady, Status: readyStatus},
 			},
+			Zones:  []string{"foozone"},
+			Region: "fooregion",
 		},
 	}
 }
@@ -348,4 +439,10 @@ func MetaAndSpecCheckingFunction(expected runtime.Object) CheckingFunction {
 		}
 		return fmt.Errorf("Object different expected=%#v received=%#v", expected, obj)
 	}
+}
+
+func AssertHasFinalizer(t *testing.T, obj runtime.Object, finalizer string) {
+	hasFinalizer, err := finalizersutil.HasFinalizer(obj, finalizer)
+	require.Nil(t, err)
+	assert.True(t, hasFinalizer)
 }

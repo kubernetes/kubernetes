@@ -82,12 +82,12 @@ func (endpointsStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	endpoints, ok := obj.(*api.Endpoints)
 	if !ok {
-		return nil, nil, fmt.Errorf("invalid object type %#v", obj)
+		return nil, nil, false, fmt.Errorf("invalid object type %#v", obj)
 	}
-	return endpoints.Labels, EndpointsToSelectableFields(endpoints), nil
+	return endpoints.Labels, EndpointsToSelectableFields(endpoints), endpoints.Initializers != nil, nil
 }
 
 // MatchEndpoints returns a generic matcher for a given label and field selector.

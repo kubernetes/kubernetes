@@ -35,6 +35,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	policyclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
@@ -173,94 +175,119 @@ func (dc *DisruptionController) finders() []podControllerFinder {
 		dc.getPodStatefulSets}
 }
 
+var (
+	controllerKindRS  = v1beta1.SchemeGroupVersion.WithKind("ReplicaSet")
+	controllerKindSS  = apps.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindRC  = v1.SchemeGroupVersion.WithKind("ReplicationController")
+	controllerKindDep = v1beta1.SchemeGroupVersion.WithKind("Deployment")
+)
+
 // getPodReplicaSets finds replicasets which have no matching deployments.
 func (dc *DisruptionController) getPodReplicaSets(pod *v1.Pod) ([]controllerAndScale, error) {
-	cas := []controllerAndScale{}
-	rss, err := dc.rsLister.GetPodReplicaSets(pod)
-	// GetPodReplicaSets returns an error only if no ReplicaSets are found.  We
-	// don't return that as an error to the caller.
+	var casSlice []controllerAndScale
+	controllerRef := controller.GetControllerOf(pod)
+	if controllerRef == nil {
+		return nil, nil
+	}
+	if controllerRef.Kind != controllerKindRS.Kind {
+		return nil, nil
+	}
+	rs, err := dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
 	if err != nil {
-		return cas, nil
+		// The only possible error is NotFound, which is ok here.
+		return nil, nil
 	}
-	controllerScale := map[types.UID]int32{}
-	for _, rs := range rss {
-		// GetDeploymentsForReplicaSet returns an error only if no matching
-		// deployments are found.
-		_, err := dc.dLister.GetDeploymentsForReplicaSet(rs)
-		if err == nil { // A deployment was found, so this finder will not count this RS.
-			continue
-		}
-		controllerScale[rs.UID] = *(rs.Spec.Replicas)
+	if rs.UID != controllerRef.UID {
+		return nil, nil
 	}
-
-	for uid, scale := range controllerScale {
-		cas = append(cas, controllerAndScale{UID: uid, scale: scale})
+	controllerRef = controller.GetControllerOf(rs)
+	if controllerRef != nil && controllerRef.Kind == controllerKindDep.Kind {
+		// Skip RS if it's controlled by a Deployment.
+		return nil, nil
 	}
-
-	return cas, nil
+	casSlice = append(casSlice, controllerAndScale{rs.UID, *(rs.Spec.Replicas)})
+	return casSlice, nil
 }
 
 // getPodStatefulSet returns the statefulset managing the given pod.
 func (dc *DisruptionController) getPodStatefulSets(pod *v1.Pod) ([]controllerAndScale, error) {
-	cas := []controllerAndScale{}
-	ss, err := dc.ssLister.GetPodStatefulSets(pod)
-
-	// GetPodStatefulSets returns an error only if no StatefulSets are found. We
-	// don't return that as an error to the caller.
+	var casSlice []controllerAndScale
+	controllerRef := controller.GetControllerOf(pod)
+	if controllerRef == nil {
+		return nil, nil
+	}
+	if controllerRef.Kind != controllerKindSS.Kind {
+		return nil, nil
+	}
+	ss, err := dc.ssLister.StatefulSets(pod.Namespace).Get(controllerRef.Name)
 	if err != nil {
-		return cas, nil
+		// The only possible error is NotFound, which is ok here.
+		return nil, nil
+	}
+	if ss.UID != controllerRef.UID {
+		return nil, nil
 	}
 
-	controllerScale := map[types.UID]int32{}
-	for _, s := range ss {
-		controllerScale[s.UID] = *(s.Spec.Replicas)
-	}
-
-	for uid, scale := range controllerScale {
-		cas = append(cas, controllerAndScale{UID: uid, scale: scale})
-	}
-
-	return cas, nil
+	casSlice = append(casSlice, controllerAndScale{ss.UID, *(ss.Spec.Replicas)})
+	return casSlice, nil
 }
 
 // getPodDeployments finds deployments for any replicasets which are being managed by deployments.
 func (dc *DisruptionController) getPodDeployments(pod *v1.Pod) ([]controllerAndScale, error) {
-	cas := []controllerAndScale{}
-	rss, err := dc.rsLister.GetPodReplicaSets(pod)
-	// GetPodReplicaSets returns an error only if no ReplicaSets are found.  We
-	// don't return that as an error to the caller.
+	var casSlice []controllerAndScale
+	controllerRef := controller.GetControllerOf(pod)
+	if controllerRef == nil {
+		return nil, nil
+	}
+	if controllerRef.Kind != controllerKindRS.Kind {
+		return nil, nil
+	}
+	rs, err := dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
 	if err != nil {
-		return cas, nil
+		// The only possible error is NotFound, which is ok here.
+		return nil, nil
 	}
-	controllerScale := map[types.UID]int32{}
-	for _, rs := range rss {
-		ds, err := dc.dLister.GetDeploymentsForReplicaSet(rs)
-		// GetDeploymentsForReplicaSet returns an error only if no matching
-		// deployments are found.  In that case we skip this ReplicaSet.
-		if err != nil {
-			continue
-		}
-		for _, d := range ds {
-			controllerScale[d.UID] = *(d.Spec.Replicas)
-		}
+	if rs.UID != controllerRef.UID {
+		return nil, nil
 	}
-
-	for uid, scale := range controllerScale {
-		cas = append(cas, controllerAndScale{UID: uid, scale: scale})
+	controllerRef = controller.GetControllerOf(rs)
+	if controllerRef == nil {
+		return nil, nil
 	}
-
-	return cas, nil
+	if controllerRef.Kind != controllerKindDep.Kind {
+		return nil, nil
+	}
+	deployment, err := dc.dLister.Deployments(rs.Namespace).Get(controllerRef.Name)
+	if err != nil {
+		// The only possible error is NotFound, which is ok here.
+		return nil, nil
+	}
+	if deployment.UID != controllerRef.UID {
+		return nil, nil
+	}
+	casSlice = append(casSlice, controllerAndScale{deployment.UID, *(deployment.Spec.Replicas)})
+	return casSlice, nil
 }
 
 func (dc *DisruptionController) getPodReplicationControllers(pod *v1.Pod) ([]controllerAndScale, error) {
-	cas := []controllerAndScale{}
-	rcs, err := dc.rcLister.GetPodControllers(pod)
-	if err == nil {
-		for _, rc := range rcs {
-			cas = append(cas, controllerAndScale{UID: rc.UID, scale: *(rc.Spec.Replicas)})
-		}
+	var casSlice []controllerAndScale
+	controllerRef := controller.GetControllerOf(pod)
+	if controllerRef == nil {
+		return nil, nil
 	}
-	return cas, nil
+	if controllerRef.Kind != controllerKindRC.Kind {
+		return nil, nil
+	}
+	rc, err := dc.rcLister.ReplicationControllers(pod.Namespace).Get(controllerRef.Name)
+	if err != nil {
+		// The only possible error is NotFound, which is ok here.
+		return nil, nil
+	}
+	if rc.UID != controllerRef.UID {
+		return nil, nil
+	}
+	casSlice = append(casSlice, controllerAndScale{rc.UID, *(rc.Spec.Replicas)})
+	return casSlice, nil
 }
 
 func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
@@ -394,6 +421,8 @@ func (dc *DisruptionController) getPdbForPod(pod *v1.Pod) *policy.PodDisruptionB
 	return pdbs[0]
 }
 
+// This function returns pods using the PodDisruptionBudget object.
+// IMPORTANT NOTE : the returned pods should NOT be modified.
 func (dc *DisruptionController) getPodsForPdb(pdb *policy.PodDisruptionBudget) ([]*v1.Pod, error) {
 	sel, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
 	if sel.Empty() {
@@ -406,12 +435,7 @@ func (dc *DisruptionController) getPodsForPdb(pdb *policy.PodDisruptionBudget) (
 	if err != nil {
 		return []*v1.Pod{}, err
 	}
-	// TODO: Do we need to copy here?
-	result := make([]*v1.Pod, 0, len(pods))
-	for i := range pods {
-		result = append(result, &(*pods[i]))
-	}
-	return result, nil
+	return pods, nil
 }
 
 func (dc *DisruptionController) worker() {
@@ -516,64 +540,88 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 	// permitted controller configurations (specifically, considering it an error
 	// if a pod covered by a PDB has 0 controllers or > 1 controller) should be
 	// handled the same way for integer and percentage minAvailable
-	if pdb.Spec.MinAvailable.Type == intstr.Int {
-		desiredHealthy = pdb.Spec.MinAvailable.IntVal
-		expectedCount = int32(len(pods))
-	} else if pdb.Spec.MinAvailable.Type == intstr.String {
-		// When the user specifies a fraction of pods that must be available, we
-		// use as the fraction's denominator
-		// SUM_{all c in C} scale(c)
-		// where C is the union of C_p1, C_p2, ..., C_pN
-		// and each C_pi is the set of controllers controlling the pod pi
 
-		// k8s only defines what will happens when 0 or 1 controllers control a
-		// given pod.  We explicitly exclude the 0 controllers case here, and we
-		// report an error if we find a pod with more than 1 controller.  Thus in
-		// practice each C_pi is a set of exactly 1 controller.
-
-		// A mapping from controllers to their scale.
-		controllerScale := map[types.UID]int32{}
-
-		// 1. Find the controller(s) for each pod.  If any pod has 0 controllers,
-		// that's an error.  If any pod has more than 1 controller, that's also an
-		// error.
-		for _, pod := range pods {
-			controllerCount := 0
-			for _, finder := range dc.finders() {
-				var controllers []controllerAndScale
-				controllers, err = finder(pod)
-				if err != nil {
-					return
-				}
-				for _, controller := range controllers {
-					controllerScale[controller.UID] = controller.scale
-					controllerCount++
-				}
-			}
-			if controllerCount == 0 {
-				err = fmt.Errorf("asked for percentage, but found no controllers for pod %q", pod.Name)
-				dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllers", err.Error())
-				return
-			} else if controllerCount > 1 {
-				err = fmt.Errorf("pod %q has %v>1 controllers", pod.Name, controllerCount)
-				dc.recorder.Event(pdb, v1.EventTypeWarning, "TooManyControllers", err.Error())
-				return
-			}
-		}
-
-		// 2. Add up all the controllers.
-		expectedCount = 0
-		for _, count := range controllerScale {
-			expectedCount += count
-		}
-
-		// 3. Do the math.
-		var dh int
-		dh, err = intstr.GetValueFromIntOrPercent(&pdb.Spec.MinAvailable, int(expectedCount), true)
+	if pdb.Spec.MaxUnavailable != nil {
+		expectedCount, err = dc.getExpectedScale(pdb, pods)
 		if err != nil {
 			return
 		}
-		desiredHealthy = int32(dh)
+		var maxUnavailable int
+		maxUnavailable, err = intstr.GetValueFromIntOrPercent(pdb.Spec.MaxUnavailable, int(expectedCount), true)
+		if err != nil {
+			return
+		}
+		desiredHealthy = expectedCount - int32(maxUnavailable)
+		if desiredHealthy < 0 {
+			desiredHealthy = 0
+		}
+	} else if pdb.Spec.MinAvailable != nil {
+		if pdb.Spec.MinAvailable.Type == intstr.Int {
+			desiredHealthy = pdb.Spec.MinAvailable.IntVal
+			expectedCount = int32(len(pods))
+		} else if pdb.Spec.MinAvailable.Type == intstr.String {
+			expectedCount, err = dc.getExpectedScale(pdb, pods)
+			if err != nil {
+				return
+			}
+
+			var minAvailable int
+			minAvailable, err = intstr.GetValueFromIntOrPercent(pdb.Spec.MinAvailable, int(expectedCount), true)
+			if err != nil {
+				return
+			}
+			desiredHealthy = int32(minAvailable)
+		}
+	}
+	return
+}
+
+func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount int32, err error) {
+	// When the user specifies a fraction of pods that must be available, we
+	// use as the fraction's denominator
+	// SUM_{all c in C} scale(c)
+	// where C is the union of C_p1, C_p2, ..., C_pN
+	// and each C_pi is the set of controllers controlling the pod pi
+
+	// k8s only defines what will happens when 0 or 1 controllers control a
+	// given pod.  We explicitly exclude the 0 controllers case here, and we
+	// report an error if we find a pod with more than 1 controller.  Thus in
+	// practice each C_pi is a set of exactly 1 controller.
+
+	// A mapping from controllers to their scale.
+	controllerScale := map[types.UID]int32{}
+
+	// 1. Find the controller(s) for each pod.  If any pod has 0 controllers,
+	// that's an error.  If any pod has more than 1 controller, that's also an
+	// error.
+	for _, pod := range pods {
+		controllerCount := 0
+		for _, finder := range dc.finders() {
+			var controllers []controllerAndScale
+			controllers, err = finder(pod)
+			if err != nil {
+				return
+			}
+			for _, controller := range controllers {
+				controllerScale[controller.UID] = controller.scale
+				controllerCount++
+			}
+		}
+		if controllerCount == 0 {
+			err = fmt.Errorf("found no controllers for pod %q", pod.Name)
+			dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllers", err.Error())
+			return
+		} else if controllerCount > 1 {
+			err = fmt.Errorf("pod %q has %v>1 controllers", pod.Name, controllerCount)
+			dc.recorder.Event(pdb, v1.EventTypeWarning, "TooManyControllers", err.Error())
+			return
+		}
+	}
+
+	// 2. Add up all the controllers.
+	expectedCount = 0
+	for _, count := range controllerScale {
+		expectedCount += count
 	}
 
 	return

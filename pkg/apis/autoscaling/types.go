@@ -25,15 +25,15 @@ import (
 // Scale represents a scaling request for a resource.
 type Scale struct {
 	metav1.TypeMeta
-	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta
 
-	// defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
 	// +optional
 	Spec ScaleSpec
 
-	// current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
+	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
 	// +optional
 	Status ScaleStatus
 }
@@ -53,14 +53,14 @@ type ScaleStatus struct {
 	// label query over pods that should match the replicas count. This is same
 	// as the label selector but in the string format to avoid introspection
 	// by clients. The string will be in the same format as the query-param syntax.
-	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
 	Selector string
 }
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
-	// Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
 	Kind string
 	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string
@@ -202,6 +202,59 @@ type HorizontalPodAutoscalerStatus struct {
 
 	// CurrentMetrics is the last read state of the metrics used by this autoscaler.
 	CurrentMetrics []MetricStatus
+
+	// Conditions is the set of conditions required for this autoscaler to scale its target,
+	// and indicates whether or not those conditions are met.
+	Conditions []HorizontalPodAutoscalerCondition
+}
+
+// ConditionStatus indicates the status of a condition (true, false, or unknown).
+type ConditionStatus string
+
+// These are valid condition statuses. "ConditionTrue" means a resource is in the condition;
+// "ConditionFalse" means a resource is not in the condition; "ConditionUnknown" means kubernetes
+// can't decide if a resource is in the condition or not. In the future, we could add other
+// intermediate conditions, e.g. ConditionDegraded.
+const (
+	ConditionTrue    ConditionStatus = "True"
+	ConditionFalse   ConditionStatus = "False"
+	ConditionUnknown ConditionStatus = "Unknown"
+)
+
+// HorizontalPodAutoscalerConditionType are the valid conditions of
+// a HorizontalPodAutoscaler.
+type HorizontalPodAutoscalerConditionType string
+
+var (
+	// ScalingActive indicates that the HPA controller is able to scale if necessary:
+	// it's correctly configured, can fetch the desired metrics, and isn't disabled.
+	ScalingActive HorizontalPodAutoscalerConditionType = "ScalingActive"
+	// AbleToScale indicates a lack of transient issues which prevent scaling from occuring,
+	// such as being in a backoff window, or being unable to access/update the target scale.
+	AbleToScale HorizontalPodAutoscalerConditionType = "AbleToScale"
+	// ScalingLimited indicates that the calculated scale based on metrics would be above or
+	// below the range for the HPA, and has thus been capped.
+	ScalingLimited HorizontalPodAutoscalerConditionType = "ScalingLimited"
+)
+
+// HorizontalPodAutoscalerCondition describes the state of
+// a HorizontalPodAutoscaler at a certain point.
+type HorizontalPodAutoscalerCondition struct {
+	// Type describes the current condition
+	Type HorizontalPodAutoscalerConditionType
+	// Status is the status of the condition (True, False, Unknown)
+	Status ConditionStatus
+	// LastTransitionTime is the last time the condition transitioned from
+	// one status to another
+	// +optional
+	LastTransitionTime metav1.Time
+	// Reason is the reason for the condition's last transition.
+	// +optional
+	Reason string
+	// Message is a human-readable explanation containing details about
+	// the transition
+	// +optional
+	Message string
 }
 
 // MetricStatus describes the last-read state of a single metric.
@@ -279,12 +332,12 @@ type ResourceMetricStatus struct {
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta
 	// Metadata is the standard object metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Spec is the specification for the behaviour of the autoscaler.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
 	// +optional
 	Spec HorizontalPodAutoscalerSpec
 

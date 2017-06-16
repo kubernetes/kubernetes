@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -163,7 +162,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	if currentAnnotations == nil {
 		currentAnnotations = make(map[string]string)
 	}
-	currentAnnotations[annotations.LastAppliedConfigAnnotation] = string(original)
+	currentAnnotations[api.LastAppliedConfigAnnotation] = string(original)
 	currentAccessor.SetAnnotations(currentAnnotations)
 	current, err := runtime.Encode(testapi.Default.Codec(), currentObj)
 	if err != nil {
@@ -203,7 +202,7 @@ func validatePatchApplication(t *testing.T, req *http.Request) {
 	}
 
 	annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-	if _, ok := annotationsMap[annotations.LastAppliedConfigAnnotation]; !ok {
+	if _, ok := annotationsMap[api.LastAppliedConfigAnnotation]; !ok {
 		t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 	}
 
@@ -457,8 +456,7 @@ func TestApplyObjectOutput(t *testing.T) {
 	}
 
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
-	tf.CommandPrinter = &printers.YAMLPrinter{}
-	tf.GenericPrinter = true
+	tf.Printer = &printers.YAMLPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
@@ -706,7 +704,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 					t.Fatal(err)
 				}
 				annotationMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-				if _, ok := annotationMap[annotations.LastAppliedConfigAnnotation]; !ok {
+				if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
 					t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 				}
 				strategy := walkMapPath(t, patchMap, []string{"spec", "strategy"})
@@ -988,9 +986,8 @@ func TestRunApplySetLastApplied(t *testing.T) {
 		if buf.String() != test.expectedOut {
 			t.Fatalf("%s: unexpected output: %s\nexpected: %s", test.name, buf.String(), test.expectedOut)
 		}
-
 	}
-
+	cmdutil.BehaviorOnFatal(func(str string, code int) {})
 }
 
 func checkPatchString(t *testing.T, req *http.Request) {
@@ -1006,7 +1003,7 @@ func checkPatchString(t *testing.T, req *http.Request) {
 	}
 
 	annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-	if _, ok := annotationsMap[annotations.LastAppliedConfigAnnotation]; !ok {
+	if _, ok := annotationsMap[api.LastAppliedConfigAnnotation]; !ok {
 		t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 	}
 

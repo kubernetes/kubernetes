@@ -24,7 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/emicklei/go-restful/swagger"
+	"github.com/emicklei/go-restful-swagger12"
+	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -195,7 +196,7 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 		return err
 	}
 
-	err = f.Chmod(0755)
+	err = os.Chmod(f.Name(), 0755)
 	if err != nil {
 		return err
 	}
@@ -234,6 +235,10 @@ func (d *CachedDiscoveryClient) ServerVersion() (*version.Info, error) {
 
 func (d *CachedDiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
 	return d.delegate.SwaggerSchema(version)
+}
+
+func (d *CachedDiscoveryClient) OpenAPISchema() (*spec.Swagger, error) {
+	return d.delegate.OpenAPISchema()
 }
 
 func (d *CachedDiscoveryClient) Fresh() bool {

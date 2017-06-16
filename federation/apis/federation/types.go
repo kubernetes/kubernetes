@@ -19,6 +19,7 @@ package federation
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.
@@ -97,7 +98,7 @@ type ClusterStatus struct {
 type Cluster struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
@@ -113,7 +114,7 @@ type Cluster struct {
 type ClusterList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta
 
@@ -121,35 +122,54 @@ type ClusterList struct {
 	Items []Cluster
 }
 
-// Temporary/alpha structures to support custom replica assignments within FederatedReplicaSet.
+// Temporary/alpha structures to support custom replica assignments within Federated workloads.
 
-// A set of preferences that can be added to federated version of ReplicaSet as a json-serialized annotation.
-// The preferences allow the user to express in which clusters he wants to put his replicas within the
-// mentioned FederatedReplicaSet.
-type FederatedReplicaSetPreferences struct {
-	// If set to true then already scheduled and running replicas may be moved to other clusters to
-	// in order to bring cluster replicasets towards a desired state. Otherwise, if set to false,
+// A set of preferences that can be added to federated version of workloads (deployments, replicasets, ..)
+// as a json-serialized annotation. The preferences allow the users to express in which clusters they
+// want to put their replicas within the mentioned workload objects.
+type ReplicaAllocationPreferences struct {
+	// If set to true then already scheduled and running replicas may be moved to other clusters
+	// in order to match current state to the specified preferences. Otherwise, if set to false,
 	// up and running replicas will not be moved.
 	// +optional
 	Rebalance bool
 
-	// A mapping between cluster names and preferences regarding local ReplicaSet in these clusters.
-	// "*" (if provided) applies to all clusters if an explicit mapping is not provided. If there is no
-	// "*" that clusters without explicit preferences should not have any replicas scheduled.
+	// A mapping between cluster names and preferences regarding a local workload object (dep, rs, .. ) in
+	// these clusters.
+	// "*" (if provided) applies to all clusters if an explicit mapping is not provided.
+	// If omitted, clusters without explicit preferences should not have any replicas scheduled.
 	// +optional
-	Clusters map[string]ClusterReplicaSetPreferences
+	Clusters map[string]ClusterPreferences
 }
 
-// Preferences regarding number of replicas assigned to a cluster replicaset within a federated replicaset.
-type ClusterReplicaSetPreferences struct {
-	// Minimum number of replicas that should be assigned to this Local ReplicaSet. 0 by default.
+// Preferences regarding number of replicas assigned to a cluster workload object (dep, rs, ..) within
+// a federated workload object.
+type ClusterPreferences struct {
+	// Minimum number of replicas that should be assigned to this cluster workload object. 0 by default.
 	// +optional
 	MinReplicas int64
 
-	// Maximum number of replicas that should be assigned to this Local ReplicaSet. Unbounded if no value provided (default).
+	// Maximum number of replicas that should be assigned to this cluster workload object.
+	// Unbounded if no value provided (default).
 	// +optional
 	MaxReplicas *int64
 
-	// A number expressing the preference to put an additional replica to this LocalReplicaSet. 0 by default.
+	// A number expressing the preference to put an additional replica to this cluster workload object.
+	// 0 by default.
 	Weight int64
+}
+
+// Annotation for a federated service to keep record of service loadbalancer ingresses in federated cluster
+type FederatedServiceIngress struct {
+	// List of loadbalancer ingress of a service in all federated clusters
+	// +optional
+	Items []ClusterServiceIngress `json:"items,omitempty"`
+}
+
+// Loadbalancer ingresses of a service within a federated cluster
+type ClusterServiceIngress struct {
+	// Cluster is the name of the federated cluster
+	Cluster string `json:"cluster"`
+	// List of loadbalancer ingresses of a federated service within a federated cluster
+	Items []v1.LoadBalancerIngress `json:"items"`
 }

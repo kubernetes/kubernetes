@@ -52,12 +52,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against Jobs.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:      api.Scheme,
-		NewFunc:     func() runtime.Object { return &batch.Job{} },
-		NewListFunc: func() runtime.Object { return &batch.JobList{} },
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*batch.Job).Name, nil
-		},
+		Copier:            api.Scheme,
+		NewFunc:           func() runtime.Object { return &batch.Job{} },
+		NewListFunc:       func() runtime.Object { return &batch.JobList{} },
 		PredicateFunc:     job.MatchJob,
 		QualifiedResource: batch.Resource("jobs"),
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("jobs"),
@@ -75,6 +72,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	statusStore.UpdateStrategy = job.StatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}
+}
+
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (r *REST) Categories() []string {
+	return []string{"all"}
 }
 
 // StatusREST implements the REST endpoint for changing the status of a resourcequota.

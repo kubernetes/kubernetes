@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"sort"
 
 	"github.com/spf13/cobra"
@@ -31,19 +30,17 @@ import (
 )
 
 var (
-	apiversions_example = templates.Examples(i18n.T(`
+	apiversionsExample = templates.Examples(i18n.T(`
 		# Print the supported API versions
 		kubectl api-versions`))
 )
 
 func NewCmdApiVersions(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "api-versions",
-		// apiversions is deprecated.
-		Aliases: []string{"apiversions"},
+		Use:     "api-versions",
 		Short:   "Print the supported API versions on the server, in the form of \"group/version\"",
 		Long:    "Print the supported API versions on the server, in the form of \"group/version\"",
-		Example: apiversions_example,
+		Example: apiversionsExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunApiVersions(f, out)
 			cmdutil.CheckErr(err)
@@ -53,10 +50,6 @@ func NewCmdApiVersions(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunApiVersions(f cmdutil.Factory, w io.Writer) error {
-	if len(os.Args) > 1 && os.Args[1] == "apiversions" {
-		printDeprecationWarning("api-versions", "apiversions")
-	}
-
 	discoveryclient, err := f.DiscoveryClient()
 	if err != nil {
 		return err

@@ -102,7 +102,7 @@ func TestDialURL(t *testing.T) {
 				TLSClientConfig: tlsConfigCopy,
 			}
 
-			extractedDial, err := utilnet.Dialer(transport)
+			extractedDial, err := utilnet.DialerFor(transport)
 			if err != nil {
 				t.Fatal(err)
 			}

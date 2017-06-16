@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
@@ -29,6 +30,7 @@ import (
 	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -84,11 +86,12 @@ func TestWriteStaticPodManifests(t *testing.T) {
 
 		// Below is dead code.
 		if rt.expectedAPIProbePort != 0 {
-			manifest, err := os.Open(kubeadmapi.GlobalEnvParams.KubernetesDir + "/manifests/kube-apiserver.yaml")
+			manifest, err := os.Open(filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "kube-apiserver.yaml"))
 			if err != nil {
 				t.Errorf("WriteStaticPodManifests: %v", err)
 				continue
 			}
+			defer manifest.Close()
 
 			var pod api.Pod
 			d := yaml.NewYAMLOrJSONDecoder(manifest, 4096)
@@ -120,6 +123,77 @@ func TestWriteStaticPodManifests(t *testing.T) {
 			if rt.expectedAPIProbePort != port {
 				t.Errorf("WriteStaticPodManifests: apiserver pod liveness probe port was: %v, wanted %v", port, rt.expectedAPIProbePort)
 			}
+		}
+	}
+}
+
+func TestNewVolume(t *testing.T) {
+	var tests = []struct {
+		name     string
+		path     string
+		expected api.Volume
+	}{
+		{
+			name: "foo",
+			path: "/etc/foo",
+			expected: api.Volume{
+				Name: "foo",
+				VolumeSource: api.VolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/etc/foo"},
+				}},
+		},
+	}
+
+	for _, rt := range tests {
+		actual := newVolume(rt.name, rt.path)
+		if actual.Name != rt.expected.Name {
+			t.Errorf(
+				"failed newVolume:\n\texpected: %s\n\t  actual: %s",
+				rt.expected.Name,
+				actual.Name,
+			)
+		}
+		if actual.VolumeSource.HostPath.Path != rt.expected.VolumeSource.HostPath.Path {
+			t.Errorf(
+				"failed newVolume:\n\texpected: %s\n\t  actual: %s",
+				rt.expected.VolumeSource.HostPath.Path,
+				actual.VolumeSource.HostPath.Path,
+			)
+		}
+	}
+}
+
+func TestNewVolumeMount(t *testing.T) {
+	var tests = []struct {
+		name     string
+		path     string
+		expected api.VolumeMount
+	}{
+		{
+			name: "foo",
+			path: "/etc/foo",
+			expected: api.VolumeMount{
+				Name:      "foo",
+				MountPath: "/etc/foo",
+			},
+		},
+	}
+
+	for _, rt := range tests {
+		actual := newVolumeMount(rt.name, rt.path)
+		if actual.Name != rt.expected.Name {
+			t.Errorf(
+				"failed newVolumeMount:\n\texpected: %s\n\t  actual: %s",
+				rt.expected.Name,
+				actual.Name,
+			)
+		}
+		if actual.MountPath != rt.expected.MountPath {
+			t.Errorf(
+				"failed newVolumeMount:\n\texpected: %s\n\t  actual: %s",
+				rt.expected.MountPath,
+				actual.MountPath,
+			)
 		}
 	}
 }
@@ -259,11 +333,9 @@ func TestCertsVolumeMount(t *testing.T) {
 
 func TestK8sVolume(t *testing.T) {
 	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
 		expected api.Volume
 	}{
 		{
-			cfg: &kubeadmapi.MasterConfiguration{},
 			expected: api.Volume{
 				Name: "k8s",
 				VolumeSource: api.VolumeSource{
@@ -274,7 +346,7 @@ func TestK8sVolume(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := k8sVolume(rt.cfg)
+		actual := k8sVolume()
 		if actual.Name != rt.expected.Name {
 			t.Errorf(
 				"failed k8sVolume:\n\texpected: %s\n\t  actual: %s",
@@ -299,7 +371,7 @@ func TestK8sVolumeMount(t *testing.T) {
 		{
 			expected: api.VolumeMount{
 				Name:      "k8s",
-				MountPath: "/etc/kubernetes/",
+				MountPath: kubeadmapi.GlobalEnvParams.KubernetesDir,
 				ReadOnly:  true,
 			},
 		},
@@ -450,7 +522,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -460,7 +532,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--kubelet-client-key=" + testCertsDir + "/apiserver-kubelet-client.key",
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged=true",
-				"--storage-backend=etcd3",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 				"--experimental-bootstrap-token-auth=true",
 				"--requestheader-username-headers=X-Remote-User",
@@ -483,7 +554,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -493,7 +564,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--kubelet-client-key=" + testCertsDir + "/apiserver-kubelet-client.key",
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged=true",
-				"--storage-backend=etcd3",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 				"--experimental-bootstrap-token-auth=true",
 				"--requestheader-username-headers=X-Remote-User",
@@ -517,7 +587,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -527,7 +597,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--kubelet-client-key=" + testCertsDir + "/apiserver-kubelet-client.key",
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged=true",
-				"--storage-backend=etcd3",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 				"--experimental-bootstrap-token-auth=true",
 				"--requestheader-username-headers=X-Remote-User",
@@ -553,7 +622,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds",
+				"--admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
@@ -563,7 +632,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--kubelet-client-key=" + testCertsDir + "/apiserver-kubelet-client.key",
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged=true",
-				"--storage-backend=etcd3",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 				"--experimental-bootstrap-token-auth=true",
 				"--proxy-client-cert-file=/var/lib/certs/front-proxy-client.crt",
@@ -599,7 +667,8 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}{
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				CertificatesDir: testCertsDir,
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.7.0",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -610,15 +679,14 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
 				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
 				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
-				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:bootstrappers",
 				"--use-service-account-credentials=true",
 				"--controllers=*,bootstrapsigner,tokencleaner",
 			},
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				CloudProvider:   "foo",
-				CertificatesDir: testCertsDir,
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.6.4",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -629,7 +697,26 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
 				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
 				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
+				"--use-service-account-credentials=true",
+				"--controllers=*,bootstrapsigner,tokencleaner",
 				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:bootstrappers",
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				CloudProvider:     "foo",
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.7.0",
+			},
+			expected: []string{
+				"kube-controller-manager",
+				"--address=127.0.0.1",
+				"--leader-elect=true",
+				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
+				"--root-ca-file=" + testCertsDir + "/ca.crt",
+				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
+				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
+				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
 				"--use-service-account-credentials=true",
 				"--controllers=*,bootstrapsigner,tokencleaner",
 				"--cloud-provider=foo",
@@ -637,8 +724,9 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				Networking:      kubeadm.Networking{PodSubnet: "bar"},
-				CertificatesDir: testCertsDir,
+				Networking:        kubeadm.Networking{PodSubnet: "bar"},
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.7.0",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -649,7 +737,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
 				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
 				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
-				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:bootstrappers",
 				"--use-service-account-credentials=true",
 				"--controllers=*,bootstrapsigner,tokencleaner",
 				"--allocate-node-cidrs=true",
@@ -659,7 +746,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getControllerManagerCommand(rt.cfg, false)
+		actual := getControllerManagerCommand(rt.cfg, false, version.MustParseSemantic(rt.cfg.KubernetesVersion))
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
@@ -797,7 +884,15 @@ func TestGetAuthzParameters(t *testing.T) {
 		{
 			authMode: []string{"ABAC", "RBAC", "Webhook"},
 			expected: []string{
-				"--authorization-mode=RBAC,ABAC,Webhook",
+				"--authorization-mode=ABAC,RBAC,Webhook",
+				"--authorization-policy-file=/etc/kubernetes/abac_policy.json",
+				"--authorization-webhook-config-file=/etc/kubernetes/webhook_authz.conf",
+			},
+		},
+		{
+			authMode: []string{"Node", "RBAC", "Webhook", "ABAC"},
+			expected: []string{
+				"--authorization-mode=Node,RBAC,Webhook,ABAC",
 				"--authorization-policy-file=/etc/kubernetes/abac_policy.json",
 				"--authorization-webhook-config-file=/etc/kubernetes/webhook_authz.conf",
 			},
@@ -870,7 +965,7 @@ func TestVersionCompare(t *testing.T) {
 		"v1.7.1",
 	}
 	for _, v := range versions {
-		if !version.MustParseSemantic(v).AtLeast(v170) {
+		if !version.MustParseSemantic(v).AtLeast(kubeadmconstants.MinimumAPIAggregationVersion) {
 			t.Errorf("err")
 		}
 	}

@@ -27,9 +27,9 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
-func (gce *GCECloud) waitForOp(op *compute.Operation, getOperation func(operationName string) (*compute.Operation, error)) error {
+func (gce *GCECloud) waitForOp(op *compute.Operation, getOperation func(operationName string) (*compute.Operation, error), mc *metricContext) error {
 	if op == nil {
-		return fmt.Errorf("operation must not be nil")
+		return mc.Observe(fmt.Errorf("operation must not be nil"))
 	}
 
 	if opIsDone(op) {
@@ -38,18 +38,20 @@ func (gce *GCECloud) waitForOp(op *compute.Operation, getOperation func(operatio
 
 	opStart := time.Now()
 	opName := op.Name
+
 	return wait.Poll(operationPollInterval, operationPollTimeoutDuration, func() (bool, error) {
 		start := time.Now()
 		gce.operationPollRateLimiter.Accept()
 		duration := time.Now().Sub(start)
 		if duration > 5*time.Second {
-			glog.Infof("pollOperation: throttled %v for %v", duration, opName)
+			glog.V(2).Infof("pollOperation: throttled %v for %v", duration, opName)
 		}
 		pollOp, err := getOperation(opName)
 		if err != nil {
 			glog.Warningf("GCE poll operation %s failed: pollOp: [%v] err: [%v] getErrorFromOp: [%v]",
 				opName, pollOp, err, getErrorFromOp(pollOp))
 		}
+
 		done := opIsDone(pollOp)
 		if done {
 			duration := time.Now().Sub(opStart)
@@ -60,12 +62,13 @@ func (gce *GCECloud) waitForOp(op *compute.Operation, getOperation func(operatio
 					glog.Warningf("waitForOperation: long operation (%v): %v (failed to encode to JSON: %v)",
 						duration, pollOp, err)
 				} else {
-					glog.Infof("waitForOperation: long operation (%v): %v",
+					glog.V(2).Infof("waitForOperation: long operation (%v): %v",
 						duration, string(enc))
 				}
 			}
 		}
-		return done, getErrorFromOp(pollOp)
+
+		return done, mc.Observe(getErrorFromOp(pollOp))
 	})
 }
 
@@ -86,20 +89,20 @@ func getErrorFromOp(op *compute.Operation) error {
 	return nil
 }
 
-func (gce *GCECloud) waitForGlobalOp(op *compute.Operation) error {
+func (gce *GCECloud) waitForGlobalOp(op *compute.Operation, mc *metricContext) error {
 	return gce.waitForOp(op, func(operationName string) (*compute.Operation, error) {
 		return gce.service.GlobalOperations.Get(gce.projectID, operationName).Do()
-	})
+	}, mc)
 }
 
-func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error {
+func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string, mc *metricContext) error {
 	return gce.waitForOp(op, func(operationName string) (*compute.Operation, error) {
 		return gce.service.RegionOperations.Get(gce.projectID, region, operationName).Do()
-	})
+	}, mc)
 }
 
-func (gce *GCECloud) waitForZoneOp(op *compute.Operation, zone string) error {
+func (gce *GCECloud) waitForZoneOp(op *compute.Operation, zone string, mc *metricContext) error {
 	return gce.waitForOp(op, func(operationName string) (*compute.Operation, error) {
 		return gce.service.ZoneOperations.Get(gce.projectID, zone, operationName).Do()
-	})
+	}, mc)
 }

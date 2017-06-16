@@ -1,5 +1,5 @@
 /*
-Package restful, a lean package for creating REST-style WebServices without magic.
+Package restful , a lean package for creating REST-style WebServices without magic.
 
 WebServices and Routes
 

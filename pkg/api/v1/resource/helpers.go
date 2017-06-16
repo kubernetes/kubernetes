@@ -22,7 +22,6 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -112,15 +111,19 @@ func ExtractResourceValueByContainerName(fs *v1.ResourceFieldSelector, pod *v1.P
 	return ExtractContainerResourceValue(fs, container)
 }
 
+type deepCopier interface {
+	DeepCopy(interface{}) (interface{}, error)
+}
+
 // ExtractResourceValueByContainerNameAndNodeAllocatable extracts the value of a resource
 // by providing container name and node allocatable
-func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string, nodeAllocatable v1.ResourceList) (string, error) {
+func ExtractResourceValueByContainerNameAndNodeAllocatable(copier deepCopier, fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string, nodeAllocatable v1.ResourceList) (string, error) {
 	realContainer, err := findContainerInPod(pod, containerName)
 	if err != nil {
 		return "", err
 	}
 
-	containerCopy, err := api.Scheme.DeepCopy(realContainer)
+	containerCopy, err := copier.DeepCopy(realContainer)
 	if err != nil {
 		return "", fmt.Errorf("failed to perform a deep copy of container object: %v", err)
 	}

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -34,47 +34,39 @@ import (
 // Eviction Policy is described here:
 // https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/kubelet-eviction.md
 
-var _ = framework.KubeDescribe("AllocatableEviction [Slow] [Serial] [Disruptive] [Flaky]", func() {
-	f := framework.NewDefaultFramework("allocatable-eviction-test")
+var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disruptive] [Flaky]", func() {
+	f := framework.NewDefaultFramework("memory-allocatable-eviction-test")
 
 	podTestSpecs := []podTestSpec{
 		{
 			evictionPriority: 1, // This pod should be evicted before the innocent pod
-			pod:              *getMemhogPod("memory-hog-pod", "memory-hog", v1.ResourceRequirements{}),
+			pod:              getMemhogPod("memory-hog-pod", "memory-hog", v1.ResourceRequirements{}),
 		},
 		{
 			evictionPriority: 0, // This pod should never be evicted
-			pod: v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "innocent-pod"},
-				Spec: v1.PodSpec{
-					RestartPolicy: v1.RestartPolicyNever,
-					Containers: []v1.Container{
-						{
-							Image: "gcr.io/google_containers/busybox:1.24",
-							Name:  "normal-memory-usage-container",
-							Command: []string{
-								"sh",
-								"-c", //make one big (5 Gb) file
-								"dd if=/dev/urandom of=largefile bs=5000000000 count=1; while true; do sleep 5; done",
-							},
-						},
-					},
-				},
-			},
+			pod:              getInnocentPod(),
 		},
 	}
-	evictionTestTimeout := 40 * time.Minute
+	evictionTestTimeout := 10 * time.Minute
 	testCondition := "Memory Pressure"
-	kubeletConfigUpdate := func(initialConfig *componentconfig.KubeletConfiguration) {
-		initialConfig.EvictionHard = "memory.available<10%"
-		// Set large system and kube reserved values to trigger allocatable thresholds far before hard eviction thresholds.
-		initialConfig.SystemReserved = componentconfig.ConfigurationMap(map[string]string{"memory": "1Gi"})
-		initialConfig.KubeReserved = componentconfig.ConfigurationMap(map[string]string{"memory": "1Gi"})
-		initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
-		initialConfig.ExperimentalNodeAllocatableIgnoreEvictionThreshold = false
-		initialConfig.CgroupsPerQOS = true
-	}
-	runEvictionTest(f, testCondition, podTestSpecs, evictionTestTimeout, hasMemoryPressure, kubeletConfigUpdate)
+
+	Context(fmt.Sprintf("when we run containers that should cause %s", testCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
+			// Set large system and kube reserved values to trigger allocatable thresholds far before hard eviction thresholds.
+			kubeReserved := getNodeCPUAndMemoryCapacity(f)[v1.ResourceMemory]
+			// The default hard eviction threshold is 250Mb, so Allocatable = Capacity - Reserved - 250Mb
+			// We want Allocatable = 50Mb, so set Reserved = Capacity - Allocatable - 250Mb = Capacity - 300Mb
+			kubeReserved.Sub(resource.MustParse("300Mi"))
+			initialConfig.KubeReserved = componentconfig.ConfigurationMap(map[string]string{"memory": kubeReserved.String()})
+			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
+			initialConfig.ExperimentalNodeAllocatableIgnoreEvictionThreshold = false
+			initialConfig.CgroupsPerQOS = true
+		})
+		// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
+		Context("With kubeconfig updated", func() {
+			runEvictionTest(f, testCondition, podTestSpecs, evictionTestTimeout, hasMemoryPressure)
+		})
+	})
 })
 
 // Returns TRUE if the node has Memory Pressure, FALSE otherwise

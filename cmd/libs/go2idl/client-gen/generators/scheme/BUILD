@@ -12,6 +12,7 @@ go_library(
     srcs = ["generator_for_scheme.go"],
     tags = ["automanaged"],
     deps = [
+        "//cmd/libs/go2idl/client-gen/path:go_default_library",
         "//cmd/libs/go2idl/client-gen/types:go_default_library",
         "//vendor/k8s.io/gengo/generator:go_default_library",
         "//vendor/k8s.io/gengo/namer:go_default_library",

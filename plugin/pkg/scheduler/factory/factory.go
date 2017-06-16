@@ -26,10 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -83,7 +84,7 @@ type ConfigFactory struct {
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
 
-	scheduledPodPopulator cache.Controller
+	scheduledPodsHasSynced cache.InformerSynced
 
 	schedulerCache schedulercache.Cache
 
@@ -106,6 +107,7 @@ func NewConfigFactory(
 	schedulerName string,
 	client clientset.Interface,
 	nodeInformer coreinformers.NodeInformer,
+	podInformer coreinformers.PodInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	replicationControllerInformer coreinformers.ReplicationControllerInformer,
@@ -133,23 +135,60 @@ func NewConfigFactory(
 		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
 	}
 
-	// On add/delete to the scheduled pods, remove from the assumed pods.
-	// We construct this here instead of in CreateFromKeys because
-	// ScheduledPodLister is something we provide to plug in functions that
-	// they may need to call.
-	var scheduledPodIndexer cache.Indexer
-	scheduledPodIndexer, c.scheduledPodPopulator = cache.NewIndexerInformer(
-		c.createAssignedNonTerminatedPodLW(),
-		&v1.Pod{},
-		0,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    c.addPodToCache,
-			UpdateFunc: c.updatePodInCache,
-			DeleteFunc: c.deletePodFromCache,
+	c.scheduledPodsHasSynced = podInformer.Informer().HasSynced
+	// scheduled pod cache
+	podInformer.Informer().AddEventHandler(
+		cache.FilteringResourceEventHandler{
+			FilterFunc: func(obj interface{}) bool {
+				switch t := obj.(type) {
+				case *v1.Pod:
+					return assignedNonTerminatedPod(t)
+				default:
+					runtime.HandleError(fmt.Errorf("unable to handle object in %T: %T", c, obj))
+					return false
+				}
+			},
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc:    c.addPodToCache,
+				UpdateFunc: c.updatePodInCache,
+				DeleteFunc: c.deletePodFromCache,
+			},
 		},
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
-	c.scheduledPodLister = corelisters.NewPodLister(scheduledPodIndexer)
+	// unscheduled pod queue
+	podInformer.Informer().AddEventHandler(
+		cache.FilteringResourceEventHandler{
+			FilterFunc: func(obj interface{}) bool {
+				switch t := obj.(type) {
+				case *v1.Pod:
+					return unassignedNonTerminatedPod(t)
+				default:
+					runtime.HandleError(fmt.Errorf("unable to handle object in %T: %T", c, obj))
+					return false
+				}
+			},
+			Handler: cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					if err := c.podQueue.Add(obj); err != nil {
+						runtime.HandleError(fmt.Errorf("unable to queue %T: %v", obj, err))
+					}
+				},
+				UpdateFunc: func(oldObj, newObj interface{}) {
+					if err := c.podQueue.Update(newObj); err != nil {
+						runtime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
+					}
+				},
+				DeleteFunc: func(obj interface{}) {
+					if err := c.podQueue.Delete(obj); err != nil {
+						runtime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
+					}
+				},
+			},
+		},
+	)
+	// ScheduledPodLister is something we provide to plug-in functions that
+	// they may need to call.
+	c.scheduledPodLister = assignedPodLister{podInformer.Lister()}
 
 	// Only nodes in the "Ready" condition with status == "True" are schedulable
 	nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -339,15 +378,30 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 			}
 		}
 	}
+	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
+	// Give it higher precedence than scheduler CLI configuration when it is provided.
+	if policy.HardPodAffinitySymmetricWeight != 0 {
+		f.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
+	}
 	return f.CreateFromKeys(predicateKeys, priorityKeys, extenders)
+}
+
+// getBinder returns an extender that supports bind or a default binder.
+func (f *ConfigFactory) getBinder(extenders []algorithm.SchedulerExtender) scheduler.Binder {
+	for i := range extenders {
+		if extenders[i].IsBinder() {
+			return extenders[i]
+		}
+	}
+	return &binder{f.client}
 }
 
 // Creates a scheduler from a set of registered fit predicate keys and priority keys.
 func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*scheduler.Config, error) {
 	glog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
 
-	if f.GetHardPodAffinitySymmetricWeight() < 0 || f.GetHardPodAffinitySymmetricWeight() > 100 {
-		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 0-100", f.GetHardPodAffinitySymmetricWeight())
+	if f.GetHardPodAffinitySymmetricWeight() < 1 || f.GetHardPodAffinitySymmetricWeight() > 100 {
+		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100", f.GetHardPodAffinitySymmetricWeight())
 	}
 
 	predicateFuncs, err := f.GetPredicates(predicateKeys)
@@ -370,7 +424,6 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		return nil, err
 	}
 
-	f.Run()
 	// TODO(resouer) use equivalence cache instead of nil here when #36238 get merged
 	algo := core.NewGenericScheduler(f.schedulerCache, nil, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders)
 	podBackoff := util.CreateDefaultPodBackoff()
@@ -379,8 +432,11 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		// The scheduler only needs to consider schedulable nodes.
 		NodeLister:          &nodePredicateLister{f.nodeLister},
 		Algorithm:           algo,
-		Binder:              &binder{f.client},
+		Binder:              f.getBinder(extenders),
 		PodConditionUpdater: &podConditionUpdater{f.client},
+		WaitForCacheSync: func() bool {
+			return cache.WaitForCacheSync(f.StopEverything, f.scheduledPodsHasSynced)
+		},
 		NextPod: func() *v1.Pod {
 			return f.getNextPod()
 		},
@@ -448,14 +504,6 @@ func (f *ConfigFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 	}, nil
 }
 
-func (f *ConfigFactory) Run() {
-	// Watch and queue pods that need scheduling.
-	cache.NewReflector(f.createUnassignedNonTerminatedPodLW(), &v1.Pod{}, f.podQueue, 0).RunUntil(f.StopEverything)
-
-	// Begin populating scheduled pods.
-	go f.scheduledPodPopulator.Run(f.StopEverything)
-}
-
 func (f *ConfigFactory) getNextPod() *v1.Pod {
 	for {
 		pod := cache.Pop(f.podQueue).(*v1.Pod)
@@ -498,19 +546,106 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 	}
 }
 
-// Returns a cache.ListWatch that finds all pods that need to be
-// scheduled.
-func (factory *ConfigFactory) createUnassignedNonTerminatedPodLW() *cache.ListWatch {
-	selector := fields.ParseSelectorOrDie("spec.nodeName==" + "" + ",status.phase!=" + string(v1.PodSucceeded) + ",status.phase!=" + string(v1.PodFailed))
-	return cache.NewListWatchFromClient(factory.client.Core().RESTClient(), "pods", metav1.NamespaceAll, selector)
+// unassignedNonTerminatedPod selects pods that are unassigned and non-terminal.
+func unassignedNonTerminatedPod(pod *v1.Pod) bool {
+	if len(pod.Spec.NodeName) != 0 {
+		return false
+	}
+	if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+		return false
+	}
+	return true
 }
 
-// Returns a cache.ListWatch that finds all pods that are
-// already scheduled.
-// TODO: return a ListerWatcher interface instead?
-func (factory *ConfigFactory) createAssignedNonTerminatedPodLW() *cache.ListWatch {
-	selector := fields.ParseSelectorOrDie("spec.nodeName!=" + "" + ",status.phase!=" + string(v1.PodSucceeded) + ",status.phase!=" + string(v1.PodFailed))
-	return cache.NewListWatchFromClient(factory.client.Core().RESTClient(), "pods", metav1.NamespaceAll, selector)
+// assignedNonTerminatedPod selects pods that are assigned and non-terminal (scheduled and running).
+func assignedNonTerminatedPod(pod *v1.Pod) bool {
+	if len(pod.Spec.NodeName) == 0 {
+		return false
+	}
+	if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+		return false
+	}
+	return true
+}
+
+// assignedPodLister filters the pods returned from a PodLister to
+// only include those that have a node name set.
+type assignedPodLister struct {
+	corelisters.PodLister
+}
+
+// List lists all Pods in the indexer for a given namespace.
+func (l assignedPodLister) List(selector labels.Selector) ([]*v1.Pod, error) {
+	list, err := l.PodLister.List(selector)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]*v1.Pod, 0, len(list))
+	for _, pod := range list {
+		if len(pod.Spec.NodeName) > 0 {
+			filtered = append(filtered, pod)
+		}
+	}
+	return filtered, nil
+}
+
+// List lists all Pods in the indexer for a given namespace.
+func (l assignedPodLister) Pods(namespace string) corelisters.PodNamespaceLister {
+	return assignedPodNamespaceLister{l.PodLister.Pods(namespace)}
+}
+
+// assignedPodNamespaceLister filters the pods returned from a PodNamespaceLister to
+// only include those that have a node name set.
+type assignedPodNamespaceLister struct {
+	corelisters.PodNamespaceLister
+}
+
+// List lists all Pods in the indexer for a given namespace.
+func (l assignedPodNamespaceLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
+	list, err := l.PodNamespaceLister.List(selector)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]*v1.Pod, 0, len(list))
+	for _, pod := range list {
+		if len(pod.Spec.NodeName) > 0 {
+			filtered = append(filtered, pod)
+		}
+	}
+	return filtered, nil
+}
+
+// Get retrieves the Pod from the indexer for a given namespace and name.
+func (l assignedPodNamespaceLister) Get(name string) (*v1.Pod, error) {
+	pod, err := l.PodNamespaceLister.Get(name)
+	if err != nil {
+		return nil, err
+	}
+	if len(pod.Spec.NodeName) > 0 {
+		return pod, nil
+	}
+	return nil, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
+}
+
+type podInformer struct {
+	informer cache.SharedIndexInformer
+}
+
+func (i *podInformer) Informer() cache.SharedIndexInformer {
+	return i.informer
+}
+
+func (i *podInformer) Lister() corelisters.PodLister {
+	return corelisters.NewPodLister(i.informer.GetIndexer())
+}
+
+// NewPodInformer creates a shared index informer that returns only non-terminal pods.
+func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) coreinformers.PodInformer {
+	selector := fields.ParseSelectorOrDie("status.phase!=" + string(v1.PodSucceeded) + ",status.phase!=" + string(v1.PodFailed))
+	lw := cache.NewListWatchFromClient(client.Core().RESTClient(), "pods", metav1.NamespaceAll, selector)
+	return &podInformer{
+		informer: cache.NewSharedIndexInformer(lw, &v1.Pod{}, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
+	}
 }
 
 func (factory *ConfigFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue *cache.FIFO) func(pod *v1.Pod, err error) {
@@ -518,7 +653,11 @@ func (factory *ConfigFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, pod
 		if err == core.ErrNoNodesAvailable {
 			glog.V(4).Infof("Unable to schedule %v %v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
 		} else {
-			glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
+			if _, ok := err.(*core.FitError); ok {
+				glog.V(4).Infof("Unable to schedule %v %v: no fit: %v; waiting", pod.Namespace, pod.Name, err)
+			} else {
+				glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
+			}
 		}
 		backoff.Gc()
 		// Retry asynchronously.
@@ -584,10 +723,7 @@ type binder struct {
 // Bind just does a POST binding RPC.
 func (b *binder) Bind(binding *v1.Binding) error {
 	glog.V(3).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), binding.Namespace)
-	return b.Client.Core().RESTClient().Post().Namespace(genericapirequest.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
-	// TODO: use Pods interface for binding once clusters are upgraded
-	// return b.Pods(binding.Namespace).Bind(binding)
+	return b.Client.CoreV1().Pods(binding.Namespace).Bind(binding)
 }
 
 type podConditionUpdater struct {

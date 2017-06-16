@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build appengine
+// +build appengine appenginevm
 
 package google
 
@@ -10,4 +10,5 @@ import "google.golang.org/appengine"
 
 func init() {
 	appengineTokenFunc = appengine.AccessToken
+	appengineAppIDFunc = appengine.AppID
 }

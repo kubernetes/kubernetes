@@ -58,13 +58,37 @@ func filterIrrelevantPods(pods []*v1.Pod) []*v1.Pod {
 var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart")
 	var ps *testutils.PodStore
+	var originalNodeNames []string
+	var originalPodNames []string
+	var numNodes int
+	var systemNamespace string
 
 	BeforeEach(func() {
 		// This test requires the ability to restart all nodes, so the provider
 		// check must be identical to that call.
 		framework.SkipUnlessProviderIs("gce", "gke")
-
 		ps = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
+		numNodes = framework.TestContext.CloudConfig.NumNodes
+		systemNamespace = metav1.NamespaceSystem
+
+		By("ensuring all nodes are ready")
+		var err error
+		originalNodeNames, err = framework.CheckNodesReady(f.ClientSet, framework.NodeReadyInitialTimeout, numNodes)
+		Expect(err).NotTo(HaveOccurred())
+		framework.Logf("Got the following nodes before restart: %v", originalNodeNames)
+
+		By("ensuring all pods are running and ready")
+		allPods := ps.List()
+		pods := filterIrrelevantPods(allPods)
+
+		originalPodNames = make([]string, len(pods))
+		for i, p := range pods {
+			originalPodNames[i] = p.ObjectMeta.Name
+		}
+		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, originalPodNames, framework.PodReadyBeforeTimeout) {
+			printStatusAndLogsForNotReadyPods(f.ClientSet, systemNamespace, originalPodNames, pods)
+			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
+		}
 	})
 
 	AfterEach(func() {
@@ -74,41 +98,21 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 	})
 
 	It("should restart all nodes and ensure all nodes and pods recover", func() {
-		nn := framework.TestContext.CloudConfig.NumNodes
-
-		By("ensuring all nodes are ready")
-		nodeNamesBefore, err := framework.CheckNodesReady(f.ClientSet, framework.NodeReadyInitialTimeout, nn)
-		Expect(err).NotTo(HaveOccurred())
-		framework.Logf("Got the following nodes before restart: %v", nodeNamesBefore)
-
-		By("ensuring all pods are running and ready")
-		allPods := ps.List()
-		pods := filterIrrelevantPods(allPods)
-
-		podNamesBefore := make([]string, len(pods))
-		for i, p := range pods {
-			podNamesBefore[i] = p.ObjectMeta.Name
-		}
-		ns := metav1.NamespaceSystem
-		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, ns, podNamesBefore, framework.PodReadyBeforeTimeout) {
-			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
-		}
-
 		By("restarting all of the nodes")
-		err = restartNodes(f, nodeNamesBefore)
+		err := restartNodes(f, originalNodeNames)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("ensuring all nodes are ready after the restart")
-		nodeNamesAfter, err := framework.CheckNodesReady(f.ClientSet, framework.RestartNodeReadyAgainTimeout, nn)
+		nodeNamesAfter, err := framework.CheckNodesReady(f.ClientSet, framework.RestartNodeReadyAgainTimeout, numNodes)
 		Expect(err).NotTo(HaveOccurred())
 		framework.Logf("Got the following nodes after restart: %v", nodeNamesAfter)
 
 		// Make sure that we have the same number of nodes. We're not checking
 		// that the names match because that's implementation specific.
 		By("ensuring the same number of nodes exist after the restart")
-		if len(nodeNamesBefore) != len(nodeNamesAfter) {
+		if len(originalNodeNames) != len(nodeNamesAfter) {
 			framework.Failf("Had %d nodes before nodes were restarted, but now only have %d",
-				len(nodeNamesBefore), len(nodeNamesAfter))
+				len(originalNodeNames), len(nodeNamesAfter))
 		}
 
 		// Make sure that we have the same number of pods. We're not checking
@@ -116,10 +120,12 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		// across node restarts.
 		By("ensuring the same number of pods are running and ready after restart")
 		podCheckStart := time.Now()
-		podNamesAfter, err := waitForNPods(ps, len(podNamesBefore), framework.RestartPodReadyAgainTimeout)
+		podNamesAfter, err := waitForNPods(ps, len(originalPodNames), framework.RestartPodReadyAgainTimeout)
 		Expect(err).NotTo(HaveOccurred())
 		remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
-		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, ns, podNamesAfter, remaining) {
+		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, podNamesAfter, remaining) {
+			pods := ps.List()
+			printStatusAndLogsForNotReadyPods(f.ClientSet, systemNamespace, podNamesAfter, pods)
 			framework.Failf("At least one pod wasn't running and ready after the restart.")
 		}
 	})
@@ -133,7 +139,7 @@ func waitForNPods(ps *testutils.PodStore, expect int, timeout time.Duration) ([]
 	var errLast error
 	found := wait.Poll(framework.Poll, timeout, func() (bool, error) {
 		allPods := ps.List()
-		pods := filterIrrelevantPods(allPods)
+		pods = filterIrrelevantPods(allPods)
 		if len(pods) != expect {
 			errLast = fmt.Errorf("expected to find %d pods but found only %d", expect, len(pods))
 			framework.Logf("Error getting pods: %v", errLast)

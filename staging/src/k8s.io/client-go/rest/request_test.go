@@ -40,19 +40,18 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
 	restclientwatch "k8s.io/client-go/rest/watch"
-	"k8s.io/client-go/util/clock"
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
-
-	_ "k8s.io/client-go/pkg/api/install"
 )
 
 func TestNewRequestSetsAccept(t *testing.T) {
@@ -84,7 +83,7 @@ func TestRequestSetsHeaders(t *testing.T) {
 	})
 	config := defaultContentConfig()
 	config.ContentType = "application/other"
-	serializers := defaultSerializers()
+	serializers := defaultSerializers(t)
 	r := NewRequest(server, "get", &url.URL{Path: "/path"}, "", config, serializers, nil, nil)
 
 	// Check if all "issue" methods are setting headers.
@@ -94,9 +93,10 @@ func TestRequestSetsHeaders(t *testing.T) {
 }
 
 func TestRequestWithErrorWontChange(t *testing.T) {
+	gvCopy := v1.SchemeGroupVersion
 	original := Request{
 		err:     errors.New("test"),
-		content: ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion},
+		content: ContentConfig{GroupVersion: &gvCopy},
 	}
 	r := original
 	changed := r.Param("foo", "bar").
@@ -231,7 +231,7 @@ func TestRequestVersionedParams(t *testing.T) {
 	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
-	r.VersionedParams(&api.PodLogOptions{Follow: true, Container: "bar"}, api.ParameterCodec)
+	r.VersionedParams(&v1.PodLogOptions{Follow: true, Container: "bar"}, scheme.ParameterCodec)
 
 	if !reflect.DeepEqual(r.params, url.Values{
 		"foo":       []string{"a"},
@@ -244,7 +244,7 @@ func TestRequestVersionedParams(t *testing.T) {
 
 func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 	r := &Request{content: ContentConfig{GroupVersion: &v1.SchemeGroupVersion}}
-	r.VersionedParams(&metav1.ListOptions{ResourceVersion: "1"}, api.ParameterCodec)
+	r.VersionedParams(&metav1.ListOptions{ResourceVersion: "1"}, scheme.ParameterCodec)
 	if !reflect.DeepEqual(r.params, url.Values{
 		"resourceVersion": []string{"1"},
 	}) {
@@ -252,7 +252,7 @@ func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 	}
 
 	var timeout int64 = 10
-	r.VersionedParams(&metav1.ListOptions{ResourceVersion: "2", TimeoutSeconds: &timeout}, api.ParameterCodec)
+	r.VersionedParams(&metav1.ListOptions{ResourceVersion: "2", TimeoutSeconds: &timeout}, scheme.ParameterCodec)
 	if !reflect.DeepEqual(r.params, url.Values{
 		"resourceVersion": []string{"1", "2"},
 		"timeoutSeconds":  []string{"10"},
@@ -279,22 +279,21 @@ func (obj NotAnAPIObject) GroupVersionKind() *schema.GroupVersionKind       { re
 func (obj NotAnAPIObject) SetGroupVersionKind(gvk *schema.GroupVersionKind) {}
 
 func defaultContentConfig() ContentConfig {
+	gvCopy := v1.SchemeGroupVersion
 	return ContentConfig{
-		GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
-		NegotiatedSerializer: api.Codecs,
+		ContentType:          "application/json",
+		GroupVersion:         &gvCopy,
+		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 	}
 }
 
-func defaultSerializers() Serializers {
-	return Serializers{
-		Encoder:             api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
-		Decoder:             api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
-		StreamingSerializer: api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
-		Framer:              runtime.DefaultFramer,
-		RenegotiatedDecoder: func(contentType string, params map[string]string) (runtime.Decoder, error) {
-			return api.Codecs.LegacyCodec(v1.SchemeGroupVersion), nil
-		},
+func defaultSerializers(t *testing.T) Serializers {
+	config := defaultContentConfig()
+	serializers, err := createSerializers(config)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
+	return *serializers
 }
 
 func TestRequestBody(t *testing.T) {
@@ -325,8 +324,18 @@ func TestRequestBody(t *testing.T) {
 
 func TestResultIntoWithErrReturnsErr(t *testing.T) {
 	res := Result{err: errors.New("test")}
-	if err := res.Into(&api.Pod{}); err != res.err {
+	if err := res.Into(&v1.Pod{}); err != res.err {
 		t.Errorf("should have returned exact error from result")
+	}
+}
+
+func TestResultIntoWithNoBodyReturnsErr(t *testing.T) {
+	res := Result{
+		body:    []byte{},
+		decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+	}
+	if err := res.Into(&v1.Pod{}); err == nil || !strings.Contains(err.Error(), "0-length") {
+		t.Errorf("should have complained about 0 length body")
 	}
 }
 
@@ -394,7 +403,7 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
-		r := NewRequest(nil, "", uri, "", defaultContentConfig(), defaultSerializers(), nil, nil)
+		r := NewRequest(nil, "", uri, "", defaultContentConfig(), defaultSerializers(t), nil, nil)
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
@@ -475,7 +484,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 				Header:     http.Header{"Content-Type": []string{"application/protobuf"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
-			Decoder: api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+			Decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 
 			Called:            true,
 			ExpectContentType: "application/protobuf",
@@ -491,7 +500,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 				StatusCode: 500,
 				Header:     http.Header{"Content-Type": []string{"application/,others"}},
 			},
-			Decoder: api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+			Decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 
 			Error: true,
 			ErrFn: func(err error) bool {
@@ -505,7 +514,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 				Header:     http.Header{"Content-Type": []string{"text/any"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
-			Decoder: api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+			Decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 		},
 		{
 			// no negotiation when no response content type specified
@@ -514,7 +523,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 				StatusCode: 200,
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
-			Decoder: api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+			Decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 		},
 		{
 			// unrecognized content type is not handled
@@ -524,7 +533,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 				Header:     http.Header{"Content-Type": []string{"application/unrecognized"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
-			Decoder: api.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+			Decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 
 			NegotiateErr:      fmt.Errorf("aaaa"),
 			Called:            true,
@@ -537,7 +546,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		},
 	}
 	for i, test := range testCases {
-		serializers := defaultSerializers()
+		serializers := defaultSerializers(t)
 		negotiator := &renegotiator{
 			decoder: test.Decoder,
 			err:     test.NegotiateErr,
@@ -675,7 +684,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 	for i, testCase := range testCases {
 		r := &Request{
 			content:      defaultContentConfig(),
-			serializers:  defaultSerializers(),
+			serializers:  defaultSerializers(t),
 			resourceName: testCase.Name,
 			resource:     testCase.Resource,
 		}
@@ -711,7 +720,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 		}
 
 		// verify result.Into properly handles the error
-		if err := result.Into(&api.Pod{}); !reflect.DeepEqual(expect, err) {
+		if err := result.Into(&v1.Pod{}); !reflect.DeepEqual(expect, err) {
 			t.Errorf("%d: unexpected error on Into(): %s", i, diff.ObjectReflectDiff(expect, err))
 		}
 
@@ -749,7 +758,7 @@ func TestRequestWatch(t *testing.T) {
 		{
 			Request: &Request{
 				content:     defaultContentConfig(),
-				serializers: defaultSerializers(),
+				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusForbidden,
@@ -766,7 +775,7 @@ func TestRequestWatch(t *testing.T) {
 		{
 			Request: &Request{
 				content:     defaultContentConfig(),
-				serializers: defaultSerializers(),
+				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusUnauthorized,
@@ -783,11 +792,11 @@ func TestRequestWatch(t *testing.T) {
 		{
 			Request: &Request{
 				content:     defaultContentConfig(),
-				serializers: defaultSerializers(),
+				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusUnauthorized,
-						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
+						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
 							Status: metav1.StatusFailure,
 							Reason: metav1.StatusReasonUnauthorized,
 						})))),
@@ -802,7 +811,7 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
-				serializers: defaultSerializers(),
+				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, io.EOF
 				}),
@@ -812,7 +821,7 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
-				serializers: defaultSerializers(),
+				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, &url.Error{Err: io.EOF}
 				}),
@@ -822,7 +831,7 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
-				serializers: defaultSerializers(),
+				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, errors.New("http: can't write HTTP request on broken connection")
 				}),
@@ -832,7 +841,7 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
-				serializers: defaultSerializers(),
+				serializers: defaultSerializers(t),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return nil, errors.New("foo: connection reset by peer")
 				}),
@@ -894,14 +903,14 @@ func TestRequestStream(t *testing.T) {
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: http.StatusUnauthorized,
-						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
+						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
 							Status: metav1.StatusFailure,
 							Reason: metav1.StatusReasonUnauthorized,
 						})))),
 					}, nil
 				}),
 				content:     defaultContentConfig(),
-				serializers: defaultSerializers(),
+				serializers: defaultSerializers(t),
 				baseURL:     &url.URL{},
 			},
 			Err: true,
@@ -915,7 +924,7 @@ func TestRequestStream(t *testing.T) {
 					}, nil
 				}),
 				content:     defaultContentConfig(),
-				serializers: defaultSerializers(),
+				serializers: defaultSerializers(t),
 				baseURL:     &url.URL{},
 			},
 			Err: true,
@@ -1018,12 +1027,12 @@ func TestRequestDo(t *testing.T) {
 
 func TestDoRequestNewWay(t *testing.T) {
 	reqBody := "request body"
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
+	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -1247,14 +1256,14 @@ func BenchmarkCheckRetryClosesBody(b *testing.B) {
 }
 
 func TestDoRequestNewWayReader(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), reqObj)
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	reqObj := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	reqBodyExpected, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), reqObj)
+	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
+	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -1282,19 +1291,19 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := defaultResourcePathWithPrefix("foo", "bar", "", "baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?" + metav1.LabelSelectorQueryParam(v1.SchemeGroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
 func TestDoRequestNewWayObj(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), reqObj)
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	reqObj := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	reqBodyExpected, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), reqObj)
+	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
+	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -1322,13 +1331,13 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := defaultResourcePathWithPrefix("", "foo", "", "bar/baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?" + metav1.LabelSelectorQueryParam(v1.SchemeGroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
 func TestDoRequestNewWayFile(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), reqObj)
+	reqObj := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	reqBodyExpected, err := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1345,12 +1354,12 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
+	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -1384,18 +1393,18 @@ func TestDoRequestNewWayFile(t *testing.T) {
 }
 
 func TestWasCreated(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), reqObj)
+	reqObj := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	reqBodyExpected, err := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
+	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
 		TargetPort: intstr.FromInt(12345),
 	}}}}
-	expectedBody, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
+	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   201,
 		ResponseBody: string(expectedBody),
@@ -1521,8 +1530,8 @@ func TestUnacceptableParamNames(t *testing.T) {
 func TestBody(t *testing.T) {
 	const data = "test payload"
 
-	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	bodyExpected, _ := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion), obj)
+	obj := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	bodyExpected, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), obj)
 
 	f, err := ioutil.TempFile("", "test_body")
 	if err != nil {
@@ -1534,7 +1543,7 @@ func TestBody(t *testing.T) {
 	f.Close()
 	defer os.Remove(f.Name())
 
-	var nilObject *api.DeleteOptions
+	var nilObject *v1.DeleteOptions
 	typedObject := interface{}(nilObject)
 	c := testRESTClient(t, nil)
 	tests := []struct {
@@ -1585,9 +1594,9 @@ func TestWatch(t *testing.T) {
 		t   watch.EventType
 		obj runtime.Object
 	}{
-		{watch.Added, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "first"}}},
-		{watch.Modified, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "second"}}},
-		{watch.Deleted, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "last"}}},
+		{watch.Added, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "first"}}},
+		{watch.Modified, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "second"}}},
+		{watch.Deleted, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "last"}}},
 	}
 
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1600,7 +1609,7 @@ func TestWatch(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		flusher.Flush()
 
-		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, api.Codecs.LegacyCodec(v1.SchemeGroupVersion)), api.Codecs.LegacyCodec(v1.SchemeGroupVersion))
+		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)), scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion))
 		for _, item := range table {
 			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
 				panic(err)

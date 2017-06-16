@@ -16,12 +16,10 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//cmd/libs/go2idl/client-gen/test_apis/testgroup/install:go_default_library",
+        "//cmd/libs/go2idl/client-gen/test_apis/testgroup:go_default_library",
         "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset:go_default_library",
         "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion:go_default_library",
         "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion/fake:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

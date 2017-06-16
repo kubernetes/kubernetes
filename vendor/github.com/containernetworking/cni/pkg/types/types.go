@@ -16,6 +16,7 @@ package types
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -57,44 +58,50 @@ func (n *IPNet) UnmarshalJSON(data []byte) error {
 
 // NetConf describes a network.
 type NetConf struct {
-	Name string `json:"name,omitempty"`
-	Type string `json:"type,omitempty"`
-	IPAM struct {
+	CNIVersion string `json:"cniVersion,omitempty"`
+
+	Name         string          `json:"name,omitempty"`
+	Type         string          `json:"type,omitempty"`
+	Capabilities map[string]bool `json:"capabilities,omitempty"`
+	IPAM         struct {
 		Type string `json:"type,omitempty"`
 	} `json:"ipam,omitempty"`
 	DNS DNS `json:"dns"`
 }
 
-// Result is what gets returned from the plugin (via stdout) to the caller
-type Result struct {
-	IP4 *IPConfig `json:"ip4,omitempty"`
-	IP6 *IPConfig `json:"ip6,omitempty"`
-	DNS DNS       `json:"dns,omitempty"`
+// NetConfList describes an ordered list of networks.
+type NetConfList struct {
+	CNIVersion string `json:"cniVersion,omitempty"`
+
+	Name    string     `json:"name,omitempty"`
+	Plugins []*NetConf `json:"plugins,omitempty"`
 }
 
-func (r *Result) Print() error {
-	return prettyPrint(r)
+type ResultFactoryFunc func([]byte) (Result, error)
+
+// Result is an interface that provides the result of plugin execution
+type Result interface {
+	// The highest CNI specification result verison the result supports
+	// without having to convert
+	Version() string
+
+	// Returns the result converted into the requested CNI specification
+	// result version, or an error if conversion failed
+	GetAsVersion(version string) (Result, error)
+
+	// Prints the result in JSON format to stdout
+	Print() error
+
+	// Returns a JSON string representation of the result
+	String() string
 }
 
-// String returns a formatted string in the form of "[IP4: $1,][ IP6: $2,] DNS: $3" where
-// $1 represents the receiver's IPv4, $2 represents the receiver's IPv6 and $3 the
-// receiver's DNS. If $1 or $2 are nil, they won't be present in the returned string.
-func (r *Result) String() string {
-	var str string
-	if r.IP4 != nil {
-		str = fmt.Sprintf("IP4:%+v, ", *r.IP4)
+func PrintResult(result Result, version string) error {
+	newResult, err := result.GetAsVersion(version)
+	if err != nil {
+		return err
 	}
-	if r.IP6 != nil {
-		str += fmt.Sprintf("IP6:%+v, ", *r.IP6)
-	}
-	return fmt.Sprintf("%sDNS:%+v", str, r.DNS)
-}
-
-// IPConfig contains values necessary to configure an interface
-type IPConfig struct {
-	IP      net.IPNet
-	Gateway net.IP
-	Routes  []Route
+	return newResult.Print()
 }
 
 // DNS contains values interesting for DNS resolvers
@@ -109,6 +116,18 @@ type Route struct {
 	Dst net.IPNet
 	GW  net.IP
 }
+
+func (r *Route) String() string {
+	return fmt.Sprintf("%+v", *r)
+}
+
+// Well known error codes
+// see https://github.com/containernetworking/cni/blob/master/SPEC.md#well-known-error-codes
+const (
+	ErrUnknown                uint = iota // 0
+	ErrIncompatibleCNIVersion             // 1
+	ErrUnsupportedField                   // 2
+)
 
 type Error struct {
 	Code    uint   `json:"code"`
@@ -128,37 +147,9 @@ func (e *Error) Print() error {
 // for our custom IPNet type
 
 // JSON (un)marshallable types
-type ipConfig struct {
-	IP      IPNet   `json:"ip"`
-	Gateway net.IP  `json:"gateway,omitempty"`
-	Routes  []Route `json:"routes,omitempty"`
-}
-
 type route struct {
 	Dst IPNet  `json:"dst"`
 	GW  net.IP `json:"gw,omitempty"`
-}
-
-func (c *IPConfig) MarshalJSON() ([]byte, error) {
-	ipc := ipConfig{
-		IP:      IPNet(c.IP),
-		Gateway: c.Gateway,
-		Routes:  c.Routes,
-	}
-
-	return json.Marshal(ipc)
-}
-
-func (c *IPConfig) UnmarshalJSON(data []byte) error {
-	ipc := ipConfig{}
-	if err := json.Unmarshal(data, &ipc); err != nil {
-		return err
-	}
-
-	c.IP = net.IPNet(ipc.IP)
-	c.Gateway = ipc.Gateway
-	c.Routes = ipc.Routes
-	return nil
 }
 
 func (r *Route) UnmarshalJSON(data []byte) error {
@@ -189,3 +180,6 @@ func prettyPrint(obj interface{}) error {
 	_, err = os.Stdout.Write(data)
 	return err
 }
+
+// NotImplementedError is used to indicate that a method is not implemented for the given platform
+var NotImplementedError = errors.New("Not Implemented")

@@ -316,3 +316,69 @@ func swapNodeControllerTaint(kubeClient clientset.Interface, taintToAdd, taintTo
 	glog.V(4).Infof("Made sure that Node %v has no %v Taint", node.Name, taintToRemove)
 	return true
 }
+
+func createAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
+	return func(originalObj interface{}) {
+		obj, err := api.Scheme.DeepCopy(originalObj)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+		node := obj.(*v1.Node)
+
+		if err := f(node); err != nil {
+			utilruntime.HandleError(fmt.Errorf("Error while processing Node Delete: %v", err))
+		}
+	}
+}
+
+func createUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldObj, newObj interface{}) {
+	return func(origOldObj, origNewObj interface{}) {
+		oldObj, err := api.Scheme.DeepCopy(origOldObj)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+		newObj, err := api.Scheme.DeepCopy(origNewObj)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+		node := newObj.(*v1.Node)
+		prevNode := oldObj.(*v1.Node)
+
+		if err := f(prevNode, node); err != nil {
+			utilruntime.HandleError(fmt.Errorf("Error while processing Node Add/Delete: %v", err))
+		}
+	}
+}
+
+func createDeleteNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
+	return func(originalObj interface{}) {
+		obj, err := api.Scheme.DeepCopy(originalObj)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+
+		node, isNode := obj.(*v1.Node)
+		// We can get DeletedFinalStateUnknown instead of *v1.Node here and
+		// we need to handle that correctly. #34692
+		if !isNode {
+			deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
+			if !ok {
+				glog.Errorf("Received unexpected object: %v", obj)
+				return
+			}
+			node, ok = deletedState.Obj.(*v1.Node)
+			if !ok {
+				glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+				return
+			}
+		}
+
+		if err := f(node); err != nil {
+			utilruntime.HandleError(fmt.Errorf("Error while processing Node Add/Delete: %v", err))
+		}
+	}
+}

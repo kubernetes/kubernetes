@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,6 +67,42 @@ func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, select
 func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	switch spec.PodManagementPolicy {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("podManagementPolicy"), ""))
+	case apps.OrderedReadyPodManagement, apps.ParallelPodManagement:
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("podManagementPolicy"), spec.PodManagementPolicy, fmt.Sprintf("must be '%s' or '%s'", apps.OrderedReadyPodManagement, apps.ParallelPodManagement)))
+	}
+
+	switch spec.UpdateStrategy.Type {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), ""))
+	case apps.OnDeleteStatefulSetStrategyType:
+		if spec.UpdateStrategy.RollingUpdate != nil {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath.Child("updateStrategy").Child("rollingUpdate"),
+					spec.UpdateStrategy.RollingUpdate,
+					fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
+		}
+	case apps.RollingUpdateStatefulSetStrategyType:
+		if spec.UpdateStrategy.RollingUpdate != nil {
+			allErrs = append(allErrs,
+				apivalidation.ValidateNonnegativeField(
+					int64(spec.UpdateStrategy.RollingUpdate.Partition),
+					fldPath.Child("updateStrategy").Child("rollingUpdate").Child("partition"))...)
+		}
+
+	default:
+		allErrs = append(allErrs,
+			field.Invalid(fldPath.Child("updateStrategy"), spec.UpdateStrategy,
+				fmt.Sprintf("must be '%s' or '%s'",
+					apps.RollingUpdateStatefulSetStrategyType,
+					apps.OnDeleteStatefulSetStrategyType)))
+	}
+
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
@@ -104,20 +141,21 @@ func ValidateStatefulSet(statefulSet *apps.StatefulSet) field.ErrorList {
 func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
 
-	// TODO: For now we're taking the safe route and disallowing all updates to
-	// spec except for Replicas, for scaling, and Template.Spec.containers.image
-	// for rolling-update. Enable others on a case by case basis.
 	restoreReplicas := statefulSet.Spec.Replicas
 	statefulSet.Spec.Replicas = oldStatefulSet.Spec.Replicas
 
-	restoreContainers := statefulSet.Spec.Template.Spec.Containers
-	statefulSet.Spec.Template.Spec.Containers = oldStatefulSet.Spec.Template.Spec.Containers
+	restoreTemplate := statefulSet.Spec.Template
+	statefulSet.Spec.Template = oldStatefulSet.Spec.Template
+
+	restoreStrategy := statefulSet.Spec.UpdateStrategy
+	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
 
 	if !reflect.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas' and 'containers' are forbidden."))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden."))
 	}
 	statefulSet.Spec.Replicas = restoreReplicas
-	statefulSet.Spec.Template.Spec.Containers = restoreContainers
+	statefulSet.Spec.Template = restoreTemplate
+	statefulSet.Spec.UpdateStrategy = restoreStrategy
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
 	containerErrs, _ := apivalidation.ValidateContainerUpdates(statefulSet.Spec.Template.Spec.Containers, oldStatefulSet.Spec.Template.Spec.Containers, field.NewPath("spec").Child("template").Child("containers"))
@@ -131,4 +169,35 @@ func ValidateStatefulSetStatusUpdate(statefulSet, oldStatefulSet *apps.StatefulS
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))...)
 	// TODO: Validate status.
 	return allErrs
+}
+
+// ValidateControllerRevisionName can be used to check whether the given ControllerRevision name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+var ValidateControllerRevisionName = apivalidation.NameIsDNSSubdomain
+
+// ValidateControllerRevision collects errors for the fields of state and returns those errors as an ErrorList. If the
+// returned list is empty, state is valid. Validation is performed to ensure that state is a valid ObjectMeta, its name
+// is valid, and that it doesn't exceed the MaxControllerRevisionSize.
+func ValidateControllerRevision(revision *apps.ControllerRevision) field.ErrorList {
+	errs := field.ErrorList{}
+
+	errs = append(errs, apivalidation.ValidateObjectMeta(&revision.ObjectMeta, true, ValidateControllerRevisionName, field.NewPath("metadata"))...)
+	if revision.Data == nil {
+		errs = append(errs, field.Required(field.NewPath("data"), "data is mandatory"))
+	}
+	errs = append(errs, apivalidation.ValidateNonnegativeField(revision.Revision, field.NewPath("revision"))...)
+	return errs
+}
+
+// ValidateControllerRevisionUpdate collects errors pertaining to the mutation of an ControllerRevision Object. If the
+// returned ErrorList is empty the update operation is valid. Any mutation to the ControllerRevision's Data or Revision
+// is considered to be invalid.
+func ValidateControllerRevisionUpdate(newHistory, oldHistory *apps.ControllerRevision) field.ErrorList {
+	errs := field.ErrorList{}
+
+	errs = append(errs, apivalidation.ValidateObjectMetaUpdate(&newHistory.ObjectMeta, &oldHistory.ObjectMeta, field.NewPath("metadata"))...)
+	errs = append(errs, ValidateControllerRevision(newHistory)...)
+	errs = append(errs, apivalidation.ValidateImmutableField(newHistory.Data, oldHistory.Data, field.NewPath("data"))...)
+	return errs
 }

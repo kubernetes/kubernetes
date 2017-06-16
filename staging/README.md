@@ -1,3 +1,16 @@
-This staging/src/k8s.io/client-go directory is the staging area of the client repo. It contains a versioned client, tools built around the client like the reflector, and all the client dependencies. The content will be periodically published to k8s.io/client-go repo.
-The staged content is copied from the main repo, i.e., k8s.io/kubernetes, with directory rearrangement and necessary rewritings. To sync the content with the latest code in your local k8s.io/kubernetes, you need to run `godep restore` in k8s root directory, then run staging/copy.sh.
-vendor/k8s.io/client-go is a symlink pointing to this staging area, so to use the packages in the staging area, you can import it as "vendor/client-go/<package-name>", as if the client were vendored. The client will be vendored from k8s.io/client-go for real after the test matrix is converted to vendor k8s components.
+This directory is the staging area for packages that have been split to their
+own repository. The content here will be periodically published to respective
+top-level k8s.io repositories.
+
+Most code in the `staging/` directory is authoritative, i.e. the only copy of
+the code. You can directly modify such code. However the packages in
+`staging/src/k8s.io/client-go/pkg` are copied from `pkg/`. If you modify the
+original code in `pkg/`, you need to run `hack/godep-restore.sh` from the k8s
+root directory, followed by `hack/update-staging-client-go.sh`. We are working
+towards making all code in `staging/` authoritative.
+
+The `vendor/k8s.io` directory contains symlinks pointing to this staging area,
+so to use a package in the staging area, you can import it as
+`k8s.io/<package-name>`, as if the package were vendored. Packages will be
+vendored from `k8s.io/<package-name>` for real after the test matrix is
+converted to vendor k8s components.

@@ -1,0 +1,6 @@
+apiVersion: mygroup.example.com/v1alpha1
+kind: Noxu
+metadata:
+  name: alfa-noxu
+spec:
+  key: value

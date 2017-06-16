@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 const ProviderName = "openstack"
@@ -52,11 +53,6 @@ const ProviderName = "openstack"
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
 var ErrNoAddressFound = errors.New("No address found for host")
-
-const (
-	MiB = 1024 * 1024
-	GB  = 1000 * 1000 * 1000
-)
 
 // encoding.TextUnmarshaler interface for time.Duration
 type MyDuration struct {
@@ -131,6 +127,8 @@ type Config struct {
 }
 
 func init() {
+	RegisterMetrics()
+
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		cfg, err := readConfig(config)
 		if err != nil {
@@ -264,6 +262,9 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 
 	return &os, nil
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (os *OpenStack) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 // mapNodeNameToServerName maps a k8s NodeName to an OpenStack Server Name
 // This is a simple string cast.
@@ -427,19 +428,13 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	glog.V(4).Info("openstack.LoadBalancer() called")
 
 	// TODO: Search for and support Rackspace loadbalancer API, and others.
-	network, err := openstack.NewNetworkV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
+	network, err := os.NewNetworkV2()
 	if err != nil {
-		glog.Warningf("Failed to find network endpoint: %v", err)
 		return nil, false
 	}
 
-	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
+	compute, err := os.NewComputeV2()
 	if err != nil {
-		glog.Warningf("Failed to find compute endpoint: %v", err)
 		return nil, false
 	}
 
@@ -503,11 +498,8 @@ func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	glog.V(4).Info("openstack.Routes() called")
 
-	network, err := openstack.NewNetworkV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
+	network, err := os.NewNetworkV2()
 	if err != nil {
-		glog.Warningf("Failed to find network endpoint: %v", err)
 		return nil, false
 	}
 
@@ -522,11 +514,8 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 		return nil, false
 	}
 
-	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
+	compute, err := os.NewComputeV2()
 	if err != nil {
-		glog.Warningf("Failed to find compute endpoint: %v", err)
 		return nil, false
 	}
 
@@ -594,29 +583,20 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 
 	switch bsVersion {
 	case "v1":
-		sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
-			Region: os.region,
-		})
-		if err != nil || sClient == nil {
-			glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
+		sClient, err := os.NewBlockStorageV1()
+		if err != nil {
 			return nil, err
 		}
 		return &VolumesV1{sClient, os.bsOpts}, nil
 	case "v2":
-		sClient, err := openstack.NewBlockStorageV2(os.provider, gophercloud.EndpointOpts{
-			Region: os.region,
-		})
-		if err != nil || sClient == nil {
-			glog.Errorf("Unable to initialize cinder v2 client for region: %s", os.region)
+		sClient, err := os.NewBlockStorageV2()
+		if err != nil {
 			return nil, err
 		}
 		return &VolumesV2{sClient, os.bsOpts}, nil
 	case "auto":
-		sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
-			Region: os.region,
-		})
-		if err != nil || sClient == nil {
-			glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
+		sClient, err := os.NewBlockStorageV1()
+		if err != nil {
 			return nil, err
 		}
 		availableApiVersions := []apiversions_v1.APIVersion{}

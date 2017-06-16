@@ -164,7 +164,7 @@ func (l *libcontainerAdapter) adaptName(cgroupName CgroupName, outputToCgroupFs 
 	return ConvertCgroupNameToSystemd(cgroupName, outputToCgroupFs)
 }
 
-// CgroupSubsystems holds information about the mounted cgroup subsytems
+// CgroupSubsystems holds information about the mounted cgroup subsystems
 type CgroupSubsystems struct {
 	// Cgroup subsystem mounts.
 	// e.g.: "/sys/fs/cgroup/cpu" -> ["cpu", "cpuacct"]
@@ -181,7 +181,7 @@ type CgroupSubsystems struct {
 // It uses the Libcontainer raw fs cgroup manager for cgroup management.
 type cgroupManagerImpl struct {
 	// subsystems holds information about all the
-	// mounted cgroup subsytems on the node
+	// mounted cgroup subsystems on the node
 	subsystems *CgroupSubsystems
 	// simplifies interaction with libcontainer and its cgroup managers
 	adapter *libcontainerAdapter
@@ -227,8 +227,20 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	// Get map of all cgroup paths on the system for the particular cgroup
 	cgroupPaths := m.buildCgroupPaths(name)
 
+	// the presence of alternative control groups not known to runc confuses
+	// the kubelet existence checks.
+	// ideally, we would have a mechaninsm in runc to support Exists() logic
+	// scoped to the set control groups it understands.  this is being discussed
+	// in https://github.com/opencontainers/runc/issues/1440
+	// once resolved, we can remove this code.
+	whitelistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "hugetlb", "systemd")
+
 	// If even one cgroup path doesn't exist, then the cgroup doesn't exist.
-	for _, path := range cgroupPaths {
+	for controller, path := range cgroupPaths {
+		// ignore mounts we dont care about
+		if !whitelistControllers.Has(controller) {
+			continue
+		}
 		if !libcontainercgroups.PathExists(path) {
 			return false
 		}
@@ -293,8 +305,8 @@ var supportedSubsystems = []subsystem{
 	&cgroupfs.CpuGroup{},
 }
 
-// setSupportedSubsytems sets cgroup resource limits only on the supported
-// subsytems. ie. cpu and memory. We don't use libcontainer's cgroup/fs/Set()
+// setSupportedSubsystems sets cgroup resource limits only on the supported
+// subsystems. ie. cpu and memory. We don't use libcontainer's cgroup/fs/Set()
 // method as it doesn't allow us to skip updates on the devices cgroup
 // Allowing or denying all devices by writing 'a' to devices.allow or devices.deny is
 // not possible once the device cgroups has children. Once the pod level cgroup are
@@ -302,10 +314,10 @@ var supportedSubsystems = []subsystem{
 // We would like to skip setting any values on the device cgroup in this case
 // but this is not possible with libcontainers Set() method
 // See https://github.com/opencontainers/runc/issues/932
-func setSupportedSubsytems(cgroupConfig *libcontainerconfigs.Cgroup) error {
+func setSupportedSubsystems(cgroupConfig *libcontainerconfigs.Cgroup) error {
 	for _, sys := range supportedSubsystems {
 		if _, ok := cgroupConfig.Paths[sys.Name()]; !ok {
-			return fmt.Errorf("Failed to find subsytem mount for subsytem: %v", sys.Name())
+			return fmt.Errorf("Failed to find subsystem mount for subsystem: %v", sys.Name())
 		}
 		if err := sys.Set(cgroupConfig.Paths[sys.Name()], cgroupConfig); err != nil {
 			return fmt.Errorf("Failed to set config for supported subsystems : %v", err)
@@ -368,7 +380,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 		Paths:     cgroupPaths,
 	}
 
-	if err := setSupportedSubsytems(libcontainerCgroupConfig); err != nil {
+	if err := setSupportedSubsystems(libcontainerCgroupConfig); err != nil {
 		return fmt.Errorf("failed to set supported cgroup subsystems for cgroup %v: %v", cgroupConfig.Name, err)
 	}
 	return nil
@@ -410,7 +422,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	// Apply(-1) is a hack to create the cgroup directories for each resource
 	// subsystem. The function [cgroups.Manager.apply()] applies cgroup
 	// configuration to the process with the specified pid.
-	// It creates cgroup files for each subsytems and writes the pid
+	// It creates cgroup files for each subsystems and writes the pid
 	// in the tasks file. We use the function to create all the required
 	// cgroup files but not attach any "real" pid to the cgroup.
 	if err := manager.Apply(-1); err != nil {
@@ -424,7 +436,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	return nil
 }
 
-// Scans through all subsytems to find pids associated with specified cgroup.
+// Scans through all subsystems to find pids associated with specified cgroup.
 func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 	// we need the driver specific name
 	cgroupFsName := m.Name(name)
@@ -488,11 +500,11 @@ func (m *cgroupManagerImpl) ReduceCPULimits(cgroupName CgroupName) error {
 	return m.Update(containerConfig)
 }
 
-func getStatsSupportedSubsytems(cgroupPaths map[string]string) (*libcontainercgroups.Stats, error) {
+func getStatsSupportedSubsystems(cgroupPaths map[string]string) (*libcontainercgroups.Stats, error) {
 	stats := libcontainercgroups.NewStats()
 	for _, sys := range supportedSubsystems {
 		if _, ok := cgroupPaths[sys.Name()]; !ok {
-			return nil, fmt.Errorf("Failed to find subsytem mount for subsytem: %v", sys.Name())
+			return nil, fmt.Errorf("Failed to find subsystem mount for subsystem: %v", sys.Name())
 		}
 		if err := sys.GetStats(cgroupPaths[sys.Name()], stats); err != nil {
 			return nil, fmt.Errorf("Failed to get stats for supported subsystems : %v", err)
@@ -512,7 +524,7 @@ func toResourceStats(stats *libcontainercgroups.Stats) *ResourceStats {
 // Get sets the ResourceParameters of the specified cgroup as read from the cgroup fs
 func (m *cgroupManagerImpl) GetResourceStats(name CgroupName) (*ResourceStats, error) {
 	cgroupPaths := m.buildCgroupPaths(name)
-	stats, err := getStatsSupportedSubsytems(cgroupPaths)
+	stats, err := getStatsSupportedSubsystems(cgroupPaths)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get stats supported cgroup subsystems for cgroup %v: %v", name, err)
 	}

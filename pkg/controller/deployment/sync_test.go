@@ -31,9 +31,9 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
-func maxSurge(val int) *intstr.IntOrString {
-	surge := intstr.FromInt(val)
-	return &surge
+func intOrStrP(val int) *intstr.IntOrString {
+	intOrStr := intstr.FromInt(val)
+	return &intOrStr
 }
 
 func TestScale(t *testing.T) {
@@ -218,8 +218,8 @@ func TestScale(t *testing.T) {
 		},
 		{
 			name:          "deployment with surge pods",
-			deployment:    newDeployment("foo", 20, nil, maxSurge(2), nil, nil),
-			oldDeployment: newDeployment("foo", 10, nil, maxSurge(2), nil, nil),
+			deployment:    newDeployment("foo", 20, nil, intOrStrP(2), nil, nil),
+			oldDeployment: newDeployment("foo", 10, nil, intOrStrP(2), nil, nil),
 
 			newRS:  rs("foo-v2", 6, nil, newTimestamp),
 			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 6, nil, oldTimestamp)},
@@ -229,8 +229,8 @@ func TestScale(t *testing.T) {
 		},
 		{
 			name:          "change both surge and size",
-			deployment:    newDeployment("foo", 50, nil, maxSurge(6), nil, nil),
-			oldDeployment: newDeployment("foo", 10, nil, maxSurge(3), nil, nil),
+			deployment:    newDeployment("foo", 50, nil, intOrStrP(6), nil, nil),
+			oldDeployment: newDeployment("foo", 10, nil, intOrStrP(3), nil, nil),
 
 			newRS:  rs("foo-v2", 5, nil, newTimestamp),
 			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 8, nil, oldTimestamp)},
@@ -248,6 +248,21 @@ func TestScale(t *testing.T) {
 
 			expectedNew: nil,
 			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 10, nil, newTimestamp), rs("foo-v1", 4, nil, oldTimestamp)},
+		},
+		{
+			name:          "saturated but broken new replica set does not affect old pods",
+			deployment:    newDeployment("foo", 2, nil, intOrStrP(1), intOrStrP(1), nil),
+			oldDeployment: newDeployment("foo", 2, nil, intOrStrP(1), intOrStrP(1), nil),
+
+			newRS: func() *extensions.ReplicaSet {
+				rs := rs("foo-v2", 2, nil, newTimestamp)
+				rs.Status.AvailableReplicas = 0
+				return rs
+			}(),
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 1, nil, oldTimestamp)},
+
+			expectedNew: rs("foo-v2", 2, nil, newTimestamp),
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v1", 1, nil, oldTimestamp)},
 		},
 	}
 

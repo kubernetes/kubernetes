@@ -48,17 +48,17 @@ func TestGoodLinks(t *testing.T) {
 		{"[README](https://lwn.net)",
 			"[README](https://lwn.net)"},
 		// _ to -
-		{"[README](https://github.com/kubernetes/kubernetes/tree/master/docs/devel/cli_roadmap.md)",
-			"[README](../../docs/devel/cli-roadmap.md)"},
+		{"[README](https://github.com/kubernetes/kubernetes/tree/master/cmd/mungedocs/testdata/test_dashes.md)",
+			"[README](../../cmd/mungedocs/testdata/test-dashes.md)"},
 		// - to _
-		{"[README](../../docs/devel/api-changes.md)",
-			"[README](../../docs/devel/api_changes.md)"},
+		{"[README](../../cmd/mungedocs/testdata/test-underscores.md)",
+			"[README](../../cmd/mungedocs/testdata/test_underscores.md)"},
 
 		// Does this even make sense?  i dunno
 		{"[README](/docs/README.md)",
 			"[README](https://github.com/docs/README.md)"},
-		{"[README](/kubernetes/kubernetes/tree/master/docs/README.md)",
-			"[README](../../docs/README.md)"},
+		{"[README](/kubernetes/kubernetes/tree/master/cmd/mungedocs/testdata/README.md)",
+			"[README](../../cmd/mungedocs/testdata/README.md)"},
 	}
 	for i, c := range cases {
 		in := getMungeLines(c.in)

@@ -96,21 +96,31 @@ func SetDefaults_Container(obj *Container) {
 		obj.TerminationMessagePolicy = TerminationMessageReadFile
 	}
 }
-func SetDefaults_ServiceSpec(obj *ServiceSpec) {
-	if obj.SessionAffinity == "" {
-		obj.SessionAffinity = ServiceAffinityNone
+func SetDefaults_Service(obj *Service) {
+	if obj.Spec.SessionAffinity == "" {
+		obj.Spec.SessionAffinity = ServiceAffinityNone
 	}
-	if obj.Type == "" {
-		obj.Type = ServiceTypeClusterIP
+	if obj.Spec.Type == "" {
+		obj.Spec.Type = ServiceTypeClusterIP
 	}
-	for i := range obj.Ports {
-		sp := &obj.Ports[i]
+	for i := range obj.Spec.Ports {
+		sp := &obj.Spec.Ports[i]
 		if sp.Protocol == "" {
 			sp.Protocol = ProtocolTCP
 		}
 		if sp.TargetPort == intstr.FromInt(0) || sp.TargetPort == intstr.FromString("") {
 			sp.TargetPort = intstr.FromInt(int(sp.Port))
 		}
+	}
+	// Defaults ExternalTrafficPolicy field for NodePort / LoadBalancer service
+	// to Global for consistency.
+	if _, ok := obj.Annotations[BetaAnnotationExternalTraffic]; ok {
+		// Don't default this field if beta annotation exists.
+		return
+	} else if (obj.Spec.Type == ServiceTypeNodePort ||
+		obj.Spec.Type == ServiceTypeLoadBalancer) &&
+		obj.Spec.ExternalTrafficPolicy == "" {
+		obj.Spec.ExternalTrafficPolicy = ServiceExternalTrafficPolicyTypeCluster
 	}
 }
 func SetDefaults_Pod(obj *Pod) {
@@ -229,7 +239,11 @@ func SetDefaults_ISCSIVolumeSource(obj *ISCSIVolumeSource) {
 func SetDefaults_AzureDiskVolumeSource(obj *AzureDiskVolumeSource) {
 	if obj.CachingMode == nil {
 		obj.CachingMode = new(AzureDataDiskCachingMode)
-		*obj.CachingMode = AzureDataDiskCachingNone
+		*obj.CachingMode = AzureDataDiskCachingReadWrite
+	}
+	if obj.Kind == nil {
+		obj.Kind = new(AzureDataDiskKind)
+		*obj.Kind = AzureSharedBlobDisk
 	}
 	if obj.FSType == nil {
 		obj.FSType = new(string)

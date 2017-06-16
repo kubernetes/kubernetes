@@ -103,15 +103,21 @@ func SetInitContainersStatusesAnnotations(pod *v1.Pod) error {
 		}
 		pod.Annotations[v1.PodInitContainerStatusesAnnotationKey] = string(value)
 		pod.Annotations[v1.PodInitContainerStatusesBetaAnnotationKey] = string(value)
+	} else {
+		delete(pod.Annotations, v1.PodInitContainerStatusesAnnotationKey)
+		delete(pod.Annotations, v1.PodInitContainerStatusesBetaAnnotationKey)
 	}
 	return nil
 }
+
+// Visitor is called with each object name, and returns true if visiting should continue
+type Visitor func(name string) (shouldContinue bool)
 
 // VisitPodSecretNames invokes the visitor function with the name of every secret
 // referenced by the pod spec. If visitor returns false, visiting is short-circuited.
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
-func VisitPodSecretNames(pod *v1.Pod, visitor func(string) bool) bool {
+func VisitPodSecretNames(pod *v1.Pod, visitor Visitor) bool {
 	for _, reference := range pod.Spec.ImagePullSecrets {
 		if !visitor(reference.Name) {
 			return false
@@ -168,12 +174,16 @@ func VisitPodSecretNames(pod *v1.Pod, visitor func(string) bool) bool {
 			if source.ISCSI.SecretRef != nil && !visitor(source.ISCSI.SecretRef.Name) {
 				return false
 			}
+		case source.StorageOS != nil:
+			if source.StorageOS.SecretRef != nil && !visitor(source.StorageOS.SecretRef.Name) {
+				return false
+			}
 		}
 	}
 	return true
 }
 
-func visitContainerSecretNames(container *v1.Container, visitor func(string) bool) bool {
+func visitContainerSecretNames(container *v1.Container, visitor Visitor) bool {
 	for _, env := range container.EnvFrom {
 		if env.SecretRef != nil {
 			if !visitor(env.SecretRef.Name) {
@@ -184,6 +194,60 @@ func visitContainerSecretNames(container *v1.Container, visitor func(string) boo
 	for _, envVar := range container.Env {
 		if envVar.ValueFrom != nil && envVar.ValueFrom.SecretKeyRef != nil {
 			if !visitor(envVar.ValueFrom.SecretKeyRef.Name) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// VisitPodConfigmapNames invokes the visitor function with the name of every configmap
+// referenced by the pod spec. If visitor returns false, visiting is short-circuited.
+// Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
+// Returns true if visiting completed, false if visiting was short-circuited.
+func VisitPodConfigmapNames(pod *v1.Pod, visitor Visitor) bool {
+	for i := range pod.Spec.InitContainers {
+		if !visitContainerConfigmapNames(&pod.Spec.InitContainers[i], visitor) {
+			return false
+		}
+	}
+	for i := range pod.Spec.Containers {
+		if !visitContainerConfigmapNames(&pod.Spec.Containers[i], visitor) {
+			return false
+		}
+	}
+	var source *v1.VolumeSource
+	for i := range pod.Spec.Volumes {
+		source = &pod.Spec.Volumes[i].VolumeSource
+		switch {
+		case source.Projected != nil:
+			for j := range source.Projected.Sources {
+				if source.Projected.Sources[j].ConfigMap != nil {
+					if !visitor(source.Projected.Sources[j].ConfigMap.Name) {
+						return false
+					}
+				}
+			}
+		case source.ConfigMap != nil:
+			if !visitor(source.ConfigMap.Name) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func visitContainerConfigmapNames(container *v1.Container, visitor Visitor) bool {
+	for _, env := range container.EnvFrom {
+		if env.ConfigMapRef != nil {
+			if !visitor(env.ConfigMapRef.Name) {
+				return false
+			}
+		}
+	}
+	for _, envVar := range container.Env {
+		if envVar.ValueFrom != nil && envVar.ValueFrom.ConfigMapKeyRef != nil {
+			if !visitor(envVar.ValueFrom.ConfigMapKeyRef.Name) {
 				return false
 			}
 		}

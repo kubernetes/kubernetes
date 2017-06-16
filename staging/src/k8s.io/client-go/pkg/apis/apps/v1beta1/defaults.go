@@ -27,6 +27,13 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_StatefulSet(obj *StatefulSet) {
+	if len(obj.Spec.PodManagementPolicy) == 0 {
+		obj.Spec.PodManagementPolicy = OrderedReadyPodManagement
+	}
+
+	if obj.Spec.UpdateStrategy.Type == "" {
+		obj.Spec.UpdateStrategy.Type = OnDeleteStatefulSetStrategyType
+	}
 	labels := obj.Spec.Template.Labels
 	if labels != nil {
 		if obj.Spec.Selector == nil {
@@ -42,6 +49,17 @@ func SetDefaults_StatefulSet(obj *StatefulSet) {
 		obj.Spec.Replicas = new(int32)
 		*obj.Spec.Replicas = 1
 	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = new(int32)
+		*obj.Spec.RevisionHistoryLimit = 10
+	}
+	if obj.Spec.UpdateStrategy.Type == RollingUpdateStatefulSetStrategyType &&
+		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
+		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
+		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
+		*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+	}
+
 }
 
 // SetDefaults_Deployment sets additional defaults compared to its counterpart

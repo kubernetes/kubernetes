@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -79,9 +79,9 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 
 		for _, testArg := range rTests {
 			itArg := testArg
-
-			It(fmt.Sprintf("resource tracking for %d pods per node", itArg.podsNr), func() {
-				testInfo := getTestNodeInfo(f, itArg.getTestName())
+			desc := fmt.Sprintf("resource tracking for %d pods per node", itArg.podsNr)
+			It(desc, func() {
+				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
 				runResourceUsageTest(f, rc, itArg)
 
@@ -109,9 +109,9 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 
 		for _, testArg := range rTests {
 			itArg := testArg
-
-			It(fmt.Sprintf("resource tracking for %d pods per node [Benchmark]", itArg.podsNr), func() {
-				testInfo := getTestNodeInfo(f, itArg.getTestName())
+			desc := fmt.Sprintf("resource tracking for %d pods per node [Benchmark]", itArg.podsNr)
+			It(desc, func() {
+				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
 				runResourceUsageTest(f, rc, itArg)
 
@@ -202,8 +202,8 @@ func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimi
 	cpuSummaryPerNode[nodeName] = cpuSummary
 
 	// Print resource usage
-	framework.PrintPerfData(framework.ResourceUsageToPerfDataWithLabels(usagePerNode, testInfo))
-	framework.PrintPerfData(framework.CPUUsageToPerfDataWithLabels(cpuSummaryPerNode, testInfo))
+	logPerfData(framework.ResourceUsageToPerfDataWithLabels(usagePerNode, testInfo), "memory")
+	logPerfData(framework.CPUUsageToPerfDataWithLabels(cpuSummaryPerNode, testInfo), "cpu")
 
 	// Verify resource usage
 	if isVerify {

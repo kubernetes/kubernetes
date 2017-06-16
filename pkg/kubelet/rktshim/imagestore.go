@@ -19,7 +19,7 @@ package rktshim
 import (
 	"errors"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // TODO(tmrts): Move these errors to the container API for code re-use.

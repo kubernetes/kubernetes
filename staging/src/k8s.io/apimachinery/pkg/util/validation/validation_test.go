@@ -19,6 +19,8 @@ package validation
 import (
 	"strings"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestIsDNS1123Label(t *testing.T) {
@@ -154,33 +156,49 @@ func TestIsValidPortNum(t *testing.T) {
 	}
 }
 
-func TestIsValidGroupId(t *testing.T) {
-	goodValues := []int64{0, 1, 1000, 65535, 2147483647}
+func createGroupIDs(ids ...int64) []types.UnixGroupID {
+	var output []types.UnixGroupID
+	for _, id := range ids {
+		output = append(output, types.UnixGroupID(id))
+	}
+	return output
+}
+
+func createUserIDs(ids ...int64) []types.UnixUserID {
+	var output []types.UnixUserID
+	for _, id := range ids {
+		output = append(output, types.UnixUserID(id))
+	}
+	return output
+}
+
+func TestIsValidGroupID(t *testing.T) {
+	goodValues := createGroupIDs(0, 1, 1000, 65535, 2147483647)
 	for _, val := range goodValues {
-		if msgs := IsValidGroupId(val); len(msgs) != 0 {
+		if msgs := IsValidGroupID(val); len(msgs) != 0 {
 			t.Errorf("expected true for '%d': %v", val, msgs)
 		}
 	}
 
-	badValues := []int64{-1, -1003, 2147483648, 4147483647}
+	badValues := createGroupIDs(-1, -1003, 2147483648, 4147483647)
 	for _, val := range badValues {
-		if msgs := IsValidGroupId(val); len(msgs) == 0 {
+		if msgs := IsValidGroupID(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%d'", val)
 		}
 	}
 }
 
-func TestIsValidUserId(t *testing.T) {
-	goodValues := []int64{0, 1, 1000, 65535, 2147483647}
+func TestIsValidUserID(t *testing.T) {
+	goodValues := createUserIDs(0, 1, 1000, 65535, 2147483647)
 	for _, val := range goodValues {
-		if msgs := IsValidUserId(val); len(msgs) != 0 {
+		if msgs := IsValidUserID(val); len(msgs) != 0 {
 			t.Errorf("expected true for '%d': %v", val, msgs)
 		}
 	}
 
-	badValues := []int64{-1, -1003, 2147483648, 4147483647}
+	badValues := createUserIDs(-1, -1003, 2147483648, 4147483647)
 	for _, val := range badValues {
-		if msgs := IsValidUserId(val); len(msgs) == 0 {
+		if msgs := IsValidUserID(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%d'", val)
 		}
 	}

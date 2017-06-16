@@ -43,6 +43,7 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	storagebeta "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -356,6 +357,15 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 					"1.5Gi",
 					nil,
 				},
+				{
+					"Azure disk volume with empty sku and location",
+					[]string{"azure"},
+					"kubernetes.io/azure-disk",
+					map[string]string{},
+					"1Gi",
+					"1Gi",
+					nil,
+				},
 			}
 
 			var betaTest *storageClassTest
@@ -463,7 +473,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			// not being deleted.
 			// NOTE:  Polls until no PVs are detected, times out at 5 minutes.
 
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 
 			const raceAttempts int = 100
 			var residualPVs []*v1.PersistentVolume
@@ -561,7 +571,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by changing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
 			test := storageClassTest{
 				name:      "default",
@@ -592,7 +602,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by removing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
-			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere")
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
 			test := storageClassTest{
 				name:      "default",
@@ -753,6 +763,8 @@ func getDefaultPluginName() string {
 		return "kubernetes.io/cinder"
 	case framework.ProviderIs("vsphere"):
 		return "kubernetes.io/vsphere-volume"
+	case framework.ProviderIs("azure"):
+		return "kubernetes.io/azure-disk"
 	}
 	return ""
 }
@@ -818,7 +830,7 @@ func startExternalProvisioner(c clientset.Interface, ns string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nfs-provisioner",
-					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.3",
+					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.6",
 					SecurityContext: &v1.SecurityContext{
 						Capabilities: &v1.Capabilities{
 							Add: []v1.Capability{"DAC_READ_SEARCH"},
@@ -924,7 +936,7 @@ func getRandomCloudZone(c clientset.Interface) string {
 	// collect values of zone label from all nodes
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
-		if zone, found := node.Labels[metav1.LabelZoneFailureDomain]; found {
+		if zone, found := node.Labels[kubeletapis.LabelZoneFailureDomain]; found {
 			zones.Insert(zone)
 		}
 	}

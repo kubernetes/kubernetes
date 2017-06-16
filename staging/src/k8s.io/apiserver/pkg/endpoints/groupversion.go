@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/endpoints/handlers"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
@@ -86,7 +86,7 @@ type APIGroupVersion struct {
 
 	// ResourceLister is an interface that knows how to list resources
 	// for this API Group.
-	ResourceLister handlers.APIResourceLister
+	ResourceLister discovery.APIResourceLister
 }
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
@@ -100,7 +100,8 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	if lister == nil {
 		lister = staticLister{apiResources}
 	}
-	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, lister)
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, lister, g.Context)
+	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
 	return utilerrors.NewAggregate(registrationErrors)
 }
@@ -128,7 +129,8 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 	if lister == nil {
 		lister = staticLister{apiResources}
 	}
-	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, lister)
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, lister, g.Context)
+	versionDiscoveryHandler.AddToWebService(ws)
 	return utilerrors.NewAggregate(registrationErrors)
 }
 
@@ -152,4 +154,4 @@ func (s staticLister) ListAPIResources() []metav1.APIResource {
 	return s.list
 }
 
-var _ handlers.APIResourceLister = &staticLister{}
+var _ discovery.APIResourceLister = &staticLister{}

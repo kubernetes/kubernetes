@@ -39,6 +39,7 @@ from charms.reactive import is_state
 from charms.reactive import when, when_any, when_not
 from charms.reactive.helpers import data_changed
 from charms.kubernetes.common import get_version
+from charms.kubernetes.common import retry
 from charms.kubernetes.flagmanager import FlagManager
 
 from charmhelpers.core import hookenv
@@ -183,18 +184,23 @@ def setup_leader_authentication():
     api_opts.add('basic-auth-file', basic_auth)
     api_opts.add('token-auth-file', known_tokens)
     hookenv.status_set('maintenance', 'Rendering authentication templates.')
-    if not os.path.isfile(basic_auth):
-        setup_basic_auth('admin', 'admin', 'admin')
-    if not os.path.isfile(known_tokens):
-        setup_tokens(None, 'admin', 'admin')
-        setup_tokens(None, 'kubelet', 'kubelet')
-        setup_tokens(None, 'kube_proxy', 'kube_proxy')
-    # Generate the default service account token key
-    os.makedirs('/root/cdk', exist_ok=True)
-    if not os.path.isfile(service_key):
-        cmd = ['openssl', 'genrsa', '-out', service_key,
-               '2048']
-        check_call(cmd)
+
+    keys = [service_key, basic_auth, known_tokens]
+    # Try first to fetch data from an old leadership broadcast.
+    if not get_keys_from_leader(keys):
+        if not os.path.isfile(basic_auth):
+            setup_basic_auth('admin', 'admin', 'admin')
+        if not os.path.isfile(known_tokens):
+            setup_tokens(None, 'admin', 'admin')
+            setup_tokens(None, 'kubelet', 'kubelet')
+            setup_tokens(None, 'kube_proxy', 'kube_proxy')
+        # Generate the default service account token key
+        os.makedirs('/root/cdk', exist_ok=True)
+        if not os.path.isfile(service_key):
+            cmd = ['openssl', 'genrsa', '-out', service_key,
+                   '2048']
+            check_call(cmd)
+
     api_opts.add('service-account-key-file', service_key)
     controller_opts.add('service-account-private-key-file', service_key)
 
@@ -223,14 +229,36 @@ def setup_non_leader_authentication():
     basic_auth = '/root/cdk/basic_auth.csv'
     known_tokens = '/root/cdk/known_tokens.csv'
 
+    hookenv.status_set('maintenance', 'Rendering authentication templates.')
+
+    keys = [service_key, basic_auth, known_tokens]
+    if not get_keys_from_leader(keys):
+        # the keys were not retrieved. Non-leaders have to retry.
+        return
+
+    api_opts.add('basic-auth-file', basic_auth)
+    api_opts.add('token-auth-file', known_tokens)
+    api_opts.add('service-account-key-file', service_key)
+    controller_opts.add('service-account-private-key-file', service_key)
+
+    set_state('authentication.setup')
+
+
+def get_keys_from_leader(keys):
+    """
+    Gets the broadcasted keys from the leader and stores them in
+    the corresponding files.
+
+    Args:
+        keys: list of keys. Keys are actually files on the FS.
+
+    Returns: True if all key were fetched, False if not.
+
+    """
     # This races with other codepaths, and seems to require being created first
     # This block may be extracted later, but for now seems to work as intended
     os.makedirs('/root/cdk', exist_ok=True)
 
-    hookenv.status_set('maintenance', 'Rendering authentication templates.')
-
-    # Set an array for looping logic
-    keys = [service_key, basic_auth, known_tokens]
     for k in keys:
         # If the path does not exist, assume we need it
         if not os.path.exists(k):
@@ -241,17 +269,12 @@ def setup_non_leader_authentication():
                 msg = "Waiting on leaders crypto keys."
                 hookenv.status_set('waiting', msg)
                 hookenv.log('Missing content for file {}'.format(k))
-                return
+                return False
             # Write out the file and move on to the next item
             with open(k, 'w+') as fp:
                 fp.write(contents)
 
-    api_opts.add('basic-auth-file', basic_auth)
-    api_opts.add('token-auth-file', known_tokens)
-    api_opts.add('service-account-key-file', service_key)
-    controller_opts.add('service-account-private-key-file', service_key)
-
-    set_state('authentication.setup')
+    return True
 
 
 @when('kubernetes-master.snaps.installed')
@@ -261,7 +284,8 @@ def set_app_version():
     hookenv.application_version_set(version.split(b' v')[-1].rstrip())
 
 
-@when('cdk-addons.configured')
+@when('cdk-addons.configured', 'kube-api-endpoint.connected',
+      'kube-control.connected')
 def idle_status():
     ''' Signal at the end of the run that we are running. '''
     if not all_kube_system_pods_running():
@@ -296,7 +320,24 @@ def start_master(etcd):
     set_state('kubernetes-master.components.started')
 
 
+@when('etcd.available')
+def etcd_data_change(etcd):
+    ''' Etcd scale events block master reconfiguration due to the
+        kubernetes-master.components.started state. We need a way to
+        handle these events consistenly only when the number of etcd
+        units has actually changed '''
+
+    # key off of the connection string
+    connection_string = etcd.get_connection_string()
+
+    # If the connection string changes, remove the started state to trigger
+    # handling of the master components
+    if data_changed('etcd-connect', connection_string):
+        remove_state('kubernetes-master.components.started')
+
+
 @when('kube-control.connected')
+@when('cdk-addons.configured')
 def send_cluster_dns_detail(kube_control):
     ''' Send cluster DNS info '''
     # Note that the DNS server doesn't necessarily exist at this point. We know
@@ -368,6 +409,7 @@ def push_api_data(kube_api):
 @when('kubernetes-master.components.started')
 def configure_cdk_addons():
     ''' Configure CDK addons '''
+    remove_state('cdk-addons.configured')
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
     args = [
         'arch=' + arch(),
@@ -376,13 +418,28 @@ def configure_cdk_addons():
         'enable-dashboard=' + dbEnabled
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
-    try:
-        check_call(['cdk-addons.apply'])
-    except CalledProcessError:
+    if not addons_ready():
         hookenv.status_set('waiting', 'Waiting to retry addon deployment')
         remove_state('cdk-addons.configured')
         return
+
     set_state('cdk-addons.configured')
+
+
+@retry(times=3, delay_secs=20)
+def addons_ready():
+    """
+    Test if the add ons got installed
+
+    Returns: True is the addons got applied
+
+    """
+    try:
+        check_call(['cdk-addons.apply'])
+        return True
+    except CalledProcessError:
+        hookenv.log("Addons are not ready yet.")
+        return False
 
 
 @when('loadbalancer.available', 'certificates.ca.available',
@@ -735,6 +792,7 @@ def configure_master_services():
     api_opts.add('insecure-port', '8080')
     api_opts.add('storage-backend', 'etcd2')  # FIXME: add etcd3 support
     admission_control = [
+        'Initializers',
         'NamespaceLifecycle',
         'LimitRanger',
         'ServiceAccount',
@@ -745,6 +803,9 @@ def configure_master_services():
     if get_version('kube-apiserver') < (1, 6):
         hookenv.log('Removing DefaultTolerationSeconds from admission-control')
         admission_control.remove('DefaultTolerationSeconds')
+    if get_version('kube-apiserver') < (1, 7):
+        hookenv.log('Removing Initializers from admission-control')
+        admission_control.remove('Initializers')
     api_opts.add('admission-control', ','.join(admission_control), strict=True)
 
     # Default to 3 minute resync. TODO: Make this configureable?
@@ -788,10 +849,11 @@ def setup_tokens(token, username, user):
     if not token:
         alpha = string.ascii_letters + string.digits
         token = ''.join(random.SystemRandom().choice(alpha) for _ in range(32))
-    with open(known_tokens, 'w') as stream:
-        stream.write('{0},{1},{2}'.format(token, username, user))
+    with open(known_tokens, 'a') as stream:
+        stream.write('{0},{1},{2}\n'.format(token, username, user))
 
 
+@retry(times=3, delay_secs=10)
 def all_kube_system_pods_running():
     ''' Check pod status in the kube-system namespace. Returns True if all
     pods are running, False otherwise. '''

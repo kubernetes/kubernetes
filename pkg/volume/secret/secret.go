@@ -178,11 +178,11 @@ func (b *secretVolumeMounter) CanMount() error {
 	return nil
 }
 
-func (b *secretVolumeMounter) SetUp(fsGroup *int64) error {
+func (b *secretVolumeMounter) SetUp(fsGroup *types.UnixGroupID) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
@@ -198,7 +198,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	secret, err := b.getSecret(b.pod.Namespace, b.source.SecretName)
 	if err != nil {
 		if !(errors.IsNotFound(err) && optional) {
-			glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.source.SecretName)
+			glog.Errorf("Couldn't get secret %v/%v: %v", b.pod.Namespace, b.source.SecretName, err)
 			return err
 		}
 		secret = &v1.Secret{

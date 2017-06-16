@@ -28,9 +28,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 )
 
@@ -70,7 +70,7 @@ func convertLegacyNameAndLabels(names []string, labels map[string]string) ([]str
 	}
 
 	// Generate new dockershim name.
-	m, _, err := dockertools.ParseDockerName(names[0])
+	m, _, err := libdocker.ParseDockerName(names[0])
 	if err != nil {
 		return nil, nil, err
 	}
@@ -187,7 +187,7 @@ func (ds *dockerService) ListLegacyPodSandbox(filter *runtimeapi.PodSandboxFilte
 	}
 
 	// Convert docker containers to runtime api sandboxes.
-	result := []*runtimeapi.PodSandbox{}
+	result := make([]*runtimeapi.PodSandbox, 0, len(containers))
 	for i := range containers {
 		c := containers[i]
 		// Skip new containers with containerTypeLabelKey label.
@@ -242,7 +242,7 @@ func (ds *dockerService) ListLegacyContainers(filter *runtimeapi.ContainerFilter
 	}
 
 	// Convert docker to runtime api containers.
-	result := []*runtimeapi.Container{}
+	result := make([]*runtimeapi.Container, 0, len(containers))
 	for i := range containers {
 		c := containers[i]
 		// Skip new containers with containerTypeLabelKey label.

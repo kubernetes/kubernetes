@@ -50,6 +50,10 @@ const (
 	// portion of CPU and basically stop all the real work.
 	// Increasing threshold to 1s is within our SLO and should solve this problem.
 	apiCallLatencyThreshold time.Duration = 1 * time.Second
+
+	// We set a higher threshold for list apicalls as they can take more time when
+	// the list is really big. For eg. list nodes in a 5000-node cluster.
+	apiListCallLatencyThreshold time.Duration = 2 * time.Second
 )
 
 type MetricsForE2E metrics.MetricsCollection
@@ -103,7 +107,7 @@ func (m *MetricsForE2E) PrintHumanReadable() string {
 
 func (m *MetricsForE2E) PrintJSON() string {
 	m.filterMetrics()
-	return PrettyPrintJSON(*m)
+	return PrettyPrintJSON(m)
 }
 
 func (m *MetricsForE2E) SummaryKind() string {
@@ -122,9 +126,23 @@ var InterestingApiServerMetrics = []string{
 }
 
 var InterestingControllerManagerMetrics = []string{
-	"garbage_collector_event_queue_latency",
-	"garbage_collector_dirty_queue_latency",
-	"garbage_collector_orhan_queue_latency",
+	"garbage_collector_attempt_to_delete_queue_latency",
+	"garbage_collector_attempt_to_delete_work_duration",
+	"garbage_collector_attempt_to_orphan_queue_latency",
+	"garbage_collector_attempt_to_orphan_work_duration",
+	"garbage_collector_dirty_processing_latency_microseconds",
+	"garbage_collector_event_processing_latency_microseconds",
+	"garbage_collector_graph_changes_queue_latency",
+	"garbage_collector_graph_changes_work_duration",
+	"garbage_collector_orphan_processing_latency_microseconds",
+
+	"namespace_queue_latency",
+	"namespace_queue_latency_sum",
+	"namespace_queue_latency_count",
+	"namespace_retries",
+	"namespace_work_duration",
+	"namespace_work_duration_sum",
+	"namespace_work_duration_count",
 }
 
 var InterestingKubeletMetrics = []string{
@@ -150,10 +168,34 @@ type PodStartupLatency struct {
 	Latency LatencyMetric `json:"latency"`
 }
 
+func (l *PodStartupLatency) SummaryKind() string {
+	return "PodStartupLatency"
+}
+
+func (l *PodStartupLatency) PrintHumanReadable() string {
+	return PrettyPrintJSON(l)
+}
+
+func (l *PodStartupLatency) PrintJSON() string {
+	return PrettyPrintJSON(PodStartupLatencyToPerfData(l))
+}
+
 type SchedulingLatency struct {
 	Scheduling LatencyMetric `json:"scheduling"`
 	Binding    LatencyMetric `json:"binding"`
 	Total      LatencyMetric `json:"total"`
+}
+
+func (l *SchedulingLatency) SummaryKind() string {
+	return "SchedulingLatency"
+}
+
+func (l *SchedulingLatency) PrintHumanReadable() string {
+	return PrettyPrintJSON(l)
+}
+
+func (l *SchedulingLatency) PrintJSON() string {
+	return PrettyPrintJSON(l)
 }
 
 type SaturationTime struct {
@@ -164,31 +206,48 @@ type SaturationTime struct {
 }
 
 type APICall struct {
-	Resource string        `json:"resource"`
-	Verb     string        `json:"verb"`
-	Latency  LatencyMetric `json:"latency"`
+	Resource    string        `json:"resource"`
+	Subresource string        `json:"subresource"`
+	Verb        string        `json:"verb"`
+	Latency     LatencyMetric `json:"latency"`
+	Count       int           `json:"count"`
 }
 
 type APIResponsiveness struct {
 	APICalls []APICall `json:"apicalls"`
 }
 
-func (a APIResponsiveness) Len() int      { return len(a.APICalls) }
-func (a APIResponsiveness) Swap(i, j int) { a.APICalls[i], a.APICalls[j] = a.APICalls[j], a.APICalls[i] }
-func (a APIResponsiveness) Less(i, j int) bool {
+func (a *APIResponsiveness) SummaryKind() string {
+	return "APIResponsiveness"
+}
+
+func (a *APIResponsiveness) PrintHumanReadable() string {
+	return PrettyPrintJSON(a)
+}
+
+func (a *APIResponsiveness) PrintJSON() string {
+	return PrettyPrintJSON(ApiCallToPerfData(a))
+}
+
+func (a *APIResponsiveness) Len() int { return len(a.APICalls) }
+func (a *APIResponsiveness) Swap(i, j int) {
+	a.APICalls[i], a.APICalls[j] = a.APICalls[j], a.APICalls[i]
+}
+func (a *APIResponsiveness) Less(i, j int) bool {
 	return a.APICalls[i].Latency.Perc99 < a.APICalls[j].Latency.Perc99
 }
 
+// Set request latency for a particular quantile in the APICall metric entry (creating one if necessary).
 // 0 <= quantile <=1 (e.g. 0.95 is 95%tile, 0.5 is median)
 // Only 0.5, 0.9 and 0.99 quantiles are supported.
-func (a *APIResponsiveness) addMetric(resource, verb string, quantile float64, latency time.Duration) {
+func (a *APIResponsiveness) addMetricRequestLatency(resource, subresource, verb string, quantile float64, latency time.Duration) {
 	for i, apicall := range a.APICalls {
-		if apicall.Resource == resource && apicall.Verb == verb {
+		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb {
 			a.APICalls[i] = setQuantileAPICall(apicall, quantile, latency)
 			return
 		}
 	}
-	apicall := setQuantileAPICall(APICall{Resource: resource, Verb: verb}, quantile, latency)
+	apicall := setQuantileAPICall(APICall{Resource: resource, Subresource: subresource, Verb: verb}, quantile, latency)
 	a.APICalls = append(a.APICalls, apicall)
 }
 
@@ -211,17 +270,29 @@ func setQuantile(metric *LatencyMetric, quantile float64, latency time.Duration)
 	}
 }
 
-func readLatencyMetrics(c clientset.Interface) (APIResponsiveness, error) {
+// Add request count to the APICall metric entry (creating one if necessary).
+func (a *APIResponsiveness) addMetricRequestCount(resource, subresource, verb string, count int) {
+	for i, apicall := range a.APICalls {
+		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb {
+			a.APICalls[i].Count += count
+			return
+		}
+	}
+	apicall := APICall{Resource: resource, Subresource: subresource, Verb: verb, Count: count}
+	a.APICalls = append(a.APICalls, apicall)
+}
+
+func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 	var a APIResponsiveness
 
 	body, err := getMetrics(c)
 	if err != nil {
-		return a, err
+		return nil, err
 	}
 
 	samples, err := extractMetricSamples(body)
 	if err != nil {
-		return a, err
+		return nil, err
 	}
 
 	ignoredResources := sets.NewString("events")
@@ -231,39 +302,52 @@ func readLatencyMetrics(c clientset.Interface) (APIResponsiveness, error) {
 	for _, sample := range samples {
 		// Example line:
 		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
-		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" {
+		// apiserver_request_count{resource="pods",verb="LIST",client="kubectl",code="200",contentType="json"} 233
+		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" &&
+			sample.Metric[model.MetricNameLabel] != "apiserver_request_count" {
 			continue
 		}
 
 		resource := string(sample.Metric["resource"])
+		subresource := string(sample.Metric["subresource"])
 		verb := string(sample.Metric["verb"])
 		if ignoredResources.Has(resource) || ignoredVerbs.Has(verb) {
 			continue
 		}
-		latency := sample.Value
-		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
-		if err != nil {
-			return a, err
+
+		switch sample.Metric[model.MetricNameLabel] {
+		case "apiserver_request_latencies_summary":
+			latency := sample.Value
+			quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
+			if err != nil {
+				return nil, err
+			}
+			a.addMetricRequestLatency(resource, subresource, verb, quantile, time.Duration(int64(latency))*time.Microsecond)
+		case "apiserver_request_count":
+			count := sample.Value
+			a.addMetricRequestCount(resource, subresource, verb, int(count))
+
 		}
-		a.addMetric(resource, verb, quantile, time.Duration(int64(latency))*time.Microsecond)
 	}
 
-	return a, err
+	return &a, err
 }
 
 // Prints top five summary metrics for request types with latency and returns
 // number of such request types above threshold.
-func HighLatencyRequests(c clientset.Interface) (int, error) {
+func HighLatencyRequests(c clientset.Interface) (int, *APIResponsiveness, error) {
 	metrics, err := readLatencyMetrics(c)
 	if err != nil {
-		return 0, err
+		return 0, metrics, err
 	}
 	sort.Sort(sort.Reverse(metrics))
 	badMetrics := 0
 	top := 5
-	for _, metric := range metrics.APICalls {
+	for i := range metrics.APICalls {
 		isBad := false
-		if metric.Latency.Perc99 > apiCallLatencyThreshold {
+		verb := metrics.APICalls[i].Verb
+		if verb != "LIST" && metrics.APICalls[i].Latency.Perc99 > apiCallLatencyThreshold ||
+			verb == "LIST" && metrics.APICalls[i].Latency.Perc99 > apiListCallLatencyThreshold {
 			badMetrics++
 			isBad = true
 		}
@@ -273,23 +357,15 @@ func HighLatencyRequests(c clientset.Interface) (int, error) {
 			if isBad {
 				prefix = "WARNING "
 			}
-			Logf("%vTop latency metric: %+v", prefix, metric)
+			Logf("%vTop latency metric: %+v", prefix, metrics.APICalls[i])
 		}
 	}
-
-	// TODO(random-liu): Remove the log when we migrate to new perfdash
-	Logf("API calls latencies: %s", PrettyPrintJSON(metrics))
-	// Log perf data
-	PrintPerfData(ApiCallToPerfData(metrics))
-
-	return badMetrics, nil
+	return badMetrics, metrics, nil
 }
 
 // Verifies whether 50, 90 and 99th percentiles of PodStartupLatency are
 // within the threshold.
-func VerifyPodStartupLatency(latency PodStartupLatency) error {
-	Logf("Pod startup latency: %s", PrettyPrintJSON(latency))
-
+func VerifyPodStartupLatency(latency *PodStartupLatency) error {
 	if latency.Latency.Perc50 > podStartupThreshold {
 		return fmt.Errorf("too high pod startup latency 50th percentile: %v", latency.Latency.Perc50)
 	}
@@ -325,7 +401,7 @@ func getMetrics(c clientset.Interface) (string, error) {
 }
 
 // Retrieves scheduler metrics information.
-func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
+func getSchedulingLatency(c clientset.Interface) (*SchedulingLatency, error) {
 	result := SchedulingLatency{}
 
 	// Check if master Node is registered
@@ -334,7 +410,7 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 
 	subResourceProxyAvailable, err := ServerVersionGTE(SubResourcePodProxyVersion, c.Discovery())
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 
 	var data string
@@ -376,13 +452,13 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 		cmd := "curl http://localhost:10251/metrics"
 		sshResult, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
 		if err != nil || sshResult.Code != 0 {
-			return result, fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
+			return &result, fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
 		}
 		data = sshResult.Stdout
 	}
 	samples, err := extractMetricSamples(data)
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 
 	for _, sample := range samples {
@@ -402,23 +478,20 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 		latency := sample.Value
 		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
 		if err != nil {
-			return result, err
+			return nil, err
 		}
 		setQuantile(metric, quantile, time.Duration(int64(latency))*time.Microsecond)
 	}
-	return result, nil
+	return &result, nil
 }
 
 // Verifies (currently just by logging them) the scheduling latencies.
-func VerifySchedulerLatency(c clientset.Interface) error {
+func VerifySchedulerLatency(c clientset.Interface) (*SchedulingLatency, error) {
 	latency, err := getSchedulingLatency(c)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	Logf("Scheduling latency: %s", PrettyPrintJSON(latency))
-
-	// TODO: Add some reasonable checks once we know more about the values.
-	return nil
+	return latency, nil
 }
 
 func PrettyPrintJSON(metrics interface{}) string {
@@ -495,17 +568,6 @@ func LogSuspiciousLatency(latencyData []PodLatencyData, latencyDataLag []PodLate
 	}
 	Logf("Approx throughput: %v pods/min",
 		float64(nodeCount)/(latencyDataLag[len(latencyDataLag)-1].Latency.Minutes()))
-}
-
-// testMaximumLatencyValue verifies the highest latency value is less than or equal to
-// the given time.Duration. Since the arrays are sorted we are looking at the last
-// element which will always be the highest. If the latency is higher than the max Failf
-// is called.
-func testMaximumLatencyValue(latencies []PodLatencyData, max time.Duration, name string) {
-	highestLatency := latencies[len(latencies)-1]
-	if !(highestLatency.Latency <= max) {
-		Failf("%s were not all under %s: %#v", name, max.String(), latencies)
-	}
 }
 
 func PrintLatencies(latencies []PodLatencyData, header string) {

@@ -18,29 +18,20 @@ package remote
 
 import (
 	"fmt"
-	"net"
-	"os"
-	"syscall"
 
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/util/interrupt"
-)
-
-const (
-	// defaultEndpoint is the default address of dockershim grpc server socket.
-	defaultAddress = "/var/run/dockershim.sock"
-	// unixProtocol is the network protocol of unix socket.
-	unixProtocol = "unix"
 )
 
 // DockerServer is the grpc server of dockershim.
 type DockerServer struct {
-	// addr is the address to serve on.
-	addr string
+	// endpoint is the endpoint to serve on.
+	endpoint string
 	// service is the docker service which implements runtime and image services.
 	service DockerService
 	// server is the grpc server.
@@ -48,24 +39,19 @@ type DockerServer struct {
 }
 
 // NewDockerServer creates the dockershim grpc server.
-func NewDockerServer(addr string, s dockershim.DockerService) *DockerServer {
+func NewDockerServer(endpoint string, s dockershim.DockerService) *DockerServer {
 	return &DockerServer{
-		addr:    addr,
-		service: NewDockerService(s),
+		endpoint: endpoint,
+		service:  NewDockerService(s),
 	}
 }
 
 // Start starts the dockershim grpc server.
 func (s *DockerServer) Start() error {
 	glog.V(2).Infof("Start dockershim grpc server")
-	// Unlink to cleanup the previous socket file.
-	err := syscall.Unlink(s.addr)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to unlink socket file %q: %v", s.addr, err)
-	}
-	l, err := net.Listen(unixProtocol, s.addr)
+	l, err := util.CreateListener(s.endpoint)
 	if err != nil {
-		return fmt.Errorf("failed to listen on %q: %v", s.addr, err)
+		return fmt.Errorf("failed to listen on %q: %v", s.endpoint, err)
 	}
 	// Create the grpc server and register runtime and image services.
 	s.server = grpc.NewServer()

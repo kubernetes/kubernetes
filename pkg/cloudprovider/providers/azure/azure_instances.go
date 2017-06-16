@@ -17,14 +17,13 @@ limitations under the License.
 package azure
 
 import (
-	"errors"
 	"fmt"
-	"regexp"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -32,6 +31,7 @@ import (
 func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	ip, err := az.getIPForMachine(name)
 	if err != nil {
+		glog.Errorf("error: az.NodeAddresses, az.getIPForMachine(%s), err=%v", name, err)
 		return nil, err
 	}
 
@@ -45,7 +45,12 @@ func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (az *Cloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	return []v1.NodeAddress{}, errors.New("unimplemented")
+	name, err := splitProviderID(providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return az.NodeAddresses(name)
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
@@ -56,9 +61,22 @@ func (az *Cloud) ExternalID(name types.NodeName) (string, error) {
 // InstanceID returns the cloud provider ID of the specified instance.
 // Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (az *Cloud) InstanceID(name types.NodeName) (string, error) {
-	machine, exists, err := az.getVirtualMachine(name)
+	var machine compute.VirtualMachine
+	var exists bool
+	var err error
+	az.operationPollRateLimiter.Accept()
+	machine, exists, err = az.getVirtualMachine(name)
 	if err != nil {
-		return "", err
+		if az.CloudProviderBackoff {
+			glog.V(2).Infof("InstanceID(%s) backing off", name)
+			machine, exists, err = az.GetVirtualMachineWithRetry(name)
+			if err != nil {
+				glog.V(2).Infof("InstanceID(%s) abort backoff", name)
+				return "", err
+			}
+		} else {
+			return "", err
+		}
 	} else if !exists {
 		return "", cloudprovider.InstanceNotFound
 	}
@@ -69,7 +87,12 @@ func (az *Cloud) InstanceID(name types.NodeName) (string, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (az *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
-	return "", errors.New("unimplemented")
+	name, err := splitProviderID(providerID)
+	if err != nil {
+		return "", err
+	}
+
+	return az.InstanceID(name)
 }
 
 // InstanceType returns the type of the specified instance.
@@ -79,6 +102,7 @@ func (az *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
 func (az *Cloud) InstanceType(name types.NodeName) (string, error) {
 	machine, exists, err := az.getVirtualMachine(name)
 	if err != nil {
+		glog.Errorf("error: az.InstanceType(%s), az.getVirtualMachine(%s) err=%v", name, name, err)
 		return "", err
 	} else if !exists {
 		return "", cloudprovider.InstanceNotFound
@@ -101,8 +125,10 @@ func (az *Cloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 func (az *Cloud) listAllNodesInResourceGroup() ([]compute.VirtualMachine, error) {
 	allNodes := []compute.VirtualMachine{}
 
+	az.operationPollRateLimiter.Accept()
 	result, err := az.VirtualMachinesClient.List(az.ResourceGroup)
 	if err != nil {
+		glog.Errorf("error: az.listAllNodesInResourceGroup(), az.VirtualMachinesClient.List(%s), err=%v", az.ResourceGroup, err)
 		return nil, err
 	}
 
@@ -111,8 +137,10 @@ func (az *Cloud) listAllNodesInResourceGroup() ([]compute.VirtualMachine, error)
 	for morePages {
 		allNodes = append(allNodes, *result.Value...)
 
+		az.operationPollRateLimiter.Accept()
 		result, err = az.VirtualMachinesClient.ListAllNextResults(result)
 		if err != nil {
+			glog.Errorf("error: az.listAllNodesInResourceGroup(), az.VirtualMachinesClient.ListAllNextResults(%v), err=%v", result, err)
 			return nil, err
 		}
 
@@ -121,24 +149,6 @@ func (az *Cloud) listAllNodesInResourceGroup() ([]compute.VirtualMachine, error)
 
 	return allNodes, nil
 
-}
-
-func filterNodes(nodes []compute.VirtualMachine, filter string) ([]compute.VirtualMachine, error) {
-	filteredNodes := []compute.VirtualMachine{}
-
-	re, err := regexp.Compile(filter)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, node := range nodes {
-		// search tags
-		if re.MatchString(*node.Name) {
-			filteredNodes = append(filteredNodes, node)
-		}
-	}
-
-	return filteredNodes, nil
 }
 
 // mapNodeNameToVMName maps a k8s NodeName to an Azure VM Name

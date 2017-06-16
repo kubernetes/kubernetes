@@ -118,7 +118,7 @@ func TestDoProbe(t *testing.T) {
 			}
 
 			// Clean up.
-			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(nil, nil), &statustest.FakePodDeletionSafetyProvider{})
+			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(nil, nil, nil), &statustest.FakePodDeletionSafetyProvider{})
 			resultsManager(m, probeType).Remove(testContainerID)
 		}
 	}
@@ -339,5 +339,46 @@ func TestOnHoldOnLivenessCheckFailure(t *testing.T) {
 	expectResult(t, w, results.Success, msg)
 	if w.onHold {
 		t.Errorf("Prober should not be on hold anymore")
+	}
+}
+
+func TestResultRunOnLivenessCheckFailure(t *testing.T) {
+	m := newTestManager()
+	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
+
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	msg := "inital probe success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+	if w.resultRun != 1 {
+		t.Errorf("Prober resultRun should 1")
+	}
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "probe failure, result success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+	if w.resultRun != 1 {
+		t.Errorf("Prober resultRun should 1")
+	}
+
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "2nd probe failure, result success"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Success, msg)
+	if w.resultRun != 2 {
+		t.Errorf("Prober resultRun should be 2")
+	}
+
+	// Exceeding FailureThreshold should cause resultRun to
+	// reset to 1 so that the probe on the restarted pod
+	// also gets FailureThreshold attempts to succeed.
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	msg = "3rd probe failure, result failure"
+	expectContinue(t, w, w.doProbe(), msg)
+	expectResult(t, w, results.Failure, msg)
+	if w.resultRun != 1 {
+		t.Errorf("Prober resultRun should be reset to 1")
 	}
 }

@@ -24,9 +24,10 @@ spec:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       dnsPolicy: Default
+      hostNetwork: true
       containers:
       - name: fluentd-gcp
-        image: gcr.io/google-containers/fluentd-gcp:2.0.2
+        image: gcr.io/google-containers/fluentd-gcp:2.0.5
         # If fluentd consumes its own logs, the following situation may happen:
         # fluentd fails to send a chunk to the server => writes it to the log =>
         # tries to send this message to the server => fails to send a chunk and so on.
@@ -88,11 +89,24 @@ spec:
               then
                 exit 1;
               fi;
+      - name: prometheus-to-sd-exporter
+        image: gcr.io/google-containers/prometheus-to-sd:v0.1.0
+        command:
+          - /monitor
+          - --component=fluentd
+          - --target-port=31337
+          - --stackdriver-prefix=container.googleapis.com/internal/addons
+          - --whitelisted-metrics=logging_line_count,logging_entry_count
+        volumeMounts:
+        - name: ssl-certs
+          mountPath: /etc/ssl/certs
       nodeSelector:
         beta.kubernetes.io/fluentd-ds-ready: "true"
       tolerations:
       - key: "node.alpha.kubernetes.io/ismaster"
         effect: "NoSchedule"
+      - operator: "Exists"
+        effect: "NoExecute"
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog
@@ -106,4 +120,7 @@ spec:
           path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-gcp-config
+          name: fluentd-gcp-config-v1.0
+      - name: ssl-certs
+        hostPath:
+          path: /etc/ssl/certs

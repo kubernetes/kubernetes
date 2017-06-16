@@ -18,8 +18,8 @@ package poddisruptionbudget
 
 import (
 	"fmt"
-	"reflect"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,7 +66,7 @@ func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx genericapirequest.Contex
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
 	// See metav1.ObjectMeta description for more information on Generation.
-	if !reflect.DeepEqual(oldPodDisruptionBudget.Spec, newPodDisruptionBudget.Spec) {
+	if !apiequality.Semantic.DeepEqual(oldPodDisruptionBudget.Spec, newPodDisruptionBudget.Spec) {
 		newPodDisruptionBudget.Generation = oldPodDisruptionBudget.Generation + 1
 	}
 }
@@ -105,12 +105,12 @@ func PodDisruptionBudgetToSelectableFields(podDisruptionBudget *policy.PodDisrup
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	podDisruptionBudget, ok := obj.(*policy.PodDisruptionBudget)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a PodDisruptionBudget.")
+		return nil, nil, false, fmt.Errorf("given object is not a PodDisruptionBudget.")
 	}
-	return labels.Set(podDisruptionBudget.ObjectMeta.Labels), PodDisruptionBudgetToSelectableFields(podDisruptionBudget), nil
+	return labels.Set(podDisruptionBudget.ObjectMeta.Labels), PodDisruptionBudgetToSelectableFields(podDisruptionBudget), podDisruptionBudget.Initializers != nil, nil
 }
 
 // MatchPodDisruptionBudget is the filter used by the generic etcd backend to watch events

@@ -109,14 +109,14 @@ type Mounter interface {
 	// content should be owned by 'fsGroup' so that it can be
 	// accessed by the pod. This may be called more than once, so
 	// implementations must be idempotent.
-	SetUp(fsGroup *int64) error
+	SetUp(fsGroup *types.UnixGroupID) error
 	// SetUpAt prepares and mounts/unpacks the volume to the
 	// specified directory path, which may or may not exist yet.
 	// The mount point and its content should be owned by
 	// 'fsGroup' so that it can be accessed by the pod. This may
 	// be called more than once, so implementations must be
 	// idempotent.
-	SetUpAt(dir string, fsGroup *int64) error
+	SetUpAt(dir string, fsGroup *types.UnixGroupID) error
 	// GetAttributes returns the attributes of the mounter.
 	GetAttributes() Attributes
 }

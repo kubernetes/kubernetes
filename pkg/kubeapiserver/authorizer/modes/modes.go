@@ -22,9 +22,10 @@ const (
 	ModeABAC        string = "ABAC"
 	ModeWebhook     string = "Webhook"
 	ModeRBAC        string = "RBAC"
+	ModeNode        string = "Node"
 )
 
-var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook, ModeRBAC}
+var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook, ModeRBAC, ModeNode}
 
 // IsValidAuthorizationMode returns true if the given authorization mode is a valid one for the apiserver
 func IsValidAuthorizationMode(authzMode string) bool {

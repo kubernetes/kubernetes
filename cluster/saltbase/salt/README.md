@@ -22,9 +22,6 @@ Config                                              | GCE   | Vagrant | AWS | Az
 [kubelet](kubelet/)                                 | M n   | M n     | M n | M n
 [logrotate](logrotate/)                             | M n   |   n     | M n | M n
 [supervisord](supervisor/)                          | M n   | M n     | M n | M n
-[nginx](nginx/)                                     |       |         |     | M
-[openvpn-client](openvpn-client/)                   |       |         |     |   n
-[openvpn](openvpn/)                                 |       |         |     | M
 [base](base.sls)                                    | M n   | M n     | M n | M n
 [kube-client-tools](kube-client-tools.sls)          | M     | M       | M   | M
 

@@ -29,8 +29,8 @@ import (
 // from false to true).
 type ConditionFunc func(event Event) (bool, error)
 
-// errWatchClosed is returned when the watch channel is closed before timeout in Until.
-var errWatchClosed = errors.New("watch closed before Until timeout")
+// ErrWatchClosed is returned when the watch channel is closed before timeout in Until.
+var ErrWatchClosed = errors.New("watch closed before Until timeout")
 
 // Until reads items from the watch until each provided condition succeeds, and then returns the last watch
 // encountered. The first condition that returns an error terminates the watch (and the event is also returned).
@@ -65,7 +65,7 @@ func Until(timeout time.Duration, watcher Interface, conditions ...ConditionFunc
 			select {
 			case event, ok := <-ch:
 				if !ok {
-					return lastEvent, errWatchClosed
+					return lastEvent, ErrWatchClosed
 				}
 				lastEvent = &event
 

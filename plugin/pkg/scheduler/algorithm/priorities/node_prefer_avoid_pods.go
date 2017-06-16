@@ -51,10 +51,8 @@ func CalculateNodePreferAvoidPodsPriorityMap(pod *v1.Pod, meta interface{}, node
 	}
 	for i := range avoids.PreferAvoidPods {
 		avoid := &avoids.PreferAvoidPods[i]
-		if controllerRef != nil {
-			if avoid.PodSignature.PodController.Kind == controllerRef.Kind && avoid.PodSignature.PodController.UID == controllerRef.UID {
-				return schedulerapi.HostPriority{Host: node.Name, Score: 0}, nil
-			}
+		if avoid.PodSignature.PodController.Kind == controllerRef.Kind && avoid.PodSignature.PodController.UID == controllerRef.UID {
+			return schedulerapi.HostPriority{Host: node.Name, Score: 0}, nil
 		}
 	}
 	return schedulerapi.HostPriority{Host: node.Name, Score: 10}, nil

@@ -23,12 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func SortedByGroup(servers []*APIService) [][]*APIService {
-	serversByPriority := ByPriority(servers)
-	sort.Sort(serversByPriority)
+func SortedByGroupAndVersion(servers []*APIService) [][]*APIService {
+	serversByGroupPriorityMinimum := ByGroupPriorityMinimum(servers)
+	sort.Sort(serversByGroupPriorityMinimum)
 
 	ret := [][]*APIService{}
-	for _, curr := range serversByPriority {
+	for _, curr := range serversByGroupPriorityMinimum {
 		// check to see if we already have an entry for this group
 		existingIndex := -1
 		for j, groupInReturn := range ret {
@@ -40,6 +40,7 @@ func SortedByGroup(servers []*APIService) [][]*APIService {
 
 		if existingIndex >= 0 {
 			ret[existingIndex] = append(ret[existingIndex], curr)
+			sort.Sort(ByVersionPriority(ret[existingIndex]))
 			continue
 		}
 
@@ -49,15 +50,32 @@ func SortedByGroup(servers []*APIService) [][]*APIService {
 	return ret
 }
 
-type ByPriority []*APIService
+// ByGroupPriorityMinimum sorts with the highest group number first, then by name.
+// This is not a simple reverse, because we want the name sorting to be alpha, not
+// reverse alpha.
+type ByGroupPriorityMinimum []*APIService
 
-func (s ByPriority) Len() int      { return len(s) }
-func (s ByPriority) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s ByPriority) Less(i, j int) bool {
-	if s[i].Spec.Priority == s[j].Spec.Priority {
-		return s[i].Name < s[j].Name
+func (s ByGroupPriorityMinimum) Len() int      { return len(s) }
+func (s ByGroupPriorityMinimum) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s ByGroupPriorityMinimum) Less(i, j int) bool {
+	if s[i].Spec.GroupPriorityMinimum != s[j].Spec.GroupPriorityMinimum {
+		return s[i].Spec.GroupPriorityMinimum > s[j].Spec.GroupPriorityMinimum
 	}
-	return s[i].Spec.Priority < s[j].Spec.Priority
+	return s[i].Name < s[j].Name
+}
+
+// ByVersionPriority sorts with the highest version number first, then by name.
+// This is not a simple reverse, because we want the name sorting to be alpha, not
+// reverse alpha.
+type ByVersionPriority []*APIService
+
+func (s ByVersionPriority) Len() int      { return len(s) }
+func (s ByVersionPriority) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s ByVersionPriority) Less(i, j int) bool {
+	if s[i].Spec.VersionPriority != s[j].Spec.VersionPriority {
+		return s[i].Spec.VersionPriority > s[j].Spec.VersionPriority
+	}
+	return s[i].Name < s[j].Name
 }
 
 // APIServiceNameToGroupVersion returns the GroupVersion for a given apiServiceName.  The name
@@ -65,4 +83,38 @@ func (s ByPriority) Less(i, j int) bool {
 func APIServiceNameToGroupVersion(apiServiceName string) schema.GroupVersion {
 	tokens := strings.SplitN(apiServiceName, ".", 2)
 	return schema.GroupVersion{Group: tokens[1], Version: tokens[0]}
+}
+
+// SetAPIServiceCondition sets the status condition.  It either overwrites the existing one or
+// creates a new one
+func SetAPIServiceCondition(apiService *APIService, newCondition APIServiceCondition) {
+	var existingCondition *APIServiceCondition
+	for i := range apiService.Status.Conditions {
+		if apiService.Status.Conditions[i].Type == newCondition.Type {
+			existingCondition = &apiService.Status.Conditions[i]
+			break
+		}
+	}
+	if existingCondition == nil {
+		apiService.Status.Conditions = append(apiService.Status.Conditions, newCondition)
+		return
+	}
+
+	if existingCondition.Status != newCondition.Status {
+		existingCondition.Status = newCondition.Status
+		existingCondition.LastTransitionTime = newCondition.LastTransitionTime
+	}
+
+	existingCondition.Reason = newCondition.Reason
+	existingCondition.Message = newCondition.Message
+}
+
+// IsAPIServiceConditionTrue indicates if the condition is present and strictly true
+func IsAPIServiceConditionTrue(apiService *APIService, conditionType APIServiceConditionType) bool {
+	for _, condition := range apiService.Status.Conditions {
+		if condition.Type == conditionType && condition.Status == ConditionTrue {
+			return true
+		}
+	}
+	return false
 }

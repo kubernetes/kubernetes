@@ -70,3 +70,31 @@ re-render configuration and disrupt the worker services.
 
 External access to pods must be performed through a [Kubernetes
 Ingress Resource](http://kubernetes.io/docs/user-guide/ingress/).
+
+When using NodePort type networking, there is no automation in exposing the
+ports selected by kubernetes or chosen by the user. They will need to be
+opened manually and can be performed across an entire worker pool.
+
+If your NodePort service port selected is `30510` you can open this across all
+members of a worker pool named `kubernetes-worker` like so:
+
+```
+juju run --application kubernetes-worker open-port 30510/tcp
+```
+
+Don't forget to expose the kubernetes-worker application if its not already
+exposed, as this can cause confusion once the port has been opened and the
+service is not reachable.
+
+Note: When debugging connection issues with NodePort services, its important
+to first check the kube-proxy service on the worker units. If kube-proxy is not
+running, the associated port-mapping will not be configured in the iptables
+rulechains. 
+
+If you need to close the NodePort once a workload has been terminated, you can
+follow the same steps inversely.
+
+```
+juju run --application kubernetes-worker close-port 30510
+```
+

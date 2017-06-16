@@ -34,6 +34,8 @@ type FakeRoleBindings struct {
 
 var rolebindingsResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "", Resource: "rolebindings"}
 
+var rolebindingsKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "", Kind: "RoleBinding"}
+
 func (c *FakeRoleBindings) Create(roleBinding *rbac.RoleBinding) (result *rbac.RoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(rolebindingsResource, c.ns, roleBinding), &rbac.RoleBinding{})
@@ -80,7 +82,7 @@ func (c *FakeRoleBindings) Get(name string, options v1.GetOptions) (result *rbac
 
 func (c *FakeRoleBindings) List(opts v1.ListOptions) (result *rbac.RoleBindingList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(rolebindingsResource, c.ns, opts), &rbac.RoleBindingList{})
+		Invokes(testing.NewListAction(rolebindingsResource, rolebindingsKind, c.ns, opts), &rbac.RoleBindingList{})
 
 	if obj == nil {
 		return nil, err

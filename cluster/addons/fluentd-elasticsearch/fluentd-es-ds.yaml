@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
       - name: fluentd-es
-        image: gcr.io/google_containers/fluentd-elasticsearch:1.22
+        image: gcr.io/google_containers/fluentd-elasticsearch:1.23
         command:
           - '/bin/sh'
           - '-c'

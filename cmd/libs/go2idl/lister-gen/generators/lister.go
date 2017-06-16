@@ -106,6 +106,13 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			internalGVPkg = strings.Join(parts[0:len(parts)-1], "/")
 		}
 
+		// If there's a comment of the form "// +groupName=somegroup" or
+		// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
+		// group when generating.
+		if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
+			gv.Group = clientgentypes.Group(strings.SplitN(override[0], ".", 2)[0])
+		}
+
 		var typesToGenerate []*types.Type
 		for _, t := range p.Types {
 			// filter out types which dont have genclient=true.
@@ -220,7 +227,7 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 
 	glog.V(5).Infof("processing type %v", t)
 	m := map[string]interface{}{
-		"Resource":   c.Universe.Function(types.Name{Package: g.internalGVPkg, Name: "Resource"}),
+		"Resource":   c.Universe.Function(types.Name{Package: t.Name.Package, Name: "Resource"}),
 		"type":       t,
 		"objectMeta": g.objectMeta,
 	}

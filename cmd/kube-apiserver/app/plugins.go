@@ -24,26 +24,57 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Admission policies
-	_ "k8s.io/kubernetes/plugin/pkg/admission/admit"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/deny"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/exec"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/gc"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/initialresources"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/limitranger"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/podpreset"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/storageclass/default"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+	"k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
+	"k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
+	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
+	"k8s.io/kubernetes/plugin/pkg/admission/deny"
+	"k8s.io/kubernetes/plugin/pkg/admission/exec"
+	"k8s.io/kubernetes/plugin/pkg/admission/gc"
+	"k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
+	"k8s.io/kubernetes/plugin/pkg/admission/initialization"
+	"k8s.io/kubernetes/plugin/pkg/admission/initialresources"
+	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
+	"k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
+	"k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
+	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
+	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
+	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
+	"k8s.io/kubernetes/plugin/pkg/admission/podpreset"
+	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
+	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
+	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
+	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
+	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
+	"k8s.io/kubernetes/plugin/pkg/admission/storageclass/setdefault"
+	"k8s.io/kubernetes/plugin/pkg/admission/webhook"
 )
+
+// registerAllAdmissionPlugins registers all admission plugins
+func registerAllAdmissionPlugins(plugins *admission.Plugins) {
+	admit.Register(plugins)
+	alwayspullimages.Register(plugins)
+	antiaffinity.Register(plugins)
+	defaulttolerationseconds.Register(plugins)
+	deny.Register(plugins)
+	exec.Register(plugins)
+	gc.Register(plugins)
+	imagepolicy.Register(plugins)
+	initialization.Register(plugins)
+	initialresources.Register(plugins)
+	limitranger.Register(plugins)
+	autoprovision.Register(plugins)
+	exists.Register(plugins)
+	noderestriction.Register(plugins)
+	label.Register(plugins)
+	podnodeselector.Register(plugins)
+	podpreset.Register(plugins)
+	podtolerationrestriction.Register(plugins)
+	resourcequota.Register(plugins)
+	podsecuritypolicy.Register(plugins)
+	scdeny.Register(plugins)
+	serviceaccount.Register(plugins)
+	setdefault.Register(plugins)
+	webhook.Register(plugins)
+}

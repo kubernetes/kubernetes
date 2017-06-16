@@ -25,11 +25,11 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
+        "//pkg/api/helper/qos:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions:go_default_library",
-        "//pkg/kubelet/qos:go_default_library",
         "//pkg/quota:go_default_library",
         "//pkg/quota/generic:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

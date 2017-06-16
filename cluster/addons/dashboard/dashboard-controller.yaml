@@ -20,15 +20,15 @@ spec:
     spec:
       containers:
       - name: kubernetes-dashboard
-        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.6.0
+        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.6.1
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:
             cpu: 100m
-            memory: 50Mi
+            memory: 300Mi
           requests:
             cpu: 100m
-            memory: 50Mi
+            memory: 100Mi
         ports:
         - containerPort: 9090
         livenessProbe:

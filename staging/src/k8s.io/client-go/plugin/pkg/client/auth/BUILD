@@ -12,6 +12,7 @@ go_library(
     srcs = ["plugins.go"],
     tags = ["automanaged"],
     deps = [
+        "//vendor/k8s.io/client-go/plugin/pkg/client/auth/azure:go_default_library",
         "//vendor/k8s.io/client-go/plugin/pkg/client/auth/gcp:go_default_library",
         "//vendor/k8s.io/client-go/plugin/pkg/client/auth/oidc:go_default_library",
     ],

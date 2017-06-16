@@ -16,6 +16,15 @@ limitations under the License.
 
 package gce
 
+import "time"
+
+func newClustersMetricContext(request, zone string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{"clusters_" + request, unusedMetricLabel, zone},
+	}
+}
+
 func (gce *GCECloud) ListClusters() ([]string, error) {
 	allClusters := []string{}
 
@@ -36,14 +45,16 @@ func (gce *GCECloud) Master(clusterName string) (string, error) {
 }
 
 func (gce *GCECloud) listClustersInZone(zone string) ([]string, error) {
+	mc := newClustersMetricContext("list_zone", zone)
 	// TODO: use PageToken to list all not just the first 500
 	list, err := gce.containerService.Projects.Zones.Clusters.List(gce.projectID, zone).Do()
 	if err != nil {
-		return nil, err
+		return nil, mc.Observe(err)
 	}
+
 	result := []string{}
 	for _, cluster := range list.Clusters {
 		result = append(result, cluster.Name)
 	}
-	return result, nil
+	return result, mc.Observe(nil)
 }

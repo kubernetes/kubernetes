@@ -65,11 +65,11 @@ type Config struct {
 	GetDefinitions GetOpenAPIDefinitions
 
 	// GetOperationIDAndTags returns operation id and tags for a restful route. It is an optional function to customize operation IDs.
-	GetOperationIDAndTags func(servePath string, r *restful.Route) (string, []string, error)
+	GetOperationIDAndTags func(r *restful.Route) (string, []string, error)
 
 	// GetDefinitionName returns a friendly name for a definition base on the serving path. parameter `name` is the full name of the definition.
 	// It is an optional function to customize model names.
-	GetDefinitionName func(servePath string, name string) (string, spec.Extensions)
+	GetDefinitionName func(name string) (string, spec.Extensions)
 
 	// PostProcessSpec runs after the spec is ready to serve. It allows a final modification to the spec before serving.
 	PostProcessSpec func(*spec.Swagger) (*spec.Swagger, error)
@@ -124,26 +124,27 @@ type Config struct {
 //
 func GetOpenAPITypeFormat(typeName string) (string, string) {
 	schemaTypeFormatMap := map[string][]string{
-		"uint":      {"integer", "int32"},
-		"uint8":     {"integer", "byte"},
-		"uint16":    {"integer", "int32"},
-		"uint32":    {"integer", "int64"},
-		"uint64":    {"integer", "int64"},
-		"int":       {"integer", "int32"},
-		"int8":      {"integer", "byte"},
-		"int16":     {"integer", "int32"},
-		"int32":     {"integer", "int32"},
-		"int64":     {"integer", "int64"},
-		"byte":      {"integer", "byte"},
-		"float64":   {"number", "double"},
-		"float32":   {"number", "float"},
-		"bool":      {"boolean", ""},
-		"time.Time": {"string", "date-time"},
-		"string":    {"string", ""},
-		"integer":   {"integer", ""},
-		"number":    {"number", ""},
-		"boolean":   {"boolean", ""},
-		"[]byte":    {"string", "byte"}, // base64 encoded characters
+		"uint":        {"integer", "int32"},
+		"uint8":       {"integer", "byte"},
+		"uint16":      {"integer", "int32"},
+		"uint32":      {"integer", "int64"},
+		"uint64":      {"integer", "int64"},
+		"int":         {"integer", "int32"},
+		"int8":        {"integer", "byte"},
+		"int16":       {"integer", "int32"},
+		"int32":       {"integer", "int32"},
+		"int64":       {"integer", "int64"},
+		"byte":        {"integer", "byte"},
+		"float64":     {"number", "double"},
+		"float32":     {"number", "float"},
+		"bool":        {"boolean", ""},
+		"time.Time":   {"string", "date-time"},
+		"string":      {"string", ""},
+		"integer":     {"integer", ""},
+		"number":      {"number", ""},
+		"boolean":     {"boolean", ""},
+		"[]byte":      {"string", "byte"}, // base64 encoded characters
+		"interface{}": {"object", ""},
 	}
 	mapped, ok := schemaTypeFormatMap[typeName]
 	if !ok {

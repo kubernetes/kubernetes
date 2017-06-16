@@ -33,6 +33,8 @@ type FakeComponentStatuses struct {
 
 var componentstatusesResource = schema.GroupVersionResource{Group: "", Version: "", Resource: "componentstatuses"}
 
+var componentstatusesKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "ComponentStatus"}
+
 func (c *FakeComponentStatuses) Create(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(componentstatusesResource, componentStatus), &api.ComponentStatus{})
@@ -75,7 +77,7 @@ func (c *FakeComponentStatuses) Get(name string, options v1.GetOptions) (result 
 
 func (c *FakeComponentStatuses) List(opts v1.ListOptions) (result *api.ComponentStatusList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(componentstatusesResource, opts), &api.ComponentStatusList{})
+		Invokes(testing.NewRootListAction(componentstatusesResource, componentstatusesKind, opts), &api.ComponentStatusList{})
 	if obj == nil {
 		return nil, err
 	}

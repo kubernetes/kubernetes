@@ -62,6 +62,7 @@ function create_cluster {
   --volume=/var/lib/docker/:/var/lib/docker:rw \
   --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
   --volume=/var/run:/var/run:rw \
+  --volume=/run/xtables.lock:/run/xtables.lock:rw \
   --net=host \
   --pid=host \
   --privileged=true \

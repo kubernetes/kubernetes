@@ -16,7 +16,11 @@ limitations under the License.
 
 package factory
 
-import "testing"
+import (
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	"testing"
+)
 
 func TestAlgorithmNameValidation(t *testing.T) {
 	algorithmNamesShouldValidate := []string{
@@ -36,6 +40,42 @@ func TestAlgorithmNameValidation(t *testing.T) {
 	for _, name := range algorithmNamesShouldNotValidate {
 		if validName.MatchString(name) {
 			t.Errorf("%v should be an invalid algorithm name but is valid.", name)
+		}
+	}
+}
+
+func TestValidatePriorityConfigOverFlow(t *testing.T) {
+	tests := []struct {
+		description string
+		configs     []algorithm.PriorityConfig
+		expected    bool
+	}{
+		{
+			description: "one of the weights is MaxInt",
+			configs:     []algorithm.PriorityConfig{{Weight: api.MaxInt}, {Weight: 5}},
+			expected:    true,
+		},
+		{
+			description: "after multiplication with MaxPriority the weight is larger than MaxWeight",
+			configs:     []algorithm.PriorityConfig{{Weight: api.MaxInt/api.MaxPriority + api.MaxPriority}, {Weight: 5}},
+			expected:    true,
+		},
+		{
+			description: "normal weights",
+			configs:     []algorithm.PriorityConfig{{Weight: 10000}, {Weight: 5}},
+			expected:    false,
+		},
+	}
+	for _, test := range tests {
+		err := validateSelectedConfigs(test.configs)
+		if test.expected {
+			if err == nil {
+				t.Errorf("Expected Overflow for %s", test.description)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Did not expect an overflow for %s", test.description)
+			}
 		}
 	}
 }

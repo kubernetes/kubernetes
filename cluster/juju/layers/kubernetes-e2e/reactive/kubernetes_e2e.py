@@ -14,13 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
 from charms import layer
+from charms.layer import snap
 
 from charms.reactive import hook
 from charms.reactive import is_state
-from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import when
 from charms.reactive import when_not
@@ -29,7 +27,6 @@ from charmhelpers.core import hookenv
 
 from shlex import split
 
-from subprocess import call
 from subprocess import check_call
 from subprocess import check_output
 
@@ -37,7 +34,7 @@ from subprocess import check_output
 @hook('upgrade-charm')
 def reset_delivery_states():
     ''' Remove the state set when resources are unpacked. '''
-    remove_state('kubernetes-e2e.installed')
+    install_snaps()
 
 
 @when('kubernetes-e2e.installed')
@@ -65,52 +62,19 @@ def messaging():
     hookenv.status_set('active', 'Ready to test.')
 
 
-@when_not('kubernetes-e2e.installed')
-def install_kubernetes_e2e():
+@when('config.changed.channel')
+def channel_changed():
+    install_snaps()
+
+
+def install_snaps():
     ''' Deliver the e2e and kubectl components from the binary resource stream
     packages declared in the charm '''
-    charm_dir = os.getenv('CHARM_DIR')
-    arch = determine_arch()
-
-    # Get the resource via resource_get
-    resource = 'e2e_{}'.format(arch)
-    try:
-        archive = hookenv.resource_get(resource)
-    except Exception:
-        message = 'Error fetching the {} resource.'.format(resource)
-        hookenv.log(message)
-        hookenv.status_set('blocked', message)
-        return
-
-    if not archive:
-        hookenv.log('Missing {} resource.'.format(resource))
-        hookenv.status_set('blocked', 'Missing {} resource.'.format(resource))
-        return
-
-    # Handle null resource publication, we check if filesize < 1mb
-    filesize = os.stat(archive).st_size
-    if filesize < 1000000:
-        hookenv.status_set('blocked',
-                           'Incomplete {} resource.'.format(resource))
-        return
-
-    hookenv.status_set('maintenance',
-                       'Unpacking {} resource.'.format(resource))
-
-    unpack_path = '{}/files/kubernetes'.format(charm_dir)
-    os.makedirs(unpack_path, exist_ok=True)
-    cmd = ['tar', 'xfvz', archive, '-C', unpack_path]
-    hookenv.log(cmd)
-    check_call(cmd)
-
-    services = ['e2e.test', 'ginkgo', 'kubectl']
-
-    for service in services:
-        unpacked = '{}/{}'.format(unpack_path, service)
-        app_path = '/usr/local/bin/{}'.format(service)
-        install = ['install', '-v', unpacked, app_path]
-        call(install)
-
+    channel = hookenv.config('channel')
+    hookenv.status_set('maintenance', 'Installing kubectl snap')
+    snap.install('kubectl', channel=channel, classic=True)
+    hookenv.status_set('maintenance', 'Installing kubernetes-test snap')
+    snap.install('kubernetes-test', channel=channel, classic=True)
     set_state('kubernetes-e2e.installed')
 
 

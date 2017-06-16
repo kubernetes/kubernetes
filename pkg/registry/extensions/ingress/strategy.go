@@ -18,8 +18,8 @@ package ingress
 
 import (
 	"fmt"
-	"reflect"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,7 +66,7 @@ func (ingressStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
 	// See metav1.ObjectMeta description for more information on Generation.
-	if !reflect.DeepEqual(oldIngress.Spec, newIngress.Spec) {
+	if !apiequality.Semantic.DeepEqual(oldIngress.Spec, newIngress.Spec) {
 		newIngress.Generation = oldIngress.Generation + 1
 	}
 
@@ -106,12 +106,12 @@ func IngressToSelectableFields(ingress *extensions.Ingress) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	ingress, ok := obj.(*extensions.Ingress)
 	if !ok {
-		return nil, nil, fmt.Errorf("Given object is not an Ingress.")
+		return nil, nil, false, fmt.Errorf("given object is not an Ingress.")
 	}
-	return labels.Set(ingress.ObjectMeta.Labels), IngressToSelectableFields(ingress), nil
+	return labels.Set(ingress.ObjectMeta.Labels), IngressToSelectableFields(ingress), ingress.Initializers != nil, nil
 }
 
 // MatchIngress is the filter used by the generic etcd backend to ingress

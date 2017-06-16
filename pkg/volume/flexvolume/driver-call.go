@@ -46,11 +46,18 @@ const (
 	unmountCmd = "unmount"
 
 	// Option keys
-	optionFSType    = "kubernetes.io/fsType"
-	optionReadWrite = "kubernetes.io/readwrite"
-	optionKeySecret = "kubernetes.io/secret"
-	optionFSGroup   = "kubernetes.io/fsGroup"
-	optionMountsDir = "kubernetes.io/mountsDir"
+	optionFSType         = "kubernetes.io/fsType"
+	optionReadWrite      = "kubernetes.io/readwrite"
+	optionKeySecret      = "kubernetes.io/secret"
+	optionFSGroup        = "kubernetes.io/fsGroup"
+	optionMountsDir      = "kubernetes.io/mountsDir"
+	optionPVorVolumeName = "kubernetes.io/pvOrVolumeName"
+
+	optionKeyPodName      = "kubernetes.io/pod.name"
+	optionKeyPodNamespace = "kubernetes.io/pod.namespace"
+	optionKeyPodUID       = "kubernetes.io/pod.uid"
+
+	optionKeyServiceAccountName = "kubernetes.io/serviceAccount.name"
 )
 
 const (
@@ -167,6 +174,8 @@ func NewOptionsForDriver(spec *volume.Spec, host volume.VolumeHost, extraOptions
 	} else {
 		options[optionReadWrite] = "rw"
 	}
+
+	options[optionPVorVolumeName] = spec.Name()
 
 	for key, value := range extraOptions {
 		options[key] = value

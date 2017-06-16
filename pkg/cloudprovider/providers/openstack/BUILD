@@ -13,8 +13,10 @@ go_library(
     srcs = [
         "metadata.go",
         "openstack.go",
+        "openstack_client.go",
         "openstack_instances.go",
         "openstack_loadbalancer.go",
+        "openstack_metrics.go",
         "openstack_routes.go",
         "openstack_volumes.go",
     ],
@@ -24,6 +26,7 @@ go_library(
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
@@ -53,9 +56,11 @@ go_library(
         "//vendor/github.com/gophercloud/gophercloud/openstack/networking/v2/ports:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/pagination:go_default_library",
         "//vendor/github.com/mitchellh/mapstructure:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
     ],
 )
@@ -78,6 +83,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
     ],
 )
 

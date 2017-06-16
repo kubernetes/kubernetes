@@ -26,7 +26,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
+	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
 func deepEqualWithoutGeneration(t *testing.T, testcase int, actual, expected *NodeInfo) {
@@ -437,8 +439,7 @@ func TestRemovePod(t *testing.T) {
 	nodeName := "node"
 	basePod := makeBasePod(nodeName, "test", "100m", "500", []v1.ContainerPort{{HostPort: 80}})
 	tests := []struct {
-		pod *v1.Pod
-
+		pod       *v1.Pod
 		wNodeInfo *NodeInfo
 	}{{
 		pod: basePod,
@@ -502,6 +503,265 @@ func TestForgetPod(t *testing.T) {
 		cache.cleanupAssumedPods(now.Add(2 * ttl))
 		if n := cache.nodes[nodeName]; n != nil {
 			t.Errorf("#%d: expecting pod deleted and nil node info, get=%s", i, n)
+		}
+	}
+}
+
+// addResource adds ResourceList into Resource.
+func addResource(r *Resource, rl v1.ResourceList) {
+	if r == nil {
+		return
+	}
+
+	for rName, rQuant := range rl {
+		switch rName {
+		case v1.ResourceCPU:
+			r.MilliCPU += rQuant.MilliValue()
+		case v1.ResourceMemory:
+			r.Memory += rQuant.Value()
+		case v1.ResourceNvidiaGPU:
+			r.NvidiaGPU += rQuant.Value()
+		default:
+			if v1helper.IsOpaqueIntResourceName(rName) {
+				r.AddOpaque(rName, rQuant.Value())
+			}
+		}
+	}
+}
+
+// getResourceRequest returns the resource request of all containers in Pods;
+// excuding initContainers.
+func getResourceRequest(pod *v1.Pod) v1.ResourceList {
+	result := &Resource{}
+	for _, container := range pod.Spec.Containers {
+		addResource(result, container.Resources.Requests)
+	}
+
+	return result.ResourceList()
+}
+
+// newResource returns a new Resource by ResourceList.
+func newResource(rl v1.ResourceList) *Resource {
+	res := &Resource{}
+
+	for rName, rQuantity := range rl {
+		switch rName {
+		case v1.ResourceMemory:
+			res.Memory = rQuantity.Value()
+		case v1.ResourceCPU:
+			res.MilliCPU = rQuantity.MilliValue()
+		case v1.ResourceNvidiaGPU:
+			res.NvidiaGPU += rQuantity.Value()
+		default:
+			if v1helper.IsOpaqueIntResourceName(rName) {
+				res.SetOpaque(rName, rQuantity.Value())
+			}
+		}
+	}
+
+	return res
+}
+
+// buildNodeInfo creates a NodeInfo by simulating node operations in cache.
+func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *NodeInfo {
+	expected := NewNodeInfo()
+
+	// Simulate SetNode.
+	expected.node = node
+	expected.allocatableResource = newResource(node.Status.Allocatable)
+	expected.taints = node.Spec.Taints
+	expected.generation++
+
+	for _, pod := range pods {
+		// Simulate AddPod
+		expected.pods = append(expected.pods, pod)
+		addResource(expected.requestedResource, getResourceRequest(pod))
+		addResource(expected.nonzeroRequest, getResourceRequest(pod))
+		expected.usedPorts = schedutil.GetUsedPorts(pod)
+		expected.generation++
+	}
+
+	return expected
+}
+
+// TestNodeOperators tests node operations of cache, including add, update
+// and remove.
+func TestNodeOperators(t *testing.T) {
+	// Test datas
+	nodeName := "test-node"
+	cpu_1 := resource.MustParse("1000m")
+	mem_100m := resource.MustParse("100m")
+	cpu_half := resource.MustParse("500m")
+	mem_50m := resource.MustParse("50m")
+	resourceFooName := "pod.alpha.kubernetes.io/opaque-int-resource-foo"
+	resourceFoo := resource.MustParse("1")
+
+	tests := []struct {
+		node *v1.Node
+		pods []*v1.Pod
+	}{
+		{
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeName,
+				},
+				Status: v1.NodeStatus{
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:                   cpu_1,
+						v1.ResourceMemory:                mem_100m,
+						v1.ResourceName(resourceFooName): resourceFoo,
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    "test-key",
+							Value:  "test-value",
+							Effect: v1.TaintEffectPreferNoSchedule,
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod1",
+					},
+					Spec: v1.PodSpec{
+						NodeName: nodeName,
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    cpu_half,
+										v1.ResourceMemory: mem_50m,
+									},
+								},
+								Ports: []v1.ContainerPort{
+									{
+										Name:          "http",
+										HostPort:      80,
+										ContainerPort: 80,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeName,
+				},
+				Status: v1.NodeStatus{
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:                   cpu_1,
+						v1.ResourceMemory:                mem_100m,
+						v1.ResourceName(resourceFooName): resourceFoo,
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    "test-key",
+							Value:  "test-value",
+							Effect: v1.TaintEffectPreferNoSchedule,
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod1",
+					},
+					Spec: v1.PodSpec{
+						NodeName: nodeName,
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    cpu_half,
+										v1.ResourceMemory: mem_50m,
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod2",
+					},
+					Spec: v1.PodSpec{
+						NodeName: nodeName,
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    cpu_half,
+										v1.ResourceMemory: mem_50m,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		expected := buildNodeInfo(test.node, test.pods)
+		node := test.node
+
+		cache := newSchedulerCache(time.Second, time.Second, nil)
+		cache.AddNode(node)
+		for _, pod := range test.pods {
+			cache.AddPod(pod)
+		}
+
+		// Case 1: the node was added into cache successfully.
+		got, found := cache.nodes[node.Name]
+		if !found {
+			t.Errorf("Failed to find node %v in schedulercache.", node.Name)
+		}
+
+		if !reflect.DeepEqual(got, expected) {
+			t.Errorf("Failed to add node into schedulercache:\n got: %+v \nexpected: %+v", got, expected)
+		}
+
+		// Case 2: dump cached nodes successfully.
+		cachedNodes := map[string]*NodeInfo{}
+		cache.UpdateNodeNameToInfoMap(cachedNodes)
+		newNode, found := cachedNodes[node.Name]
+		if !found || len(cachedNodes) != 1 {
+			t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes, cache.nodes)
+		}
+		if !reflect.DeepEqual(newNode, expected) {
+			t.Errorf("Failed to clone node:\n got: %+v, \n expected: %+v", newNode, expected)
+		}
+
+		// Case 3: update node attribute successfully.
+		node.Status.Allocatable[v1.ResourceMemory] = mem_50m
+		expected.allocatableResource.Memory = mem_50m.Value()
+		expected.generation++
+		cache.UpdateNode(nil, node)
+		got, found = cache.nodes[node.Name]
+		if !found {
+			t.Errorf("Failed to find node %v in schedulercache after UpdateNode.", node.Name)
+		}
+
+		if !reflect.DeepEqual(got, expected) {
+			t.Errorf("Failed to update node in schedulercache:\n got: %+v \nexpected: %+v", got, expected)
+		}
+
+		// Case 4: the node can not be removed if pods is not empty.
+		cache.RemoveNode(node)
+		if _, found := cache.nodes[node.Name]; !found {
+			t.Errorf("The node %v should not be removed if pods is not empty.", node.Name)
 		}
 	}
 }

@@ -25,7 +25,7 @@ import (
 // that matches Time. Do not use in Go structs.
 type Timestamp struct {
 	// Represents seconds of UTC time since Unix epoch
-	// 1970-01-01T00:00:00Z. Must be from from 0001-01-01T00:00:00Z to
+	// 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
 	// 9999-12-31T23:59:59Z inclusive.
 	Seconds int64 `json:"seconds" protobuf:"varint,1,opt,name=seconds"`
 	// Non-negative fractions of a second at nanosecond resolution. Negative

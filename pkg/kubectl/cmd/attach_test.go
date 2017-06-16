@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -157,19 +157,19 @@ func TestPodAndContainerAttach(t *testing.T) {
 
 		err := options.Complete(f, cmd, test.args)
 		if test.expectError && err == nil {
-			t.Errorf("unexpected non-error (%s)", test.name)
+			t.Errorf("%s: unexpected non-error", test.name)
 		}
 		if !test.expectError && err != nil {
-			t.Errorf("unexpected error: %v (%s)", err, test.name)
+			t.Errorf("%s: unexpected error: %v", test.name, err)
 		}
 		if err != nil {
 			continue
 		}
 		if options.PodName != test.expectedPod {
-			t.Errorf("expected: %s, got: %s (%s)", test.expectedPod, options.PodName, test.name)
+			t.Errorf("%s: expected: %s, got: %s", test.name, test.expectedPod, options.PodName)
 		}
 		if options.ContainerName != test.expectedContainer {
-			t.Errorf("expected: %s, got: %s (%s)", test.expectedContainer, options.ContainerName, test.name)
+			t.Errorf("%s: expected: %s, got: %s", test.name, test.expectedContainer, options.ContainerName)
 		}
 	}
 }

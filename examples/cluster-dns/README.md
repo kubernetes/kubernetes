@@ -4,7 +4,7 @@ This is a toy example demonstrating how to use kubernetes DNS.
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](../../docs/getting-started-guides/). Make sure DNS is enabled in your setup, see [DNS doc](https://github.com/kubernetes/dns).
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](https://kubernetes.io/docs/getting-started-guides/). Make sure DNS is enabled in your setup, see [DNS doc](https://github.com/kubernetes/dns).
 
 ```sh
 $ cd kubernetes
@@ -13,7 +13,7 @@ $ hack/dev-build-and-up.sh
 
 ### Step One: Create two namespaces
 
-We'll see how cluster DNS works across multiple [namespaces](../../docs/user-guide/namespaces.md), first we need to create two namespaces:
+We'll see how cluster DNS works across multiple [namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/), first we need to create two namespaces:
 
 ```sh
 $ kubectl create -f examples/cluster-dns/namespace-dev.yaml
@@ -41,7 +41,7 @@ You can view your cluster name and user name in kubernetes config at ~/.kube/con
 
 ### Step Two: Create backend replication controller in each namespace
 
-Use the file [`examples/cluster-dns/dns-backend-rc.yaml`](dns-backend-rc.yaml) to create a backend server [replication controller](../../docs/user-guide/replication-controller.md) in each namespace.
+Use the file [`examples/cluster-dns/dns-backend-rc.yaml`](dns-backend-rc.yaml) to create a backend server [replication controller](https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/) in each namespace.
 
 ```sh
 $ kubectl config use-context dev
@@ -69,7 +69,7 @@ dns-backend   dns-backend    ddysher/dns-backend   name=dns-backend   1
 ### Step Three: Create backend service
 
 Use the file [`examples/cluster-dns/dns-backend-service.yaml`](dns-backend-service.yaml) to create
-a [service](../../docs/user-guide/services.md) for the backend server.
+a [service](https://kubernetes.io/docs/concepts/services-networking/service/) for the backend server.
 
 ```sh
 $ kubectl config use-context dev
@@ -96,7 +96,7 @@ dns-backend  10.0.2.4         <none>            8000/TCP               name=dns-
 
 ### Step Four: Create client pod in one namespace
 
-Use the file [`examples/cluster-dns/dns-frontend-pod.yaml`](dns-frontend-pod.yaml) to create a client [pod](../../docs/user-guide/pods.md) in dev namespace. The client pod will make a connection to backend and exit. Specifically, it tries to connect to address `http://dns-backend.development.cluster.local:8000`.
+Use the file [`examples/cluster-dns/dns-frontend-pod.yaml`](dns-frontend-pod.yaml) to create a client [pod](https://kubernetes.io/docs/concepts/workloads/pods/pod/) in dev namespace. The client pod will make a connection to backend and exit. Specifically, it tries to connect to address `http://dns-backend.development.cluster.local:8000`.
 
 ```sh
 $ kubectl config use-context dev

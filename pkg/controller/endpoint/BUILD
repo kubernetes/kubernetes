@@ -21,6 +21,7 @@ go_library(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/core/v1:go_default_library",
+        "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",

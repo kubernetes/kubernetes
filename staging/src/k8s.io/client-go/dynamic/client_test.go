@@ -191,7 +191,7 @@ func TestGet(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource, tc.namespace).Get(tc.name)
+		got, err := cl.Resource(resource, tc.namespace).Get(tc.name, metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when getting %q: %v", tc.name, err)
 			continue
@@ -554,5 +554,13 @@ func TestPatch(t *testing.T) {
 		if !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("Patch(%q) want: %v\ngot: %v", tc.name, tc.want, got)
 		}
+	}
+}
+
+func TestVersionedParameterEncoderWithV1Fallback(t *testing.T) {
+	enc := VersionedParameterEncoderWithV1Fallback
+	_, err := enc.EncodeParameters(&metav1.ListOptions{}, schema.GroupVersion{Group: "foo.bar.com", Version: "v4"})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }

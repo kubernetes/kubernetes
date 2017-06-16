@@ -119,7 +119,7 @@ for upload_attempt in $(seq 3); do
   if [[ -d "${ARTIFACTS}" && -n $(ls -A "${ARTIFACTS}") ]]; then
     V=2 kube::log::status "Uploading artifacts"
     gsutil -m -q -o "GSUtil:use_magicfile=True" cp -a "${gcs_acl}" -r -c \
-      -z log,xml,xml "${ARTIFACTS}" "${GCS_LOGS_PATH}/artifacts" || continue
+      -z log,xml,json "${ARTIFACTS}" "${GCS_LOGS_PATH}/artifacts" || continue
   fi
   break
 done

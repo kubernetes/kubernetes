@@ -24,7 +24,7 @@ import (
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
-	// Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
@@ -166,6 +166,46 @@ type HorizontalPodAutoscalerStatus struct {
 
 	// currentMetrics is the last read state of the metrics used by this autoscaler.
 	CurrentMetrics []MetricStatus `json:"currentMetrics" protobuf:"bytes,5,rep,name=currentMetrics"`
+
+	// conditions is the set of conditions required for this autoscaler to scale its target,
+	// and indicates whether or not those conditions are met.
+	Conditions []HorizontalPodAutoscalerCondition `json:"conditions" protobuf:"bytes,6,rep,name=conditions"`
+}
+
+// HorizontalPodAutoscalerConditionType are the valid conditions of
+// a HorizontalPodAutoscaler.
+type HorizontalPodAutoscalerConditionType string
+
+var (
+	// ScalingActive indicates that the HPA controller is able to scale if necessary:
+	// it's correctly configured, can fetch the desired metrics, and isn't disabled.
+	ScalingActive HorizontalPodAutoscalerConditionType = "ScalingActive"
+	// AbleToScale indicates a lack of transient issues which prevent scaling from occuring,
+	// such as being in a backoff window, or being unable to access/update the target scale.
+	AbleToScale HorizontalPodAutoscalerConditionType = "AbleToScale"
+	// ScalingLimited indicates that the calculated scale based on metrics would be above or
+	// below the range for the HPA, and has thus been capped.
+	ScalingLimited HorizontalPodAutoscalerConditionType = "ScalingLimited"
+)
+
+// HorizontalPodAutoscalerCondition describes the state of
+// a HorizontalPodAutoscaler at a certain point.
+type HorizontalPodAutoscalerCondition struct {
+	// type describes the current condition
+	Type HorizontalPodAutoscalerConditionType `json:"type" protobuf:"bytes,1,name=type"`
+	// status is the status of the condition (True, False, Unknown)
+	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,name=status"`
+	// lastTransitionTime is the last time the condition transitioned from
+	// one status to another
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
+	// reason is the reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
+	// message is a human-readable explanation containing details about
+	// the transition
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
 // MetricStatus describes the last-read state of a single metric.
@@ -243,12 +283,12 @@ type ResourceMetricStatus struct {
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta `json:",inline"`
 	// metadata is the standard object metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec is the specification for the behaviour of the autoscaler.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
 	// +optional
 	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 

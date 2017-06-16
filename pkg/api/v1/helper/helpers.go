@@ -203,10 +203,10 @@ func NodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (label
 	return selector, nil
 }
 
-// AddOrUpdateTolerationInPod tries to add a toleration to the pod's toleration list.
+// AddOrUpdateTolerationInPodSpec tries to add a toleration to the toleration list in PodSpec.
 // Returns true if something was updated, false otherwise.
-func AddOrUpdateTolerationInPod(pod *v1.Pod, toleration *v1.Toleration) bool {
-	podTolerations := pod.Spec.Tolerations
+func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration) bool {
+	podTolerations := spec.Tolerations
 
 	var newTolerations []v1.Toleration
 	updated := false
@@ -227,8 +227,14 @@ func AddOrUpdateTolerationInPod(pod *v1.Pod, toleration *v1.Toleration) bool {
 		newTolerations = append(newTolerations, *toleration)
 	}
 
-	pod.Spec.Tolerations = newTolerations
+	spec.Tolerations = newTolerations
 	return true
+}
+
+// AddOrUpdateTolerationInPod tries to add a toleration to the pod's toleration list.
+// Returns true if something was updated, false otherwise.
+func AddOrUpdateTolerationInPod(pod *v1.Pod, toleration *v1.Toleration) bool {
+	return AddOrUpdateTolerationInPodSpec(&pod.Spec, toleration)
 }
 
 // TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
@@ -491,4 +497,34 @@ func PersistentVolumeClaimHasClass(claim *v1.PersistentVolumeClaim) bool {
 	}
 
 	return false
+}
+
+// GetStorageNodeAffinityFromAnnotation gets the json serialized data from PersistentVolume.Annotations
+// and converts it to the NodeAffinity type in api.
+// TODO: update when storage node affinity graduates to beta
+func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*v1.NodeAffinity, error) {
+	if len(annotations) > 0 && annotations[v1.AlphaStorageNodeAffinityAnnotation] != "" {
+		var affinity v1.NodeAffinity
+		err := json.Unmarshal([]byte(annotations[v1.AlphaStorageNodeAffinityAnnotation]), &affinity)
+		if err != nil {
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
+}
+
+// Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
+// TODO: update when storage node affinity graduates to beta
+func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *v1.NodeAffinity) error {
+	if affinity == nil {
+		return nil
+	}
+
+	json, err := json.Marshal(*affinity)
+	if err != nil {
+		return err
+	}
+	annotations[v1.AlphaStorageNodeAffinityAnnotation] = string(json)
+	return nil
 }

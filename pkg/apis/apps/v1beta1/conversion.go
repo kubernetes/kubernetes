@@ -37,6 +37,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	err := scheme.AddConversionFuncs(
 		Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec,
 		Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec,
+		Convert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy,
+		Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy,
 		// extensions
 		// TODO: below conversions should be dropped in favor of auto-generated
 		// ones, see https://github.com/kubernetes/kubernetextensionsssues/39865
@@ -66,7 +68,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	if err != nil {
 		return err
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("apps/v1beta1", "Deployment",
+	err = scheme.AddFieldLabelConversionFunc("apps/v1beta1", "Deployment",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace":
@@ -109,7 +111,17 @@ func Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *StatefulSetSpec
 	} else {
 		out.VolumeClaimTemplates = nil
 	}
+	if err := Convert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+		return err
+	}
+	if in.RevisionHistoryLimit != nil {
+		out.RevisionHistoryLimit = new(int32)
+		*out.RevisionHistoryLimit = *in.RevisionHistoryLimit
+	} else {
+		out.RevisionHistoryLimit = nil
+	}
 	out.ServiceName = in.ServiceName
+	out.PodManagementPolicy = apps.PodManagementPolicyType(in.PodManagementPolicy)
 	return nil
 }
 
@@ -139,7 +151,40 @@ func Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSe
 	} else {
 		out.VolumeClaimTemplates = nil
 	}
+	if in.RevisionHistoryLimit != nil {
+		out.RevisionHistoryLimit = new(int32)
+		*out.RevisionHistoryLimit = *in.RevisionHistoryLimit
+	} else {
+		out.RevisionHistoryLimit = nil
+	}
 	out.ServiceName = in.ServiceName
+	out.PodManagementPolicy = PodManagementPolicyType(in.PodManagementPolicy)
+	if err := Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *StatefulSetUpdateStrategy, out *apps.StatefulSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = apps.StatefulSetUpdateStrategyType(in.Type)
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = new(apps.RollingUpdateStatefulSetStrategy)
+		out.RollingUpdate.Partition = *in.RollingUpdate.Partition
+	} else {
+		out.RollingUpdate = nil
+	}
+	return nil
+}
+
+func Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy(in *apps.StatefulSetUpdateStrategy, out *StatefulSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = StatefulSetUpdateStrategyType(in.Type)
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = new(RollingUpdateStatefulSetStrategy)
+		out.RollingUpdate.Partition = new(int32)
+		*out.RollingUpdate.Partition = in.RollingUpdate.Partition
+	} else {
+		out.RollingUpdate = nil
+	}
 	return nil
 }
 

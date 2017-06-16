@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/golang/glog"
@@ -29,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/gpu"
 )
 
@@ -60,13 +61,13 @@ type nvidiaGPUManager struct {
 	defaultDevices []string
 	// The interface which could get GPU mapping from all the containers.
 	// TODO: Should make this independent of Docker in the future.
-	dockerClient     dockertools.DockerInterface
+	dockerClient     libdocker.Interface
 	activePodsLister activePodsLister
 }
 
 // NewNvidiaGPUManager returns a GPUManager that manages local Nvidia GPUs.
 // TODO: Migrate to use pod level cgroups and make it generic to all runtimes.
-func NewNvidiaGPUManager(activePodsLister activePodsLister, dockerClient dockertools.DockerInterface) (gpu.GPUManager, error) {
+func NewNvidiaGPUManager(activePodsLister activePodsLister, dockerClient libdocker.Interface) (gpu.GPUManager, error) {
 	if dockerClient == nil {
 		return nil, fmt.Errorf("invalid docker client specified")
 	}
@@ -101,8 +102,7 @@ func (ngm *nvidiaGPUManager) Start() error {
 	if err := ngm.discoverGPUs(); err != nil {
 		return err
 	}
-	// It's possible that the runtime isn't available now.
-	ngm.allocated = ngm.gpusInUse()
+
 	// We ignore errors when identifying allocated GPUs because it is possible that the runtime interfaces may be not be logically up.
 	return nil
 }
@@ -239,7 +239,7 @@ func (ngm *nvidiaGPUManager) gpusInUse() *podGPUs {
 		var containersToInspect []containerIdentifier
 		for _, container := range pod.Status.ContainerStatuses {
 			if containers.Has(container.Name) {
-				containersToInspect = append(containersToInspect, containerIdentifier{container.ContainerID, container.Name})
+				containersToInspect = append(containersToInspect, containerIdentifier{strings.Replace(container.ContainerID, "docker://", "", 1), container.Name})
 			}
 		}
 		// add the pod and its containers that need to be inspected.

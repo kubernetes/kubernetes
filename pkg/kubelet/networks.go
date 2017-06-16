@@ -72,20 +72,20 @@ func (c *criNetworkHost) GetNetNS(containerID string) (string, error) {
 // noOpLegacyHost implements the network.LegacyHost interface for the remote
 // runtime shim by just returning empties. It doesn't support legacy features
 // like host port and bandwidth shaping.
-type noOpLegacyHost struct{}
+type NoOpLegacyHost struct{}
 
-func (n *noOpLegacyHost) GetPodByName(namespace, name string) (*v1.Pod, bool) {
+func (n *NoOpLegacyHost) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	return nil, true
 }
 
-func (n *noOpLegacyHost) GetKubeClient() clientset.Interface {
+func (n *NoOpLegacyHost) GetKubeClient() clientset.Interface {
 	return nil
 }
 
-func (n *noOpLegacyHost) GetRuntime() kubecontainer.Runtime {
+func (n *NoOpLegacyHost) GetRuntime() kubecontainer.Runtime {
 	return nil
 }
 
-func (nh *noOpLegacyHost) SupportsLegacyFeatures() bool {
+func (nh *NoOpLegacyHost) SupportsLegacyFeatures() bool {
 	return false
 }

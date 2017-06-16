@@ -35,6 +35,7 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
+    deps = ["//vendor/github.com/docker/engine-api/types:go_default_library"],
 )
 
 filegroup(

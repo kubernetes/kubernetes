@@ -15,11 +15,11 @@
 # Cross-build the serve_hostname image
 #
 # Usage:
-#       [TAG=v1.6] [PREFIX=gcr.io/google_containers] [TEST_REGISTRY=gcr.io/k8s-authenticated-test] [ARCH=amd64] [BASEIMAGE=busybox] make all
+#       [TAG=v1.7] [PREFIX=gcr.io/google_containers] [TEST_REGISTRY=gcr.io/k8s-authenticated-test] [ARCH=amd64] [BASEIMAGE=busybox] make all
 
 .PHONY: all push container clean
 
-TAG ?= v1.6
+TAG ?= v1.7
 
 REGISTRY ?= gcr.io/google-containers
 TEST_REGISTRY ?= gcr.io/k8s-authenticated-test
@@ -31,7 +31,7 @@ ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 GOARM=7
 TEMP_DIR := $(shell mktemp -d)
-GOLANG_VERSION=1.7.5
+GOLANG_VERSION=1.8.3
 
 BIN = serve_hostname
 SRCS = serve_hostname.go

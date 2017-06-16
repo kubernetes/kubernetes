@@ -2,23 +2,8 @@ apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: redis-master
-  # these labels can be applied automatically 
-  # from the labels in the pod template if not set
-  # labels:
-  #   app: redis
-  #   role: master
-  #   tier: backend
 spec:
-  # this replicas value is default
-  # modify it according to your case
   replicas: 1
-  # selector can be applied automatically 
-  # from the labels in the pod template if not set
-  # selector:
-  #   matchLabels:
-  #     app: guestbook
-  #     role: master
-  #     tier: backend
   template:
     metadata:
       labels:

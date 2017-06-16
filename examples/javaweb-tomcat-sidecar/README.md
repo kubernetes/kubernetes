@@ -34,7 +34,7 @@ Generally, we have to set up a distributed file system (NFS at least) volume to 
 
 ### How To Set this Up
 
-In Kubernetes a [_Pod_](../../docs/user-guide/pods.md) is the smallest deployable unit that can be created, scheduled, and managed. It's a collocated group of containers that share an IP and storage volume.
+In Kubernetes a [_Pod_](https://kubernetes.io/docs/user-guide/pods.md) is the smallest deployable unit that can be created, scheduled, and managed. It's a collocated group of containers that share an IP and storage volume.
 
 Here is the config [javaweb.yaml](javaweb.yaml) for Java Web pod:
 

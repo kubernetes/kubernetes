@@ -25,6 +25,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
@@ -69,13 +70,13 @@ func TestCreatePodSecurityContextNonmutating(t *testing.T) {
 				// these are pod mutating strategies that are tested above
 				FSGroup: extensions.FSGroupStrategyOptions{
 					Rule: extensions.FSGroupStrategyMustRunAs,
-					Ranges: []extensions.IDRange{
+					Ranges: []extensions.GroupIDRange{
 						{Min: 1, Max: 1},
 					},
 				},
 				SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
 					Rule: extensions.SupplementalGroupsStrategyMustRunAs,
-					Ranges: []extensions.IDRange{
+					Ranges: []extensions.GroupIDRange{
 						{Min: 1, Max: 1},
 					},
 				},
@@ -111,76 +112,86 @@ func TestCreatePodSecurityContextNonmutating(t *testing.T) {
 }
 
 func TestCreateContainerSecurityContextNonmutating(t *testing.T) {
-	// Create a pod with a security context that needs filling in
-	createPod := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				Containers: []api.Container{{
-					SecurityContext: &api.SecurityContext{},
-				}},
-			},
+	untrue := false
+	tests := []struct {
+		security *api.SecurityContext
+	}{
+		{nil},
+		{&api.SecurityContext{RunAsNonRoot: &untrue}},
+	}
+
+	for _, tc := range tests {
+		// Create a pod with a security context that needs filling in
+		createPod := func() *api.Pod {
+			return &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						SecurityContext: tc.security,
+					}},
+				},
+			}
 		}
-	}
 
-	// Create a PSP with strategies that will populate a blank security context
-	createPSP := func() *extensions.PodSecurityPolicy {
-		var uid int64 = 1
-		return &extensions.PodSecurityPolicy{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "psp-sa",
-				Annotations: map[string]string{
-					seccomp.AllowedProfilesAnnotationKey: "*",
-					seccomp.DefaultProfileAnnotationKey:  "foo",
+		// Create a PSP with strategies that will populate a blank security context
+		createPSP := func() *extensions.PodSecurityPolicy {
+			uid := types.UnixUserID(1)
+			return &extensions.PodSecurityPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "psp-sa",
+					Annotations: map[string]string{
+						seccomp.AllowedProfilesAnnotationKey: "*",
+						seccomp.DefaultProfileAnnotationKey:  "foo",
+					},
 				},
-			},
-			Spec: extensions.PodSecurityPolicySpec{
-				DefaultAddCapabilities:   []api.Capability{"foo"},
-				RequiredDropCapabilities: []api.Capability{"bar"},
-				RunAsUser: extensions.RunAsUserStrategyOptions{
-					Rule:   extensions.RunAsUserStrategyMustRunAs,
-					Ranges: []extensions.IDRange{{Min: uid, Max: uid}},
+				Spec: extensions.PodSecurityPolicySpec{
+					DefaultAddCapabilities:   []api.Capability{"foo"},
+					RequiredDropCapabilities: []api.Capability{"bar"},
+					RunAsUser: extensions.RunAsUserStrategyOptions{
+						Rule:   extensions.RunAsUserStrategyMustRunAs,
+						Ranges: []extensions.UserIDRange{{Min: uid, Max: uid}},
+					},
+					SELinux: extensions.SELinuxStrategyOptions{
+						Rule:           extensions.SELinuxStrategyMustRunAs,
+						SELinuxOptions: &api.SELinuxOptions{User: "you"},
+					},
+					// these are pod mutating strategies that are tested above
+					FSGroup: extensions.FSGroupStrategyOptions{
+						Rule: extensions.FSGroupStrategyRunAsAny,
+					},
+					SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
+						Rule: extensions.SupplementalGroupsStrategyRunAsAny,
+					},
+					// mutates the container SC by defaulting to true if container sets nil
+					ReadOnlyRootFilesystem: true,
 				},
-				SELinux: extensions.SELinuxStrategyOptions{
-					Rule:           extensions.SELinuxStrategyMustRunAs,
-					SELinuxOptions: &api.SELinuxOptions{User: "you"},
-				},
-				// these are pod mutating strategies that are tested above
-				FSGroup: extensions.FSGroupStrategyOptions{
-					Rule: extensions.FSGroupStrategyRunAsAny,
-				},
-				SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
-					Rule: extensions.SupplementalGroupsStrategyRunAsAny,
-				},
-				// mutates the container SC by defaulting to true if container sets nil
-				ReadOnlyRootFilesystem: true,
-			},
+			}
 		}
-	}
 
-	pod := createPod()
-	psp := createPSP()
+		pod := createPod()
+		psp := createPSP()
 
-	provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
-	if err != nil {
-		t.Fatalf("unable to create provider %v", err)
-	}
-	sc, _, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.Containers[0])
-	if err != nil {
-		t.Fatalf("unable to create container security context %v", err)
-	}
+		provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
+		if err != nil {
+			t.Fatalf("unable to create provider %v", err)
+		}
+		sc, _, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.Containers[0])
+		if err != nil {
+			t.Fatalf("unable to create container security context %v", err)
+		}
 
-	// The generated security context should have filled in missing options, so they should differ
-	if reflect.DeepEqual(sc, &pod.Spec.Containers[0].SecurityContext) {
-		t.Error("expected created security context to be different than container's, but they were identical")
-	}
+		// The generated security context should have filled in missing options, so they should differ
+		if reflect.DeepEqual(sc, &pod.Spec.Containers[0].SecurityContext) {
+			t.Error("expected created security context to be different than container's, but they were identical")
+		}
 
-	// Creating the provider or the security context should not have mutated the psp or pod
-	if !reflect.DeepEqual(createPod(), pod) {
-		diffs := diff.ObjectDiff(createPod(), pod)
-		t.Errorf("pod was mutated by CreateContainerSecurityContext. diff:\n%s", diffs)
-	}
-	if !reflect.DeepEqual(createPSP(), psp) {
-		t.Error("psp was mutated by CreateContainerSecurityContext")
+		// Creating the provider or the security context should not have mutated the psp or pod
+		if !reflect.DeepEqual(createPod(), pod) {
+			diffs := diff.ObjectDiff(createPod(), pod)
+			t.Errorf("pod was mutated by CreateContainerSecurityContext. diff:\n%s", diffs)
+		}
+		if !reflect.DeepEqual(createPSP(), psp) {
+			t.Error("psp was mutated by CreateContainerSecurityContext")
+		}
 	}
 }
 
@@ -195,22 +206,22 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 	failHostIPCPod.Spec.SecurityContext.HostIPC = true
 
 	failSupplementalGroupPod := defaultPod()
-	failSupplementalGroupPod.Spec.SecurityContext.SupplementalGroups = []int64{999}
+	failSupplementalGroupPod.Spec.SecurityContext.SupplementalGroups = []types.UnixGroupID{999}
 	failSupplementalGroupPSP := defaultPSP()
 	failSupplementalGroupPSP.Spec.SupplementalGroups = extensions.SupplementalGroupsStrategyOptions{
 		Rule: extensions.SupplementalGroupsStrategyMustRunAs,
-		Ranges: []extensions.IDRange{
+		Ranges: []extensions.GroupIDRange{
 			{Min: 1, Max: 1},
 		},
 	}
 
 	failFSGroupPod := defaultPod()
-	fsGroup := int64(999)
+	fsGroup := types.UnixGroupID(999)
 	failFSGroupPod.Spec.SecurityContext.FSGroup = &fsGroup
 	failFSGroupPSP := defaultPSP()
 	failFSGroupPSP.Spec.FSGroup = extensions.FSGroupStrategyOptions{
 		Rule: extensions.FSGroupStrategyMustRunAs,
-		Ranges: []extensions.IDRange{
+		Ranges: []extensions.GroupIDRange{
 			{Min: 1, Max: 1},
 		},
 	}
@@ -236,6 +247,21 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			},
 		},
 	}
+
+	failHostPathDirPod := defaultPod()
+	failHostPathDirPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "bad volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/fail",
+				},
+			},
+		},
+	}
+	failHostPathDirPSP := defaultPSP()
+	failHostPathDirPSP.Spec.Volumes = []extensions.FSType{extensions.HostPath}
+	failHostPathDirPSP.Spec.AllowedHostPaths = []string{"/foo/bar"}
 
 	failOtherSysctlsAllowedPSP := defaultPSP()
 	failOtherSysctlsAllowedPSP.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "bar,abc"
@@ -307,6 +333,11 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			psp:           defaultPSP(),
 			expectedError: "hostPath volumes are not allowed to be used",
 		},
+		"failHostPathDirPSP": {
+			pod:           failHostPathDirPod,
+			psp:           failHostPathDirPSP,
+			expectedError: "host path /fail is not allowed to be used. allowed host paths: [/foo/bar]",
+		},
 		"failSafeSysctlFooPod with failNoSysctlAllowedSCC": {
 			pod:           failSafeSysctlFooPod,
 			psp:           failNoSysctlAllowedPSP,
@@ -352,11 +383,11 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 func TestValidateContainerSecurityContextFailures(t *testing.T) {
 	// fail user strat
 	failUserPSP := defaultPSP()
-	var uid int64 = 999
-	var badUID int64 = 1
+	uid := types.UnixUserID(999)
+	badUID := types.UnixUserID(1)
 	failUserPSP.Spec.RunAsUser = extensions.RunAsUserStrategyOptions{
 		Rule:   extensions.RunAsUserStrategyMustRunAs,
-		Ranges: []extensions.IDRange{{Min: uid, Max: uid}},
+		Ranges: []extensions.UserIDRange{{Min: uid, Max: uid}},
 	}
 	failUserPod := defaultPod()
 	failUserPod.Spec.Containers[0].SecurityContext.RunAsUser = &badUID
@@ -511,22 +542,22 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	supGroupPSP := defaultPSP()
 	supGroupPSP.Spec.SupplementalGroups = extensions.SupplementalGroupsStrategyOptions{
 		Rule: extensions.SupplementalGroupsStrategyMustRunAs,
-		Ranges: []extensions.IDRange{
+		Ranges: []extensions.GroupIDRange{
 			{Min: 1, Max: 5},
 		},
 	}
 	supGroupPod := defaultPod()
-	supGroupPod.Spec.SecurityContext.SupplementalGroups = []int64{3}
+	supGroupPod.Spec.SecurityContext.SupplementalGroups = []types.UnixGroupID{3}
 
 	fsGroupPSP := defaultPSP()
 	fsGroupPSP.Spec.FSGroup = extensions.FSGroupStrategyOptions{
 		Rule: extensions.FSGroupStrategyMustRunAs,
-		Ranges: []extensions.IDRange{
+		Ranges: []extensions.GroupIDRange{
 			{Min: 1, Max: 5},
 		},
 	}
 	fsGroupPod := defaultPod()
-	fsGroup := int64(3)
+	fsGroup := types.UnixGroupID(3)
 	fsGroupPod.Spec.SecurityContext.FSGroup = &fsGroup
 
 	seLinuxPod := defaultPod()
@@ -649,10 +680,10 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 
 	// success user strat
 	userPSP := defaultPSP()
-	var uid int64 = 999
+	uid := types.UnixUserID(999)
 	userPSP.Spec.RunAsUser = extensions.RunAsUserStrategyOptions{
 		Rule:   extensions.RunAsUserStrategyMustRunAs,
-		Ranges: []extensions.IDRange{{Min: uid, Max: uid}},
+		Ranges: []extensions.UserIDRange{{Min: uid, Max: uid}},
 	}
 	userPod := defaultPod()
 	userPod.Spec.Containers[0].SecurityContext.RunAsUser = &uid
@@ -705,12 +736,27 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	hostDirPod := defaultPod()
 	hostDirPod.Spec.Volumes = []api.Volume{
 		{
-			Name: "bad volume",
+			Name: "good volume",
 			VolumeSource: api.VolumeSource{
 				HostPath: &api.HostPathVolumeSource{},
 			},
 		},
 	}
+
+	hostPathDirPod := defaultPod()
+	hostPathDirPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "good volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/bar/baz",
+				},
+			},
+		},
+	}
+	hostPathDirPSP := defaultPSP()
+	hostPathDirPSP.Spec.Volumes = []extensions.FSType{extensions.HostPath}
+	hostPathDirPSP.Spec.AllowedHostPaths = []string{"/foo/bar"}
 
 	hostPortPSP := defaultPSP()
 	hostPortPSP.Spec.HostPorts = []extensions.HostPortRange{{Min: 1, Max: 1}}
@@ -771,6 +817,10 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 		"pass hostDir validating PSP": {
 			pod: hostDirPod,
 			psp: hostDirPSP,
+		},
+		"pass hostDir allowed directory validating PSP": {
+			pod: hostPathDirPod,
+			psp: hostPathDirPSP,
 		},
 		"pass hostPort validating PSP": {
 			pod: hostPortPod,

@@ -92,6 +92,7 @@ func (az *Cloud) getPublicIPName(clusterName string, service *v1.Service) (strin
 		return fmt.Sprintf("%s-%s", clusterName, cloudprovider.GetLoadBalancerName(service)), nil
 	}
 
+	az.operationPollRateLimiter.Accept()
 	list, err := az.PublicIPAddressesClient.List(az.ResourceGroup)
 	if err != nil {
 		return "", err
@@ -135,6 +136,7 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	serviceName := getServiceName(service)
 	glog.V(5).Infof("ensure(%s): START clusterName=%q lbName=%q", serviceName, clusterName, lbName)
 
+	az.operationPollRateLimiter.Accept()
 	sg, err := az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
 	if err != nil {
 		return nil, err
@@ -149,7 +151,16 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 		// to nil. This is a workaround until https://github.com/Azure/go-autorest/issues/112 is fixed
 		sg.SecurityGroupPropertiesFormat.NetworkInterfaces = nil
 		sg.SecurityGroupPropertiesFormat.Subnets = nil
-		_, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
+		az.operationPollRateLimiter.Accept()
+		resp, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
+		if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
+			glog.V(2).Infof("ensure(%s) backing off: sg(%s) - updating", serviceName, *sg.Name)
+			retryErr := az.CreateOrUpdateSGWithRetry(sg)
+			if retryErr != nil {
+				glog.V(2).Infof("ensure(%s) abort backoff: sg(%s) - updating", serviceName, *sg.Name)
+				return nil, retryErr
+			}
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -219,7 +230,16 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	}
 	if !existsLb || lbNeedsUpdate {
 		glog.V(3).Infof("ensure(%s): lb(%s) - updating", serviceName, lbName)
-		_, err = az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
+		az.operationPollRateLimiter.Accept()
+		resp, err := az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
+		if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
+			glog.V(2).Infof("ensure(%s) backing off: lb(%s) - updating", serviceName, lbName)
+			retryErr := az.CreateOrUpdateLBWithRetry(lb)
+			if retryErr != nil {
+				glog.V(2).Infof("ensure(%s) abort backoff: lb(%s) - updating", serviceName, lbName)
+				return nil, retryErr
+			}
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -310,7 +330,16 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 			// to nil. This is a workaround until https://github.com/Azure/go-autorest/issues/112 is fixed
 			sg.SecurityGroupPropertiesFormat.NetworkInterfaces = nil
 			sg.SecurityGroupPropertiesFormat.Subnets = nil
-			_, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *reconciledSg.Name, reconciledSg, nil)
+			az.operationPollRateLimiter.Accept()
+			resp, err := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *reconciledSg.Name, reconciledSg, nil)
+			if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
+				glog.V(2).Infof("delete(%s) backing off: sg(%s) - updating", serviceName, az.SecurityGroupName)
+				retryErr := az.CreateOrUpdateSGWithRetry(reconciledSg)
+				if retryErr != nil {
+					err = retryErr
+					glog.V(2).Infof("delete(%s) abort backoff: sg(%s) - updating", serviceName, az.SecurityGroupName)
+				}
+			}
 			if err != nil {
 				return err
 			}
@@ -339,14 +368,32 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 		if lbNeedsUpdate {
 			if len(*lb.FrontendIPConfigurations) > 0 {
 				glog.V(3).Infof("delete(%s): lb(%s) - updating", serviceName, lbName)
-				_, err = az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
+				az.operationPollRateLimiter.Accept()
+				resp, err := az.LoadBalancerClient.CreateOrUpdate(az.ResourceGroup, *lb.Name, lb, nil)
+				if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
+					glog.V(2).Infof("delete(%s) backing off: sg(%s) - updating", serviceName, az.SecurityGroupName)
+					retryErr := az.CreateOrUpdateLBWithRetry(lb)
+					if retryErr != nil {
+						err = retryErr
+						glog.V(2).Infof("delete(%s) abort backoff: sg(%s) - updating", serviceName, az.SecurityGroupName)
+					}
+				}
 				if err != nil {
 					return err
 				}
 			} else {
 				glog.V(3).Infof("delete(%s): lb(%s) - deleting; no remaining frontendipconfigs", serviceName, lbName)
 
-				_, err = az.LoadBalancerClient.Delete(az.ResourceGroup, lbName, nil)
+				az.operationPollRateLimiter.Accept()
+				resp, err := az.LoadBalancerClient.Delete(az.ResourceGroup, lbName, nil)
+				if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
+					glog.V(2).Infof("delete(%s) backing off: lb(%s) - deleting; no remaining frontendipconfigs", serviceName, lbName)
+					retryErr := az.DeleteLBWithRetry(lbName)
+					if retryErr != nil {
+						err = retryErr
+						glog.V(2).Infof("delete(%s) abort backoff: lb(%s) - deleting; no remaining frontendipconfigs", serviceName, lbName)
+					}
+				}
 				if err != nil {
 					return err
 				}
@@ -392,11 +439,21 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.Pub
 	pip.Tags = &map[string]*string{"service": &serviceName}
 
 	glog.V(3).Infof("ensure(%s): pip(%s) - creating", serviceName, *pip.Name)
-	_, err = az.PublicIPAddressesClient.CreateOrUpdate(az.ResourceGroup, *pip.Name, pip, nil)
+	az.operationPollRateLimiter.Accept()
+	resp, err := az.PublicIPAddressesClient.CreateOrUpdate(az.ResourceGroup, *pip.Name, pip, nil)
+	if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
+		glog.V(2).Infof("ensure(%s) backing off: pip(%s) - creating", serviceName, *pip.Name)
+		retryErr := az.CreateOrUpdatePIPWithRetry(pip)
+		if retryErr != nil {
+			glog.V(2).Infof("ensure(%s) abort backoff: pip(%s) - creating", serviceName, *pip.Name)
+			err = retryErr
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
 
+	az.operationPollRateLimiter.Accept()
 	pip, err = az.PublicIPAddressesClient.Get(az.ResourceGroup, *pip.Name, "")
 	if err != nil {
 		return nil, err
@@ -407,7 +464,17 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.Pub
 }
 
 func (az *Cloud) ensurePublicIPDeleted(serviceName, pipName string) error {
-	_, deleteErr := az.PublicIPAddressesClient.Delete(az.ResourceGroup, pipName, nil)
+	glog.V(2).Infof("ensure(%s): pip(%s) - deleting", serviceName, pipName)
+	az.operationPollRateLimiter.Accept()
+	resp, deleteErr := az.PublicIPAddressesClient.Delete(az.ResourceGroup, pipName, nil)
+	if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, deleteErr) {
+		glog.V(2).Infof("ensure(%s) backing off: pip(%s) - deleting", serviceName, pipName)
+		retryErr := az.DeletePublicIPWithRetry(pipName)
+		if retryErr != nil {
+			glog.V(2).Infof("ensure(%s) abort backoff: pip(%s) - deleting", serviceName, pipName)
+			return retryErr
+		}
+	}
 	_, realErr := checkResourceExistsFromError(deleteErr)
 	if realErr != nil {
 		return nil
@@ -503,10 +570,11 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 	} else {
 		ports = []v1.ServicePort{}
 	}
-	expectedProbes := make([]network.Probe, len(ports))
-	expectedRules := make([]network.LoadBalancingRule, len(ports))
-	for i, port := range ports {
-		lbRuleName := getRuleName(service, port)
+
+	var expectedProbes []network.Probe
+	var expectedRules []network.LoadBalancingRule
+	for _, port := range ports {
+		lbRuleName := getLoadBalancerRuleName(service, port)
 
 		transportProto, _, probeProto, err := getProtocolsFromKubernetesProtocol(port.Protocol)
 		if err != nil {
@@ -514,9 +582,16 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 		}
 
 		if serviceapi.NeedsHealthCheck(service) {
+			if port.Protocol == v1.ProtocolUDP {
+				// ERROR: this isn't supported
+				// health check (aka source ip preservation) is not
+				// compatible with UDP (it uses an HTTP check)
+				return lb, false, fmt.Errorf("services requiring health checks are incompatible with UDP ports")
+			}
+
 			podPresencePath, podPresencePort := serviceapi.GetServiceHealthCheckPathPort(service)
 
-			expectedProbes[i] = network.Probe{
+			expectedProbes = append(expectedProbes, network.Probe{
 				Name: &lbRuleName,
 				ProbePropertiesFormat: &network.ProbePropertiesFormat{
 					RequestPath:       to.StringPtr(podPresencePath),
@@ -525,37 +600,49 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 					IntervalInSeconds: to.Int32Ptr(5),
 					NumberOfProbes:    to.Int32Ptr(2),
 				},
-			}
-		} else {
-			expectedProbes[i] = network.Probe{
+			})
+		} else if port.Protocol != v1.ProtocolUDP {
+			// we only add the expected probe if we're doing TCP
+			expectedProbes = append(expectedProbes, network.Probe{
 				Name: &lbRuleName,
 				ProbePropertiesFormat: &network.ProbePropertiesFormat{
-					Protocol:          probeProto,
+					Protocol:          *probeProto,
 					Port:              to.Int32Ptr(port.NodePort),
 					IntervalInSeconds: to.Int32Ptr(5),
 					NumberOfProbes:    to.Int32Ptr(2),
 				},
-			}
+			})
 		}
 
-		expectedRules[i] = network.LoadBalancingRule{
+		loadDistribution := network.Default
+		if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
+			loadDistribution = network.SourceIP
+		}
+		expectedRule := network.LoadBalancingRule{
 			Name: &lbRuleName,
 			LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
-				Protocol: transportProto,
+				Protocol: *transportProto,
 				FrontendIPConfiguration: &network.SubResource{
 					ID: to.StringPtr(lbFrontendIPConfigID),
 				},
 				BackendAddressPool: &network.SubResource{
 					ID: to.StringPtr(lbBackendPoolID),
 				},
-				Probe: &network.SubResource{
-					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
-				},
+				LoadDistribution: loadDistribution,
 				FrontendPort:     to.Int32Ptr(port.Port),
 				BackendPort:      to.Int32Ptr(port.Port),
 				EnableFloatingIP: to.BoolPtr(true),
 			},
 		}
+
+		// we didn't construct the probe objects for UDP because they're not used/needed/allowed
+		if port.Protocol != v1.ProtocolUDP {
+			expectedRule.Probe = &network.SubResource{
+				ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
+			}
+		}
+
+		expectedRules = append(expectedRules, expectedRule)
 	}
 
 	// remove unwanted probes
@@ -670,17 +757,17 @@ func (az *Cloud) reconcileSecurityGroup(sg network.SecurityGroup, clusterName st
 	expectedSecurityRules := make([]network.SecurityRule, len(ports)*len(sourceAddressPrefixes))
 
 	for i, port := range ports {
-		securityRuleName := getRuleName(service, port)
 		_, securityProto, _, err := getProtocolsFromKubernetesProtocol(port.Protocol)
 		if err != nil {
 			return sg, false, err
 		}
 		for j := range sourceAddressPrefixes {
 			ix := i*len(sourceAddressPrefixes) + j
+			securityRuleName := getSecurityRuleName(service, port, sourceAddressPrefixes[j])
 			expectedSecurityRules[ix] = network.SecurityRule{
 				Name: to.StringPtr(securityRuleName),
 				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
-					Protocol:                 securityProto,
+					Protocol:                 *securityProto,
 					SourcePortRange:          to.StringPtr("*"),
 					DestinationPortRange:     to.StringPtr(strconv.Itoa(int(port.Port))),
 					SourceAddressPrefix:      to.StringPtr(sourceAddressPrefixes[j]),
@@ -772,6 +859,7 @@ func findSecurityRule(rules []network.SecurityRule, rule network.SecurityRule) b
 // participating in the specified LoadBalancer Backend Pool.
 func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, backendPoolID string) error {
 	vmName := mapNodeNameToVMName(nodeName)
+	az.operationPollRateLimiter.Accept()
 	machine, err := az.VirtualMachinesClient.Get(az.ResourceGroup, vmName, "")
 	if err != nil {
 		return err
@@ -797,6 +885,7 @@ func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, b
 		}
 	}
 
+	az.operationPollRateLimiter.Accept()
 	nic, err := az.InterfacesClient.Get(az.ResourceGroup, nicName, "")
 	if err != nil {
 		return err
@@ -828,7 +917,16 @@ func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, b
 		primaryIPConfig.LoadBalancerBackendAddressPools = &newBackendPools
 
 		glog.V(3).Infof("nicupdate(%s): nic(%s) - updating", serviceName, nicName)
-		_, err := az.InterfacesClient.CreateOrUpdate(az.ResourceGroup, *nic.Name, nic, nil)
+		az.operationPollRateLimiter.Accept()
+		resp, err := az.InterfacesClient.CreateOrUpdate(az.ResourceGroup, *nic.Name, nic, nil)
+		if az.CloudProviderBackoff && shouldRetryAPIRequest(resp, err) {
+			glog.V(2).Infof("nicupdate(%s) backing off: nic(%s) - updating, err=%v", serviceName, nicName, err)
+			retryErr := az.CreateOrUpdateInterfaceWithRetry(nic)
+			if retryErr != nil {
+				err = retryErr
+				glog.V(2).Infof("nicupdate(%s) abort backoff: nic(%s) - updating", serviceName, nicName)
+			}
+		}
 		if err != nil {
 			return err
 		}

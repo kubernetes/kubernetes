@@ -27,10 +27,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/client-go/util/clock"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
@@ -42,15 +42,21 @@ func newTestNetworkPlugin(t *testing.T) *nettest.MockNetworkPlugin {
 	return nettest.NewMockNetworkPlugin(ctrl)
 }
 
-func newTestDockerService() (*dockerService, *dockertools.FakeDockerClient, *clock.FakeClock) {
+func newTestDockerService() (*dockerService, *libdocker.FakeDockerClient, *clock.FakeClock) {
 	fakeClock := clock.NewFakeClock(time.Time{})
-	c := dockertools.NewFakeDockerClient().WithClock(fakeClock).WithVersion("1.11.2", "1.23")
+	c := libdocker.NewFakeDockerClient().WithClock(fakeClock).WithVersion("1.11.2", "1.23")
 	pm := network.NewPluginManager(&network.NoopNetworkPlugin{})
-	return &dockerService{client: c, os: &containertest.FakeOS{}, network: pm,
-		legacyCleanup: legacyCleanupFlag{done: 1}, checkpointHandler: NewTestPersistentCheckpointHandler()}, c, fakeClock
+	return &dockerService{
+		client:            c,
+		os:                &containertest.FakeOS{},
+		network:           pm,
+		legacyCleanup:     legacyCleanupFlag{done: 1},
+		checkpointHandler: NewTestPersistentCheckpointHandler(),
+		networkReady:      make(map[string]bool),
+	}, c, fakeClock
 }
 
-func newTestDockerServiceWithVersionCache() (*dockerService, *dockertools.FakeDockerClient, *clock.FakeClock) {
+func newTestDockerServiceWithVersionCache() (*dockerService, *libdocker.FakeDockerClient, *clock.FakeClock) {
 	ds, c, fakeClock := newTestDockerService()
 	ds.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {

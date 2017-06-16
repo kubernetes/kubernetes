@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,25 +16,27 @@
 # to work with Kubernetes logging. Inspired by the Dockerfile
 # dockerfile/elasticsearch
 
-FROM java:openjdk-8-jre
+FROM java:openjdk-8-jre-alpine
 
 
 ENV DEBIAN_FRONTEND noninteractive
-ENV ELASTICSEARCH_VERSION 2.4.1
+ENV ELASTICSEARCH_VERSION 5.4.0
 
-RUN apt-get update \
-    && apt-get install -y curl gosu \
-    && apt-get clean
+RUN apk update && \
+    apk --no-cache add \
+        --repository https://dl-3.alpinelinux.org/alpine/edge/testing \
+        --repository https://dl-3.alpinelinux.org/alpine/edge/community \
+        curl \
+        shadow \
+        tar \
+        gosu
 
 RUN set -x \
     && cd / \
     && mkdir /elasticsearch \
-    && curl -O https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/$ELASTICSEARCH_VERSION/elasticsearch-$ELASTICSEARCH_VERSION.tar.gz \
+    && curl -O https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-$ELASTICSEARCH_VERSION.tar.gz \
     && tar xf elasticsearch-$ELASTICSEARCH_VERSION.tar.gz -C /elasticsearch --strip-components=1 \
     && rm elasticsearch-$ELASTICSEARCH_VERSION.tar.gz
-
-RUN mkdir -p /elasticsearch/config/templates
-COPY template-k8s-logstash.json /elasticsearch/config/templates/template-k8s-logstash.json
 
 COPY config /elasticsearch/config
 
@@ -44,6 +46,7 @@ COPY elasticsearch_logging_discovery /
 RUN useradd --no-create-home --user-group elasticsearch \
     && mkdir /data \
     && chown -R elasticsearch:elasticsearch /elasticsearch
+
 
 VOLUME ["/data"]
 EXPOSE 9200 9300

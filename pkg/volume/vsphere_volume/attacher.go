@@ -75,9 +75,9 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 
 	// vsphereCloud.AttachDisk checks if disk is already attached to host and
 	// succeeds in that case, so no need to do that separately.
-	_, diskUUID, err := attacher.vsphereVolumes.AttachDisk(volumeSource.VolumePath, nodeName)
+	_, diskUUID, err := attacher.vsphereVolumes.AttachDisk(volumeSource.VolumePath, volumeSource.StoragePolicyID, nodeName)
 	if err != nil {
-		glog.Errorf("Error attaching volume %q: %+v", volumeSource.VolumePath, err)
+		glog.Errorf("Error attaching volume %q to node %q: %+v", volumeSource.VolumePath, nodeName, err)
 		return "", err
 	}
 
@@ -94,9 +94,7 @@ func (attacher *vsphereVMDKAttacher) VolumesAreAttached(specs []*volume.Spec, no
 			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
 			continue
 		}
-
 		volumePathList = append(volumePathList, volumeSource.VolumePath)
-		volumesAttachedCheck[spec] = true
 		volumeSpecMap[volumeSource.VolumePath] = spec
 	}
 	attachedResult, err := attacher.vsphereVolumes.DisksAreAttached(volumePathList, nodeName)
@@ -104,14 +102,17 @@ func (attacher *vsphereVMDKAttacher) VolumesAreAttached(specs []*volume.Spec, no
 		glog.Errorf(
 			"Error checking if volumes (%v) are attached to current node (%q). err=%v",
 			volumePathList, nodeName, err)
-		return volumesAttachedCheck, err
+		return nil, err
 	}
 
 	for volumePath, attached := range attachedResult {
+		spec := volumeSpecMap[volumePath]
 		if !attached {
-			spec := volumeSpecMap[volumePath]
 			volumesAttachedCheck[spec] = false
-			glog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", volumePath, spec.Name())
+			glog.V(2).Infof("VolumesAreAttached: volume %q (specName: %q) is no longer attached", volumePath, spec.Name())
+		} else {
+			volumesAttachedCheck[spec] = true
+			glog.V(2).Infof("VolumesAreAttached: volume %q (specName: %q) is attached", volumePath, spec.Name())
 		}
 	}
 	return volumesAttachedCheck, nil

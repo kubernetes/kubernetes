@@ -72,7 +72,6 @@ filegroup(
         "//examples/explorer:all-srcs",
         "//examples/guestbook-go:all-srcs",
         "//examples/https-nginx:all-srcs",
-        "//examples/k8petstore/web-server/src:all-srcs",
         "//examples/sharing-clusters:all-srcs",
     ],
     tags = ["automanaged"],

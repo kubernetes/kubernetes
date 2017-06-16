@@ -41,7 +41,7 @@ import (
 	"github.com/pborman/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	compute "google.golang.org/api/compute/v1"
+	compute "google.golang.org/api/compute/v0.beta"
 )
 
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
@@ -60,7 +60,8 @@ var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
 
 const (
-	defaultMachine = "n1-standard-1"
+	defaultMachine                = "n1-standard-1"
+	acceleratorTypeResourceFormat = "https://www.googleapis.com/compute/beta/projects/%s/zones/%s/acceleratorTypes/%s"
 )
 
 var (
@@ -100,6 +101,15 @@ type ImageConfig struct {
 	Images map[string]GCEImage `json:"images"`
 }
 
+type Accelerator struct {
+	Type  string `json:"type,omitempty"`
+	Count int64  `json:"count, omitempty"`
+}
+
+type Resources struct {
+	Accelerators []Accelerator `json:"accelerators,omitempty"`
+}
+
 type GCEImage struct {
 	Image      string `json:"image, omitempty"`
 	Project    string `json:"project"`
@@ -109,7 +119,8 @@ type GCEImage struct {
 	// If the number of existing previous images is lesser than what is desired, the test will use that is available.
 	PreviousImages int `json:"previous_images, omitempty"`
 
-	Machine string `json:"machine, omitempty"`
+	Machine   string    `json:"machine, omitempty"`
+	Resources Resources `json:"resources, omitempty"`
 	// This test is for benchmark (no limit verification, more result log, node name has format 'machine-image-uuid') if 'Tests' is non-empty.
 	Tests []string `json:"tests, omitempty"`
 }
@@ -119,11 +130,12 @@ type internalImageConfig struct {
 }
 
 type internalGCEImage struct {
-	image    string
-	project  string
-	metadata *compute.Metadata
-	machine  string
-	tests    []string
+	image     string
+	project   string
+	resources Resources
+	metadata  *compute.Metadata
+	machine   string
+	tests     []string
 }
 
 // parseFlags parse subcommands and flags
@@ -192,11 +204,12 @@ func main() {
 			}
 			for _, image := range images {
 				gceImage := internalGCEImage{
-					image:    image,
-					project:  imageConfig.Project,
-					metadata: getImageMetadata(imageConfig.Metadata),
-					machine:  imageConfig.Machine,
-					tests:    imageConfig.Tests,
+					image:     image,
+					project:   imageConfig.Project,
+					metadata:  getImageMetadata(imageConfig.Metadata),
+					machine:   imageConfig.Machine,
+					tests:     imageConfig.Tests,
+					resources: imageConfig.Resources,
 				}
 				if isRegex && len(images) > 1 {
 					// Use image name when shortName is not unique.
@@ -347,7 +360,7 @@ func getImageMetadata(input string) *compute.Metadata {
 		val := v
 		metadataItems = append(metadataItems, &compute.MetadataItems{
 			Key:   k,
-			Value: &val,
+			Value: val,
 		})
 	}
 	ret := compute.Metadata{Items: metadataItems}
@@ -510,17 +523,41 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 				Type:       "PERSISTENT",
 				InitializeParams: &compute.AttachedDiskInitializeParams{
 					SourceImage: sourceImage(imageConfig.image, imageConfig.project),
+					DiskSizeGb:  20,
 				},
 			},
 		},
 	}
-	i.Metadata = imageConfig.metadata
-	op, err := computeService.Instances.Insert(*project, *zone, i).Do()
-	if err != nil {
-		return "", err
+
+	for _, accelerator := range imageConfig.resources.Accelerators {
+		if i.GuestAccelerators == nil {
+			i.GuestAccelerators = []*compute.AcceleratorConfig{}
+			i.Scheduling = &compute.Scheduling{
+				OnHostMaintenance: "TERMINATE",
+				AutomaticRestart:  true,
+			}
+		}
+		aType := fmt.Sprintf(acceleratorTypeResourceFormat, *project, *zone, accelerator.Type)
+		ac := &compute.AcceleratorConfig{
+			AcceleratorCount: accelerator.Count,
+			AcceleratorType:  aType,
+		}
+		i.GuestAccelerators = append(i.GuestAccelerators, ac)
 	}
-	if op.Error != nil {
-		return "", fmt.Errorf("could not create instance %s: %+v", name, op.Error)
+
+	var err error
+	i.Metadata = imageConfig.metadata
+	if _, err := computeService.Instances.Get(*project, *zone, i.Name).Do(); err != nil {
+		op, err := computeService.Instances.Insert(*project, *zone, i).Do()
+		if err != nil {
+			ret := fmt.Sprintf("could not create instance %s: API error: %v", name, err)
+			if op != nil {
+				ret = fmt.Sprintf("%s: %v", ret, op.Error)
+			}
+			return "", fmt.Errorf(ret)
+		} else if op.Error != nil {
+			return "", fmt.Errorf("could not create instance %s: %+v", name, op.Error)
+		}
 	}
 
 	instanceRunning := false
@@ -553,7 +590,39 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		}
 		instanceRunning = true
 	}
+	// If instance didn't reach running state in time, return with error now.
+	if err != nil {
+		return name, err
+	}
+	// Instance reached running state in time, make sure that cloud-init is complete
+	if isCloudInitUsed(imageConfig.metadata) {
+		cloudInitFinished := false
+		for i := 0; i < 60 && !cloudInitFinished; i++ {
+			if i > 0 {
+				time.Sleep(time.Second * 20)
+			}
+			var finished string
+			finished, err = remote.SSH(name, "ls", "/var/lib/cloud/instance/boot-finished")
+			if err != nil {
+				err = fmt.Errorf("instance %s has not finished cloud-init script: %s", name, finished)
+				continue
+			}
+			cloudInitFinished = true
+		}
+	}
 	return name, err
+}
+
+func isCloudInitUsed(metadata *compute.Metadata) bool {
+	if metadata == nil {
+		return false
+	}
+	for _, item := range metadata.Items {
+		if item.Key == "user-data" && strings.HasPrefix(item.Value, "#cloud-config") {
+			return true
+		}
+	}
+	return false
 }
 
 func getExternalIp(instance *compute.Instance) string {

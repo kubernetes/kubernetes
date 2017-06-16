@@ -157,8 +157,6 @@ const (
 	// Name of a volume in external cloud that is being provisioned and thus
 	// should be ignored by rest of Kubernetes.
 	ProvisionedVolumeName = "placeholder-for-provisioning"
-	// Mount options annotations
-	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
 )
 
 // ProvisionableVolumePlugin is an extended interface of VolumePlugin and is
@@ -234,12 +232,19 @@ type VolumeHost interface {
 
 	// Returns a function that returns a secret.
 	GetSecretFunc() func(namespace, name string) (*v1.Secret, error)
+
+	// Returns a function that returns a configmap.
+	GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error)
+
+	// Returns the labels on the node
+	GetNodeLabels() (map[string]string, error)
 }
 
 // VolumePluginMgr tracks registered plugins.
 type VolumePluginMgr struct {
 	mutex   sync.Mutex
 	plugins map[string]VolumePlugin
+	Host    VolumeHost
 }
 
 // Spec is an internal representation of a volume.  All API volume types translate to Spec.
@@ -338,6 +343,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) 
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
+	pm.Host = host
 	if pm.plugins == nil {
 		pm.plugins = map[string]VolumePlugin{}
 	}

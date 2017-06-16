@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 licenses(["notice"])
 
 load(
@@ -17,6 +15,9 @@ go_library(
         "templates.go",
     ],
     tags = ["automanaged"],
+    visibility = [
+        "//build/visible_to:pkg_kubectl_cmd_templates_CONSUMERS",
+    ],
     deps = [
         "//pkg/util/term:go_default_library",
         "//vendor/github.com/MakeNowJust/heredoc:go_default_library",
@@ -30,11 +31,13 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
-    visibility = ["//visibility:private"],
 )
 
 filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = [
+        "//build/visible_to:pkg_kubectl_cmd_templates_CONSUMERS",
+    ],
 )

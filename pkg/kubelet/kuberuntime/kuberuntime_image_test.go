@@ -17,10 +17,16 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -93,4 +99,75 @@ func TestImageStats(t *testing.T) {
 	assert.NoError(t, err)
 	expectedStats := &kubecontainer.ImageStats{TotalStorageBytes: imageSize * uint64(len(images))}
 	assert.Equal(t, expectedStats, actualStats)
+}
+
+func TestPullWithSecrets(t *testing.T) {
+	// auth value is equivalent to: "username":"passed-user","password":"passed-password"
+	dockerCfg := map[string]map[string]string{"index.docker.io/v1/": {"email": "passed-email", "auth": "cGFzc2VkLXVzZXI6cGFzc2VkLXBhc3N3b3Jk"}}
+	dockercfgContent, err := json.Marshal(dockerCfg)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	dockerConfigJson := map[string]map[string]map[string]string{"auths": dockerCfg}
+	dockerConfigJsonContent, err := json.Marshal(dockerConfigJson)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	tests := map[string]struct {
+		imageName           string
+		passedSecrets       []v1.Secret
+		builtInDockerConfig credentialprovider.DockerConfig
+		expectedAuth        *runtimeapi.AuthConfig
+	}{
+		"no matching secrets": {
+			"ubuntu",
+			[]v1.Secret{},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{}),
+			nil,
+		},
+		"default keyring secrets": {
+			"ubuntu",
+			[]v1.Secret{},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
+				"index.docker.io/v1/": {Username: "built-in", Password: "password", Provider: nil},
+			}),
+			&runtimeapi.AuthConfig{Username: "built-in", Password: "password"},
+		},
+		"default keyring secrets unused": {
+			"ubuntu",
+			[]v1.Secret{},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
+				"extraneous": {Username: "built-in", Password: "password", Provider: nil},
+			}),
+			nil,
+		},
+		"builtin keyring secrets, but use passed": {
+			"ubuntu",
+			[]v1.Secret{{Type: v1.SecretTypeDockercfg, Data: map[string][]byte{v1.DockerConfigKey: dockercfgContent}}},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
+				"index.docker.io/v1/": {Username: "built-in", Password: "password", Provider: nil},
+			}),
+			&runtimeapi.AuthConfig{Username: "passed-user", Password: "passed-password"},
+		},
+		"builtin keyring secrets, but use passed with new docker config": {
+			"ubuntu",
+			[]v1.Secret{{Type: v1.SecretTypeDockerConfigJson, Data: map[string][]byte{v1.DockerConfigJsonKey: dockerConfigJsonContent}}},
+			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
+				"index.docker.io/v1/": {Username: "built-in", Password: "password", Provider: nil},
+			}),
+			&runtimeapi.AuthConfig{Username: "passed-user", Password: "passed-password"},
+		},
+	}
+	for description, test := range tests {
+		builtInKeyRing := &credentialprovider.BasicDockerKeyring{}
+		builtInKeyRing.Add(test.builtInDockerConfig)
+		_, fakeImageService, fakeManager, err := customTestRuntimeManager(builtInKeyRing)
+		require.NoError(t, err)
+
+		_, err = fakeManager.PullImage(kubecontainer.ImageSpec{Image: test.imageName}, test.passedSecrets)
+		require.NoError(t, err)
+		fakeImageService.AssertImagePulledWithAuth(t, &runtimeapi.ImageSpec{Image: test.imageName}, test.expectedAuth, description)
+	}
 }

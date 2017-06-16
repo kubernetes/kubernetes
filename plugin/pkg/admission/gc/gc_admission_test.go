@@ -61,10 +61,20 @@ func (fakeAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
 
 // newGCPermissionsEnforcement returns the admission controller configured for testing.
 func newGCPermissionsEnforcement() *gcPermissionsEnforcement {
-	gcAdmit := &gcPermissionsEnforcement{
-		Handler: admission.NewHandler(admission.Create, admission.Update),
+	// the pods/status endpoint is ignored by this plugin since old kubelets
+	// corrupt them.  the pod status strategy ensures status updates cannot mutate
+	// ownerRef.
+	whiteList := []whiteListItem{
+		{
+			groupResource: schema.GroupResource{Resource: "pods"},
+			subresource:   "status",
+		},
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, fakeAuthorizer{}, nil, api.Registry.RESTMapper())
+	gcAdmit := &gcPermissionsEnforcement{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		whiteList: whiteList,
+	}
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, fakeAuthorizer{}, nil, api.Registry.RESTMapper(), nil)
 	pluginInitializer.Initialize(gcAdmit)
 	return gcAdmit
 }
@@ -77,11 +87,12 @@ func TestGCAdmission(t *testing.T) {
 		return strings.Contains(err.Error(), "cannot set an ownerRef on a resource you can't delete")
 	}
 	tests := []struct {
-		name     string
-		username string
-		resource schema.GroupVersionResource
-		oldObj   runtime.Object
-		newObj   runtime.Object
+		name        string
+		username    string
+		resource    schema.GroupVersionResource
+		subresource string
+		oldObj      runtime.Object
+		newObj      runtime.Object
 
 		checkError func(error) bool
 	}{
@@ -200,6 +211,15 @@ func TestGCAdmission(t *testing.T) {
 			checkError: expectNoError,
 		},
 		{
+			name:        "non-pod-deleter, update status, objectref change",
+			username:    "non-pod-deleter",
+			resource:    api.SchemeGroupVersion.WithResource("pods"),
+			subresource: "status",
+			oldObj:      &api.Pod{},
+			newObj:      &api.Pod{ObjectMeta: metav1.ObjectMeta{OwnerReferences: []metav1.OwnerReference{{Name: "first"}}}},
+			checkError:  expectNoError,
+		},
+		{
 			name:       "non-pod-deleter, update, objectref change",
 			username:   "non-pod-deleter",
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
@@ -224,7 +244,7 @@ func TestGCAdmission(t *testing.T) {
 			operation = admission.Update
 		}
 		user := &user.DefaultInfo{Name: tc.username}
-		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, "", operation, user)
+		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, user)
 
 		err := gcAdmit.Admit(attributes)
 		if !tc.checkError(err) {
@@ -309,11 +329,12 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		return strings.Contains(err.Error(), "cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't delete")
 	}
 	tests := []struct {
-		name     string
-		username string
-		resource schema.GroupVersionResource
-		oldObj   runtime.Object
-		newObj   runtime.Object
+		name        string
+		username    string
+		resource    schema.GroupVersionResource
+		subresource string
+		oldObj      runtime.Object
+		newObj      runtime.Object
 
 		checkError func(error) bool
 	}{
@@ -457,7 +478,6 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			checkError: expectNoError,
 		},
 	}
-
 	gcAdmit := newGCPermissionsEnforcement()
 
 	for _, tc := range tests {
@@ -466,7 +486,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			operation = admission.Update
 		}
 		user := &user.DefaultInfo{Name: tc.username}
-		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, "", operation, user)
+		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, user)
 
 		err := gcAdmit.Admit(attributes)
 		if !tc.checkError(err) {

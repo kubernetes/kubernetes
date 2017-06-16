@@ -41,6 +41,7 @@ type HTTPExtender struct {
 	extenderURL      string
 	filterVerb       string
 	prioritizeVerb   string
+	bindVerb         string
 	weight           int
 	client           *http.Client
 	nodeCacheCapable bool
@@ -86,6 +87,7 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 		extenderURL:      config.URLPrefix,
 		filterVerb:       config.FilterVerb,
 		prioritizeVerb:   config.PrioritizeVerb,
+		bindVerb:         config.BindVerb,
 		weight:           config.Weight,
 		client:           client,
 		nodeCacheCapable: config.NodeCacheCapable,
@@ -193,6 +195,33 @@ func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 	return &result, h.weight, nil
 }
 
+// Bind delegates the action of binding a pod to a node to the extender.
+func (h *HTTPExtender) Bind(binding *v1.Binding) error {
+	var result schedulerapi.ExtenderBindingResult
+	if !h.IsBinder() {
+		// This shouldn't happen as this extender wouldn't have become a Binder.
+		return fmt.Errorf("Unexpected empty bindVerb in extender")
+	}
+	req := &schedulerapi.ExtenderBindingArgs{
+		PodName:      binding.Name,
+		PodNamespace: binding.Namespace,
+		PodUID:       binding.UID,
+		Node:         binding.Target.Name,
+	}
+	if err := h.send(h.bindVerb, &req, &result); err != nil {
+		return err
+	}
+	if result.Error != "" {
+		return fmt.Errorf(result.Error)
+	}
+	return nil
+}
+
+// IsBinder returns whether this extender is configured for the Bind method.
+func (h *HTTPExtender) IsBinder() bool {
+	return h.bindVerb != ""
+}
+
 // Helper function to send messages to the extender
 func (h *HTTPExtender) send(action string, args interface{}, result interface{}) error {
 	out, err := json.Marshal(args)
@@ -212,6 +241,10 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 	resp, err := h.client.Do(req)
 	if err != nil {
 		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Failed %v with extender at URL %v, code %v", action, h.extenderURL, resp.StatusCode)
 	}
 
 	defer resp.Body.Close()

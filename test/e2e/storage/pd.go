@@ -43,7 +43,7 @@ import (
 const (
 	gcePDDetachTimeout  = 10 * time.Minute
 	gcePDDetachPollTime = 10 * time.Second
-	nodeStatusTimeout   = 1 * time.Minute
+	nodeStatusTimeout   = 5 * time.Minute
 	nodeStatusPollTime  = 1 * time.Second
 	maxReadRetry        = 3
 )
@@ -428,6 +428,9 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			By("Cleaning up PD-RW test env")
 			podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
 			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
+			framework.WaitForNodeToBeReady(f.ClientSet, string(host0Name), nodeStatusTimeout)
+			nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+			Expect(len(nodes.Items)).To(Equal(initialGroupSize))
 		}()
 
 		By("submitting host0Pod to kubernetes")
@@ -486,6 +489,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			framework.ExpectNoError(err, "Unable to re-create the deleted node")
 			framework.ExpectNoError(framework.WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get the node group back to the original size")
 			framework.WaitForNodeToBeReady(f.ClientSet, nodeToDelete.Name, nodeStatusTimeout)
+			nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 			if len(nodes.Items) != originalCount {
 				return fmt.Errorf("The node count is not back to original count")
 			}

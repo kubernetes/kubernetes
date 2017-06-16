@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "json.go",
+        "range.go",
         "semver.go",
         "sort.go",
         "sql.go",

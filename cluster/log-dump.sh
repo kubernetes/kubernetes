@@ -105,7 +105,7 @@ function copy-logs-from-node() {
         gce|gke|kubemark)
           # get-serial-port-output lets you ask for ports 1-4, but currently (11/21/2016) only port 1 contains useful information
           gcloud compute instances get-serial-port-output --project "${PROJECT}" --zone "${ZONE}" --port 1 "${node}" > "${dir}/serial-1.log" || true
-          gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
+          gcloud compute scp --recurse --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
           ;;
         aws)
           local ip=$(get_ssh_hostname "${node}")
@@ -248,6 +248,11 @@ function dump_nodes() {
 }
 
 setup
-echo "Dumping master and node logs to ${report_dir}"
+echo "Dumping master logs to ${report_dir}"
 dump_masters
-dump_nodes
+if [[ "${DUMP_ONLY_MASTER_LOGS:-}" != "true" ]]; then
+  echo "Dumping node logs to ${report_dir}"
+  dump_nodes
+else
+  echo "Skipping dumping of node logs"
+fi

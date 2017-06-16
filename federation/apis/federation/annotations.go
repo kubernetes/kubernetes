@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,9 @@ limitations under the License.
 package federation
 
 // FederationNameAnnotation is the annotation which holds the name of
-// the federation that an object is associated with. It must be
-// applied to all API objects associated with that federation.
+// the federation that a federation control plane component is associated
+// with. It must be applied to all the API types that represent that federations
+// control plane's components in the host cluster and in joining clusters.
 const FederationNameAnnotation = "federation.alpha.kubernetes.io/federation-name"
 
 // ClusterNameAnnotation is the annotation which holds the name of

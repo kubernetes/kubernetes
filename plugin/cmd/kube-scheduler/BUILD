@@ -7,12 +7,19 @@ load(
     "go_binary",
     "go_library",
 )
+load("//pkg/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "kube-scheduler",
+    gc_linkopts = [
+        "-linkmode",
+        "external",
+        "-extldflags",
+        "-static",
+    ],
     library = ":go_default_library",
-    linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
+    x_defs = version_x_defs(),
 )
 
 go_library(

@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -35,8 +33,8 @@ import (
 )
 
 func TestDynamicClient(t *testing.T) {
-	_, s := framework.RunAMaster(nil)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("dynamic-client", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -116,7 +114,7 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	// check dynamic get
-	unstruct, err := dynamicClient.Resource(&resource, ns.Name).Get(actual.Name)
+	unstruct, err := dynamicClient.Resource(&resource, ns.Name).Get(actual.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when getting pod %q: %v", actual.Name, err)
 	}

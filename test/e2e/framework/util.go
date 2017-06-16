@@ -83,6 +83,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/conditions"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -97,7 +98,8 @@ import (
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
-	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	testutil "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -120,6 +122,9 @@ const (
 
 	// How often to Poll pods, nodes and claims.
 	Poll = 2 * time.Second
+
+	pollShortTimeout = 1 * time.Minute
+	pollLongTimeout  = 5 * time.Minute
 
 	// service accounts are provisioned after namespace creation
 	// a service account is required to support pod creation in a namespace as part of admission control
@@ -176,6 +181,11 @@ const (
 
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
+
+	// Serve hostname image name
+	ServeHostnameImage = "gcr.io/google_containers/serve_hostname:v1.4"
+	// ssh port
+	sshPort = "22"
 )
 
 var (
@@ -276,15 +286,21 @@ func Logf(format string, args ...interface{}) {
 }
 
 func Failf(format string, args ...interface{}) {
+	FailfWithOffset(1, format, args...)
+}
+
+// FailfWithOffset calls "Fail" and logs the error at "offset" levels above its caller
+// (for example, for call chain f -> g -> FailfWithOffset(1, ...) error would be logged for "f").
+func FailfWithOffset(offset int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	log("INFO", msg)
-	Fail(nowStamp()+": "+msg, 1)
+	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
 }
 
 func Skipf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	log("INFO", msg)
-	Skip(nowStamp() + ": " + msg)
+	ginkgowrapper.Skip(nowStamp() + ": " + msg)
 }
 
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
@@ -308,6 +324,12 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 func SkipIfProviderIs(unsupportedProviders ...string) {
 	if ProviderIs(unsupportedProviders...) {
 		Skipf("Not supported for providers %v (found %s)", unsupportedProviders, TestContext.Provider)
+	}
+}
+
+func SkipUnlessSSHKeyPresent() {
+	if _, err := GetSigner(TestContext.Provider); err != nil {
+		Skipf("No SSH Key for provider %s: '%v'", TestContext.Provider, err)
 	}
 }
 
@@ -406,9 +428,6 @@ func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr schema.GroupVersio
 
 // ProvidersWithSSH are those providers where each node is accessible with SSH
 var ProvidersWithSSH = []string{"gce", "gke", "aws", "local"}
-
-// providersWithMasterSSH are those providers where master node is accessible with SSH
-var providersWithMasterSSH = []string{"gce", "gke", "kubemark", "aws", "local"}
 
 type podCondition func(pod *v1.Pod) (bool, error)
 
@@ -570,15 +589,12 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		desiredPods = len(podList.Items)
 		for _, pod := range podList.Items {
 			if len(ignoreLabels) != 0 && ignoreSelector.Matches(labels.Set(pod.Labels)) {
-				Logf("%v in state %v, ignoring", pod.Name, pod.Status.Phase)
 				continue
 			}
-			res, err := testutils.PodRunningReady(&pod)
+			res, err := testutil.PodRunningReady(&pod)
 			switch {
 			case res && err == nil:
 				nOk++
-			case pod.Status.Phase == v1.PodSucceeded:
-				continue
 			case pod.Status.Phase == v1.PodSucceeded:
 				Logf("The status of Pod %s is Succeeded which is unexpected", pod.ObjectMeta.Name)
 				badPods = append(badPods, pod)
@@ -627,7 +643,7 @@ func kubectlLogPod(c clientset.Interface, pod v1.Pod, containerNameSubstr string
 					logFunc("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
 				}
 			}
-			By(fmt.Sprintf("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName))
+			logFunc("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName)
 			logFunc("%s : STARTLOG\n%s\nENDLOG for container %v:%v:%v", containerNameSubstr, logs, pod.Namespace, pod.Name, container.Name)
 		}
 	}
@@ -641,7 +657,7 @@ func LogFailedContainers(c clientset.Interface, ns string, logFunc func(ftm stri
 	}
 	logFunc("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
-		if res, err := testutils.PodRunningReady(&pod); !res || err != nil {
+		if res, err := testutil.PodRunningReady(&pod); !res || err != nil {
 			kubectlLogPod(c, pod, "", Logf)
 		}
 	}
@@ -764,7 +780,7 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeou
 		}
 		Logf("Waiting for pod %[1]s in namespace '%[2]s' status to be '%[3]s'"+
 			"(found phase: %[4]q, readiness: %[5]t) (%[6]v elapsed)",
-			podName, ns, desc, pod.Status.Phase, testutils.PodReady(pod), time.Since(start))
+			podName, ns, desc, pod.Status.Phase, testutil.PodReady(pod), time.Since(start))
 	}
 	return fmt.Errorf("gave up waiting for pod '%s' to be '%s' after %v", podName, desc, timeout)
 }
@@ -946,12 +962,13 @@ func CheckTestingNSDeletedExcept(c clientset.Interface, skip string) error {
 // deleteNS deletes the provided namespace, waits for it to be completely deleted, and then checks
 // whether there are any pods remaining in a non-terminating state.
 func deleteNS(c clientset.Interface, clientPool dynamic.ClientPool, namespace string, timeout time.Duration) error {
+	startTime := time.Now()
 	if err := c.Core().Namespaces().Delete(namespace, nil); err != nil {
 		return err
 	}
 
 	// wait for namespace to delete or timeout.
-	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
+	err := wait.PollImmediate(2*time.Second, timeout, func() (bool, error) {
 		if _, err := c.Core().Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
 			if apierrs.IsNotFound(err) {
 				return true, nil
@@ -986,11 +1003,11 @@ func deleteNS(c clientset.Interface, clientPool dynamic.ClientPool, namespace st
 		if remainingContent {
 			// pods remain
 			if remainingPods > 0 {
-				// but they were all undergoing deletion (kubelet is probably culprit)
-				if missingTimestamp == 0 {
+				if missingTimestamp != 0 {
+					// pods remained, but were not undergoing deletion (namespace controller is probably culprit)
 					return fmt.Errorf("namespace %v was not deleted with limit: %v, pods remaining: %v, pods missing deletion timestamp: %v", namespace, err, remainingPods, missingTimestamp)
 				}
-				// pods remained, but were not undergoing deletion (namespace controller is probably culprit)
+				// but they were all undergoing deletion (kubelet is probably culprit, check NodeLost)
 				return fmt.Errorf("namespace %v was not deleted with limit: %v, pods remaining: %v", namespace, err, remainingPods)
 			}
 			// other content remains (namespace controller is probably screwed up)
@@ -999,6 +1016,7 @@ func deleteNS(c clientset.Interface, clientPool dynamic.ClientPool, namespace st
 		// no remaining content, but namespace was not deleted (namespace controller is probably wedged)
 		return fmt.Errorf("namespace %v was not deleted with limit: %v, namespace is empty but is not yet removed", namespace, err)
 	}
+	Logf("namespace %v deletion completed in %s", namespace, time.Now().Sub(startTime))
 	return nil
 }
 
@@ -1378,30 +1396,6 @@ func WaitForPodSuccessInNamespaceSlow(c clientset.Interface, podName string, nam
 	return waitForPodSuccessInNamespaceTimeout(c, podName, namespace, slowPodStartTimeout)
 }
 
-// waitForRCPodOnNode returns the pod from the given replication controller (described by rcName) which is scheduled on the given node.
-// In case of failure or too long waiting time, an error is returned.
-func waitForRCPodOnNode(c clientset.Interface, ns, rcName, node string) (*v1.Pod, error) {
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
-	var p *v1.Pod = nil
-	err := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
-		Logf("Waiting for pod %s to appear on node %s", rcName, node)
-		options := metav1.ListOptions{LabelSelector: label.String()}
-		pods, err := c.Core().Pods(ns).List(options)
-		if err != nil {
-			return false, err
-		}
-		for _, pod := range pods.Items {
-			if pod.Spec.NodeName == node {
-				Logf("Pod %s found on node %s", pod.Name, node)
-				p = &pod
-				return true, nil
-			}
-		}
-		return false, nil
-	})
-	return p, err
-}
-
 // WaitForRCToStabilize waits till the RC has a matching generation/replica count between spec and status.
 func WaitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.Duration) error {
 	options := metav1.ListOptions{FieldSelector: fields.Set{
@@ -1585,6 +1579,10 @@ func WaitForReplicationControllerwithSelector(c clientset.Interface, namespace s
 func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 	for t := time.Now(); time.Since(t) < EndpointRegisterTimeout; time.Sleep(Poll) {
 		endpoint, err := c.Core().Endpoints(ns).Get(name, metav1.GetOptions{})
+		if apierrs.IsNotFound(err) {
+			Logf("Endpoint %s/%s is not ready yet", ns, name)
+			continue
+		}
 		Expect(err).NotTo(HaveOccurred())
 		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
 			Logf("Endpoint %s/%s is not ready yet", ns, name)
@@ -1865,7 +1863,7 @@ func ServiceResponding(c clientset.Interface, ns, name string) error {
 }
 
 func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
-	Logf(">>> kubeConfig: %s\n", TestContext.KubeConfig)
+	Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
 	if TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
 	}
@@ -1874,7 +1872,7 @@ func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 		return nil, fmt.Errorf("error loading KubeConfig: %v", err.Error())
 	}
 	if kubeContext != "" {
-		Logf(">>> kubeContext: %s\n", kubeContext)
+		Logf(">>> kubeContext: %s", kubeContext)
 		c.CurrentContext = kubeContext
 	}
 	return c, nil
@@ -1925,10 +1923,16 @@ func randomSuffix() string {
 }
 
 func ExpectNoError(err error, explain ...interface{}) {
+	ExpectNoErrorWithOffset(1, err, explain...)
+}
+
+// ExpectNoErrorWithOffset checks if "err" is set, and if so, fails assertion while logging the error at "offset" levels above its caller
+// (for example, for call chain f -> g -> ExpectNoErrorWithOffset(1, ...) error would be logged for "f").
+func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	if err != nil {
 		Logf("Unexpected error occurred: %v", err)
 	}
-	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
+	ExpectWithOffset(1+offset, err).NotTo(HaveOccurred(), explain...)
 }
 
 func ExpectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interface{}) {
@@ -2286,25 +2290,25 @@ func (f *Framework) MatchContainerOutput(
 	return nil
 }
 
-func RunDeployment(config testutils.DeploymentConfig) error {
+func RunDeployment(config testutil.DeploymentConfig) error {
 	By(fmt.Sprintf("creating deployment %s in namespace %s", config.Name, config.Namespace))
 	config.NodeDumpFunc = DumpNodeDebugInfo
 	config.ContainerDumpFunc = LogFailedContainers
-	return testutils.RunDeployment(config)
+	return testutil.RunDeployment(config)
 }
 
-func RunReplicaSet(config testutils.ReplicaSetConfig) error {
+func RunReplicaSet(config testutil.ReplicaSetConfig) error {
 	By(fmt.Sprintf("creating replicaset %s in namespace %s", config.Name, config.Namespace))
 	config.NodeDumpFunc = DumpNodeDebugInfo
 	config.ContainerDumpFunc = LogFailedContainers
-	return testutils.RunReplicaSet(config)
+	return testutil.RunReplicaSet(config)
 }
 
-func RunRC(config testutils.RCConfig) error {
+func RunRC(config testutil.RCConfig) error {
 	By(fmt.Sprintf("creating replication controller %s in namespace %s", config.Name, config.Namespace))
 	config.NodeDumpFunc = DumpNodeDebugInfo
 	config.ContainerDumpFunc = LogFailedContainers
-	return testutils.RunRC(config)
+	return testutil.RunRC(config)
 }
 
 type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error)
@@ -2578,7 +2582,7 @@ func GetTTLAnnotationFromNode(node *v1.Node) (time.Duration, bool) {
 }
 
 func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, labelValue string) {
-	ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
+	ExpectNoError(testutil.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
 }
 
 func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string, labelValue string) {
@@ -2601,10 +2605,10 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Tai
 // won't fail if target label doesn't exist or has been removed.
 func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKey string) {
 	By("removing the label " + labelKey + " off the node " + nodeName)
-	ExpectNoError(testutils.RemoveLabelOffNode(c, nodeName, []string{labelKey}))
+	ExpectNoError(testutil.RemoveLabelOffNode(c, nodeName, []string{labelKey}))
 
 	By("verifying the node doesn't have the label " + labelKey)
-	ExpectNoError(testutils.VerifyLabelsRemoved(c, nodeName, []string{labelKey}))
+	ExpectNoError(testutil.VerifyLabelsRemoved(c, nodeName, []string{labelKey}))
 }
 
 func VerifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Taint) {
@@ -2725,7 +2729,7 @@ func WaitForControlledPodsRunning(c clientset.Interface, ns, name string, kind s
 	if err != nil {
 		return err
 	}
-	err = testutils.WaitForPodsWithLabelRunning(c, ns, selector)
+	err = testutil.WaitForPodsWithLabelRunning(c, ns, selector)
 	if err != nil {
 		return fmt.Errorf("Error while waiting for replication controller %s pods to be running: %v", name, err)
 	}
@@ -2742,7 +2746,7 @@ func ScaleDeployment(clientset clientset.Interface, internalClientset internalcl
 
 // Returns true if all the specified pods are scheduled, else returns false.
 func podsWithLabelScheduled(c clientset.Interface, ns string, label labels.Selector) (bool, error) {
-	PodStore := testutils.NewPodStore(c, ns, label, fields.Everything())
+	PodStore := testutil.NewPodStore(c, ns, label, fields.Everything())
 	defer PodStore.Stop()
 	pods := PodStore.List()
 	if len(pods) == 0 {
@@ -2804,7 +2808,7 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 			}
 			current = 0
 			for _, pod := range pods.Items {
-				if flag, err := testutils.PodRunningReady(&pod); err == nil && flag == true {
+				if flag, err := testutil.PodRunningReady(&pod); err == nil && flag == true {
 					current++
 				}
 			}
@@ -3038,8 +3042,8 @@ func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 
 // podStoreForSelector creates a PodStore that monitors pods from given namespace matching given selector.
 // It waits until the reflector does a List() before returning.
-func podStoreForSelector(c clientset.Interface, ns string, selector labels.Selector) (*testutils.PodStore, error) {
-	ps := testutils.NewPodStore(c, ns, selector, fields.Everything())
+func podStoreForSelector(c clientset.Interface, ns string, selector labels.Selector) (*testutil.PodStore, error) {
+	ps := testutil.NewPodStore(c, ns, selector, fields.Everything())
 	err := wait.Poll(100*time.Millisecond, 2*time.Minute, func() (bool, error) {
 		if len(ps.Reflector.LastSyncResourceVersion()) != 0 {
 			return true, nil
@@ -3053,7 +3057,7 @@ func podStoreForSelector(c clientset.Interface, ns string, selector labels.Selec
 // This is to make a fair comparison of deletion time between DeleteRCAndPods
 // and DeleteRCAndWaitForGC, because the RC controller decreases status.replicas
 // when the pod is inactvie.
-func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration) error {
+func waitForPodsInactive(ps *testutil.PodStore, interval, timeout time.Duration) error {
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		pods := ps.List()
 		for _, pod := range pods {
@@ -3066,7 +3070,7 @@ func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration
 }
 
 // waitForPodsGone waits until there are no pods left in the PodStore.
-func waitForPodsGone(ps *testutils.PodStore, interval, timeout time.Duration) error {
+func waitForPodsGone(ps *testutil.PodStore, interval, timeout time.Duration) error {
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		if pods := ps.List(); len(pods) == 0 {
 			return true, nil
@@ -3186,7 +3190,7 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 			Name: deploymentName,
 		},
 		Spec: extensions.DeploymentSpec{
-			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{MatchLabels: podLabels},
 			Strategy: extensions.DeploymentStrategy{
 				Type: strategyType,
@@ -3213,72 +3217,7 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 // Note that the status should stay valid at all times unless shortly after a scaling event or the deployment is just created.
 // To verify that the deployment status is valid and wait for the rollout to finish, use WaitForDeploymentStatus instead.
 func WaitForDeploymentStatusValid(c clientset.Interface, d *extensions.Deployment) error {
-	var (
-		oldRSs, allOldRSs, allRSs []*extensions.ReplicaSet
-		newRS                     *extensions.ReplicaSet
-		deployment                *extensions.Deployment
-		reason                    string
-	)
-
-	err := wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
-		var err error
-		deployment, err = c.Extensions().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		oldRSs, allOldRSs, newRS, err = deploymentutil.GetAllReplicaSets(deployment, c)
-		if err != nil {
-			return false, err
-		}
-		if newRS == nil {
-			// New RC hasn't been created yet.
-			reason = "new replica set hasn't been created yet"
-			Logf(reason)
-			return false, nil
-		}
-		allRSs = append(oldRSs, newRS)
-		// The old/new ReplicaSets need to contain the pod-template-hash label
-		for i := range allRSs {
-			if !labelsutil.SelectorHasLabel(allRSs[i].Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
-				reason = "all replica sets need to contain the pod-template-hash label"
-				Logf(reason)
-				return false, nil
-			}
-		}
-		totalCreated := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
-		maxCreated := *(deployment.Spec.Replicas) + deploymentutil.MaxSurge(*deployment)
-		if totalCreated > maxCreated {
-			reason = fmt.Sprintf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
-			Logf(reason)
-			return false, nil
-		}
-		minAvailable := deploymentutil.MinAvailable(deployment)
-		if deployment.Status.AvailableReplicas < minAvailable {
-			reason = fmt.Sprintf("total pods available: %d, less than the min required: %d", deployment.Status.AvailableReplicas, minAvailable)
-			Logf(reason)
-			return false, nil
-		}
-
-		// When the deployment status and its underlying resources reach the desired state, we're done
-		if deploymentutil.DeploymentComplete(deployment, &deployment.Status) {
-			return true, nil
-		}
-
-		reason = fmt.Sprintf("deployment status: %#v", deployment.Status)
-		Logf(reason)
-
-		return false, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-		logPodsOfDeployment(c, deployment, allRSs)
-		err = fmt.Errorf("%s", reason)
-	}
-	if err != nil {
-		return fmt.Errorf("error waiting for deployment %q status to match expectation: %v", d.Name, err)
-	}
-	return nil
+	return testutil.WaitForDeploymentStatusValid(c, d, Logf, Poll, pollLongTimeout)
 }
 
 // Waits for the deployment to reach desired state.
@@ -3314,25 +3253,16 @@ func WaitForDeploymentStatus(c clientset.Interface, d *extensions.Deployment) er
 		totalCreated := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 		maxCreated := *(deployment.Spec.Replicas) + deploymentutil.MaxSurge(*deployment)
 		if totalCreated > maxCreated {
-			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-			logPodsOfDeployment(c, deployment, allRSs)
 			return false, fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
 		}
 		minAvailable := deploymentutil.MinAvailable(deployment)
 		if deployment.Status.AvailableReplicas < minAvailable {
-			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-			logPodsOfDeployment(c, deployment, allRSs)
 			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", deployment.Status.AvailableReplicas, minAvailable)
 		}
 
 		// When the deployment status and its underlying resources reach the desired state, we're done
 		return deploymentutil.DeploymentComplete(deployment, &deployment.Status), nil
 	})
-
-	if err == wait.ErrWaitTimeout {
-		logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-		logPodsOfDeployment(c, deployment, allRSs)
-	}
 	if err != nil {
 		return fmt.Errorf("error waiting for deployment %q status to match expectation: %v", d.Name, err)
 	}
@@ -3396,13 +3326,6 @@ func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) er
 		status = d.Status
 
 		if d.Status.UpdatedReplicas > 0 && d.Status.Replicas != d.Status.UpdatedReplicas {
-			_, allOldRSs, err := deploymentutil.GetOldReplicaSets(d, c)
-			newRS, nerr := deploymentutil.GetNewReplicaSet(d, c)
-			if err == nil && nerr == nil {
-				Logf("%+v", d)
-				logReplicaSetsOfDeployment(d, allOldRSs, newRS)
-				logPodsOfDeployment(c, d, append(allOldRSs, newRS))
-			}
 			return false, fmt.Errorf("deployment %q is running new pods alongside old pods: %#v", d.Name, status)
 		}
 
@@ -3419,68 +3342,10 @@ func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) er
 }
 
 // WaitForDeploymentRevisionAndImage waits for the deployment's and its new RS's revision and container image to match the given revision and image.
-// Note that deployment revision and its new RS revision should be updated shortly, so we only wait for 1 minute here to fail early.
+// Note that deployment revision and its new RS revision should be updated shortly most of the time, but an overwhelmed RS controller
+// may result in taking longer to relabel a RS.
 func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName string, revision, image string) error {
-	var deployment *extensions.Deployment
-	var newRS *extensions.ReplicaSet
-	var reason string
-	err := wait.Poll(Poll, 1*time.Minute, func() (bool, error) {
-		var err error
-		deployment, err = c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		// The new ReplicaSet needs to be non-nil and contain the pod-template-hash label
-
-		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c)
-
-		if err != nil {
-			return false, err
-		}
-		if newRS == nil {
-			reason = fmt.Sprintf("New replica set for deployment %q is yet to be created", deployment.Name)
-			Logf(reason)
-			return false, nil
-		}
-		if !labelsutil.SelectorHasLabel(newRS.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
-			reason = fmt.Sprintf("New replica set %q doesn't have DefaultDeploymentUniqueLabelKey", newRS.Name)
-			Logf(reason)
-			return false, nil
-		}
-		// Check revision of this deployment, and of the new replica set of this deployment
-		if deployment.Annotations == nil || deployment.Annotations[deploymentutil.RevisionAnnotation] != revision {
-			reason = fmt.Sprintf("Deployment %q doesn't have the required revision set", deployment.Name)
-			Logf(reason)
-			return false, nil
-		}
-		if deployment.Spec.Template.Spec.Containers[0].Image != image {
-			reason = fmt.Sprintf("Deployment %q doesn't have the required image set", deployment.Name)
-			Logf(reason)
-			return false, nil
-		}
-		if newRS.Annotations == nil || newRS.Annotations[deploymentutil.RevisionAnnotation] != revision {
-			reason = fmt.Sprintf("New replica set %q doesn't have the required revision set", newRS.Name)
-			Logf(reason)
-			return false, nil
-		}
-		if newRS.Spec.Template.Spec.Containers[0].Image != image {
-			reason = fmt.Sprintf("New replica set %q doesn't have the required image set", newRS.Name)
-			Logf(reason)
-			return false, nil
-		}
-		return true, nil
-	})
-	if err == wait.ErrWaitTimeout {
-		logReplicaSetsOfDeployment(deployment, nil, newRS)
-		err = fmt.Errorf(reason)
-	}
-	if newRS == nil {
-		return fmt.Errorf("deployment %q failed to create new replica set", deploymentName)
-	}
-	if err != nil {
-		return fmt.Errorf("error waiting for deployment %q (got %s / %s) and new replica set %q (got %s / %s) revision and image to match expectation (expected %s / %s): %v", deploymentName, deployment.Annotations[deploymentutil.RevisionAnnotation], deployment.Spec.Template.Spec.Containers[0].Image, newRS.Name, newRS.Annotations[deploymentutil.RevisionAnnotation], newRS.Spec.Template.Spec.Containers[0].Image, revision, image, err)
-	}
-	return nil
+	return testutil.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, revision, image, Logf, Poll, pollLongTimeout)
 }
 
 // CheckNewRSAnnotations check if the new RS's annotation is as expected
@@ -3539,23 +3404,8 @@ func WaitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string
 	})
 	if pollErr == wait.ErrWaitTimeout {
 		pollErr = fmt.Errorf("%d old replica sets were not cleaned up for deployment %q", len(oldRSs)-desiredRSNum, deploymentName)
-		logReplicaSetsOfDeployment(d, oldRSs, nil)
 	}
 	return pollErr
-}
-
-func logReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet) {
-	if newRS != nil {
-		Logf("New ReplicaSet of Deployment %s:\n%+v", deployment.Name, *newRS)
-	} else {
-		Logf("New ReplicaSet of Deployment %s is nil.", deployment.Name)
-	}
-	if len(allOldRSs) > 0 {
-		Logf("All old ReplicaSets of Deployment %s:", deployment.Name)
-	}
-	for i := range allOldRSs {
-		Logf("%+v", *allOldRSs[i])
-	}
 }
 
 func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string, desiredGeneration int64) error {
@@ -3577,34 +3427,8 @@ func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, r
 	})
 	if pollErr == wait.ErrWaitTimeout {
 		pollErr = fmt.Errorf("deployment %q never updated with the desired condition and reason: %v", deployment.Name, deployment.Status.Conditions)
-		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c)
-		if err == nil {
-			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-			logPodsOfDeployment(c, deployment, append(allOldRSs, newRS))
-		}
 	}
 	return pollErr
-}
-
-func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) {
-	minReadySeconds := deployment.Spec.MinReadySeconds
-	podListFunc := func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
-		return c.Core().Pods(namespace).List(options)
-	}
-
-	podList, err := deploymentutil.ListPods(deployment, rsList, podListFunc)
-
-	if err != nil {
-		Logf("Failed to list Pods of Deployment %s: %v", deployment.Name, err)
-		return
-	}
-	for _, pod := range podList.Items {
-		availability := "not available"
-		if podutil.IsPodAvailable(&pod, minReadySeconds, metav1.Now()) {
-			availability = "available"
-		}
-		Logf("Pod %s is %s:\n%+v", pod.Name, availability, pod)
-	}
 }
 
 // Waits for the number of events on the given object to reach a desired count.
@@ -3643,16 +3467,17 @@ func WaitForPartialEvents(c clientset.Interface, ns string, objOrRef runtime.Obj
 
 type updateDeploymentFunc func(d *extensions.Deployment)
 
-func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {
-	deployments := c.Extensions().Deployments(namespace)
+func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDeploymentFunc) (*extensions.Deployment, error) {
+	var deployment *extensions.Deployment
 	var updateErr error
-	pollErr := wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		if deployment, err = deployments.Get(name, metav1.GetOptions{}); err != nil {
+	pollErr := wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		var err error
+		if deployment, err = c.Extensions().Deployments(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(deployment)
-		if deployment, err = deployments.Update(deployment); err == nil {
+		if deployment, err = c.Extensions().Deployments(namespace).Update(deployment); err == nil {
 			Logf("Updating deployment %s", name)
 			return true, nil
 		}
@@ -3670,7 +3495,7 @@ type updateRsFunc func(d *extensions.ReplicaSet)
 func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRsFunc) (*extensions.ReplicaSet, error) {
 	var rs *extensions.ReplicaSet
 	var updateErr error
-	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+	pollErr := wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		var err error
 		if rs, err = c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
@@ -3763,6 +3588,30 @@ func UpdateJobWithRetries(c clientset.Interface, namespace, name string, applyUp
 	return job, pollErr
 }
 
+type updateDSFunc func(*extensions.DaemonSet)
+
+func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDSFunc) (ds *extensions.DaemonSet, err error) {
+	daemonsets := c.ExtensionsV1beta1().DaemonSets(namespace)
+	var updateErr error
+	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		if ds, err = daemonsets.Get(name, metav1.GetOptions{}); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(ds)
+		if ds, err = daemonsets.Update(ds); err == nil {
+			Logf("Updating DaemonSet %s", name)
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to DaemonSet %q: %v", name, updateErr)
+	}
+	return ds, pollErr
+}
+
 // NodeAddresses returns the first address of the given type of each node.
 func NodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string {
 	hosts := []string{}
@@ -3799,7 +3648,7 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 
 	sshHosts := make([]string, 0, len(hosts))
 	for _, h := range hosts {
-		sshHosts = append(sshHosts, net.JoinHostPort(h, "22"))
+		sshHosts = append(sshHosts, net.JoinHostPort(h, sshPort))
 	}
 	return sshHosts, nil
 }
@@ -3811,6 +3660,13 @@ type SSHResult struct {
 	Stdout string
 	Stderr string
 	Code   int
+}
+
+// NodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
+// eg: the name returned by framework.GetMasterHost(). This is also not guaranteed to work across
+// cloud providers since it involves ssh.
+func NodeExec(nodeName, cmd string) (SSHResult, error) {
+	return SSH(cmd, net.JoinHostPort(nodeName, sshPort), TestContext.Provider)
 }
 
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
@@ -3853,7 +3709,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult,
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP {
-			host = a.Address + ":22"
+			host = net.JoinHostPort(a.Address, sshPort)
 			break
 		}
 	}
@@ -4053,14 +3909,14 @@ func GetSigner(provider string) (ssh.Signer, error) {
 // podNames in namespace ns are running and ready, using c and waiting at most
 // timeout.
 func CheckPodsRunningReady(c clientset.Interface, ns string, podNames []string, timeout time.Duration) bool {
-	return CheckPodsCondition(c, ns, podNames, timeout, testutils.PodRunningReady, "running and ready")
+	return CheckPodsCondition(c, ns, podNames, timeout, testutil.PodRunningReady, "running and ready")
 }
 
 // CheckPodsRunningReadyOrSucceeded returns whether all pods whose names are
 // listed in podNames in namespace ns are running and ready, or succeeded; use
 // c and waiting at most timeout.
 func CheckPodsRunningReadyOrSucceeded(c clientset.Interface, ns string, podNames []string, timeout time.Duration) bool {
-	return CheckPodsCondition(c, ns, podNames, timeout, testutils.PodRunningReadyOrSucceeded, "running and ready, or succeeded")
+	return CheckPodsCondition(c, ns, podNames, timeout, testutil.PodRunningReadyOrSucceeded, "running and ready, or succeeded")
 }
 
 // CheckPodsCondition returns whether all pods whose names are listed in podNames
@@ -4068,21 +3924,24 @@ func CheckPodsRunningReadyOrSucceeded(c clientset.Interface, ns string, podNames
 func CheckPodsCondition(c clientset.Interface, ns string, podNames []string, timeout time.Duration, condition podCondition, desc string) bool {
 	np := len(podNames)
 	Logf("Waiting up to %v for %d pods to be %s: %s", timeout, np, desc, podNames)
-	result := make(chan bool, len(podNames))
-	for ix := range podNames {
+	type waitPodResult struct {
+		success bool
+		podName string
+	}
+	result := make(chan waitPodResult, len(podNames))
+	for _, podName := range podNames {
 		// Launch off pod readiness checkers.
 		go func(name string) {
 			err := WaitForPodCondition(c, ns, name, desc, timeout, condition)
-			result <- err == nil
-		}(podNames[ix])
+			result <- waitPodResult{err == nil, name}
+		}(podName)
 	}
 	// Wait for them all to finish.
 	success := true
-	// TODO(a-robinson): Change to `for range` syntax and remove logging once we
-	// support only Go >= 1.4.
-	for _, podName := range podNames {
-		if !<-result {
-			Logf("Pod %[1]s failed to be %[2]s.", podName, desc)
+	for range podNames {
+		res := <-result
+		if !res.success {
+			Logf("Pod %[1]s failed to be %[2]s.", res.podName, desc)
 			success = false
 		}
 	}
@@ -4431,7 +4290,7 @@ func sshRestartMaster() error {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
 	Logf("Restarting master via ssh, running: %v", command)
-	result, err := SSH(command, GetMasterHost()+":22", TestContext.Provider)
+	result, err := SSH(command, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		LogSSHResult(result)
 		return fmt.Errorf("couldn't restart apiserver: %v", err)
@@ -4748,7 +4607,7 @@ func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalcl
 				return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
 			}
 		} else {
-			if err := testutils.WaitForPodsWithLabelRunning(
+			if err := testutil.WaitForPodsWithLabelRunning(
 				clientset, ns, labels.SelectorFromSet(labels.Set(rc.Spec.Selector))); err != nil {
 				return err
 			}
@@ -4819,8 +4678,7 @@ func ensureGCELoadBalancerResourcesDeleted(ip, portRange string) error {
 		if err != nil {
 			return false, err
 		}
-		for ix := range list.Items {
-			item := list.Items[ix]
+		for _, item := range list.Items {
 			if item.PortRange == portRange && item.IPAddress == ip {
 				Logf("found a load balancer: %v", item)
 				return false, nil
@@ -5243,22 +5101,22 @@ func ListNamespaceEvents(c clientset.Interface, ns string) error {
 	return nil
 }
 
-// E2ETestNodePreparer implements testutils.TestNodePreparer interface, which is used
+// E2ETestNodePreparer implements testutil.TestNodePreparer interface, which is used
 // to create/modify Nodes before running a test.
 type E2ETestNodePreparer struct {
 	client clientset.Interface
 	// Specifies how many nodes should be modified using the given strategy.
 	// Only one strategy can be applied to a single Node, so there needs to
 	// be at least <sum_of_keys> Nodes in the cluster.
-	countToStrategy       []testutils.CountToStrategy
-	nodeToAppliedStrategy map[string]testutils.PrepareNodeStrategy
+	countToStrategy       []testutil.CountToStrategy
+	nodeToAppliedStrategy map[string]testutil.PrepareNodeStrategy
 }
 
-func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy) testutils.TestNodePreparer {
+func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testutil.CountToStrategy) testutil.TestNodePreparer {
 	return &E2ETestNodePreparer{
 		client:                client,
 		countToStrategy:       countToStrategy,
-		nodeToAppliedStrategy: make(map[string]testutils.PrepareNodeStrategy),
+		nodeToAppliedStrategy: make(map[string]testutil.PrepareNodeStrategy),
 	}
 }
 
@@ -5276,7 +5134,7 @@ func (p *E2ETestNodePreparer) PrepareNodes() error {
 	for _, v := range p.countToStrategy {
 		sum += v.Count
 		for ; index < sum; index++ {
-			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
+			if err := testutil.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
 				glog.Errorf("Aborting node preparation: %v", err)
 				return err
 			}
@@ -5294,7 +5152,7 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 		name := nodes.Items[i].Name
 		strategy, found := p.nodeToAppliedStrategy[name]
 		if found {
-			if err = testutils.DoCleanupNode(p.client, name, strategy); err != nil {
+			if err = testutil.DoCleanupNode(p.client, name, strategy); err != nil {
 				glog.Errorf("Skipping cleanup of Node: failed update of %v: %v", name, err)
 				encounteredError = err
 			}
@@ -5306,35 +5164,38 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 // CleanupGCEResources cleans up GCE Service Type=LoadBalancer resources with
 // the given name. The name is usually the UUID of the Service prefixed with an
 // alpha-numeric character ('a') to work around cloudprovider rules.
-func CleanupGCEResources(loadBalancerName string) (retErr error) {
+func CleanupGCEResources(loadBalancerName, zone string) (retErr error) {
 	gceCloud, err := GetGCECloud()
 	if err != nil {
 		return err
+	}
+	region, err := gcecloud.GetGCERegion(zone)
+	if err != nil {
+		return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
 	}
 	if err := gceCloud.DeleteFirewall(loadBalancerName); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = err
 	}
-	if err := gceCloud.DeleteForwardingRule(loadBalancerName); err != nil &&
+	if err := gceCloud.DeleteRegionForwardingRule(loadBalancerName, region); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 
 	}
-	if err := gceCloud.DeleteGlobalStaticIP(loadBalancerName); err != nil &&
+	if err := gceCloud.DeleteRegionAddress(loadBalancerName, region); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 	}
-	// This function shells out to gcloud, so we can't compare for NotFound errors.
-	// TODO: Invoke cloudprovider method directly instead.
-	if err := DeleteGCEStaticIP(loadBalancerName); err != nil {
-		Logf("%v", err)
-	}
+	var hcNames []string
 	hc, getErr := gceCloud.GetHttpHealthCheck(loadBalancerName)
 	if getErr != nil && !IsGoogleAPIHTTPErrorCode(getErr, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, getErr)
 		return
 	}
-	if err := gceCloud.DeleteTargetPool(loadBalancerName, hc); err != nil &&
+	if hc != nil {
+		hcNames = append(hcNames, hc.Name)
+	}
+	if err := gceCloud.DeleteExternalTargetPoolAndChecks(loadBalancerName, region, hcNames...); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 	}
@@ -5400,7 +5261,7 @@ func GetNodeExternalIP(node *v1.Node) string {
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP {
-			host = a.Address + ":22"
+			host = net.JoinHostPort(a.Address, sshPort)
 			break
 		}
 	}
@@ -5534,4 +5395,48 @@ func (f *Framework) NewTestPod(name string, requests v1.ResourceList, limits v1.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
 	_, err := RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
 	return err
+}
+
+// GetAzureCloud returns azure cloud provider
+func GetAzureCloud() (*azure.Cloud, error) {
+	cloud, ok := TestContext.CloudConfig.Provider.(*azure.Cloud)
+	if !ok {
+		return nil, fmt.Errorf("failed to convert CloudConfig.Provider to Azure: %#v", TestContext.CloudConfig.Provider)
+	}
+	return cloud, nil
+}
+
+func PrintSummaries(summaries []TestDataSummary, testBaseName string) {
+	now := time.Now()
+	for i := range summaries {
+		Logf("Printing summary: %v", summaries[i].SummaryKind())
+		switch TestContext.OutputPrintType {
+		case "hr":
+			if TestContext.ReportDir == "" {
+				Logf(summaries[i].PrintHumanReadable())
+			} else {
+				// TODO: learn to extract test name and append it to the kind instead of timestamp.
+				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".txt")
+				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
+					Logf("Failed to write file %v with test performance data: %v", filePath, err)
+				}
+			}
+		case "json":
+			fallthrough
+		default:
+			if TestContext.OutputPrintType != "json" {
+				Logf("Unknown output type: %v. Printing JSON", TestContext.OutputPrintType)
+			}
+			if TestContext.ReportDir == "" {
+				Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
+				Logf("Finished")
+			} else {
+				// TODO: learn to extract test name and append it to the kind instead of timestamp.
+				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".json")
+				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
+					Logf("Failed to write file %v with test performance data: %v", filePath, err)
+				}
+			}
+		}
+	}
 }

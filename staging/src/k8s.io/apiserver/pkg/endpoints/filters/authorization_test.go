@@ -26,7 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/client-go/pkg/apis/batch"
+	batch "k8s.io/client-go/pkg/apis/batch/v1"
 )
 
 func TestGetAuthorizerAttributes(t *testing.T) {

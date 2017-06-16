@@ -24,7 +24,6 @@ package k8s.io.kubernetes.pkg.apis.settings.v1alpha1;
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -43,7 +42,7 @@ message PodPreset {
 // PodPresetList is a list of PodPreset objects.
 message PodPresetList {
   // Standard list metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -51,7 +50,7 @@ message PodPresetList {
   repeated PodPreset items = 2;
 }
 
-// PodPresetSpec is a description of a pod injection policy.
+// PodPresetSpec is a description of a pod preset.
 message PodPresetSpec {
   // Selector is a label query over a set of resources, in this case pods.
   // Required.

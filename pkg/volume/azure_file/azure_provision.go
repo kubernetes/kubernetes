@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 var _ volume.DeletableVolumePlugin = &azureFilePlugin{}
@@ -131,6 +132,10 @@ type azureFileProvisioner struct {
 var _ volume.Provisioner = &azureFileProvisioner{}
 
 func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if !volume.AccessModesContainedInAll(a.plugin.GetAccessModes(), a.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", a.options.PVC.Spec.AccessModes, a.plugin.GetAccessModes())
+	}
+
 	var sku, location, account string
 
 	name := volume.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 75)
@@ -172,7 +177,7 @@ func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
 			Name:   a.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
-				"kubernetes.io/createdby": "azure-file-dynamic-provisioner",
+				volumehelper.VolumeDynamicallyCreatedByKey: "azure-file-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

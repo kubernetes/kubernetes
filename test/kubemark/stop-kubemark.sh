@@ -31,12 +31,12 @@ RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 detect-project &> /dev/null
 
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/addons" &> /dev/null || true
-"${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/hollow-node.json" &> /dev/null || true
+"${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/hollow-node.yaml" &> /dev/null || true
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/kubemark-ns.json" &> /dev/null || true
 
 rm -rf "${RESOURCE_DIRECTORY}/addons" \
 	"${RESOURCE_DIRECTORY}/kubeconfig.kubemark" \
-	"${RESOURCE_DIRECTORY}/hollow-node.json" \
+	"${RESOURCE_DIRECTORY}/hollow-node.yaml" \
 	"${RESOURCE_DIRECTORY}/kubemark-master-env.sh"  &> /dev/null || true
 
 delete-master-instance-and-resources

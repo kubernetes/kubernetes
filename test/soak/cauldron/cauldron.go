@@ -36,6 +36,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var (
@@ -184,7 +185,7 @@ func main() {
 						Containers: []api.Container{
 							{
 								Name:  "serve-hostname",
-								Image: "gcr.io/google_containers/serve_hostname:v1.4",
+								Image: framework.ServeHostnameImage,
 								Ports: []api.ContainerPort{{ContainerPort: 9376}},
 							},
 						},

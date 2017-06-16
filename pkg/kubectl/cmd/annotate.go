@@ -65,7 +65,7 @@ type AnnotateOptions struct {
 }
 
 var (
-	annotate_long = templates.LongDesc(`
+	annotateLong = templates.LongDesc(`
 		Update the annotations on one or more resources.
 
 		* An annotation is a key/value pair that can hold larger (compared to a label), and possibly not human-readable, data.
@@ -73,9 +73,9 @@ var (
 		* If --overwrite is true, then existing annotations can be overwritten, otherwise attempting to overwrite an annotation will result in an error.
 		* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
 
-		` + valid_resources)
+		` + validResources)
 
-	annotate_example = templates.Examples(i18n.T(`
+	annotateExample = templates.Examples(i18n.T(`
     # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
     # If the same annotation is set multiple times, only the last value will be applied
     kubectl annotate pods foo description='my frontend'
@@ -114,8 +114,8 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "annotate [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		Short:   i18n.T("Update the annotations on a resource"),
-		Long:    annotate_long,
-		Example: annotate_example,
+		Long:    annotateLong,
+		Example: annotateExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := options.Complete(out, cmd, args); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))

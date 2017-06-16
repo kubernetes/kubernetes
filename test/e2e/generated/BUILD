@@ -23,6 +23,7 @@ genrule(
     name = "bindata",
     srcs = [
         "//examples:sources",
+        "//cluster/gce/gci/nvidia-gpus:sources",
         "//test/images:sources",
         "//test/fixtures:sources",
         "//test/e2e/testing-manifests:sources",

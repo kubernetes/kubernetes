@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package admission
+package podpreset
 
 import (
 	"reflect"
@@ -553,6 +553,145 @@ func TestAdmit(t *testing.T) {
 	err := admitPod(pod, pip)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAdmitMirrorPod(t *testing.T) {
+	containerName := "container"
+
+	mirrorPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mypod",
+			Namespace: "namespace",
+			Labels: map[string]string{
+				"security": "S2",
+			},
+			Annotations: map[string]string{api.MirrorPodAnnotationKey: "mirror"},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: containerName,
+				},
+			},
+		},
+	}
+
+	pip := &settings.PodPreset{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "hello",
+			Namespace: "namespace",
+		},
+		Spec: settings.PodPresetSpec{
+			Selector: v1.LabelSelector{
+				MatchExpressions: []v1.LabelSelectorRequirement{
+					{
+						Key:      "security",
+						Operator: v1.LabelSelectorOpIn,
+						Values:   []string{"S2"},
+					},
+				},
+			},
+			Volumes: []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Env:     []api.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
+			EnvFrom: []api.EnvFromSource{
+				{
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					},
+				},
+				{
+					Prefix: "pre_",
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					},
+				},
+			},
+		},
+	}
+
+	if err := admitPod(mirrorPod, pip); err != nil {
+		t.Fatal(err)
+	}
+
+	container := mirrorPod.Spec.Containers[0]
+	if len(mirrorPod.Spec.Volumes) != 0 ||
+		len(container.VolumeMounts) != 0 ||
+		len(container.Env) != 0 ||
+		len(container.EnvFrom) != 0 {
+		t.Fatalf("mirror pod is updated by PodPreset admission:\n\tVolumes got %d, expected 0\n\tVolumeMounts go %d, expected 0\n\tEnv got, %d expected 0\n\tEnvFrom got %d, expected 0", len(mirrorPod.Spec.Volumes), len(container.VolumeMounts), len(container.Env), len(container.EnvFrom))
+	}
+}
+
+func TestExclusionNoAdmit(t *testing.T) {
+	containerName := "container"
+
+	pod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mypod",
+			Namespace: "namespace",
+			Labels: map[string]string{
+				"security": "S2",
+			},
+			Annotations: map[string]string{
+				api.PodPresetOptOutAnnotationKey: "true",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: containerName,
+					Env:  []api.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABCD", Value: "value3"}},
+				},
+			},
+		},
+	}
+
+	pip := &settings.PodPreset{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "hello",
+			Namespace: "namespace",
+		},
+		Spec: settings.PodPresetSpec{
+			Selector: v1.LabelSelector{
+				MatchExpressions: []v1.LabelSelectorRequirement{
+					{
+						Key:      "security",
+						Operator: v1.LabelSelectorOpIn,
+						Values:   []string{"S2"},
+					},
+				},
+			},
+			Volumes: []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Env:     []api.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
+			EnvFrom: []api.EnvFromSource{
+				{
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					},
+				},
+				{
+					Prefix: "pre_",
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					},
+				},
+			},
+		},
+	}
+	originalPod, err := api.Scheme.Copy(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admitPod(pod, pip)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify PodSpec has not been mutated
+	if !reflect.DeepEqual(pod, originalPod) {
+		t.Fatalf("Expected pod spec of '%v' to be unchanged", pod.Name)
 	}
 }
 

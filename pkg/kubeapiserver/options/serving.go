@@ -97,11 +97,10 @@ func (s *InsecureServingOptions) DefaultExternalAddress() (net.IP, error) {
 
 func (s *InsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.BindAddress, "insecure-bind-address", s.BindAddress, ""+
-		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces). "+
-		"Defaults to localhost.")
+		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces).")
 
 	fs.IntVar(&s.BindPort, "insecure-port", s.BindPort, ""+
-		"The port on which to serve unsecured, unauthenticated access. Default 8080. It is assumed "+
+		"The port on which to serve unsecured, unauthenticated access. It is assumed "+
 		"that firewall rules are set up such that this port is not reachable from outside of "+
 		"the cluster and that port 443 on the cluster's public address is proxied to this "+
 		"port. This is performed by nginx in the default setup.")

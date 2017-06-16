@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	batch "k8s.io/kubernetes/pkg/apis/batch"
 	v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 )
 
@@ -89,7 +88,7 @@ func (s jobNamespaceLister) Get(name string) (*v1.Job, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(batch.Resource("job"), name)
+		return nil, errors.NewNotFound(v1.Resource("job"), name)
 	}
 	return obj.(*v1.Job), nil
 }

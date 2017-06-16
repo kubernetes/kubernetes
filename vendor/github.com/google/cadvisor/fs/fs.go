@@ -149,6 +149,31 @@ func processMounts(mounts []*mount.Info, excludedMountpointPrefixes []string) ma
 			continue
 		}
 
+		// btrfs fix: following workaround fixes wrong btrfs Major and Minor Ids reported in /proc/self/mountinfo.
+		// instead of using values from /proc/self/mountinfo we use stat to get Ids from btrfs mount point
+		if mount.Fstype == "btrfs" && mount.Major == 0 && strings.HasPrefix(mount.Source, "/dev/") {
+
+			buf := new(syscall.Stat_t)
+			err := syscall.Stat(mount.Source, buf)
+			if err != nil {
+				glog.Warningf("stat failed on %s with error: %s", mount.Source, err)
+			} else {
+				glog.Infof("btrfs mount %#v", mount)
+				if buf.Mode&syscall.S_IFMT == syscall.S_IFBLK {
+					err := syscall.Stat(mount.Mountpoint, buf)
+					if err != nil {
+						glog.Warningf("stat failed on %s with error: %s", mount.Mountpoint, err)
+					} else {
+						glog.Infof("btrfs dev major:minor %d:%d\n", int(major(buf.Dev)), int(minor(buf.Dev)))
+						glog.Infof("btrfs rdev major:minor %d:%d\n", int(major(buf.Rdev)), int(minor(buf.Rdev)))
+
+						mount.Major = int(major(buf.Dev))
+						mount.Minor = int(minor(buf.Dev))
+					}
+				}
+			}
+		}
+
 		partitions[mount.Source] = partition{
 			fsType:     mount.Fstype,
 			mountpoint: mount.Mountpoint,
@@ -241,7 +266,7 @@ func getDockerImagePaths(context Context) map[string]struct{} {
 
 	// TODO(rjnagal): Detect docker root and graphdriver directories from docker info.
 	dockerRoot := context.Docker.Root
-	for _, dir := range []string{"devicemapper", "btrfs", "aufs", "overlay", "zfs"} {
+	for _, dir := range []string{"devicemapper", "btrfs", "aufs", "overlay", "overlay2", "zfs"} {
 		dockerImagePaths[path.Join(dockerRoot, dir)] = struct{}{}
 	}
 	for dockerRoot != "/" && dockerRoot != "." {
@@ -430,11 +455,15 @@ func (self *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 }
 
 func (self *RealFsInfo) GetDirDiskUsage(dir string, timeout time.Duration) (uint64, error) {
+	claimToken()
+	defer releaseToken()
+	return GetDirDiskUsage(dir, timeout)
+}
+
+func GetDirDiskUsage(dir string, timeout time.Duration) (uint64, error) {
 	if dir == "" {
 		return 0, fmt.Errorf("invalid directory")
 	}
-	claimToken()
-	defer releaseToken()
 	cmd := exec.Command("nice", "-n", "19", "du", "-s", dir)
 	stdoutp, err := cmd.StdoutPipe()
 	if err != nil {
@@ -471,13 +500,17 @@ func (self *RealFsInfo) GetDirDiskUsage(dir string, timeout time.Duration) (uint
 }
 
 func (self *RealFsInfo) GetDirInodeUsage(dir string, timeout time.Duration) (uint64, error) {
+	claimToken()
+	defer releaseToken()
+	return GetDirInodeUsage(dir, timeout)
+}
+
+func GetDirInodeUsage(dir string, timeout time.Duration) (uint64, error) {
 	if dir == "" {
 		return 0, fmt.Errorf("invalid directory")
 	}
 	var counter byteCounter
 	var stderr bytes.Buffer
-	claimToken()
-	defer releaseToken()
 	findCmd := exec.Command("find", dir, "-xdev", "-printf", ".")
 	findCmd.Stdout, findCmd.Stderr = &counter, &stderr
 	if err := findCmd.Start(); err != nil {

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -37,7 +38,7 @@ var _ = framework.KubeDescribe("Multi-AZ Clusters", func() {
 	f := framework.NewDefaultFramework("multi-az")
 	var zoneCount int
 	var err error
-	image := "gcr.io/google_containers/serve_hostname:v1.4"
+	image := framework.ServeHostnameImage
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 		if zoneCount <= 0 {
@@ -55,6 +56,10 @@ var _ = framework.KubeDescribe("Multi-AZ Clusters", func() {
 
 	It("should spread the pods of a replication controller across zones", func() {
 		SpreadRCOrFail(f, int32((2*zoneCount)+1), image)
+	})
+
+	It("should schedule pods in the same zones as statically provisioned PVs", func() {
+		PodsUseStaticPVsOrFail(f, (2*zoneCount)+1, image)
 	})
 })
 
@@ -116,12 +121,12 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 // Find the name of the zone in which a Node is running
 func getZoneNameForNode(node v1.Node) (string, error) {
 	for key, value := range node.Labels {
-		if key == metav1.LabelZoneFailureDomain {
+		if key == kubeletapis.LabelZoneFailureDomain {
 			return value, nil
 		}
 	}
 	return "", fmt.Errorf("Zone name for node %s not found. No label with key %s",
-		node.Name, metav1.LabelZoneFailureDomain)
+		node.Name, kubeletapis.LabelZoneFailureDomain)
 }
 
 // Find the names of all zones in which we have nodes in this cluster.
@@ -239,4 +244,79 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	zoneNames, err := getZoneNames(f.ClientSet)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(checkZoneSpreading(f.ClientSet, pods, zoneNames)).To(Equal(true))
+}
+
+type StaticPVTestConfig struct {
+	pvSource *v1.PersistentVolumeSource
+	pv       *v1.PersistentVolume
+	pvc      *v1.PersistentVolumeClaim
+	pod      *v1.Pod
+}
+
+// Check that the pods using statically created PVs get scheduled to the same zone that the PV is in.
+func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) {
+	// TODO: add GKE after enabling admission plugin in GKE
+	// TODO: add AWS
+	framework.SkipUnlessProviderIs("gce")
+
+	var err error
+	c := f.ClientSet
+	ns := f.Namespace.Name
+
+	zones, err := getZoneNames(c)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Creating static PVs across zones")
+	configs := make([]*StaticPVTestConfig, podCount)
+	for i := range configs {
+		configs[i] = &StaticPVTestConfig{}
+	}
+
+	defer func() {
+		By("Cleaning up pods and PVs")
+		for _, config := range configs {
+			framework.DeletePodOrFail(c, ns, config.pod.Name)
+		}
+		for _, config := range configs {
+			framework.WaitForPodNoLongerRunningInNamespace(c, config.pod.Name, ns)
+			framework.PVPVCCleanup(c, ns, config.pv, config.pvc)
+			err = framework.DeletePVSource(config.pvSource)
+			Expect(err).NotTo(HaveOccurred())
+		}
+	}()
+
+	for i, config := range configs {
+		zone := zones[i%len(zones)]
+		config.pvSource, err = framework.CreatePVSource(zone)
+		Expect(err).NotTo(HaveOccurred())
+
+		pvConfig := framework.PersistentVolumeConfig{
+			NamePrefix: "multizone-pv",
+			PVSource:   *config.pvSource,
+			Prebind:    nil,
+		}
+		className := ""
+		pvcConfig := framework.PersistentVolumeClaimConfig{StorageClassName: &className}
+
+		config.pv, config.pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	By("Waiting for all PVCs to be bound")
+	for _, config := range configs {
+		framework.WaitOnPVandPVC(c, ns, config.pv, config.pvc)
+	}
+
+	By("Creating pods for each static PV")
+	for _, config := range configs {
+		podConfig := framework.MakePod(ns, []*v1.PersistentVolumeClaim{config.pvc}, false, "")
+		config.pod, err = c.Core().Pods(ns).Create(podConfig)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	By("Waiting for all pods to be running")
+	for _, config := range configs {
+		err = framework.WaitForPodRunningInNamespace(c, config.pod)
+		Expect(err).NotTo(HaveOccurred())
+	}
 }

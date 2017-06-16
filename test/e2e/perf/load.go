@@ -34,6 +34,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -48,19 +49,18 @@ import (
 )
 
 const (
-	smallGroupSize       = 5
-	mediumGroupSize      = 30
-	bigGroupSize         = 250
-	smallGroupName       = "load-small"
-	mediumGroupName      = "load-medium"
-	bigGroupName         = "load-big"
-	smallGroupBatchSize  = 30
-	mediumGroupBatchSize = 5
-	bigGroupBatchSize    = 1
+	smallGroupSize  = 5
+	mediumGroupSize = 30
+	bigGroupSize    = 250
+	smallGroupName  = "load-small"
+	mediumGroupName = "load-medium"
+	bigGroupName    = "load-big"
 	// We start RCs/Services/pods/... in different namespace in this test.
 	// nodeCountPerNamespace determines how many namespaces we will be using
 	// depending on the number of nodes in the underlying cluster.
 	nodeCountPerNamespace = 100
+	// How many threads will be used to create/delete services during this test.
+	serviceOperationsParallelism = 1
 )
 
 var randomKind = schema.GroupKind{Kind: "Random"}
@@ -83,14 +83,22 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	var ns string
 	var configs []testutils.RunObjectConfig
 	var secretConfigs []*testutils.SecretConfig
+	var configMapConfigs []*testutils.ConfigMapConfig
+
+	testCaseBaseName := "load"
 
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
 	AfterEach(func() {
 		// Verify latency metrics
-		highLatencyRequests, err := framework.HighLatencyRequests(clientset)
-		framework.ExpectNoError(err, "Too many instances metrics above the threshold")
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
+		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset)
+		framework.ExpectNoError(err)
+		if err == nil {
+			summaries := make([]framework.TestDataSummary, 0, 1)
+			summaries = append(summaries, metrics)
+			framework.PrintSummaries(summaries, testCaseBaseName)
+			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+		}
 	})
 
 	// We assume a default throughput of 10 pods/second throughput.
@@ -109,7 +117,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		ClientQPS:   float32(math.Max(50.0, float64(2*throughput))),
 		ClientBurst: int(math.Max(100.0, float64(4*throughput))),
 	}
-	f := framework.NewFramework("load", options, nil)
+	f := framework.NewFramework(testCaseBaseName, options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
@@ -134,37 +142,41 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		image       string
 		command     []string
 		// What kind of resource we want to create
-		kind           schema.GroupKind
-		services       bool
-		secretsPerPod  int
-		daemonsPerNode int
+		kind             schema.GroupKind
+		services         bool
+		secretsPerPod    int
+		configMapsPerPod int
+		daemonsPerNode   int
 	}
 
 	loadTests := []Load{
 		// The container will consume 1 cpu and 512mb of memory.
 		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}, kind: api.Kind("ReplicationController")},
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController")},
 		// Tests for other resource types
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment")},
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: batch.Kind("Job")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: batch.Kind("Job")},
 		// Test scheduling when daemons are preset
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
 		// Test with secrets
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment"), secretsPerPod: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
+		// Test with configmaps
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
 		// Special test case which randomizes created resources
-		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: randomKind},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind},
 	}
 
 	for _, testArg := range loadTests {
 		feature := "ManualPerformance"
-		if testArg.podsPerNode == 30 && testArg.kind == api.Kind("ReplicationController") && testArg.daemonsPerNode == 0 && testArg.secretsPerPod == 0 {
+		if testArg.podsPerNode == 30 && testArg.kind == api.Kind("ReplicationController") && testArg.daemonsPerNode == 0 && testArg.secretsPerPod == 0 && testArg.configMapsPerPod == 0 {
 			feature = "Performance"
 		}
-		name := fmt.Sprintf("[Feature:%s] should be able to handle %v pods per node %v with %v secrets and %v daemons",
+		name := fmt.Sprintf("[Feature:%s] should be able to handle %v pods per node %v with %v secrets, %v configmaps and %v daemons",
 			feature,
 			testArg.podsPerNode,
 			testArg.kind,
 			testArg.secretsPerPod,
+			testArg.configMapsPerPod,
 			testArg.daemonsPerNode,
 		)
 		itArg := testArg
@@ -177,30 +189,40 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			framework.ExpectNoError(err)
 
 			totalPods := (itArg.podsPerNode - itArg.daemonsPerNode) * nodeCount
-			configs, secretConfigs = generateConfigs(totalPods, itArg.image, itArg.command, namespaces, itArg.kind, itArg.secretsPerPod)
+			configs, secretConfigs, configMapConfigs = generateConfigs(totalPods, itArg.image, itArg.command, namespaces, itArg.kind, itArg.secretsPerPod, itArg.configMapsPerPod)
+
 			if itArg.services {
 				framework.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
-				for _, service := range services {
-					_, err := clientset.Core().Services(service.Namespace).Create(service)
+				createService := func(i int) {
+					defer GinkgoRecover()
+					_, err := clientset.Core().Services(services[i].Namespace).Create(services[i])
 					framework.ExpectNoError(err)
 				}
+				workqueue.Parallelize(serviceOperationsParallelism, len(services), createService)
 				framework.Logf("%v Services created.", len(services))
 				defer func(services []*v1.Service) {
 					framework.Logf("Starting to delete services...")
-					for _, service := range services {
-						err := clientset.Core().Services(service.Namespace).Delete(service.Name, nil)
+					deleteService := func(i int) {
+						defer GinkgoRecover()
+						err := clientset.Core().Services(services[i].Namespace).Delete(services[i].Name, nil)
 						framework.ExpectNoError(err)
 					}
+					workqueue.Parallelize(serviceOperationsParallelism, len(services), deleteService)
 					framework.Logf("Services deleted")
 				}(services)
 			} else {
 				framework.Logf("Skipping service creation")
 			}
-			// Create all secrets
+			// Create all secrets.
 			for i := range secretConfigs {
 				secretConfigs[i].Run()
 				defer secretConfigs[i].Stop()
+			}
+			// Create all configmaps.
+			for i := range configMapConfigs {
+				configMapConfigs[i].Run()
+				defer configMapConfigs[i].Stop()
 			}
 			// StartDeamon if needed
 			for i := 0; i < itArg.daemonsPerNode; i++ {
@@ -339,20 +361,25 @@ func generateConfigs(
 	nss []*v1.Namespace,
 	kind schema.GroupKind,
 	secretsPerPod int,
-) ([]testutils.RunObjectConfig, []*testutils.SecretConfig) {
+	configMapsPerPod int,
+) ([]testutils.RunObjectConfig, []*testutils.SecretConfig, []*testutils.ConfigMapConfig) {
 	configs := make([]testutils.RunObjectConfig, 0)
 	secretConfigs := make([]*testutils.SecretConfig, 0)
+	configMapConfigs := make([]*testutils.ConfigMapConfig, 0)
 
 	smallGroupCount, mediumGroupCount, bigGroupCount := computePodCounts(totalPods)
-	newConfigs, newSecretConfigs := GenerateConfigsForGroup(nss, smallGroupName, smallGroupSize, smallGroupCount, image, command, kind, secretsPerPod)
+	newConfigs, newSecretConfigs, newConfigMapConfigs := GenerateConfigsForGroup(nss, smallGroupName, smallGroupSize, smallGroupCount, image, command, kind, secretsPerPod, configMapsPerPod)
 	configs = append(configs, newConfigs...)
 	secretConfigs = append(secretConfigs, newSecretConfigs...)
-	newConfigs, newSecretConfigs = GenerateConfigsForGroup(nss, mediumGroupName, mediumGroupSize, mediumGroupCount, image, command, kind, secretsPerPod)
+	configMapConfigs = append(configMapConfigs, newConfigMapConfigs...)
+	newConfigs, newSecretConfigs, newConfigMapConfigs = GenerateConfigsForGroup(nss, mediumGroupName, mediumGroupSize, mediumGroupCount, image, command, kind, secretsPerPod, configMapsPerPod)
 	configs = append(configs, newConfigs...)
 	secretConfigs = append(secretConfigs, newSecretConfigs...)
-	newConfigs, newSecretConfigs = GenerateConfigsForGroup(nss, bigGroupName, bigGroupSize, bigGroupCount, image, command, kind, secretsPerPod)
+	configMapConfigs = append(configMapConfigs, newConfigMapConfigs...)
+	newConfigs, newSecretConfigs, newConfigMapConfigs = GenerateConfigsForGroup(nss, bigGroupName, bigGroupSize, bigGroupCount, image, command, kind, secretsPerPod, configMapsPerPod)
 	configs = append(configs, newConfigs...)
 	secretConfigs = append(secretConfigs, newSecretConfigs...)
+	configMapConfigs = append(configMapConfigs, newConfigMapConfigs...)
 
 	// Create a number of clients to better simulate real usecase
 	// where not everyone is using exactly the same client.
@@ -367,8 +394,11 @@ func generateConfigs(
 	for i := 0; i < len(secretConfigs); i++ {
 		secretConfigs[i].Client = clients[i%len(clients)]
 	}
+	for i := 0; i < len(configMapConfigs); i++ {
+		configMapConfigs[i].Client = clients[i%len(clients)]
+	}
 
-	return configs, secretConfigs
+	return configs, secretConfigs, configMapConfigs
 }
 
 func GenerateConfigsForGroup(
@@ -379,14 +409,17 @@ func GenerateConfigsForGroup(
 	command []string,
 	kind schema.GroupKind,
 	secretsPerPod int,
-) ([]testutils.RunObjectConfig, []*testutils.SecretConfig) {
+	configMapsPerPod int,
+) ([]testutils.RunObjectConfig, []*testutils.SecretConfig, []*testutils.ConfigMapConfig) {
 	configs := make([]testutils.RunObjectConfig, 0, count)
 	secretConfigs := make([]*testutils.SecretConfig, 0, count*secretsPerPod)
+	configMapConfigs := make([]*testutils.ConfigMapConfig, 0, count*configMapsPerPod)
 	savedKind := kind
 	for i := 1; i <= count; i++ {
 		kind = savedKind
 		namespace := nss[i%len(nss)].Name
 		secretNames := make([]string, 0, secretsPerPod)
+		configMapNames := make([]string, 0, configMapsPerPod)
 
 		for j := 0; j < secretsPerPod; j++ {
 			secretName := fmt.Sprintf("%v-%v-secret-%v", groupName, i, j)
@@ -398,6 +431,18 @@ func GenerateConfigsForGroup(
 				LogFunc:   framework.Logf,
 			})
 			secretNames = append(secretNames, secretName)
+		}
+
+		for j := 0; j < configMapsPerPod; j++ {
+			configMapName := fmt.Sprintf("%v-%v-configmap-%v", groupName, i, j)
+			configMapConfigs = append(configMapConfigs, &testutils.ConfigMapConfig{
+				Content:   map[string]string{"foo": "bar"},
+				Client:    nil, // this will be overwritten later
+				Name:      configMapName,
+				Namespace: namespace,
+				LogFunc:   framework.Logf,
+			})
+			configMapNames = append(configMapNames, configMapName)
 		}
 
 		baseConfig := &testutils.RCConfig{
@@ -412,6 +457,7 @@ func GenerateConfigsForGroup(
 			CpuRequest:     10,       // 0.01 core
 			MemRequest:     26214400, // 25MB
 			SecretNames:    secretNames,
+			ConfigMapNames: configMapNames,
 		}
 
 		if kind == randomKind {
@@ -433,7 +479,7 @@ func GenerateConfigsForGroup(
 		}
 		configs = append(configs, config)
 	}
-	return configs, secretConfigs
+	return configs, secretConfigs, configMapConfigs
 }
 
 func generateServicesForConfigs(configs []testutils.RunObjectConfig) []*v1.Service {

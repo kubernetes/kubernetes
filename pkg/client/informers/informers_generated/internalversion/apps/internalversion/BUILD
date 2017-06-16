@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "controllerrevision.go",
         "interface.go",
         "statefulset.go",
     ],

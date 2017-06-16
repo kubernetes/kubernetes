@@ -8,12 +8,13 @@ load(
     "go_library",
     "go_test",
 )
+load("//pkg/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "hyperkube",
     library = ":go_default_library",
-    linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
+    x_defs = version_x_defs(),
 )
 
 go_test(
@@ -50,7 +51,6 @@ go_library(
         "//cmd/kube-controller-manager/app:go_default_library",
         "//cmd/kube-controller-manager/app/options:go_default_library",
         "//cmd/kube-proxy/app:go_default_library",
-        "//cmd/kube-proxy/app/options:go_default_library",
         "//cmd/kubelet/app:go_default_library",
         "//cmd/kubelet/app/options:go_default_library",
         "//federation/cmd/federation-apiserver/app:go_default_library",

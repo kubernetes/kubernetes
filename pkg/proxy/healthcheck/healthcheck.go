@@ -22,14 +22,17 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/apimachinery/pkg/util/clock"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 // Server serves HTTP endpoints for each service name, with results
@@ -194,7 +197,13 @@ var _ http.Handler = hcHandler{}
 
 func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	h.hcs.lock.Lock()
-	count := h.hcs.services[h.name].endpoints
+	svc, ok := h.hcs.services[h.name]
+	if !ok || svc == nil {
+		h.hcs.lock.Unlock()
+		glog.Errorf("Received request for closed healthcheck %q", h.name.String())
+		return
+	}
+	count := svc.endpoints
 	h.hcs.lock.Unlock()
 
 	resp.Header().Set("Content-Type", "application/json")
@@ -232,4 +241,93 @@ func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) erro
 		}
 	}
 	return nil
+}
+
+// HealthzUpdater allows callers to update healthz timestamp only.
+type HealthzUpdater interface {
+	UpdateTimestamp()
+}
+
+// HealthzServer returns 200 "OK" by default. Once timestamp has been
+// updated, it verifies we don't exceed max no respond duration since
+// last update.
+type HealthzServer struct {
+	listener    Listener
+	httpFactory HTTPServerFactory
+	clock       clock.Clock
+
+	addr          string
+	port          int32
+	healthTimeout time.Duration
+
+	lastUpdated atomic.Value
+}
+
+// NewDefaultHealthzServer returns a default healthz http server.
+func NewDefaultHealthzServer(addr string, healthTimeout time.Duration) *HealthzServer {
+	return newHealthzServer(nil, nil, nil, addr, healthTimeout)
+}
+
+func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c clock.Clock, addr string, healthTimeout time.Duration) *HealthzServer {
+	if listener == nil {
+		listener = stdNetListener{}
+	}
+	if httpServerFactory == nil {
+		httpServerFactory = stdHTTPServerFactory{}
+	}
+	if c == nil {
+		c = clock.RealClock{}
+	}
+	return &HealthzServer{
+		listener:      listener,
+		httpFactory:   httpServerFactory,
+		clock:         c,
+		addr:          addr,
+		healthTimeout: healthTimeout,
+	}
+}
+
+// UpdateTimestamp updates the lastUpdated timestamp.
+func (hs *HealthzServer) UpdateTimestamp() {
+	hs.lastUpdated.Store(hs.clock.Now())
+}
+
+// Run starts the healthz http server and returns.
+func (hs *HealthzServer) Run() {
+	serveMux := http.NewServeMux()
+	serveMux.Handle("/healthz", healthzHandler{hs: hs})
+	server := hs.httpFactory.New(hs.addr, serveMux)
+	listener, err := hs.listener.Listen(hs.addr)
+	if err != nil {
+		glog.Errorf("Failed to start healthz on %s: %v", hs.addr, err)
+		return
+	}
+	go func() {
+		glog.V(3).Infof("Starting goroutine for healthz on %s", hs.addr)
+		if err := server.Serve(listener); err != nil {
+			glog.Errorf("Healhz closed: %v", err)
+			return
+		}
+		glog.Errorf("Unexpected healhz closed.")
+	}()
+}
+
+type healthzHandler struct {
+	hs *HealthzServer
+}
+
+func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	lastUpdated := time.Time{}
+	if val := h.hs.lastUpdated.Load(); val != nil {
+		lastUpdated = val.(time.Time)
+	}
+	currentTime := h.hs.clock.Now()
+
+	resp.Header().Set("Content-Type", "application/json")
+	if !lastUpdated.IsZero() && currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
+		resp.WriteHeader(http.StatusServiceUnavailable)
+	} else {
+		resp.WriteHeader(http.StatusOK)
+	}
+	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q,"currentTime": %q}`, lastUpdated, currentTime))
 }

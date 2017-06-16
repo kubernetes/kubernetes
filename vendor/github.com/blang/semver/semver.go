@@ -200,6 +200,29 @@ func Make(s string) (Version, error) {
 	return Parse(s)
 }
 
+// ParseTolerant allows for certain version specifications that do not strictly adhere to semver
+// specs to be parsed by this library. It does so by normalizing versions before passing them to
+// Parse(). It currently trims spaces, removes a "v" prefix, and adds a 0 patch number to versions
+// with only major and minor components specified
+func ParseTolerant(s string) (Version, error) {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "v")
+
+	// Split into major.minor.(patch+pr+meta)
+	parts := strings.SplitN(s, ".", 3)
+	if len(parts) < 3 {
+		if strings.ContainsAny(parts[len(parts)-1], "+-") {
+			return Version{}, errors.New("Short version cannot contain PreRelease/Build meta data")
+		}
+		for len(parts) < 3 {
+			parts = append(parts, "0")
+		}
+		s = strings.Join(parts, ".")
+	}
+
+	return Parse(s)
+}
+
 // Parse parses version string and returns a validated Version or error
 func Parse(s string) (Version, error) {
 	if len(s) == 0 {

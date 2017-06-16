@@ -50,7 +50,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 				}
 			}
 			if node == nil {
-				Fail("unable to select a non-master node")
+				framework.Failf("unable to select a non-master node")
 			}
 		}
 

@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -31,7 +30,7 @@ import (
 )
 
 var (
-	scale_long = templates.LongDesc(i18n.T(`
+	scaleLong = templates.LongDesc(i18n.T(`
 		Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job.
 
 		Scale also allows users to specify one or more preconditions for the scale action.
@@ -40,7 +39,7 @@ var (
 		scale is attempted, and it is guaranteed that the precondition holds true when the
 		scale is sent to the server.`))
 
-	scale_example = templates.Examples(i18n.T(`
+	scaleExample = templates.Examples(i18n.T(`
 		# Scale a replicaset named 'foo' to 3.
 		kubectl scale --replicas=3 rs/foo
 
@@ -65,12 +64,10 @@ func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
-		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
-		// resize is deprecated
-		Aliases: []string{"resize"},
+		Use:     "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		Short:   i18n.T("Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"),
-		Long:    scale_long,
-		Example: scale_example,
+		Long:    scaleLong,
+		Example: scaleExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
@@ -96,10 +93,6 @@ func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 // RunScale executes the scaling
 func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *resource.FilenameOptions) error {
-	if len(os.Args) > 1 && os.Args[1] == "resize" {
-		printDeprecationWarning("scale", "resize")
-	}
-
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err

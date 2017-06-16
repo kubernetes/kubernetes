@@ -123,7 +123,7 @@ type BaseContainer interface {
 	// SystemError - System error.
 	Start(process *Process) (err error)
 
-	// Run immediatly starts the process inside the conatiner.  Returns error if process
+	// Run immediately starts the process inside the conatiner.  Returns error if process
 	// fails to start.  It does not block waiting for the exec fifo  after start returns but
 	// opens the fifo after start returns.
 	//

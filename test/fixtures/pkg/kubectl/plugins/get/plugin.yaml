@@ -1,0 +1,3 @@
+name: "get"
+shortDesc: "The wonderful new plugin-based get!"
+command: "echo new-get"

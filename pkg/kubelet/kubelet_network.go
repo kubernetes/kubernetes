@@ -229,8 +229,8 @@ func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, sear
 		if len(fields) == 0 {
 			continue
 		}
-		if fields[0] == "nameserver" {
-			nameservers = append(nameservers, fields[1:]...)
+		if fields[0] == "nameserver" && len(fields) >= 2 {
+			nameservers = append(nameservers, fields[1])
 		}
 		if fields[0] == "search" {
 			searches = fields[1:]

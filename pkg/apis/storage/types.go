@@ -51,7 +51,7 @@ type StorageClass struct {
 type StorageClassList struct {
 	metav1.TypeMeta
 	// Standard list metadata
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 

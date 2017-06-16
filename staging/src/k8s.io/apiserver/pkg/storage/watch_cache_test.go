@@ -27,16 +27,16 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/clock"
 )
 
-func makeTestPod(name string, resourceVersion uint64) *api.Pod {
-	return &api.Pod{
+func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       "ns",
 			Name:            name,
@@ -50,8 +50,8 @@ func newTestWatchCache(capacity int) *watchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
 		return NamespaceKeyFunc("prefix", obj)
 	}
-	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, error) {
-		return nil, nil, nil
+	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+		return nil, nil, false, nil
 	}
 	wc := newWatchCache(capacity, keyFunc, getAttrsFunc)
 	wc.clock = clock.NewFakeClock(time.Now())
@@ -99,7 +99,7 @@ func TestWatchCacheBasic(t *testing.T) {
 	{
 		podNames := sets.String{}
 		for _, item := range store.List() {
-			podNames.Insert(item.(*storeElement).Object.(*api.Pod).ObjectMeta.Name)
+			podNames.Insert(item.(*storeElement).Object.(*v1.Pod).ObjectMeta.Name)
 		}
 		if !podNames.HasAll("pod1", "pod2", "pod3") {
 			t.Errorf("missing pods, found %v", podNames)
@@ -117,7 +117,7 @@ func TestWatchCacheBasic(t *testing.T) {
 	{
 		podNames := sets.String{}
 		for _, item := range store.List() {
-			podNames.Insert(item.(*storeElement).Object.(*api.Pod).ObjectMeta.Name)
+			podNames.Insert(item.(*storeElement).Object.(*v1.Pod).ObjectMeta.Name)
 		}
 		if !podNames.HasAll("pod4", "pod5") {
 			t.Errorf("missing pods, found %v", podNames)
@@ -349,10 +349,10 @@ func TestReflectorForWatchCache(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return &api.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
+			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
 		},
 	}
-	r := cache.NewReflector(lw, &api.Pod{}, store, 0)
+	r := cache.NewReflector(lw, &v1.Pod{}, store, 0)
 	r.ListAndWatch(wait.NeverStop)
 
 	{

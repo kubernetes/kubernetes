@@ -53,6 +53,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 
 	"github.com/golang/glog"
 )
@@ -71,12 +72,12 @@ var (
 	podStatusReconciliationVersion = utilversion.MustParseSemantic("v1.2.0")
 
 	UnreachableTaintTemplate = &v1.Taint{
-		Key:    metav1.TaintNodeUnreachable,
+		Key:    algorithm.TaintNodeUnreachable,
 		Effect: v1.TaintEffectNoExecute,
 	}
 
 	NotReadyTaintTemplate = &v1.Taint{
-		Key:    metav1.TaintNodeNotReady,
+		Key:    algorithm.TaintNodeNotReady,
 		Effect: v1.TaintEffectNoExecute,
 	}
 )
@@ -294,7 +295,7 @@ func NewNodeController(
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod, isPod := obj.(*v1.Pod)
-			// We can get DeletedFinalStateUnknown instead of *v1.Node here and we need to handle that correctly. #34692
+			// We can get DeletedFinalStateUnknown instead of *v1.Pod here and we need to handle that correctly.
 			if !isPod {
 				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
@@ -303,7 +304,7 @@ func NewNodeController(
 				}
 				pod, ok = deletedState.Obj.(*v1.Pod)
 				if !ok {
-					glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+					glog.Errorf("DeletedFinalStateUnknown contained non-Pod object: %v", deletedState.Obj)
 					return
 				}
 			}
@@ -348,13 +349,51 @@ func NewNodeController(
 		}
 
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc:    nc.onNodeAdd,
-			UpdateFunc: nc.onNodeUpdate,
-			DeleteFunc: nc.onNodeDelete,
+			AddFunc: createAddNodeHandler(nc.cidrAllocator.AllocateOrOccupyCIDR),
+			UpdateFunc: createUpdateNodeHandler(func(_, newNode *v1.Node) error {
+				// If the PodCIDR is not empty we either:
+				// - already processed a Node that already had a CIDR after NC restarted
+				//   (cidr is marked as used),
+				// - already processed a Node successfully and allocated a CIDR for it
+				//   (cidr is marked as used),
+				// - already processed a Node but we did saw a "timeout" response and
+				//   request eventually got through in this case we haven't released
+				//   the allocated CIDR (cidr is still marked as used).
+				// There's a possible error here:
+				// - NC sees a new Node and assigns a CIDR X to it,
+				// - Update Node call fails with a timeout,
+				// - Node is updated by some other component, NC sees an update and
+				//   assigns CIDR Y to the Node,
+				// - Both CIDR X and CIDR Y are marked as used in the local cache,
+				//   even though Node sees only CIDR Y
+				// The problem here is that in in-memory cache we see CIDR X as marked,
+				// which prevents it from being assigned to any new node. The cluster
+				// state is correct.
+				// Restart of NC fixes the issue.
+				if newNode.Spec.PodCIDR == "" {
+					return nc.cidrAllocator.AllocateOrOccupyCIDR(newNode)
+				}
+				return nil
+			}),
+			DeleteFunc: createDeleteNodeHandler(nc.cidrAllocator.ReleaseCIDR),
 		})
 	}
 
 	if nc.runTaintManager {
+		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: createAddNodeHandler(func(node *v1.Node) error {
+				nc.taintManager.NodeUpdated(nil, node)
+				return nil
+			}),
+			UpdateFunc: createUpdateNodeHandler(func(oldNode, newNode *v1.Node) error {
+				nc.taintManager.NodeUpdated(oldNode, newNode)
+				return nil
+			}),
+			DeleteFunc: createDeleteNodeHandler(func(node *v1.Node) error {
+				nc.taintManager.NodeUpdated(node, nil)
+				return nil
+			}),
+		})
 		nc.taintManager = NewNoExecuteTaintManager(kubeClient)
 	}
 
@@ -432,90 +471,6 @@ func (nc *NodeController) doTaintingPass() {
 
 			return swapNodeControllerTaint(nc.kubeClient, &taintToAdd, &oppositeTaint, node), 0
 		})
-	}
-}
-
-func (nc *NodeController) onNodeAdd(originalObj interface{}) {
-	obj, err := api.Scheme.DeepCopy(originalObj)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
-	node := obj.(*v1.Node)
-
-	if err := nc.cidrAllocator.AllocateOrOccupyCIDR(node); err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
-	}
-	if nc.taintManager != nil {
-		nc.taintManager.NodeUpdated(nil, node)
-	}
-}
-
-func (nc *NodeController) onNodeUpdate(oldNode, newNode interface{}) {
-	node := newNode.(*v1.Node)
-	prevNode := oldNode.(*v1.Node)
-	// If the PodCIDR is not empty we either:
-	// - already processed a Node that already had a CIDR after NC restarted
-	//   (cidr is marked as used),
-	// - already processed a Node successfully and allocated a CIDR for it
-	//   (cidr is marked as used),
-	// - already processed a Node but we did saw a "timeout" response and
-	//   request eventually got through in this case we haven't released
-	//   the allocated CIDR (cidr is still marked as used).
-	// There's a possible error here:
-	// - NC sees a new Node and assigns a CIDR X to it,
-	// - Update Node call fails with a timeout,
-	// - Node is updated by some other component, NC sees an update and
-	//   assigns CIDR Y to the Node,
-	// - Both CIDR X and CIDR Y are marked as used in the local cache,
-	//   even though Node sees only CIDR Y
-	// The problem here is that in in-memory cache we see CIDR X as marked,
-	// which prevents it from being assigned to any new node. The cluster
-	// state is correct.
-	// Restart of NC fixes the issue.
-	if node.Spec.PodCIDR == "" {
-		nodeCopy, err := api.Scheme.Copy(node)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return
-		}
-
-		if err := nc.cidrAllocator.AllocateOrOccupyCIDR(nodeCopy.(*v1.Node)); err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
-		}
-	}
-	if nc.taintManager != nil {
-		nc.taintManager.NodeUpdated(prevNode, node)
-	}
-}
-
-func (nc *NodeController) onNodeDelete(originalObj interface{}) {
-	obj, err := api.Scheme.DeepCopy(originalObj)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
-
-	node, isNode := obj.(*v1.Node)
-	// We can get DeletedFinalStateUnknown instead of *v1.Node here and
-	// we need to handle that correctly. #34692
-	if !isNode {
-		deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			glog.Errorf("Received unexpected object: %v", obj)
-			return
-		}
-		node, ok = deletedState.Obj.(*v1.Node)
-		if !ok {
-			glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
-			return
-		}
-	}
-	if nc.taintManager != nil {
-		nc.taintManager.NodeUpdated(node, nil)
-	}
-	if err := nc.cidrAllocator.ReleaseCIDR(node); err != nil {
-		glog.Errorf("Error releasing CIDR: %v", err)
 	}
 }
 

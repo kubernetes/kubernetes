@@ -19,6 +19,7 @@ package iscsi
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -91,6 +92,15 @@ func TestExtractPortalAndIqn(t *testing.T) {
 	}
 }
 
+func TestRemoveDuplicate(t *testing.T) {
+	dupPortals := []string{"127.0.0.1:3260", "127.0.0.1:3260", "127.0.0.100:3260"}
+	portals := removeDuplicate(dupPortals)
+	want := []string{"127.0.0.1:3260", "127.0.0.100:3260"}
+	if reflect.DeepEqual(portals, want) == false {
+		t.Errorf("removeDuplicate: want: %s, got: %s", want, portals)
+	}
+}
+
 func fakeOsStat(devicePath string) (fi os.FileInfo, err error) {
 	var cmd os.FileInfo
 	return cmd, nil
@@ -98,6 +108,12 @@ func fakeOsStat(devicePath string) (fi os.FileInfo, err error) {
 
 func fakeFilepathGlob(devicePath string) (globs []string, err error) {
 	return []string{devicePath}, nil
+}
+
+func fakeFilepathGlob2(devicePath string) (globs []string, err error) {
+	return []string{
+		"/dev/disk/by-path/pci-0000:00:00.0-ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0",
+	}, nil
 }
 
 func TestExtractTransportname(t *testing.T) {
@@ -141,23 +157,29 @@ func TestExtractTransportname(t *testing.T) {
 
 func TestWaitForPathToExist(t *testing.T) {
 	devicePath := []string{"/dev/disk/by-path/ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0",
-		"/dev/disk/by-path/pci-0000:00:00.0-ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0"}
+		"/dev/disk/by-path/pci-*-ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0"}
+	fpath := "/dev/disk/by-path/pci-0000:00:00.0-ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0"
 
-	exist := waitForPathToExistInternal(devicePath[0], 1, "tcp", fakeOsStat, filepath.Glob)
+	exist := waitForPathToExistInternal(&devicePath[0], 1, "tcp", fakeOsStat, filepath.Glob)
 	if exist == false {
 		t.Errorf("waitForPathToExist: could not find path %s", devicePath[0])
 	}
-	exist = waitForPathToExistInternal(devicePath[0], 1, "fake_iface", fakeOsStat, filepath.Glob)
+	exist = waitForPathToExistInternal(&devicePath[0], 1, "fake_iface", fakeOsStat, filepath.Glob)
 	if exist != false {
 		t.Errorf("waitForPathToExist: wrong code path called for %s", devicePath[0])
 	}
 
-	exist = waitForPathToExistInternal(devicePath[1], 1, "fake_iface", os.Stat, fakeFilepathGlob)
+	exist = waitForPathToExistInternal(&devicePath[1], 1, "fake_iface", os.Stat, fakeFilepathGlob)
 	if exist == false {
 		t.Errorf("waitForPathToExist: could not find path %s", devicePath[1])
 	}
-	exist = waitForPathToExistInternal(devicePath[1], 1, "tcp", os.Stat, fakeFilepathGlob)
+	exist = waitForPathToExistInternal(&devicePath[1], 1, "tcp", os.Stat, fakeFilepathGlob)
 	if exist != false {
+		t.Errorf("waitForPathToExist: wrong code path called for %s", devicePath[1])
+	}
+
+	exist = waitForPathToExistInternal(&devicePath[1], 1, "fake_iface", os.Stat, fakeFilepathGlob2)
+	if devicePath[1] != fpath {
 		t.Errorf("waitForPathToExist: wrong code path called for %s", devicePath[1])
 	}
 }

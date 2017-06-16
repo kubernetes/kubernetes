@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	unsafe "unsafe"
 )
@@ -130,8 +131,9 @@ func Convert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList(i
 }
 
 func autoConvert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *PodDisruptionBudgetSpec, out *policy.PodDisruptionBudgetSpec, s conversion.Scope) error {
-	out.MinAvailable = in.MinAvailable
+	out.MinAvailable = (*intstr.IntOrString)(unsafe.Pointer(in.MinAvailable))
 	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.MaxUnavailable = (*intstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
 	return nil
 }
 
@@ -141,8 +143,9 @@ func Convert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(i
 }
 
 func autoConvert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(in *policy.PodDisruptionBudgetSpec, out *PodDisruptionBudgetSpec, s conversion.Scope) error {
-	out.MinAvailable = in.MinAvailable
+	out.MinAvailable = (*intstr.IntOrString)(unsafe.Pointer(in.MinAvailable))
 	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.MaxUnavailable = (*intstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
 	return nil
 }
 

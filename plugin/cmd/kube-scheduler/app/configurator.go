@@ -77,6 +77,7 @@ func CreateScheduler(
 	s *options.SchedulerServer,
 	kubecli *clientset.Clientset,
 	nodeInformer coreinformers.NodeInformer,
+	podInformer coreinformers.PodInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	replicationControllerInformer coreinformers.ReplicationControllerInformer,
@@ -89,6 +90,7 @@ func CreateScheduler(
 		s.SchedulerName,
 		kubecli,
 		nodeInformer,
+		podInformer,
 		pvInformer,
 		pvcInformer,
 		replicationControllerInformer,
@@ -139,17 +141,13 @@ func (sc schedulerConfigurator) getSchedulerPolicyConfig() (*schedulerapi.Policy
 			return nil, fmt.Errorf("Error getting scheduler policy ConfigMap: %v.", err)
 		}
 		if policyConfigMap != nil {
-			// We expect the first element in the Data member of the ConfigMap to
-			// contain the policy config.
-			if len(policyConfigMap.Data) != 1 {
-				return nil, fmt.Errorf("ConfigMap %v has %v entries in its 'Data'. It must have only one.", sc.policyConfigMap, len(policyConfigMap.Data))
+			var configString string
+			configString, policyConfigMapFound = policyConfigMap.Data[options.SchedulerPolicyConfigMapKey]
+			if !policyConfigMapFound {
+				return nil, fmt.Errorf("No element with key = '%v' is found in the ConfigMap 'Data'.", options.SchedulerPolicyConfigMapKey)
 			}
-			policyConfigMapFound = true
-			// This loop should iterate only once, as we have already checked the length of Data.
-			for _, val := range policyConfigMap.Data {
-				glog.V(5).Infof("Scheduler policy ConfigMap: %v", val)
-				configData = []byte(val)
-			}
+			glog.V(5).Infof("Scheduler policy ConfigMap: %v", configString)
+			configData = []byte(configString)
 		}
 	}
 

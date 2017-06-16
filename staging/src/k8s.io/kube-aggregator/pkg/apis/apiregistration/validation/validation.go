@@ -24,10 +24,10 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	discoveryapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 )
 
-func ValidateAPIService(apiService *discoveryapi.APIService) field.ErrorList {
+func ValidateAPIService(apiService *apiregistration.APIService) field.ErrorList {
 	requiredName := apiService.Spec.Version + "." + apiService.Spec.Group
 
 	allErrs := validation.ValidateObjectMeta(&apiService.ObjectMeta, false,
@@ -58,9 +58,11 @@ func ValidateAPIService(apiService *discoveryapi.APIService) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "version"), apiService.Spec.Version, errString))
 	}
 
-	if apiService.Spec.Priority <= 0 || apiService.Spec.Priority > 1000 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "priority"), apiService.Spec.Priority, "priority must be positive and less than 1000"))
-
+	if apiService.Spec.GroupPriorityMinimum <= 0 || apiService.Spec.GroupPriorityMinimum > 20000 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "groupPriorityMinimum"), apiService.Spec.GroupPriorityMinimum, "must be positive and less than 20000"))
+	}
+	if apiService.Spec.VersionPriority <= 0 || apiService.Spec.VersionPriority > 1000 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "versionPriority"), apiService.Spec.VersionPriority, "must be positive and less than 1000"))
 	}
 
 	if apiService.Spec.Service == nil {
@@ -86,9 +88,30 @@ func ValidateAPIService(apiService *discoveryapi.APIService) field.ErrorList {
 	return allErrs
 }
 
-func ValidateAPIServiceUpdate(newAPIService *discoveryapi.APIService, oldAPIService *discoveryapi.APIService) field.ErrorList {
+func ValidateAPIServiceUpdate(newAPIService *apiregistration.APIService, oldAPIService *apiregistration.APIService) field.ErrorList {
 	allErrs := validation.ValidateObjectMetaUpdate(&newAPIService.ObjectMeta, &oldAPIService.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateAPIService(newAPIService)...)
 
+	return allErrs
+}
+
+func ValidateAPIServiceStatus(status *apiregistration.APIServiceStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for i, condition := range status.Conditions {
+		if condition.Status != apiregistration.ConditionTrue &&
+			condition.Status != apiregistration.ConditionFalse &&
+			condition.Status != apiregistration.ConditionUnknown {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("conditions").Index(i).Child("status"), condition.Status, []string{
+				string(apiregistration.ConditionTrue), string(apiregistration.ConditionFalse), string(apiregistration.ConditionUnknown)}))
+		}
+	}
+
+	return allErrs
+}
+
+func ValidateAPIServiceStatusUpdate(newAPIService *apiregistration.APIService, oldAPIService *apiregistration.APIService) field.ErrorList {
+	allErrs := validation.ValidateObjectMetaUpdate(&newAPIService.ObjectMeta, &oldAPIService.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateAPIServiceStatus(&newAPIService.Status, field.NewPath("status"))...)
 	return allErrs
 }

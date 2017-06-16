@@ -17,16 +17,22 @@ limitations under the License.
 package set
 
 import (
+	"bytes"
+	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestUpdateSelectorForObjectTypes(t *testing.T) {
@@ -305,5 +311,34 @@ func TestGetResourcesAndSelector(t *testing.T) {
 		if !reflect.DeepEqual(gotSelector, tt.wantSelector) {
 			t.Errorf("%q. getResourcesAndSelector() gotSelector = %v, want %v", tt.name, gotSelector, tt.wantSelector)
 		}
+	}
+}
+
+func TestSelectorTest(t *testing.T) {
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdSelector(f, buf)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("local", "true")
+	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-service.yaml")
+
+	mapper, typer := f.Object()
+	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
+	cmd.Run(cmd, []string{"environment=qa"})
+
+	if !strings.Contains(buf.String(), "services/cassandra") {
+		t.Errorf("did not set selector: %s", buf.String())
 	}
 }

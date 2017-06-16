@@ -280,21 +280,6 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 	framework.Logf("DNS probes using %s succeeded\n", pod.Name)
 }
 
-func verifyDNSPodIsRunning(f *framework.Framework) {
-	systemClient := f.ClientSet.Core().Pods(metav1.NamespaceSystem)
-	By("Waiting for DNS Service to be Running")
-	options := metav1.ListOptions{LabelSelector: dnsServiceLabelSelector.String()}
-	dnsPods, err := systemClient.List(options)
-	if err != nil {
-		framework.Failf("Failed to list all dns service pods")
-	}
-	if len(dnsPods.Items) < 1 {
-		framework.Failf("No pods match the label selector %v", dnsServiceLabelSelector.String())
-	}
-	pod := dnsPods.Items[0]
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, &pod))
-}
-
 func createServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *v1.Service {
 	headlessService := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -336,10 +321,10 @@ var _ = framework.KubeDescribe("DNS", func() {
 			"kubernetes.default",
 			"kubernetes.default.svc",
 			"kubernetes.default.svc.cluster.local",
-			"google.com",
 		}
 		// Added due to #8512. This is critical for GCE and GKE deployments.
 		if framework.ProviderIs("gce", "gke") {
+			namesToResolve = append(namesToResolve, "google.com")
 			namesToResolve = append(namesToResolve, "metadata")
 		}
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name)

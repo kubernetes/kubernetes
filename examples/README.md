@@ -3,7 +3,7 @@
 This directory contains a number of examples of how to run
 real applications with Kubernetes.
 
-Demonstrations of how to use specific Kubernetes features can be found in our [documents](../docs/).
+Demonstrations of how to use specific Kubernetes features can be found in our [documents](https://kubernetes.io/docs/).
 
 
 ### Maintained Examples

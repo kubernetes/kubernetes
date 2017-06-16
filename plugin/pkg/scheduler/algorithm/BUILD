@@ -14,6 +14,7 @@ go_library(
         "doc.go",
         "scheduler_interface.go",
         "types.go",
+        "well_known_labels.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -28,10 +29,17 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["scheduler_interface_test.go"],
+    srcs = [
+        "scheduler_interface_test.go",
+        "types_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/api/v1:go_default_library"],
+    deps = [
+        "//pkg/api/v1:go_default_library",
+        "//plugin/pkg/scheduler/schedulercache:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+    ],
 )
 
 filegroup(

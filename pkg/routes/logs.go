@@ -21,14 +21,12 @@ import (
 	"path"
 
 	"github.com/emicklei/go-restful"
-
-	"k8s.io/apiserver/pkg/server/mux"
 )
 
 // Logs adds handlers for the /logs path serving log files from /var/log.
 type Logs struct{}
 
-func (l Logs) Install(c *mux.APIContainer) {
+func (l Logs) Install(c *restful.Container) {
 	// use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
 	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
 	ws := new(restful.WebService)

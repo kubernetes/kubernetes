@@ -116,7 +116,7 @@ func NewDefaultRESTMapper(defaultGroupVersions []schema.GroupVersion, f VersionI
 }
 
 func (m *DefaultRESTMapper) Add(kind schema.GroupVersionKind, scope RESTScope) {
-	plural, singular := KindToResource(kind)
+	plural, singular := UnsafeGuessKindToResource(kind)
 
 	m.singularToPlural[singular] = plural
 	m.pluralToSingular[plural] = singular
@@ -136,10 +136,10 @@ var unpluralizedSuffixes = []string{
 	"endpoints",
 }
 
-// KindToResource converts Kind to a resource name.
+// UnsafeGuessKindToResource converts Kind to a resource name.
 // Broken. This method only "sort of" works when used outside of this package.  It assumes that Kinds and Resources match
 // and they aren't guaranteed to do so.
-func KindToResource(kind schema.GroupVersionKind) ( /*plural*/ schema.GroupVersionResource /*singular*/, schema.GroupVersionResource) {
+func UnsafeGuessKindToResource(kind schema.GroupVersionKind) ( /*plural*/ schema.GroupVersionResource /*singular*/, schema.GroupVersionResource) {
 	kindName := kind.Kind
 	if len(kindName) == 0 {
 		return schema.GroupVersionResource{}, schema.GroupVersionResource{}

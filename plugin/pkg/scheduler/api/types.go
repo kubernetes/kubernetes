@@ -20,8 +20,17 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/v1"
+)
+
+const (
+	MaxUint          = ^uint(0)
+	MaxInt           = int(MaxUint >> 1)
+	MaxTotalPriority = MaxInt
+	MaxPriority      = 10
+	MaxWeight        = MaxInt / MaxPriority
 )
 
 type Policy struct {
@@ -32,6 +41,10 @@ type Policy struct {
 	Priorities []PriorityPolicy
 	// Holds the information to communicate with the extender(s)
 	ExtenderConfigs []ExtenderConfig
+	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
+	// corresponding to every RequiredDuringScheduling affinity rule.
+	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 1-100.
+	HardPodAffinitySymmetricWeight int
 }
 
 type PredicatePolicy struct {
@@ -121,6 +134,10 @@ type ExtenderConfig struct {
 	// The numeric multiplier for the node scores that the prioritize call generates.
 	// The weight should be a positive integer
 	Weight int
+	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
+	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
+	// can implement this function.
+	BindVerb string
 	// EnableHttps specifies whether https should be used to communicate with the extender
 	EnableHttps bool
 	// TLSConfig specifies the transport layer security config
@@ -160,6 +177,24 @@ type ExtenderFilterResult struct {
 	NodeNames *[]string
 	// Filtered out nodes where the pod can't be scheduled and the failure messages
 	FailedNodes FailedNodesMap
+	// Error message indicating failure
+	Error string
+}
+
+// ExtenderBindingArgs represents the arguments to an extender for binding a pod to a node.
+type ExtenderBindingArgs struct {
+	// PodName is the name of the pod being bound
+	PodName string
+	// PodNamespace is the namespace of the pod being bound
+	PodNamespace string
+	// PodUID is the UID of the pod being bound
+	PodUID types.UID
+	// Node selected by the scheduler
+	Node string
+}
+
+// ExtenderBindingResult represents the result of binding of a pod to a node from an extender.
+type ExtenderBindingResult struct {
 	// Error message indicating failure
 	Error string
 }

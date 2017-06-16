@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/helper"
 )
 
-// mustMatchPatterns implements the CapabilitiesStrategy interface
+// mustMatchPatterns implements the SysctlsStrategy interface
 type mustMatchPatterns struct {
 	patterns []string
 }

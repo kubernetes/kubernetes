@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	core "k8s.io/client-go/testing"
@@ -43,39 +42,6 @@ const (
 	k8s1        = "k8s-1"
 	k8s2        = "k8s-2"
 )
-
-func TestParseFederationReplicaSetReference(t *testing.T) {
-	successPrefs := []string{
-		`{"rebalance": true,
-		  "clusters": {
-		    "k8s-1": {"minReplicas": 10, "maxReplicas": 20, "weight": 2},
-		    "*": {"weight": 1}
-		}}`,
-	}
-	failedPrefes := []string{
-		`{`, // bad json
-	}
-
-	rs := newReplicaSetWithReplicas("rs-1", 100)
-	accessor, _ := meta.Accessor(rs)
-	anno := accessor.GetAnnotations()
-	if anno == nil {
-		anno = make(map[string]string)
-		accessor.SetAnnotations(anno)
-	}
-	for _, prefString := range successPrefs {
-		anno[FedReplicaSetPreferencesAnnotation] = prefString
-		pref, err := parseFederationReplicaSetReference(rs)
-		assert.NotNil(t, pref)
-		assert.Nil(t, err)
-	}
-	for _, prefString := range failedPrefes {
-		anno[FedReplicaSetPreferencesAnnotation] = prefString
-		pref, err := parseFederationReplicaSetReference(rs)
-		assert.Nil(t, pref)
-		assert.NotNil(t, err)
-	}
-}
 
 func TestReplicaSetController(t *testing.T) {
 	flag.Set("logtostderr", "true")

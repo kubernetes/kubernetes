@@ -18,9 +18,14 @@ package util
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
@@ -38,17 +43,13 @@ type FederatedOperation struct {
 	Type        FederatedOperationType
 	ClusterName string
 	Obj         pkgruntime.Object
+	Key         string
 }
 
 // A helper that executes the given set of updates on federation, in parallel.
 type FederatedUpdater interface {
-	// Executes the given set of operations within the specified timeout.
-	// Timeout is best-effort. There is no guarantee that the underlying operations are
-	// stopped when it is reached. However the function will return after the timeout
-	// with a non-nil error.
-	Update([]FederatedOperation, time.Duration) error
-
-	UpdateWithOnError([]FederatedOperation, time.Duration, func(FederatedOperation, error)) error
+	// Executes the given set of operations.
+	Update([]FederatedOperation) error
 }
 
 // A function that executes some operation using the passed client and object.
@@ -57,25 +58,39 @@ type FederatedOperationHandler func(kubeclientset.Interface, pkgruntime.Object) 
 type federatedUpdaterImpl struct {
 	federation FederationView
 
+	kind string
+
+	timeout time.Duration
+
+	eventRecorder record.EventRecorder
+
 	addFunction    FederatedOperationHandler
 	updateFunction FederatedOperationHandler
 	deleteFunction FederatedOperationHandler
 }
 
-func NewFederatedUpdater(federation FederationView, add, update, del FederatedOperationHandler) FederatedUpdater {
+func NewFederatedUpdater(federation FederationView, kind string, timeout time.Duration, recorder record.EventRecorder, add, update, del FederatedOperationHandler) FederatedUpdater {
 	return &federatedUpdaterImpl{
 		federation:     federation,
+		kind:           kind,
+		timeout:        timeout,
+		eventRecorder:  recorder,
 		addFunction:    add,
 		updateFunction: update,
 		deleteFunction: del,
 	}
 }
 
-func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation, timeout time.Duration) error {
-	return fu.UpdateWithOnError(ops, timeout, nil)
+func (fu *federatedUpdaterImpl) recordEvent(obj runtime.Object, eventType, eventVerb string, args ...interface{}) {
+	messageFmt := eventVerb + " %s %q in cluster %s"
+	fu.eventRecorder.Eventf(obj, api.EventTypeNormal, eventType, messageFmt, args...)
 }
 
-func (fu *federatedUpdaterImpl) UpdateWithOnError(ops []FederatedOperation, timeout time.Duration, onError func(FederatedOperation, error)) error {
+// Update executes the given set of operations within the timeout specified for
+// the instance. Timeout is best-effort. There is no guarantee that the
+// underlying operations are stopped when it is reached. However the function
+// will return after the timeout with a non-nil error.
+func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation) error {
 	done := make(chan error, len(ops))
 	for _, op := range ops {
 		go func(op FederatedOperation) {
@@ -88,33 +103,53 @@ func (fu *federatedUpdaterImpl) UpdateWithOnError(ops []FederatedOperation, time
 				return
 			}
 
+			eventArgs := []interface{}{fu.kind, op.Key, clusterName}
+			baseEventType := fmt.Sprintf("%s", op.Type)
+			eventType := fmt.Sprintf("%sInCluster", strings.Title(baseEventType))
+
 			switch op.Type {
 			case OperationTypeAdd:
+				// TODO s+OperationTypeAdd+OperationTypeCreate+
+				baseEventType = "create"
+				eventType := "CreateInCluster"
+
+				fu.recordEvent(op.Obj, eventType, "Creating", eventArgs...)
 				err = fu.addFunction(clientset, op.Obj)
 			case OperationTypeUpdate:
+				fu.recordEvent(op.Obj, eventType, "Updating", eventArgs...)
 				err = fu.updateFunction(clientset, op.Obj)
 			case OperationTypeDelete:
+				fu.recordEvent(op.Obj, eventType, "Deleting", eventArgs...)
 				err = fu.deleteFunction(clientset, op.Obj)
+				// IsNotFound error is fine since that means the object is deleted already.
+				if errors.IsNotFound(err) {
+					err = nil
+				}
 			}
-			if err != nil && onError != nil {
-				onError(op, err)
+
+			if err != nil {
+				eventType := eventType + "Failed"
+				messageFmt := "Failed to " + baseEventType + " %s %q in cluster %s: %v"
+				eventArgs = append(eventArgs, err)
+				fu.eventRecorder.Eventf(op.Obj, api.EventTypeWarning, eventType, messageFmt, eventArgs...)
 			}
+
 			done <- err
 		}(op)
 	}
 	start := time.Now()
 	for i := 0; i < len(ops); i++ {
 		now := time.Now()
-		if !now.Before(start.Add(timeout)) {
-			return fmt.Errorf("failed to finish all operations in %v", timeout)
+		if !now.Before(start.Add(fu.timeout)) {
+			return fmt.Errorf("failed to finish all operations in %v", fu.timeout)
 		}
 		select {
 		case err := <-done:
 			if err != nil {
 				return err
 			}
-		case <-time.After(start.Add(timeout).Sub(now)):
-			return fmt.Errorf("failed to finish all operations in %v", timeout)
+		case <-time.After(start.Add(fu.timeout).Sub(now)):
+			return fmt.Errorf("failed to finish all operations in %v", fu.timeout)
 		}
 	}
 	// All operations finished in time.

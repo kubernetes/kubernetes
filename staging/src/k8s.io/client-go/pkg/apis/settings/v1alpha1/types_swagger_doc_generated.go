@@ -37,7 +37,7 @@ func (PodPreset) SwaggerDoc() map[string]string {
 
 var map_PodPresetList = map[string]string{
 	"":         "PodPresetList is a list of PodPreset objects.",
-	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"items":    "Items is a list of schema objects.",
 }
 
@@ -46,7 +46,7 @@ func (PodPresetList) SwaggerDoc() map[string]string {
 }
 
 var map_PodPresetSpec = map[string]string{
-	"":             "PodPresetSpec is a description of a pod injection policy.",
+	"":             "PodPresetSpec is a description of a pod preset.",
 	"selector":     "Selector is a label query over a set of resources, in this case pods. Required.",
 	"env":          "Env defines the collection of EnvVar to inject into containers.",
 	"envFrom":      "EnvFrom defines the collection of EnvFromSource to inject into containers.",

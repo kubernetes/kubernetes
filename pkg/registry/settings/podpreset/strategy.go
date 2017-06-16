@@ -32,21 +32,21 @@ import (
 	"k8s.io/kubernetes/pkg/apis/settings/validation"
 )
 
-// podPresetStrategy implements verification logic for Pod Injection Policies.
+// podPresetStrategy implements verification logic for Pod Presets.
 type podPresetStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 }
 
-// Strategy is the default logic that applies when creating and updating Pod Injection Policy objects.
+// Strategy is the default logic that applies when creating and updating Pod Preset objects.
 var Strategy = podPresetStrategy{api.Scheme, names.SimpleNameGenerator}
 
-// NamespaceScoped returns true because all Pod Injection Policies need to be within a namespace.
+// NamespaceScoped returns true because all Pod Presets need to be within a namespace.
 func (podPresetStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// PrepareForCreate clears the status of a Pod Injection Policy before creation.
+// PrepareForCreate clears the status of a Pod Preset before creation.
 func (podPresetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	pip := obj.(*settings.PodPreset)
 	pip.Generation = 1
@@ -82,7 +82,7 @@ func (podPresetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old 
 	return append(validationErrorList, updateErrorList...)
 }
 
-// AllowUnconditionalUpdate is the default update policy for Pod Injection Policy objects.
+// AllowUnconditionalUpdate is the default update policy for Pod Preset objects.
 func (podPresetStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
@@ -93,12 +93,12 @@ func SelectableFields(pip *settings.PodPreset) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	pip, ok := obj.(*settings.PodPreset)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a PodPreset.")
+		return nil, nil, false, fmt.Errorf("given object is not a PodPreset.")
 	}
-	return labels.Set(pip.ObjectMeta.Labels), SelectableFields(pip), nil
+	return labels.Set(pip.ObjectMeta.Labels), SelectableFields(pip), pip.Initializers != nil, nil
 }
 
 // Matcher is the filter used by the generic etcd backend to watch events

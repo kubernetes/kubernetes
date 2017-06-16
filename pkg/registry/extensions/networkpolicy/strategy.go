@@ -18,8 +18,8 @@ package networkpolicy
 
 import (
 	"fmt"
-	"reflect"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,7 +61,7 @@ func (networkPolicyStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
 	// See metav1.ObjectMeta description for more information on Generation.
-	if !reflect.DeepEqual(oldNetworkPolicy.Spec, newNetworkPolicy.Spec) {
+	if !apiequality.Semantic.DeepEqual(oldNetworkPolicy.Spec, newNetworkPolicy.Spec) {
 		newNetworkPolicy.Generation = oldNetworkPolicy.Generation + 1
 	}
 }
@@ -99,12 +99,12 @@ func NetworkPolicyToSelectableFields(networkPolicy *extensions.NetworkPolicy) fi
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	networkPolicy, ok := obj.(*extensions.NetworkPolicy)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a NetworkPolicy.")
+		return nil, nil, false, fmt.Errorf("given object is not a NetworkPolicy.")
 	}
-	return labels.Set(networkPolicy.ObjectMeta.Labels), NetworkPolicyToSelectableFields(networkPolicy), nil
+	return labels.Set(networkPolicy.ObjectMeta.Labels), NetworkPolicyToSelectableFields(networkPolicy), networkPolicy.Initializers != nil, nil
 }
 
 // MatchNetworkPolicy is the filter used by the generic etcd backend to watch events

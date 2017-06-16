@@ -27,18 +27,18 @@ new Cassandra nodes as they join the cluster.
 
 This example also uses some of the core components of Kubernetes:
 
-- [_Pods_](../../../docs/user-guide/pods.md)
-- [ _Services_](../../../docs/user-guide/services.md)
-- [_Replication Controllers_](../../../docs/user-guide/replication-controller.md)
-- [_Stateful Sets_](http://kubernetes.io/docs/user-guide/petset/)
-- [_Daemon Sets_](../../../docs/admin/daemons.md)
+- [_Pods_](https://kubernetes.io/docs/user-guide/pods.md)
+- [ _Services_](https://kubernetes.io/docs/user-guide/services.md)
+- [_Replication Controllers_](https://kubernetes.io/docs/user-guide/replication-controller.md)
+- [_Stateful Sets_](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
+- [_Daemon Sets_](https://kubernetes.io/docs/admin/daemons.md)
 
 ## Prerequisites
 
 This example assumes that you have a Kubernetes version >=1.2 cluster installed and running,
-and that you have installed the [`kubectl`](../../../docs/user-guide/kubectl/kubectl.md)
+and that you have installed the [`kubectl`](https://kubernetes.io/docs/user-guide/kubectl/kubectl.md)
 command line tool somewhere in your path.  Please see the
-[getting started guides](../../../docs/getting-started-guides/)
+[getting started guides](https://kubernetes.io/docs/getting-started-guides/)
 for installation instructions for your platform.
 
 This example also has a few code and configuration files needed.  To avoid
@@ -113,8 +113,8 @@ kubectl delete daemonset cassandra
 
 ## Step 1: Create a Cassandra Headless Service
 
-A Kubernetes _[Service](../../../docs/user-guide/services.md)_ describes a set of
-[_Pods_](../../../docs/user-guide/pods.md) that perform the same task. In
+A Kubernetes _[Service](https://kubernetes.io/docs/user-guide/services.md)_ describes a set of
+[_Pods_](https://kubernetes.io/docs/user-guide/pods.md) that perform the same task. In
 Kubernetes, the atomic unit of an application is a Pod: one or more containers
 that _must_ be scheduled onto the same host.
 
@@ -171,7 +171,7 @@ StatefulSets (previously PetSets) are a feature that was upgraded to a <i>Beta</
 Kubernetes 1.5.  Deploying stateful distributed applications, like Cassandra, within a clustered
 environment can be challenging.  We implemented StatefulSet to greatly simplify this
 process.  Multiple StatefulSet features are used within this example, but is out of
-scope of this documentation.  [Please refer to the Stateful Set documentation.](https://kubernetes.io/docs/concepts/abstractions/controllers/statefulsets/)
+scope of this documentation.  [Please refer to the Stateful Set documentation.](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
 
 The StatefulSet manifest that is included below, creates a Cassandra ring that consists
 of three pods.
@@ -353,7 +353,7 @@ system_traces  system_schema  system_auth  system  system_distributed
 ```
 
 In order to increase or decrease the size of the Cassandra StatefulSet, you must use
-`kubectl edit`.  You can find more information about the edit command in the [documentation](../../../docs/user-guide/kubectl/kubectl_edit.md).
+`kubectl edit`.  You can find more information about the edit command in the [documentation](https://kubernetes.io/docs/user-guide/kubectl/kubectl_edit.md).
 
 Use the following command to edit the StatefulSet.
 
@@ -426,7 +426,7 @@ $ grace=$(kubectl get po cassandra-0 --template '{{.spec.terminationGracePeriodS
 ## Step 5: Use a Replication Controller to create Cassandra node pods
 
 A Kubernetes
-_[Replication Controller](../../../docs/user-guide/replication-controller.md)_
+_[Replication Controller](https://kubernetes.io/docs/user-guide/replication-controller.md)_
 is responsible for replicating sets of identical pods.  Like a
 Service, it has a selector query which identifies the members of its set.
 Unlike a Service, it also has a desired number of replicas, and it will create
@@ -654,7 +654,7 @@ $ kubectl delete rc cassandra
 
 ## Step 8: Use a DaemonSet instead of a Replication Controller
 
-In Kubernetes, a [_Daemon Set_](../../../docs/admin/daemons.md) can distribute pods
+In Kubernetes, a [_Daemon Set_](https://kubernetes.io/docs/admin/daemons.md) can distribute pods
 onto Kubernetes nodes, one-to-one.  Like a _ReplicationController_, it has a
 selector query which identifies the members of its set.  Unlike a
 _ReplicationController_, it has a node selector to limit which nodes are
@@ -843,7 +843,7 @@ how the container docker image was built and what it contains.
 
 You may also note that we are setting some Cassandra parameters (`MAX_HEAP_SIZE`
 and `HEAP_NEWSIZE`), and adding information about the
-[namespace](../../../docs/user-guide/namespaces.md).
+[namespace](https://kubernetes.io/docs/user-guide/namespaces.md).
 We also tell Kubernetes that the container exposes
 both the `CQL` and `Thrift` API ports.  Finally, we tell the cluster
 manager that we need 0.1 cpu (0.1 core).

@@ -20,10 +20,14 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -32,9 +36,9 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 
+	"fmt"
+
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/cache"
 )
 
 // Binder knows how to write a binding.
@@ -79,7 +83,6 @@ type Configurator interface {
 	GetNodeLister() corelisters.NodeLister
 	GetClient() clientset.Interface
 	GetScheduledPodLister() corelisters.PodLister
-	Run()
 
 	Create() (*Config, error)
 	CreateFromProvider(providerName string) (*Config, error)
@@ -110,6 +113,10 @@ type Config struct {
 	// stale while they sit in a channel.
 	NextPod func() *v1.Pod
 
+	// WaitForCacheSync waits for scheduler cache to populate.
+	// It returns true if it was successful, false if the controller should shutdown.
+	WaitForCacheSync func() bool
+
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
 	Error func(*v1.Pod, error)
@@ -119,16 +126,6 @@ type Config struct {
 
 	// Close this to shut down the scheduler.
 	StopEverything chan struct{}
-}
-
-// New returns a new scheduler.
-// TODO replace this with NewFromConfigurator.
-func New(c *Config) *Scheduler {
-	s := &Scheduler{
-		config: c,
-	}
-	metrics.Register()
-	return s
 }
 
 // NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
@@ -150,8 +147,12 @@ func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Schedul
 	return s, nil
 }
 
-// Run begins watching and scheduling. It starts a goroutine and returns immediately.
+// Run begins watching and scheduling. It waits for cache to be synced, then starts a goroutine and returns immediately.
 func (sched *Scheduler) Run() {
+	if !sched.config.WaitForCacheSync() {
+		return
+	}
+
 	go wait.Until(sched.scheduleOne, 0, sched.config.StopEverything)
 }
 
@@ -160,6 +161,88 @@ func (sched *Scheduler) Config() *Config {
 	return sched.config
 }
 
+// schedule implements the scheduling algorithm and returns the suggested host.
+func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
+	host, err := sched.config.Algorithm.Schedule(pod, sched.config.NodeLister)
+	if err != nil {
+		glog.V(1).Infof("Failed to schedule pod: %v/%v", pod.Namespace, pod.Name)
+		copied, cerr := api.Scheme.Copy(pod)
+		if cerr != nil {
+			runtime.HandleError(err)
+			return "", err
+		}
+		pod = copied.(*v1.Pod)
+		sched.config.Error(pod, err)
+		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "%v", err)
+		sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+			Type:    v1.PodScheduled,
+			Status:  v1.ConditionFalse,
+			Reason:  v1.PodReasonUnschedulable,
+			Message: err.Error(),
+		})
+		return "", err
+	}
+	return host, err
+}
+
+// assume signals to the cache that a pod is already in the cache, so that binding can be asnychronous.
+func (sched *Scheduler) assume(pod *v1.Pod, host string) error {
+	// Optimistically assume that the binding will succeed and send it to apiserver
+	// in the background.
+	// If the binding fails, scheduler will release resources allocated to assumed pod
+	// immediately.
+	assumed := *pod
+	assumed.Spec.NodeName = host
+	if err := sched.config.SchedulerCache.AssumePod(&assumed); err != nil {
+		glog.Errorf("scheduler cache AssumePod failed: %v", err)
+		// TODO: This means that a given pod is already in cache (which means it
+		// is either assumed or already added). This is most probably result of a
+		// BUG in retrying logic. As a temporary workaround (which doesn't fully
+		// fix the problem, but should reduce its impact), we simply return here,
+		// as binding doesn't make sense anyway.
+		// This should be fixed properly though.
+		return err
+	}
+
+	// Optimistically assume that the binding will succeed, so we need to invalidate affected
+	// predicates in equivalence cache.
+	// If the binding fails, these invalidated item will not break anything.
+	if sched.config.Ecache != nil {
+		sched.config.Ecache.InvalidateCachedPredicateItemForPodAdd(pod, host)
+	}
+	return nil
+}
+
+// bind binds a pod to a given node defined in a binding object.  We expect this to run asynchronously, so we
+// handle binding metrics internally.
+func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
+	bindingStart := time.Now()
+	// If binding succeeded then PodScheduled condition will be updated in apiserver so that
+	// it's atomic with setting host.
+	err := sched.config.Binder.Bind(b)
+	if err := sched.config.SchedulerCache.FinishBinding(assumed); err != nil {
+		return fmt.Errorf("scheduler cache FinishBinding failed: %v", err)
+	}
+	if err != nil {
+		glog.V(1).Infof("Failed to bind pod: %v/%v", assumed.Namespace, assumed.Name)
+		if err := sched.config.SchedulerCache.ForgetPod(assumed); err != nil {
+			return fmt.Errorf("scheduler cache ForgetPod failed: %v", err)
+		}
+		sched.config.Error(assumed, err)
+		sched.config.Recorder.Eventf(assumed, v1.EventTypeWarning, "FailedScheduling", "Binding rejected: %v", err)
+		sched.config.PodConditionUpdater.Update(assumed, &v1.PodCondition{
+			Type:   v1.PodScheduled,
+			Status: v1.ConditionFalse,
+			Reason: "BindingRejected",
+		})
+		return err
+	}
+	metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
+	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", assumed.Name, b.Target.Name)
+	return nil
+}
+
+// scheduleOne does the entire scheduling workflow for a single pod.  It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) scheduleOne() {
 	pod := sched.config.NextPod()
 	if pod.DeletionTimestamp != nil {
@@ -169,81 +252,34 @@ func (sched *Scheduler) scheduleOne() {
 	}
 
 	glog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
+
+	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
-	dest, err := sched.config.Algorithm.Schedule(pod, sched.config.NodeLister)
-	if err != nil {
-		glog.V(1).Infof("Failed to schedule pod: %v/%v", pod.Namespace, pod.Name)
-		sched.config.Error(pod, err)
-		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "%v", err)
-		sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
-			Type:    v1.PodScheduled,
-			Status:  v1.ConditionFalse,
-			Reason:  v1.PodReasonUnschedulable,
-			Message: err.Error(),
-		})
-		return
-	}
+	suggestedHost, err := sched.schedule(pod)
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
-
-	// Optimistically assume that the binding will succeed and send it to apiserver
-	// in the background.
-	// If the binding fails, scheduler will release resources allocated to assumed pod
-	// immediately.
-	assumed := *pod
-	assumed.Spec.NodeName = dest
-	if err := sched.config.SchedulerCache.AssumePod(&assumed); err != nil {
-		glog.Errorf("scheduler cache AssumePod failed: %v", err)
-		// TODO: This means that a given pod is already in cache (which means it
-		// is either assumed or already added). This is most probably result of a
-		// BUG in retrying logic. As a temporary workaround (which doesn't fully
-		// fix the problem, but should reduce its impact), we simply return here,
-		// as binding doesn't make sense anyway.
-		// This should be fixed properly though.
+	if err != nil {
 		return
 	}
 
-	// Optimistically assume that the binding will succeed, so we need to invalidate affected
-	// predicates in equivalence cache.
-	// If the binding fails, these invalidated item will not break anything.
-	if sched.config.Ecache != nil {
-		sched.config.Ecache.InvalidateCachedPredicateItemForPodAdd(pod, dest)
+	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
+	// This allows us to keep scheduling without waiting on binding to occur.
+	err = sched.assume(pod, suggestedHost)
+	if err != nil {
+		return
 	}
 
+	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
-		defer func() {
-			metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
-		}()
-
-		b := &v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
+		err := sched.bind(pod, &v1.Binding{
+			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, UID: pod.UID},
 			Target: v1.ObjectReference{
 				Kind: "Node",
-				Name: dest,
+				Name: suggestedHost,
 			},
-		}
-
-		bindingStart := time.Now()
-		// If binding succeeded then PodScheduled condition will be updated in apiserver so that
-		// it's atomic with setting host.
-		err := sched.config.Binder.Bind(b)
-		if err := sched.config.SchedulerCache.FinishBinding(&assumed); err != nil {
-			glog.Errorf("scheduler cache FinishBinding failed: %v", err)
-		}
+		})
+		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 		if err != nil {
-			glog.V(1).Infof("Failed to bind pod: %v/%v", pod.Namespace, pod.Name)
-			if err := sched.config.SchedulerCache.ForgetPod(&assumed); err != nil {
-				glog.Errorf("scheduler cache ForgetPod failed: %v", err)
-			}
-			sched.config.Error(pod, err)
-			sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "Binding rejected: %v", err)
-			sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
-				Type:   v1.PodScheduled,
-				Status: v1.ConditionFalse,
-				Reason: "BindingRejected",
-			})
-			return
+			glog.Errorf("Internal error binding pod: (%v)", err)
 		}
-		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
-		sched.config.Recorder.Eventf(pod, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v to %v", pod.Name, dest)
 	}()
 }

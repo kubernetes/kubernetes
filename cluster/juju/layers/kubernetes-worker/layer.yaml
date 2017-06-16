@@ -18,8 +18,9 @@ config:
 options:
   basic:
     packages:
-      - 'nfs-common'
+      - 'cifs-utils'
       - 'ceph-common'
+      - 'nfs-common'
       - 'socat'
   tls-client:
     ca_certificate_path: '/root/cdk/ca.crt'

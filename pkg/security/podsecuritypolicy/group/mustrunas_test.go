@@ -19,20 +19,21 @@ package group
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func TestMustRunAsOptions(t *testing.T) {
 	tests := map[string]struct {
-		ranges []extensions.IDRange
+		ranges []extensions.GroupIDRange
 		pass   bool
 	}{
 		"empty": {
-			ranges: []extensions.IDRange{},
+			ranges: []extensions.GroupIDRange{},
 		},
 		"ranges": {
-			ranges: []extensions.IDRange{
+			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 1},
 			},
 			pass: true,
@@ -52,27 +53,27 @@ func TestMustRunAsOptions(t *testing.T) {
 
 func TestGenerate(t *testing.T) {
 	tests := map[string]struct {
-		ranges   []extensions.IDRange
-		expected []int64
+		ranges   []extensions.GroupIDRange
+		expected []types.UnixGroupID
 	}{
 		"multi value": {
-			ranges: []extensions.IDRange{
+			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 2},
 			},
-			expected: []int64{1},
+			expected: []types.UnixGroupID{1},
 		},
 		"single value": {
-			ranges: []extensions.IDRange{
+			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 1},
 			},
-			expected: []int64{1},
+			expected: []types.UnixGroupID{1},
 		},
 		"multi range": {
-			ranges: []extensions.IDRange{
+			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 1},
 				{Min: 2, Max: 500},
 			},
-			expected: []int64{1},
+			expected: []types.UnixGroupID{1},
 		},
 	}
 
@@ -118,59 +119,59 @@ func TestValidate(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		ranges []extensions.IDRange
+		ranges []extensions.GroupIDRange
 		pod    *api.Pod
-		groups []int64
+		groups []types.UnixGroupID
 		pass   bool
 	}{
 		"nil security context": {
 			pod: &api.Pod{},
-			ranges: []extensions.IDRange{
+			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
 		},
 		"empty groups": {
 			pod: validPod(),
-			ranges: []extensions.IDRange{
+			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
 		},
 		"not in range": {
 			pod:    validPod(),
-			groups: []int64{5},
-			ranges: []extensions.IDRange{
+			groups: []types.UnixGroupID{5},
+			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 				{Min: 4, Max: 4},
 			},
 		},
 		"in range 1": {
 			pod:    validPod(),
-			groups: []int64{2},
-			ranges: []extensions.IDRange{
+			groups: []types.UnixGroupID{2},
+			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
 			pass: true,
 		},
 		"in range boundry min": {
 			pod:    validPod(),
-			groups: []int64{1},
-			ranges: []extensions.IDRange{
+			groups: []types.UnixGroupID{1},
+			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
 			pass: true,
 		},
 		"in range boundry max": {
 			pod:    validPod(),
-			groups: []int64{3},
-			ranges: []extensions.IDRange{
+			groups: []types.UnixGroupID{3},
+			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
 			pass: true,
 		},
 		"singular range": {
 			pod:    validPod(),
-			groups: []int64{4},
-			ranges: []extensions.IDRange{
+			groups: []types.UnixGroupID{4},
+			ranges: []extensions.GroupIDRange{
 				{Min: 4, Max: 4},
 			},
 			pass: true,

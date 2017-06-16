@@ -36,6 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -319,6 +321,10 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 			types := []api.ServiceType{api.ServiceTypeClusterIP, api.ServiceTypeNodePort, api.ServiceTypeLoadBalancer}
 			*p = types[c.Rand.Intn(len(types))]
 		},
+		func(p *api.ServiceExternalTrafficPolicyType, c fuzz.Continue) {
+			types := []api.ServiceExternalTrafficPolicyType{api.ServiceExternalTrafficPolicyTypeCluster, api.ServiceExternalTrafficPolicyTypeLocal}
+			*p = types[c.Rand.Intn(len(types))]
+		},
 		func(ct *api.Container, c fuzz.Continue) {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
@@ -423,7 +429,11 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 		func(obj *api.AzureDiskVolumeSource, c fuzz.Continue) {
 			if obj.CachingMode == nil {
 				obj.CachingMode = new(api.AzureDataDiskCachingMode)
-				*obj.CachingMode = api.AzureDataDiskCachingNone
+				*obj.CachingMode = api.AzureDataDiskCachingReadWrite
+			}
+			if obj.Kind == nil {
+				obj.Kind = new(api.AzureDataDiskKind)
+				*obj.Kind = api.AzureSharedBlobDisk
 			}
 			if obj.FSType == nil {
 				obj.FSType = new(string)
@@ -542,6 +552,11 @@ func extensionFuncs(t apitesting.TestingCommon) []interface{} {
 					},
 				}
 			}
+		},
+		func(j *extensions.DaemonSetSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
+			rhl := int32(c.Rand.Int31())
+			j.RevisionHistoryLimit = &rhl
 		},
 		func(j *extensions.DaemonSetUpdateStrategy, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
@@ -699,6 +714,25 @@ func rbacFuncs(t apitesting.TestingCommon) []interface{} {
 	}
 }
 
+func appsFuncs(t apitesting.TestingCommon) []interface{} {
+	return []interface{}{
+		func(s *apps.StatefulSet, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+
+			// match defaulter
+			if len(s.Spec.PodManagementPolicy) == 0 {
+				s.Spec.PodManagementPolicy = apps.OrderedReadyPodManagement
+			}
+			if len(s.Spec.UpdateStrategy.Type) == 0 {
+				s.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
+			}
+			if s.Spec.RevisionHistoryLimit == nil {
+				s.Spec.RevisionHistoryLimit = new(int32)
+				*s.Spec.RevisionHistoryLimit = 10
+			}
+		},
+	}
+}
 func policyFuncs(t apitesting.TestingCommon) []interface{} {
 	return []interface{}{
 		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
@@ -717,18 +751,35 @@ func certificateFuncs(t apitesting.TestingCommon) []interface{} {
 	}
 }
 
+func admissionregistrationFuncs(t apitesting.TestingCommon) []interface{} {
+	return []interface{}{
+		func(obj *admissionregistration.ExternalAdmissionHook, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			p := admissionregistration.FailurePolicyType("Fail")
+			obj.FailurePolicy = &p
+		},
+		func(obj *admissionregistration.Initializer, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			p := admissionregistration.FailurePolicyType("Fail")
+			obj.FailurePolicy = &p
+		},
+	}
+}
+
 func FuzzerFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
 	return apitesting.MergeFuzzerFuncs(t,
 		apitesting.GenericFuzzerFuncs(t, codecs),
 		overrideGenericFuncs(t, codecs),
 		coreFuncs(t),
 		extensionFuncs(t),
+		appsFuncs(t),
 		batchFuncs(t),
 		autoscalingFuncs(t),
 		rbacFuncs(t),
 		kubeadmfuzzer.KubeadmFuzzerFuncs(t),
 		policyFuncs(t),
 		certificateFuncs(t),
+		admissionregistrationFuncs(t),
 	)
 }
 

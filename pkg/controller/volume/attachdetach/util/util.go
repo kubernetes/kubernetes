@@ -159,6 +159,23 @@ func getPVSpecFromCache(name string, pvcReadOnly bool, expectedClaimUID types.UI
 	return volume.NewSpecFromPersistentVolume(clonedPV, pvcReadOnly), nil
 }
 
+// DetermineVolumeAction returns true if volume and pod needs to be added to dswp
+// and it returns false if volume and pod needs to be removed from dswp
+func DetermineVolumeAction(pod *v1.Pod, desiredStateOfWorld cache.DesiredStateOfWorld, defaultAction bool) bool {
+	if pod == nil || len(pod.Spec.Volumes) <= 0 {
+		return defaultAction
+	}
+	nodeName := types.NodeName(pod.Spec.NodeName)
+	keepTerminatedPodVolume := desiredStateOfWorld.GetKeepTerminatedPodVolumesForNode(nodeName)
+
+	if volumehelper.IsPodTerminated(pod, pod.Status) {
+		// if pod is terminate we let kubelet policy dictate if volume
+		// should be detached or not
+		return keepTerminatedPodVolume
+	}
+	return defaultAction
+}
+
 // ProcessPodVolumes processes the volumes in the given pod and adds them to the
 // desired state of the world if addVolumes is true, otherwise it removes them.
 func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.DesiredStateOfWorld, volumePluginMgr *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister) {

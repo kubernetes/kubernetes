@@ -26,8 +26,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -35,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
@@ -86,7 +85,6 @@ type ServiceController struct {
 	kubeClient          clientset.Interface
 	clusterName         string
 	balancer            cloudprovider.LoadBalancer
-	zone                cloudprovider.Zone
 	cache               *serviceCache
 	serviceLister       corelisters.ServiceLister
 	serviceListerSynced cache.InformerSynced
@@ -237,15 +235,6 @@ func (s *ServiceController) init() error {
 	}
 	s.balancer = balancer
 
-	zones, ok := s.cloud.Zones()
-	if !ok {
-		return fmt.Errorf("the cloud provider does not support zone enumeration, which is required for creating load balancers.")
-	}
-	zone, err := zones.GetZone()
-	if err != nil {
-		return fmt.Errorf("failed to get zone from cloud provider, will not be able to create load balancers: %v", err)
-	}
-	s.zone = zone
 	return nil
 }
 
@@ -377,22 +366,15 @@ func (s *ServiceController) persistUpdate(service *v1.Service) error {
 }
 
 func (s *ServiceController) createLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
-	nodes, err := s.nodeLister.List(labels.Everything())
+	nodes, err := s.nodeLister.ListWithPredicate(getNodeConditionPredicate())
 	if err != nil {
 		return nil, err
-	}
-
-	lbNodes := []*v1.Node{}
-	for ix := range nodes {
-		if includeNodeFromNodeList(nodes[ix]) {
-			lbNodes = append(lbNodes, nodes[ix])
-		}
 	}
 
 	// - Only one protocol supported per service
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
-	return s.balancer.EnsureLoadBalancer(s.clusterName, service, lbNodes)
+	return s.balancer.EnsureLoadBalancer(s.clusterName, service, nodes)
 }
 
 // ListKeys implements the interface required by DeltaFIFO to list the keys we
@@ -501,6 +483,16 @@ func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.S
 	if oldService.UID != newService.UID {
 		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "UID", "%v -> %v",
 			oldService.UID, newService.UID)
+		return true
+	}
+	if oldService.Spec.ExternalTrafficPolicy != newService.Spec.ExternalTrafficPolicy {
+		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "ExternalTrafficPolicy", "%v -> %v",
+			oldService.Spec.ExternalTrafficPolicy, newService.Spec.ExternalTrafficPolicy)
+		return true
+	}
+	if oldService.Spec.HealthCheckNodePort != newService.Spec.HealthCheckNodePort {
+		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "HealthCheckNodePort", "%v -> %v",
+			oldService.Spec.HealthCheckNodePort, newService.Spec.HealthCheckNodePort)
 		return true
 	}
 
@@ -619,10 +611,16 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 	return func(node *v1.Node) bool {
 		// We add the master to the node list, but its unschedulable.  So we use this to filter
 		// the master.
-		// TODO: Use a node annotation to indicate the master
 		if node.Spec.Unschedulable {
 			return false
 		}
+
+		// As of 1.6, we will taint the master, but not necessarily mark it unschedulable.
+		// Recognize nodes labeled as master, and filter them also, as we were doing previously.
+		if _, hasMasterRoleLabel := node.Labels[constants.LabelNodeRoleMaster]; hasMasterRoleLabel {
+			return false
+		}
+
 		// If we have no info, don't accept
 		if len(node.Status.Conditions) == 0 {
 			return false

@@ -19,7 +19,7 @@ package kubectl
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/annotations"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
@@ -35,7 +35,7 @@ func GetOriginalConfiguration(mapping *meta.RESTMapping, obj runtime.Object) ([]
 		return nil, nil
 	}
 
-	original, ok := annots[annotations.LastAppliedConfigAnnotation]
+	original, ok := annots[api.LastAppliedConfigAnnotation]
 	if !ok {
 		return nil, nil
 	}
@@ -60,7 +60,7 @@ func SetOriginalConfiguration(info *resource.Info, original []byte) error {
 		annots = map[string]string{}
 	}
 
-	annots[annotations.LastAppliedConfigAnnotation] = string(original)
+	annots[api.LastAppliedConfigAnnotation] = string(original)
 	if err := info.Mapping.MetadataAccessor.SetAnnotations(info.Object, annots); err != nil {
 		return err
 	}
@@ -89,8 +89,8 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 			annots = map[string]string{}
 		}
 
-		original := annots[annotations.LastAppliedConfigAnnotation]
-		delete(annots, annotations.LastAppliedConfigAnnotation)
+		original := annots[api.LastAppliedConfigAnnotation]
+		delete(annots, api.LastAppliedConfigAnnotation)
 		accessor.SetAnnotations(annots)
 		// TODO: this needs to be abstracted - there should be no assumption that versioned object
 		// can be marshalled to JSON.
@@ -100,7 +100,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 		}
 
 		if annotate {
-			annots[annotations.LastAppliedConfigAnnotation] = string(modified)
+			annots[api.LastAppliedConfigAnnotation] = string(modified)
 			accessor.SetAnnotations(annots)
 			// TODO: this needs to be abstracted - there should be no assumption that versioned object
 			// can be marshalled to JSON.
@@ -111,7 +111,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 		}
 
 		// Restore the object to its original condition.
-		annots[annotations.LastAppliedConfigAnnotation] = original
+		annots[api.LastAppliedConfigAnnotation] = original
 		accessor.SetAnnotations(annots)
 	} else {
 		// Otherwise, use the server side version of the object.
@@ -126,8 +126,8 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 			annots = map[string]string{}
 		}
 
-		original := annots[annotations.LastAppliedConfigAnnotation]
-		delete(annots, annotations.LastAppliedConfigAnnotation)
+		original := annots[api.LastAppliedConfigAnnotation]
+		delete(annots, api.LastAppliedConfigAnnotation)
 		if err := accessor.SetAnnotations(info.Object, annots); err != nil {
 			return nil, err
 		}
@@ -138,7 +138,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 		}
 
 		if annotate {
-			annots[annotations.LastAppliedConfigAnnotation] = string(modified)
+			annots[api.LastAppliedConfigAnnotation] = string(modified)
 			if err := info.Mapping.MetadataAccessor.SetAnnotations(info.Object, annots); err != nil {
 				return nil, err
 			}
@@ -150,7 +150,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 		}
 
 		// Restore the object to its original condition.
-		annots[annotations.LastAppliedConfigAnnotation] = original
+		annots[api.LastAppliedConfigAnnotation] = original
 		if err := info.Mapping.MetadataAccessor.SetAnnotations(info.Object, annots); err != nil {
 			return nil, err
 		}

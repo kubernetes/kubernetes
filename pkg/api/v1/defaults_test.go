@@ -17,7 +17,7 @@ limitations under the License.
 package v1_test
 
 import (
-	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -232,53 +232,416 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 	}
 }
 
-func TestSetDefaultReplicationControllerImagePullPolicy(t *testing.T) {
-	containersWithoutPullPolicy, _ := json.Marshal([]map[string]interface{}{
-		{
-			"name":  "install",
-			"image": "busybox:latest",
-		},
-	})
+type InitContainerValidator func(got, expected *v1.Container) error
 
-	containersWithPullPolicy, _ := json.Marshal([]map[string]interface{}{
-		{
-			"name":            "install",
-			"imagePullPolicy": "IfNotPresent",
-		},
-	})
+func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
+	assertEnvFieldRef := func(got, expected *v1.Container) error {
+		if len(got.Env) != len(expected.Env) {
+			return fmt.Errorf("different number of env: got <%v>, expected <%v>", len(got.Env), len(expected.Env))
+		}
+
+		for j := range got.Env {
+			ge := &got.Env[j]
+			ee := &expected.Env[j]
+
+			if ge.Name != ee.Name {
+				return fmt.Errorf("different name of env: got <%v>, expected <%v>", ge.Name, ee.Name)
+			}
+
+			if ge.ValueFrom.FieldRef.APIVersion != ee.ValueFrom.FieldRef.APIVersion {
+				return fmt.Errorf("different api version of FieldRef <%v>: got <%v>, expected <%v>",
+					ge.Name, ge.ValueFrom.FieldRef.APIVersion, ee.ValueFrom.FieldRef.APIVersion)
+			}
+		}
+		return nil
+	}
+
+	assertImagePullPolicy := func(got, expected *v1.Container) error {
+		if got.ImagePullPolicy != expected.ImagePullPolicy {
+			return fmt.Errorf("different image pull poicy: got <%v>, expected <%v>", got.ImagePullPolicy, expected.ImagePullPolicy)
+		}
+		return nil
+	}
+
+	assertContainerPort := func(got, expected *v1.Container) error {
+		if len(got.Ports) != len(expected.Ports) {
+			return fmt.Errorf("different number of ports: got <%v>, expected <%v>", len(got.Ports), len(expected.Ports))
+		}
+
+		for i := range got.Ports {
+			gp := &got.Ports[i]
+			ep := &expected.Ports[i]
+
+			if gp.Name != ep.Name {
+				return fmt.Errorf("different name of port: got <%v>, expected <%v>", gp.Name, ep.Name)
+			}
+
+			if gp.Protocol != ep.Protocol {
+				return fmt.Errorf("different port protocol <%v>: got <%v>, expected <%v>", gp.Name, gp.Protocol, ep.Protocol)
+			}
+		}
+
+		return nil
+	}
+
+	assertResource := func(got, expected *v1.Container) error {
+		if len(got.Resources.Limits) != len(expected.Resources.Limits) {
+			return fmt.Errorf("different number of resources.Limits: got <%v>, expected <%v>", len(got.Resources.Limits), (expected.Resources.Limits))
+		}
+
+		for k, v := range got.Resources.Limits {
+			if ev, found := expected.Resources.Limits[v1.ResourceName(k)]; !found {
+				return fmt.Errorf("failed to find resource <%v> in expected resources.Limits.", k)
+			} else {
+				if ev.Value() != v.Value() {
+					return fmt.Errorf("different resource.Limits: got <%v>, expected <%v>.", v.Value(), ev.Value())
+				}
+			}
+		}
+
+		if len(got.Resources.Requests) != len(expected.Resources.Requests) {
+			return fmt.Errorf("different number of resources.Requests: got <%v>, expected <%v>", len(got.Resources.Requests), (expected.Resources.Requests))
+		}
+
+		for k, v := range got.Resources.Requests {
+			if ev, found := expected.Resources.Requests[v1.ResourceName(k)]; !found {
+				return fmt.Errorf("failed to find resource <%v> in expected resources.Requests.", k)
+			} else {
+				if ev.Value() != v.Value() {
+					return fmt.Errorf("different resource.Requests: got <%v>, expected <%v>.", v.Value(), ev.Value())
+				}
+			}
+		}
+
+		return nil
+	}
+
+	assertProb := func(got, expected *v1.Container) error {
+		// Assert LivenessProbe
+		if got.LivenessProbe.Handler.HTTPGet.Path != expected.LivenessProbe.Handler.HTTPGet.Path ||
+			got.LivenessProbe.Handler.HTTPGet.Scheme != expected.LivenessProbe.Handler.HTTPGet.Scheme ||
+			got.LivenessProbe.FailureThreshold != expected.LivenessProbe.FailureThreshold ||
+			got.LivenessProbe.SuccessThreshold != expected.LivenessProbe.SuccessThreshold ||
+			got.LivenessProbe.PeriodSeconds != expected.LivenessProbe.PeriodSeconds ||
+			got.LivenessProbe.TimeoutSeconds != expected.LivenessProbe.TimeoutSeconds {
+			return fmt.Errorf("different LivenessProbe: got <%v>, expected <%v>", got.LivenessProbe, expected.LivenessProbe)
+		}
+
+		// Assert ReadinessProbe
+		if got.ReadinessProbe.Handler.HTTPGet.Path != expected.ReadinessProbe.Handler.HTTPGet.Path ||
+			got.ReadinessProbe.Handler.HTTPGet.Scheme != expected.ReadinessProbe.Handler.HTTPGet.Scheme ||
+			got.ReadinessProbe.FailureThreshold != expected.ReadinessProbe.FailureThreshold ||
+			got.ReadinessProbe.SuccessThreshold != expected.ReadinessProbe.SuccessThreshold ||
+			got.ReadinessProbe.PeriodSeconds != expected.ReadinessProbe.PeriodSeconds ||
+			got.ReadinessProbe.TimeoutSeconds != expected.ReadinessProbe.TimeoutSeconds {
+			return fmt.Errorf("different ReadinessProbe: got <%v>, expected <%v>", got.ReadinessProbe, expected.ReadinessProbe)
+		}
+
+		return nil
+	}
+
+	assertLifeCycle := func(got, expected *v1.Container) error {
+		if got.Lifecycle.PostStart.HTTPGet.Path != expected.Lifecycle.PostStart.HTTPGet.Path ||
+			got.Lifecycle.PostStart.HTTPGet.Scheme != expected.Lifecycle.PostStart.HTTPGet.Scheme {
+			return fmt.Errorf("different LifeCycle: got <%v>, expected <%v>", got.Lifecycle, expected.Lifecycle)
+		}
+
+		return nil
+	}
+
+	cpu, _ := resource.ParseQuantity("100Gi")
+	mem, _ := resource.ParseQuantity("100Mi")
 
 	tests := []struct {
-		rc               v1.ReplicationController
-		expectPullPolicy v1.PullPolicy
+		name       string
+		rc         v1.ReplicationController
+		expected   []v1.Container
+		validators []InitContainerValidator
 	}{
 		{
+			name: "imagePullIPolicy",
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": string(containersWithoutPullPolicy),
+								"pod.beta.kubernetes.io/init-containers": `
+                                [
+                                    {
+                                        "name": "install",
+                                        "image": "busybox"
+                                    }
+                                ]`,
 							},
 						},
 					},
 				},
 			},
-			expectPullPolicy: v1.PullAlways,
+			expected: []v1.Container{
+				{
+					ImagePullPolicy: v1.PullAlways,
+				},
+			},
+			validators: []InitContainerValidator{assertImagePullPolicy},
 		},
 		{
+			name: "FieldRef",
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": string(containersWithPullPolicy),
+								"pod.beta.kubernetes.io/init-containers": `
+                                [
+                                    {
+                                    "name": "fun",
+                                    "image": "alpine",
+                                    "env": [
+                                      {
+                                        "name": "MY_POD_IP",
+                                        "valueFrom": {
+                                          "fieldRef": {
+                                            "apiVersion": "",
+                                            "fieldPath": "status.podIP"
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                ]`,
 							},
 						},
 					},
 				},
 			},
-			expectPullPolicy: v1.PullIfNotPresent,
+			expected: []v1.Container{
+				{
+					Env: []v1.EnvVar{
+						{
+							Name: "MY_POD_IP",
+							ValueFrom: &v1.EnvVarSource{
+								FieldRef: &v1.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "status.podIP",
+								},
+							},
+						},
+					},
+				},
+			},
+			validators: []InitContainerValidator{assertEnvFieldRef},
 		},
+		{
+			name: "ContainerPort",
+			rc: v1.ReplicationController{
+				Spec: v1.ReplicationControllerSpec{
+					Template: &v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								"pod.beta.kubernetes.io/init-containers": `
+                                [
+                                    {
+                                    "name": "fun",
+                                    "image": "alpine",
+                                    "ports": [
+                                      {
+                                        "name": "default"
+                                      }
+                                    ]
+                                  }
+                                ]`,
+							},
+						},
+					},
+				},
+			},
+			expected: []v1.Container{
+				{
+					Ports: []v1.ContainerPort{
+						{
+							Name:     "default",
+							Protocol: v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			validators: []InitContainerValidator{assertContainerPort},
+		},
+		{
+			name: "Resources",
+			rc: v1.ReplicationController{
+				Spec: v1.ReplicationControllerSpec{
+					Template: &v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								"pod.beta.kubernetes.io/init-containers": `
+                                [
+                                  {
+                                    "name": "fun",
+                                    "image": "alpine",
+                                    "resources": {
+                                        "limits": {
+                                            "cpu": "100Gi",
+                                            "memory": "100Mi"
+                                        },
+                                        "requests": {
+                                            "cpu": "100Gi",
+                                            "memory": "100Mi"
+                                        }
+                                    }
+                                  }
+                                ]`,
+							},
+						},
+					},
+				},
+			},
+			expected: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    cpu,
+							v1.ResourceMemory: mem,
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu,
+							v1.ResourceMemory: mem,
+						},
+					},
+				},
+			},
+			validators: []InitContainerValidator{assertResource},
+		},
+		{
+			name: "Prob",
+			rc: v1.ReplicationController{
+				Spec: v1.ReplicationControllerSpec{
+					Template: &v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								"pod.beta.kubernetes.io/init-containers": `
+                                [
+                                    {
+                                    "name": "fun",
+                                    "image": "alpine",
+                                    "livenessProbe": {
+                                        "httpGet": {
+                                            "host": "localhost"
+                                        }
+                                    },
+                                    "readinessProbe": {
+                                        "httpGet": {
+                                            "host": "localhost"
+                                        }
+                                    }
+                                  }
+                                ]`,
+							},
+						},
+					},
+				},
+			},
+			expected: []v1.Container{
+				{
+					LivenessProbe: &v1.Probe{
+						Handler: v1.Handler{
+							HTTPGet: &v1.HTTPGetAction{
+								Path:   "/",
+								Scheme: v1.URISchemeHTTP,
+							},
+						},
+						TimeoutSeconds:   1,
+						PeriodSeconds:    10,
+						SuccessThreshold: 1,
+						FailureThreshold: 3,
+					},
+					ReadinessProbe: &v1.Probe{
+						Handler: v1.Handler{
+							HTTPGet: &v1.HTTPGetAction{
+								Path:   "/",
+								Scheme: v1.URISchemeHTTP,
+							},
+						},
+						TimeoutSeconds:   1,
+						PeriodSeconds:    10,
+						SuccessThreshold: 1,
+						FailureThreshold: 3,
+					},
+				},
+			},
+			validators: []InitContainerValidator{assertProb},
+		},
+		{
+			name: "LifeCycle",
+			rc: v1.ReplicationController{
+				Spec: v1.ReplicationControllerSpec{
+					Template: &v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								"pod.beta.kubernetes.io/init-containers": `
+                                [
+                                    {
+                                    "name": "fun",
+                                    "image": "alpine",
+                                    "lifecycle": {
+                                        "postStart": {
+                                            "httpGet": {
+                                                "host": "localhost"
+                                            }
+                                        },
+                                        "preStop": {
+                                            "httpGet": {
+                                                "host": "localhost"
+                                            }
+                                        }
+                                    }
+                                  }
+                                ]`,
+							},
+						},
+					},
+				},
+			},
+			expected: []v1.Container{
+				{
+					Lifecycle: &v1.Lifecycle{
+						PostStart: &v1.Handler{
+							HTTPGet: &v1.HTTPGetAction{
+								Path:   "/",
+								Scheme: v1.URISchemeHTTP,
+							},
+						},
+						PreStop: &v1.Handler{
+							HTTPGet: &v1.HTTPGetAction{
+								Path:   "/",
+								Scheme: v1.URISchemeHTTP,
+							},
+						},
+					},
+				},
+			},
+			validators: []InitContainerValidator{assertLifeCycle},
+		},
+	}
+
+	assertInitContainers := func(got, expected []v1.Container, validators []InitContainerValidator) error {
+		if len(got) != len(expected) {
+			return fmt.Errorf("different number of init container: got <%d>, expected <%d>",
+				len(got), len(expected))
+		}
+
+		for i := range got {
+			g := &got[i]
+			e := &expected[i]
+
+			for _, validator := range validators {
+				if err := validator(g, e); err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
 	}
 
 	for _, test := range tests {
@@ -289,11 +652,9 @@ func TestSetDefaultReplicationControllerImagePullPolicy(t *testing.T) {
 			t.Errorf("unexpected object: %v", rc2)
 			t.FailNow()
 		}
-		if test.expectPullPolicy != rc2.Spec.Template.Spec.InitContainers[0].ImagePullPolicy {
-			t.Errorf("expected ImagePullPolicy: %s, got: %s",
-				test.expectPullPolicy,
-				rc2.Spec.Template.Spec.InitContainers[0].ImagePullPolicy,
-			)
+
+		if err := assertInitContainers(rc2.Spec.Template.Spec.InitContainers, test.expected, test.validators); err != nil {
+			t.Errorf("test %v failed: %v", test.name, err)
 		}
 	}
 }
@@ -510,6 +871,41 @@ func TestSetDefaultServicePort(t *testing.T) {
 	}
 	if out.Spec.Ports[1].TargetPort != intstr.FromInt(int(in.Spec.Ports[1].Port)) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
+	}
+}
+
+func TestSetDefaulServiceExternalTraffic(t *testing.T) {
+	in := &v1.Service{}
+	obj := roundTrip(t, runtime.Object(in))
+	out := obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != "" {
+		t.Errorf("Expected ExternalTrafficPolicy to be empty, got %v", out.Spec.ExternalTrafficPolicy)
+	}
+
+	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeNodePort}}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
+	}
+
+	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer}}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
+	}
+
+	in = &v1.Service{
+		Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficLocal},
+		},
+	}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != "" {
+		t.Errorf("Expected ExternalTrafficPolicy to be empty, got %v", out.Spec.ExternalTrafficPolicy)
 	}
 }
 

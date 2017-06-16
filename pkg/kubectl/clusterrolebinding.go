@@ -132,7 +132,7 @@ func (s ClusterRoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, err
 	}
 	for _, sa := range sets.NewString(s.ServiceAccounts...).List() {
 		tokens := strings.Split(sa, ":")
-		if len(tokens) != 2 {
+		if len(tokens) != 2 || tokens[0] == "" || tokens[1] == "" {
 			return nil, fmt.Errorf("serviceaccount must be <namespace>:<name>")
 		}
 		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbac.Subject{

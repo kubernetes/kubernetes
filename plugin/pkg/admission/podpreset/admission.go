@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package admission
+package podpreset
 
 import (
 	"fmt"
@@ -41,8 +41,9 @@ const (
 	pluginName       = "PodPreset"
 )
 
-func init() {
-	kubeapiserveradmission.Plugins.Register(pluginName, func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register(pluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewPlugin(), nil
 	})
 }
@@ -97,7 +98,20 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 	if !ok {
 		return errors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
+
+	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
+		return nil
+	}
+
 	list, err := c.lister.PodPresets(pod.GetNamespace()).List(labels.Everything())
+
+	// Ignore if exclusion annotation is present
+	if podAnnotations := pod.GetAnnotations(); podAnnotations != nil {
+		glog.V(5).Infof("Looking at pod annotations, found: %v", podAnnotations)
+		if podAnnotations[api.PodPresetOptOutAnnotationKey] == "true" {
+			return nil
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("listing pod presets failed: %v", err)
 	}
@@ -176,7 +190,8 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 		if pod.ObjectMeta.Annotations == nil {
 			pod.ObjectMeta.Annotations = map[string]string{}
 		}
-		pod.ObjectMeta.Annotations[fmt.Sprintf("%s/%s", annotationPrefix, pip.GetName())] = pip.GetResourceVersion()
+
+		pod.ObjectMeta.Annotations[fmt.Sprintf("%s/podpreset-%s", annotationPrefix, pip.GetName())] = pip.GetResourceVersion()
 	}
 
 	return nil

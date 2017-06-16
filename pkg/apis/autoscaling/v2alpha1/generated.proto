@@ -26,7 +26,6 @@ import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
-import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/apis/autoscaling/v1/generated.proto";
 
@@ -35,7 +34,7 @@ option go_package = "v2alpha1";
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
-  // Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+  // Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
   optional string kind = 1;
 
   // Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
@@ -51,18 +50,42 @@ message CrossVersionObjectReference {
 // implementing the scale subresource based on the metrics specified.
 message HorizontalPodAutoscaler {
   // metadata is the standard object metadata.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the specification for the behaviour of the autoscaler.
-  // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
   // +optional
   optional HorizontalPodAutoscalerSpec spec = 2;
 
   // status is the current information about the autoscaler.
   // +optional
   optional HorizontalPodAutoscalerStatus status = 3;
+}
+
+// HorizontalPodAutoscalerCondition describes the state of
+// a HorizontalPodAutoscaler at a certain point.
+message HorizontalPodAutoscalerCondition {
+  // type describes the current condition
+  optional string type = 1;
+
+  // status is the status of the condition (True, False, Unknown)
+  optional string status = 2;
+
+  // lastTransitionTime is the last time the condition transitioned from
+  // one status to another
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+
+  // reason is the reason for the condition's last transition.
+  // +optional
+  optional string reason = 4;
+
+  // message is a human-readable explanation containing details about
+  // the transition
+  // +optional
+  optional string message = 5;
 }
 
 // HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.
@@ -122,6 +145,10 @@ message HorizontalPodAutoscalerStatus {
 
   // currentMetrics is the last read state of the metrics used by this autoscaler.
   repeated MetricStatus currentMetrics = 5;
+
+  // conditions is the set of conditions required for this autoscaler to scale its target,
+  // and indicates whether or not those conditions are met.
+  repeated HorizontalPodAutoscalerCondition conditions = 6;
 }
 
 // MetricSpec specifies how to scale based on a single metric

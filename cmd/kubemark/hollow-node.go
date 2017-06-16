@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/flag"
@@ -30,14 +29,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubemark"
-	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
+	fakeexec "k8s.io/kubernetes/pkg/util/exec"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
+	fakesysctl "k8s.io/kubernetes/pkg/util/sysctl/testing"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 
 	"github.com/golang/glog"
@@ -52,12 +51,12 @@ type HollowNodeConfig struct {
 	NodeName            string
 	ServerPort          int
 	ContentType         string
+	UseRealProxier      bool
 }
 
 const (
-	maxPods            = 110
-	podsPerCore        = 0
-	configResyncPeriod = 15 * time.Minute
+	maxPods     = 110
+	podsPerCore = 0
 )
 
 var knownMorphs = sets.NewString("kubelet", "proxy")
@@ -70,6 +69,7 @@ func (c *HollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.ServerPort, "api-server-port", 443, "Port on which API server is listening.")
 	fs.StringVar(&c.Morph, "morph", "", fmt.Sprintf("Specifies into which Hollow component this binary should morph. Allowed values: %v", knownMorphs.List()))
 	fs.StringVar(&c.ContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType of requests sent to apiserver.")
+	fs.BoolVar(&c.UseRealProxier, "use-real-proxier", true, "Set to true if you want to use real proxier inside hollow-proxy.")
 }
 
 func (c *HollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
@@ -114,8 +114,7 @@ func main() {
 	if config.Morph == "kubelet" {
 		cadvisorInterface := new(cadvisortest.Fake)
 		containerManager := cm.NewStubContainerManager()
-
-		fakeDockerClient := dockertools.NewFakeDockerClient().WithTraceDisabled()
+		fakeDockerClient := libdocker.NewFakeDockerClient().WithTraceDisabled()
 		fakeDockerClient.EnableSleep = true
 
 		hollowKubelet := kubemark.NewHollowKubelet(
@@ -133,34 +132,30 @@ func main() {
 	}
 
 	if config.Morph == "proxy" {
-		eventBroadcaster := record.NewBroadcaster()
-		recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: config.NodeName})
-
-		iptInterface := fakeiptables.NewFake()
-
-		informerFactory := informers.NewSharedInformerFactory(internalClientset, configResyncPeriod)
-		serviceConfig := proxyconfig.NewServiceConfig(informerFactory.Core().InternalVersion().Services(), configResyncPeriod)
-		serviceConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
-
-		endpointsConfig := proxyconfig.NewEndpointsConfig(informerFactory.Core().InternalVersion().Endpoints(), configResyncPeriod)
-		endpointsConfig.RegisterEventHandler(&kubemark.FakeProxyHandler{})
-
 		eventClient, err := clientgoclientset.NewForConfig(clientConfig)
 		if err != nil {
 			glog.Fatalf("Failed to create API Server client: %v", err)
 		}
+		iptInterface := fakeiptables.NewFake()
+		sysctl := fakesysctl.NewFake()
+		execer := &fakeexec.FakeExec{}
+		eventBroadcaster := record.NewBroadcaster()
+		recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: config.NodeName})
 
-		hollowProxy := kubemark.NewHollowProxyOrDie(
+		hollowProxy, err := kubemark.NewHollowProxyOrDie(
 			config.NodeName,
 			internalClientset,
 			eventClient,
-			endpointsConfig,
-			serviceConfig,
-			informerFactory,
 			iptInterface,
+			sysctl,
+			execer,
 			eventBroadcaster,
 			recorder,
+			config.UseRealProxier,
 		)
+		if err != nil {
+			glog.Fatalf("Failed to create hollowProxy instance: %v", err)
+		}
 		hollowProxy.Run()
 	}
 }

@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -64,7 +65,7 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 		// If hostname was requested and no Hostname address was registered...
 		if addressType == v1.NodeHostName {
 			// ...fall back to the kubernetes.io/hostname label for compatibility with kubelets before 1.5
-			if hostname, ok := node.Labels[metav1.LabelHostname]; ok && len(hostname) > 0 {
+			if hostname, ok := node.Labels[kubeletapis.LabelHostname]; ok && len(hostname) > 0 {
 				return hostname, nil
 			}
 		}
@@ -75,7 +76,6 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 // GetNodeHostIP returns the provided node's IP, based on the priority:
 // 1. NodeInternalIP
 // 2. NodeExternalIP
-// 3. NodeLegacyHostIP
 func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 	addresses := node.Status.Addresses
 	addressMap := make(map[v1.NodeAddressType][]v1.NodeAddress)
@@ -88,16 +88,12 @@ func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 	if addresses, ok := addressMap[v1.NodeExternalIP]; ok {
 		return net.ParseIP(addresses[0].Address), nil
 	}
-	if addresses, ok := addressMap[v1.NodeLegacyHostIP]; ok {
-		return net.ParseIP(addresses[0].Address), nil
-	}
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
 }
 
 // InternalGetNodeHostIP returns the provided node's IP, based on the priority:
 // 1. NodeInternalIP
 // 2. NodeExternalIP
-// 3. NodeLegacyHostIP
 func InternalGetNodeHostIP(node *api.Node) (net.IP, error) {
 	addresses := node.Status.Addresses
 	addressMap := make(map[api.NodeAddressType][]api.NodeAddress)
@@ -108,9 +104,6 @@ func InternalGetNodeHostIP(node *api.Node) (net.IP, error) {
 		return net.ParseIP(addresses[0].Address), nil
 	}
 	if addresses, ok := addressMap[api.NodeExternalIP]; ok {
-		return net.ParseIP(addresses[0].Address), nil
-	}
-	if addresses, ok := addressMap[api.NodeLegacyHostIP]; ok {
 		return net.ParseIP(addresses[0].Address), nil
 	}
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
@@ -124,8 +117,8 @@ func GetZoneKey(node *v1.Node) string {
 		return ""
 	}
 
-	region, _ := labels[metav1.LabelZoneRegion]
-	failureDomain, _ := labels[metav1.LabelZoneFailureDomain]
+	region, _ := labels[kubeletapis.LabelZoneRegion]
+	failureDomain, _ := labels[kubeletapis.LabelZoneFailureDomain]
 
 	if region == "" && failureDomain == "" {
 		return ""

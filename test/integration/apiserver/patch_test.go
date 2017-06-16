@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -39,8 +37,8 @@ import (
 
 // Tests that the apiserver retries non-overlapping conflicts on patches
 func TestPatchConflicts(t *testing.T) {
-	s, clientSet := setup(t)
-	defer s.Close()
+	s, clientSet, closeFn := setup(t)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("status-code", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)

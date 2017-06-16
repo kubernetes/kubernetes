@@ -17,7 +17,13 @@ limitations under the License.
 package dockershim
 
 import (
+	"bytes"
+	"crypto/md5"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -28,22 +34,36 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
 
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/security/apparmor"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 const (
 	annotationPrefix = "annotation."
+
+	// Docker changed the API for specifying options in v1.11
+	securityOptSeparatorChangeVersion = "1.23.0" // Corresponds to docker 1.11.x
+	securityOptSeparatorOld           = ':'
+	securityOptSeparatorNew           = '='
 )
 
 var (
 	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
 
+	// this is hacky, but extremely common.
+	// if a container starts but the executable file is not found, runc gives a message that matches
+	startRE = regexp.MustCompile(`\\\\\\\"(.*)\\\\\\\": executable file not found`)
+
 	// Docker changes the security option separator from ':' to '=' in the 1.23
 	// API version.
-	optsSeparatorChangeVersion = semver.MustParse(dockertools.SecurityOptSeparatorChangeVersion)
+	optsSeparatorChangeVersion = semver.MustParse(securityOptSeparatorChangeVersion)
+
+	defaultSeccompOpt = []dockerOpt{{"seccomp", "unconfined", ""}}
 )
 
 // generateEnvList converts KeyValue list to a list of strings, in the form of
@@ -113,7 +133,8 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 // '<HostPath>:<ContainerPath>:ro', if the path is read only, or
 // '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
 // relabeling and the pod provides an SELinux label
-func generateMountBindings(mounts []*runtimeapi.Mount) (result []string) {
+func generateMountBindings(mounts []*runtimeapi.Mount) []string {
+	result := make([]string, 0, len(mounts))
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
 		readOnly := m.Readonly
@@ -133,7 +154,7 @@ func generateMountBindings(mounts []*runtimeapi.Mount) (result []string) {
 		}
 		result = append(result, bind)
 	}
-	return
+	return result
 }
 
 func makePortsAndBindings(pm []*runtimeapi.PortMapping) (map[dockernat.Port]struct{}, map[dockernat.Port][]dockernat.PortBinding) {
@@ -181,57 +202,80 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (map[dockernat.Port]stru
 	return exposedPorts, portBindings
 }
 
-// getContainerSecurityOpt gets container security options from container and sandbox config, currently from sandbox
-// annotations.
+func getSeccompDockerOpts(annotations map[string]string, ctrName, profileRoot string) ([]dockerOpt, error) {
+	profile, profileOK := annotations[v1.SeccompContainerAnnotationKeyPrefix+ctrName]
+	if !profileOK {
+		// try the pod profile
+		profile, profileOK = annotations[v1.SeccompPodAnnotationKey]
+		if !profileOK {
+			// return early the default
+			return defaultSeccompOpt, nil
+		}
+	}
+
+	if profile == "unconfined" {
+		// return early the default
+		return defaultSeccompOpt, nil
+	}
+
+	if profile == "docker/default" {
+		// return nil so docker will load the default seccomp profile
+		return nil, nil
+	}
+
+	if !strings.HasPrefix(profile, "localhost/") {
+		return nil, fmt.Errorf("unknown seccomp profile option: %s", profile)
+	}
+
+	name := strings.TrimPrefix(profile, "localhost/") // by pod annotation validation, name is a valid subpath
+	fname := filepath.Join(profileRoot, filepath.FromSlash(name))
+	file, err := ioutil.ReadFile(fname)
+	if err != nil {
+		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", name, err)
+	}
+
+	b := bytes.NewBuffer(nil)
+	if err := json.Compact(b, file); err != nil {
+		return nil, err
+	}
+	// Rather than the full profile, just put the filename & md5sum in the event log.
+	msg := fmt.Sprintf("%s(md5:%x)", name, md5.Sum(file))
+
+	return []dockerOpt{{"seccomp", b.String(), msg}}, nil
+}
+
+// getSeccompSecurityOpts gets container seccomp options from container and sandbox
+// config, currently from sandbox annotations.
 // It is an experimental feature and may be promoted to official runtime api in the future.
-func getContainerSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string, separator rune) ([]string, error) {
-	appArmorOpts, err := dockertools.GetAppArmorOpts(sandboxConfig.GetAnnotations(), containerName)
+func getSeccompSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string, separator rune) ([]string, error) {
+	seccompOpts, err := getSeccompDockerOpts(sandboxConfig.GetAnnotations(), containerName, seccompProfileRoot)
 	if err != nil {
 		return nil, err
 	}
-	seccompOpts, err := dockertools.GetSeccompOpts(sandboxConfig.GetAnnotations(), containerName, seccompProfileRoot)
+	return fmtDockerOpts(seccompOpts, separator), nil
+}
+
+// getApparmorSecurityOpts gets apparmor options from container config.
+func getApparmorSecurityOpts(sc *runtimeapi.LinuxContainerSecurityContext, separator rune) ([]string, error) {
+	if sc == nil || sc.ApparmorProfile == "" {
+		return nil, nil
+	}
+
+	appArmorOpts, err := getAppArmorOpts(sc.ApparmorProfile)
 	if err != nil {
 		return nil, err
 	}
-	securityOpts := append(appArmorOpts, seccompOpts...)
-	fmtOpts := dockertools.FmtDockerOpts(securityOpts, separator)
+
+	fmtOpts := fmtDockerOpts(appArmorOpts, separator)
 	return fmtOpts, nil
 }
 
-func getSandboxSecurityOpts(sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string, separator rune) ([]string, error) {
-	// sandboxContainerName doesn't exist in the pod, so pod security options will be returned by default.
-	return getContainerSecurityOpts(sandboxContainerName, sandboxConfig, seccompProfileRoot, separator)
-}
-
-func getNetworkNamespace(c *dockertypes.ContainerJSON) string {
+func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
 	if c.State.Pid == 0 {
-		// Docker reports pid 0 for an exited container. We can't use it to
-		// check the network namespace, so return an empty string instead.
-		glog.V(4).Infof("Cannot find network namespace for the terminated container %q", c.ID)
-		return ""
+		// Docker reports pid 0 for an exited container.
+		return "", fmt.Errorf("Cannot find network namespace for the terminated container %q", c.ID)
 	}
-	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid)
-}
-
-// getSysctlsFromAnnotations gets sysctls from annotations.
-func getSysctlsFromAnnotations(annotations map[string]string) (map[string]string, error) {
-	var results map[string]string
-
-	sysctls, unsafeSysctls, err := v1helper.SysctlsFromPodAnnotations(annotations)
-	if err != nil {
-		return nil, err
-	}
-	if len(sysctls)+len(unsafeSysctls) > 0 {
-		results = make(map[string]string, len(sysctls)+len(unsafeSysctls))
-		for _, c := range sysctls {
-			results[c.Name] = c.Value
-		}
-		for _, c := range unsafeSysctls {
-			results[c.Name] = c.Value
-		}
-	}
-
-	return results, nil
+	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid), nil
 }
 
 // dockerFilter wraps around dockerfilters.Args and provides methods to modify
@@ -252,10 +296,23 @@ func (f *dockerFilter) AddLabel(key, value string) {
 	f.Add("label", fmt.Sprintf("%s=%s", key, value))
 }
 
+// parseUserFromImageUser splits the user out of an user:group string.
+func parseUserFromImageUser(id string) string {
+	if id == "" {
+		return id
+	}
+	// split instances where the id may contain user:group
+	if strings.Contains(id, ":") {
+		return strings.Split(id, ":")[0]
+	}
+	// no group, just return the id
+	return id
+}
+
 // getUserFromImageUser gets uid or user name of the image user.
 // If user is numeric, it will be treated as uid; or else, it is treated as user name.
 func getUserFromImageUser(imageUser string) (*int64, string) {
-	user := dockertools.GetUserFromImageUser(imageUser)
+	user := parseUserFromImageUser(imageUser)
 	// return both nil if user is not specified in the image.
 	if user == "" {
 		return nil, ""
@@ -281,7 +338,7 @@ func getUserFromImageUser(imageUser string) (*int64, string) {
 // In that case we have to create the container with a randomized name.
 // TODO(random-liu): Remove this work around after docker 1.11 is deprecated.
 // TODO(#33189): Monitor the tests to see if the fix is sufficient.
-func recoverFromCreationConflictIfNeeded(client dockertools.DockerInterface, createConfig dockertypes.ContainerCreateConfig, err error) (*dockertypes.ContainerCreateResponse, error) {
+func recoverFromCreationConflictIfNeeded(client libdocker.Interface, createConfig dockertypes.ContainerCreateConfig, err error) (*dockertypes.ContainerCreateResponse, error) {
 	matches := conflictRE.FindStringSubmatch(err.Error())
 	if len(matches) != 2 {
 		return nil, err
@@ -295,7 +352,7 @@ func recoverFromCreationConflictIfNeeded(client dockertools.DockerInterface, cre
 	} else {
 		glog.Errorf("Failed to remove the conflicting container %q: %v", id, rmErr)
 		// Return if the error is not container not found error.
-		if !dockertools.IsContainerNotFoundError(rmErr) {
+		if !libdocker.IsContainerNotFoundError(rmErr) {
 			return nil, err
 		}
 	}
@@ -304,6 +361,19 @@ func recoverFromCreationConflictIfNeeded(client dockertools.DockerInterface, cre
 	createConfig.Name = randomizeName(createConfig.Name)
 	glog.V(2).Infof("Create the container with randomized name %s", createConfig.Name)
 	return client.CreateContainer(createConfig)
+}
+
+// transformStartContainerError does regex parsing on returned error
+// for where container runtimes are giving less than ideal error messages.
+func transformStartContainerError(err error) error {
+	if err == nil {
+		return nil
+	}
+	matches := startRE.FindStringSubmatch(err.Error())
+	if len(matches) > 0 {
+		return fmt.Errorf("executable not found in $PATH")
+	}
+	return err
 }
 
 // getSecurityOptSeparator returns the security option separator based on the
@@ -315,24 +385,85 @@ func getSecurityOptSeparator(v *semver.Version) rune {
 	case -1:
 		// Current version is less than the API change version; use the old
 		// separator.
-		return dockertools.SecurityOptSeparatorOld
+		return securityOptSeparatorOld
 	default:
-		return dockertools.SecurityOptSeparatorNew
+		return securityOptSeparatorNew
 	}
 }
 
 // ensureSandboxImageExists pulls the sandbox image when it's not present.
-func ensureSandboxImageExists(client dockertools.DockerInterface, image string) error {
+func ensureSandboxImageExists(client libdocker.Interface, image string) error {
+	dockerCfgSearchPath := []string{"/.docker", filepath.Join(os.Getenv("HOME"), ".docker")}
+	return ensureSandboxImageExistsDockerCfg(client, image, dockerCfgSearchPath)
+}
+
+func ensureSandboxImageExistsDockerCfg(client libdocker.Interface, image string, dockerCfgSearchPath []string) error {
 	_, err := client.InspectImageByRef(image)
 	if err == nil {
 		return nil
 	}
-	if !dockertools.IsImageNotFoundError(err) {
+	if !libdocker.IsImageNotFoundError(err) {
 		return fmt.Errorf("failed to inspect sandbox image %q: %v", image, err)
 	}
-	err = client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{})
+
+	// To support images in private registries, try to read docker config
+	authConfig := dockertypes.AuthConfig{}
+	keyring := &credentialprovider.BasicDockerKeyring{}
+	var cfgLoadErr error
+	if cfg, err := credentialprovider.ReadDockerConfigJSONFile(dockerCfgSearchPath); err == nil {
+		keyring.Add(cfg)
+	} else if cfg, err := credentialprovider.ReadDockercfgFile(dockerCfgSearchPath); err == nil {
+		keyring.Add(cfg)
+	} else {
+		cfgLoadErr = err
+	}
+	if creds, withCredentials := keyring.Lookup(image); withCredentials {
+		// Use the first one that matched our image
+		for _, cred := range creds {
+			authConfig.Username = cred.Username
+			authConfig.Password = cred.Password
+			break
+		}
+	}
+
+	err = client.PullImage(image, authConfig, dockertypes.ImagePullOptions{})
 	if err != nil {
+		if cfgLoadErr != nil {
+			glog.Warningf("Couldn't load Docker cofig. If sandbox image %q is in a private registry, this will cause further errors. Error: %v", image, cfgLoadErr)
+		}
 		return fmt.Errorf("unable to pull sandbox image %q: %v", image, err)
 	}
 	return nil
+}
+
+func getAppArmorOpts(profile string) ([]dockerOpt, error) {
+	if profile == "" || profile == apparmor.ProfileRuntimeDefault {
+		// The docker applies the default profile by default.
+		return nil, nil
+	}
+
+	// Assume validation has already happened.
+	profileName := strings.TrimPrefix(profile, apparmor.ProfileNamePrefix)
+	return []dockerOpt{{"apparmor", profileName, ""}}, nil
+}
+
+// fmtDockerOpts formats the docker security options using the given separator.
+func fmtDockerOpts(opts []dockerOpt, sep rune) []string {
+	fmtOpts := make([]string, len(opts))
+	for i, opt := range opts {
+		fmtOpts[i] = fmt.Sprintf("%s%c%s", opt.key, sep, opt.value)
+	}
+	return fmtOpts
+}
+
+type dockerOpt struct {
+	// The key-value pair passed to docker.
+	key, value string
+	// The alternative value to use in log/event messages.
+	msg string
+}
+
+// Expose key/value from  dockerOpt.
+func (d dockerOpt) GetKV() (string, string) {
+	return d.key, d.value
 }

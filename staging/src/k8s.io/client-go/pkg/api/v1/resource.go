@@ -54,3 +54,10 @@ func (self *ResourceList) NvidiaGPU() *resource.Quantity {
 	}
 	return &resource.Quantity{}
 }
+
+func (self *ResourceList) StorageOverlay() *resource.Quantity {
+	if val, ok := (*self)[ResourceStorageOverlay]; ok {
+		return &val
+	}
+	return &resource.Quantity{}
+}

@@ -17,8 +17,9 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/kubelet/api:go_default_library",
-        "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/apis/cri:go_default_library",
+        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/util:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",

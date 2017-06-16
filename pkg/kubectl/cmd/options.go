@@ -17,6 +17,8 @@ limitations under the License.
 package cmd
 
 import (
+	"io"
+
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	"k8s.io/kubernetes/pkg/util/i18n"
 
@@ -24,24 +26,30 @@ import (
 )
 
 var (
-	options_example = templates.Examples(i18n.T(`
+	optionsExample = templates.Examples(i18n.T(`
 		# Print flags inherited by all commands
 		kubectl options`))
 )
 
 // NewCmdOptions implements the options command
-func NewCmdOptions() *cobra.Command {
+func NewCmdOptions(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "options",
 		Short:   i18n.T("Print the list of flags inherited by all commands"),
 		Long:    "Print the list of flags inherited by all commands",
-		Example: options_example,
+		Example: optionsExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Usage()
 		},
 	}
 
-	templates.UseOptionsTemplates(cmd)
+	// The `options` command needs write its output to the `out` stream
+	// (typically stdout). Without calling SetOutput here, the Usage()
+	// function call will fall back to stderr.
+	//
+	// See https://github.com/kubernetes/kubernetes/pull/46394 for details.
+	cmd.SetOutput(out)
 
+	templates.UseOptionsTemplates(cmd)
 	return cmd
 }

@@ -39,7 +39,7 @@ var (
 			Name: "apiserver_request_count",
 			Help: "Counter of apiserver requests broken out for each verb, API resource, client, and HTTP response contentType and code.",
 		},
-		[]string{"verb", "resource", "client", "contentType", "code"},
+		[]string{"verb", "resource", "subresource", "client", "contentType", "code"},
 	)
 	requestLatencies = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -48,7 +48,7 @@ var (
 			// Use buckets ranging from 125 ms to 8 seconds.
 			Buckets: prometheus.ExponentialBuckets(125000, 2.0, 7),
 		},
-		[]string{"verb", "resource"},
+		[]string{"verb", "resource", "subresource"},
 	)
 	requestLatenciesSummary = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
@@ -57,7 +57,7 @@ var (
 			// Make the sliding window of 1h.
 			MaxAge: time.Hour,
 		},
-		[]string{"verb", "resource"},
+		[]string{"verb", "resource", "subresource"},
 	)
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 )
@@ -69,11 +69,11 @@ func Register() {
 	prometheus.MustRegister(requestLatenciesSummary)
 }
 
-func Monitor(verb, resource *string, client, contentType string, httpCode int, reqStart time.Time) {
+func Monitor(verb, resource, subresource *string, client, contentType string, httpCode int, reqStart time.Time) {
 	elapsed := float64((time.Since(reqStart)) / time.Microsecond)
-	requestCounter.WithLabelValues(*verb, *resource, client, contentType, codeToString(httpCode)).Inc()
-	requestLatencies.WithLabelValues(*verb, *resource).Observe(elapsed)
-	requestLatenciesSummary.WithLabelValues(*verb, *resource).Observe(elapsed)
+	requestCounter.WithLabelValues(*verb, *resource, *subresource, client, contentType, codeToString(httpCode)).Inc()
+	requestLatencies.WithLabelValues(*verb, *resource, *subresource).Observe(elapsed)
+	requestLatenciesSummary.WithLabelValues(*verb, *resource, *subresource).Observe(elapsed)
 }
 
 func Reset() {
@@ -84,7 +84,7 @@ func Reset() {
 
 // InstrumentRouteFunc works like Prometheus' InstrumentHandlerFunc but wraps
 // the go-restful RouteFunction instead of a HandlerFunc
-func InstrumentRouteFunc(verb, resource string, routeFunc restful.RouteFunction) restful.RouteFunction {
+func InstrumentRouteFunc(verb, resource, subresource string, routeFunc restful.RouteFunction) restful.RouteFunction {
 	return restful.RouteFunction(func(request *restful.Request, response *restful.Response) {
 		now := time.Now()
 
@@ -103,10 +103,11 @@ func InstrumentRouteFunc(verb, resource string, routeFunc restful.RouteFunction)
 
 		routeFunc(request, response)
 
+		reportedVerb := verb
 		if verb == "LIST" && strings.ToLower(request.QueryParameter("watch")) == "true" {
-			verb = "WATCH"
+			reportedVerb = "WATCH"
 		}
-		Monitor(&verb, &resource, cleanUserAgent(utilnet.GetHTTPClient(request.Request)), rw.Header().Get("Content-Type"), delegate.status, now)
+		Monitor(&reportedVerb, &resource, &subresource, cleanUserAgent(utilnet.GetHTTPClient(request.Request)), rw.Header().Get("Content-Type"), delegate.status, now)
 	})
 }
 

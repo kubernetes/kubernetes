@@ -45,7 +45,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
 		pollTimeout    = 1 * time.Minute
-		image          = "gcr.io/google_containers/node-problem-detector:v0.3.0"
+		image          = "gcr.io/google_containers/node-problem-detector:v0.4.0"
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
 	var c clientset.Interface
@@ -372,6 +372,7 @@ func injectLog(file string, timestamp time.Time, log string, num int) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	for i := 0; i < num; i++ {
 		_, err := f.WriteString(fmt.Sprintf("%s kernel: [0.000000] %s\n", timestamp.Format(time.Stamp), log))
 		if err != nil {

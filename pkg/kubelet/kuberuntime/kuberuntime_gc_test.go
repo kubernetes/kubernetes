@@ -25,7 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
@@ -33,6 +33,20 @@ import (
 func TestSandboxGC(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
+
+	fakePodGetter := m.containerGC.podGetter.(*fakePodGetter)
+	makeGCSandbox := func(pod *v1.Pod, attempt uint32, state runtimeapi.PodSandboxState, withPodGetter bool, createdAt int64) sandboxTemplate {
+		if withPodGetter {
+			// initialize the pod getter
+			fakePodGetter.pods[pod.UID] = pod
+		}
+		return sandboxTemplate{
+			pod:       pod,
+			state:     state,
+			attempt:   attempt,
+			createdAt: createdAt,
+		}
+	}
 
 	pods := []*v1.Pod{
 		makeTestPod("foo1", "new", "1234", []v1.Container{
@@ -42,65 +56,87 @@ func TestSandboxGC(t *testing.T) {
 		makeTestPod("foo2", "new", "5678", []v1.Container{
 			makeTestContainer("bar3", "busybox"),
 		}),
+		makeTestPod("deleted", "new", "9012", []v1.Container{
+			makeTestContainer("bar4", "busybox"),
+		}),
 	}
 
 	for c, test := range []struct {
-		description string              // description of the test case
-		sandboxes   []sandboxTemplate   // templates of sandboxes
-		containers  []containerTemplate // templates of containers
-		minAge      time.Duration       // sandboxMinGCAge
-		remain      []int               // template indexes of remaining sandboxes
+		description         string              // description of the test case
+		sandboxes           []sandboxTemplate   // templates of sandboxes
+		containers          []containerTemplate // templates of containers
+		minAge              time.Duration       // sandboxMinGCAge
+		remain              []int               // template indexes of remaining sandboxes
+		evictNonDeletedPods bool
 	}{
 		{
-			description: "sandbox with no containers should be garbage collected.",
+			description: "notready sandboxes without containers for deleted pods should be garbage collected.",
 			sandboxes: []sandboxTemplate{
-				{pod: pods[0], state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
+				makeGCSandbox(pods[2], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, false, 0),
 			},
-			containers: []containerTemplate{},
-			remain:     []int{},
+			containers:          []containerTemplate{},
+			remain:              []int{},
+			evictNonDeletedPods: false,
 		},
 		{
-			description: "running sandbox should not be garbage collected.",
+			description: "ready sandboxes without containers for deleted pods should not be garbage collected.",
 			sandboxes: []sandboxTemplate{
-				{pod: pods[0], state: runtimeapi.PodSandboxState_SANDBOX_READY},
+				makeGCSandbox(pods[2], 0, runtimeapi.PodSandboxState_SANDBOX_READY, false, 0),
 			},
-			containers: []containerTemplate{},
-			remain:     []int{0},
+			containers:          []containerTemplate{},
+			remain:              []int{0},
+			evictNonDeletedPods: false,
+		},
+		{
+			description: "sandboxes for existing pods should not be garbage collected.",
+			sandboxes: []sandboxTemplate{
+				makeGCSandbox(pods[0], 0, runtimeapi.PodSandboxState_SANDBOX_READY, true, 0),
+				makeGCSandbox(pods[1], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 0),
+			},
+			containers:          []containerTemplate{},
+			remain:              []int{0, 1},
+			evictNonDeletedPods: false,
+		},
+		{
+			description: "non-running sandboxes for existing pods should be garbage collected if evictNonDeletedPods is set.",
+			sandboxes: []sandboxTemplate{
+				makeGCSandbox(pods[0], 0, runtimeapi.PodSandboxState_SANDBOX_READY, true, 0),
+				makeGCSandbox(pods[1], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 0),
+			},
+			containers:          []containerTemplate{},
+			remain:              []int{0},
+			evictNonDeletedPods: true,
 		},
 		{
 			description: "sandbox with containers should not be garbage collected.",
 			sandboxes: []sandboxTemplate{
-				{pod: pods[0], state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
+				makeGCSandbox(pods[0], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, false, 0),
 			},
 			containers: []containerTemplate{
 				{pod: pods[0], container: &pods[0].Spec.Containers[0], state: runtimeapi.ContainerState_CONTAINER_EXITED},
 			},
-			remain: []int{0},
-		},
-		{
-			description: "sandbox within min age should not be garbage collected.",
-			sandboxes: []sandboxTemplate{
-				{pod: pods[0], createdAt: time.Now().UnixNano(), state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
-				{pod: pods[1], createdAt: time.Now().Add(-2 * time.Hour).UnixNano(), state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
-			},
-			containers: []containerTemplate{},
-			minAge:     time.Hour, // assume the test won't take an hour
-			remain:     []int{0},
+			remain:              []int{0},
+			evictNonDeletedPods: false,
 		},
 		{
 			description: "multiple sandboxes should be handled properly.",
 			sandboxes: []sandboxTemplate{
 				// running sandbox.
-				{pod: pods[0], attempt: 1, state: runtimeapi.PodSandboxState_SANDBOX_READY},
-				// exited sandbox with containers.
-				{pod: pods[1], attempt: 1, state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
+				makeGCSandbox(pods[0], 1, runtimeapi.PodSandboxState_SANDBOX_READY, true, 1),
 				// exited sandbox without containers.
-				{pod: pods[1], attempt: 0, state: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
+				makeGCSandbox(pods[0], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 0),
+				// exited sandbox with containers.
+				makeGCSandbox(pods[1], 1, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 1),
+				// exited sandbox without containers.
+				makeGCSandbox(pods[1], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, 0),
+				// exited sandbox without containers for deleted pods.
+				makeGCSandbox(pods[2], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, false, 0),
 			},
 			containers: []containerTemplate{
 				{pod: pods[1], container: &pods[1].Spec.Containers[0], sandboxAttempt: 1, state: runtimeapi.ContainerState_CONTAINER_EXITED},
 			},
-			remain: []int{0, 1},
+			remain:              []int{0, 2},
+			evictNonDeletedPods: false,
 		},
 	} {
 		t.Logf("TestCase #%d: %+v", c, test)
@@ -109,7 +145,7 @@ func TestSandboxGC(t *testing.T) {
 		fakeRuntime.SetFakeSandboxes(fakeSandboxes)
 		fakeRuntime.SetFakeContainers(fakeContainers)
 
-		err := m.containerGC.evictSandboxes(test.minAge)
+		err := m.containerGC.evictSandboxes(test.evictNonDeletedPods)
 		assert.NoError(t, err)
 		realRemain, err := fakeRuntime.ListPodSandbox(nil)
 		assert.NoError(t, err)
@@ -145,18 +181,20 @@ func TestContainerGC(t *testing.T) {
 	defaultGCPolicy := kubecontainer.ContainerGCPolicy{MinAge: time.Hour, MaxPerPodContainer: 2, MaxContainers: 6}
 
 	for c, test := range []struct {
-		description string                           // description of the test case
-		containers  []containerTemplate              // templates of containers
-		policy      *kubecontainer.ContainerGCPolicy // container gc policy
-		remain      []int                            // template indexes of remaining containers
+		description         string                           // description of the test case
+		containers          []containerTemplate              // templates of containers
+		policy              *kubecontainer.ContainerGCPolicy // container gc policy
+		remain              []int                            // template indexes of remaining containers
+		evictNonDeletedPods bool
 	}{
 		{
 			description: "all containers should be removed when max container limit is 0",
 			containers: []containerTemplate{
 				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			policy: &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: 1, MaxContainers: 0},
-			remain: []int{},
+			policy:              &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: 1, MaxContainers: 0},
+			remain:              []int{},
+			evictNonDeletedPods: false,
 		},
 		{
 			description: "max containers should be complied when no max per pod container limit is set",
@@ -167,8 +205,9 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			policy: &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: 4},
-			remain: []int{0, 1, 2, 3},
+			policy:              &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: 4},
+			remain:              []int{0, 1, 2, 3},
+			evictNonDeletedPods: false,
 		},
 		{
 			description: "no containers should be removed if both max container and per pod container limits are not set",
@@ -177,8 +216,9 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			policy: &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: -1},
-			remain: []int{0, 1, 2},
+			policy:              &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: -1},
+			remain:              []int{0, 1, 2},
+			evictNonDeletedPods: false,
 		},
 		{
 			description: "recently started containers should not be removed",
@@ -187,7 +227,8 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer("foo", "bar", 1, time.Now().UnixNano(), runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer("foo", "bar", 0, time.Now().UnixNano(), runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			remain: []int{0, 1, 2},
+			remain:              []int{0, 1, 2},
+			evictNonDeletedPods: false,
 		},
 		{
 			description: "oldest containers should be removed when per pod container limit exceeded",
@@ -196,7 +237,8 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			remain: []int{0, 1},
+			remain:              []int{0, 1},
+			evictNonDeletedPods: false,
 		},
 		{
 			description: "running containers should not be removed",
@@ -205,7 +247,8 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_RUNNING),
 			},
-			remain: []int{0, 1, 2},
+			remain:              []int{0, 1, 2},
+			evictNonDeletedPods: false,
 		},
 		{
 			description: "no containers should be removed when limits are not exceeded",
@@ -213,7 +256,8 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			remain: []int{0, 1},
+			remain:              []int{0, 1},
+			evictNonDeletedPods: false,
 		},
 		{
 			description: "max container count should apply per (UID, container) pair",
@@ -228,7 +272,8 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer("foo2", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer("foo2", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			remain: []int{0, 1, 3, 4, 6, 7},
+			remain:              []int{0, 1, 3, 4, 6, 7},
+			evictNonDeletedPods: false,
 		},
 		{
 			description: "max limit should apply and try to keep from every pod",
@@ -244,7 +289,8 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer("foo4", "bar4", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer("foo4", "bar4", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			remain: []int{0, 2, 4, 6, 8},
+			remain:              []int{0, 2, 4, 6, 8},
+			evictNonDeletedPods: false,
 		},
 		{
 			description: "oldest pods should be removed if limit exceeded",
@@ -260,7 +306,21 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer("foo6", "bar6", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer("foo7", "bar7", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			remain: []int{0, 2, 4, 6, 8, 9},
+			remain:              []int{0, 2, 4, 6, 8, 9},
+			evictNonDeletedPods: false,
+		},
+		{
+			description: "all non-running containers should be removed when evictNonDeletedPods is set",
+			containers: []containerTemplate{
+				makeGCContainer("foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo1", "bar1", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo1", "bar1", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo2", "bar2", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo3", "bar3", 0, 0, runtimeapi.ContainerState_CONTAINER_RUNNING),
+			},
+			remain:              []int{5},
+			evictNonDeletedPods: true,
 		},
 		{
 			description: "containers for deleted pods should be removed",
@@ -272,7 +332,8 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer("deleted", "bar1", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer("deleted", "bar1", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			remain: []int{0, 1, 2},
+			remain:              []int{0, 1, 2},
+			evictNonDeletedPods: false,
 		},
 	} {
 		t.Logf("TestCase #%d: %+v", c, test)
@@ -282,7 +343,7 @@ func TestContainerGC(t *testing.T) {
 		if test.policy == nil {
 			test.policy = &defaultGCPolicy
 		}
-		err := m.containerGC.evictContainers(*test.policy, true)
+		err := m.containerGC.evictContainers(*test.policy, true, test.evictNonDeletedPods)
 		assert.NoError(t, err)
 		realRemain, err := fakeRuntime.ListContainers(nil)
 		assert.NoError(t, err)

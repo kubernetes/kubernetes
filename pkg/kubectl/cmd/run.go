@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
@@ -48,12 +47,12 @@ import (
 )
 
 var (
-	run_long = templates.LongDesc(i18n.T(`
+	runLong = templates.LongDesc(i18n.T(`
 		Create and run a particular image, possibly replicated.
 
 		Creates a deployment or job to manage the created container(s).`))
 
-	run_example = templates.Examples(i18n.T(`
+	runExample = templates.Examples(i18n.T(`
 		# Start a single instance of nginx.
 		kubectl run nginx --image=nginx
 
@@ -90,12 +89,10 @@ var (
 
 func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
-		// run-container is deprecated
-		Aliases: []string{"run-container"},
+		Use:     "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
 		Short:   i18n.T("Run a particular image on the cluster"),
-		Long:    run_long,
-		Example: run_example,
+		Long:    runLong,
+		Example: runExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
 			err := Run(f, cmdIn, cmdOut, cmdErr, cmd, args, argsLenAtDash)
@@ -140,10 +137,6 @@ func addRunFlags(cmd *cobra.Command) {
 }
 
 func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
-	if len(os.Args) > 1 && os.Args[1] == "run-container" {
-		printDeprecationWarning("run", "run-container")
-	}
-
 	// Let kubectl run follow rules for `--`, see #13004 issue
 	if len(args) == 0 || argsLenAtDash == 0 {
 		return cmdutil.UsageError(cmd, "NAME is required for run")
@@ -563,7 +556,14 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 	}
 
 	if cmdutil.GetFlagString(cmd, "output") != "" || cmdutil.GetDryRunFlag(cmd) {
-		return f.PrintObject(cmd, mapper, obj, out)
+		err := f.PrintObject(cmd, mapper, obj, out)
+		if err != nil {
+			return err
+		}
+		if cmdutil.GetFlagString(cmd, "output") == "yaml" {
+			fmt.Fprintln(out, "---")
+		}
+		return nil
 	}
 	cmdutil.PrintSuccess(mapper, false, out, mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
 

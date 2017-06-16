@@ -23,18 +23,12 @@ import (
 
 	dockertypes "github.com/docker/engine-api/types"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 // This file contains helper functions to convert docker API types to runtime
 // API types, or vice versa.
-
-const (
-	// Status of a container returned by docker ListContainers
-	statusRunningPrefix = "Up"
-	statusCreatedPrefix = "Created"
-	statusExitedPrefix  = "Exited"
-)
 
 func imageToRuntimeAPIImage(image *dockertypes.Image) (*runtimeapi.Image, error) {
 	if image == nil {
@@ -126,11 +120,11 @@ func toRuntimeAPIContainerState(state string) runtimeapi.ContainerState {
 	// Parse the state string in dockertypes.Container. This could break when
 	// we upgrade docker.
 	switch {
-	case strings.HasPrefix(state, statusRunningPrefix):
+	case strings.HasPrefix(state, libdocker.StatusRunningPrefix):
 		return runtimeapi.ContainerState_CONTAINER_RUNNING
-	case strings.HasPrefix(state, statusExitedPrefix):
+	case strings.HasPrefix(state, libdocker.StatusExitedPrefix):
 		return runtimeapi.ContainerState_CONTAINER_EXITED
-	case strings.HasPrefix(state, statusCreatedPrefix):
+	case strings.HasPrefix(state, libdocker.StatusCreatedPrefix):
 		return runtimeapi.ContainerState_CONTAINER_CREATED
 	default:
 		return runtimeapi.ContainerState_CONTAINER_UNKNOWN
@@ -141,7 +135,7 @@ func toRuntimeAPISandboxState(state string) runtimeapi.PodSandboxState {
 	// Parse the state string in dockertypes.Container. This could break when
 	// we upgrade docker.
 	switch {
-	case strings.HasPrefix(state, statusRunningPrefix):
+	case strings.HasPrefix(state, libdocker.StatusRunningPrefix):
 		return runtimeapi.PodSandboxState_SANDBOX_READY
 	default:
 		return runtimeapi.PodSandboxState_SANDBOX_NOTREADY

@@ -35,6 +35,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
+	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -145,7 +146,6 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 
 	go func() {
 		defer utilruntime.HandleCrash()
-		time.Sleep(5 * time.Minute) // give time for our cache to fill
 		e.checkLeftoverEndpoints()
 	}()
 
@@ -461,6 +461,14 @@ func (e *EndpointController) checkLeftoverEndpoints() {
 	}
 	for i := range list.Items {
 		ep := &list.Items[i]
+		if _, ok := ep.Annotations[resourcelock.LeaderElectionRecordAnnotationKey]; ok {
+			// when there are multiple controller-manager instances,
+			// we observe that it will delete leader-election endpoints after 5min
+			// and cause re-election
+			// so skip the delete here
+			// as leader-election only have endpoints without service
+			continue
+		}
 		key, err := keyFunc(ep)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("Unable to get key for endpoint %#v", ep))

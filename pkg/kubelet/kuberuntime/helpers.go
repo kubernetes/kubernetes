@@ -24,7 +24,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -104,14 +105,14 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
 
-	labeledInfo := getContainerInfoFromLabels(c.Labels)
 	annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
 	return &kubecontainer.Container{
-		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
-		Name:  labeledInfo.ContainerName,
-		Image: c.Image.Image,
-		Hash:  annotatedInfo.Hash,
-		State: toKubeContainerState(c.State),
+		ID:      kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
+		Name:    c.GetMetadata().GetName(),
+		ImageID: c.ImageRef,
+		Image:   c.Image.Image,
+		Hash:    annotatedInfo.Hash,
+		State:   toKubeContainerState(c.State),
 	}, nil
 }
 
@@ -235,4 +236,22 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 		})
 	}
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
+}
+
+// getSysctlsFromAnnotations gets sysctls and unsafeSysctls from annotations.
+func getSysctlsFromAnnotations(annotations map[string]string) (map[string]string, error) {
+	apiSysctls, apiUnsafeSysctls, err := v1helper.SysctlsFromPodAnnotations(annotations)
+	if err != nil {
+		return nil, err
+	}
+
+	sysctls := make(map[string]string)
+	for _, c := range apiSysctls {
+		sysctls[c.Name] = c.Value
+	}
+	for _, c := range apiUnsafeSysctls {
+		sysctls[c.Name] = c.Value
+	}
+
+	return sysctls, nil
 }

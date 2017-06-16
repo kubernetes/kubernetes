@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ FROM gcr.io/google_containers/ubuntu-slim:0.6
 
 
 ENV DEBIAN_FRONTEND noninteractive
-ENV KIBANA_VERSION 4.6.1
+ENV KIBANA_VERSION 5.4.0
 
 RUN apt-get update \
     && apt-get install -y curl \
@@ -28,7 +28,7 @@ RUN apt-get update \
 RUN set -x \
     && cd / \
     && mkdir /kibana \
-    && curl -O https://download.elastic.co/kibana/kibana/kibana-$KIBANA_VERSION-linux-x86_64.tar.gz \
+    && curl -O https://artifacts.elastic.co/downloads/kibana/kibana-$KIBANA_VERSION-linux-x86_64.tar.gz \
     && tar xf kibana-$KIBANA_VERSION-linux-x86_64.tar.gz -C /kibana --strip-components=1 \
     && rm kibana-$KIBANA_VERSION-linux-x86_64.tar.gz
 

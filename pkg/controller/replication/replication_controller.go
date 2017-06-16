@@ -61,8 +61,8 @@ var controllerKind = v1.SchemeGroupVersion.WithKind("ReplicationController")
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored
 // in the system with actual running pods.
-// TODO: this really should be called ReplicationController. The only reason why it's a Manager
-// is to distinguish this type from API object "ReplicationController". We should fix this.
+// NOTE: using this name to distinguish this type from API object "ReplicationController"; will
+//       not fix it right now. Refer to #41459 for more detail.
 type ReplicationManager struct {
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
@@ -214,7 +214,7 @@ func (rm *ReplicationManager) updateRC(old, cur interface{}) {
 	// this function), but in general extra resyncs shouldn't be
 	// that bad as rcs that haven't met expectations yet won't
 	// sync, and all the listing is done using local stores.
-	if oldRC.Spec.Replicas != curRC.Spec.Replicas {
+	if *(oldRC.Spec.Replicas) != *(curRC.Spec.Replicas) {
 		glog.V(4).Infof("Replication controller %v updated. Desired pod count change: %d->%d", curRC.Name, *(oldRC.Spec.Replicas), *(curRC.Spec.Replicas))
 	}
 	rm.enqueueController(cur)

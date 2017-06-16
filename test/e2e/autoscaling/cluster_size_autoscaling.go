@@ -79,14 +79,6 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		c = f.ClientSet
 		framework.SkipUnlessProviderIs("gce", "gke")
 
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		nodeCount = len(nodes.Items)
-		Expect(nodeCount).NotTo(BeZero())
-		cpu := nodes.Items[0].Status.Capacity[v1.ResourceCPU]
-		mem := nodes.Items[0].Status.Capacity[v1.ResourceMemory]
-		coresPerNode = int((&cpu).MilliValue() / 1000)
-		memCapacityMb = int((&mem).Value() / 1024 / 1024)
-
 		originalSizes = make(map[string]int)
 		sum := 0
 		for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
@@ -96,6 +88,17 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			originalSizes[mig] = size
 			sum += size
 		}
+		// Give instances time to spin up
+		framework.ExpectNoError(framework.WaitForClusterSize(c, sum, scaleUpTimeout))
+
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		nodeCount = len(nodes.Items)
+		Expect(nodeCount).NotTo(BeZero())
+		cpu := nodes.Items[0].Status.Capacity[v1.ResourceCPU]
+		mem := nodes.Items[0].Status.Capacity[v1.ResourceMemory]
+		coresPerNode = int((&cpu).MilliValue() / 1000)
+		memCapacityMb = int((&mem).Value() / 1024 / 1024)
+
 		Expect(nodeCount).Should(Equal(sum))
 
 		if framework.ProviderIs("gke") {
@@ -286,7 +289,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			}
 
 			for newNode := range newNodesSet {
-				if output, err := exec.Command("gcloud", "compute", "instances", "describe",
+				if output, err := execCmd("gcloud", "compute", "instances", "describe",
 					newNode,
 					"--project="+framework.TestContext.CloudConfig.ProjectID,
 					"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err == nil {
@@ -347,8 +350,8 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		increasedSize := 0
 		newSizes := make(map[string]int)
 		for key, val := range originalSizes {
-			newSizes[key] = val + 2
-			increasedSize += val + 2
+			newSizes[key] = val + 2 + unready
+			increasedSize += val + 2 + unready
 		}
 		setMigSizes(newSizes)
 		framework.ExpectNoError(WaitForClusterSizeFuncWithUnready(f.ClientSet,
@@ -457,6 +460,11 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 })
 
+func execCmd(args ...string) *exec.Cmd {
+	glog.Infof("Executing: %s", strings.Join(args, " "))
+	return exec.Command(args[0], args[1:]...)
+}
+
 func runDrainTest(f *framework.Framework, migSizes map[string]int, podsPerNode, pdbSize int, verifyFunction func(int)) {
 	increasedSize := manuallyIncreaseClusterSize(f, migSizes)
 
@@ -473,6 +481,7 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, podsPerNode, 
 	defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "reschedulable-pods")
 
 	By("Create a PodDisruptionBudget")
+	minAvailable := intstr.FromInt(numPods - pdbSize)
 	pdb := &policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pdb",
@@ -480,7 +489,7 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, podsPerNode, 
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: labelMap},
-			MinAvailable: intstr.FromInt(numPods - pdbSize),
+			MinAvailable: &minAvailable,
 		},
 	}
 	_, err = f.StagingClient.Policy().PodDisruptionBudgets(namespace).Create(pdb)
@@ -494,7 +503,7 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, podsPerNode, 
 }
 
 func getGKEClusterUrl() string {
-	out, err := exec.Command("gcloud", "auth", "print-access-token").Output()
+	out, err := execCmd("gcloud", "auth", "print-access-token").Output()
 	framework.ExpectNoError(err)
 	token := strings.Replace(string(out), "\n", "", -1)
 
@@ -517,8 +526,6 @@ func isAutoscalerEnabled(expectedMinNodeCountInTargetPool int) (bool, error) {
 		return false, err
 	}
 	strBody := string(body)
-	glog.Infof("Cluster config %s", strBody)
-
 	if strings.Contains(strBody, "\"minNodeCount\": "+strconv.Itoa(expectedMinNodeCountInTargetPool)) {
 		return true, nil
 	}
@@ -530,7 +537,7 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 	if nodePool == "default-pool" {
 		glog.Infof("Using gcloud to enable autoscaling for pool %s", nodePool)
 
-		output, err := exec.Command("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+		output, err := execCmd("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
 			"--enable-autoscaling",
 			"--min-nodes="+strconv.Itoa(minCount),
 			"--max-nodes="+strconv.Itoa(maxCount),
@@ -578,7 +585,7 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 	if nodePool == "default-pool" {
 		glog.Infof("Using gcloud to disable autoscaling for pool %s", nodePool)
 
-		output, err := exec.Command("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+		output, err := execCmd("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
 			"--no-enable-autoscaling",
 			"--node-pool="+nodePool,
 			"--project="+framework.TestContext.CloudConfig.ProjectID,
@@ -618,19 +625,19 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 }
 
 func addNodePool(name string, machineType string, numNodes int) {
-	output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create", name, "--quiet",
+	output, err := execCmd("gcloud", "alpha", "container", "node-pools", "create", name, "--quiet",
 		"--machine-type="+machineType,
 		"--num-nodes="+strconv.Itoa(numNodes),
 		"--project="+framework.TestContext.CloudConfig.ProjectID,
 		"--zone="+framework.TestContext.CloudConfig.Zone,
 		"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
-	framework.ExpectNoError(err)
 	glog.Infof("Creating node-pool %s: %s", name, output)
+	framework.ExpectNoError(err)
 }
 
 func deleteNodePool(name string) {
 	glog.Infof("Deleting node pool %s", name)
-	output, err := exec.Command("gcloud", "alpha", "container", "node-pools", "delete", name, "--quiet",
+	output, err := execCmd("gcloud", "alpha", "container", "node-pools", "delete", name, "--quiet",
 		"--project="+framework.TestContext.CloudConfig.ProjectID,
 		"--zone="+framework.TestContext.CloudConfig.Zone,
 		"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()

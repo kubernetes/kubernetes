@@ -150,7 +150,7 @@ var _ = framework.KubeDescribe("Proxy", func() {
 			Expect(framework.RunRC(cfg)).NotTo(HaveOccurred())
 			defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, cfg.Name)
 
-			Expect(f.WaitForAnEndpoint(service.Name)).NotTo(HaveOccurred())
+			Expect(framework.WaitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)).NotTo(HaveOccurred())
 
 			// table constructors
 			// Try proxying through the service and directly to through the pod.
@@ -269,7 +269,7 @@ var _ = framework.KubeDescribe("Proxy", func() {
 					framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
 				}
 
-				Fail(strings.Join(errs, "\n"))
+				framework.Failf(strings.Join(errs, "\n"))
 			}
 		})
 	})

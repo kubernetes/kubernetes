@@ -265,14 +265,21 @@ func (s *StatefulSetTester) GetPodList(ss *apps.StatefulSet) *v1.PodList {
 
 // ConfirmStatefulPodCount asserts that the current number of Pods in ss is count waiting up to timeout for ss to
 // to scale to count.
-func (s *StatefulSetTester) ConfirmStatefulPodCount(count int, ss *apps.StatefulSet, timeout time.Duration) {
+func (s *StatefulSetTester) ConfirmStatefulPodCount(count int, ss *apps.StatefulSet, timeout time.Duration, hard bool) {
 	start := time.Now()
 	deadline := start.Add(timeout)
 	for t := time.Now(); t.Before(deadline); t = time.Now() {
 		podList := s.GetPodList(ss)
 		statefulPodCount := len(podList.Items)
 		if statefulPodCount != count {
-			Failf("StatefulSet %v scaled unexpectedly scaled to %d -> %d replicas: %+v", ss.Name, count, len(podList.Items), podList)
+			logPodStates(podList.Items)
+			if hard {
+				Failf("StatefulSet %v scaled unexpectedly scaled to %d -> %d replicas", ss.Name, count, len(podList.Items))
+			} else {
+				Logf("StatefulSet %v has not reached scale %d, at %d", ss.Name, count, statefulPodCount)
+			}
+			time.Sleep(1 * time.Second)
+			continue
 		}
 		Logf("Verifying statefulset %v doesn't scale past %d for another %+v", ss.Name, count, deadline.Sub(t))
 		time.Sleep(1 * time.Second)
@@ -299,6 +306,22 @@ func (s *StatefulSetTester) waitForRunning(numStatefulPods int32, ss *apps.State
 				}
 			}
 			return true, nil
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for pods to enter running: %v", pollErr)
+	}
+}
+
+// WaitForState periodically polls for the ss and its pods until the until function returns either true or an error
+func (s *StatefulSetTester) WaitForState(ss *apps.StatefulSet, until func(*apps.StatefulSet, *v1.PodList) (bool, error)) {
+	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
+		func() (bool, error) {
+			ssGet, err := s.c.Apps().StatefulSets(ss.Namespace).Get(ss.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			podList := s.GetPodList(ssGet)
+			return until(ssGet, podList)
 		})
 	if pollErr != nil {
 		Failf("Failed waiting for pods to enter running: %v", pollErr)
@@ -358,8 +381,33 @@ func (s *StatefulSetTester) SetHealthy(ss *apps.StatefulSet) {
 	}
 }
 
-// WaitForStatus waits for the ss.Status.Replicas to be equal to expectedReplicas
-func (s *StatefulSetTester) WaitForStatus(ss *apps.StatefulSet, expectedReplicas int32) {
+// WaitForStatusReadyReplicas waits for the ss.Status.ReadyReplicas to be equal to expectedReplicas
+func (s *StatefulSetTester) WaitForStatusReadyReplicas(ss *apps.StatefulSet, expectedReplicas int32) {
+	Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
+
+	ns, name := ss.Namespace, ss.Name
+	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
+		func() (bool, error) {
+			ssGet, err := s.c.Apps().StatefulSets(ns).Get(name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if *ssGet.Status.ObservedGeneration < ss.Generation {
+				return false, nil
+			}
+			if ssGet.Status.ReadyReplicas != expectedReplicas {
+				Logf("Waiting for stateful set status to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
+				return false, nil
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for stateful set status.readyReplicas updated to %d: %v", expectedReplicas, pollErr)
+	}
+}
+
+// WaitForStatusReplicas waits for the ss.Status.Replicas to be equal to expectedReplicas
+func (s *StatefulSetTester) WaitForStatusReplicas(ss *apps.StatefulSet, expectedReplicas int32) {
 	Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
@@ -409,7 +457,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		if err := sst.Scale(&ss, 0); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
-		sst.WaitForStatus(&ss, 0)
+		sst.WaitForStatusReplicas(&ss, 0)
 		Logf("Deleting statefulset %v", ss.Name)
 		// Use OrphanDependents=false so it's deleted synchronously.
 		// We already made sure the Pods are gone inside Scale().
@@ -554,6 +602,7 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 					Volumes: vols,
 				},
 			},
+			UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			VolumeClaimTemplates: claims,
 			ServiceName:          governingSvcName,
 		},

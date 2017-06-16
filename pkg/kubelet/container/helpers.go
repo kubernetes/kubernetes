@@ -32,7 +32,7 @@ import (
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
@@ -104,7 +104,9 @@ func HashContainer(container *v1.Container) uint64 {
 
 // HashContainerLegacy returns the hash of the container. It is used to compare
 // the running container with its desired spec.
-// TODO: Delete this function after we deprecate dockertools.
+// This is used by rktnetes and dockershim (for handling <=1.5 containers).
+// TODO: Remove this function when kubernetes version is >=1.8 AND rktnetes
+// update its hash function.
 func HashContainerLegacy(container *v1.Container) uint64 {
 	hash := adler32.New()
 	hashutil.DeepHashObject(hash, *container)

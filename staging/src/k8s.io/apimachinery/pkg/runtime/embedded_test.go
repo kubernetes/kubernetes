@@ -19,7 +19,6 @@ package runtime_test
 import (
 	"encoding/json"
 	"reflect"
-	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -240,8 +239,11 @@ func TestNestedObject(t *testing.T) {
 	// the external representation
 	var decodedViaJSON EmbeddedTest
 	err = json.Unmarshal(wire, &decodedViaJSON)
-	if err == nil || !strings.Contains(err.Error(), "unmarshal object into Go value of type runtime.Object") {
-		t.Fatalf("Unexpected decode error %v", err)
+	if err == nil {
+		t.Fatal("Expeceted decode error")
+	}
+	if _, ok := err.(*json.UnmarshalTypeError); !ok {
+		t.Fatalf("Unexpected decode error: %v", err)
 	}
 	if a := decodedViaJSON; a.Object != nil || a.EmptyObject != nil {
 		t.Errorf("Expected embedded objects to be nil: %#v", a)

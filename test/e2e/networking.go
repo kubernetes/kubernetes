@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"net/http"
 
-	. "github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+
+	. "github.com/onsi/ginkgo"
 )
 
 var _ = framework.KubeDescribe("Networking", func() {
@@ -57,11 +59,13 @@ var _ = framework.KubeDescribe("Networking", func() {
 			{path: "/healthz"},
 			{path: "/api"},
 			{path: "/apis"},
-			{path: "/logs"},
 			{path: "/metrics"},
 			{path: "/swaggerapi"},
 			{path: "/version"},
 			// TODO: test proxy links here
+		}
+		if !framework.ProviderIs("gke") {
+			tests = append(tests, struct{ path string }{path: "/logs"})
 		}
 		for _, test := range tests {
 			By(fmt.Sprintf("testing: %s", test.path))
@@ -80,8 +84,8 @@ var _ = framework.KubeDescribe("Networking", func() {
 		config := framework.NewNetworkingTestConfig(f)
 
 		By("checking kube-proxy URLs")
-		config.GetSelfURL("/healthz", "ok")
-		config.GetSelfURL("/proxyMode", "iptables") // the default
+		config.GetSelfURL(ports.ProxyHealthzPort, "/healthz", "200 OK")
+		config.GetSelfURL(ports.ProxyStatusPort, "/proxyMode", "iptables") // the default
 	})
 
 	// TODO: Remove [Slow] when this has had enough bake time to prove presubmit worthiness.

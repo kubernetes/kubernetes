@@ -17,6 +17,8 @@ limitations under the License.
 package internal
 
 import (
+	"context"
+
 	dns "google.golang.org/api/dns/v1"
 	"google.golang.org/api/googleapi"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
@@ -32,6 +34,12 @@ type ResourceRecordSetsListCall struct {
 func (call *ResourceRecordSetsListCall) Do(opts ...googleapi.CallOption) (interfaces.ResourceRecordSetsListResponse, error) {
 	response, err := call.impl.Do(opts...)
 	return &ResourceRecordSetsListResponse{response}, err
+}
+
+func (call *ResourceRecordSetsListCall) Pages(ctx context.Context, f func(interfaces.ResourceRecordSetsListResponse) error) error {
+	return call.impl.Pages(ctx, func(page *dns.ResourceRecordSetsListResponse) error {
+		return f(&ResourceRecordSetsListResponse{page})
+	})
 }
 
 func (call *ResourceRecordSetsListCall) Name(name string) interfaces.ResourceRecordSetsListCall {

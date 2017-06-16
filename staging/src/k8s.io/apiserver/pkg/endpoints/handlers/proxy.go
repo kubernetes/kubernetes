@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"errors"
 	"io"
 	"math/rand"
@@ -55,11 +56,11 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	proxyHandlerTraceID := rand.Int63()
 
 	var verb string
-	var apiResource string
+	var apiResource, subresource string
 	var httpCode int
 	reqStart := time.Now()
 	defer func() {
-		metrics.Monitor(&verb, &apiResource,
+		metrics.Monitor(&verb, &apiResource, &subresource,
 			net.GetHTTPClient(req),
 			w.Header().Get("Content-Type"),
 			httpCode, reqStart)
@@ -84,7 +85,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	verb = requestInfo.Verb
-	namespace, resource, parts := requestInfo.Namespace, requestInfo.Resource, requestInfo.Parts
+	namespace, resource, subresource, parts := requestInfo.Namespace, requestInfo.Resource, requestInfo.Subresource, requestInfo.Parts
 
 	ctx = request.WithNamespace(ctx, namespace)
 	if len(parts) < 2 {
@@ -118,14 +119,14 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	redirector, ok := storage.(rest.Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
-		httpCode = responsewriters.ErrorNegotiated(apierrors.NewMethodNotSupported(schema.GroupResource{Resource: resource}, "proxy"), r.Serializer, gv, w, req)
+		httpCode = responsewriters.ErrorNegotiated(ctx, apierrors.NewMethodNotSupported(schema.GroupResource{Resource: resource}, "proxy"), r.Serializer, gv, w, req)
 		return
 	}
 
 	location, roundTripper, err := redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
-		httpCode = responsewriters.ErrorNegotiated(err, r.Serializer, gv, w, req)
+		httpCode = responsewriters.ErrorNegotiated(ctx, err, r.Serializer, gv, w, req)
 		return
 	}
 	if location == nil {
@@ -156,22 +157,15 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	location.RawQuery = values.Encode()
 
-	newReq, err := http.NewRequest(req.Method, location.String(), req.Body)
-	if err != nil {
-		httpCode = responsewriters.ErrorNegotiated(err, r.Serializer, gv, w, req)
-		return
-	}
-	httpCode = http.StatusOK
-	newReq.Header = req.Header
-	newReq.ContentLength = req.ContentLength
-	// Copy the TransferEncoding is for future-proofing. Currently Go only supports "chunked" and
-	// it can determine the TransferEncoding based on ContentLength and the Body.
-	newReq.TransferEncoding = req.TransferEncoding
+	// WithContext creates a shallow clone of the request with the new context.
+	newReq := req.WithContext(context.Background())
+	newReq.Header = net.CloneHeader(req.Header)
+	newReq.URL = location
 
 	// TODO convert this entire proxy to an UpgradeAwareProxy similar to
 	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
 	// That proxy needs to be modified to support multiple backends, not just 1.
-	if r.tryUpgrade(w, req, newReq, location, roundTripper, gv) {
+	if r.tryUpgrade(ctx, w, req, newReq, location, roundTripper, gv) {
 		return
 	}
 
@@ -220,13 +214,17 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 // tryUpgrade returns true if the request was handled.
-func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Request, location *url.URL, transport http.RoundTripper, gv schema.GroupVersion) bool {
+func (r *ProxyHandler) tryUpgrade(ctx request.Context, w http.ResponseWriter, req, newReq *http.Request, location *url.URL, transport http.RoundTripper, gv schema.GroupVersion) bool {
 	if !httpstream.IsUpgradeRequest(req) {
 		return false
 	}
+	// Only append X-Forwarded-For in the upgrade path, since httputil.NewSingleHostReverseProxy
+	// handles this in the non-upgrade path.
+	net.AppendForwardedForHeader(newReq)
+
 	backendConn, err := proxyutil.DialURL(location, transport)
 	if err != nil {
-		responsewriters.ErrorNegotiated(err, r.Serializer, gv, w, req)
+		responsewriters.ErrorNegotiated(ctx, err, r.Serializer, gv, w, req)
 		return true
 	}
 	defer backendConn.Close()
@@ -236,13 +234,13 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	// hijack, just for reference...
 	requestHijackedConn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
-		responsewriters.ErrorNegotiated(err, r.Serializer, gv, w, req)
+		responsewriters.ErrorNegotiated(ctx, err, r.Serializer, gv, w, req)
 		return true
 	}
 	defer requestHijackedConn.Close()
 
 	if err = newReq.Write(backendConn); err != nil {
-		responsewriters.ErrorNegotiated(err, r.Serializer, gv, w, req)
+		responsewriters.ErrorNegotiated(ctx, err, r.Serializer, gv, w, req)
 		return true
 	}
 

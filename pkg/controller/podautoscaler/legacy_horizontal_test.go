@@ -35,7 +35,6 @@ import (
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	autoscalingv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
@@ -46,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
-	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
 
@@ -325,19 +324,19 @@ func (tc *legacyTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 			metrics := metricsapi.PodMetricsList{}
 			for i, cpu := range tc.reportedLevels {
 				podMetric := metricsapi.PodMetrics{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: namespace,
 					},
-					Timestamp: unversioned.Time{Time: time.Now()},
+					Timestamp: metav1.Time{Time: time.Now()},
 					Containers: []metricsapi.ContainerMetrics{
 						{
 							Name: "container",
-							Usage: v1.ResourceList{
-								v1.ResourceCPU: *resource.NewMilliQuantity(
+							Usage: clientv1.ResourceList{
+								clientv1.ResourceCPU: *resource.NewMilliQuantity(
 									int64(cpu),
 									resource.DecimalSI),
-								v1.ResourceMemory: *resource.NewQuantity(
+								clientv1.ResourceMemory: *resource.NewQuantity(
 									int64(1024*1024),
 									resource.BinarySI),
 							},
@@ -489,6 +488,8 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 	}
 
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
+	defaultUpscaleForbiddenWindow := 3 * time.Minute
+	defaultDownscaleForbiddenWindow := 5 * time.Minute
 
 	hpaController := NewHorizontalController(
 		eventClient.Core(),
@@ -497,6 +498,8 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 		replicaCalc,
 		informerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
 		controller.NoResyncPeriodFunc(),
+		defaultUpscaleForbiddenWindow,
+		defaultDownscaleForbiddenWindow,
 	)
 	hpaController.hpaListerSynced = alwaysReady
 

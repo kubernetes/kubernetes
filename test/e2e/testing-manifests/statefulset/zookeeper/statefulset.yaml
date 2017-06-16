@@ -9,57 +9,39 @@ spec:
     metadata:
       labels:
         app: zk
-      annotations:
-        pod.alpha.kubernetes.io/init-containers: '[
-            {
-                "name": "install",
-                "image": "gcr.io/google_containers/zookeeper-install-3.5.0-alpha:e2e",
-                "imagePullPolicy": "Always",
-                "args": ["--install-into=/opt", "--work-dir=/work-dir"],
-                "volumeMounts": [
-                    {
-                        "name": "opt",
-                        "mountPath": "/opt/"
-                    },
-                    {
-                        "name": "workdir",
-                        "mountPath": "/work-dir"
-                    }
-                ]
-            },
-            {
-                "name": "bootstrap",
-                "image": "java:openjdk-8-jre",
-                "command": ["/work-dir/peer-finder"],
-                "args": ["-on-start=\"/work-dir/on-start.sh\"", "-service=zk"],
-                "env": [
-                  {
-                      "name": "POD_NAMESPACE",
-                      "valueFrom": {
-                          "fieldRef": {
-                              "apiVersion": "v1",
-                              "fieldPath": "metadata.namespace"
-                          }
-                      }
-                   }
-                ],
-                "volumeMounts": [
-                    {
-                        "name": "opt",
-                        "mountPath": "/opt"
-                    },
-                    {
-                        "name": "workdir",
-                        "mountPath": "/work-dir"
-                    },
-                    {
-                        "name": "datadir",
-                        "mountPath": "/tmp/zookeeper"
-                    }
-                ]
-            }
-        ]'
     spec:
+      initContainers:
+      - name: install
+        image: gcr.io/google_containers/zookeeper-install-3.5.0-alpha:e2e
+        imagePullPolicy: Always
+        args:
+        - "--install-into=/opt"
+        - "--work-dir=/work-dir"
+        volumeMounts:
+        - name: opt
+          mountPath: "/opt/"
+        - name: workdir
+          mountPath: "/work-dir"
+      - name: bootstrap
+        image: java:openjdk-8-jre
+        command:
+        - "/work-dir/peer-finder"
+        args:
+        - -on-start="/work-dir/on-start.sh"
+        - "-service=zk"
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: opt
+          mountPath: "/opt"
+        - name: workdir
+          mountPath: "/work-dir"
+        - name: datadir
+          mountPath: "/tmp/zookeeper"
       containers:
       - name: zk
         image: java:openjdk-8-jre

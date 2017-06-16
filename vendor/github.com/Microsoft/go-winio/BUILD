@@ -10,15 +10,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "backup.go",
-        "file.go",
-        "fileinfo.go",
-        "pipe.go",
-        "privilege.go",
         "reparse.go",
-        "sd.go",
         "syscall.go",
-        "zsyscall.go",
     ],
     tags = ["automanaged"],
 )

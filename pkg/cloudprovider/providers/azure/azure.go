@@ -20,8 +20,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"time"
 
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -30,11 +33,20 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
-	"time"
+	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-// CloudProviderName is the value used for the --cloud-provider flag
-const CloudProviderName = "azure"
+const (
+	// CloudProviderName is the value used for the --cloud-provider flag
+	CloudProviderName      = "azure"
+	rateLimitQPSDefault    = 1.0
+	rateLimitBucketDefault = 5
+	backoffRetriesDefault  = 6
+	backoffExponentDefault = 1.5
+	backoffDurationDefault = 5 // in seconds
+	backoffJitterDefault   = 1.0
+)
 
 // Config holds the configuration parsed from the --cloud-config flag
 // All fields are required unless otherwise specified
@@ -68,21 +80,39 @@ type Config struct {
 	AADClientID string `json:"aadClientId" yaml:"aadClientId"`
 	// The ClientSecret for an AAD application with RBAC access to talk to Azure RM APIs
 	AADClientSecret string `json:"aadClientSecret" yaml:"aadClientSecret"`
+	// Enable exponential backoff to manage resource request retries
+	CloudProviderBackoff bool `json:"cloudProviderBackoff" yaml:"cloudProviderBackoff"`
+	// Backoff retry limit
+	CloudProviderBackoffRetries int `json:"cloudProviderBackoffRetries" yaml:"cloudProviderBackoffRetries"`
+	// Backoff exponent
+	CloudProviderBackoffExponent float64 `json:"cloudProviderBackoffExponent" yaml:"cloudProviderBackoffExponent"`
+	// Backoff duration
+	CloudProviderBackoffDuration int `json:"cloudProviderBackoffDuration" yaml:"cloudProviderBackoffDuration"`
+	// Backoff jitter
+	CloudProviderBackoffJitter float64 `json:"cloudProviderBackoffJitter" yaml:"cloudProviderBackoffJitter"`
+	// Enable rate limiting
+	CloudProviderRateLimit bool `json:"cloudProviderRateLimit" yaml:"cloudProviderRateLimit"`
+	// Rate limit QPS
+	CloudProviderRateLimitQPS float32 `json:"cloudProviderRateLimitQPS" yaml:"cloudProviderRateLimitQPS"`
+	// Rate limit Bucket Size
+	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket" yaml:"cloudProviderRateLimitBucket"`
 }
 
 // Cloud holds the config and clients
 type Cloud struct {
 	Config
-	Environment             azure.Environment
-	RoutesClient            network.RoutesClient
-	SubnetsClient           network.SubnetsClient
-	InterfacesClient        network.InterfacesClient
-	RouteTablesClient       network.RouteTablesClient
-	LoadBalancerClient      network.LoadBalancersClient
-	PublicIPAddressesClient network.PublicIPAddressesClient
-	SecurityGroupsClient    network.SecurityGroupsClient
-	VirtualMachinesClient   compute.VirtualMachinesClient
-	StorageAccountClient    storage.AccountsClient
+	Environment              azure.Environment
+	RoutesClient             network.RoutesClient
+	SubnetsClient            network.SubnetsClient
+	InterfacesClient         network.InterfacesClient
+	RouteTablesClient        network.RouteTablesClient
+	LoadBalancerClient       network.LoadBalancersClient
+	PublicIPAddressesClient  network.PublicIPAddressesClient
+	SecurityGroupsClient     network.SecurityGroupsClient
+	VirtualMachinesClient    compute.VirtualMachinesClient
+	StorageAccountClient     storage.AccountsClient
+	operationPollRateLimiter flowcontrol.RateLimiter
+	resourceRequestBackoff   wait.Backoff
 }
 
 func init() {
@@ -176,8 +206,59 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	az.StorageAccountClient = storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
 	az.StorageAccountClient.Authorizer = servicePrincipalToken
 
+	// Conditionally configure rate limits
+	if az.CloudProviderRateLimit {
+		// Assign rate limit defaults if no configuration was passed in
+		if az.CloudProviderRateLimitQPS == 0 {
+			az.CloudProviderRateLimitQPS = rateLimitQPSDefault
+		}
+		if az.CloudProviderRateLimitBucket == 0 {
+			az.CloudProviderRateLimitBucket = rateLimitBucketDefault
+		}
+		az.operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
+			az.CloudProviderRateLimitQPS,
+			az.CloudProviderRateLimitBucket)
+		glog.V(2).Infof("Azure cloudprovider using rate limit config: QPS=%d, bucket=%d",
+			az.CloudProviderRateLimitQPS,
+			az.CloudProviderRateLimitBucket)
+	} else {
+		// if rate limits are configured off, az.operationPollRateLimiter.Accept() is a no-op
+		az.operationPollRateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+	}
+
+	// Conditionally configure resource request backoff
+	if az.CloudProviderBackoff {
+		// Assign backoff defaults if no configuration was passed in
+		if az.CloudProviderBackoffRetries == 0 {
+			az.CloudProviderBackoffRetries = backoffRetriesDefault
+		}
+		if az.CloudProviderBackoffExponent == 0 {
+			az.CloudProviderBackoffExponent = backoffExponentDefault
+		}
+		if az.CloudProviderBackoffDuration == 0 {
+			az.CloudProviderBackoffDuration = backoffDurationDefault
+		}
+		if az.CloudProviderBackoffJitter == 0 {
+			az.CloudProviderBackoffJitter = backoffJitterDefault
+		}
+		az.resourceRequestBackoff = wait.Backoff{
+			Steps:    az.CloudProviderBackoffRetries,
+			Factor:   az.CloudProviderBackoffExponent,
+			Duration: time.Duration(az.CloudProviderBackoffDuration) * time.Second,
+			Jitter:   az.CloudProviderBackoffJitter,
+		}
+		glog.V(2).Infof("Azure cloudprovider using retry backoff: retries=%d, exponent=%f, duration=%d, jitter=%f",
+			az.CloudProviderBackoffRetries,
+			az.CloudProviderBackoffExponent,
+			az.CloudProviderBackoffDuration,
+			az.CloudProviderBackoffJitter)
+	}
+
 	return &az, nil
 }
+
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (az *Cloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
 
 // LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 func (az *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
@@ -214,7 +295,11 @@ func (az *Cloud) ProviderName() string {
 	return CloudProviderName
 }
 
+// configureUserAgent configures the autorest client with a user agent that
+// includes "kubernetes" and the full kubernetes git version string
+// example:
+// Azure-SDK-for-Go/7.0.1-beta arm-network/2016-09-01; kubernetes-cloudprovider/v1.7.0-alpha.2.711+a2fadef8170bb0-dirty;
 func configureUserAgent(client *autorest.Client) {
 	k8sVersion := version.Get().GitVersion
-	client.UserAgent = fmt.Sprintf("%s; %s", client.UserAgent, k8sVersion)
+	client.UserAgent = fmt.Sprintf("%s; kubernetes-cloudprovider/%s", client.UserAgent, k8sVersion)
 }

@@ -18,6 +18,7 @@ package apps
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -44,6 +45,57 @@ type StatefulSet struct {
 	Status StatefulSetStatus
 }
 
+// PodManagementPolicyType defines the policy for creating pods under a stateful set.
+type PodManagementPolicyType string
+
+const (
+	// OrderedReadyPodManagement will create pods in strictly increasing order on
+	// scale up and strictly decreasing order on scale down, progressing only when
+	// the previous pod is ready or terminated. At most one pod will be changed
+	// at any time.
+	OrderedReadyPodManagement PodManagementPolicyType = "OrderedReady"
+	// ParallelPodManagement will create and delete pods as soon as the stateful set
+	// replica count is changed, and will not wait for pods to be ready or complete
+	// termination.
+	ParallelPodManagement = "Parallel"
+)
+
+// StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
+// controller will use to perform updates. It includes any additional parameters
+// necessary to perform the update for the indicated strategy.
+type StatefulSetUpdateStrategy struct {
+	// Type indicates the type of the StatefulSetUpdateStrategy.
+	Type StatefulSetUpdateStrategyType
+	// RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
+	RollingUpdate *RollingUpdateStatefulSetStrategy
+}
+
+// StatefulSetUpdateStrategyType is a string enumeration type that enumerates
+// all possible update strategies for the StatefulSet controller.
+type StatefulSetUpdateStrategyType string
+
+const (
+	// RollingUpdateStatefulSetStrategyType indicates that update will be
+	// applied to all Pods in the StatefulSet with respect to the StatefulSet
+	// ordering constraints. When a scale operation is performed with this
+	// strategy, new Pods will be created from the specification version indicated
+	// by the StatefulSet's updateRevision.
+	RollingUpdateStatefulSetStrategyType = "RollingUpdate"
+	// OnDeleteStatefulSetStrategyType triggers the legacy behavior. Version
+	// tracking and ordered rolling restarts are disabled. Pods are recreated
+	// from the StatefulSetSpec when they are manually deleted. When a scale
+	// operation is performed with this strategy,specification version indicated
+	// by the StatefulSet's currentRevision.
+	OnDeleteStatefulSetStrategyType = "OnDelete"
+)
+
+// RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
+type RollingUpdateStatefulSetStrategy struct {
+	// Partition indicates the ordinal at which the StatefulSet should be
+	// partitioned.
+	Partition int32
+}
+
 // A StatefulSetSpec is the specification of a StatefulSet.
 type StatefulSetSpec struct {
 	// Replicas is the desired number of replicas of the given Template.
@@ -56,7 +108,7 @@ type StatefulSetSpec struct {
 
 	// Selector is a label query over pods that should match the replica count.
 	// If empty, defaulted to labels on the pod template.
-	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
 	Selector *metav1.LabelSelector
 
@@ -82,16 +134,58 @@ type StatefulSetSpec struct {
 	// pattern: pod-specific-string.serviceName.default.svc.cluster.local
 	// where "pod-specific-string" is managed by the StatefulSet controller.
 	ServiceName string
+
+	// PodManagementPolicy controls how pods are created during initial scale up,
+	// when replacing pods on nodes, or when scaling down. The default policy is
+	// `OrderedReady`, where pods are created in increasing order (pod-0, then
+	// pod-1, etc) and the controller will wait until each pod is ready before
+	// continuing. When scaling down, the pods are removed in the opposite order.
+	// The alternative policy is `Parallel` which will create pods in parallel
+	// to match the desired scale without waiting, and on scale down will delete
+	// all pods at once.
+	// +optional
+	PodManagementPolicy PodManagementPolicyType
+
+	// updateStrategy indicates the StatefulSetUpdateStrategy that will be
+	// employed to update Pods in the StatefulSet when a revision is made to
+	// Template.
+	UpdateStrategy StatefulSetUpdateStrategy
+
+	// revisionHistoryLimit is the maximum number of revisions that will
+	// be maintained in the StatefulSet's revision history. The revision history
+	// consists of all revisions not represented by a currently applied
+	// StatefulSetSpec version. The default value is 10.
+	RevisionHistoryLimit *int32
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
 type StatefulSetStatus struct {
-	// most recent generation observed by this StatefulSet.
+	// observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the
+	// StatefulSet's generation, which is updated on mutation by the API Server.
 	// +optional
 	ObservedGeneration *int64
 
-	// Replicas is the number of actual replicas.
+	// replicas is the number of Pods created by the StatefulSet controller.
 	Replicas int32
+
+	// readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.
+	ReadyReplicas int32
+
+	// currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
+	// indicated by currentRevision.
+	CurrentReplicas int32
+
+	// updatedReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
+	// indicated by updateRevision.
+	UpdatedReplicas int32
+
+	// currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the
+	// sequence [0,currentReplicas).
+	CurrentRevision string
+
+	// updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence
+	// [replicas-updatedReplicas,replicas)
+	UpdateRevision string
 }
 
 // StatefulSetList is a collection of StatefulSets.
@@ -100,4 +194,36 @@ type StatefulSetList struct {
 	// +optional
 	metav1.ListMeta
 	Items []StatefulSet
+}
+
+// +genclient=true
+
+// ControllerRevision implements an immutable snapshot of state data. Clients
+// are responsible for serializing and deserializing the objects that contain
+// their internal state.
+// Once a ControllerRevision has been successfully created, it can not be updated.
+// The API Server will fail validation of all requests that attempt to mutate
+// the Data field. ControllerRevisions may, however, be deleted.
+type ControllerRevision struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// Data is the Object representing the state.
+	Data runtime.Object
+
+	// Revision indicates the revision of the state represented by Data.
+	Revision int64
+}
+
+// ControllerRevisionList is a resource containing a list of ControllerRevision objects.
+type ControllerRevisionList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of ControllerRevision objects.
+	Items []ControllerRevision
 }

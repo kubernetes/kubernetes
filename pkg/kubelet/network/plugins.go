@@ -76,11 +76,11 @@ type NetworkPlugin interface {
 	// TODO: rename podInfraContainerID to sandboxID
 	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
 
-	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
+	// GetPodNetworkStatus is the method called to obtain the ipv4 or ipv6 addresses of the container
 	// TODO: rename podInfraContainerID to sandboxID
 	GetPodNetworkStatus(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (*PodNetworkStatus, error)
 
-	// NetworkStatus returns error if the network plugin is in error state
+	// Status returns error if the network plugin is in error state
 	Status() error
 }
 
@@ -144,6 +144,8 @@ type Host interface {
 // CNI plugin wrappers like kubenet.
 type NamespaceGetter interface {
 	// GetNetNS returns network namespace information for the given containerID.
+	// Runtimes should *never* return an empty namespace and nil error for
+	// a container; if error is nil then the namespace string must be valid.
 	GetNetNS(containerID string) (string, error)
 }
 

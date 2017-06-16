@@ -109,3 +109,25 @@ func TestInt64AsCanonicalString(t *testing.T) {
 		}
 	}
 }
+
+func TestAmountSign(t *testing.T) {
+	table := []struct {
+		i      int64Amount
+		expect int
+	}{
+		{int64Amount{value: -50, scale: 1}, -1},
+		{int64Amount{value: 0, scale: 1}, 0},
+		{int64Amount{value: 300, scale: 1}, 1},
+		{int64Amount{value: -50, scale: -8}, -1},
+		{int64Amount{value: 50, scale: -8}, 1},
+		{int64Amount{value: 0, scale: -8}, 0},
+		{int64Amount{value: -50, scale: 0}, -1},
+		{int64Amount{value: 50, scale: 0}, 1},
+		{int64Amount{value: 0, scale: 0}, 0},
+	}
+	for _, testCase := range table {
+		if result := testCase.i.Sign(); result != testCase.expect {
+			t.Errorf("i: %v, Expected: %v, Actual: %v", testCase.i, testCase.expect, result)
+		}
+	}
+}

@@ -21,11 +21,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -70,13 +71,21 @@ func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error)
 	call := plugin.NewDriverCall(getVolumeNameCmd)
 	call.AppendSpec(spec, plugin.host, nil)
 
-	status, err := call.Run()
+	_, err := call.Run()
 	if isCmdNotSupportedErr(err) {
 		return (*pluginDefaults)(plugin).GetVolumeName(spec)
 	} else if err != nil {
 		return "", err
 	}
-	return utilstrings.EscapeQualifiedNameForDisk(status.VolumeName), nil
+
+	name, err := (*pluginDefaults)(plugin).GetVolumeName(spec)
+	if err != nil {
+		return "", err
+	}
+
+	glog.Warning(logPrefix(plugin), "GetVolumeName is not supported yet. Defaulting to PV or volume name: ", name)
+
+	return name, nil
 }
 
 // CanSupport is part of the volume.VolumePlugin interface.
@@ -108,13 +117,15 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 	source, readOnly := getVolumeSource(spec)
 	return &flexVolumeMounter{
 		flexVolume: &flexVolume{
-			driverName:   source.Driver,
-			execPath:     plugin.getExecutable(),
-			mounter:      mounter,
-			plugin:       plugin,
-			podUID:       pod.UID,
-			podNamespace: pod.Namespace,
-			volName:      spec.Name(),
+			driverName:            source.Driver,
+			execPath:              plugin.getExecutable(),
+			mounter:               mounter,
+			plugin:                plugin,
+			podName:               pod.Name,
+			podUID:                pod.UID,
+			podNamespace:          pod.Namespace,
+			podServiceAccountName: pod.Spec.ServiceAccountName,
+			volName:               spec.Name(),
 		},
 		runner:             runner,
 		spec:               spec,

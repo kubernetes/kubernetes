@@ -28,16 +28,18 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/prometheus/common/model"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
+
+	"github.com/prometheus/common/model"
 )
 
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
@@ -100,18 +102,19 @@ func GetKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMetrics {
 	latencyMethods := sets.NewString(
 		kubeletmetrics.PodWorkerLatencyKey,
 		kubeletmetrics.PodWorkerStartLatencyKey,
-		kubeletmetrics.SyncPodsLatencyKey,
 		kubeletmetrics.PodStartLatencyKey,
-		kubeletmetrics.PodStatusLatencyKey,
-		kubeletmetrics.ContainerManagerOperationsKey,
 		kubeletmetrics.CgroupManagerOperationsKey,
 		kubeletmetrics.DockerOperationsLatencyKey,
 		kubeletmetrics.PodWorkerStartLatencyKey,
 		kubeletmetrics.PLEGRelistLatencyKey,
 	)
+	return GetKubeletMetrics(ms, latencyMethods)
+}
+
+func GetKubeletMetrics(ms metrics.KubeletMetrics, methods sets.String) KubeletLatencyMetrics {
 	var latencyMetrics KubeletLatencyMetrics
 	for method, samples := range ms {
-		if !latencyMethods.Has(method) {
+		if !methods.Has(method) {
 			continue
 		}
 		for _, sample := range samples {
@@ -363,6 +366,9 @@ func getOneTimeResourceUsageOnNode(
 	}
 
 	f := func(name string, newStats *stats.ContainerStats) *ContainerResourceUsage {
+		if newStats == nil || newStats.CPU == nil || newStats.Memory == nil {
+			return nil
+		}
 		return &ContainerResourceUsage{
 			Name:                    name,
 			Timestamp:               newStats.StartTime.Time,
@@ -390,7 +396,9 @@ func getOneTimeResourceUsageOnNode(
 			if !isInteresting {
 				continue
 			}
-			usageMap[pod.PodRef.Name+"/"+container.Name] = f(pod.PodRef.Name+"/"+container.Name, &container)
+			if usage := f(pod.PodRef.Name+"/"+container.Name, &container); usage != nil {
+				usageMap[pod.PodRef.Name+"/"+container.Name] = usage
+			}
 		}
 	}
 	return usageMap, nil

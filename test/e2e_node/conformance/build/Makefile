@@ -55,7 +55,7 @@ endif
 	docker build --pull -t ${REGISTRY}/node-test-${ARCH}:${VERSION} ${TEMP_DIR}
 
 push: build
-	gcloud docker push ${REGISTRY}/node-test-${ARCH}:${VERSION}
+	gcloud docker -- push ${REGISTRY}/node-test-${ARCH}:${VERSION}
 ifeq ($(ARCH),amd64)
 	docker tag ${REGISTRY}/node-test-${ARCH}:${VERSION} ${REGISTRY}/node-test:${VERSION}
 	gcloud docker -- push ${REGISTRY}/node-test:${VERSION}

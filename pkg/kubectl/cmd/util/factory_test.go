@@ -281,8 +281,11 @@ func TestRefetchSchemaWhenValidationFails(t *testing.T) {
 			}
 		}),
 	}
-	dir := os.TempDir() + "/schemaCache"
-	os.RemoveAll(dir)
+	dir, err := ioutil.TempDir("", "schemaCache")
+	if err != nil {
+		t.Fatalf("Error getting tempDir: %v", err)
+	}
+	defer os.RemoveAll(dir)
 
 	fullDir, err := substituteUserHome(dir)
 	if err != nil {
@@ -339,8 +342,11 @@ func TestValidateCachesSchema(t *testing.T) {
 			}
 		}),
 	}
-	dir := os.TempDir() + "/schemaCache"
-	os.RemoveAll(dir)
+	dir, err := ioutil.TempDir("", "schemaCache")
+	if err != nil {
+		t.Fatalf("Error getting tempDir: %v", err)
+	}
+	defer os.RemoveAll(dir)
 
 	obj := &api.Pod{}
 	data, err := runtime.Encode(testapi.Default.Codec(), obj)

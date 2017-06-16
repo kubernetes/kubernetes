@@ -70,7 +70,7 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, nodeName
 	// succeeds in that case, so no need to do that separately.
 	devicePath, err := attacher.awsVolumes.AttachDisk(volumeID, nodeName, readOnly)
 	if err != nil {
-		glog.Errorf("Error attaching volume %q: %+v", volumeID, err)
+		glog.Errorf("Error attaching volume %q to node %q: %+v", volumeID, nodeName, err)
 		return "", err
 	}
 

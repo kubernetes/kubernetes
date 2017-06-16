@@ -111,7 +111,7 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (boo
 			scope = "cluster-wide"
 		}
 
-		glog.Infof("RBAC DENY: user %q groups %v cannot %s %s", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
+		glog.Infof("RBAC DENY: user %q groups %q cannot %s %s", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
 	}
 
 	reason := ""

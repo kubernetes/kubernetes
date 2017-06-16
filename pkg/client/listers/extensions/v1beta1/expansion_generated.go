@@ -23,7 +23,7 @@ package v1beta1
 type IngressListerExpansion interface{}
 
 // IngressNamespaceListerExpansion allows custom methods to be added to
-// IngressNamespaeLister.
+// IngressNamespaceLister.
 type IngressNamespaceListerExpansion interface{}
 
 // PodSecurityPolicyListerExpansion allows custom methods to be added to
@@ -35,7 +35,7 @@ type PodSecurityPolicyListerExpansion interface{}
 type ScaleListerExpansion interface{}
 
 // ScaleNamespaceListerExpansion allows custom methods to be added to
-// ScaleNamespaeLister.
+// ScaleNamespaceLister.
 type ScaleNamespaceListerExpansion interface{}
 
 // ThirdPartyResourceListerExpansion allows custom methods to be added to

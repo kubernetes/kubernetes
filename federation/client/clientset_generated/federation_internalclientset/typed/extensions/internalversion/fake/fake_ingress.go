@@ -34,6 +34,8 @@ type FakeIngresses struct {
 
 var ingressesResource = schema.GroupVersionResource{Group: "extensions", Version: "", Resource: "ingresses"}
 
+var ingressesKind = schema.GroupVersionKind{Group: "extensions", Version: "", Kind: "Ingress"}
+
 func (c *FakeIngresses) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(ingressesResource, c.ns, ingress), &extensions.Ingress{})
@@ -90,7 +92,7 @@ func (c *FakeIngresses) Get(name string, options v1.GetOptions) (result *extensi
 
 func (c *FakeIngresses) List(opts v1.ListOptions) (result *extensions.IngressList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(ingressesResource, c.ns, opts), &extensions.IngressList{})
+		Invokes(testing.NewListAction(ingressesResource, ingressesKind, c.ns, opts), &extensions.IngressList{})
 
 	if obj == nil {
 		return nil, err

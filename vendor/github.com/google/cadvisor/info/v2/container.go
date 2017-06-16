@@ -269,6 +269,10 @@ type NetworkStats struct {
 	Tcp TcpStat `json:"tcp"`
 	// TCP6 connection stats (Established, Listen...)
 	Tcp6 TcpStat `json:"tcp6"`
+	// UDP connection stats
+	Udp v1.UdpStat `json:"udp"`
+	// UDP6 connection stats
+	Udp6 v1.UdpStat `json:"udp6"`
 }
 
 // Instantaneous CPU stats

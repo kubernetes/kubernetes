@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -31,7 +30,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -54,6 +52,9 @@ import (
 
 const (
 	maxKubectlExecRetries = 5
+	// TODO(mikedanese): reset this to 5 minutes once #47135 is resolved.
+	// ref https://github.com/kubernetes/kubernetes/issues/47135
+	DefaultNamespaceDeletionTimeout = 10 * time.Minute
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
@@ -90,6 +91,10 @@ type Framework struct {
 
 	// configuration for framework's client
 	Options FrameworkOptions
+
+	// Place where various additional data is stored during test run to be printed to ReportDir,
+	// or stdout if ReportDir is not set once test ends.
+	TestSummaries []TestDataSummary
 }
 
 type TestDataSummary interface {
@@ -244,7 +249,7 @@ func (f *Framework) AfterEach() {
 		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !CurrentGinkgoTestDescription().Failed) {
 			for _, ns := range f.namespacesToDelete {
 				By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
-				timeout := 5 * time.Minute
+				timeout := DefaultNamespaceDeletionTimeout
 				if f.NamespaceDeletionTimeout != 0 {
 					timeout = f.NamespaceDeletionTimeout
 				}
@@ -257,12 +262,11 @@ func (f *Framework) AfterEach() {
 				}
 			}
 		} else {
-			if TestContext.DeleteNamespace {
+			if !TestContext.DeleteNamespace {
 				Logf("Found DeleteNamespace=false, skipping namespace deletion!")
-			} else if TestContext.DeleteNamespaceOnFailure {
-				Logf("Found DeleteNamespaceOnFailure=false, skipping namespace deletion!")
+			} else {
+				Logf("Found DeleteNamespaceOnFailure=false and current test failed, skipping namespace deletion!")
 			}
-
 		}
 
 		// Paranoia-- prevent reuse!
@@ -307,70 +311,37 @@ func (f *Framework) AfterEach() {
 		LogContainersInPodsWithLabels(f.ClientSet, metav1.NamespaceSystem, ImagePullerLabels, "image-puller", logFunc)
 	}
 
-	summaries := make([]TestDataSummary, 0)
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
 		By("Collecting resource usage data")
 		summary, resourceViolationError := f.gatherer.stopAndSummarize([]int{90, 99, 100}, f.AddonResourceConstraints)
 		defer ExpectNoError(resourceViolationError)
-		summaries = append(summaries, summary)
+		f.TestSummaries = append(f.TestSummaries, summary)
 	}
 
 	if TestContext.GatherLogsSizes {
 		By("Gathering log sizes data")
 		close(f.logsSizeCloseChannel)
 		f.logsSizeWaitGroup.Wait()
-		summaries = append(summaries, f.logsSizeVerifier.GetSummary())
+		f.TestSummaries = append(f.TestSummaries, f.logsSizeVerifier.GetSummary())
 	}
 
 	if TestContext.GatherMetricsAfterTest {
 		By("Gathering metrics")
-		// TODO: enable Scheduler and ControllerManager metrics grabbing when Master's Kubelet will be registered.
-		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, true, false, false, true)
+		// Grab apiserver, scheduler, controller-manager metrics and nodes' kubelet metrics (for non-kubemark case).
+		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, !ProviderIs("kubemark"), true, true, true)
 		if err != nil {
-			Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
+			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 		} else {
 			received, err := grabber.Grab()
 			if err != nil {
-				Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
+				Logf("MetricsGrabber failed to grab metrics (skipping metrics gathering): %v", err)
 			} else {
-				summaries = append(summaries, (*MetricsForE2E)(&received))
+				f.TestSummaries = append(f.TestSummaries, (*MetricsForE2E)(&received))
 			}
 		}
 	}
 
-	outputTypes := strings.Split(TestContext.OutputPrintType, ",")
-	now := time.Now()
-	for _, printType := range outputTypes {
-		switch printType {
-		case "hr":
-			for i := range summaries {
-				if TestContext.ReportDir == "" {
-					Logf(summaries[i].PrintHumanReadable())
-				} else {
-					// TODO: learn to extract test name and append it to the kind instead of timestamp.
-					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+now.Format(time.RFC3339)+".txt")
-					if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
-						Logf("Failed to write file %v with test performance data: %v", filePath, err)
-					}
-				}
-			}
-		case "json":
-			for i := range summaries {
-				if TestContext.ReportDir == "" {
-					Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
-					Logf("Finished")
-				} else {
-					// TODO: learn to extract test name and append it to the kind instead of timestamp.
-					filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+now.Format(time.RFC3339)+".json")
-					if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
-						Logf("Failed to write file %v with test performance data: %v", filePath, err)
-					}
-				}
-			}
-		default:
-			Logf("Unknown output type: %v. Skipping.", printType)
-		}
-	}
+	PrintSummaries(f.TestSummaries, f.BaseName)
 
 	// Check whether all nodes are ready after the test.
 	// This is explicitly done at the very end of the test, to avoid
@@ -434,52 +405,6 @@ func (f *Framework) TestContainerOutput(scenarioName string, pod *v1.Pod, contai
 // the specified container log against the given expected output using a regexp matcher.
 func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
 	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, MatchRegexp)
-}
-
-// WaitForAnEndpoint waits for at least one endpoint to become available in the
-// service's corresponding endpoints object.
-func (f *Framework) WaitForAnEndpoint(serviceName string) error {
-	for {
-		// TODO: Endpoints client should take a field selector so we
-		// don't have to list everything.
-		list, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).List(metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-		rv := list.ResourceVersion
-
-		isOK := func(e *v1.Endpoints) bool {
-			return e.Name == serviceName && len(e.Subsets) > 0 && len(e.Subsets[0].Addresses) > 0
-		}
-		for i := range list.Items {
-			if isOK(&list.Items[i]) {
-				return nil
-			}
-		}
-
-		options := metav1.ListOptions{
-			FieldSelector:   fields.Set{"metadata.name": serviceName}.AsSelector().String(),
-			ResourceVersion: rv,
-		}
-		w, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).Watch(options)
-		if err != nil {
-			return err
-		}
-		defer w.Stop()
-
-		for {
-			val, ok := <-w.ResultChan()
-			if !ok {
-				// reget and re-watch
-				break
-			}
-			if e, ok := val.Object.(*v1.Endpoints); ok {
-				if isOK(e) {
-					return nil
-				}
-			}
-		}
-	}
 }
 
 // Write a file using kubectl exec echo <contents> > <path> via specified container

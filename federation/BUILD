@@ -2,7 +2,7 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
-load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
+load("@io_bazel//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 filegroup(
     name = "package-srcs",
@@ -30,6 +30,7 @@ filegroup(
         "//federation/pkg/federatedtypes:all-srcs",
         "//federation/pkg/federation-controller:all-srcs",
         "//federation/pkg/kubefed:all-srcs",
+        "//federation/plugin/pkg/admission/schedulingpolicy:all-srcs",
         "//federation/registry/cluster:all-srcs",
     ],
     tags = ["automanaged"],

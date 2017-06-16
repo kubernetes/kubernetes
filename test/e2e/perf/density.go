@@ -65,9 +65,10 @@ type DensityTestConfig struct {
 	PollInterval      time.Duration
 	PodCount          int
 	// What kind of resource we want to create
-	kind          schema.GroupKind
-	SecretConfigs []*testutils.SecretConfig
-	DaemonConfigs []*testutils.DaemonConfig
+	kind             schema.GroupKind
+	SecretConfigs    []*testutils.SecretConfig
+	ConfigMapConfigs []*testutils.ConfigMapConfig
+	DaemonConfigs    []*testutils.DaemonConfig
 }
 
 func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceConstraint {
@@ -146,7 +147,7 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 	}
 	constraints["l7-lb-controller"] = framework.ResourceConstraint{
 		CPUConstraint:    0.15,
-		MemoryConstraint: 60 * (1024 * 1024),
+		MemoryConstraint: 75 * (1024 * 1024),
 	}
 	constraints["influxdb"] = framework.ResourceConstraint{
 		CPUConstraint:    2,
@@ -193,11 +194,13 @@ func logPodStartupStatus(c clientset.Interface, expectedPods int, observedLabels
 func runDensityTest(dtc DensityTestConfig) time.Duration {
 	defer GinkgoRecover()
 
-	// Create all secrets
+	// Create all secrets, configmaps and daemons.
 	for i := range dtc.SecretConfigs {
 		dtc.SecretConfigs[i].Run()
 	}
-
+	for i := range dtc.ConfigMapConfigs {
+		dtc.ConfigMapConfigs[i].Run()
+	}
 	for i := range dtc.DaemonConfigs {
 		dtc.DaemonConfigs[i].Run()
 	}
@@ -267,11 +270,13 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 		}
 	}
 
-	// Delete all secrets
+	// Delete all secrets, configmaps and daemons.
 	for i := range dtc.SecretConfigs {
 		dtc.SecretConfigs[i].Stop()
 	}
-
+	for i := range dtc.ConfigMapConfigs {
+		dtc.ConfigMapConfigs[i].Stop()
+	}
 	for i := range dtc.DaemonConfigs {
 		framework.ExpectNoError(framework.DeleteResourceAndPods(
 			dtc.ClientSet,
@@ -304,6 +309,8 @@ var _ = framework.KubeDescribe("Density", func() {
 	var nodes *v1.NodeList
 	var masters sets.String
 
+	testCaseBaseName := "density"
+
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
 		saturationThreshold := time.Duration((totalPods / MinPodsPerSecondThroughput)) * time.Second
@@ -319,17 +326,25 @@ var _ = framework.KubeDescribe("Density", func() {
 		}
 		framework.Logf("Cluster saturation time: %s", framework.PrettyPrintJSON(saturationData))
 
+		summaries := make([]framework.TestDataSummary, 0, 2)
 		// Verify latency metrics.
-		highLatencyRequests, err := framework.HighLatencyRequests(c)
+		highLatencyRequests, metrics, err := framework.HighLatencyRequests(c)
 		framework.ExpectNoError(err)
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+		if err == nil {
+			summaries = append(summaries, metrics)
+			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+		}
 
 		// Verify scheduler metrics.
 		// TODO: Reset metrics at the beginning of the test.
 		// We should do something similar to how we do it for APIserver.
-		if err = framework.VerifySchedulerLatency(c); err != nil {
-			framework.Logf("Warning: Scheduler latency not calculated, %v", err)
+		latency, err := framework.VerifySchedulerLatency(c)
+		framework.ExpectNoError(err)
+		if err == nil {
+			summaries = append(summaries, latency)
 		}
+
+		framework.PrintSummaries(summaries, testCaseBaseName)
 	})
 
 	options := framework.FrameworkOptions{
@@ -338,7 +353,7 @@ var _ = framework.KubeDescribe("Density", func() {
 	}
 	// Explicitly put here, to delete namespace at the end of the test
 	// (after measuring latency metrics, etc.).
-	f := framework.NewFramework("density", options, nil)
+	f := framework.NewFramework(testCaseBaseName, options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
@@ -385,9 +400,10 @@ var _ = framework.KubeDescribe("Density", func() {
 		// Controls how often the apiserver is polled for pods
 		interval time.Duration
 		// What kind of resource we should be creating. Default: ReplicationController
-		kind           schema.GroupKind
-		secretsPerPod  int
-		daemonsPerNode int
+		kind             schema.GroupKind
+		secretsPerPod    int
+		configMapsPerPod int
+		daemonsPerNode   int
 	}
 
 	densityTests := []Density{
@@ -404,24 +420,27 @@ var _ = framework.KubeDescribe("Density", func() {
 		{podsPerNode: 30, runLatencyTest: true, kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
 		// Test with secrets
 		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
+		// Test with configmaps
+		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
 	}
 
 	for _, testArg := range densityTests {
 		feature := "ManualPerformance"
 		switch testArg.podsPerNode {
 		case 30:
-			if testArg.kind == api.Kind("ReplicationController") && testArg.daemonsPerNode == 0 && testArg.secretsPerPod == 0 {
+			if testArg.kind == api.Kind("ReplicationController") && testArg.daemonsPerNode == 0 && testArg.secretsPerPod == 0 && testArg.configMapsPerPod == 0 {
 				feature = "Performance"
 			}
 		case 95:
 			feature = "HighDensityPerformance"
 		}
 
-		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node using %v with %v secrets and %v daemons",
+		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node using %v with %v secrets, %v configmaps and %v daemons",
 			feature,
 			testArg.podsPerNode,
 			testArg.kind,
 			testArg.secretsPerPod,
+			testArg.configMapsPerPod,
 			testArg.daemonsPerNode,
 		)
 		itArg := testArg
@@ -449,6 +468,7 @@ var _ = framework.KubeDescribe("Density", func() {
 
 			configs := make([]testutils.RunObjectConfig, numberOfCollections)
 			secretConfigs := make([]*testutils.SecretConfig, 0, numberOfCollections*itArg.secretsPerPod)
+			configMapConfigs := make([]*testutils.ConfigMapConfig, 0, numberOfCollections*itArg.configMapsPerPod)
 			// Since all RCs are created at the same time, timeout for each config
 			// has to assume that it will be run at the very end.
 			podThroughput := 20
@@ -469,6 +489,18 @@ var _ = framework.KubeDescribe("Density", func() {
 					})
 					secretNames = append(secretNames, secretName)
 				}
+				configMapNames := []string{}
+				for j := 0; j < itArg.configMapsPerPod; j++ {
+					configMapName := fmt.Sprintf("density-configmap-%v-%v", i, j)
+					configMapConfigs = append(configMapConfigs, &testutils.ConfigMapConfig{
+						Content:   map[string]string{"foo": "bar"},
+						Client:    clients[i],
+						Name:      configMapName,
+						Namespace: nsName,
+						LogFunc:   framework.Logf,
+					})
+					configMapNames = append(configMapNames, configMapName)
+				}
 				name := fmt.Sprintf("density%v-%v-%v", totalPods, i, uuid)
 				baseConfig := &testutils.RCConfig{
 					Client:               clients[i],
@@ -487,6 +519,7 @@ var _ = framework.KubeDescribe("Density", func() {
 					Silent:               true,
 					LogFunc:              framework.Logf,
 					SecretNames:          secretNames,
+					ConfigMapNames:       configMapNames,
 				}
 				switch itArg.kind {
 				case api.Kind("ReplicationController"):
@@ -510,6 +543,7 @@ var _ = framework.KubeDescribe("Density", func() {
 				PollInterval:      DensityPollInterval,
 				kind:              itArg.kind,
 				SecretConfigs:     secretConfigs,
+				ConfigMapConfigs:  configMapConfigs,
 			}
 
 			for i := 0; i < itArg.daemonsPerNode; i++ {
@@ -718,7 +752,8 @@ var _ = framework.KubeDescribe("Density", func() {
 				framework.PrintLatencies(e2eLag, "worst e2e total latencies")
 
 				// Test whether e2e pod startup time is acceptable.
-				podStartupLatency := framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLag)}
+				podStartupLatency := &framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLag)}
+				f.TestSummaries = append(f.TestSummaries, podStartupLatency)
 				framework.ExpectNoError(framework.VerifyPodStartupLatency(podStartupLatency))
 
 				framework.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)

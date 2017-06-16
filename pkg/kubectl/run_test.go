@@ -417,7 +417,8 @@ func TestGeneratePod(t *testing.T) {
 			},
 			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
+					Name:   "foo",
+					Labels: map[string]string{"run": "foo"},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -451,7 +452,8 @@ func TestGeneratePod(t *testing.T) {
 			},
 			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
+					Name:   "foo",
+					Labels: map[string]string{"run": "foo"},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -484,7 +486,8 @@ func TestGeneratePod(t *testing.T) {
 			},
 			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
+					Name:   "foo",
+					Labels: map[string]string{"run": "foo"},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -513,7 +516,8 @@ func TestGeneratePod(t *testing.T) {
 			},
 			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
+					Name:   "foo",
+					Labels: map[string]string{"run": "foo"},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{

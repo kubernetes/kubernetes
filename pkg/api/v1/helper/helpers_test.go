@@ -499,3 +499,90 @@ func TestGetAffinityFromPodAnnotations(t *testing.T) {
 		}
 	}
 }
+
+// TODO: remove when alpha support for topology constraints is removed
+func TestGetNodeAffinityFromAnnotations(t *testing.T) {
+	testCases := []struct {
+		annotations map[string]string
+		expectErr   bool
+	}{
+		{
+			annotations: nil,
+			expectErr:   false,
+		},
+		{
+			annotations: map[string]string{},
+			expectErr:   false,
+		},
+		{
+			annotations: map[string]string{
+				v1.AlphaStorageNodeAffinityAnnotation: `{
+                                        "requiredDuringSchedulingIgnoredDuringExecution": {
+                                                "nodeSelectorTerms": [
+                                                        { "matchExpressions": [
+                                                                { "key": "test-key1",
+                                                                  "operator": "In",
+                                                                  "values": ["test-value1", "test-value2"]
+                                                                },
+                                                                { "key": "test-key2",
+                                                                  "operator": "In",
+                                                                  "values": ["test-value1", "test-value2"]
+                                                                }
+                                                        ]}
+                                                ]}
+                                        }`,
+			},
+			expectErr: false,
+		},
+		{
+			annotations: map[string]string{
+				v1.AlphaStorageNodeAffinityAnnotation: `[{
+                                        "requiredDuringSchedulingIgnoredDuringExecution": {
+                                                "nodeSelectorTerms": [
+                                                        { "matchExpressions": [
+                                                                { "key": "test-key1",
+                                                                  "operator": "In",
+                                                                  "values": ["test-value1", "test-value2"]
+                                                                },
+                                                                { "key": "test-key2",
+                                                                  "operator": "In",
+                                                                  "values": ["test-value1", "test-value2"]
+                                                                }
+                                                        ]}
+                                                ]}
+                                        }]`,
+			},
+			expectErr: true,
+		},
+		{
+			annotations: map[string]string{
+				v1.AlphaStorageNodeAffinityAnnotation: `{
+                                        "requiredDuringSchedulingIgnoredDuringExecution": {
+                                                "nodeSelectorTerms":
+                                                         "matchExpressions": [
+                                                                { "key": "test-key1",
+                                                                  "operator": "In",
+                                                                  "values": ["test-value1", "test-value2"]
+                                                                },
+                                                                { "key": "test-key2",
+                                                                  "operator": "In",
+                                                                  "values": ["test-value1", "test-value2"]
+                                                                }
+                                                        ]}
+                                                }
+                                        }`,
+			},
+			expectErr: true,
+		},
+	}
+
+	for i, tc := range testCases {
+		_, err := GetStorageNodeAffinityFromAnnotation(tc.annotations)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+	}
+}
