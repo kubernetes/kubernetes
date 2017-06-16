@@ -48,14 +48,14 @@ import (
 // KUBE_INTEGRATION_PV_OBJECTS - nr. of PVs/PVCs to be created
 //      (100 by default)
 // KUBE_INTEGRATION_PV_SYNC_PERIOD - volume controller sync period
-//      (10s by default)
+//      (1s by default)
 // KUBE_INTEGRATION_PV_END_SLEEP - for how long should
 //      TestPersistentVolumeMultiPVsPVCs sleep when it's finished (0s by
 //      default). This is useful to test how long does it take for periodic sync
 //      to process bound PVs/PVCs.
 //
 const defaultObjectCount = 100
-const defaultSyncPeriod = 10 * time.Second
+const defaultSyncPeriod = 1 * time.Second
 
 const provisionerPluginName = "kubernetes.io/mock-provisioner"
 
