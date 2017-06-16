@@ -131,7 +131,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDns}, "ok", dnsReadyTimeout)
 		Expect(err).NotTo(HaveOccurred(), "waiting for output from pod exec")
 
-		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, "dns-backend.development.cluster.local", fmt.Sprintf("dns-backend.%s.svc.cluster.local", namespaces[0].Name))
+		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, "dns-backend.development.svc.cluster.local", fmt.Sprintf("dns-backend.%s.svc.cluster.local", namespaces[0].Name))
 
 		// create a pod in each namespace
 		for _, ns := range namespaces {
