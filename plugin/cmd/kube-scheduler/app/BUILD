@@ -17,6 +17,7 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/util/configz:go_default_library",
+        "//pkg/version:go_default_library",
         "//plugin/cmd/kube-scheduler/app/options:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",
         "//plugin/pkg/scheduler/algorithmprovider:go_default_library",
