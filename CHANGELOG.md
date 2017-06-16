@@ -16,6 +16,7 @@
     - [Action Required](#action-required-1)
     - [Other notable changes](#other-notable-changes-1)
 - [v1.6.5](#v165)
+  - [Known Issues for v1.6.5](#known-issues-for-v165)
   - [Downloads for v1.6.5](#downloads-for-v165)
     - [Client Binaries](#client-binaries-2)
     - [Server Binaries](#server-binaries-2)
@@ -31,6 +32,7 @@
     - [Action Required](#action-required-2)
     - [Other notable changes](#other-notable-changes-3)
 - [v1.6.4](#v164)
+  - [Known Issues for v1.6.4](#known-issues-for-v164)
   - [Downloads for v1.6.4](#downloads-for-v164)
     - [Client Binaries](#client-binaries-4)
     - [Server Binaries](#server-binaries-4)
@@ -769,6 +771,17 @@ filename | sha256 hash
 
 [Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.6/examples)
 
+## Known Issues for v1.6.5
+
+* If you use the [GLBC Ingress Controller](https://github.com/kubernetes/ingress/tree/master/controllers/gce),
+  upgrading an existing pre-v1.6.4 cluster to Kubernetes v1.6.5 will cause an unintentional
+  [overwrite of manual edits to GCP Health Checks](https://github.com/kubernetes/ingress/issues/842)
+  managed by the GLBC Ingress Controller. This can cause the health checks to start failing,
+  requiring you to reapply the manual edits.
+  * This issue does not affect clusters that were already running Kubernetes v1.6.4 or higher.
+  * This issue does not affect Health Checks that were left in the configuration
+    [originally set by the GLBC Ingress Controller](https://github.com/kubernetes/ingress/tree/master/controllers/gce#health-checks).
+
 ## Downloads for v1.6.5
 
 
@@ -1064,6 +1077,17 @@ filename | sha256 hash
 # v1.6.4
 
 [Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.6.3/examples)
+
+## Known Issues for v1.6.4
+
+* If you use the [GLBC Ingress Controller](https://github.com/kubernetes/ingress/tree/master/controllers/gce),
+  upgrading an existing cluster to Kubernetes v1.6.4 will cause an unintentional
+  [overwrite of manual edits to GCP Health Checks](https://github.com/kubernetes/ingress/issues/842)
+  managed by the GLBC Ingress Controller. This can cause the health checks to start failing,
+  requiring you to reapply the manual edits.
+  * This issue does not affect clusters that start out with Kubernetes v1.6.4 or higher.
+  * This issue does not affect Health Checks that were left in the configuration
+    [originally set by the GLBC Ingress Controller](https://github.com/kubernetes/ingress/tree/master/controllers/gce#health-checks).
 
 ## Downloads for v1.6.4
 
