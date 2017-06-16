@@ -58134,6 +58134,31 @@
      }
     }
    },
+   "io.k8s.api.core.v1.AzureFilePersistentVolumeSource": {
+    "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+    "required": [
+     "secretName",
+     "shareName"
+    ],
+    "properties": {
+     "readOnly": {
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+      "type": "boolean"
+     },
+     "secretName": {
+      "description": "the name of secret that contains Azure Storage Account Name and Key",
+      "type": "string"
+     },
+     "secretNamespace": {
+      "description": "the namespace of the secret that contains Azure Storage Account Name and Key default is the same as the Pod",
+      "type": "string"
+     },
+     "shareName": {
+      "description": "Share Name",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.AzureFileVolumeSource": {
     "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
     "required": [
@@ -60429,7 +60454,7 @@
      },
      "azureFile": {
       "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
-      "$ref": "#/definitions/io.k8s.api.core.v1.AzureFileVolumeSource"
+      "$ref": "#/definitions/io.k8s.api.core.v1.AzureFilePersistentVolumeSource"
      },
      "capacity": {
       "description": "A description of the persistent volume's resources and capacity. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
