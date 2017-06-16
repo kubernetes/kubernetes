@@ -17,9 +17,10 @@ limitations under the License.
 package openapi
 
 import (
+	"strings"
+
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
-	"strings"
 )
 
 // OpenAPIDefinition describes single type. Normally these definitions are auto-generated using gen-openapi.
@@ -83,6 +84,30 @@ type Config struct {
 	DefaultSecurity []map[string][]string
 }
 
+var schemaTypeFormatMap = map[string][]string{
+	"uint":        {"integer", "int32"},
+	"uint8":       {"integer", "byte"},
+	"uint16":      {"integer", "int32"},
+	"uint32":      {"integer", "int64"},
+	"uint64":      {"integer", "int64"},
+	"int":         {"integer", "int32"},
+	"int8":        {"integer", "byte"},
+	"int16":       {"integer", "int32"},
+	"int32":       {"integer", "int32"},
+	"int64":       {"integer", "int64"},
+	"byte":        {"integer", "byte"},
+	"float64":     {"number", "double"},
+	"float32":     {"number", "float"},
+	"bool":        {"boolean", ""},
+	"time.Time":   {"string", "date-time"},
+	"string":      {"string", ""},
+	"integer":     {"integer", ""},
+	"number":      {"number", ""},
+	"boolean":     {"boolean", ""},
+	"[]byte":      {"string", "byte"}, // base64 encoded characters
+	"interface{}": {"object", ""},
+}
+
 // This function is a reference for converting go (or any custom type) to a simple open API type,format pair. There are
 // two ways to customize spec for a type. If you add it here, a type will be converted to a simple type and the type
 // comment (the comment that is added before type definition) will be lost. The spec will still have the property
@@ -123,29 +148,6 @@ type Config struct {
 // }
 //
 func GetOpenAPITypeFormat(typeName string) (string, string) {
-	schemaTypeFormatMap := map[string][]string{
-		"uint":        {"integer", "int32"},
-		"uint8":       {"integer", "byte"},
-		"uint16":      {"integer", "int32"},
-		"uint32":      {"integer", "int64"},
-		"uint64":      {"integer", "int64"},
-		"int":         {"integer", "int32"},
-		"int8":        {"integer", "byte"},
-		"int16":       {"integer", "int32"},
-		"int32":       {"integer", "int32"},
-		"int64":       {"integer", "int64"},
-		"byte":        {"integer", "byte"},
-		"float64":     {"number", "double"},
-		"float32":     {"number", "float"},
-		"bool":        {"boolean", ""},
-		"time.Time":   {"string", "date-time"},
-		"string":      {"string", ""},
-		"integer":     {"integer", ""},
-		"number":      {"number", ""},
-		"boolean":     {"boolean", ""},
-		"[]byte":      {"string", "byte"}, // base64 encoded characters
-		"interface{}": {"object", ""},
-	}
 	mapped, ok := schemaTypeFormatMap[typeName]
 	if !ok {
 		return "", ""
