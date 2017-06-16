@@ -215,7 +215,7 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	r := o.Factory.NewBuilder().
+	r := o.Factory.NewBuilder(true).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		ResourceNames("node", args[0]).
 		Do()

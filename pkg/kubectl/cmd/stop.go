@@ -83,8 +83,8 @@ func RunStop(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer
 		return err
 	}
 
-	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	mapper, _ := f.Object()
+	r := f.NewBuilder(true).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(false, args...).

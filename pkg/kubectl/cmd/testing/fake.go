@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -337,7 +338,7 @@ func (f *FakeFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
 	return f.tf.Describer, f.tf.Err
 }
 
-func (f *FakeFactory) PrinterForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+func (f *FakeFactory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -457,16 +458,29 @@ func (f *FakeFactory) BindFlags(flags *pflag.FlagSet) {
 func (f *FakeFactory) BindExternalFlags(flags *pflag.FlagSet) {
 }
 
-func (f *FakeFactory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
+func (f *FakeFactory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
 	return nil
 }
 
-func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
+func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
-func (f *FakeFactory) NewBuilder() *resource.Builder {
+func (f *FakeFactory) NewBuilder(allowRemoteCalls bool) *resource.Builder {
 	return nil
+}
+
+func (f *FakeFactory) NewUnstructuredBuilder(allowRemoteCalls bool) (*resource.Builder, error) {
+	if !allowRemoteCalls {
+		return f.NewBuilder(allowRemoteCalls), nil
+	}
+
+	mapper, typer, err := f.UnstructuredObject()
+	if err != nil {
+		return nil, err
+	}
+
+	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme), nil
 }
 
 func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
@@ -618,7 +632,7 @@ func (f *fakeAPIFactory) UnstructuredClientForMapping(m *meta.RESTMapping) (reso
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
-func (f *fakeAPIFactory) PrinterForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+func (f *fakeAPIFactory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -681,7 +695,7 @@ func (f *fakeAPIFactory) Generators(cmdName string) map[string]kubectl.Generator
 	return cmdutil.DefaultGenerators(cmdName)
 }
 
-func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
+func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
 	gvks, _, err := api.Scheme.ObjectKinds(obj)
 	if err != nil {
 		return err
@@ -692,21 +706,34 @@ func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper,
 		return err
 	}
 
-	printer, err := f.PrinterForMapping(cmd, nil, mapping, false)
+	printer, err := f.PrinterForMapping(cmd, isLocal, nil, mapping, false)
 	if err != nil {
 		return err
 	}
 	return printer.PrintObj(obj, out)
 }
 
-func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
+func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
-func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
+func (f *fakeAPIFactory) NewBuilder(allowRemoteCalls bool) *resource.Builder {
 	mapper, typer := f.Object()
 
 	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+}
+
+func (f *fakeAPIFactory) NewUnstructuredBuilder(allowRemoteCalls bool) (*resource.Builder, error) {
+	if !allowRemoteCalls {
+		return f.NewBuilder(allowRemoteCalls), nil
+	}
+
+	mapper, typer, err := f.UnstructuredObject()
+	if err != nil {
+		return nil, err
+	}
+
+	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme), nil
 }
 
 func (f *fakeAPIFactory) SuggestedPodTemplateResources() []schema.GroupResource {

@@ -127,7 +127,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	}
 
 	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := f.NewBuilder(true).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -255,7 +255,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		info.Refresh(object, true)
 		if cmdutil.GetDryRunFlag(cmd) {
 			if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-				return f.PrintObject(cmd, mapper, object, out)
+				return f.PrintObject(cmd, false, mapper, object, out)
 			}
 			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, true, "exposed")
 			return nil
@@ -271,7 +271,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		}
 
 		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return f.PrintObject(cmd, mapper, object, out)
+			return f.PrintObject(cmd, false, mapper, object, out)
 		}
 
 		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "exposed")

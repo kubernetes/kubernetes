@@ -199,7 +199,7 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	}
 
 	c.PrintObject = func(obj runtime.Object) error {
-		return f.PrintObject(cmd, c.Mapper, obj, c.Out)
+		return f.PrintObject(cmd, false, c.Mapper, obj, c.Out)
 	}
 
 	clientSet, err := f.ClientSet()
