@@ -168,23 +168,41 @@ func (c *Cloner) customDeepCopy(src, fv reflect.Value) (reflect.Value, error) {
 	return outValue, result.(error)
 }
 
+func isValueType(kind reflect.Kind) bool {
+	switch kind {
+	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32,
+		reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16,
+		reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64,
+		reflect.Complex64, reflect.Complex128, reflect.String:
+		return true
+	}
+	return false
+}
+
 func (c *Cloner) defaultDeepCopy(src reflect.Value) (reflect.Value, error) {
 	switch src.Kind() {
 	case reflect.Chan, reflect.Func, reflect.UnsafePointer, reflect.Uintptr:
 		return src, fmt.Errorf("cannot deep copy kind: %s", src.Kind())
 	case reflect.Array:
-		dst := reflect.New(src.Type())
+		dst := reflect.New(src.Type()).Elem()
+		if isValueType(src.Type().Elem().Kind()) {
+			reflect.Copy(dst, src)
+			return dst, nil
+		}
 		for i := 0; i < src.Len(); i++ {
 			copyVal, err := c.deepCopy(src.Index(i))
 			if err != nil {
 				return src, err
 			}
-			dst.Elem().Index(i).Set(copyVal)
+			dst.Index(i).Set(copyVal)
 		}
-		return dst.Elem(), nil
+		return dst, nil
 	case reflect.Interface:
 		if src.IsNil() {
 			return src, nil
+		}
+		if isValueType(src.Elem().Kind()) {
+			return src.Elem(), nil
 		}
 		return c.deepCopy(src.Elem())
 	case reflect.Map:
@@ -193,11 +211,27 @@ func (c *Cloner) defaultDeepCopy(src reflect.Value) (reflect.Value, error) {
 		}
 		dst := reflect.MakeMap(src.Type())
 		for _, k := range src.MapKeys() {
-			copyVal, err := c.deepCopy(src.MapIndex(k))
-			if err != nil {
-				return src, err
+			var copyKey, copyVal reflect.Value
+			var err error
+
+			if isValueType(src.Type().Key().Kind()) {
+				copyKey = k
+			} else {
+				copyKey, err = c.deepCopy(k)
+				if err != nil {
+					return src, err
+				}
 			}
-			dst.SetMapIndex(k, copyVal)
+
+			if isValueType(src.Type().Elem().Kind()) {
+				copyVal = src.MapIndex(k)
+			} else {
+				copyVal, err = c.deepCopy(src.MapIndex(k))
+				if err != nil {
+					return src, err
+				}
+			}
+			dst.SetMapIndex(copyKey, copyVal)
 		}
 		return dst, nil
 	case reflect.Ptr:
@@ -205,6 +239,10 @@ func (c *Cloner) defaultDeepCopy(src reflect.Value) (reflect.Value, error) {
 			return src, nil
 		}
 		dst := reflect.New(src.Type().Elem())
+		if isValueType(src.Type().Elem().Kind()) {
+			dst.Elem().Set(src.Elem())
+			return dst, nil
+		}
 		copyVal, err := c.deepCopy(src.Elem())
 		if err != nil {
 			return src, err
@@ -215,13 +253,17 @@ func (c *Cloner) defaultDeepCopy(src reflect.Value) (reflect.Value, error) {
 		if src.IsNil() {
 			return src, nil
 		}
-		dst := reflect.MakeSlice(src.Type(), 0, src.Len())
+		dst := reflect.MakeSlice(src.Type(), src.Len(), src.Len())
+		if isValueType(src.Type().Elem().Kind()) {
+			reflect.Copy(dst, src)
+			return dst, nil
+		}
 		for i := 0; i < src.Len(); i++ {
 			copyVal, err := c.deepCopy(src.Index(i))
 			if err != nil {
 				return src, err
 			}
-			dst = reflect.Append(dst, copyVal)
+			dst.Index(i).Set(copyVal)
 		}
 		return dst, nil
 	case reflect.Struct:
@@ -233,6 +275,10 @@ func (c *Cloner) defaultDeepCopy(src reflect.Value) (reflect.Value, error) {
 				// example, time.Time is a value type with
 				// private members that can be shallow copied.
 				return src, nil
+			}
+			if isValueType(src.Field(i).Type().Kind()) {
+				dst.Elem().Field(i).Set(src.Field(i))
+				continue
 			}
 			copyVal, err := c.deepCopy(src.Field(i))
 			if err != nil {
