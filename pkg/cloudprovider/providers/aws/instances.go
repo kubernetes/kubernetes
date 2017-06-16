@@ -23,6 +23,10 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"sync"
+	"time"
 )
 
 // awsInstanceID represents the ID of the instance in the AWS API, e.g. i-12345678
@@ -80,6 +84,42 @@ func (name kubernetesInstanceID) mapToAWSInstanceID() (awsInstanceID, error) {
 	return awsInstanceID(awsID), nil
 }
 
+// mapToAWSInstanceID extracts the awsInstanceIDs from the Nodes, returning an error if a Node cannot be mapped
+func mapToAWSInstanceIDs(nodes []*v1.Node) ([]awsInstanceID, error) {
+	var instanceIDs []awsInstanceID
+	for _, node := range nodes {
+		if node.Spec.ProviderID == "" {
+			return nil, fmt.Errorf("node %q did not have ProviderID set", node.Name)
+		}
+		instanceID, err := kubernetesInstanceID(node.Spec.ProviderID).mapToAWSInstanceID()
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse ProviderID %q for node %q", node.Spec.ProviderID, node.Name)
+		}
+		instanceIDs = append(instanceIDs, instanceID)
+	}
+
+	return instanceIDs, nil
+}
+
+// mapToAWSInstanceIDsTolerant extracts the awsInstanceIDs from the Nodes, skipping Nodes that cannot be mapped
+func mapToAWSInstanceIDsTolerant(nodes []*v1.Node) []awsInstanceID {
+	var instanceIDs []awsInstanceID
+	for _, node := range nodes {
+		if node.Spec.ProviderID == "" {
+			glog.Warningf("node %q did not have ProviderID set", node.Name)
+			continue
+		}
+		instanceID, err := kubernetesInstanceID(node.Spec.ProviderID).mapToAWSInstanceID()
+		if err != nil {
+			glog.Warningf("unable to parse ProviderID %q for node %q", node.Spec.ProviderID, node.Name)
+			continue
+		}
+		instanceIDs = append(instanceIDs, instanceID)
+	}
+
+	return instanceIDs
+}
+
 // Gets the full information about this instance from the EC2 API
 func describeInstance(ec2Client EC2, instanceID awsInstanceID) (*ec2.Instance, error) {
 	request := &ec2.DescribeInstancesInput{
@@ -97,4 +137,133 @@ func describeInstance(ec2Client EC2, instanceID awsInstanceID) (*ec2.Instance, e
 		return nil, fmt.Errorf("multiple instances found for instance: %s", instanceID)
 	}
 	return instances[0], nil
+}
+
+// instanceCache manages the cache of DescribeInstances
+type instanceCache struct {
+	// TODO: Get rid of this field, send all calls through the instanceCache
+	cloud *Cloud
+
+	mutex    sync.Mutex
+	snapshot *allInstancesSnapshot
+}
+
+// Gets the full information about these instance from the EC2 API
+func (c *instanceCache) describeAllInstancesUncached() (*allInstancesSnapshot, error) {
+	now := time.Now()
+
+	glog.V(4).Infof("EC2 DescribeInstances - fetching all instances")
+
+	filters := []*ec2.Filter{}
+	instances, err := c.cloud.describeInstances(filters)
+	if err != nil {
+		return nil, err
+	}
+
+	m := make(map[awsInstanceID]*ec2.Instance)
+	for _, i := range instances {
+		id := awsInstanceID(aws.StringValue(i.InstanceId))
+		m[id] = i
+	}
+
+	snapshot := &allInstancesSnapshot{now, m}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if c.snapshot != nil && snapshot.olderThan(c.snapshot) {
+		// If this happens a lot, we could run this function in a mutex and only return one result
+		glog.Infof("Not caching concurrent AWS DescribeInstances results")
+	} else {
+		c.snapshot = snapshot
+	}
+
+	return snapshot, nil
+}
+
+// cacheCriteria holds criteria that must hold to use a cached snapshot
+type cacheCriteria struct {
+	// MaxAge indicates the maximum age of a cached snapshot we can accept.
+	// If set to 0 (i.e. unset), cached values will not time out because of age.
+	MaxAge time.Duration
+
+	// HasInstances is a list of awsInstanceIDs that must be in a cached snapshot for it to be considered valid.
+	// If an instance is not found in the cached snapshot, the snapshot be ignored and we will re-fetch.
+	HasInstances []awsInstanceID
+}
+
+// describeAllInstancesCached returns all instances, using cached results if applicable
+func (c *instanceCache) describeAllInstancesCached(criteria cacheCriteria) (*allInstancesSnapshot, error) {
+	var err error
+	snapshot := c.getSnapshot()
+	if snapshot != nil && !snapshot.MeetsCriteria(criteria) {
+		snapshot = nil
+	}
+
+	if snapshot == nil {
+		snapshot, err = c.describeAllInstancesUncached()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		glog.V(6).Infof("EC2 DescribeInstances - using cached results")
+	}
+
+	return snapshot, nil
+}
+
+// getSnapshot returns a snapshot if one exists
+func (c *instanceCache) getSnapshot() *allInstancesSnapshot {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	return c.snapshot
+}
+
+// olderThan is a simple helper to encapsulate timestamp comparison
+func (s *allInstancesSnapshot) olderThan(other *allInstancesSnapshot) bool {
+	// After() is technically broken by time changes until we have monotonic time
+	return other.timestamp.After(s.timestamp)
+}
+
+// MeetsCriteria returns true if the snapshot meets the criteria in cacheCriteria
+func (s *allInstancesSnapshot) MeetsCriteria(criteria cacheCriteria) bool {
+	if criteria.MaxAge > 0 {
+		// Sub() is technically broken by time changes until we have monotonic time
+		now := time.Now()
+		if now.Sub(s.timestamp) > criteria.MaxAge {
+			glog.V(6).Infof("instanceCache snapshot cannot be used as is older than MaxAge=%s", criteria.MaxAge)
+			return false
+		}
+	}
+
+	if len(criteria.HasInstances) != 0 {
+		for _, id := range criteria.HasInstances {
+			if nil == s.instances[id] {
+				glog.V(6).Infof("instanceCache snapshot cannot be used as does not contain instance %s", id)
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// allInstancesSnapshot holds the results from querying for all instances,
+// along with the timestamp for cache-invalidation purposes
+type allInstancesSnapshot struct {
+	timestamp time.Time
+	instances map[awsInstanceID]*ec2.Instance
+}
+
+// FindInstances returns the instances corresponding to the specified ids.  If an id is not found, it is ignored.
+func (s *allInstancesSnapshot) FindInstances(ids []awsInstanceID) map[awsInstanceID]*ec2.Instance {
+	m := make(map[awsInstanceID]*ec2.Instance)
+	for _, id := range ids {
+		instance := s.instances[id]
+		if instance != nil {
+			m[id] = instance
+		}
+	}
+	return m
 }
