@@ -22,6 +22,8 @@ import (
 	"path"
 	"strings"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 func TestEmptyVersion(t *testing.T) {
@@ -117,6 +119,41 @@ func TestVersionFromNetwork(t *testing.T) {
 			t.Errorf("KubernetesReleaseVersion: error expected for key %q, but result is %q", k, ver)
 		case ver != v.Expected:
 			t.Errorf("KubernetesReleaseVersion: unexpected result for key %q. Expected: %q Actual: %q", k, v.Expected, ver)
+		}
+	}
+}
+
+func TestIsNodeAuthorizerSupported(t *testing.T) {
+	versionsSupported := map[string]bool{
+		"v1.6.0":         false,
+		"v1.6.9":         false,
+		"v1.7.0-alpha.1": false,
+		"v1.7.0-alpha.2": false,
+		"v1.7.0-alpha.3": false,
+		"v1.7.0-alpha.4": false,
+		"v1.7.0-beta.0":  false,
+		"v1.7.0-beta.1":  true, // BREAKPOINT!
+		"v1.7.0-beta.2":  true,
+		"v1.7.0-rc.0":    true,
+		"v1.7.0":         true,
+		"v1.7.3":         true,
+		"v1.8.0-alpha.0": false, // EXCEPTION!
+		"v1.8.0-alpha.1": true,
+		"v1.8.0-alpha.2": true,
+		"v1.8.0-beta.0":  true,
+		"v1.8.0-beta.1":  true,
+		"v1.8.0-rc.0":    true,
+		"v1.8.0":         true,
+		"v1.8.6":         true,
+	}
+	for ver, expected := range versionsSupported {
+
+		parsedVersion, err := version.ParseSemantic(ver)
+		if err != nil {
+			t.Fatalf("version %s must parse", ver)
+		}
+		if actual := IsNodeAuthorizerSupported(parsedVersion); actual != expected {
+			t.Errorf("IsNodeAuthorizerSupported: unexpected result for version %s, expected %t but got %t", ver, expected, actual)
 		}
 	}
 }

@@ -81,7 +81,7 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 }
 
 func defaultAuthorizationModes(authzModes []string, k8sVersion *version.Version) []string {
-	if k8sVersion.AtLeast(kubeadmconstants.MinimumNodeAuthorizerVersion) {
+	if kubeadmutil.IsNodeAuthorizerSupported(k8sVersion) {
 		strset := sets.NewString(authzModes...)
 		if !strset.Has(authzmodes.ModeNode) {
 			return append([]string{authzmodes.ModeNode}, authzModes...)
