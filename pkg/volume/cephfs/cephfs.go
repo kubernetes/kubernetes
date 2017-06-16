@@ -145,6 +145,7 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			id:           id,
 			secret_file:  secret_file,
 			readonly:     cephvs.ReadOnly,
+			fuse:         cephvs.Fuse,
 			mounter:      mounter,
 			plugin:       plugin,
 			mountOptions: volume.MountOptionFromSpec(spec),
@@ -189,6 +190,7 @@ type cephfs struct {
 	secret      string
 	secret_file string
 	readonly    bool
+	fuse        bool
 	mounter     mount.Interface
 	plugin      *cephfsPlugin
 	volume.MetricsNil
@@ -204,6 +206,7 @@ var _ volume.Mounter = &cephfsMounter{}
 func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:        cephfsVolume.readonly,
+		Fuse:            cephfsVolume.fuse,
 		Managed:         false,
 		SupportsSELinux: false,
 	}
@@ -280,6 +283,9 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	if cephfsVolume.readonly {
 		opt = append(opt, "ro")
 	}
+	if cephfsVolume.fuse {
+		opt = append(opt, "f")
+	}
 	opt = append(opt, ceph_opt)
 
 	// build src like mon1:6789,mon2:6789,mon3:6789:/
@@ -303,7 +309,7 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 
 func getVolumeSource(spec *volume.Spec) (*v1.CephFSVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.CephFS != nil {
-		return spec.Volume.CephFS, spec.Volume.CephFS.ReadOnly, nil
+		return spec.Volume.CephFS, spec.Volume.CephFS.ReadOnly, spec.Volume.CephFS.Fuse, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.CephFS != nil {
 		return spec.PersistentVolume.Spec.CephFS, spec.ReadOnly, nil
