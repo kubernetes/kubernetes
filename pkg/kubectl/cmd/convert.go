@@ -131,7 +131,6 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 	clientMapper := resource.ClientMapperFunc(f.ClientForMapping)
 
 	if o.local {
-		fmt.Fprintln(os.Stderr, "running in local mode...")
 		o.builder = resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.DisabledClientForMapping{ClientMapper: clientMapper}, f.Decoder(true))
 	} else {
 		o.builder = resource.NewBuilder(mapper, f.CategoryExpander(), typer, clientMapper, f.Decoder(true))
@@ -155,6 +154,10 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
 	templateFile := cmdutil.GetFlagString(cmd, "template")
 	if len(outputFormat) == 0 {
+		if o.local {
+			fmt.Fprintln(os.Stderr, "running in local mode...")
+		}
+
 		if len(templateFile) == 0 {
 			outputFormat = "yaml"
 		} else {
