@@ -378,7 +378,7 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 	}
 
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
-	if outputFormat != "" || cmdutil.GetDryRunFlag(cmd) {
+	if outputFormat != "" {
 		return f.PrintObject(cmd, mapper, obj, cmdOut)
 	}
 	cmdutil.PrintSuccess(mapper, false, cmdOut, mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
@@ -555,7 +555,7 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 		return err
 	}
 
-	if cmdutil.GetFlagString(cmd, "output") != "" || cmdutil.GetDryRunFlag(cmd) {
+	if cmdutil.GetFlagString(cmd, "output") != "" {
 		err := f.PrintObject(cmd, mapper, obj, out)
 		if err != nil {
 			return err
