@@ -361,10 +361,11 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDVolumeSource
 			glog.V(4).Infof("rbd: create %s size %s format %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
 		}
 		args := []string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", p.rbdMounter.imageFormat}
-		if p.rbdMounter.imageFormat == rbdImageFormat2 && len(p.rbdMounter.imageFeatures) > 0 {
-			for _, f := range p.rbdMounter.imageFeatures {
-				args = append(args, "--image-feature", f)
-			}
+		if p.rbdMounter.imageFormat == rbdImageFormat2 {
+			// if no image features is provided, it results in empty string
+			// which disable all RBD image format 2 features as we expected
+			features := strings.Join(p.rbdMounter.imageFeatures, ",")
+			args = append(args, "--image-feature", features)
 		}
 		output, err = p.rbdMounter.plugin.execCommand("rbd", args)
 		if err == nil {

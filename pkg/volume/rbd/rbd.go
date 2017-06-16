@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -33,6 +34,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+)
+
+var (
+	supportedFeatures = sets.NewString("layering")
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -295,7 +300,11 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		case "imagefeatures":
 			arr := dstrings.Split(v, ",")
 			for _, f := range arr {
-				r.imageFeatures = append(r.imageFeatures, f)
+				if !supportedFeatures.Has(f) {
+					return nil, fmt.Errorf("invalid feature %q for volume plugin %s, supported features are: %v", f, r.plugin.GetPluginName(), supportedFeatures)
+				} else {
+					r.imageFeatures = append(r.imageFeatures, f)
+				}
 			}
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, r.plugin.GetPluginName())
