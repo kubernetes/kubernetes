@@ -1134,16 +1134,25 @@ func initializeServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		CertificateSigningRequestClient: certSigningRequestClient,
 		Template: &x509.CertificateRequest{
 			Subject: pkix.Name{
-				CommonName:   string(nodeName),
+				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
 				Organization: []string{"system:nodes"},
 			},
 			DNSNames:    hostnames,
 			IPAddresses: ips,
 		},
 		Usages: []certificates.KeyUsage{
+			// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+			//
+			// Digital signature allows the certificate to be used to verify
+			// digital signatures used during TLS negotiation.
+			certificates.UsageDigitalSignature,
+			// KeyEncipherment allows the cert/key pair to be used to encrypt
+			// keys, including the symetric keys negotiated during TLS setup
+			// and used for data transfer.
 			certificates.UsageKeyEncipherment,
+			// ServerAuth allows the cert to be used by a TLS server to
+			// authenticate itself to a TLS client.
 			certificates.UsageServerAuth,
-			certificates.UsageSigning,
 		},
 		CertificateStore: certificateStore,
 	})
