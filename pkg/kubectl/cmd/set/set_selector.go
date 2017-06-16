@@ -117,14 +117,20 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	o.mapper = mapper
 	o.encoder = f.JSONEncoder()
 
-	o.builder = f.NewBuilder().
+	o.builder = f.NewBuilder(!o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.fileOptions).
 		Flatten()
 
+	if !o.local {
+		o.builder = o.builder.
+			ResourceTypeOrNameArgs(o.all, o.resources...).
+			Latest()
+	}
+
 	o.PrintObject = func(obj runtime.Object) error {
-		return f.PrintObject(cmd, mapper, obj, o.out)
+		return f.PrintObject(cmd, o.local, mapper, obj, o.out)
 	}
 	o.ClientForMapping = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 		return f.ClientForMapping(mapping)
@@ -147,10 +153,6 @@ func (o *SelectorOptions) Validate() error {
 
 // RunSelector executes the command.
 func (o *SelectorOptions) RunSelector() error {
-	if !o.local {
-		o.builder = o.builder.ResourceTypeOrNameArgs(o.all, o.resources...).
-			Latest()
-	}
 	r := o.builder.Do()
 	err := r.Err()
 	if err != nil {

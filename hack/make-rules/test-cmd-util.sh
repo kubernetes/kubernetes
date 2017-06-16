@@ -1759,8 +1759,8 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" describe foos | grep listlabel=true
   kubectl "${kube_flags[@]}" describe foos | grep itemlabel=true
 
-  # Delete the resource
-  kubectl "${kube_flags[@]}" delete foos test
+  # Delete the resource with cascade.
+  kubectl "${kube_flags[@]}" delete foos test --cascade=true
 
   # Make sure it's gone
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -1797,8 +1797,8 @@ run_non_native_resource_tests() {
   kill -9 ${patch_pid}
   kube::test::if_has_string "${watch_output}" 'bars/test'
 
-  # Delete the resource
-  kubectl "${kube_flags[@]}" delete bars test
+  # Delete the resource without cascade.
+  kubectl "${kube_flags[@]}" delete bars test --cascade=false
 
   # Make sure it's gone
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -2017,6 +2017,24 @@ run_recursive_resources_tests() {
   # Post-condition: busybox0 & busybox1 PODs are updated, and since busybox2 is malformed, it should error
   kube::test::get_object_assert pods "{{range.items}}{{${labels_field}.status}}:{{end}}" 'replaced:replaced:'
   kube::test::if_has_string "${output_message}" 'error validating data: kind not set'
+
+
+  ### Convert deployment YAML file locally without affecting the live deployment.
+  # Pre-condition: no deployments exist
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  # Create a deployment (revision 1)
+  kubectl create -f hack/testdata/deployment-revision1.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
+  # Command
+  output_message=$(kubectl convert --local -f hack/testdata/deployment-revision1.yaml --output-version=apps/v1beta1 -o go-template='{{ .apiVersion }}' "${kube_flags[@]}")
+  echo $output_message
+  # Post-condition: apiVersion is still extensions/v1beta1 in the live deployment, but command output is the new value
+  kube::test::get_object_assert 'deployment nginx' "{{ .apiVersion }}" 'extensions/v1beta1'
+  kube::test::if_has_string "${output_message}" "apps/v1beta1"
+  # Clean up
+  kubectl delete deployment nginx "${kube_flags[@]}"
 
   ## Convert multiple busybox PODs recursively from directory of YAML files
   # Pre-condition: busybox0 & busybox1 PODs exist

@@ -33,6 +33,8 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/certificates/v1beta1:go_default_library",
         "//pkg/controller/certificates:go_default_library",
+        "//pkg/features:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 

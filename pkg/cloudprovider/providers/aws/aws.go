@@ -377,9 +377,7 @@ type Cloud struct {
 	// Note that we cache some state in awsInstance (mountpoints), so we must preserve the instance
 	selfAWSInstance *awsInstance
 
-	mutex                    sync.Mutex
-	lastNodeNames            sets.String
-	lastInstancesByNodeNames []*ec2.Instance
+	instanceCache instanceCache
 
 	// We keep an active list of devices we have assigned but not yet
 	// attached, to avoid a race condition where we assign a device mapping
@@ -862,6 +860,7 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		attaching:        make(map[types.NodeName]map[mountDevice]awsVolumeID),
 		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
 	}
+	awsCloud.instanceCache.cloud = awsCloud
 
 	if cfg.Global.VPC != "" && cfg.Global.SubnetID != "" && (cfg.Global.KubernetesClusterTag != "" || cfg.Global.KubernetesClusterID != "") {
 		// When the master is running on a different AWS account, cloud provider or on-premise
@@ -2556,14 +2555,6 @@ func buildListener(port v1.ServicePort, annotations map[string]string, sslPorts 
 	return listener, nil
 }
 
-func nodeNames(nodes []*v1.Node) sets.String {
-	ret := sets.String{}
-	for _, node := range nodes {
-		ret.Insert(node.Name)
-	}
-	return ret
-}
-
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
 func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	annotations := apiService.Annotations
@@ -2601,7 +2592,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for AWS ELB")
 	}
 
-	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes), "running")
+	instances, err := c.findInstancesForELB(nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -2955,7 +2946,7 @@ func (c *Cloud) getTaggedSecurityGroups() (map[string]*ec2.SecurityGroup, error)
 
 // Open security group ingress rules on the instances so that the load balancer can talk to them
 // Will also remove any security groups ingress rules for the load balancer that are _not_ needed for allInstances
-func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancerDescription, allInstances []*ec2.Instance) error {
+func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancerDescription, instances map[awsInstanceID]*ec2.Instance) error {
 	if c.cfg.Global.DisableSecurityGroupIngress {
 		return nil
 	}
@@ -3010,7 +3001,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 	instanceSecurityGroupIds := map[string]bool{}
 
 	// Scan instances for groups we want open
-	for _, instance := range allInstances {
+	for _, instance := range instances {
 		securityGroup, err := findSecurityGroupForInstance(instance, taggedSecurityGroups)
 		if err != nil {
 			return err
@@ -3188,7 +3179,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
 func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes), "running")
+	instances, err := c.findInstancesForELB(nodes)
 	if err != nil {
 		return err
 	}
@@ -3203,7 +3194,7 @@ func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, node
 		return fmt.Errorf("Load balancer not found")
 	}
 
-	err = c.ensureLoadBalancerInstances(orEmpty(lb.LoadBalancerName), lb.Instances, instances)
+	err = c.ensureLoadBalancerInstances(aws.StringValue(lb.LoadBalancerName), lb.Instances, instances)
 	if err != nil {
 		return nil
 	}
@@ -3260,37 +3251,6 @@ func (c *Cloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Instan
 	return instancesByID, nil
 }
 
-// Fetches and caches instances in the given state, by node names; returns an error if any cannot be found. If no states
-// are given, no state filter is used and instances of all states are fetched.
-// This is implemented with a multi value filter on the node names, fetching the desired instances with a single query.
-// TODO(therc): make all the caching more rational during the 1.4 timeframe
-func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String, states ...string) ([]*ec2.Instance, error) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	if nodeNames.Equal(c.lastNodeNames) {
-		if len(c.lastInstancesByNodeNames) > 0 {
-			// We assume that if the list of nodes is the same, the underlying
-			// instances have not changed. Later we might guard this with TTLs.
-			glog.V(2).Infof("Returning cached instances for %v", nodeNames)
-			return c.lastInstancesByNodeNames, nil
-		}
-	}
-	instances, err := c.getInstancesByNodeNames(nodeNames.List(), states...)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if len(instances) == 0 {
-		return nil, nil
-	}
-
-	glog.V(2).Infof("Caching instances for %v", nodeNames)
-	c.lastNodeNames = nodeNames
-	c.lastInstancesByNodeNames = instances
-	return instances, nil
-}
-
 func (c *Cloud) getInstancesByNodeNames(nodeNames []string, states ...string) ([]*ec2.Instance, error) {
 	names := aws.StringSlice(nodeNames)
 	ec2Instances := []*ec2.Instance{}
@@ -3328,6 +3288,7 @@ func (c *Cloud) getInstancesByNodeNames(nodeNames []string, states ...string) ([
 	return ec2Instances, nil
 }
 
+// TODO: Move to instanceCache
 func (c *Cloud) describeInstances(filters []*ec2.Filter) ([]*ec2.Instance, error) {
 	filters = c.tagging.addFilters(filters)
 	request := &ec2.DescribeInstancesInput{

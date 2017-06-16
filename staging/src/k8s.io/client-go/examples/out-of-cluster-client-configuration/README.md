@@ -1,7 +1,8 @@
 # Authenticating outside the cluster
 
-This example shows you how to authenticate to the Kubernetes API from an
-application running outside the Kubernetes cluster with client-go.
+This example shows you how to configure a client with client-go to authenticate
+to the Kubernetes API from an application running outside the Kubernetes
+cluster.
 
 You can use your kubeconfig file that contains the context information
 of your cluster to initialize a client. The kubeconfig file is also used
@@ -14,7 +15,7 @@ Make sure your `kubectl` is configured and pointed to a cluster. Run
 
 Run this application with:
 
-    cd out-of-cluster
+    cd out-of-cluster-client-configuration
     go build -o app .
     ./app
 

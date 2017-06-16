@@ -350,8 +350,8 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		increasedSize := 0
 		newSizes := make(map[string]int)
 		for key, val := range originalSizes {
-			newSizes[key] = val + 2
-			increasedSize += val + 2
+			newSizes[key] = val + 2 + unready
+			increasedSize += val + 2 + unready
 		}
 		setMigSizes(newSizes)
 		framework.ExpectNoError(WaitForClusterSizeFuncWithUnready(f.ClientSet,

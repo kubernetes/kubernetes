@@ -54,7 +54,7 @@ type ImageOptions struct {
 	Cmd          *cobra.Command
 	ResolveImage func(in string) (string, error)
 
-	PrintObject            func(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
 	Resources              []string
 	ContainerImages        map[string]string
@@ -137,7 +137,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return err
 	}
 
-	builder := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	builder := f.NewBuilder(!o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -227,7 +227,7 @@ func (o *ImageOptions) Run() error {
 		}
 
 		if o.PrintObject != nil && (o.Local || o.DryRun) {
-			return o.PrintObject(o.Cmd, o.Mapper, info.Object, o.Out)
+			return o.PrintObject(o.Cmd, o.Local, o.Mapper, info.Object, o.Out)
 		}
 
 		// patch the change
@@ -250,7 +250,7 @@ func (o *ImageOptions) Run() error {
 		info.Refresh(obj, true)
 
 		if len(o.Output) > 0 {
-			return o.PrintObject(o.Cmd, o.Mapper, obj, o.Out)
+			return o.PrintObject(o.Cmd, o.Local, o.Mapper, obj, o.Out)
 		}
 		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "image updated")
 	}
