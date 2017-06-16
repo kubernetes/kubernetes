@@ -46,7 +46,8 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		nil, /* cloud */
 		nil, /* plugins */
 		false,
-		time.Second*5)
+		5*time.Second,
+		DefaultTimerConfig)
 
 	// Assert
 	if err != nil {
@@ -212,7 +213,8 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		nil, /* cloud */
 		plugins,
 		false,
-		time.Second*1)
+		1*time.Second,
+		DefaultTimerConfig)
 
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)

@@ -82,7 +82,6 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer closeFn()
 	namespaceName := "test-pod-deletion"
-
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-sandbox",
@@ -283,7 +282,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 // running the RC manager to prevent the rc manager from creating new pods
 // rather than adopting the existing ones.
 func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podNum int) {
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) == podNum {
 			return true, nil
@@ -347,6 +346,12 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	plugins := []volume.VolumePlugin{plugin}
 	cloud := &fakecloud.FakeCloud{}
 	informers := informers.NewSharedInformerFactory(testClient, resyncPeriod)
+	timers := attachdetach.TimerConfig{
+		ReconcilerLoopPeriod:                              100 * time.Millisecond,
+		ReconcilerMaxWaitForUnmountDuration:               6 * time.Second,
+		DesiredStateOfWorldPopulatorLoopSleepPeriod:       1 * time.Second,
+		DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Second,
+	}
 	ctrl, err := attachdetach.NewAttachDetachController(
 		testClient,
 		informers.Core().V1().Pods(),
@@ -356,7 +361,8 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		cloud,
 		plugins,
 		false,
-		time.Second*5)
+		5*time.Second,
+		timers)
 
 	if err != nil {
 		t.Fatalf("Error creating AttachDetach : %v", err)
