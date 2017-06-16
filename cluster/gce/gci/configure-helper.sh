@@ -1374,6 +1374,12 @@ function start-kube-apiserver {
     container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
   fi
 
+  if [[ -n "${ENCRYPTION_PROVIDER_CONFIG:-}" ]]; then
+    local encryption_provider_config_path="/etc/srv/kubernetes/encryption-provider-config.yml"
+    echo "${ENCRYPTION_PROVIDER_CONFIG}" | base64 --decode > "${encryption_provider_config_path}"
+    params+=" --experimental-encryption-provider-config=${encryption_provider_config_path}"
+  fi
+
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.
@@ -1660,7 +1666,7 @@ function start-kube-addons {
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
 
-    # Configure Calico based on cluster size and image type. 
+    # Configure Calico based on cluster size and image type.
     local -r ds_file="${dst_dir}/calico-policy-controller/calico-node-daemonset.yaml"
     local -r typha_dep_file="${dst_dir}/calico-policy-controller/typha-deployment.yaml"
     sed -i -e "s@__CALICO_CNI_DIR__@/home/kubernetes/bin@g" "${ds_file}"
