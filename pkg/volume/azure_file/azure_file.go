@@ -19,15 +19,16 @@ package azure_file
 import (
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -104,6 +105,13 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 	if err != nil {
 		return nil, err
 	}
+	nameSpace := pod.Namespace
+	if spec.PersistentVolume != nil {
+		ns, err := getSecretNamespace(plugin.host.GetKubeClient(), spec.PersistentVolume)
+		if err == nil {
+			nameSpace = ns
+		}
+	}
 
 	return &azureFileMounter{
 		azureFile: &azureFile{
@@ -113,11 +121,12 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(pod.UID, spec.Name(), plugin.host)),
 		},
-		util:         util,
-		secretName:   source.SecretName,
-		shareName:    source.ShareName,
-		readOnly:     readOnly,
-		mountOptions: volume.MountOptionFromSpec(spec),
+		util:            util,
+		secretNamespace: nameSpace,
+		secretName:      source.SecretName,
+		shareName:       source.ShareName,
+		readOnly:        readOnly,
+		mountOptions:    volume.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -164,11 +173,12 @@ func (azureFileVolume *azureFile) GetPath() string {
 
 type azureFileMounter struct {
 	*azureFile
-	util         azureUtil
-	secretName   string
-	shareName    string
-	readOnly     bool
-	mountOptions []string
+	util            azureUtil
+	secretNamespace string
+	secretName      string
+	shareName       string
+	readOnly        bool
+	mountOptions    []string
 }
 
 var _ volume.Mounter = &azureFileMounter{}
@@ -203,7 +213,7 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error
 		return nil
 	}
 	var accountKey, accountName string
-	if accountName, accountKey, err = b.util.GetAzureCredentials(b.plugin.host, b.pod.Namespace, b.secretName); err != nil {
+	if accountName, accountKey, err = b.util.GetAzureCredentials(b.plugin.host, b.secretNamespace, b.secretName); err != nil {
 		return err
 	}
 	os.MkdirAll(dir, 0750)
@@ -267,4 +277,18 @@ func getVolumeSource(
 	}
 
 	return nil, false, fmt.Errorf("Spec does not reference an AzureFile volume type")
+}
+
+func getSecretNamespace(kubeClient clientset.Interface, pv *v1.PersistentVolume) (string, error) {
+	class, err := util.GetClassForVolume(kubeClient, pv)
+	if err != nil {
+		return "", err
+	}
+	for k, v := range class.Parameters {
+		switch strings.ToLower(k) {
+		case "secretnamespace":
+			return v, nil
+		}
+	}
+	return "", fmt.Errorf("no namespace parameter defined")
 }
