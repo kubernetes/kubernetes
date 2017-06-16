@@ -295,7 +295,6 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 			return fmt.Errorf("Failed to create load balancer for service %s: %v", key, err), retryable
 		}
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "CreatedLoadBalancer", "Created load balancer")
-		s.endpoints[service.ObjectMeta.Name] = s.getNumberOfEndpoints(service)
 	}
 
 	// Write the state if changed
