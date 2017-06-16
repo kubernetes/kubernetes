@@ -18,15 +18,20 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -73,6 +78,7 @@ const (
 type LogsOptions struct {
 	Namespace   string
 	ResourceArg string
+	Selector    string
 	Options     runtime.Object
 
 	Mapper       meta.RESTMapper
@@ -80,9 +86,10 @@ type LogsOptions struct {
 	ClientMapper resource.ClientMapper
 	Decoder      runtime.Decoder
 
-	Object        runtime.Object
-	GetPodTimeout time.Duration
-	LogsForObject func(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
+	Object          runtime.Object
+	GetPodTimeout   time.Duration
+	LogsForObject   func(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
+	PrefixMatchList []string
 
 	Out io.Writer
 }
@@ -103,7 +110,7 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, out, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.RunLogs())
+			cmdutil.CheckErr(o.RunLogs(out, args))
 		},
 		Aliases: []string{"log"},
 	}
@@ -125,15 +132,15 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	containerName := cmdutil.GetFlagString(cmd, "container")
-	selector := cmdutil.GetFlagString(cmd, "selector")
+	o.Selector = cmdutil.GetFlagString(cmd, "selector")
 	switch len(args) {
 	case 0:
-		if len(selector) == 0 {
+		if len(o.Selector) == 0 {
 			return cmdutil.UsageError(cmd, logsUsageStr)
 		}
 	case 1:
 		o.ResourceArg = args[0]
-		if len(selector) != 0 {
+		if len(o.Selector) != 0 {
 			return cmdutil.UsageError(cmd, "only a selector (-l) or a POD name is allowed")
 		}
 	case 2:
@@ -184,7 +191,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	o.ClientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	o.Out = out
 
-	if len(selector) != 0 {
+	if len(o.Selector) != 0 {
 		if logOptions.Follow {
 			return cmdutil.UsageError(cmd, "only one of follow (-f) or selector (-l) is allowed")
 		}
@@ -196,29 +203,75 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 		}
 	}
 
-	mapper, typer := f.Object()
-	decoder := f.Decoder(true)
+	o.Mapper, o.Typer = f.Object()
+	o.Decoder = f.Decoder(true)
 	if o.Object == nil {
-		builder := resource.NewBuilder(mapper, f.CategoryExpander(), typer, o.ClientMapper, decoder).
+		builder := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, o.ClientMapper, o.Decoder).
 			NamespaceParam(o.Namespace).DefaultNamespace().
 			SingleResourceType()
 		if o.ResourceArg != "" {
 			builder.ResourceNames("pods", o.ResourceArg)
 		}
-		if selector != "" {
-			builder.ResourceTypes("pods").SelectorParam(selector)
+		if o.Selector != "" {
+			builder.ResourceTypes("pods").SelectorParam(o.Selector)
 		}
 		infos, err := builder.Do().Infos()
+		// if name not found use prefix match
+		aggErrs := []error{}
 		if err != nil {
-			return err
+			aggErrs = append(aggErrs, err)
+			if apierrors.IsNotFound(err) && o.ResourceArg != "" {
+				o.Object, o.PrefixMatchList, err = o.prefixMatchResourceList(builder, simpleTrimResourceTypeName(o.ResourceArg), err)
+				if err != nil {
+					aggErrs = append(aggErrs, err)
+					return utilerrors.NewAggregate(aggErrs)
+				}
+				if len(o.PrefixMatchList) > 0 {
+					return nil
+				}
+			}
 		}
-		if selector == "" && len(infos) != 1 {
+		if o.Selector == "" && len(infos) != 1 {
 			return errors.New("expected a resource")
 		}
-		o.Object = infos[0].Object
+
+		if o.Object == nil {
+			o.Object = infos[0].Object
+		}
+	}
+	return nil
+}
+
+func simpleTrimResourceTypeName(s string) string {
+	if strings.Contains(s, "/") {
+		seg := strings.Split(s, "/")
+		return seg[0]
+	}
+	//if no slash found, return default resource
+	return "pods"
+}
+
+func (o LogsOptions) prefixMatchResourceList(builder *resource.Builder, resourceType string, originalError error) (runtime.Object, []string, error) {
+	infos, err := builder.ResourceTypeOrNameArgs(true, resourceType).
+		Flatten().Do().Infos()
+	if err != nil {
+		return nil, nil, err
+	}
+	//match pods using prefix
+	prefixTimes := 0
+	for i, info := range infos {
+		if strings.HasPrefix(info.Name, o.ResourceArg) {
+			o.PrefixMatchList = append(o.PrefixMatchList, info.Name)
+			o.Object = infos[i].Object
+			prefixTimes++
+		}
 	}
 
-	return nil
+	if prefixTimes == 0 {
+		return nil, nil, originalError
+	}
+
+	return o.Object, o.PrefixMatchList, nil
 }
 
 func (o LogsOptions) Validate() error {
@@ -234,18 +287,37 @@ func (o LogsOptions) Validate() error {
 }
 
 // RunLogs retrieves a pod log
-func (o LogsOptions) RunLogs() error {
-	switch t := o.Object.(type) {
-	case *api.PodList:
-		for _, p := range t.Items {
-			if err := o.getLogs(&p); err != nil {
-				return err
+func (o LogsOptions) RunLogs(out io.Writer, args []string) error {
+	if matchLen := len(o.PrefixMatchList); matchLen > 1 {
+		if matchLen > 5 {
+			o.PrefixMatchList = o.PrefixMatchList[:5]
+		}
+		first := true
+		fmt.Fprintf(out, "No resource named %s, did you mean? ", args[0])
+		for i := range o.PrefixMatchList {
+			if first {
+				fmt.Fprintf(out, "%s", o.PrefixMatchList[i])
+				first = false
+			} else {
+				fmt.Fprintf(out, ", %s", o.PrefixMatchList[i])
 			}
 		}
-		return nil
-	default:
-		return o.getLogs(o.Object)
+		fmt.Fprintf(out, "\n")
+	} else {
+		switch t := o.Object.(type) {
+		case *api.PodList:
+			for _, p := range t.Items {
+				if err := o.getLogs(&p); err != nil {
+					return err
+				}
+			}
+			return nil
+		default:
+			return o.getLogs(o.Object)
+		}
 	}
+
+	return nil
 }
 
 func (o LogsOptions) getLogs(obj runtime.Object) error {
@@ -253,7 +325,6 @@ func (o LogsOptions) getLogs(obj runtime.Object) error {
 	if err != nil {
 		return err
 	}
-
 	readCloser, err := req.Stream()
 	if err != nil {
 		return err
