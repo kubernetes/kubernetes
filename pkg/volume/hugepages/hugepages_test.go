@@ -84,6 +84,7 @@ func TestHugePagesPlugin_CanSupport(t *testing.T) {
 				return []byte("HugePages_Total: 10"), nil
 			}
 			return []byte("HugePages_Total: 0"), nil
+
 		}
 		canSupport := plug.CanSupport(&volume.Spec{Volume: testCase.volumeSpec})
 		assert.Equal(t, testCase.expectedResult, canSupport)
@@ -92,32 +93,32 @@ func TestHugePagesPlugin_CanSupport(t *testing.T) {
 
 func TestDetectHugePages(t *testing.T) {
 	testCases := []struct {
-		expectedOutput  int
+		expectedOutput  error
 		input           string
 		isInputReadable bool
 	}{
 		{
-			expectedOutput:  -1,
+			expectedOutput:  fmt.Errorf("error has occurred"),
 			input:           "",
 			isInputReadable: false,
 		},
 		{
-			expectedOutput:  -1,
+			expectedOutput:  fmt.Errorf("Cannot parse /proc/meminfo"),
 			input:           "HugePages_Total",
 			isInputReadable: true,
 		},
 		{
-			expectedOutput:  -1,
+			expectedOutput:  fmt.Errorf("Cannot parse huge pages value"),
 			input:           "HugePages_Total: xyz",
 			isInputReadable: true,
 		},
 		{
-			expectedOutput:  -1,
+			expectedOutput:  fmt.Errorf("No huge pages was detected"),
 			input:           "",
 			isInputReadable: true,
 		},
 		{
-			expectedOutput:  512,
+			expectedOutput:  nil,
 			input:           "HugePages_Total: 512",
 			isInputReadable: true,
 		},
@@ -125,7 +126,7 @@ func TestDetectHugePages(t *testing.T) {
 	for _, testCase := range testCases {
 		readFile = func(string) ([]byte, error) {
 			if !testCase.isInputReadable {
-				return []byte(""), fmt.Errorf("error has been occurred")
+				return []byte(""), fmt.Errorf("error has occurred")
 			}
 			return []byte(testCase.input), nil
 		}
