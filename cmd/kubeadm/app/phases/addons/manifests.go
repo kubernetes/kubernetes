@@ -72,6 +72,8 @@ spec:
         - /usr/local/bin/kube-proxy
         - --kubeconfig=/var/lib/kube-proxy/kubeconfig.conf
         {{ .ClusterCIDR }}
+        securityContext:
+          privileged: true
         volumeMounts:
         - mountPath: /var/lib/kube-proxy
           name: kube-proxy
@@ -79,8 +81,6 @@ spec:
         - mountPath: /run/xtables.lock
           name: xtables-lock
           readOnly: false
-      securityContext:
-        privileged: true
       hostNetwork: true
       serviceAccountName: kube-proxy
       # TODO: Why doesn't the Decoder recognize this new field and decode it properly? Right now it's ignored

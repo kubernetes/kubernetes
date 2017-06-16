@@ -339,6 +339,9 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 	}
 	portMappingsParam := make([]cniPortMapping, 0, len(portMappings))
 	for _, p := range portMappings {
+		if p.HostPort <= 0 {
+			continue
+		}
 		portMappingsParam = append(portMappingsParam, cniPortMapping{
 			HostPort:      p.HostPort,
 			ContainerPort: p.ContainerPort,

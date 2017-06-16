@@ -64,6 +64,10 @@ function get-calico-typha-replicas {
   if [[ "${NUM_NODES}" -gt "500" ]]; then
     typha_count=5
   fi
+  if [[ "${NETWORK_POLICY_PROVIDER:-}" != "calico" ]]; then
+    # We're not configured to use Calico, so don't start any Typhas.
+    typha_count=0
+  fi
   echo "${typha_count}"
 }
 
@@ -509,7 +513,7 @@ rules:
     # Ingress controller reads `configmaps/ingress-uid` through the unsecured port.
     # TODO(#46983): Change this to the ingress controller service account.
     users: ["system:unsecured"]
-    namespaces: ["kube-sytem"]
+    namespaces: ["kube-system"]
     verbs: ["get"]
     resources:
       - group: "" # core
@@ -521,7 +525,7 @@ rules:
       - group: "" # core
         resources: ["nodes"]
   - level: None
-    groups: ["system:nodes"]
+    userGroups: ["system:nodes"]
     verbs: ["get"]
     resources:
       - group: "" # core
@@ -532,7 +536,7 @@ rules:
       - system:kube-scheduler
       - system:serviceaccount:kube-system:endpoint-controller
     verbs: ["get", "update"]
-    namespaces: ["kube-sytem"]
+    namespaces: ["kube-system"]
     resources:
       - group: "" # core
         resources: ["endpoints"]
@@ -910,6 +914,10 @@ function start-kubelet {
   fi
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
     flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
+  fi
+  # FlexVolume plugin
+  if [[ -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
+    flags+=" --volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
   fi
   if [[ "${ENABLE_MANIFEST_URL:-}" == "true" ]]; then
     flags+=" --manifest-url=${MANIFEST_URL}"
@@ -1374,6 +1382,12 @@ function start-kube-apiserver {
     container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
   fi
 
+  if [[ -n "${ENCRYPTION_PROVIDER_CONFIG:-}" ]]; then
+    local encryption_provider_config_path="/etc/srv/kubernetes/encryption-provider-config.yml"
+    echo "${ENCRYPTION_PROVIDER_CONFIG}" | base64 --decode > "${encryption_provider_config_path}"
+    params+=" --experimental-encryption-provider-config=${encryption_provider_config_path}"
+  fi
+
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.
@@ -1660,7 +1674,7 @@ function start-kube-addons {
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
 
-    # Configure Calico based on cluster size and image type. 
+    # Configure Calico based on cluster size and image type.
     local -r ds_file="${dst_dir}/calico-policy-controller/calico-node-daemonset.yaml"
     local -r typha_dep_file="${dst_dir}/calico-policy-controller/typha-deployment.yaml"
     sed -i -e "s@__CALICO_CNI_DIR__@/home/kubernetes/bin@g" "${ds_file}"

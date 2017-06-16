@@ -59,11 +59,13 @@ var _ = framework.KubeDescribe("Networking", func() {
 			{path: "/healthz"},
 			{path: "/api"},
 			{path: "/apis"},
-			{path: "/logs"},
 			{path: "/metrics"},
 			{path: "/swaggerapi"},
 			{path: "/version"},
 			// TODO: test proxy links here
+		}
+		if !framework.ProviderIs("gke") {
+			tests = append(tests, struct{ path string }{path: "/logs"})
 		}
 		for _, test := range tests {
 			By(fmt.Sprintf("testing: %s", test.path))

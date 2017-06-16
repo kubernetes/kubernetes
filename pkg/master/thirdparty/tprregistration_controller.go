@@ -255,9 +255,10 @@ func (c *tprRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 	c.apiServiceRegistration.AddAPIServiceToSync(&apiregistration.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: apiServiceName},
 		Spec: apiregistration.APIServiceSpec{
-			Group:    groupVersion.Group,
-			Version:  groupVersion.Version,
-			Priority: 500, // TPRs should have relatively low priority
+			Group:                groupVersion.Group,
+			Version:              groupVersion.Version,
+			GroupPriorityMinimum: 1000, // TPRs should have relatively low priority
+			VersionPriority:      100,  // TPRs should have relatively low priority
 		},
 	})
 

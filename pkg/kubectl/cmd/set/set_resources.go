@@ -81,7 +81,7 @@ type ResourcesOptions struct {
 	Requests             string
 	ResourceRequirements api.ResourceRequirements
 
-	PrintObject            func(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
 	Resources              []string
 }
@@ -141,12 +141,13 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		return err
 	}
 
-	builder := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	builder := f.NewBuilder(!o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		//FilenameParam(enforceNamespace, o.Filenames...).
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		Flatten()
+
 	if !o.Local {
 		builder = builder.
 			SelectorParam(o.Selector).
@@ -223,7 +224,7 @@ func (o *ResourcesOptions) Run() error {
 		}
 
 		if o.Local || cmdutil.GetDryRunFlag(o.Cmd) {
-			return o.PrintObject(o.Cmd, o.Mapper, info.Object, o.Out)
+			return o.PrintObject(o.Cmd, o.Local, o.Mapper, info.Object, o.Out)
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)

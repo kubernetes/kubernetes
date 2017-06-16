@@ -528,6 +528,12 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 		}
 
 		return nil
+	case *metav1.WatchEvent:
+		// This is the same as the InternalEvent case above, except the caller
+		// already did the conversion for us (see #44350).
+		// In theory, we probably don't need the InternalEvent case anymore,
+		// but the test coverage for TPR is too low to risk removing it.
+		return json.NewEncoder(stream).Encode(obj)
 	case *metav1.Status, *metav1.APIResourceList:
 		return t.delegate.Encode(obj, stream)
 	default:

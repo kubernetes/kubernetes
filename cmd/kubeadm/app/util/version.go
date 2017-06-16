@@ -22,6 +22,9 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 var (
@@ -68,4 +71,13 @@ func KubernetesReleaseVersion(version string) (string, error) {
 		return KubernetesReleaseVersion(strings.Trim(string(body), " \t\n"))
 	}
 	return "", fmt.Errorf("version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
+}
+
+// IsNodeAuthorizerSupported returns true if the provided version of kubernetes is able to use the Node Authorizer feature.
+// There is a really nasty problem with the branching here and the timing of this feature implementation. When the release-1.7 branch was
+// cut, two new tags were made: v1.7.0-beta.0 and v1.8.0-alpha.0. The Node Authorizer feature merged _after those cuts_. This means the minimum
+// version we have to use is v1.7.0-beta.1. BUT since v1.8.0-alpha.0 sorts higher than v1.7.0-beta.1 (the actual version gate), we have to manually
+// exclude v1.8.0-alpha.0 from this condition. v1.8.0-alpha.1 will indeed contain the patch.
+func IsNodeAuthorizerSupported(k8sVersion *version.Version) bool {
+	return k8sVersion.AtLeast(kubeadmconstants.MinimumNodeAuthorizerVersion) && k8sVersion.String() != "1.8.0-alpha.0"
 }

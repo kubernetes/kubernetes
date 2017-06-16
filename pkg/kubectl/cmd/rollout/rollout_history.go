@@ -74,14 +74,12 @@ func RunHistory(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 		return fmt.Errorf("revision must be a positive integer: %v", revision)
 	}
 
-	mapper, typer := f.Object()
-
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := f.NewBuilder(true).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
 		ResourceTypeOrNameArgs(true, args...).

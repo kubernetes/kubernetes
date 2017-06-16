@@ -104,6 +104,9 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
+	// To help debugging, immediately log version
+	glog.Infof("Version: %+v", version.Get())
+
 	nodeTunneler, proxyTransport, err := CreateNodeDialer(runOptions)
 	if err != nil {
 		return err

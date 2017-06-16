@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
@@ -48,10 +49,19 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	return f
 }
 
-func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
-	mapper, typer, err := f.objectMappingFactory.UnstructuredObject()
-	if err != nil {
-		return nil, err
+func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+	var mapper meta.RESTMapper
+	var typer runtime.ObjectTyper
+	var err error
+
+	if isLocal {
+		mapper = api.Registry.RESTMapper()
+		typer = api.Scheme
+	} else {
+		mapper, typer, err = f.objectMappingFactory.UnstructuredObject()
+		if err != nil {
+			return nil, err
+		}
 	}
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
@@ -59,7 +69,7 @@ func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, outputOpts *printer
 	return PrinterForCommand(cmd, outputOpts, mapper, typer, encoder, decoders, options)
 }
 
-func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
+func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
 	// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
 	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
 	if err != nil {
@@ -76,7 +86,7 @@ func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, outputOpts *printer
 		ColumnLabels:       columnLabel,
 	}
 
-	printer, err := f.PrinterForCommand(cmd, outputOpts, options)
+	printer, err := f.PrinterForCommand(cmd, isLocal, outputOpts, options)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +118,7 @@ func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, outputOpts *printer
 	return printer, nil
 }
 
-func (f *ring2Factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
+func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
 	// try to get a typed object
 	_, typer := f.objectMappingFactory.Object()
 	gvks, _, err := typer.ObjectKinds(obj)
@@ -132,18 +142,46 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, o
 		return err
 	}
 
-	printer, err := f.PrinterForMapping(cmd, nil, mapping, false)
+	printer, err := f.PrinterForMapping(cmd, isLocal, nil, mapping, false)
 	if err != nil {
 		return err
 	}
 	return printer.PrintObj(obj, out)
 }
 
-func (f *ring2Factory) NewBuilder() *resource.Builder {
+// NewBuilder returns a new resource builder.
+// Receives a bool flag and avoids remote calls if set to false
+func (f *ring2Factory) NewBuilder(allowRemoteCalls bool) *resource.Builder {
+	var clientMapper resource.ClientMapper
+	clientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping)
+
 	mapper, typer := f.objectMappingFactory.Object()
 	categoryExpander := f.objectMappingFactory.CategoryExpander()
 
-	return resource.NewBuilder(mapper, categoryExpander, typer, resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping), f.clientAccessFactory.Decoder(true))
+	if allowRemoteCalls {
+		clientMapper = clientMapperFunc
+	} else {
+		clientMapper = resource.DisabledClientForMapping{ClientMapper: clientMapperFunc}
+	}
+
+	return resource.NewBuilder(mapper, categoryExpander, typer, clientMapper, f.clientAccessFactory.Decoder(true))
+}
+
+func (f *ring2Factory) NewUnstructuredBuilder(allowRemoteCalls bool) (*resource.Builder, error) {
+	if !allowRemoteCalls {
+		return f.NewBuilder(allowRemoteCalls), nil
+	}
+
+	clientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.UnstructuredClientForMapping)
+
+	mapper, typer, err := f.objectMappingFactory.UnstructuredObject()
+	if err != nil {
+		return nil, err
+	}
+
+	categoryExpander := f.objectMappingFactory.CategoryExpander()
+	return resource.NewBuilder(mapper, categoryExpander, typer, clientMapperFunc, unstructured.UnstructuredJSONScheme), nil
+
 }
 
 // PluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.

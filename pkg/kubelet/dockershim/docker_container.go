@@ -233,6 +233,7 @@ func (ds *dockerService) removeContainerLogSymlink(containerID string) error {
 func (ds *dockerService) StartContainer(containerID string) error {
 	err := ds.client.StartContainer(containerID)
 	if err != nil {
+		err = transformStartContainerError(err)
 		return fmt.Errorf("failed to start container %q: %v", containerID, err)
 	}
 	// Create container log symlink.

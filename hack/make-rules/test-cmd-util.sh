@@ -1759,8 +1759,8 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" describe foos | grep listlabel=true
   kubectl "${kube_flags[@]}" describe foos | grep itemlabel=true
 
-  # Delete the resource
-  kubectl "${kube_flags[@]}" delete foos test
+  # Delete the resource with cascade.
+  kubectl "${kube_flags[@]}" delete foos test --cascade=true
 
   # Make sure it's gone
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -1771,8 +1771,34 @@ run_non_native_resource_tests() {
   # Test that we can list this new third party resource
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test:'
 
-  # Delete the resource
-  kubectl "${kube_flags[@]}" delete bars test
+  # Test that we can watch the resource.
+  # Start watcher in background with process substitution,
+  # so we can read from stdout asynchronously.
+  kube::log::status "Testing ThirdPartyResource watching"
+  exec 3< <(kubectl "${kube_flags[@]}" get bars --request-timeout=1m --watch-only -o name & echo $! ; wait)
+  local watch_pid
+  read <&3 watch_pid
+
+  # We can't be sure when the watch gets established,
+  # so keep triggering events (in the background) until something comes through.
+  local tries=0
+  while [ ${tries} -lt 10 ]; do
+    tries=$((tries+1))
+    kubectl "${kube_flags[@]}" patch bars/test -p "{\"patched\":\"${tries}\"}" --type=merge
+    sleep 1
+  done &
+  local patch_pid=$!
+
+  # Wait up to 30s for a complete line of output.
+  local watch_output
+  read <&3 -t 30 watch_output
+  # Stop the watcher and the patch loop.
+  kill -9 ${watch_pid}
+  kill -9 ${patch_pid}
+  kube::test::if_has_string "${watch_output}" 'bars/test'
+
+  # Delete the resource without cascade.
+  kubectl "${kube_flags[@]}" delete bars test --cascade=false
 
   # Make sure it's gone
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -1991,6 +2017,24 @@ run_recursive_resources_tests() {
   # Post-condition: busybox0 & busybox1 PODs are updated, and since busybox2 is malformed, it should error
   kube::test::get_object_assert pods "{{range.items}}{{${labels_field}.status}}:{{end}}" 'replaced:replaced:'
   kube::test::if_has_string "${output_message}" 'error validating data: kind not set'
+
+
+  ### Convert deployment YAML file locally without affecting the live deployment.
+  # Pre-condition: no deployments exist
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  # Create a deployment (revision 1)
+  kubectl create -f hack/testdata/deployment-revision1.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
+  # Command
+  output_message=$(kubectl convert --local -f hack/testdata/deployment-revision1.yaml --output-version=apps/v1beta1 -o go-template='{{ .apiVersion }}' "${kube_flags[@]}")
+  echo $output_message
+  # Post-condition: apiVersion is still extensions/v1beta1 in the live deployment, but command output is the new value
+  kube::test::get_object_assert 'deployment nginx' "{{ .apiVersion }}" 'extensions/v1beta1'
+  kube::test::if_has_string "${output_message}" "apps/v1beta1"
+  # Clean up
+  kubectl delete deployment nginx "${kube_flags[@]}"
 
   ## Convert multiple busybox PODs recursively from directory of YAML files
   # Pre-condition: busybox0 & busybox1 PODs exist

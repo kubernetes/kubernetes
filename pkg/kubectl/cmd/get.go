@@ -168,10 +168,11 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
-	mapper, typer, err := f.UnstructuredObject()
+	builder, err := f.NewUnstructuredBuilder(true)
 	if err != nil {
 		return err
 	}
+
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -201,7 +202,12 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
-		r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+		builder, err := f.NewUnstructuredBuilder(true)
+		if err != nil {
+			return err
+		}
+
+		r := builder.
 			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 			FilenameParam(enforceNamespace, &options.FilenameOptions).
 			SelectorParam(selector).
@@ -210,7 +216,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			SingleResourceType().
 			Latest().
 			Do()
-		err := r.Err()
+		err = r.Err()
 		if err != nil {
 			return err
 		}
@@ -226,7 +232,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()
-		printer, err := f.PrinterForMapping(cmd, nil, mapping, allNamespaces)
+		printer, err := f.PrinterForMapping(cmd, false, nil, mapping, allNamespaces)
 		if err != nil {
 			return err
 		}
@@ -291,7 +297,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return nil
 	}
 
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := builder.
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
 		SelectorParam(selector).
@@ -306,7 +312,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return err
 	}
 
-	printer, err := f.PrinterForCommand(cmd, nil, printers.PrintOptions{})
+	printer, err := f.PrinterForCommand(cmd, false, nil, printers.PrintOptions{})
 	if err != nil {
 		return err
 	}
@@ -455,7 +461,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				outputOpts, _ = outputOptsForMappingFromOpenAPI(f, cmdutil.GetOpenAPICacheDir(cmd), mapping)
 			}
 
-			printer, err = f.PrinterForMapping(cmd, outputOpts, mapping, allNamespaces)
+			printer, err = f.PrinterForMapping(cmd, false, outputOpts, mapping, allNamespaces)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
