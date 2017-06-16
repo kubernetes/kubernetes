@@ -138,7 +138,7 @@ type ResourceMetricSource struct {
 	// the requested value of the resource for the pods.
 	// +optional
 	TargetAverageUtilization *int32 `json:"targetAverageUtilization,omitempty" protobuf:"varint,2,opt,name=targetAverageUtilization"`
-	// targetAverageValue is the the target value of the average of the
+	// targetAverageValue is the target value of the average of the
 	// resource metric across all relevant pods, as a raw value (instead of as
 	// a percentage of the request), similar to the "pods" metric source type.
 	// +optional
@@ -268,7 +268,7 @@ type ResourceMetricStatus struct {
 	// specification.
 	// +optional
 	CurrentAverageUtilization *int32 `json:"currentAverageUtilization,omitempty" protobuf:"bytes,2,opt,name=currentAverageUtilization"`
-	// currentAverageValue is the the current value of the average of the
+	// currentAverageValue is the current value of the average of the
 	// resource metric across all relevant pods, as a raw value (instead of as
 	// a percentage of the request), similar to the "pods" metric source type.
 	// It will always be set, regardless of the corresponding metric specification.

@@ -387,14 +387,14 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 			Version:      groupVersion.Version,
 		})
 	}
-	preferedVersionForDiscovery := metav1.GroupVersionForDiscovery{
+	preferredVersionForDiscovery := metav1.GroupVersionForDiscovery{
 		GroupVersion: apiGroupInfo.GroupMeta.GroupVersion.String(),
 		Version:      apiGroupInfo.GroupMeta.GroupVersion.Version,
 	}
 	apiGroup := metav1.APIGroup{
 		Name:             apiGroupInfo.GroupMeta.GroupVersion.Group,
 		Versions:         apiVersionsForDiscovery,
-		PreferredVersion: preferedVersionForDiscovery,
+		PreferredVersion: preferredVersionForDiscovery,
 	}
 
 	s.DiscoveryGroupManager.AddGroup(apiGroup)
