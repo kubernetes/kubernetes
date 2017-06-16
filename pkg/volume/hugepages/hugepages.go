@@ -53,21 +53,19 @@ func (plugin *hugePagesPlugin) GetPluginName() string {
 }
 
 func (plugin *hugePagesPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _ := getVolumeSource(spec)
-	if volumeSource == nil {
+	if volumeSource, _ := getVolumeSource(spec); volumeSource == nil {
 		return "", fmt.Errorf("Spec does not reference a HugePages volume type")
 	}
-
-	// Return user defined volume name, since this is an ephemeral volume type
+	// Return user defined volume name
 	return spec.Name(), nil
 }
 
 var readFile = ioutil.ReadFile
 
-func detectHugepages() int {
+func detectHugepages() error {
 	data, err := readFile("/proc/meminfo")
 	if err != nil {
-		return -1
+		return err
 	}
 
 	for _, line := range strings.Split(string(data), "\n") {
@@ -75,20 +73,23 @@ func detectHugepages() int {
 			// line is representing key-value data in following form 'key: value'
 			lineSplitted := strings.Split(line, ":")
 			if len(lineSplitted) != 2 {
-				return -1
+				return fmt.Errorf("Cannot parse /proc/meminfo")
 			}
 			value, err := strconv.Atoi(strings.TrimSpace(lineSplitted[1]))
 			if err != nil {
-				return -1
+				return fmt.Errorf("Cannot parse huge pages value")
 			}
-			return value
+			if value <= 0 {
+				return fmt.Errorf("No huge pages was detected")
+			}
+			return nil
 		}
 	}
-	return -1
+	return fmt.Errorf("No huge pages was detected")
 }
 
 func (plugin *hugePagesPlugin) CanSupport(spec *volume.Spec) bool {
-	if detectHugepages() <= 0 {
+	if err := detectHugepages(); err != nil {
 		return false
 	}
 	if spec.Volume != nil && spec.Volume.HugePages != nil {
@@ -137,7 +138,6 @@ func (plugin *hugePagesPlugin) ConstructVolumeSpec(volName, mountPath string) (*
 			HugePages: &v1.HugePagesVolumeSource{},
 		},
 	}
-
 	return volume.NewSpecFromVolume(hugePagesVolume), nil
 }
 
@@ -182,29 +182,22 @@ func (hp *hugePages) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-
 	if volumeutil.IsReady(hp.getMetaDir()) && !notMnt {
 		return nil
 	}
-
-	// If the plugin readiness file is present for this volume, and the
-	// storage medium is the default, then the volume is ready.  If the
-	// medium is memory, and a mountpoint is present, then the volume is
-	// ready.
-
-	err = hp.setupHugePages(dir)
-
-	volume.SetVolumeOwnership(hp, fsGroup)
-
-	if err == nil {
-		volumeutil.SetReady(hp.getMetaDir())
+	if err = hp.setupHugePages(dir); err != nil {
+		return err
+	}
+	if err = volume.SetVolumeOwnership(hp, fsGroup); err != nil {
+		return err
 	}
 
-	return err
+	volumeutil.SetReady(hp.getMetaDir())
+
+	return nil
 }
 
-// setupTmpfs creates a tmpfs mount at the specified directory with the
-// specified SELinux context.
+// setupHugePages creates a hugetlbfs mount at the specified directory
 func (hp *hugePages) setupHugePages(dir string) error {
 	if hp.mounter == nil {
 		return fmt.Errorf("mounter is nil")
@@ -213,9 +206,7 @@ func (hp *hugePages) setupHugePages(dir string) error {
 		return err
 	}
 
-	options := hp.prepareMountOptions()
-
-	return hp.mounter.Mount("nodev", dir, "hugetlbfs", options)
+	return hp.mounter.Mount("nodev", dir, "hugetlbfs", hp.prepareMountOptions())
 }
 
 // prepare mount options for hugetlbfs
@@ -227,14 +218,12 @@ func (hp *hugePages) prepareMountOptions() []string {
 	}
 }
 
-// setupDir creates the directory with the specified SELinux context and
-// the default permissions specified by the perm constant.
+// setupDir creates the directory with param constant
 func (hp *hugePages) setupDir(dir string) error {
 	// Create the directory if it doesn't already exist.
 	if err := os.MkdirAll(dir, perm); err != nil {
 		return err
 	}
-
 	// stat the directory to read permission bits
 	fileinfo, err := os.Lstat(dir)
 	if err != nil {
@@ -310,7 +299,6 @@ func getVolumeSource(spec *volume.Spec) (*v1.HugePagesVolumeSource, bool) {
 
 	if spec.Volume != nil && spec.Volume.HugePages != nil {
 		volumeSource = spec.Volume.HugePages
-		readOnly = spec.ReadOnly
 	}
 	return volumeSource, readOnly
 }
