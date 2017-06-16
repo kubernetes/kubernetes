@@ -49,7 +49,7 @@ func createGCEStaticIP(name string) (string, error) {
 	for attempts := 0; attempts < 4; attempts++ {
 		outputBytes, err = exec.Command("gcloud", "compute", "addresses", "create",
 			name, "--project", framework.TestContext.CloudConfig.ProjectID,
-			"--region", region, "-q").CombinedOutput()
+			"--region", region, "-q", "--format=yaml").CombinedOutput()
 		if err == nil {
 			break
 		}
