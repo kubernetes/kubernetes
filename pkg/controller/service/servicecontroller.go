@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -800,9 +801,9 @@ func (s *ServiceController) processServiceDeletion(key string) (error, time.Dura
 }
 
 // This functions gets the number of endpoints for a given service name
-func (s *ServiceController) getEndpoints(service *api.Service) []string {
+func (s *ServiceController) getEndpoints(service *v1.Service) []string {
 	var podIps []string
-	endpoints, err := s.kubeClient.Core().Endpoints(service.Namespace).Get(service.Name)
+	endpoints, err := s.kubeClient.Core().Endpoints(service.Namespace).Get(service.Name, metav1.GetOptions{})
 	if err == nil {
 		subsets := endpoints.Subsets
 		if len(subsets) > 0 {
