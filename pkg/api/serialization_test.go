@@ -137,7 +137,7 @@ func TestSetControllerConversion(t *testing.T) {
 // debug issues that arise while adding a new API type.
 func TestSpecificKind(t *testing.T) {
 	// Uncomment the following line to enable logging of which conversions
-	// api.scheme.Log(t)
+	// api.Scheme.Log(t)
 	internalGVK := schema.GroupVersionKind{Group: "extensions", Version: runtime.APIVersionInternal, Kind: "DaemonSet"}
 
 	seed := rand.Int63()
