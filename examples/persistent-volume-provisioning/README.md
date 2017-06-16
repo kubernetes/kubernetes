@@ -209,6 +209,7 @@ parameters:
     pool: kube
     userId: kube
     userSecretName: ceph-secret-user
+    imageFormat: "1"
 ```
 
 * `monitors`: Ceph monitors, comma delimited. It is required.
@@ -218,6 +219,10 @@ parameters:
 * `pool`: Ceph RBD pool. Default is "rbd".
 * `userId`: Ceph client ID that is used to map the RBD image. Default is the same as `adminId`.
 * `userSecretName`: The name of Ceph Secret for `userId` to map RBD image. It must exist in the same namespace as PVCs. It is required.
+* `imageFormat`: Ceph RBD image format, "1" or "2". Default is "1".
+* `imageFeatures`: Ceph RBD image format 2 features, comma delimited. This is optional, and only be used if you set `imageFormat` to "2". For a complete list of available image features, please refer to [RBD docs](http://docs.ceph.com/docs/master/man/8/rbd/). By default, all features (except for striping) will be enabled.
+
+NOTE: If you want to use RBD image format 2, you may need to disable some image features, because some of them are not supported by [Ceph kernel module](https://github.com/ceph/ceph-client). For example, only "layering" feature is supported on Linux 4.9 LTS version, so you need to specify `imageFeatures` to "layering", if set `imageFormat` to "2".
 
 #### Quobyte
 

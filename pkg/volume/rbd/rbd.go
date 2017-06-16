@@ -269,7 +269,7 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	adminSecretNamespace := "default"
 	secretName := ""
 	secret := ""
-	imageFormat := ""
+	imageFormat := rbdImageFormat1
 
 	for k, v := range r.options.Parameters {
 		switch dstrings.ToLower(k) {
@@ -292,6 +292,11 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			secretName = v
 		case "imageformat":
 			imageFormat = v
+		case "imagefeatures":
+			arr := dstrings.Split(v, ",")
+			for _, f := range arr {
+				r.imageFeatures = append(r.imageFeatures, f)
+			}
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, r.plugin.GetPluginName())
 		}
@@ -386,15 +391,16 @@ func (rbd *rbd) GetPath() string {
 type rbdMounter struct {
 	*rbd
 	// capitalized so they can be exported in persistRBD()
-	Mon          []string
-	Id           string
-	Keyring      string
-	Secret       string
-	fsType       string
-	adminSecret  string
-	adminId      string
-	mountOptions []string
-	imageFormat  string
+	Mon           []string
+	Id            string
+	Keyring       string
+	Secret        string
+	fsType        string
+	adminSecret   string
+	adminId       string
+	mountOptions  []string
+	imageFormat   string
+	imageFeatures []string
 }
 
 var _ volume.Mounter = &rbdMounter{}
