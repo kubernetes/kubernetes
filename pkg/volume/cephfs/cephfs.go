@@ -145,6 +145,7 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			id:           id,
 			secret_file:  secret_file,
 			readonly:     cephvs.ReadOnly,
+			fuse:         cephvs.Fuse,
 			mounter:      mounter,
 			plugin:       plugin,
 			mountOptions: volume.MountOptionFromSpec(spec),
@@ -189,7 +190,7 @@ type cephfs struct {
 	secret      string
 	secret_file string
 	readonly    bool
-	Fuse        bool
+	fuse        bool
 	mounter     mount.Interface
 	plugin      *cephfsPlugin
 	volume.MetricsNil
