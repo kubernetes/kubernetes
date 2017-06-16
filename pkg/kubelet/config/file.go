@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -44,6 +45,9 @@ type sourceFile struct {
 }
 
 func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
+	// "golang.org/x/exp/inotify" requires a path without trailing "/"
+	path = strings.TrimRight(path, string(os.PathSeparator))
+
 	config := new(path, nodeName, period, updates)
 	glog.V(1).Infof("Watching path %q", path)
 	go wait.Forever(config.run, period)
