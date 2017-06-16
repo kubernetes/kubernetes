@@ -149,6 +149,28 @@ func failureTrap(c clientset.Interface, ns string) {
 		}
 		testutil.LogPodsOfDeployment(c, &d, rsList, framework.Logf)
 	}
+	// We need print all the ReplicaSets if there are no Deployment object created
+	if len(deployments.Items) != 0 {
+		return
+	}
+	framework.Logf("Log out all the ReplicaSets if there is no deployment created")
+	rss, err := c.ExtensionsV1beta1().ReplicaSets(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	if err != nil {
+		framework.Logf("Could not list ReplicaSets in namespace %q: %v", ns, err)
+		return
+	}
+	for _, rs := range rss.Items {
+		framework.Logf(spew.Sprintf("ReplicaSet %q:\n%+v\n", rs.Name, rs))
+		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+		if err != nil {
+			framework.Logf("failed to get selector of ReplicaSet %s: %v", rs.Name, err)
+		}
+		options := metav1.ListOptions{LabelSelector: selector.String()}
+		podList, err := c.Core().Pods(rs.Namespace).List(options)
+		for _, pod := range podList.Items {
+			framework.Logf(spew.Sprintf("pod: %q:\n%+v\n", pod.Name, pod))
+		}
+	}
 }
 
 func intOrStrP(num int) *intstr.IntOrString {
