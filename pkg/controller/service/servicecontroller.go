@@ -94,7 +94,7 @@ type ServiceController struct {
 	nodeListerSynced    cache.InformerSynced
 	// services that need to be synced
 	workingQueue workqueue.DelayingInterface
-	endpoints map[string]int
+	endpoints map[string][]string
 }
 
 // New returns a new service controller to keep cloud provider service resources
@@ -125,33 +125,17 @@ func New(
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
 		workingQueue:     workqueue.NewNamedDelayingQueue("service"),
-		endpoints: make(map[string]int),
+		endpoints: make(map[string][]string),
 	}
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: s.enqueueService,
 			UpdateFunc: func(old, cur interface{}) {
-				endpointsChanged := false
 				oldSvc, ok1 := old.(*v1.Service)
 				curSvc, ok2 := cur.(*v1.Service)
-				oldEndpoints := s.endpoints[oldSvc.ObjectMeta.Name]
-				newEndpoints := s.getNumberOfEndpoints(oldSvc)
-				if oldEndpoints != newEndpoints {
-					endpointsChanged = true
-				s.endpoints[oldSvc.ObjectMeta.Name] = newEndpoints
-				}
 				if ok1 && ok2 && s.needsUpdate(oldSvc, curSvc) {
 					s.enqueueService(cur)
-				} else if wantsLoadBalancer(curSvc) && endpointsChanged {
-					nodes, err := s.nodeLister.List(labels.Everything())
-					err = s.balancer.UpdateLoadBalancer(s.clusterName, curSvc, nodes)
-					if err == nil {
-						s.eventRecorder.Event(curSvc,
-							api.EventTypeNormal, 
-							"UpdatedLoadBalancer", 
-							"Updated load balancer with new Endpoints")
-					}
 				}
 			},
 			DeleteFunc: s.enqueueService,
@@ -495,7 +479,13 @@ func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.S
 			oldService.Spec.HealthCheckNodePort, newService.Spec.HealthCheckNodePort)
 		return true
 	}
-
+	// Check if endpoints have changed
+	oldEndpoints := s.endpoints[oldService.ObjectMeta.Name]
+	newEndpoints := s.getEndpoints(oldService)
+	if !reflect.DeepEqual(oldEndpoints, newEndpoints) {
+		s.endpoints[oldService.ObjectMeta.Name] = newEndpoints
+		return true
+	}
 	return false
 }
 
@@ -764,6 +754,7 @@ func (s *ServiceController) syncService(key string) error {
 		return err
 	default:
 		cachedService = s.cache.getOrCreate(key)
+		s.endpoints[service.ObjectMeta.Name] = s.getEndpoints(service)
 		err, retryDelay = s.processServiceUpdate(cachedService, service, key)
 	}
 
@@ -810,22 +801,20 @@ func (s *ServiceController) processServiceDeletion(key string) (error, time.Dura
 }
 
 // This functions gets the number of endpoints for a given service name
-func (s *ServiceController) getNumberOfEndpoints(service *v1.Service) int {
-        if wantsLoadBalancer(service) {
-                endpoints, err := s.kubeClient.Core().Endpoints(service.Namespace).Get(service.Name, metav1.GetOptions{})
-                if err == nil {
-                        var podIps []string
-                        subsets := endpoints.Subsets
-                        if len(subsets) > 0 {
-                                subset := subsets[0]
-                                addresses := subset.Addresses
-                                for _, address:= range addresses {
-                                        ip := address.IP
-                                        podIps = append(podIps, ip)
-                                }
-                                return len(podIps)
-                        }
-                }
-        }
-        return 0
+func (s *ServiceController) getEndpoints(service *api.Service) []string {
+	var podIps []string
+	endpoints, err := s.kubeClient.Core().Endpoints(service.Namespace).Get(service.Name)
+	if err == nil {
+		subsets := endpoints.Subsets
+		if len(subsets) > 0 {
+			subset := subsets[0]
+			addresses := subset.Addresses
+			for _, address:= range addresses {
+				ip := address.IP
+			        podIps = append(podIps, ip)
+			}
+			return podIps
+		}
+	}
+	return podIps
 }
