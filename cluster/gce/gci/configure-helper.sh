@@ -64,6 +64,10 @@ function get-calico-typha-replicas {
   if [[ "${NUM_NODES}" -gt "500" ]]; then
     typha_count=5
   fi
+  if [[ "${NETWORK_POLICY_PROVIDER:-}" != "calico" ]]; then
+    # We're not configured to use Calico, so don't start any Typhas.
+    typha_count=0
+  fi
   echo "${typha_count}"
 }
 
