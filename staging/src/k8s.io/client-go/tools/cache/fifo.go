@@ -169,7 +169,7 @@ func (f *FIFO) AddIfNotPresent(obj interface{}) error {
 	return nil
 }
 
-// addIfNotPresent assumes the fifo lock is already held and adds the the provided
+// addIfNotPresent assumes the fifo lock is already held and adds the provided
 // item to the queue under id if it does not already exist.
 func (f *FIFO) addIfNotPresent(id string, obj interface{}) {
 	f.populated = true

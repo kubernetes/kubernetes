@@ -21,7 +21,7 @@ type BreadthFirst struct {
 }
 
 // Walk performs a breadth-first traversal of the graph g starting from the given node,
-// depending on the the EdgeFilter field and the until parameter if they are non-nil. The
+// depending on the EdgeFilter field and the until parameter if they are non-nil. The
 // traversal follows edges for which EdgeFilter(edge) is true and returns the first node
 // for which until(node, depth) is true. During the traversal, if the Visit field is
 // non-nil, it is called with the nodes joined by each followed edge.
@@ -113,7 +113,7 @@ type DepthFirst struct {
 }
 
 // Walk performs a depth-first traversal of the graph g starting from the given node,
-// depending on the the EdgeFilter field and the until parameter if they are non-nil. The
+// depending on the EdgeFilter field and the until parameter if they are non-nil. The
 // traversal follows edges for which EdgeFilter(edge) is true and returns the first node
 // for which until(node) is true. During the traversal, if the Visit field is non-nil, it
 // is called with the nodes joined by each followed edge.

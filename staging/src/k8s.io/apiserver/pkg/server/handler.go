@@ -62,7 +62,7 @@ type APIServerHandler struct {
 	// which we don't fit into and it still muddies up swagger.  Trying to switch the webservices into a route doesn't work because the
 	//  containing webservice faces all the same problems listed above.
 	// This leads to the crazy thing done here.  Our mux does what we need, so we'll place it in front of gorestful.  It will introspect to
-	// decide if the the route is likely to be handled by goresful and route there if needed.  Otherwise, it goes to PostGoRestful mux in
+	// decide if the route is likely to be handled by goresful and route there if needed.  Otherwise, it goes to PostGoRestful mux in
 	// order to handle "normal" paths and delegation. Hopefully no API consumers will ever have to deal with this level of detail.  I think
 	// we should consider completely removing gorestful.
 	// Other servers should only use this opaquely to delegate to an API server.

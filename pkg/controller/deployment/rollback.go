@@ -55,7 +55,7 @@ func (dc *DeploymentController) rollback(d *extensions.Deployment, rsList []*ext
 			glog.V(4).Infof("Found replica set %q with desired revision %d", rs.Name, v)
 			// rollback by copying podTemplate.Spec from the replica set
 			// revision number will be incremented during the next getAllReplicaSetsAndSyncRevision call
-			// no-op if the the spec matches current deployment's podTemplate.Spec
+			// no-op if the spec matches current deployment's podTemplate.Spec
 			performedRollback, err := dc.rollbackToTemplate(d, rs)
 			if performedRollback && err == nil {
 				dc.emitRollbackNormalEvent(d, fmt.Sprintf("Rolled back deployment %q to revision %d", d.Name, *toRevision))

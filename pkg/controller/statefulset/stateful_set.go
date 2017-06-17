@@ -400,7 +400,7 @@ func (ssc *StatefulSetController) processNextWorkItem() bool {
 	return true
 }
 
-// worker runs a worker goroutine that invokes processNextWorkItem until the the controller's queue is closed
+// worker runs a worker goroutine that invokes processNextWorkItem until the controller's queue is closed
 func (ssc *StatefulSetController) worker() {
 	for ssc.processNextWorkItem() {
 	}

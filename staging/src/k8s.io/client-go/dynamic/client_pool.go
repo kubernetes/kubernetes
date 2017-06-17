@@ -56,7 +56,7 @@ type clientPoolImpl struct {
 	mapper              meta.RESTMapper
 }
 
-// NewClientPool returns a ClientPool from the specified config. It reuses clients for the the same
+// NewClientPool returns a ClientPool from the specified config. It reuses clients for the same
 // group version. It is expected this type may be wrapped by specific logic that special cases certain
 // resources or groups.
 func NewClientPool(config *restclient.Config, mapper meta.RESTMapper, apiPathResolverFunc APIPathResolverFunc) ClientPool {

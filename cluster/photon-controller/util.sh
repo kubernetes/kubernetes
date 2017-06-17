@@ -636,7 +636,7 @@ function install-kubernetes-on-master {
 }
 
 #
-# Install Kubernetes on the the nodes in parallel
+# Install Kubernetes on the nodes in parallel
 # This uses the kubernetes-master-salt.sh script created by gen-node-salt
 # That script uses salt to install Kubernetes
 #
