@@ -59,6 +59,8 @@ var (
 )
 
 func addPortFlags(cmd *cobra.Command) {
+	cmd.Flags().StringSlice("tcp", []string{}, "Port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().MarkDeprecated("tcp", "It will be removed in the future, please use --ports instead")
 	cmd.Flags().StringSlice("ports", []string{}, "Protocol and port pairs can be specified as '<protocol>:<port>:<targetPort>'.")
 }
 
@@ -92,9 +94,13 @@ func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ServiceClusterIPGeneratorV1Name:
+		ports, err := PortsFromCommandArgs(cmd)
+		if err != nil {
+			return err
+		}
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
-			Ports:     cmdutil.GetFlagStringSlice(cmd, "ports"),
+			Ports:     ports,
 			Type:      api.ServiceTypeClusterIP,
 			ClusterIP: cmdutil.GetFlagString(cmd, "clusterip"),
 		}
@@ -148,9 +154,13 @@ func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comma
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ServiceNodePortGeneratorV1Name:
+		ports, err := PortsFromCommandArgs(cmd)
+		if err != nil {
+			return err
+		}
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
-			Ports:     cmdutil.GetFlagStringSlice(cmd, "ports"),
+			Ports:     ports,
 			Type:      api.ServiceTypeNodePort,
 			ClusterIP: "",
 			NodePort:  cmdutil.GetFlagInt(cmd, "node-port"),
@@ -204,9 +214,13 @@ func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ServiceLoadBalancerGeneratorV1Name:
+		ports, err := PortsFromCommandArgs(cmd)
+		if err != nil {
+			return err
+		}
 		generator = &kubectl.ServiceCommonGeneratorV1{
 			Name:      name,
-			Ports:     cmdutil.GetFlagStringSlice(cmd, "ports"),
+			Ports:     ports,
 			Type:      api.ServiceTypeLoadBalancer,
 			ClusterIP: "",
 		}
