@@ -28,6 +28,7 @@ import (
 
 	appcschema "github.com/appc/spec/schema"
 	appctypes "github.com/appc/spec/schema/types"
+	"github.com/coreos/go-systemd/unit"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -2072,6 +2073,56 @@ func TestGetPodSystemdServiceFiles(t *testing.T) {
 		for _, f := range serviceFiles {
 			assert.Contains(t, tt.expected, f.Name(), fmt.Sprintf("Test case #%d", i))
 
+		}
+	}
+}
+
+func TestSetupSystemdCustomFields(t *testing.T) {
+	testCases := []struct {
+		unitOpts       []*unit.UnitOption
+		podAnnotations map[string]string
+		expectedValues []string
+		raiseErr       bool
+	}{
+		// without annotation
+		{
+			[]*unit.UnitOption{
+				{Section: "Service", Name: "ExecStart", Value: "/bin/true"},
+			},
+			map[string]string{},
+			[]string{"/bin/true"},
+			false,
+		},
+		// with valid annotation for LimitNOFile
+		{
+			[]*unit.UnitOption{
+				{Section: "Service", Name: "ExecStart", Value: "/bin/true"},
+			},
+			map[string]string{k8sRktLimitNoFileAnno: "1024"},
+			[]string{"/bin/true", "1024"},
+			false,
+		},
+		// with invalid annotation for LimitNOFile
+		{
+			[]*unit.UnitOption{
+				{Section: "Service", Name: "ExecStart", Value: "/bin/true"},
+			},
+			map[string]string{k8sRktLimitNoFileAnno: "-1"},
+			[]string{"/bin/true"},
+			true,
+		},
+	}
+
+	for i, tt := range testCases {
+		raiseErr := false
+		newUnitsOpts, err := setupSystemdCustomFields(tt.podAnnotations, tt.unitOpts)
+		if err != nil {
+			raiseErr = true
+		}
+		assert.Equal(t, tt.raiseErr, raiseErr, fmt.Sprintf("Test case #%d", i))
+		for _, opt := range newUnitsOpts {
+			assert.Equal(t, "Service", opt.Section, fmt.Sprintf("Test case #%d", i))
+			assert.Contains(t, tt.expectedValues, opt.Value, fmt.Sprintf("Test case #%d", i))
 		}
 	}
 }
