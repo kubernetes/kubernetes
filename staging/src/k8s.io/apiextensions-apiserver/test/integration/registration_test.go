@@ -389,7 +389,7 @@ func TestEtcdStorage(t *testing.T) {
 				Metadata: Metadata{
 					Name:      "noxus.mygroup.example.com",
 					Namespace: "",
-					SelfLink:  "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/noxus.mygroup.example.com",
+					SelfLink:  "",
 				},
 			},
 		},
@@ -414,7 +414,7 @@ func TestEtcdStorage(t *testing.T) {
 				Metadata: Metadata{
 					Name:      "curlets.mygroup.example.com",
 					Namespace: "",
-					SelfLink:  "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/curlets.mygroup.example.com",
+					SelfLink:  "",
 				},
 			},
 		},
