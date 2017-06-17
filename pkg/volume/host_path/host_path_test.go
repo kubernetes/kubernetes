@@ -182,6 +182,31 @@ func TestProvisioner(t *testing.T) {
 	os.RemoveAll(pv.Spec.HostPath.Path)
 }
 
+func TestInvalidHostPath(t *testing.T) {
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volumetest.NewFakeVolumeHost("fake", nil, nil))
+
+	plug, err := plugMgr.FindPluginByName(hostPathPluginName)
+	if err != nil {
+		t.Fatalf("Unable to find plugin %s by name: %v", hostPathPluginName, err)
+	}
+	spec := &v1.Volume{
+		Name:         "vol1",
+		VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/no/backsteps/allowed/.."}},
+	}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
+	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = mounter.SetUp(nil)
+	expectedMsg := "invalid HostPath `/no/backsteps/allowed/..`: must not contain '..'"
+	if err.Error() != expectedMsg {
+		t.Fatalf("expected error `%s` but got `%s`", expectedMsg, err)
+	}
+}
+
 func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volumetest.NewFakeVolumeHost("fake", nil, nil))
