@@ -19,12 +19,7 @@ package initialization
 import (
 	"fmt"
 	"io"
-	"net"
-	"net/url"
-	"os"
 	"strings"
-	"syscall"
-	"time"
 
 	"github.com/golang/glog"
 
@@ -64,16 +59,6 @@ type initializer struct {
 	authorizer authorizer.Authorizer
 }
 
-// Retry config loading failures for up to four and a half seconds if the config hasn't been loaded
-// yet or if the server is down. Creation requests are delayed during this interval, which prevents
-// racy failures during startup until the initializer configuration becomes available.
-// TODO: move into InitializationConfigurationManager, since these values depend on the config
-//   refresh loop.
-const (
-	retryTemporaryConfigFailures = 8
-	retryTemporaryConfigInterval = 550 * time.Millisecond
-)
-
 // NewInitializer creates a new initializer plugin which assigns newly created resources initializers
 // based on configuration loaded from the admission API group.
 // FUTURE: this may be moved to the storage layer of the apiserver, but for now this is an alpha feature
@@ -100,60 +85,30 @@ func (i *initializer) SetAuthorizer(a authorizer.Authorizer) {
 
 var initializerFieldPath = field.NewPath("metadata", "initializers")
 
-// temporaryConnectionError returns true if the error is considered temporary
-func temporaryConnectionError(err error) bool {
-	if urlError, ok := err.(*url.Error); ok {
-		if urlError.Temporary() {
-			return true
-		}
-		if opError, ok := urlError.Err.(*net.OpError); ok {
-			if syscallError, ok := opError.Err.(*os.SyscallError); ok {
-				if errno, ok := syscallError.Err.(syscall.Errno); ok && errno == syscall.ECONNREFUSED {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-// readConfigWithRetry holds requests instead of failing them if the server is not yet initialized
+// readConfig holds requests instead of failing them if the server is not yet initialized
 // or is unresponsive. It formats the returned error for client use if necessary.
-func (i *initializer) readConfigWithRetry(a admission.Attributes) (*v1alpha1.InitializerConfiguration, error) {
-	var lastErr error
-	for count := 0; count < retryTemporaryConfigFailures; count++ {
-		if count > 0 {
-			time.Sleep(retryTemporaryConfigInterval)
-		}
+func (i *initializer) readConfig(a admission.Attributes) (*v1alpha1.InitializerConfiguration, error) {
+	// read initializers from config
+	config, err := i.config.Initializers()
+	if err == nil {
+		return config, nil
+	}
 
-		// read initializers from config
-		config, err := i.config.Initializers()
-		if err == nil {
-			return config, nil
-		}
-
-		// if initializer configuration is disabled, fail open
-		if err == configuration.ErrDisabled {
-			return &v1alpha1.InitializerConfiguration{}, nil
-		}
-
-		// retry certain errors
-		lastErr = err
-		if err != configuration.ErrNotReady && !temporaryConnectionError(err) {
-			break
-		}
+	// if initializer configuration is disabled, fail open
+	if err == configuration.ErrDisabled {
+		return &v1alpha1.InitializerConfiguration{}, nil
 	}
 
 	e := errors.NewServerTimeout(a.GetResource().GroupResource(), "create", 1)
-	if lastErr == configuration.ErrNotReady {
-		e.ErrStatus.Message = fmt.Sprintf("Waiting for initialization configuration to load: %v", lastErr)
+	if err == configuration.ErrNotReady {
+		e.ErrStatus.Message = fmt.Sprintf("Waiting for initialization configuration to load: %v", err)
 		e.ErrStatus.Reason = "LoadingConfiguration"
 		e.ErrStatus.Details.Causes = append(e.ErrStatus.Details.Causes, metav1.StatusCause{
 			Type:    "InitializerConfigurationPending",
 			Message: "The server is waiting for the initializer configuration to be loaded.",
 		})
 	} else {
-		e.ErrStatus.Message = fmt.Sprintf("Unable to refresh the initializer configuration: %v", lastErr)
+		e.ErrStatus.Message = fmt.Sprintf("Unable to refresh the initializer configuration: %v", err)
 		e.ErrStatus.Reason = "LoadingConfiguration"
 		e.ErrStatus.Details.Causes = append(e.ErrStatus.Details.Causes, metav1.StatusCause{
 			Type:    "InitializerConfigurationFailure",
@@ -206,7 +161,7 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 		} else {
 			glog.V(5).Infof("Checking initialization for %s", a.GetResource())
 
-			config, err := i.readConfigWithRetry(a)
+			config, err := i.readConfig(a)
 			if err != nil {
 				return err
 			}
