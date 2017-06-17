@@ -327,6 +327,18 @@ function create-master-pki {
   # < 1.6.
   ln -sf "${APISERVER_SERVER_KEY_PATH}" /etc/srv/kubernetes/server.key
   ln -sf "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.cert
+
+  AGGREGATOR_CA_KEY_PATH="${pki_dir}/aggr_ca.key"
+  echo "${AGGREGATOR_CA_KEY:-}" | base64 --decode > "${AGGREGATOR_CA_KEY_PATH}"
+
+  REQUESTHEADER_CA_CERT_PATH="${pki_dir}/aggr_ca.crt"
+  echo "${REQUESTHEADER_CA_CERT:-}" | base64 --decode > "${REQUESTHEADER_CA_CERT_PATH}"
+
+  PROXY_CLIENT_KEY_PATH="${pki_dir}/proxy_client.key"
+  echo "${PROXY_CLIENT_KEY:-}" | base64 --decode > "${PROXY_CLIENT_KEY_PATH}"
+
+  PROXY_CLIENT_CERT_PATH="${pki_dir}/proxy_client.crt"
+  echo "${PROXY_CLIENT_CERT:-}" | base64 --decode > "${PROXY_CLIENT_CERT_PATH}"
 }
 
 # After the first boot and on upgrade, these files exist on the master-pd
@@ -1210,6 +1222,15 @@ function start-kube-apiserver {
   params+=" --secure-port=443"
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
+  if [[ ! -z "${REQUESTHEADER_CA_CERT:-}" ]]; then
+    params+=" --requestheader-client-ca-file=${REQUESTHEADER_CA_CERT_PATH}"
+    params+=" --requestheader-allowed-names=aggregator"
+    params+=" --requestheader-extra-headers-prefix=X-Remote-Extra-"
+    params+=" --requestheader-group-headers=X-Remote-Group"
+    params+=" --requestheader-username-headers=X-Remote-User"
+    params+=" --proxy-client-cert-file=${PROXY_CLIENT_CERT_PATH}"
+    params+=" --proxy-client-key-file=${PROXY_CLIENT_KEY_PATH}"
+  fi
   params+=" --enable-aggregator-routing=true"
   if [[ -e "${APISERVER_CLIENT_CERT_PATH}" ]] && [[ -e "${APISERVER_CLIENT_KEY_PATH}" ]]; then
     params+=" --kubelet-client-certificate=${APISERVER_CLIENT_CERT_PATH}"
