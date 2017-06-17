@@ -27,32 +27,32 @@ import (
 
 // ClientConnectionConfiguration contains details for constructing a client.
 type ClientConnectionConfiguration struct {
-	// kubeConfigFile is the path to a kubeconfig file.
+	// KubeConfigFile is the path to a kubeconfig file.
 	KubeConfigFile string
-	// acceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the
+	// AcceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the
 	// default value of 'application/json'. This field will control all connections to the server used by a particular
 	// client.
 	AcceptContentTypes string
-	// contentType is the content type used when sending data to the server from this client.
+	// ContentType is the content type used when sending data to the server from this client.
 	ContentType string
-	// qps controls the number of queries per second allowed for this connection.
+	// QPS controls the number of queries per second allowed for this connection.
 	QPS float32
-	// burst allows extra queries to accumulate when a client is exceeding its rate.
+	// Burst allows extra queries to accumulate when a client is exceeding its rate.
 	Burst int
 }
 
 // KubeProxyIPTablesConfiguration contains iptables-related configuration
 // details for the Kubernetes proxy server.
 type KubeProxyIPTablesConfiguration struct {
-	// masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
+	// MasqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
 	// the pure iptables proxy mode. Values must be within the range [0, 31].
 	MasqueradeBit *int32
-	// masqueradeAll tells kube-proxy to SNAT everything if using the pure iptables proxy mode.
+	// MasqueradeAll tells kube-proxy to SNAT everything if using the pure iptables proxy mode.
 	MasqueradeAll bool
-	// syncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m',
+	// SyncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').  Must be greater than 0.
 	SyncPeriod metav1.Duration
-	// minSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m',
+	// MinSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').
 	MinSyncPeriod metav1.Duration
 }
@@ -60,19 +60,19 @@ type KubeProxyIPTablesConfiguration struct {
 // KubeProxyConntrackConfiguration contains conntrack settings for
 // the Kubernetes proxy server.
 type KubeProxyConntrackConfiguration struct {
-	// max is the maximum number of NAT connections to track (0 to
-	// leave as-is).  This takes precedence over conntrackMaxPerCore and conntrackMin.
+	// Max is the maximum number of NAT connections to track (0 to
+	// leave as-is).  This takes precedence over ConntrackMaxPerCore and ConntrackMin.
 	Max int32
-	// maxPerCore is the maximum number of NAT connections to track
-	// per CPU core (0 to leave the limit as-is and ignore conntrackMin).
+	// MaxPerCore is the maximum number of NAT connections to track
+	// per CPU core (0 to leave the limit as-is and ignore ConntrackMin).
 	MaxPerCore int32
-	// min is the minimum value of connect-tracking records to allocate,
-	// regardless of conntrackMaxPerCore (set conntrackMaxPerCore=0 to leave the limit as-is).
+	// Min is the minimum value of connect-tracking records to allocate,
+	// regardless of ConntrackMaxPerCore (set ConntrackMaxPerCore=0 to leave the limit as-is).
 	Min int32
-	// tcpEstablishedTimeout is how long an idle TCP connection will be kept open
+	// TCPEstablishedTimeout is how long an idle TCP connection will be kept open
 	// (e.g. '2s').  Must be greater than 0.
 	TCPEstablishedTimeout metav1.Duration
-	// tcpCloseWaitTimeout is how long an idle conntrack entry
+	// TCPCloseWaitTimeout is how long an idle conntrack entry
 	// in CLOSE_WAIT state will remain in the conntrack
 	// table. (e.g. '60s'). Must be greater than 0 to set.
 	TCPCloseWaitTimeout metav1.Duration
@@ -83,7 +83,7 @@ type KubeProxyConntrackConfiguration struct {
 type KubeProxyConfiguration struct {
 	metav1.TypeMeta
 
-	// featureGates is a comma-separated list of key=value pairs that control
+	// FeatureGates is a comma-separated list of key=value pairs that control
 	// which alpha/beta features are enabled.
 	//
 	// TODO this really should be a map but that requires refactoring all
@@ -92,46 +92,46 @@ type KubeProxyConfiguration struct {
 	// pairs.
 	FeatureGates string
 
-	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
+	// BindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
 	// for all interfaces)
 	BindAddress string
-	// healthzBindAddress is the IP address and port for the health check server to serve on,
+	// HealthzBindAddress is the IP address and port for the health check server to serve on,
 	// defaulting to 0.0.0.0:10256
 	HealthzBindAddress string
-	// metricsBindAddress is the IP address and port for the metrics server to serve on,
+	// MetricsBindAddress is the IP address and port for the metrics server to serve on,
 	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
 	MetricsBindAddress string
-	// enableProfiling enables profiling via web interface on /debug/pprof handler.
+	// EnableProfiling enables profiling via web interface on /debug/pprof handler.
 	// Profiling handlers will be handled by metrics server.
 	EnableProfiling bool
-	// clusterCIDR is the CIDR range of the pods in the cluster. It is used to
+	// ClusterCIDR is the CIDR range of the pods in the cluster. It is used to
 	// bridge traffic coming from outside of the cluster. If not provided,
 	// no off-cluster bridging will be performed.
 	ClusterCIDR string
-	// hostnameOverride, if non-empty, will be used as the identity instead of the actual hostname.
+	// HostnameOverride, if non-empty, will be used as the identity instead of the actual hostname.
 	HostnameOverride string
-	// clientConnection specifies the kubeconfig file and client connection settings for the proxy
+	// ClientConnection specifies the kubeconfig file and client connection settings for the proxy
 	// server to use when communicating with the apiserver.
 	ClientConnection ClientConnectionConfiguration
-	// iptables contains iptables-related configuration options.
+	// IPTables contains iptables-related configuration options.
 	IPTables KubeProxyIPTablesConfiguration
-	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
+	// OOMScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
 	// the range [-1000, 1000]
 	OOMScoreAdj *int32
-	// mode specifies which proxy mode to use.
+	// Mode specifies which proxy mode to use.
 	Mode ProxyMode
-	// portRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed
+	// PortRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed
 	// in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
 	PortRange string
-	// resourceContainer is the absolute name of the resource-only container to create and run
+	// ResourceContainer is the absolute name of the resource-only container to create and run
 	// the Kube-proxy in (Default: /kube-proxy).
 	ResourceContainer string
-	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
-	// Must be greater than 0. Only applicable for proxyMode=userspace.
+	// UDPIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
+	// Must be greater than 0. Only applicable for ProxyMode=userspace.
 	UDPIdleTimeout metav1.Duration
-	// conntrack contains conntrack-related configuration options.
+	// Conntrack contains conntrack-related configuration options.
 	Conntrack KubeProxyConntrackConfiguration
-	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
+	// ConfigSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
 	// than 0.
 	ConfigSyncPeriod metav1.Duration
 }
@@ -176,148 +176,148 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
-	// podManifestPath is the path to the directory containing pod manifests to
+	// PodManifestPath is the path to the directory containing pod manifests to
 	// run, or the path to a single manifest file
 	PodManifestPath string
-	// syncFrequency is the max period between synchronizing running
+	// SyncFrequency is the max period between synchronizing running
 	// containers and config
 	SyncFrequency metav1.Duration
-	// fileCheckFrequency is the duration between checking config files for
+	// FileCheckFrequency is the duration between checking config files for
 	// new data
 	FileCheckFrequency metav1.Duration
-	// httpCheckFrequency is the duration between checking http for new data
+	// HTTPCheckFrequency is the duration between checking http for new data
 	HTTPCheckFrequency metav1.Duration
-	// manifestURL is the URL for accessing the container manifest
+	// ManifestURL is the URL for accessing the container manifest
 	ManifestURL string
-	// manifestURLHeader is the HTTP header to use when accessing the manifest
+	// ManifestURLHeader is the HTTP header to use when accessing the manifest
 	// URL, with the key separated from the value with a ':', as in 'key:value'
 	ManifestURLHeader string
-	// enableServer enables the Kubelet's server
+	// EnableServer enables the Kubelet's server
 	EnableServer bool
-	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
+	// Address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces)
 	Address string
-	// port is the port for the Kubelet to serve on.
+	// Port is the port for the Kubelet to serve on.
 	Port int32
-	// readOnlyPort is the read-only port for the Kubelet to serve on with
+	// ReadOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
 	ReadOnlyPort int32
-	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
-	// if any, concatenated after server cert). If tlsCertFile and
-	// tlsPrivateKeyFile are not provided, a self-signed certificate
+	// TLSCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
+	// if any, concatenated after server cert). If TLSCertFile and
+	// TLSPrivateKeyFile are not provided, a self-signed certificate
 	// and key are generated for the public address and saved to the directory
 	// passed to certDir.
 	TLSCertFile string
-	// tlsPrivateKeyFile is the ile containing x509 private key matching
-	// tlsCertFile.
+	// TLSPrivateKeyFile is the ile containing x509 private key matching
+	// TLSCertFile.
 	TLSPrivateKeyFile string
-	// certDirectory is the directory where the TLS certs are located (by
-	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
+	// CertDirectory is the directory where the TLS certs are located (by
+	// default /var/run/kubernetes). If TLSCertFile and TLSPrivateKeyFile
 	// are provided, this flag will be ignored.
 	CertDirectory string
-	// authentication specifies how requests to the Kubelet's server are authenticated
+	// Authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication
-	// authorization specifies how requests to the Kubelet's server are authorized
+	// Authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization
-	// rootDirectory is the directory path to place kubelet files (volume
+	// RootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
 	RootDirectory string
-	// seccompProfileRoot is the directory path for seccomp profiles.
+	// SeccompProfileRoot is the directory path for seccomp profiles.
 	SeccompProfileRoot string
-	// allowPrivileged enables containers to request privileged mode.
+	// AllowPrivileged enables containers to request privileged mode.
 	// Defaults to false.
 	AllowPrivileged bool
-	// hostNetworkSources is a comma-separated list of sources from which the
+	// HostNetworkSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use of host network. Defaults to "*". Valid
 	// options are "file", "http", "api", and "*" (all sources).
 	HostNetworkSources []string
-	// hostPIDSources is a comma-separated list of sources from which the
+	// HostPIDSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host pid namespace. Defaults to "*".
 	HostPIDSources []string
-	// hostIPCSources is a comma-separated list of sources from which the
+	// HostIPCSources is a comma-separated list of sources from which the
 	// Kubelet allows pods to use the host ipc namespace. Defaults to "*".
 	HostIPCSources []string
-	// registryPullQPS is the limit of registry pulls per second. If 0,
+	// RegistryPullQPS is the limit of registry pulls per second. If 0,
 	// unlimited. Set to 0 for no limit. Defaults to 5.0.
 	RegistryPullQPS int32
-	// registryBurst is the maximum size of a bursty pulls, temporarily allows
+	// RegistryBurst is the maximum size of a bursty pulls, temporarily allows
 	// pulls to burst to this number, while still not exceeding registryQps.
 	// Only used if registryQPS > 0.
 	RegistryBurst int32
-	// eventRecordQPS is the maximum event creations per second. If 0, there
+	// EventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced.
 	EventRecordQPS int32
-	// eventBurst is the maximum size of a bursty event records, temporarily
+	// EventBurst is the maximum size of a bursty event records, temporarily
 	// allows event records to burst to this number, while still not exceeding
 	// event-qps. Only used if eventQps > 0
 	EventBurst int32
-	// enableDebuggingHandlers enables server endpoints for log collection
+	// EnableDebuggingHandlers enables server endpoints for log collection
 	// and local running of containers and commands
 	EnableDebuggingHandlers bool
-	// enableContentionProfiling enables lock contention profiling, if enableDebuggingHandlers is true.
+	// EnableContentionProfiling enables lock contention profiling, if EnableDebuggingHandlers is true.
 	EnableContentionProfiling bool
-	// minimumGCAge is the minimum age for a finished container before it is
+	// MinimumGCAge is the minimum age for a finished container before it is
 	// garbage collected.
 	MinimumGCAge metav1.Duration
-	// maxPerPodContainerCount is the maximum number of old instances to
+	// MaxPerPodContainerCount is the maximum number of old instances to
 	// retain per container. Each container takes up some disk space.
 	MaxPerPodContainerCount int32
-	// maxContainerCount is the maximum number of old instances of containers
+	// MaxContainerCount is the maximum number of old instances of containers
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount int32
-	// cAdvisorPort is the port of the localhost cAdvisor endpoint
+	// CAdvisorPort is the port of the localhost cAdvisor endpoint
 	CAdvisorPort int32
-	// healthzPort is the port of the localhost healthz endpoint
+	// HealthzPort is the port of the localhost healthz endpoint
 	HealthzPort int32
-	// healthzBindAddress is the IP address for the healthz server to serve
+	// HealthzBindAddress is the IP address for the healthz server to serve
 	// on.
 	HealthzBindAddress string
-	// oomScoreAdj is The oom-score-adj value for kubelet process. Values
+	// OOMScoreAdj is The oom-score-adj value for kubelet process. Values
 	// must be within the range [-1000, 1000].
 	OOMScoreAdj int32
-	// registerNode enables automatic registration with the apiserver.
+	// RegisterNode enables automatic registration with the apiserver.
 	RegisterNode bool
-	// clusterDomain is the DNS domain for this cluster. If set, kubelet will
+	// ClusterDomain is the DNS domain for this cluster. If set, kubelet will
 	// configure all containers to search this domain in addition to the
 	// host's search domains.
 	ClusterDomain string
-	// masterServiceNamespace is The namespace from which the kubernetes
+	// MasterServiceNamespace is The namespace from which the kubernetes
 	// master services should be injected into pods.
 	MasterServiceNamespace string
-	// clusterDNS is a list of IP address for a cluster DNS server.  If set,
+	// ClusterDNS is a list of IP address for a cluster DNS server.  If set,
 	// kubelet will configure all containers to use this for DNS resolution
 	// instead of the host's DNS servers
 	ClusterDNS []string
-	// streamingConnectionIdleTimeout is the maximum time a streaming connection
+	// StreamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	StreamingConnectionIdleTimeout metav1.Duration
-	// nodeStatusUpdateFrequency is the frequency that kubelet posts node
+	// NodeStatusUpdateFrequency is the frequency that kubelet posts node
 	// status to master. Note: be cautious when changing the constant, it
-	// must work with nodeMonitorGracePeriod in nodecontroller.
+	// must work with NodeMonitorGracePeriod in nodecontroller.
 	NodeStatusUpdateFrequency metav1.Duration
-	// imageMinimumGCAge is the minimum age for an unused image before it is
+	// ImageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
 	ImageMinimumGCAge metav1.Duration
-	// imageGCHighThresholdPercent is the percent of disk usage after which
+	// ImageGCHighThresholdPercent is the percent of disk usage after which
 	// image garbage collection is always run.
 	ImageGCHighThresholdPercent int32
-	// imageGCLowThresholdPercent is the percent of disk usage before which
+	// ImageGCLowThresholdPercent is the percent of disk usage before which
 	// image garbage collection is never run. Lowest disk usage to garbage
 	// collect to.
 	ImageGCLowThresholdPercent int32
-	// lowDiskSpaceThresholdMB is the absolute free disk space, in MB, to
+	// LowDiskSpaceThresholdMB is the absolute free disk space, in MB, to
 	// maintain. When disk space falls below this threshold, new pods would
 	// be rejected.
 	LowDiskSpaceThresholdMB int32
 	// How frequently to calculate and cache volume disk usage for all pods
 	VolumeStatsAggPeriod metav1.Duration
-	// volumePluginDir is the full path of the directory in which to search
+	// VolumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string
-	// cloudProvider is the provider for cloud services.
+	// CloudProvider is the provider for cloud services.
 	// +optional
 	CloudProvider string
-	// cloudConfigFile is the path to the cloud provider configuration file.
+	// CloudConfigFile is the path to the cloud provider configuration file.
 	// +optional
 	CloudConfigFile string
 	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
@@ -343,19 +343,19 @@ type KubeletConfiguration struct {
 	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
 	// +optional
 	CgroupRoot string
-	// containerRuntime is the container runtime to use.
+	// ContainerRuntime is the container runtime to use.
 	ContainerRuntime string
-	// remoteRuntimeEndpoint is the endpoint of remote runtime service
+	// RemoteRuntimeEndpoint is the endpoint of remote runtime service
 	RemoteRuntimeEndpoint string
-	// remoteImageEndpoint is the endpoint of remote image service
+	// RemoteImageEndpoint is the endpoint of remote image service
 	RemoteImageEndpoint string
-	// runtimeRequestTimeout is the timeout for all runtime requests except long running
+	// RuntimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	// +optional
 	RuntimeRequestTimeout metav1.Duration
-	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
+	// ExperimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
 	ExperimentalMounterPath string
-	// lockFilePath is the path that kubelet will use to as a lock file.
+	// LockFilePath is the path that kubelet will use to as a lock file.
 	// It uses this file as a lock to synchronize with other kubelet processes
 	// that may be running.
 	LockFilePath string
@@ -373,7 +373,7 @@ type KubeletConfiguration struct {
 	// Generally, one must set --hairpin-mode=veth-flag to achieve hairpin NAT,
 	// because promiscous-bridge assumes the existence of a container bridge named cbr0.
 	HairpinMode string
-	// maxPods is the number of pods that can run on this Kubelet.
+	// MaxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
@@ -381,50 +381,50 @@ type KubeletConfiguration struct {
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration."), []
 	ResolverConfig string
-	// cpuCFSQuota is Enable CPU CFS quota enforcement for containers that
+	// CPUCFSQuota is Enable CPU CFS quota enforcement for containers that
 	// specify CPU limits
 	CPUCFSQuota bool
-	// containerized should be set to true if kubelet is running in a container.
+	// Containerized should be set to true if kubelet is running in a container.
 	Containerized bool
-	// maxOpenFiles is Number of files that can be opened by Kubelet process.
+	// MaxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
-	// registerSchedulable tells the kubelet to register the node as
+	// RegisterSchedulable tells the kubelet to register the node as
 	// schedulable. Won't have any effect if register-node is false.
-	// DEPRECATED: use registerWithTaints instead
+	// DEPRECATED: use RegisterWithTaints instead
 	RegisterSchedulable bool
-	// registerWithTaints are an array of taints to add to a node object when
+	// RegisterWithTaints are an array of taints to add to a node object when
 	// the kubelet registers itself. This only takes effect when registerNode
 	// is true and upon the initial registration of the node.
 	RegisterWithTaints []api.Taint
-	// contentType is contentType of requests sent to apiserver.
+	// ContentType is contentType of requests sent to apiserver.
 	ContentType string
-	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
+	// KubeAPIQPS is the QPS to use while talking with kubernetes apiserver
 	KubeAPIQPS int32
-	// kubeAPIBurst is the burst to allow while talking with kubernetes
+	// KubeAPIBurst is the burst to allow while talking with kubernetes
 	// apiserver
 	KubeAPIBurst int32
-	// serializeImagePulls when enabled, tells the Kubelet to pull images one
+	// SerializeImagePulls when enabled, tells the Kubelet to pull images one
 	// at a time. We recommend *not* changing the default value on nodes that
 	// run docker daemon with version  < 1.9 or an Aufs storage backend.
 	// Issue #10959 has more details.
 	SerializeImagePulls bool
-	// outOfDiskTransitionFrequency is duration for which the kubelet has to
+	// OutOfDiskTransitionFrequency is duration for which the kubelet has to
 	// wait before transitioning out of out-of-disk node condition status.
 	// +optional
 	OutOfDiskTransitionFrequency metav1.Duration
-	// nodeLabels to add when registering the node in the cluster.
+	// NodeLabels to add when registering the node in the cluster.
 	NodeLabels map[string]string
-	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
+	// NonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
 	NonMasqueradeCIDR string
 	// enable gathering custom metrics.
 	EnableCustomMetrics bool
-	// Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
+	// Comma-delimited list of hard eviction expressions. For example, 'memory.available<300Mi'.
 	// +optional
 	EvictionHard string
-	// Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.
+	// Comma-delimited list of soft eviction expressions. For example, 'memory.available<300Mi'.
 	// +optional
 	EvictionSoft string
-	// Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
+	// Comma-delimeted list of grace periods for each soft eviction signal. For example, 'memory.available=30s'.
 	// +optional
 	EvictionSoftGracePeriod string
 	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
@@ -441,7 +441,7 @@ type KubeletConfiguration struct {
 	ExperimentalKernelMemcgNotification bool
 	// Maximum number of pods per core. Cannot exceed MaxPods
 	PodsPerCore int32
-	// enableControllerAttachDetach enables the Attach/Detach controller to
+	// EnableControllerAttachDetach enables the Attach/Detach controller to
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations
 	EnableControllerAttachDetach bool
@@ -455,18 +455,18 @@ type KubeletConfiguration struct {
 	// These rules will serve as utility for various components, e.g. kube-proxy.
 	// The rules will be created based on IPTablesMasqueradeBit and IPTablesDropBit.
 	MakeIPTablesUtilChains bool
-	// iptablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT
+	// IPTablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT
 	// Values must be within the range [0, 31].
 	// Warning: Please match the value of corresponding parameter in kube-proxy
 	// TODO: clean up IPTablesMasqueradeBit in kube-proxy
 	IPTablesMasqueradeBit int32
-	// iptablesDropBit is the bit of the iptables fwmark space to use for dropping packets. Kubelet will ensure iptables mark and drop rules.
+	// IPTablesDropBit is the bit of the iptables fwmark space to use for dropping packets. Kubelet will ensure iptables mark and drop rules.
 	// Values must be within the range [0, 31]. Must be different from IPTablesMasqueradeBit
 	IPTablesDropBit int32
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
 	// +optional
 	AllowedUnsafeSysctls []string
-	// featureGates is a string of comma-separated key=value pairs that describe feature
+	// FeatureGates is a string of comma-separated key=value pairs that describe feature
 	// gates for alpha/experimental features.
 	FeatureGates string
 	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
@@ -517,47 +517,47 @@ const (
 )
 
 type KubeletAuthorization struct {
-	// mode is the authorization mode to apply to requests to the kubelet server.
+	// Mode is the authorization mode to apply to requests to the kubelet server.
 	// Valid values are AlwaysAllow and Webhook.
 	// Webhook mode uses the SubjectAccessReview API to determine authorization.
 	Mode KubeletAuthorizationMode
 
-	// webhook contains settings related to Webhook authorization.
+	// Webhook contains settings related to Webhook authorization.
 	Webhook KubeletWebhookAuthorization
 }
 
 type KubeletWebhookAuthorization struct {
-	// cacheAuthorizedTTL is the duration to cache 'authorized' responses from the webhook authorizer.
+	// CacheAuthorizedTTL is the duration to cache 'authorized' responses from the webhook authorizer.
 	CacheAuthorizedTTL metav1.Duration
-	// cacheUnauthorizedTTL is the duration to cache 'unauthorized' responses from the webhook authorizer.
+	// CacheUnauthorizedTTL is the duration to cache 'unauthorized' responses from the webhook authorizer.
 	CacheUnauthorizedTTL metav1.Duration
 }
 
 type KubeletAuthentication struct {
-	// x509 contains settings related to x509 client certificate authentication
+	// X509 contains settings related to x509 client certificate authentication
 	X509 KubeletX509Authentication
-	// webhook contains settings related to webhook bearer token authentication
+	// Webhook contains settings related to webhook bearer token authentication
 	Webhook KubeletWebhookAuthentication
-	// anonymous contains settings related to anonymous authentication
+	// Anonymous contains settings related to anonymous authentication
 	Anonymous KubeletAnonymousAuthentication
 }
 
 type KubeletX509Authentication struct {
-	// clientCAFile is the path to a PEM-encoded certificate bundle. If set, any request presenting a client certificate
+	// ClientCAFile is the path to a PEM-encoded certificate bundle. If set, any request presenting a client certificate
 	// signed by one of the authorities in the bundle is authenticated with a username corresponding to the CommonName,
 	// and groups corresponding to the Organization in the client certificate.
 	ClientCAFile string
 }
 
 type KubeletWebhookAuthentication struct {
-	// enabled allows bearer token authentication backed by the tokenreviews.authentication.k8s.io API
+	// Enabled allows bearer token authentication backed by the tokenreviews.authentication.k8s.io API
 	Enabled bool
-	// cacheTTL enables caching of authentication results
+	// CacheTTL enables caching of authentication results
 	CacheTTL metav1.Duration
 }
 
 type KubeletAnonymousAuthentication struct {
-	// enabled allows anonymous requests to the kubelet server.
+	// Enabled allows anonymous requests to the kubelet server.
 	// Requests that are not rejected by another authentication method are treated as anonymous requests.
 	// Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.
 	Enabled bool
@@ -566,25 +566,25 @@ type KubeletAnonymousAuthentication struct {
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta
 
-	// port is the port that the scheduler's http service runs on.
+	// Port is the port that the scheduler's http service runs on.
 	Port int32
-	// address is the IP address to serve on.
+	// Address is the IP address to serve on.
 	Address string
-	// algorithmProvider is the scheduling algorithm provider to use.
+	// AlgorithmProvider is the scheduling algorithm provider to use.
 	AlgorithmProvider string
-	// policyConfigFile is the filepath to the scheduler policy configuration.
+	// PolicyConfigFile is the filepath to the scheduler policy configuration.
 	PolicyConfigFile string
-	// enableProfiling enables profiling via web interface.
+	// EnableProfiling enables profiling via web interface.
 	EnableProfiling bool
-	// enableContentionProfiling enables lock contention profiling, if enableProfiling is true.
+	// EnableContentionProfiling enables lock contention profiling, if enableProfiling is true.
 	EnableContentionProfiling bool
-	// contentType is contentType of requests sent to apiserver.
+	// ContentType is contentType of requests sent to apiserver.
 	ContentType string
-	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
+	// KubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
 	KubeAPIQPS float32
-	// kubeAPIBurst is the QPS burst to use while talking with kubernetes apiserver.
+	// KubeAPIBurst is the QPS burst to use while talking with kubernetes apiserver.
 	KubeAPIBurst int32
-	// schedulerName is name of the scheduler, used to select which pods
+	// SchedulerName is name of the scheduler, used to select which pods
 	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
 	SchedulerName string
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
@@ -594,7 +594,7 @@ type KubeSchedulerConfiguration struct {
 	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
 	// DEPRECATED: This is no longer used.
 	FailureDomains string
-	// leaderElection defines the configuration of leader election client.
+	// LeaderElection defines the configuration of leader election client.
 	LeaderElection LeaderElectionConfiguration
 	// LockObjectNamespace defines the namespace of the lock object
 	LockObjectNamespace string
@@ -618,35 +618,35 @@ type KubeSchedulerConfiguration struct {
 // LeaderElectionConfiguration defines the configuration of leader election
 // clients for components that can run with leader election enabled.
 type LeaderElectionConfiguration struct {
-	// leaderElect enables a leader election client to gain leadership
+	// LeaderElect enables a leader election client to gain leadership
 	// before executing the main loop. Enable this when running replicated
 	// components for high availability.
 	LeaderElect bool
-	// leaseDuration is the duration that non-leader candidates will wait
+	// LeaseDuration is the duration that non-leader candidates will wait
 	// after observing a leadership renewal until attempting to acquire
 	// leadership of a led but unrenewed leader slot. This is effectively the
 	// maximum duration that a leader can be stopped before it is replaced
 	// by another candidate. This is only applicable if leader election is
 	// enabled.
 	LeaseDuration metav1.Duration
-	// renewDeadline is the interval between attempts by the acting master to
+	// RenewDeadline is the interval between attempts by the acting master to
 	// renew a leadership slot before it stops leading. This must be less
 	// than or equal to the lease duration. This is only applicable if leader
 	// election is enabled.
 	RenewDeadline metav1.Duration
-	// retryPeriod is the duration the clients should wait between attempting
+	// RetryPeriod is the duration the clients should wait between attempting
 	// acquisition and renewal of a leadership. This is only applicable if
 	// leader election is enabled.
 	RetryPeriod metav1.Duration
-	// resourceLock indicates the resource object type that will be used to lock
+	// ResourceLock indicates the resource object type that will be used to lock
 	// during leader election cycles.
 	ResourceLock string
 }
 
 type GroupResource struct {
-	// group is the group portion of the GroupResource.
+	// Group is the group portion of the GroupResource.
 	Group string
-	// resource is the resource portion of the GroupResource.
+	// Resource is the resource portion of the GroupResource.
 	Resource string
 }
 
@@ -660,146 +660,146 @@ type KubeControllerManagerConfiguration struct {
 	// first item for a particular name wins
 	Controllers []string
 
-	// port is the port that the controller-manager's http service runs on.
+	// Port is the port that the controller-manager's http service runs on.
 	Port int32
-	// address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
+	// Address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
 	Address string
-	// useServiceAccountCredentials indicates whether controllers should be run with
+	// UseServiceAccountCredentials indicates whether controllers should be run with
 	// individual service account credentials.
 	UseServiceAccountCredentials bool
-	// cloudProvider is the provider for cloud services.
+	// CloudProvider is the provider for cloud services.
 	CloudProvider string
-	// cloudConfigFile is the path to the cloud provider configuration file.
+	// CloudConfigFile is the path to the cloud provider configuration file.
 	CloudConfigFile string
-	// concurrentEndpointSyncs is the number of endpoint syncing operations
+	// ConcurrentEndpointSyncs is the number of endpoint syncing operations
 	// that will be done concurrently. Larger number = faster endpoint updating,
 	// but more CPU (and network) load.
 	ConcurrentEndpointSyncs int32
-	// concurrentRSSyncs is the number of replica sets that are  allowed to sync
+	// ConcurrentRSSyncs is the number of replica sets that are  allowed to sync
 	// concurrently. Larger number = more responsive replica  management, but more
 	// CPU (and network) load.
 	ConcurrentRSSyncs int32
-	// concurrentRCSyncs is the number of replication controllers that are
+	// ConcurrentRCSyncs is the number of replication controllers that are
 	// allowed to sync concurrently. Larger number = more responsive replica
 	// management, but more CPU (and network) load.
 	ConcurrentRCSyncs int32
-	// concurrentServiceSyncs is the number of services that are
+	// ConcurrentServiceSyncs is the number of services that are
 	// allowed to sync concurrently. Larger number = more responsive service
 	// management, but more CPU (and network) load.
 	ConcurrentServiceSyncs int32
-	// concurrentResourceQuotaSyncs is the number of resource quotas that are
+	// ConcurrentResourceQuotaSyncs is the number of resource quotas that are
 	// allowed to sync concurrently. Larger number = more responsive quota
 	// management, but more CPU (and network) load.
 	ConcurrentResourceQuotaSyncs int32
-	// concurrentDeploymentSyncs is the number of deployment objects that are
+	// ConcurrentDeploymentSyncs is the number of deployment objects that are
 	// allowed to sync concurrently. Larger number = more responsive deployments,
 	// but more CPU (and network) load.
 	ConcurrentDeploymentSyncs int32
-	// concurrentDaemonSetSyncs is the number of daemonset objects that are
+	// ConcurrentDaemonSetSyncs is the number of daemonset objects that are
 	// allowed to sync concurrently. Larger number = more responsive daemonset,
 	// but more CPU (and network) load.
 	ConcurrentDaemonSetSyncs int32
-	// concurrentJobSyncs is the number of job objects that are
+	// ConcurrentJobSyncs is the number of job objects that are
 	// allowed to sync concurrently. Larger number = more responsive jobs,
 	// but more CPU (and network) load.
 	ConcurrentJobSyncs int32
-	// concurrentNamespaceSyncs is the number of namespace objects that are
+	// ConcurrentNamespaceSyncs is the number of namespace objects that are
 	// allowed to sync concurrently.
 	ConcurrentNamespaceSyncs int32
-	// concurrentSATokenSyncs is the number of service account token syncing operations
+	// ConcurrentSATokenSyncs is the number of service account token syncing operations
 	// that will be done concurrently.
 	ConcurrentSATokenSyncs int32
-	// lookupCacheSizeForRC is the size of lookup cache for replication controllers.
+	// LookupCacheSizeForRC is the size of lookup cache for replication controllers.
 	// Larger number = more responsive replica management, but more MEM load.
 	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
 	// DEPRECATED: This is no longer used.
 	LookupCacheSizeForRC int32
-	// lookupCacheSizeForRS is the size of lookup cache for replicatsets.
+	// LookupCacheSizeForRS is the size of lookup cache for replicatsets.
 	// Larger number = more responsive replica management, but more MEM load.
 	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
 	// DEPRECATED: This is no longer used.
 	LookupCacheSizeForRS int32
-	// lookupCacheSizeForDaemonSet is the size of lookup cache for daemonsets.
+	// LookupCacheSizeForDaemonSet is the size of lookup cache for daemonsets.
 	// Larger number = more responsive daemonset, but more MEM load.
 	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
 	// DEPRECATED: This is no longer used.
 	LookupCacheSizeForDaemonSet int32
-	// serviceSyncPeriod is the period for syncing services with their external
+	// ServiceSyncPeriod is the period for syncing services with their external
 	// load balancers.
 	ServiceSyncPeriod metav1.Duration
-	// nodeSyncPeriod is the period for syncing nodes from cloudprovider. Longer
+	// NodeSyncPeriod is the period for syncing nodes from cloudprovider. Longer
 	// periods will result in fewer calls to cloud provider, but may delay addition
 	// of new nodes to cluster.
 	NodeSyncPeriod metav1.Duration
-	// routeReconciliationPeriod is the period for reconciling routes created for Nodes by cloud provider..
+	// RouteReconciliationPeriod is the period for reconciling routes created for Nodes by cloud provider..
 	RouteReconciliationPeriod metav1.Duration
-	// resourceQuotaSyncPeriod is the period for syncing quota usage status
+	// ResourceQuotaSyncPeriod is the period for syncing quota usage status
 	// in the system.
 	ResourceQuotaSyncPeriod metav1.Duration
-	// namespaceSyncPeriod is the period for syncing namespace life-cycle
+	// NamespaceSyncPeriod is the period for syncing namespace life-cycle
 	// updates.
 	NamespaceSyncPeriod metav1.Duration
-	// pvClaimBinderSyncPeriod is the period for syncing persistent volumes
+	// PVClaimBinderSyncPeriod is the period for syncing persistent volumes
 	// and persistent volume claims.
 	PVClaimBinderSyncPeriod metav1.Duration
-	// minResyncPeriod is the resync period in reflectors; will be random between
+	// MinResyncPeriod is the resync period in reflectors; will be random between
 	// minResyncPeriod and 2*minResyncPeriod.
 	MinResyncPeriod metav1.Duration
-	// terminatedPodGCThreshold is the number of terminated pods that can exist
+	// TerminatedPodGCThreshold is the number of terminated pods that can exist
 	// before the terminated pod garbage collector starts deleting terminated pods.
 	// If <= 0, the terminated pod garbage collector is disabled.
 	TerminatedPodGCThreshold int32
-	// horizontalPodAutoscalerSyncPeriod is the period for syncing the number of
+	// HorizontalPodAutoscalerSyncPeriod is the period for syncing the number of
 	// pods in horizontal pod autoscaler.
 	HorizontalPodAutoscalerSyncPeriod metav1.Duration
-	// horizontalPodAutoscalerUpscaleForbiddenWindow is a period after which next upscale allowed.
+	// HorizontalPodAutoscalerUpscaleForbiddenWindow is a period after which next upscale allowed.
 	HorizontalPodAutoscalerUpscaleForbiddenWindow metav1.Duration
-	// horizontalPodAutoscalerDownscaleForbiddenWindow is a period after which next downscale allowed.
+	// HorizontalPodAutoscalerDownscaleForbiddenWindow is a period after which next downscale allowed.
 	HorizontalPodAutoscalerDownscaleForbiddenWindow metav1.Duration
-	// deploymentControllerSyncPeriod is the period for syncing the deployments.
+	// DeploymentControllerSyncPeriod is the period for syncing the deployments.
 	DeploymentControllerSyncPeriod metav1.Duration
-	// podEvictionTimeout is the grace period for deleting pods on failed nodes.
+	// PodEvictionTimeout is the grace period for deleting pods on failed nodes.
 	PodEvictionTimeout metav1.Duration
-	// DEPRECATED: deletingPodsQps is the number of nodes per second on which pods are deleted in
+	// DEPRECATED: DeletingPodsQps is the number of nodes per second on which pods are deleted in
 	// case of node failure.
 	DeletingPodsQps float32
-	// DEPRECATED: deletingPodsBurst is the number of nodes on which pods are bursty deleted in
+	// DEPRECATED: DeletingPodsBurst is the number of nodes on which pods are bursty deleted in
 	// case of node failure. For more details look into RateLimiter.
 	DeletingPodsBurst int32
-	// nodeMontiorGracePeriod is the amount of time which we allow a running node to be
+	// NodeMonitorGracePeriod is the amount of time which we allow a running node to be
 	// unresponsive before marking it unhealthy. Must be N times more than kubelet's
-	// nodeStatusUpdateFrequency, where N means number of retries allowed for kubelet
+	// NodeStatusUpdateFrequency, where N means number of retries allowed for kubelet
 	// to post node status.
 	NodeMonitorGracePeriod metav1.Duration
-	// registerRetryCount is the number of retries for initial node registration.
+	// RegisterRetryCount is the number of retries for initial node registration.
 	// Retry interval equals node-sync-period.
 	RegisterRetryCount int32
-	// nodeStartupGracePeriod is the amount of time which we allow starting a node to
+	// NodeStartupGracePeriod is the amount of time which we allow starting a node to
 	// be unresponsive before marking it unhealthy.
 	NodeStartupGracePeriod metav1.Duration
-	// nodeMonitorPeriod is the period for syncing NodeStatus in NodeController.
+	// NodeMonitorPeriod is the period for syncing NodeStatus in NodeController.
 	NodeMonitorPeriod metav1.Duration
-	// serviceAccountKeyFile is the filename containing a PEM-encoded private RSA key
+	// ServiceAccountKeyFile is the filename containing a PEM-encoded private RSA key
 	// used to sign service account tokens.
 	ServiceAccountKeyFile string
-	// clusterSigningCertFile is the filename containing a PEM-encoded
+	// ClusterSigningCertFile is the filename containing a PEM-encoded
 	// X509 CA certificate used to issue cluster-scoped certificates
 	ClusterSigningCertFile string
-	// clusterSigningCertFile is the filename containing a PEM-encoded
+	// ClusterSigningKeyFile is the filename containing a PEM-encoded
 	// RSA or ECDSA private key used to issue cluster-scoped certificates
 	ClusterSigningKeyFile string
-	// clusterSigningDuration is the length of duration signed certificates
+	// ClusterSigningDuration is the length of duration signed certificates
 	// will be given.
 	ClusterSigningDuration metav1.Duration
 	// enableProfiling enables profiling via web interface host:port/debug/pprof/
 	EnableProfiling bool
-	// enableContentionProfiling enables lock contention profiling, if enableProfiling is true.
+	// EnableContentionProfiling enables lock contention profiling, if enableProfiling is true.
 	EnableContentionProfiling bool
-	// clusterName is the instance prefix for the cluster.
+	// ClusterName is the instance prefix for the cluster.
 	ClusterName string
-	// clusterCIDR is CIDR Range for Pods in cluster.
+	// ClusterCIDR is CIDR Range for Pods in cluster.
 	ClusterCIDR string
-	// serviceCIDR is CIDR Range for Services in cluster.
+	// ServiceCIDR is CIDR Range for Services in cluster.
 	ServiceCIDR string
 	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
 	NodeCIDRMaskSize int32
@@ -808,21 +808,21 @@ type KubeControllerManagerConfiguration struct {
 	AllocateNodeCIDRs bool
 	// CIDRAllocatorType determines what kind of pod CIDR allocator will be used.
 	CIDRAllocatorType string
-	// configureCloudRoutes enables CIDRs allocated with allocateNodeCIDRs
+	// ConfigureCloudRoutes enables CIDRs allocated with AllocateNodeCIDRs
 	// to be configured on the cloud provider.
 	ConfigureCloudRoutes bool
-	// rootCAFile is the root certificate authority will be included in service
+	// RootCAFile is the root certificate authority will be included in service
 	// account's token secret. This must be a valid PEM-encoded CA bundle.
 	RootCAFile string
-	// contentType is contentType of requests sent to apiserver.
+	// ContentType is contentType of requests sent to apiserver.
 	ContentType string
-	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
+	// KubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
 	KubeAPIQPS float32
-	// kubeAPIBurst is the burst to use while talking with kubernetes apiserver.
+	// KubeAPIBurst is the burst to use while talking with kubernetes apiserver.
 	KubeAPIBurst int32
-	// leaderElection defines the configuration of leader election client.
+	// LeaderElection defines the configuration of leader election client.
 	LeaderElection LeaderElectionConfiguration
-	// volumeConfiguration holds configuration for volume related features.
+	// VolumeConfiguration holds configuration for volume related features.
 	VolumeConfiguration VolumeConfiguration
 	// How long to wait between starting controller managers
 	ControllerStartInterval metav1.Duration
@@ -830,19 +830,19 @@ type KubeControllerManagerConfiguration struct {
 	// corresponding flag of the kube-apiserver. WARNING: the generic garbage
 	// collector is an alpha feature.
 	EnableGarbageCollector bool
-	// concurrentGCSyncs is the number of garbage collector workers that are
+	// ConcurrentGCSyncs is the number of garbage collector workers that are
 	// allowed to sync concurrently.
 	ConcurrentGCSyncs int32
-	// gcIgnoredResources is the list of GroupResources that garbage collection should ignore.
+	// GCIgnoredResources is the list of GroupResources that garbage collection should ignore.
 	GCIgnoredResources []GroupResource
-	// nodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
+	// NodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
 	NodeEvictionRate float32
-	// secondaryNodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is unhealthy
+	// SecondaryNodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is unhealthy
 	SecondaryNodeEvictionRate float32
-	// secondaryNodeEvictionRate is implicitly overridden to 0 for clusters smaller than or equal to largeClusterSizeThreshold
+	// SecondaryNodeEvictionRate is implicitly overridden to 0 for clusters smaller than or equal to LargeClusterSizeThreshold
 	LargeClusterSizeThreshold int32
-	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
-	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
+	// Zone is treated as unhealthy in NodeEvictionRate and SecondaryNodeEvictionRate when at least
+	// UnhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
 	UnhealthyZoneThreshold float32
 	// Reconciler runs a periodic loop to reconcile the desired state of the with
 	// the actual state of the world by triggering attach detach operations.
@@ -866,43 +866,43 @@ type KubeControllerManagerConfiguration struct {
 // are then passed to the appropriate plugin. The ControllerManager binary is the only part
 // of the code which knows what plugins are supported and which flags correspond to each plugin.
 type VolumeConfiguration struct {
-	// enableHostPathProvisioning enables HostPath PV provisioning when running without a
+	// EnableHostPathProvisioning enables HostPath PV provisioning when running without a
 	// cloud provider. This allows testing and development of provisioning features. HostPath
 	// provisioning is not supported in any way, won't work in a multi-node cluster, and
 	// should not be used for anything other than testing or development.
 	EnableHostPathProvisioning bool
-	// enableDynamicProvisioning enables the provisioning of volumes when running within an environment
+	// EnableDynamicProvisioning enables the provisioning of volumes when running within an environment
 	// that supports dynamic provisioning. Defaults to true.
 	EnableDynamicProvisioning bool
-	// persistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.
+	// PersistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.
 	PersistentVolumeRecyclerConfiguration PersistentVolumeRecyclerConfiguration
-	// volumePluginDir is the full path of the directory in which the flex
+	// FlexVolumePluginDir is the full path of the directory in which the flex
 	// volume plugin should search for additional third party volume plugins
 	FlexVolumePluginDir string
 }
 
 type PersistentVolumeRecyclerConfiguration struct {
-	// maximumRetry is number of retries the PV recycler will execute on failure to recycle
+	// MaximumRetry is number of retries the PV Recycler will execute on failure to recycle
 	// PV.
 	MaximumRetry int32
-	// minimumTimeoutNFS is the minimum ActiveDeadlineSeconds to use for an NFS Recycler
+	// MinimumTimeoutNFS is the minimum ActiveDeadlineSeconds to use for an NFS Recycler
 	// pod.
 	MinimumTimeoutNFS int32
-	// podTemplateFilePathNFS is the file path to a pod definition used as a template for
+	// PodTemplateFilePathNFS is the file path to a pod definition used as a template for
 	// NFS persistent volume recycling
 	PodTemplateFilePathNFS string
-	// incrementTimeoutNFS is the increment of time added per Gi to ActiveDeadlineSeconds
+	// IncrementTimeoutNFS is the increment of time added per Gi to ActiveDeadlineSeconds
 	// for an NFS scrubber pod.
 	IncrementTimeoutNFS int32
-	// podTemplateFilePathHostPath is the file path to a pod definition used as a template for
+	// PodTemplateFilePathHostPath is the file path to a pod definition used as a template for
 	// HostPath persistent volume recycling. This is for development and testing only and
 	// will not work in a multi-node cluster.
 	PodTemplateFilePathHostPath string
-	// minimumTimeoutHostPath is the minimum ActiveDeadlineSeconds to use for a HostPath
+	// MinimumTimeoutHostPath is the minimum ActiveDeadlineSeconds to use for a HostPath
 	// Recycler pod.  This is for development and testing only and will not work in a multi-node
 	// cluster.
 	MinimumTimeoutHostPath int32
-	// incrementTimeoutHostPath is the increment of time added per Gi to ActiveDeadlineSeconds
+	// IncrementTimeoutHostPath is the increment of time added per Gi to ActiveDeadlineSeconds
 	// for a HostPath scrubber pod.  This is for development and testing only and will not work
 	// in a multi-node cluster.
 	IncrementTimeoutHostPath int32
