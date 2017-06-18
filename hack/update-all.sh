@@ -62,11 +62,20 @@ fi
 
 BASH_TARGETS="
 	update-generated-protobuf
+	update-codegen
 	update-codecgen
+	update-generated-docs
+	update-generated-swagger-docs
+	update-swagger-spec
 	update-openapi-spec
+	update-api-reference-docs
 	update-federation-openapi-spec
-	update-bazel
-    update-gofmt"
+	update-federation-swagger-spec
+	update-federation-generated-swagger-docs
+	update-federation-api-reference-docs
+	update-staging-client-go
+	update-staging-godeps
+	update-bazel"
 
 for t in $BASH_TARGETS; do
 	echo -e "${color_yellow}Updating $t${color_norm}"
