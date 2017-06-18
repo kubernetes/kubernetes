@@ -63,6 +63,7 @@ spec:
     name: srvkube
   - hostPath:
       path: /var/log/kube-apiserver.log
+      type: FileOrCreate
     name: logfile
   - hostPath:
       path: /etc/ssl
