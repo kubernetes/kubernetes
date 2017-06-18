@@ -67,7 +67,7 @@ var (
 	jobColumns                       = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
 	cronJobColumns                   = []string{"NAME", "SCHEDULE", "SUSPEND", "ACTIVE", "LAST-SCHEDULE"}
 	batchJobWideColumns              = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
-	serviceColumns                   = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
+	serviceColumns                   = []string{"NAME", "TYPE", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
 	serviceWideColumns               = []string{"SELECTOR"}
 	ingressColumns                   = []string{"NAME", "HOSTS", "ADDRESS", "PORTS", "AGE"}
 	statefulSetColumns               = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
@@ -711,7 +711,7 @@ func getServiceExternalIP(svc *api.Service, wide bool) string {
 		if len(svc.Spec.ExternalIPs) > 0 {
 			return strings.Join(svc.Spec.ExternalIPs, ",")
 		}
-		return "<nodes>"
+		return "<none>"
 	case api.ServiceTypeLoadBalancer:
 		lbIps := loadBalancerStatusStringer(svc.Status.LoadBalancer, wide)
 		if len(svc.Spec.ExternalIPs) > 0 {
@@ -742,9 +742,8 @@ func makePortString(ports []api.ServicePort) string {
 
 func printService(svc *api.Service, w io.Writer, options printers.PrintOptions) error {
 	name := printers.FormatResourceName(options.Kind, svc.Name, options.WithKind)
-
 	namespace := svc.Namespace
-
+	svcType := svc.Spec.Type
 	internalIP := svc.Spec.ClusterIP
 	externalIP := getServiceExternalIP(svc, options.Wide)
 
@@ -753,8 +752,9 @@ func printService(svc *api.Service, w io.Writer, options printers.PrintOptions) 
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s",
 		name,
+		string(svcType),
 		internalIP,
 		externalIP,
 		makePortString(svc.Spec.Ports),
