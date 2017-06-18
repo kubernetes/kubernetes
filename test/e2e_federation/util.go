@@ -371,7 +371,7 @@ func createBackendPodsOrFail(clusters fedframework.ClusterSlice, namespace strin
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: "gcr.io/google_containers/echoserver:1.4",
+					Image: "gcr.io/google_containers/echoserver:1.6",
 				},
 			},
 			RestartPolicy: v1.RestartPolicyAlways,

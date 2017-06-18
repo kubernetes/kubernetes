@@ -284,9 +284,9 @@ def set_app_version():
     hookenv.application_version_set(version.split(b' v')[-1].rstrip())
 
 
-@when('cdk-addons.configured', 'kube-api-endpoint.connected',
+@when('cdk-addons.configured', 'kube-api-endpoint.available',
       'kube-control.connected')
-def idle_status():
+def idle_status(kube_api, kube_control):
     ''' Signal at the end of the run that we are running. '''
     if not all_kube_system_pods_running():
         hookenv.status_set('waiting', 'Waiting for kube-system pods to start')
