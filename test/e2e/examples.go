@@ -265,7 +265,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("CassandraStatefulSet", func() {
 		It("should create statefulset", func() {
 			mkpath := func(file string) string {
-				return filepath.Join("examples/storage/cassandra", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/cassandra", file)
 			}
 			serviceYaml := mkpath("cassandra-service.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)

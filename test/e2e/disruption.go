@@ -257,7 +257,7 @@ func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 				Containers: []v1.Container{
 					{
 						Name:  "busybox",
-						Image: "gcr.io/google_containers/echoserver:1.4",
+						Image: "gcr.io/google_containers/echoserver:1.6",
 					},
 				},
 				RestartPolicy: v1.RestartPolicyAlways,
@@ -301,7 +301,7 @@ func waitForPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, exclusive bool) {
 	container := v1.Container{
 		Name:  "busybox",
-		Image: "gcr.io/google_containers/echoserver:1.4",
+		Image: "gcr.io/google_containers/echoserver:1.6",
 	}
 	if exclusive {
 		container.Ports = []v1.ContainerPort{

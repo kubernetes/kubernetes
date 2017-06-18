@@ -268,6 +268,19 @@ func TestValidatePersistentVolumes(t *testing.T) {
 					StorageClassName: "test-storage-class",
 				}),
 		},
+		"bad-hostpath-volume-backsteps": {
+			isExpectedFailure: true,
+			volume: testVolume("foo", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/foo/.."},
+				},
+				StorageClassName: "backstep-hostpath",
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -1101,6 +1114,20 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name: "invalid HostPath backsteps",
+			vol: api.Volume{
+				Name: "hostpath",
+				VolumeSource: api.VolumeSource{
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/mnt/path/..",
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "path",
+			errdetail: "must not contain '..'",
 		},
 		// GcePersistentDisk
 		{

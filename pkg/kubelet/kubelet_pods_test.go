@@ -42,76 +42,137 @@ import (
 )
 
 func TestMakeMounts(t *testing.T) {
-	container := v1.Container{
-		VolumeMounts: []v1.VolumeMount{
-			{
-				MountPath: "/etc/hosts",
-				Name:      "disk",
-				ReadOnly:  false,
+	testCases := map[string]struct {
+		container      v1.Container
+		podVolumes     kubecontainer.VolumeMap
+		expectErr      bool
+		expectedErrMsg string
+		expectedMounts []kubecontainer.Mount
+	}{
+		"valid mounts": {
+			podVolumes: kubecontainer.VolumeMap{
+				"disk":  kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
+				"disk4": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/host"}},
+				"disk5": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/var/lib/kubelet/podID/volumes/empty/disk5"}},
 			},
-			{
-				MountPath: "/mnt/path3",
-				Name:      "disk",
-				ReadOnly:  true,
+			container: v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath: "/etc/hosts",
+						Name:      "disk",
+						ReadOnly:  false,
+					},
+					{
+						MountPath: "/mnt/path3",
+						Name:      "disk",
+						ReadOnly:  true,
+					},
+					{
+						MountPath: "/mnt/path4",
+						Name:      "disk4",
+						ReadOnly:  false,
+					},
+					{
+						MountPath: "/mnt/path5",
+						Name:      "disk5",
+						ReadOnly:  false,
+					},
+				},
 			},
-			{
-				MountPath: "/mnt/path4",
-				Name:      "disk4",
-				ReadOnly:  false,
+			expectedMounts: []kubecontainer.Mount{
+				{
+					Name:           "disk",
+					ContainerPath:  "/etc/hosts",
+					HostPath:       "/mnt/disk",
+					ReadOnly:       false,
+					SELinuxRelabel: false,
+				},
+				{
+					Name:           "disk",
+					ContainerPath:  "/mnt/path3",
+					HostPath:       "/mnt/disk",
+					ReadOnly:       true,
+					SELinuxRelabel: false,
+				},
+				{
+					Name:           "disk4",
+					ContainerPath:  "/mnt/path4",
+					HostPath:       "/mnt/host",
+					ReadOnly:       false,
+					SELinuxRelabel: false,
+				},
+				{
+					Name:           "disk5",
+					ContainerPath:  "/mnt/path5",
+					HostPath:       "/var/lib/kubelet/podID/volumes/empty/disk5",
+					ReadOnly:       false,
+					SELinuxRelabel: false,
+				},
 			},
-			{
-				MountPath: "/mnt/path5",
-				Name:      "disk5",
-				ReadOnly:  false,
+			expectErr: false,
+		},
+		"invalid absolute SubPath": {
+			podVolumes: kubecontainer.VolumeMap{
+				"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
 			},
+			container: v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath: "/mnt/path3",
+						SubPath:   "/must/not/be/absolute",
+						Name:      "disk",
+						ReadOnly:  true,
+					},
+				},
+			},
+			expectErr:      true,
+			expectedErrMsg: "error SubPath `/must/not/be/absolute` must not be an absolute path",
+		},
+		"invalid SubPath with backsteps": {
+			podVolumes: kubecontainer.VolumeMap{
+				"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
+			},
+			container: v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath: "/mnt/path3",
+						SubPath:   "no/backsteps/../allowed",
+						Name:      "disk",
+						ReadOnly:  true,
+					},
+				},
+			},
+			expectErr:      true,
+			expectedErrMsg: "unable to provision SubPath `no/backsteps/../allowed`: must not contain '..'",
 		},
 	}
 
-	podVolumes := kubecontainer.VolumeMap{
-		"disk":  kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
-		"disk4": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/host"}},
-		"disk5": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/var/lib/kubelet/podID/volumes/empty/disk5"}},
-	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			pod := v1.Pod{
+				Spec: v1.PodSpec{
+					HostNetwork: true,
+				},
+			}
 
-	pod := v1.Pod{
-		Spec: v1.PodSpec{
-			HostNetwork: true,
-		},
-	}
+			mounts, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes)
 
-	mounts, _ := makeMounts(&pod, "/pod", &container, "fakepodname", "", "", podVolumes)
+			// validate only the error if we expect an error
+			if tc.expectErr {
+				if err == nil || err.Error() != tc.expectedErrMsg {
+					t.Fatalf("expected error message `%s` but got `%v`", tc.expectedErrMsg, err)
+				}
+				return
+			}
 
-	expectedMounts := []kubecontainer.Mount{
-		{
-			Name:           "disk",
-			ContainerPath:  "/etc/hosts",
-			HostPath:       "/mnt/disk",
-			ReadOnly:       false,
-			SELinuxRelabel: false,
-		},
-		{
-			Name:           "disk",
-			ContainerPath:  "/mnt/path3",
-			HostPath:       "/mnt/disk",
-			ReadOnly:       true,
-			SELinuxRelabel: false,
-		},
-		{
-			Name:           "disk4",
-			ContainerPath:  "/mnt/path4",
-			HostPath:       "/mnt/host",
-			ReadOnly:       false,
-			SELinuxRelabel: false,
-		},
-		{
-			Name:           "disk5",
-			ContainerPath:  "/mnt/path5",
-			HostPath:       "/var/lib/kubelet/podID/volumes/empty/disk5",
-			ReadOnly:       false,
-			SELinuxRelabel: false,
-		},
+			// otherwise validate the mounts
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, tc.expectedMounts, mounts, "mounts of container %+v", tc.container)
+		})
 	}
-	assert.Equal(t, expectedMounts, mounts, "mounts of container %+v", container)
 }
 
 func TestHostsFileContent(t *testing.T) {

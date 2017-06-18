@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
 
@@ -138,6 +139,15 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			return nil, err
 		}
 		if mount.SubPath != "" {
+			if filepath.IsAbs(mount.SubPath) {
+				return nil, fmt.Errorf("error SubPath `%s` must not be an absolute path", mount.SubPath)
+			}
+
+			err = volumevalidation.ValidatePathNoBacksteps(mount.SubPath)
+			if err != nil {
+				return nil, fmt.Errorf("unable to provision SubPath `%s`: %v", mount.SubPath, err)
+			}
+
 			fileinfo, err := os.Lstat(hostPath)
 			if err != nil {
 				return nil, err

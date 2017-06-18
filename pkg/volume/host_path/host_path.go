@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/validation"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -103,6 +104,7 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volum
 	if err != nil {
 		return nil, err
 	}
+
 	return &hostPathMounter{
 		hostPath: &hostPath{path: hostPathVolumeSource.Path},
 		readOnly: readOnly,
@@ -205,6 +207,10 @@ func (b *hostPathMounter) CanMount() error {
 
 // SetUp does nothing.
 func (b *hostPathMounter) SetUp(fsGroup *types.UnixGroupID) error {
+	err := validation.ValidatePathNoBacksteps(b.GetPath())
+	if err != nil {
+		return fmt.Errorf("invalid HostPath `%s`: %v", b.GetPath(), err)
+	}
 	return nil
 }
 
