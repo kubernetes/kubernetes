@@ -26,6 +26,7 @@ go_library(
         "//pkg/bootstrap/api:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
