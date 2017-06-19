@@ -137,12 +137,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--serialize-image-pulls", "false",
 		"--pod-manifest-path", manifestPath,
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
-		// Assign a fixed CIDR to the node because there is no node controller.
-		//
-		// Note: this MUST be in sync with with the IP in
-		// - cluster/gce/config-test.sh and
-		// - test/e2e_node/conformance/run_test.sh.
-		"--pod-cidr", "10.100.0.0/24",
+		"--pod-cidr", "10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
 		"--eviction-pressure-transition-period", "30s",
 		// Apply test framework feature gates by default. This could also be overridden
 		// by kubelet-flags.
