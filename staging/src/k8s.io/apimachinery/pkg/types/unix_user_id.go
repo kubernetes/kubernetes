@@ -16,8 +16,39 @@ limitations under the License.
 
 package types
 
+import (
+	"k8s.io/apimachinery/pkg/openapi"
+
+	"github.com/go-openapi/spec"
+)
+
 // int64 is used as a safe bet against wrap-around (uid's are general
 // int32) and to support uid_t -1, and -2.
 
 type UnixUserID int64
 type UnixGroupID int64
+
+// TODO: these types should be moved to an api definition tree somewhere. I've
+// added these functions to un-break the open api spec (#47448)
+
+func (_ UnixUserID) OpenAPIDefinition() openapi.OpenAPIDefinition {
+	return openapi.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:   []string{"integer"},
+				Format: "int64",
+			},
+		},
+	}
+}
+
+func (_ UnixGroupID) OpenAPIDefinition() openapi.OpenAPIDefinition {
+	return openapi.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:   []string{"integer"},
+				Format: "int64",
+			},
+		},
+	}
+}
