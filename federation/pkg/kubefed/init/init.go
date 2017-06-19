@@ -285,13 +285,25 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 		}
 	}
 
-	fmt.Fprintf(cmdOut, "Creating a namespace %s for federation system components...", i.commonOptions.FederationSystemNamespace)
-	glog.V(4).Infof("Creating a namespace %s for federation system components", i.commonOptions.FederationSystemNamespace)
-	_, err = createNamespace(hostClientset, i.commonOptions.Name, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+	// Getting the namespace to check if it already exists
+	federationNamespace, err := hostClientset.Core().Namespaces().Get(i.commonOptions.FederationSystemNamespace, metav1.GetOptions{})
 	if err != nil {
-		return err
+		// Create the namespace if not exists
+		fmt.Fprintf(cmdOut, "Creating a namespace %s for federation system components...", i.commonOptions.FederationSystemNamespace)
+		glog.V(4).Infof("Creating a namespace %s for federation system components", i.commonOptions.FederationSystemNamespace)
+		ns, err := createNamespace(hostClientset, i.commonOptions.Name, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
+		if err != nil {
+			return fmt.Errorf("Error while trying to create namespace %v\nerr: %v", ns, err)
+		}
+	} else {
+		// If the namespace already exists, add a federation-name annotation
+		fmt.Fprintf(cmdOut, "Adding a federation-name annotation to namespace %s...", federationNamespace.Name)
+		glog.V(4).Infof("Adding a federation-name annotation to namespace %s", federationNamespace.Name)
+		ns, err := addFederationNameAnnotation(hostClientset, i.commonOptions.Name, federationNamespace, i.options.dryRun)
+		if err != nil {
+			return fmt.Errorf("Error while trying to add the federation-name annotation to namespace %v\nerr: %v", ns, err)
+		}
 	}
-
 	fmt.Fprintln(cmdOut, " done")
 
 	fmt.Fprint(cmdOut, "Creating federation control plane service...")
@@ -442,8 +454,22 @@ func createNamespace(clientset client.Interface, federationName, namespace strin
 	if dryRun {
 		return ns, nil
 	}
-
 	return clientset.Core().Namespaces().Create(ns)
+}
+
+func addFederationNameAnnotation(clientset client.Interface, federationName string, namespace *api.Namespace, dryRun bool) (*api.Namespace, error) {
+	annotations := namespace.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{federation.FederationNameAnnotation: federationName}
+	} else {
+		annotations[federation.FederationNameAnnotation] = federationName
+	}
+
+	if dryRun {
+		return namespace, nil
+	}
+
+	return clientset.Core().Namespaces().Update(namespace)
 }
 
 func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcName, federationName, apiserverAdvertiseAddress string, apiserverServiceType v1.ServiceType, dryRun bool) (*api.Service, []string, []string, error) {
