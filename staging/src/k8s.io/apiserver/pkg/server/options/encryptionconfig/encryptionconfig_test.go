@@ -170,22 +170,22 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	// Transforms data using one of them, and tries to untransform using both of them.
 	// Repeats this for both the possible combinations.
 
-	identityFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithIdentityFirst))
+	identityFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithIdentityFirst), nil)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithIdentityFirst)
 	}
 
-	aesGcmFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithAesGcmFirst))
+	aesGcmFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithAesGcmFirst), nil)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesGcmFirst)
 	}
 
-	aesCbcFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithAesCbcFirst))
+	aesCbcFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithAesCbcFirst), nil)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesCbcFirst)
 	}
 
-	secretboxFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithSecretboxFirst))
+	secretboxFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithSecretboxFirst), nil)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithSecretboxFirst)
 	}
@@ -208,6 +208,7 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 		{secretboxFirstTransformer, "secretboxFirst"},
 		{identityFirstTransformer, "identityFirst"},
 	}
+	// TODO: No test for Google KMS right now due to more complex requirements.
 
 	for _, testCase := range transformers {
 		transformedData, err := testCase.Transformer.TransformToStorage(originalText, context)
@@ -233,14 +234,14 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 
 // Throw error if key has no secret
 func TestEncryptionProviderConfigNoSecretForKey(t *testing.T) {
-	if _, err := ParseEncryptionConfiguration(strings.NewReader(incorrectConfigNoSecretForKey)); err == nil {
+	if _, err := ParseEncryptionConfiguration(strings.NewReader(incorrectConfigNoSecretForKey), nil); err == nil {
 		t.Fatalf("invalid configuration file (one key has no secret) got parsed:\n%s", incorrectConfigNoSecretForKey)
 	}
 }
 
 // Throw error if invalid key for AES
 func TestEncryptionProviderConfigInvalidKey(t *testing.T) {
-	if _, err := ParseEncryptionConfiguration(strings.NewReader(incorrectConfigInvalidKey)); err == nil {
+	if _, err := ParseEncryptionConfiguration(strings.NewReader(incorrectConfigInvalidKey), nil); err == nil {
 		t.Fatalf("invalid configuration file (bad AES key) got parsed:\n%s", incorrectConfigInvalidKey)
 	}
 }

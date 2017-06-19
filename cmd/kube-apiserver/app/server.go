@@ -569,7 +569,7 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 	}
 
 	if s.Etcd.EncryptionProviderConfigFilepath != "" {
-		transformerOverrides, err := encryptionconfig.GetTransformerOverrides(s.Etcd.EncryptionProviderConfigFilepath)
+		transformerOverrides, err := encryptionconfig.GetTransformerOverrides(s.Etcd.EncryptionProviderConfigFilepath, s.CloudProvider)
 		if err != nil {
 			return nil, err
 		}

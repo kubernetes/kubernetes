@@ -45,6 +45,8 @@ type ProviderConfig struct {
 	Secretbox *SecretboxConfig `json:"secretbox,omitempty"`
 	// identity is the (empty) configuration for the identity transformer.
 	Identity *IdentityConfig `json:"identity,omitempty"`
+	// gkms is the configuration for the Google KMS transformer.
+	Gkms *GKMSConfig `json:"gkms,omitempty"`
 }
 
 // AESConfig contains the API configuration for an AES transformer.
@@ -69,3 +71,11 @@ type Key struct {
 
 // IdentityConfig is an empty struct to allow identity transformer in provider configuration.
 type IdentityConfig struct{}
+
+// GKMSConfig contains API configuration for Google KMS transformer.
+type GKMSConfig struct {
+	ProjectID string `json:"projectID,omitempty"`
+	Location  string `json:"location,omitempty"`
+	KeyRing   string `json:"keyRing,omitempty"`
+	CryptoKey string `json:"cryptoKey,omitempty"`
+}

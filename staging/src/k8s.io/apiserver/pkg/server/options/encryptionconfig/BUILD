@@ -16,10 +16,12 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/kubeapiserver/options:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/aes:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/gkms:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/identity:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/secretbox:go_default_library",
     ],
