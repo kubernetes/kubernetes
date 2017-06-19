@@ -587,11 +587,7 @@ function start-kubelet {
   fi
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
-    if [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
-      flags+=" --cni-bin-dir=/opt/kubernetes/bin"
-    else
-      flags+=" --network-plugin-dir=/opt/kubernetes/bin"
-    fi
+    flags+=" --cni-bin-dir=/opt/kubernetes/bin"
     flags+=" --network-plugin=${NETWORK_PROVIDER}"
   fi
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
