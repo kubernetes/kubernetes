@@ -87,21 +87,99 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	return activePods
 }
 
+// parseDeviceSpec returns container name or error if device spec is incorrect
+// if container name is empty string, the device will mapped into all containers
+func (kl *Kubelet) parseDeviceSpec(deviceInfo *kubecontainer.DeviceInfo, deviceSpec string) (string, error) {
+	deviceArr := strings.SplitN(deviceSpec, ":", 4)
+	if !filepath.IsAbs(deviceArr[0]) {
+		return "", fmt.Errorf("incorrect value of PathOnHost in device spec: %s", deviceSpec)
+	}
+
+	// number of spec
+	specNum := len(deviceArr)
+
+	// PathOnHost
+	deviceInfo.PathOnHost = deviceArr[0]
+
+	// PathInContainer
+	if specNum > 1 && deviceArr[1] != "" {
+		if !filepath.IsAbs(deviceArr[1]) {
+			return "", fmt.Errorf("incorrect value of PathInContainer in device spec: %s", deviceSpec)
+		}
+		deviceInfo.PathInContainer = deviceArr[1]
+	} else {
+		// If PathInContainer does not specified will be applied PathOnHost value
+		deviceInfo.PathInContainer = deviceInfo.PathOnHost
+	}
+
+	// Permissions
+	if specNum > 2 && deviceArr[2] != "" {
+		if len(deviceArr[2]) > 0 && len(deviceArr[2]) < 4 && strings.ContainsAny(deviceArr[2], "mrw") {
+			deviceInfo.Permissions = deviceArr[2]
+		} else {
+			return "", fmt.Errorf("incorrect value of Permissions in device spec: %s", deviceSpec)
+		}
+	} else {
+		// If permissions does not specified will be applied default value
+		deviceInfo.Permissions = "mrw"
+	}
+
+	if specNum > 3 {
+		return deviceArr[3], nil
+	}
+
+	return "", nil
+}
+
+const AlphaAllowDeviceListAnnotation = "device.alpha.kubernetes.io/allow-list"
+
+func (kl *Kubelet) extractDevicesFromPodAnnotations(pod *v1.Pod, container *v1.Container) ([]kubecontainer.DeviceInfo, error) {
+	var devices []kubecontainer.DeviceInfo
+	if deviceList, found := pod.ObjectMeta.Annotations[AlphaAllowDeviceListAnnotation]; found {
+		deviceListArr := strings.Split(deviceList, ";")
+		for i := range deviceListArr {
+			deviceSpec := strings.TrimSpace(deviceListArr[i])
+			if len(deviceSpec) == 0 {
+				// skip empty spec
+				continue
+			}
+
+			var deviceInfo kubecontainer.DeviceInfo
+			containerName, err := kl.parseDeviceSpec(&deviceInfo, deviceSpec)
+			if err != nil {
+				return nil, err
+			}
+
+			// If container name not specified in device spec,
+			// the device will be mapped to all containers inside Pod
+			if containerName == "" || containerName == container.Name {
+				devices = append(devices, deviceInfo)
+			}
+		}
+	}
+
+	return devices, nil
+}
+
 // makeDevices determines the devices for the given container.
 // Experimental.
 func (kl *Kubelet) makeDevices(pod *v1.Pod, container *v1.Container) ([]kubecontainer.DeviceInfo, error) {
-	if container.Resources.Limits.NvidiaGPU().IsZero() {
-		return nil, nil
-	}
-
-	nvidiaGPUPaths, err := kl.gpuManager.AllocateGPU(pod, container)
+	// Extract devices from pod annotations
+	devices, err := kl.extractDevicesFromPodAnnotations(pod, container)
 	if err != nil {
 		return nil, err
 	}
-	var devices []kubecontainer.DeviceInfo
-	for _, path := range nvidiaGPUPaths {
-		// Devices have to be mapped one to one because of nvidia CUDA library requirements.
-		devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: path, PathInContainer: path, Permissions: "mrw"})
+
+	if !container.Resources.Limits.NvidiaGPU().IsZero() {
+		nvidiaGPUPaths, err := kl.gpuManager.AllocateGPU(pod, container)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, path := range nvidiaGPUPaths {
+			// Devices have to be mapped one to one because of nvidia CUDA library requirements.
+			devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: path, PathInContainer: path, Permissions: "mrw"})
+		}
 	}
 
 	return devices, nil
