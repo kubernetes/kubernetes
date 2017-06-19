@@ -31,7 +31,7 @@ type ResourceConfig struct {
 	// resources is a list of kubernetes resources which have to be encrypted.
 	Resources []string `json:"resources"`
 	// providers is a list of transformers to be used for reading and writing the resources to disk.
-	// eg: aes, identity.
+	// eg: aesgcm, aescbc, secretbox, identity.
 	Providers []ProviderConfig `json:"providers"`
 }
 
@@ -50,20 +50,22 @@ type ProviderConfig struct {
 // AESConfig contains the API configuration for an AES transformer.
 type AESConfig struct {
 	// keys is a list of keys to be used for creating the AES transformer.
+	// Each key has to be 32 bytes long for AES-CBC and 16, 24 or 32 bytes for AES-GCM.
 	Keys []Key `json:"keys"`
 }
 
-// SECRETBOXConfig contains the API configuration for an Secretbox transformer.
+// SecretboxConfig contains the API configuration for an Secretbox transformer.
 type SecretboxConfig struct {
 	// keys is a list of keys to be used for creating the Secretbox transformer.
+	// Each key has to be 32 bytes long.
 	Keys []Key `json:"keys"`
 }
 
-// Key contains name and secret of the provided key for AES transformer.
+// Key contains name and secret of the provided key for a transformer.
 type Key struct {
 	// name is the name of the key to be used while storing data to disk.
 	Name string `json:"name"`
-	// secret is the actual AES key, encoded in base64. It has to be 16, 24 or 32 bytes long.
+	// secret is the actual key, encoded in base64.
 	Secret string `json:"secret"`
 }
 
