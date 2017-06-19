@@ -64,10 +64,6 @@ function get-calico-typha-replicas {
   if [[ "${NUM_NODES}" -gt "500" ]]; then
     typha_count=5
   fi
-  if [[ "${NETWORK_POLICY_PROVIDER:-}" != "calico" ]]; then
-    # We're not configured to use Calico, so don't start any Typhas.
-    typha_count=0
-  fi
   echo "${typha_count}"
 }
 
@@ -911,11 +907,7 @@ function start-kubelet {
   fi
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
-    if [[ "${NETWORK_PROVIDER:-}" == "cni" || "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
-      flags+=" --cni-bin-dir=/home/kubernetes/bin"
-    else
-      flags+=" --network-plugin-dir=/home/kubernetes/bin"
-    fi
+    flags+=" --cni-bin-dir=/home/kubernetes/bin"
     if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
       # Calico uses CNI always.
       flags+=" --network-plugin=cni"
@@ -1702,6 +1694,13 @@ function start-kube-addons {
     sed -i -e "s@__CALICO_NODE_CPU__@$(get-calico-node-cpu)@g" "${ds_file}"
     sed -i -e "s@__CALICO_TYPHA_CPU__@$(get-calico-typha-cpu)@g" "${typha_dep_file}"
     sed -i -e "s@__CALICO_TYPHA_REPLICAS__@$(get-calico-typha-replicas)@g" "${typha_dep_file}"
+  else
+    # If not configured to use Calico, the set the typha replica count to 0, but only if the 
+    # addon is present.
+    local -r typha_dep_file="${dst_dir}/calico-policy-controller/typha-deployment.yaml"
+    if [[ -e $typha_dep_file ]]; then
+      sed -i -e "s@__CALICO_TYPHA_REPLICAS__@0@g" "${typha_dep_file}"
+    fi
   fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"

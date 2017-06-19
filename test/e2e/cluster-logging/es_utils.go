@@ -46,12 +46,8 @@ func newEsLogsProvider(f *framework.Framework) (*esLogsProvider, error) {
 	return &esLogsProvider{Framework: f}, nil
 }
 
-func (logsProvider *esLogsProvider) FluentdApplicationName() string {
-	return "fluentd-es"
-}
-
 // Ensures that elasticsearch is running and ready to serve requests
-func (logsProvider *esLogsProvider) EnsureWorking() error {
+func (logsProvider *esLogsProvider) Init() error {
 	f := logsProvider.Framework
 	// Check for the existence of the Elasticsearch service.
 	By("Checking the Elasticsearch service exists.")
@@ -157,7 +153,11 @@ func (logsProvider *esLogsProvider) EnsureWorking() error {
 	return nil
 }
 
-func (logsProvider *esLogsProvider) ReadEntries(pod *loggingPod) []*logEntry {
+func (logsProvider *esLogsProvider) Cleanup() {
+	// Nothing to do
+}
+
+func (logsProvider *esLogsProvider) ReadEntries(pod *loggingPod) []logEntry {
 	f := logsProvider.Framework
 
 	proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.Core().RESTClient().Get())
@@ -202,7 +202,7 @@ func (logsProvider *esLogsProvider) ReadEntries(pod *loggingPod) []*logEntry {
 		return nil
 	}
 
-	entries := []*logEntry{}
+	entries := []logEntry{}
 	// Iterate over the hits and populate the observed array.
 	for _, e := range h {
 		l, ok := e.(map[string]interface{})
@@ -223,22 +223,12 @@ func (logsProvider *esLogsProvider) ReadEntries(pod *loggingPod) []*logEntry {
 			continue
 		}
 
-		timestampString, ok := source["@timestamp"].(string)
-		if !ok {
-			framework.Logf("Timestamp not of the expected type: %T", source["@timestamp"])
-			continue
-		}
-		timestamp, err := time.Parse(time.RFC3339, timestampString)
-		if err != nil {
-			framework.Logf("Timestamp was not in correct format: %s", timestampString)
-			continue
-		}
-
-		entries = append(entries, &logEntry{
-			Payload:   msg,
-			Timestamp: timestamp,
-		})
+		entries = append(entries, logEntry{Payload: msg})
 	}
 
 	return entries
+}
+
+func (logsProvider *esLogsProvider) FluentdApplicationName() string {
+	return "fluentd-es"
 }

@@ -3,6 +3,8 @@ kind: Pod
 metadata:
   name: kube-addon-manager
   namespace: kube-system
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ''
   labels:
     component: kube-addon-manager
 spec:
