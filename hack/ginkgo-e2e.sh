@@ -136,7 +136,9 @@ fi
 export PATH=$(dirname "${e2e_test}"):"${PATH}"
 "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
+  --ginkgo.focus="should orphan pods created by rc if delete options say so" \
   --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" \
+  --ginkgo.untilItFails="true" \
   --host="${KUBE_MASTER_URL}" \
   --provider="${KUBERNETES_PROVIDER}" \
   --gce-project="${PROJECT:-}" \

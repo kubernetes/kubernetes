@@ -402,6 +402,7 @@ func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents [
 	var errorsSlice []error
 	for _, dependent := range dependents {
 		// the dependent.identity.UID is used as precondition
+		glog.V(1).Infof("CHAO: patching %s", dependent.identity)
 		patch := deleteOwnerRefPatch(dependent.identity.UID, owner.UID)
 		_, err := gc.patchObject(dependent.identity, patch)
 		// note that if the target ownerReference doesn't exist in the
