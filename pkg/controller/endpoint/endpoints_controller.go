@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -67,13 +68,15 @@ var (
 )
 
 // NewEndpointController returns a new *EndpointController.
-func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer, client clientset.Interface) *EndpointController {
+func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
+	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface) *EndpointController {
 	if client != nil && client.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().RESTClient().GetRateLimiter())
 	}
 	e := &EndpointController{
-		client: client,
-		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint"),
+		client:           client,
+		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint"),
+		workerLoopPeriod: time.Second,
 	}
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -98,6 +101,9 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.podLister = podInformer.Lister()
 	e.podsSynced = podInformer.Informer().HasSynced
 
+	e.endpointsLister = endpointsInformer.Lister()
+	e.endpointsSynced = endpointsInformer.Informer().HasSynced
+
 	return e
 }
 
@@ -119,12 +125,22 @@ type EndpointController struct {
 	// Added as a member to the struct to allow injection for testing.
 	podsSynced cache.InformerSynced
 
+	// endpointsLister is able to list/get endpoints and is populated by the shared informer passed to
+	// NewEndpointController.
+	endpointsLister corelisters.EndpointsLister
+	// endpointsSynced returns true if the endpoints shared informer has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	endpointsSynced cache.InformerSynced
+
 	// Services that need to be updated. A channel is inappropriate here,
 	// because it allows services with lots of pods to be serviced much
 	// more often than services with few pods; it also would cause a
 	// service that's inserted multiple times to be processed more than
 	// necessary.
 	queue workqueue.RateLimitingInterface
+
+	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and pod changes.
+	workerLoopPeriod time.Duration
 }
 
 // Runs e; will not return until stopCh is closed. workers determines how many
@@ -136,12 +152,12 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Starting endpoint controller")
 	defer glog.Infof("Shutting down endpoint controller")
 
-	if !controller.WaitForCacheSync("endpoint", stopCh, e.podsSynced, e.servicesSynced) {
+	if !controller.WaitForCacheSync("endpoint", stopCh, e.podsSynced, e.servicesSynced, e.endpointsSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(e.worker, time.Second, stopCh)
+		go wait.Until(e.worker, e.workerLoopPeriod, stopCh)
 	}
 
 	go func() {
@@ -399,7 +415,7 @@ func (e *EndpointController) syncService(key string) error {
 	subsets = endpoints.RepackSubsets(subsets)
 
 	// See if there's actually an update here.
-	currentEndpoints, err := e.client.Core().Endpoints(service.Namespace).Get(service.Name, metav1.GetOptions{})
+	currentEndpoints, err := e.endpointsLister.Endpoints(service.Namespace).Get(service.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			currentEndpoints = &v1.Endpoints{
@@ -418,7 +434,11 @@ func (e *EndpointController) syncService(key string) error {
 		glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 		return nil
 	}
-	newEndpoints := currentEndpoints
+	copy, err := api.Scheme.DeepCopy(currentEndpoints)
+	if err != nil {
+		return err
+	}
+	newEndpoints := copy.(*v1.Endpoints)
 	newEndpoints.Subsets = subsets
 	newEndpoints.Labels = service.Labels
 	if newEndpoints.Annotations == nil {
@@ -454,13 +474,12 @@ func (e *EndpointController) syncService(key string) error {
 // some stragglers could have been left behind if the endpoint controller
 // reboots).
 func (e *EndpointController) checkLeftoverEndpoints() {
-	list, err := e.client.Core().Endpoints(metav1.NamespaceAll).List(metav1.ListOptions{})
+	list, err := e.endpointsLister.List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err))
 		return
 	}
-	for i := range list.Items {
-		ep := &list.Items[i]
+	for _, ep := range list {
 		if _, ok := ep.Annotations[resourcelock.LeaderElectionRecordAnnotationKey]; ok {
 			// when there are multiple controller-manager instances,
 			// we observe that it will delete leader-election endpoints after 5min
