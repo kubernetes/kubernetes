@@ -12,6 +12,7 @@ go_library(
     srcs = ["backend.go"],
     tags = ["automanaged"],
     deps = [
+        "//vendor/gopkg.in/natefinch/lumberjack.v2:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/audit:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/audit:go_default_library",
     ],
