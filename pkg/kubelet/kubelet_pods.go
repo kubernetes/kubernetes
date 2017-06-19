@@ -87,6 +87,8 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	return activePods
 }
 
+// parseDeviceSpec returns container name or error if device spec is incorrect
+// if container name is empty string, the device will mapped into all containers
 func (kl *Kubelet) parseDeviceSpec(deviceInfo *kubecontainer.DeviceInfo, deviceSpec string) (string, error) {
 	deviceArr := strings.SplitN(deviceSpec, ":", 4)
 	if !filepath.IsAbs(deviceArr[0]) {
