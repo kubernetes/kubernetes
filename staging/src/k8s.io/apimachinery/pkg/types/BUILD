@@ -18,4 +18,8 @@ go_library(
         "unix_user_id.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor/github.com/go-openapi/spec:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/openapi:go_default_library",
+    ],
 )
