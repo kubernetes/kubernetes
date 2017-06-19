@@ -1,7 +1,7 @@
 // +build linux
 
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package hugepages
 
 import (
@@ -71,8 +72,12 @@ func TestHugePagesPlugin_CanSupport(t *testing.T) {
 		{
 			shouldDetectHugePages: true,
 			volumeSpec: &v1.Volume{
-				Name:         "test",
-				VolumeSource: v1.VolumeSource{HugePages: &v1.HugePagesVolumeSource{}},
+				Name: "test",
+				VolumeSource: v1.VolumeSource{
+					HugePages: &v1.HugePagesVolumeSource{
+						MaxSize: "10M",
+					},
+				},
 			},
 			expectedResult: true,
 		},
@@ -81,9 +86,9 @@ func TestHugePagesPlugin_CanSupport(t *testing.T) {
 	for _, testCase := range testCases {
 		readFile = func(string) ([]byte, error) {
 			if testCase.shouldDetectHugePages {
-				return []byte("HugePages_Total: 10"), nil
+				return []byte("HugePages_Total: 10 \nHugePages_Free: 10 \nHugepagesize: 2048"), nil
 			}
-			return []byte("HugePages_Total: 0"), nil
+			return []byte(fmt.Sprintf("HugePages_Total: 0 \n Hugepagesize: 2048")), nil
 
 		}
 		canSupport := plug.CanSupport(&volume.Spec{Volume: testCase.volumeSpec})
@@ -91,36 +96,55 @@ func TestHugePagesPlugin_CanSupport(t *testing.T) {
 	}
 }
 
-func TestDetectHugePages(t *testing.T) {
+func TestGetNumHugePages(t *testing.T) {
 	testCases := []struct {
-		expectedOutput  error
-		input           string
-		isInputReadable bool
+		expectedHugePagesTotal int64
+		expectedHugePagesFree  int64
+		shouldFail             bool
+		input                  string
+		isInputReadable        bool
 	}{
 		{
-			expectedOutput:  fmt.Errorf("error has occurred"),
-			input:           "",
-			isInputReadable: false,
+			shouldFail:             true,
+			input:                  "",
+			isInputReadable:        false,
+			expectedHugePagesFree:  0,
+			expectedHugePagesTotal: 0,
 		},
 		{
-			expectedOutput:  fmt.Errorf("Cannot parse /proc/meminfo"),
-			input:           "HugePages_Total",
-			isInputReadable: true,
+			shouldFail:             true,
+			input:                  "HugePages_Total",
+			isInputReadable:        true,
+			expectedHugePagesFree:  0,
+			expectedHugePagesTotal: 0,
 		},
 		{
-			expectedOutput:  fmt.Errorf("Cannot parse huge pages value"),
-			input:           "HugePages_Total: xyz",
-			isInputReadable: true,
+			shouldFail:             true,
+			input:                  "HugePages_Total: xyz",
+			isInputReadable:        true,
+			expectedHugePagesFree:  0,
+			expectedHugePagesTotal: 0,
 		},
 		{
-			expectedOutput:  fmt.Errorf("No huge pages was detected"),
-			input:           "",
-			isInputReadable: true,
+			shouldFail:             true,
+			input:                  "",
+			isInputReadable:        true,
+			expectedHugePagesFree:  0,
+			expectedHugePagesTotal: 0,
 		},
 		{
-			expectedOutput:  nil,
-			input:           "HugePages_Total: 512",
-			isInputReadable: true,
+			shouldFail:             false,
+			input:                  "HugePages_Total: 512 \nHugepagesize: 2048",
+			isInputReadable:        true,
+			expectedHugePagesFree:  0,
+			expectedHugePagesTotal: 512 * 2048,
+		},
+		{
+			shouldFail:             false,
+			input:                  "HugePages_Free: 400 \nHugepagesize: 1000",
+			isInputReadable:        true,
+			expectedHugePagesFree:  400 * 1000,
+			expectedHugePagesTotal: 0,
 		},
 	}
 	for _, testCase := range testCases {
@@ -130,8 +154,14 @@ func TestDetectHugePages(t *testing.T) {
 			}
 			return []byte(testCase.input), nil
 		}
-		output := detectHugepages()
-		assert.Equal(t, testCase.expectedOutput, output)
+		hugePagesTotal, hugePagesFree, err := getNumHugepages()
+		if testCase.shouldFail == true && err == nil {
+			t.Error("Test should fail")
+		} else if testCase.shouldFail == false && err != nil {
+			t.Error("Test shouldn't fail")
+		}
+		assert.Equal(t, testCase.expectedHugePagesFree, hugePagesFree)
+		assert.Equal(t, testCase.expectedHugePagesTotal, hugePagesTotal)
 	}
 }
 

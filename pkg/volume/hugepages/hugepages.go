@@ -1,3 +1,19 @@
+/*
+Copyright 2017 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package hugepages
 
 import (
@@ -9,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -37,6 +54,8 @@ var _ volume.VolumePlugin = &hugePagesPlugin{}
 const (
 	hugePagesPluginName  = "kubernetes.io/hugepages"
 	hugePagesTotalString = "HugePages_Total"
+	hugePagesFreeString  = "HugePages_Free"
+	hugePagesSizeString  = "Hugepagesize"
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -62,40 +81,76 @@ func (plugin *hugePagesPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 
 var readFile = ioutil.ReadFile
 
-func detectHugepages() error {
+func parseMeminfoLine(fieldName string, line string) (int64, error) {
+	// line is representing key-value data in following form 'key: value'
+	lineSplitted := strings.Split(line, ":")
+	if len(lineSplitted) != 2 {
+		return 0, fmt.Errorf("Cannot parse /proc/meminfo")
+	}
+	value, err := strconv.Atoi(strings.TrimSpace(lineSplitted[1]))
+	if err != nil {
+		return 0, fmt.Errorf("Cannot parse %s value", fieldName)
+	}
+	if value <= 0 {
+		return 0, fmt.Errorf("No %s was detected", fieldName)
+	}
+	return int64(value), nil
+}
+
+func getNumHugepages() (int64, int64, error) {
 	data, err := readFile("/proc/meminfo")
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
+	var hugePagesTotal, hugePagesFree, hugePagesSize int64
 
 	for _, line := range strings.Split(string(data), "\n") {
 		if strings.HasPrefix(line, hugePagesTotalString) {
-			// line is representing key-value data in following form 'key: value'
-			lineSplitted := strings.Split(line, ":")
-			if len(lineSplitted) != 2 {
-				return fmt.Errorf("Cannot parse /proc/meminfo")
+			if hugePagesTotal, err = parseMeminfoLine(hugePagesTotalString, line); err != nil {
+				return 0, 0, err
 			}
-			value, err := strconv.Atoi(strings.TrimSpace(lineSplitted[1]))
+		}
+		if strings.HasPrefix(line, hugePagesFreeString) {
+			if hugePagesFree, err = parseMeminfoLine(hugePagesFreeString, line); err != nil {
+				return 0, 0, err
+			}
+		}
+		// Hugepagesize is always in kB https://github.com/torvalds/linux/blob/master/mm/hugetlb.c#L2999
+		if strings.HasPrefix(line, hugePagesSizeString) {
+			hugePagesSize, err = parseMeminfoLine(hugePagesSizeString, line)
 			if err != nil {
-				return fmt.Errorf("Cannot parse huge pages value")
+				return 0, 0, err
 			}
-			if value <= 0 {
-				return fmt.Errorf("No huge pages was detected")
-			}
-			return nil
 		}
 	}
-	return fmt.Errorf("No huge pages was detected")
+
+	if hugePagesSize == 0 {
+		return 0, 0, fmt.Errorf("Cannot find Hugepagesize")
+	}
+	// return hugePagesTotal and hugePagesFree in kB
+	return hugePagesTotal * hugePagesSize, hugePagesFree * hugePagesSize, nil
 }
 
 func (plugin *hugePagesPlugin) CanSupport(spec *volume.Spec) bool {
-	if err := detectHugepages(); err != nil {
+	hugePagesTotal, hugePagesFree, err := getNumHugepages()
+	if err != nil {
 		return false
 	}
-	if spec.Volume != nil && spec.Volume.HugePages != nil {
-		return true
+	if spec.Volume == nil || spec.Volume.HugePages == nil {
+		return false
 	}
-	return false
+
+	maxSize, err := resource.ParseQuantity(spec.Volume.HugePages.MaxSize)
+	if err != nil {
+		return false
+	}
+	maxSizeInKB := maxSize.ScaledValue(resource.Kilo)
+
+	if maxSizeInKB > hugePagesTotal || maxSizeInKB > hugePagesFree {
+		return false
+	}
+
+	return true
 }
 
 func (plugin *hugePagesPlugin) RequiresRemount() bool {

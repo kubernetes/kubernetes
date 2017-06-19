@@ -742,7 +742,7 @@ func validateHugePagesVolumeSource(hugePages *api.HugePagesVolumeSource, fldPath
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSize"), hugePages.MaxSize, "Not a valid quantity"))
 	} else {
 		if maxSize.ScaledValue(resource.Mega) < 2 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSize"), hugePages.MaxSize, "MaxSize lower than pageSize"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSize"), hugePages.MaxSize, "MaxSize is lower than pageSize"))
 		}
 	}
 	minSize, err := resource.ParseQuantity(hugePages.MinSize)
@@ -750,7 +750,10 @@ func validateHugePagesVolumeSource(hugePages *api.HugePagesVolumeSource, fldPath
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("minSize"), hugePages.MinSize, "Not a valid quantity"))
 	} else {
 		if minSize.ScaledValue(resource.Mega) < 2 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("minSize"), hugePages.MinSize, "MaxSize lower than pageSize"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("minSize"), hugePages.MinSize, "MaxSize is lower than pageSize"))
+		}
+		if minSize.ScaledValue(resource.Mega) > maxSize.ScaledValue(resource.Mega) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("minSize"), hugePages.MinSize, "MinSize is bigger than maxSize"))
 		}
 	}
 	return allErrs

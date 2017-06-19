@@ -16,5 +16,5 @@ spec:
   - name: hugepage
     hugePages: 
       pageSize: "2M"
-      maxSize: "200M"
+      size: "200M"
   hostNetwork: true
