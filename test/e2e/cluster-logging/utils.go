@@ -33,13 +33,16 @@ import (
 
 const (
 	// Duration of delay between any two attempts to check if all logs are ingested
-	ingestionRetryDelay = 100 * time.Second
+	ingestionRetryDelay = 30 * time.Second
 
 	// Amount of requested cores for logging container in millicores
 	loggingContainerCpuRequest = 10
 
 	// Amount of requested memory for logging container in bytes
 	loggingContainerMemoryRequest = 10 * 1024 * 1024
+
+	// Name of the container used for logging tests
+	loggingContainerName = "logging-container"
 )
 
 var (
@@ -51,26 +54,21 @@ var (
 type loggingPod struct {
 	// Name of the pod
 	Name string
-	// If we didn't read some log entries, their
-	// timestamps should be no less than this timestamp.
-	// Effectively, timestamp of the last ingested entry
-	// for which there's no missing entry before it
-	LastTimestamp time.Time
 	// Cache of ingested and read entries
-	Occurrences map[int]*logEntry
+	Occurrences map[int]logEntry
 	// Number of lines expected to be ingested from this pod
 	ExpectedLinesNumber int
 }
 
 type logEntry struct {
-	Payload   string
-	Timestamp time.Time
+	Payload string
 }
 
 type logsProvider interface {
+	Init() error
+	Cleanup()
+	ReadEntries(*loggingPod) []logEntry
 	FluentdApplicationName() string
-	EnsureWorking() error
-	ReadEntries(*loggingPod) []*logEntry
 }
 
 type loggingTestConfig struct {
@@ -81,7 +79,7 @@ type loggingTestConfig struct {
 	MaxAllowedFluentdRestarts int
 }
 
-func (entry *logEntry) getLogEntryNumber() (int, bool) {
+func (entry logEntry) getLogEntryNumber() (int, bool) {
 	submatch := logEntryMessageRegex.FindStringSubmatch(entry.Payload)
 	if submatch == nil || len(submatch) < 2 {
 		return 0, false
@@ -96,10 +94,8 @@ func createLoggingPod(f *framework.Framework, podName string, nodeName string, t
 	createLogsGeneratorPod(f, podName, nodeName, totalLines, loggingDuration)
 
 	return &loggingPod{
-		Name: podName,
-		// It's used to avoid querying logs from before the pod was started
-		LastTimestamp:       time.Now(),
-		Occurrences:         make(map[int]*logEntry),
+		Name:                podName,
+		Occurrences:         make(map[int]logEntry),
 		ExpectedLinesNumber: totalLines,
 	}
 }
@@ -113,7 +109,7 @@ func createLogsGeneratorPod(f *framework.Framework, podName string, nodeName str
 			RestartPolicy: api_v1.RestartPolicyNever,
 			Containers: []api_v1.Container{
 				{
-					Name:  podName,
+					Name:  loggingContainerName,
 					Image: "gcr.io/google_containers/logs-generator:v0.1.0",
 					Env: []api_v1.EnvVar{
 						{
@@ -146,7 +142,7 @@ func waitForSomeLogs(f *framework.Framework, config *loggingTestConfig) error {
 	podHasIngestedLogs := make([]bool, len(config.Pods))
 	podWithIngestedLogsCount := 0
 
-	for start := time.Now(); podWithIngestedLogsCount < len(config.Pods) && time.Since(start) < config.IngestionTimeout; time.Sleep(ingestionRetryDelay) {
+	for start := time.Now(); time.Since(start) < config.IngestionTimeout; time.Sleep(ingestionRetryDelay) {
 		for podIdx, pod := range config.Pods {
 			if podHasIngestedLogs[podIdx] {
 				continue
@@ -166,6 +162,10 @@ func waitForSomeLogs(f *framework.Framework, config *loggingTestConfig) error {
 					break
 				}
 			}
+		}
+
+		if podWithIngestedLogsCount == len(config.Pods) {
+			break
 		}
 	}
 
@@ -189,7 +189,7 @@ func waitForFullLogsIngestion(f *framework.Framework, config *loggingTestConfig)
 		missingByPod[podIdx] = pod.ExpectedLinesNumber
 	}
 
-	for start := time.Now(); totalMissing > 0 && time.Since(start) < config.IngestionTimeout; time.Sleep(ingestionRetryDelay) {
+	for start := time.Now(); time.Since(start) < config.IngestionTimeout; time.Sleep(ingestionRetryDelay) {
 		missing := 0
 		for podIdx, pod := range config.Pods {
 			if missingByPod[podIdx] == 0 {
@@ -203,6 +203,8 @@ func waitForFullLogsIngestion(f *framework.Framework, config *loggingTestConfig)
 		totalMissing = missing
 		if totalMissing > 0 {
 			framework.Logf("Still missing %d lines in total", totalMissing)
+		} else {
+			break
 		}
 	}
 
@@ -245,18 +247,13 @@ func pullMissingLogsCount(logsProvider logsProvider, pod *loggingPod) int {
 	if err != nil {
 		framework.Logf("Failed to get missing lines count from pod %s due to %v", pod.Name, err)
 		return pod.ExpectedLinesNumber
-	} else if missingOnPod > 0 {
-		framework.Logf("Pod %s is missing %d lines", pod.Name, missingOnPod)
-	} else {
-		framework.Logf("All logs from pod %s are ingested", pod.Name)
 	}
+
 	return missingOnPod
 }
 
 func getMissingLinesCount(logsProvider logsProvider, pod *loggingPod) (int, error) {
 	entries := logsProvider.ReadEntries(pod)
-
-	framework.Logf("Got %d entries from provider", len(entries))
 
 	for _, entry := range entries {
 		lineNumber, ok := entry.getLogEntryNumber()
@@ -268,17 +265,6 @@ func getMissingLinesCount(logsProvider logsProvider, pod *loggingPod) (int, erro
 			framework.Logf("Unexpected line number: %d", lineNumber)
 		} else {
 			pod.Occurrences[lineNumber] = entry
-		}
-	}
-
-	for i := 0; i < pod.ExpectedLinesNumber; i++ {
-		entry, ok := pod.Occurrences[i]
-		if !ok {
-			break
-		}
-
-		if entry.Timestamp.After(pod.LastTimestamp) {
-			pod.LastTimestamp = entry.Timestamp
 		}
 	}
 
