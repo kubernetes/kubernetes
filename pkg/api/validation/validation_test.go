@@ -2364,6 +2364,21 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeInvalid,
 			errfield: "hugePages.pageSize",
 		},
+		{
+			name: "minSize bigger than maxSize",
+			vol: api.Volume{
+				Name: "hugepages-volume",
+				VolumeSource: api.VolumeSource{
+					HugePages: &api.HugePagesVolumeSource{
+						PageSize: "2M",
+						MaxSize:  "100M",
+						MinSize:  "120M",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "hugePages.minSize",
+		},
 	}
 
 	for i, tc := range testCases {
