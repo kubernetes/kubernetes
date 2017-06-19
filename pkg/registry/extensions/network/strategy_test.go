@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package internalversion
+package network
 
-type DaemonSetExpansion interface{}
+import (
+	"testing"
 
-type IngressExpansion interface{}
+	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+)
 
-type NetworkExpansion interface{}
-
-type NetworkPolicyExpansion interface{}
-
-type PodSecurityPolicyExpansion interface{}
-
-type ReplicaSetExpansion interface{}
-
-type ThirdPartyResourceExpansion interface{}
+func TestSelectableFieldLabelConversions(t *testing.T) {
+	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
+		testapi.Extensions.GroupVersion().String(),
+		"Network",
+		NetworkStrategyToSelectableFields(&extensions.Network{}),
+		nil,
+	)
+}

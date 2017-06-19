@@ -414,6 +414,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("thirdpartyresources"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("networks"),
 	)
 
 	return ret

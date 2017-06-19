@@ -1150,3 +1150,30 @@ type NetworkPolicyList struct {
 
 	Items []NetworkPolicy
 }
+
+// NetworkList is a list of network resource in container.
+type NetworkList struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []Network `json:"items"`
+}
+
+// +genclient=true
+
+// Network is a network resource in container.
+type Network struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the attributes on a network
+	// +optional
+	Spec NetworkSpec `json:"spec,omitempty"`
+}
+
+// NetworkSpec describes the attributes on a network resource.
+type NetworkSpec struct {
+	Plugin         string `json:"plugin"`
+	HostAccessible string `json:"hostaccessible"`
+}

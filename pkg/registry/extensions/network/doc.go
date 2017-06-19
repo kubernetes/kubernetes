@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package internalversion
-
-type DaemonSetExpansion interface{}
-
-type IngressExpansion interface{}
-
-type NetworkExpansion interface{}
-
-type NetworkPolicyExpansion interface{}
-
-type PodSecurityPolicyExpansion interface{}
-
-type ReplicaSetExpansion interface{}
-
-type ThirdPartyResourceExpansion interface{}
+package network // import "k8s.io/kubernetes/pkg/registry/extensions/network"

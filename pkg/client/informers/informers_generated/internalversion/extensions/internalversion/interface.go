@@ -30,6 +30,8 @@ type Interface interface {
 	Deployments() DeploymentInformer
 	// Ingresses returns a IngressInformer.
 	Ingresses() IngressInformer
+	// Networks returns a NetworkInformer.
+	Networks() NetworkInformer
 	// NetworkPolicies returns a NetworkPolicyInformer.
 	NetworkPolicies() NetworkPolicyInformer
 	// PodSecurityPolicies returns a PodSecurityPolicyInformer.
@@ -62,6 +64,11 @@ func (v *version) Deployments() DeploymentInformer {
 // Ingresses returns a IngressInformer.
 func (v *version) Ingresses() IngressInformer {
 	return &ingressInformer{factory: v.SharedInformerFactory}
+}
+
+// Networks returns a NetworkInformer.
+func (v *version) Networks() NetworkInformer {
+	return &networkInformer{factory: v.SharedInformerFactory}
 }
 
 // NetworkPolicies returns a NetworkPolicyInformer.
