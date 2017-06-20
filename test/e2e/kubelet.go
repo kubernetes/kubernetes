@@ -43,6 +43,8 @@ const (
 	containerStatsPollingInterval = 5 * time.Second
 	// Maximum number of nodes that we constraint to
 	maxNodesToCheck = 10
+	// Maximum number of retries of getting node
+	maxRetries = 5
 )
 
 // getPodMatches returns a set of pod names on the given node that matches the
@@ -99,7 +101,6 @@ func waitTillNPodsRunningOnNodes(c clientset.Interface, nodeNames sets.String, p
 // it silently ignores it.
 // TODO: migrate to use framework.AddOrUpdateLabelOnNode/framework.RemoveLabelOffNode
 func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRemove map[string]string) {
-	const maxRetries = 5
 	for nodeName := range nodeNames {
 		var node *v1.Node
 		var err error
