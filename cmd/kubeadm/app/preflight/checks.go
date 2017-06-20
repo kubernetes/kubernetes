@@ -485,6 +485,11 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 	return err
 }
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
+	// First, check if we're root separately from the other preflight checks and fail fast
+	if err := RunRootCheckOnly(); err != nil {
+		return err
+	}
+
 	checks := []Checker{
 		SystemVerificationCheck{},
 		IsRootCheck{},
@@ -538,6 +543,11 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 }
 
 func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
+	// First, check if we're root separately from the other preflight checks and fail fast
+	if err := RunRootCheckOnly(); err != nil {
+		return err
+	}
+
 	checks := []Checker{
 		SystemVerificationCheck{},
 		IsRootCheck{},
