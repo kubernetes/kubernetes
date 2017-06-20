@@ -29,6 +29,9 @@
 "metadata": {
   "name":"kube-scheduler",
   "namespace": "kube-system",
+  "annotations": {
+    "scheduler.alpha.kubernetes.io/critical-pod": ""
+  },
   "labels": {
     "tier": "control-plane",
     "component": "kube-scheduler"

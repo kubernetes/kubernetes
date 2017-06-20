@@ -212,6 +212,9 @@
 "metadata": {
   "name":"kube-apiserver",
   "namespace": "kube-system",
+  "annotations": {
+    "scheduler.alpha.kubernetes.io/critical-pod": ""
+  },
   "labels": {
     "tier": "control-plane",
     "component": "kube-apiserver"

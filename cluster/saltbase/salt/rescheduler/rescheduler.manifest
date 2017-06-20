@@ -3,6 +3,8 @@ kind: Pod
 metadata:
   name: rescheduler-v0.3.0
   namespace: kube-system
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ''
   labels:
     k8s-app: rescheduler
     version: v0.3.0

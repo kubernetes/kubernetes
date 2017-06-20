@@ -38,13 +38,17 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Feature:Stackdr
 		gclLogsProvider, err := newGclLogsProvider(f)
 		framework.ExpectNoError(err, "Failed to create GCL logs provider")
 
+		err = gclLogsProvider.Init()
+		defer gclLogsProvider.Cleanup()
+		framework.ExpectNoError(err, "Failed to init GCL logs provider")
+
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items
 		nodeCount := len(nodes)
 		podCount := 30 * nodeCount
 		loggingDuration := 10 * time.Minute
 		linesPerSecond := 1000 * nodeCount
 		linesPerPod := linesPerSecond * int(loggingDuration.Seconds()) / podCount
-		ingestionTimeout := 60 * time.Minute
+		ingestionTimeout := 20 * time.Minute
 
 		By("Running logs generator pods")
 		pods := []*loggingPod{}
@@ -55,9 +59,6 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Feature:Stackdr
 
 			defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
 		}
-
-		By("Waiting for pods to succeed")
-		time.Sleep(loggingDuration)
 
 		By("Waiting for all log lines to be ingested")
 		config := &loggingTestConfig{
@@ -79,12 +80,16 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Feature:Stackdr
 		gclLogsProvider, err := newGclLogsProvider(f)
 		framework.ExpectNoError(err, "Failed to create GCL logs provider")
 
+		err = gclLogsProvider.Init()
+		defer gclLogsProvider.Cleanup()
+		framework.ExpectNoError(err, "Failed to init GCL logs provider")
+
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items
 		maxPodCount := 10
 		jobDuration := 1 * time.Minute
 		linesPerPodPerSecond := 100
 		testDuration := 10 * time.Minute
-		ingestionTimeout := 60 * time.Minute
+		ingestionTimeout := 20 * time.Minute
 
 		podRunDelay := time.Duration(int64(jobDuration) / int64(maxPodCount))
 		podRunCount := int(testDuration.Seconds())/int(podRunDelay.Seconds()) - 1
@@ -101,9 +106,6 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Feature:Stackdr
 			}
 			time.Sleep(podRunDelay)
 		}
-
-		By("Waiting for the last pods to finish")
-		time.Sleep(jobDuration)
 
 		By("Waiting for all log lines to be ingested")
 		config := &loggingTestConfig{

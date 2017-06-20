@@ -3130,53 +3130,13 @@ func waitForReplicaSetPodsGone(c clientset.Interface, rs *extensions.ReplicaSet)
 
 // WaitForReadyReplicaSet waits until the replica set has all of its replicas ready.
 func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
-	rs, err := c.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
-	if err != nil {
-		return err
-	}
-	options := metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err := c.Core().Pods(rs.Namespace).List(options)
-	if err != nil {
-		return err
-	}
-	readyPods := int32(0)
-	unready := sets.NewString()
-	for i := range podList.Items {
-		pod := podList.Items[i]
-
-		if podutil.IsPodReady(&pod) {
-			readyPods++
-		} else {
-			unready.Insert(pod.Name)
+	err := wait.Poll(Poll, pollShortTimeout, func() (bool, error) {
+		rs, err := c.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
 		}
-	}
-
-	// All pods for our replica set are ready.
-	if *(rs.Spec.Replicas) == rs.Status.Replicas && *(rs.Spec.Replicas) == readyPods {
-		return nil
-	}
-	options.ResourceVersion = podList.ResourceVersion
-	w, err := c.Core().Pods(ns).Watch(options)
-	if err != nil {
-		return err
-	}
-	defer w.Stop()
-	condition := func(event watch.Event) (bool, error) {
-		if event.Type != watch.Modified {
-			return false, nil
-		}
-		pod := event.Object.(*v1.Pod)
-		if podutil.IsPodReady(pod) && unready.Has(pod.Name) {
-			unready.Delete(pod.Name)
-		}
-		return unready.Len() == 0, nil
-	}
-
-	_, err = watch.Until(Poll, w, condition)
+		return *(rs.Spec.Replicas) == rs.Status.Replicas && *(rs.Spec.Replicas) == rs.Status.ReadyReplicas, nil
+	})
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("replica set %q never became ready", name)
 	}

@@ -20,8 +20,6 @@ spec:
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
-      nodeSelector:
-        projectcalico.org/ds-ready: "true"
       hostNetwork: true
       containers:
       - image: calico/typha:v0.2.2

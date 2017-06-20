@@ -52,7 +52,7 @@ const (
 	resizeTimeout         = 5 * time.Minute
 	scaleUpTimeout        = 5 * time.Minute
 	scaleUpTriggerTimeout = 2 * time.Minute
-	scaleDownTimeout      = 15 * time.Minute
+	scaleDownTimeout      = 20 * time.Minute
 	podTimeout            = 2 * time.Minute
 	nodesRecoverTimeout   = 5 * time.Minute
 
@@ -346,6 +346,33 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	simpleScaleDownTest := func(unready int) {
+		// This is a temporary fix to allow CA to migrate some kube-system pods
+		// TODO: Remove this when the PDB is added for those components
+		By("Create PodDisruptionBudgets for kube-system components, so they can be migrated if required")
+		pdbsToAdd := []string{"kube-dns-autoscaler", "kube-dns"}
+		for _, pdbLabel := range pdbsToAdd {
+			By(fmt.Sprintf("Create PodDisruptionBudget for %v", pdbLabel))
+			labelMap := map[string]string{"k8s-app": pdbLabel}
+			pdbName := fmt.Sprintf("test-pdb-for-%v", pdbLabel)
+			minAvailable := intstr.FromInt(1)
+			pdb := &policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pdbName,
+					Namespace: "kube-system",
+				},
+				Spec: policy.PodDisruptionBudgetSpec{
+					Selector:     &metav1.LabelSelector{MatchLabels: labelMap},
+					MinAvailable: &minAvailable,
+				},
+			}
+			_, err := f.StagingClient.Policy().PodDisruptionBudgets("kube-system").Create(pdb)
+
+			defer func() {
+				f.StagingClient.Policy().PodDisruptionBudgets("kube-system").Delete(pdbName, &metav1.DeleteOptions{})
+			}()
+			framework.ExpectNoError(err)
+		}
+
 		By("Manually increase cluster size")
 		increasedSize := 0
 		newSizes := make(map[string]int)
