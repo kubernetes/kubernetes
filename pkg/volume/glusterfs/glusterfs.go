@@ -81,7 +81,6 @@ const (
 	absoluteGidMin          = 2000
 	absoluteGidMax          = math.MaxInt32
 	linuxGlusterMountBinary = "mount.glusterfs"
-	autoUnmountBinaryVer    = "3.11"
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -138,12 +137,12 @@ func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volu
 	source, _ := plugin.getGlusterVolumeSource(spec)
 	epName := source.EndpointsName
 	// PVC/POD is in same ns.
-	ns := pod.Namespace
+	podNs := pod.Namespace
 	kubeClient := plugin.host.GetKubeClient()
 	if kubeClient == nil {
 		return nil, fmt.Errorf("glusterfs: failed to get kube client to initialize mounter")
 	}
-	ep, err := kubeClient.Core().Endpoints(ns).Get(epName, metav1.GetOptions{})
+	ep, err := kubeClient.Core().Endpoints(podNs).Get(epName, metav1.GetOptions{})
 	if err != nil {
 		glog.Errorf("glusterfs: failed to get endpoints %s[%v]", epName, err)
 		return nil, err
@@ -354,8 +353,8 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 			}
 		}
 
-		autoerrs := b.mounter.Mount(ip+":"+b.path, dir, "glusterfs", autoMountOptions)
-		if autoerrs == nil {
+		autoErr := b.mounter.Mount(ip+":"+b.path, dir, "glusterfs", autoMountOptions)
+		if autoErr == nil {
 			glog.Infof("glusterfs: successfully mounted %s", dir)
 			return nil
 		}
@@ -365,10 +364,10 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	// Failed mount scenario.
 	// Since glusterfs does not return error text
 	// it all goes in a log file, we will read the log file
-	logerror := readGlusterLog(log, b.pod.Name)
-	if logerror != nil {
-		// return fmt.Errorf("glusterfs: mount failed: %v", logerror)
-		return fmt.Errorf("glusterfs: mount failed: %v the following error information was pulled from the glusterfs log to help diagnose this issue: %v", errs, logerror)
+	logErr := readGlusterLog(log, b.pod.Name)
+	if logErr != nil {
+		// return fmt.Errorf("glusterfs: mount failed: %v", logErr)
+		return fmt.Errorf("glusterfs: mount failed: %v the following error information was pulled from the glusterfs log to help diagnose this issue: %v", errs, logErr)
 	}
 	return fmt.Errorf("glusterfs: mount failed: %v", errs)
 
