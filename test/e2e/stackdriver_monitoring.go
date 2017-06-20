@@ -89,7 +89,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 	rc := common.NewDynamicResourceConsumer(rcName, common.KindDeployment, pods, allPodsCPU, memoryUsed, 0, perPodCPU, memoryLimit, f)
 	defer rc.CleanUp()
 
-	rc.WaitForReplicas(pods)
+	rc.WaitForReplicas(pods, 15*time.Minute)
 
 	metricsMap := map[string]bool{}
 	pollingFunction := checkForMetrics(projectId, gcmService, time.Now(), metricsMap, allPodsCPU, perPodCPU)

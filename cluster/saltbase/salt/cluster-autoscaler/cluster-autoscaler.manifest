@@ -7,7 +7,7 @@
   {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
   {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
 {% endif -%}
-{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config -%}
+{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config + " " + pillar.get('autoscaler_expander_config', '') -%}
 
 {
     "kind": "Pod",
