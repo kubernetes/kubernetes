@@ -1551,6 +1551,7 @@ func validateContainerPorts(ports []api.ContainerPort, fldPath *field.Path) fiel
 	return allErrs
 }
 
+// ValidateEnv validates env vars
 func ValidateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -1721,8 +1722,9 @@ func validateContainerResourceDivisor(rName string, divisor resource.Quantity, f
 func validateConfigMapKeySelector(s *api.ConfigMapKeySelector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(s.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	nameFn := ValidateNameFunc(ValidateSecretName)
+	for _, msg := range nameFn(s.Name, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), s.Name, msg))
 	}
 	if len(s.Key) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
@@ -1738,8 +1740,9 @@ func validateConfigMapKeySelector(s *api.ConfigMapKeySelector, fldPath *field.Pa
 func validateSecretKeySelector(s *api.SecretKeySelector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(s.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	nameFn := ValidateNameFunc(ValidateSecretName)
+	for _, msg := range nameFn(s.Name, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), s.Name, msg))
 	}
 	if len(s.Key) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
@@ -2011,6 +2014,7 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 		allErrs = append(allErrs, validateProbe(ctr.ReadinessProbe, idxPath.Child("readinessProbe"))...)
 		allErrs = append(allErrs, validateContainerPorts(ctr.Ports, idxPath.Child("ports"))...)
 		allErrs = append(allErrs, ValidateEnv(ctr.Env, idxPath.Child("env"))...)
+		allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, idxPath.Child("envFrom"))...)
 		allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volumes, idxPath.Child("volumeMounts"))...)
 		allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, idxPath.Child("imagePullPolicy"))...)
 		allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
