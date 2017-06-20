@@ -18,6 +18,7 @@ package upgrades
 
 import (
 	"fmt"
+	"time"
 
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/test/e2e/common"
@@ -72,22 +73,23 @@ func (t *HPAUpgradeTest) Teardown(f *framework.Framework) {
 }
 
 func (t *HPAUpgradeTest) test() {
+	const timeToWait = 15 * time.Minute
 	t.rc.Resume()
 
 	By(fmt.Sprintf("HPA scales to 1 replica: consume 10 millicores, target per pod 100 millicores, min pods 1."))
 	t.rc.ConsumeCPU(10) /* millicores */
 	By(fmt.Sprintf("HPA waits for 1 replica"))
-	t.rc.WaitForReplicas(1)
+	t.rc.WaitForReplicas(1, timeToWait)
 
 	By(fmt.Sprintf("HPA scales to 3 replicas: consume 250 millicores, target per pod 100 millicores."))
 	t.rc.ConsumeCPU(250) /* millicores */
 	By(fmt.Sprintf("HPA waits for 3 replicas"))
-	t.rc.WaitForReplicas(3)
+	t.rc.WaitForReplicas(3, timeToWait)
 
 	By(fmt.Sprintf("HPA scales to 5 replicas: consume 700 millicores, target per pod 100 millicores, max pods 5."))
 	t.rc.ConsumeCPU(700) /* millicores */
 	By(fmt.Sprintf("HPA waits for 5 replicas"))
-	t.rc.WaitForReplicas(5)
+	t.rc.WaitForReplicas(5, timeToWait)
 
 	// We need to pause background goroutines as during upgrade master is unavailable and requests issued by them fail.
 	t.rc.Pause()

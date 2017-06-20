@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 
@@ -34,10 +33,8 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/util/proxy"
 	kubeinformers "k8s.io/client-go/informers"
 	kubeclientset "k8s.io/client-go/kubernetes"
-	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/pkg/version"
 
 	"bytes"
@@ -89,19 +86,6 @@ func init() {
 // legacyAPIServiceName is the fixed name of the only non-groupified API version
 const legacyAPIServiceName = "v1."
 
-type ServiceResolver interface {
-	ResolveEndpoint(namespace, name string) (*url.URL, error)
-}
-
-type aggregatorEndpointRouting struct {
-	services  listersv1.ServiceLister
-	endpoints listersv1.EndpointsLister
-}
-
-type aggregatorClusterRouting struct {
-	services listersv1.ServiceLister
-}
-
 type Config struct {
 	GenericConfig       *genericapiserver.Config
 	CoreAPIServerClient kubeclientset.Interface
@@ -110,10 +94,19 @@ type Config struct {
 	// this to confirm the proxy's identity
 	ProxyClientCert []byte
 	ProxyClientKey  []byte
-	ProxyTransport  *http.Transport
 
-	// Indicates if the Aggregator should send to the cluster IP (false) or route to the endpoints IP (true)
+	// If present, the Dial method will be used for dialing out to delegate
+	// apiservers.
+	ProxyTransport *http.Transport
+
+	// Indicates if the Aggregator should send to the service's cluster IP
+	// (false) or route to the one of the service's endpoint's IP (true);
+	// if ServiceResolver is provided, then this is ignored.
 	EnableAggregatorRouting bool
+
+	// Mechanism by which the Aggregator will resolve services. If nil,
+	// constructed based on the value of EnableAggregatorRouting.
+	ServiceResolver ServiceResolver
 }
 
 // APIAggregator contains state for a Kubernetes cluster master/api server.
@@ -186,14 +179,6 @@ func (c *Config) SkipComplete() completedConfig {
 	return completedConfig{c}
 }
 
-func (r *aggregatorEndpointRouting) ResolveEndpoint(namespace, name string) (*url.URL, error) {
-	return proxy.ResolveEndpoint(r.services, r.endpoints, namespace, name)
-}
-
-func (r *aggregatorClusterRouting) ResolveEndpoint(namespace, name string) (*url.URL, error) {
-	return proxy.ResolveCluster(r.services, namespace, name)
-}
-
 // New returns a new instance of APIAggregator from the given config.
 func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
 	genericServer, err := c.Config.GenericConfig.SkipComplete().New("kube-aggregator", delegationTarget) // completion is done in Complete, no need for a second time
@@ -211,15 +196,15 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	)
 	kubeInformers := kubeinformers.NewSharedInformerFactory(c.CoreAPIServerClient, 5*time.Minute)
 
-	var routing ServiceResolver
-	if c.EnableAggregatorRouting {
-		routing = &aggregatorEndpointRouting{
-			services:  kubeInformers.Core().V1().Services().Lister(),
-			endpoints: kubeInformers.Core().V1().Endpoints().Lister(),
-		}
-	} else {
-		routing = &aggregatorClusterRouting{
-			services: kubeInformers.Core().V1().Services().Lister(),
+	var routing ServiceResolver = c.ServiceResolver
+	if routing == nil {
+		if c.EnableAggregatorRouting {
+			routing = NewEndpointServiceResolver(
+				kubeInformers.Core().V1().Services().Lister(),
+				kubeInformers.Core().V1().Endpoints().Lister(),
+			)
+		} else {
+			routing = NewClusterIPServiceResolver(kubeInformers.Core().V1().Services().Lister())
 		}
 	}
 

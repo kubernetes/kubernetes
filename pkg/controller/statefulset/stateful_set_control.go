@@ -488,17 +488,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 	// we terminate the Pod with the largest ordinal that does not match the update revision.
 	for target := len(replicas) - 1; target >= updateMin; target-- {
-		// all replicas should be healthy before an update progresses we allow termination of the firstUnhealthy
-		// Pod in any state allow for rolling back a failed update.
-		if !isRunningAndReady(replicas[target]) && replicas[target] != firstUnhealthyPod {
-			glog.V(4).Infof(
-				"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready prior to update",
-				set.Namespace,
-				set.Name,
-				firstUnhealthyPod.Name)
-			return &status, nil
-		}
-		if getPodRevision(replicas[target]) != updateRevision.Name {
+
+		// delete the Pod if it is not already terminating and does not match the update revision.
+		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
 			glog.V(4).Infof("StatefulSet %s/%s terminating Pod %s for update",
 				set.Namespace,
 				set.Name,
@@ -507,6 +499,17 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			status.CurrentReplicas--
 			return &status, err
 		}
+
+		// wait for unhealthy Pods on update
+		if !isHealthy(replicas[target]) {
+			glog.V(4).Infof(
+				"StatefulSet %s/%s is waiting for Pod %s to update",
+				set.Namespace,
+				set.Name,
+				replicas[target].Name)
+			return &status, nil
+		}
+
 	}
 	return &status, nil
 }
