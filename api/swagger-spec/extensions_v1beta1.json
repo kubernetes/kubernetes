@@ -10033,9 +10033,9 @@
      "allowedHostPaths": {
       "type": "array",
       "items": {
-       "type": "string"
+       "$ref": "v1beta1.AllowedHostPath"
       },
-      "description": "AllowedHostPaths is a white list of allowed host path prefixes. Empty indicates that all host paths may be used."
+      "description": "AllowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used."
      }
     }
    },
@@ -10151,6 +10151,16 @@
        "$ref": "v1beta1.IDRange"
       },
       "description": "Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end."
+     }
+    }
+   },
+   "v1beta1.AllowedHostPath": {
+    "id": "v1beta1.AllowedHostPath",
+    "description": "AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path to be defined.",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Path is the path prefix that the host volume must match"
      }
     }
    },
