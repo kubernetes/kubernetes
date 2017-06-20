@@ -37,6 +37,7 @@ go_library(
         "apiservice_controller.go",
         "handler_apis.go",
         "handler_proxy.go",
+        "resolvers.go",
     ],
     tags = ["automanaged"],
     deps = [
