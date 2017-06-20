@@ -145,7 +145,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			}
 		}
 		Expect(eventFound).Should(Equal(true))
-		// Verify, that cluster size is not changed.
+		// Verify that cluster size is not changed
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size <= nodeCount }, time.Second))
 	})
@@ -154,7 +154,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false, 1*time.Second)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
-		// Verify, that cluster size is increased
+		// Verify that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFuncWithUnready(f.ClientSet,
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout, unready))
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
@@ -231,6 +231,25 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size >= nodeCount+2 }, scaleUpTimeout))
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+	})
+
+	It("should increase cluster size if pods are pending due to pod anti-affinity [Feature:ClusterSizeAutoscalingAntiAffinityScaleUp]", func() {
+		pods := nodeCount
+		newPods := 2
+		labels := map[string]string{
+			"anti-affinity": "yes",
+		}
+		By("starting a pod with anti-affinity on each node")
+		framework.ExpectNoError(runAntiAffinityPods(f, f.Namespace.Name, pods, "some-pod", labels, labels))
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "some-pod")
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+
+		By("scheduling extra pods with anti-affinity to existing ones")
+		framework.ExpectNoError(runAntiAffinityPods(f, f.Namespace.Name, newPods, "extra-pod", labels, labels))
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "extra-pod")
+
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+newPods, scaleUpTimeout))
 	})
 
 	It("should add node to the particular mig [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -873,7 +892,46 @@ func makeNodeSchedulable(c clientset.Interface, node *v1.Node) error {
 	return fmt.Errorf("Failed to remove taint from node in allowed number of retries")
 }
 
-// Creat an RC running a given number of pods on each node without adding any constraint forcing
+// Create an RC running a given number of pods with anti-affinity
+func runAntiAffinityPods(f *framework.Framework, namespace string, pods int, id string, podLabels, antiAffinityLabels map[string]string) error {
+	config := &testutils.RCConfig{
+		Affinity:       buildAntiAffinity(antiAffinityLabels),
+		Client:         f.ClientSet,
+		InternalClient: f.InternalClientset,
+		Name:           id,
+		Namespace:      namespace,
+		Timeout:        scaleUpTimeout,
+		Image:          framework.GetPauseImageName(f.ClientSet),
+		Replicas:       pods,
+		Labels:         podLabels,
+	}
+	err := framework.RunRC(*config)
+	if err != nil {
+		return err
+	}
+	_, err = f.ClientSet.Core().ReplicationControllers(namespace).Get(id, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func buildAntiAffinity(labels map[string]string) *v1.Affinity {
+	return &v1.Affinity{
+		PodAntiAffinity: &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: labels,
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+		},
+	}
+}
+
+// Create an RC running a given number of pods on each node without adding any constraint forcing
 // such pod distribution. This is meant to create a bunch of underutilized (but not unused) nodes
 // with pods that can be rescheduled on different nodes.
 // This is achieved using the following method:
