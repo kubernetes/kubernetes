@@ -156,6 +156,6 @@ func compact(ctx context.Context, client *clientv3.Client, t, rev int64) (int64,
 	if _, err = client.Compact(ctx, rev); err != nil {
 		return curTime, curRev, err
 	}
-	glog.Infof("etcd: compacted rev (%d), endpoints (%v)", rev, client.Endpoints())
+	glog.V(4).Infof("etcd: compacted rev (%d), endpoints (%v)", rev, client.Endpoints())
 	return curTime, curRev, nil
 }
