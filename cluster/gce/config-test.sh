@@ -168,6 +168,10 @@ KUBEPROXY_TEST_ARGS="${KUBEPROXY_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 # TODO(piosz): remove this in 1.8
 NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
 
+# To avoid running the DaemonSet on older version make sure the ip-masq-agent
+# only runs when the readiness label is set.
+NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/masq-agent-ds-ready=true"
+
 # To avoid running Calico on a node that is not configured appropriately, 
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
@@ -281,6 +285,9 @@ OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
 
 # Network Policy plugin specific settings.
 NETWORK_POLICY_PROVIDER="${NETWORK_POLICY_PROVIDER:-none}" # calico
+
+# Should the kubelet configure egress masquerade (old way) or let a daemonset do it?
+NON_MASQUERADE_CIDR="0.0.0.0/0"
 
 # How should the kubelet configure hairpin mode?
 HAIRPIN_MODE="${HAIRPIN_MODE:-promiscuous-bridge}" # promiscuous-bridge, hairpin-veth, none
