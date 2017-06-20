@@ -346,32 +346,9 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	simpleScaleDownTest := func(unready int) {
-		// This is a temporary fix to allow CA to migrate some kube-system pods
-		// TODO: Remove this when the PDB is added for those components
-		By("Create PodDisruptionBudgets for kube-system components, so they can be migrated if required")
-		pdbsToAdd := []string{"kube-dns-autoscaler", "kube-dns"}
-		for _, pdbLabel := range pdbsToAdd {
-			By(fmt.Sprintf("Create PodDisruptionBudget for %v", pdbLabel))
-			labelMap := map[string]string{"k8s-app": pdbLabel}
-			pdbName := fmt.Sprintf("test-pdb-for-%v", pdbLabel)
-			minAvailable := intstr.FromInt(1)
-			pdb := &policy.PodDisruptionBudget{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      pdbName,
-					Namespace: "kube-system",
-				},
-				Spec: policy.PodDisruptionBudgetSpec{
-					Selector:     &metav1.LabelSelector{MatchLabels: labelMap},
-					MinAvailable: &minAvailable,
-				},
-			}
-			_, err := f.StagingClient.Policy().PodDisruptionBudgets("kube-system").Create(pdb)
-
-			defer func() {
-				f.StagingClient.Policy().PodDisruptionBudgets("kube-system").Delete(pdbName, &metav1.DeleteOptions{})
-			}()
-			framework.ExpectNoError(err)
-		}
+		cleanup, err := addKubeSystemPdbs(f)
+		defer cleanup()
+		framework.ExpectNoError(err)
 
 		By("Manually increase cluster size")
 		increasedSize := 0
@@ -1080,4 +1057,50 @@ func waitForScaleUpStatus(c clientset.Interface, expected string, timeout time.D
 		}
 	}
 	return nil, fmt.Errorf("ScaleUp status did not reach expected value: %v", expected)
+}
+
+// This is a temporary fix to allow CA to migrate some kube-system pods
+// TODO: Remove this when the PDB is added for those components
+func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
+	By("Create PodDisruptionBudgets for kube-system components, so they can be migrated if required")
+
+	newPdbs := make([]string, 0)
+	cleanup := func() {
+		for _, newPdbName := range newPdbs {
+			f.StagingClient.Policy().PodDisruptionBudgets("kube-system").Delete(newPdbName, &metav1.DeleteOptions{})
+		}
+	}
+
+	type pdbInfo struct {
+		label         string
+		min_available int
+	}
+	pdbsToAdd := []pdbInfo{
+		{label: "kube-dns-autoscaler", min_available: 1},
+		{label: "kube-dns", min_available: 1},
+		{label: "event-exporter", min_available: 0},
+	}
+	for _, pdbData := range pdbsToAdd {
+		By(fmt.Sprintf("Create PodDisruptionBudget for %v", pdbData.label))
+		labelMap := map[string]string{"k8s-app": pdbData.label}
+		pdbName := fmt.Sprintf("test-pdb-for-%v", pdbData.label)
+		minAvailable := intstr.FromInt(pdbData.min_available)
+		pdb := &policy.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pdbName,
+				Namespace: "kube-system",
+			},
+			Spec: policy.PodDisruptionBudgetSpec{
+				Selector:     &metav1.LabelSelector{MatchLabels: labelMap},
+				MinAvailable: &minAvailable,
+			},
+		}
+		_, err := f.StagingClient.Policy().PodDisruptionBudgets("kube-system").Create(pdb)
+		newPdbs = append(newPdbs, pdbName)
+
+		if err != nil {
+			return cleanup, err
+		}
+	}
+	return cleanup, nil
 }
