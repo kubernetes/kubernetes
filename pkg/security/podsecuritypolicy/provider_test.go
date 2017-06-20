@@ -261,7 +261,9 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 	}
 	failHostPathDirPSP := defaultPSP()
 	failHostPathDirPSP.Spec.Volumes = []extensions.FSType{extensions.HostPath}
-	failHostPathDirPSP.Spec.AllowedHostPaths = []string{"/foo/bar"}
+	failHostPathDirPSP.Spec.AllowedHostPaths = []extensions.AllowedHostPath{
+		{Path: "/foo/bar"},
+	}
 
 	failOtherSysctlsAllowedPSP := defaultPSP()
 	failOtherSysctlsAllowedPSP.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "bar,abc"
@@ -336,7 +338,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		"failHostPathDirPSP": {
 			pod:           failHostPathDirPod,
 			psp:           failHostPathDirPSP,
-			expectedError: "host path /fail is not allowed to be used. allowed host paths: [/foo/bar]",
+			expectedError: "host path /fail is not allowed to be used.",
 		},
 		"failSafeSysctlFooPod with failNoSysctlAllowedSCC": {
 			pod:           failSafeSysctlFooPod,
@@ -756,7 +758,9 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	}
 	hostPathDirPSP := defaultPSP()
 	hostPathDirPSP.Spec.Volumes = []extensions.FSType{extensions.HostPath}
-	hostPathDirPSP.Spec.AllowedHostPaths = []string{"/foo/bar"}
+	hostPathDirPSP.Spec.AllowedHostPaths = []extensions.AllowedHostPath{
+		{Path: "/foo/bar"},
+	}
 
 	hostPortPSP := defaultPSP()
 	hostPortPSP.Spec.HostPorts = []extensions.HostPortRange{{Min: 1, Max: 1}}

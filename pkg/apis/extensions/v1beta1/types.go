@@ -929,10 +929,16 @@ type PodSecurityPolicySpec struct {
 	// will not be forced to.
 	// +optional
 	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,14,opt,name=readOnlyRootFilesystem"`
-	// AllowedHostPaths is a white list of allowed host path prefixes. Empty indicates that all
-	// host paths may be used.
+	// AllowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used.
 	// +optional
-	AllowedHostPaths []string `json:"allowedHostPaths,omitempty" protobuf:"bytes,15,opt,name=allowedHostPaths"`
+	AllowedHostPaths []AllowedHostPath `json:"allowedHostPaths,omitempty" protobuf:"bytes,15,opt,name=allowedHostPaths"`
+}
+
+// AllowedHostPath defines the host volume conditions that will be enabled by a policy
+// for pods to use. It requires the path to be defined.
+type AllowedHostPath struct {
+	// Path is the path prefix that the host volume must match
+	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 }
 
 // FS Type gives strong typing to different file systems that are used by volumes.

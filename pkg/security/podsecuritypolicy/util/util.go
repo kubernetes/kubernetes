@@ -186,7 +186,7 @@ func PSPAllowsHostVolumePath(psp *extensions.PodSecurityPolicy, hostPath string)
 	}
 
 	for _, allowedPath := range psp.Spec.AllowedHostPaths {
-		if hasPathPrefix(hostPath, allowedPath) {
+		if hasPathPrefix(hostPath, allowedPath.Path) {
 			return true
 		}
 	}
