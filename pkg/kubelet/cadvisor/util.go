@@ -37,7 +37,7 @@ func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
 
 func StorageScratchCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceList {
 	c := v1.ResourceList{
-		v1.ResourceStorage: *resource.NewQuantity(
+		v1.ResourceStorageScratch: *resource.NewQuantity(
 			int64(info.Capacity),
 			resource.BinarySI),
 	}
