@@ -155,10 +155,10 @@ func TestGetNumHugePages(t *testing.T) {
 			return []byte(testCase.input), nil
 		}
 		hugePagesTotal, hugePagesFree, err := getNumHugepages()
-		if testCase.shouldFail == true && err == nil {
-			t.Error("Test should fail")
-		} else if testCase.shouldFail == false && err != nil {
-			t.Error("Test shouldn't fail")
+		if testCase.shouldFail == true {
+			assert.Nil(t, err)
+		} else if testCase.shouldFail == false {
+			assert.NotNil(t, err)
 		}
 		assert.Equal(t, testCase.expectedHugePagesFree, hugePagesFree)
 		assert.Equal(t, testCase.expectedHugePagesTotal, hugePagesTotal)

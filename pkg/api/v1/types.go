@@ -1299,12 +1299,10 @@ type HugePagesVolumeSource struct {
 	// Defaults to 2M
 	// +optional
 	PageSize string `json:"pageSize,omitempty" protobuf:"bytes,1,opt,name=pageSize"`
-	// Defaults to PageSize
-	// The size option sets the maximum value of memory (huge pages).
-	// The size option is specified as resource.Quantity
+	// The MaxSize option sets the maximum value of memory (huge pages).
+	// The MaxSize option is specified as resource.Quantity
 	MaxSize string `json:"size,omitempty" protobuf:"bytes,2,opt,name=size"`
-	// Defaults to PageSize
-	// The min_size option sets the minimum
+	// The MinSize option sets the minimum
 	// value of memory (huge pages) allowed for the filesystem and reserves them.
 	// The size option is specified as resource.Quantity
 	// +optional

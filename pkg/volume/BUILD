@@ -105,6 +105,7 @@ filegroup(
         "//pkg/volume/git_repo:all-srcs",
         "//pkg/volume/glusterfs:all-srcs",
         "//pkg/volume/host_path:all-srcs",
+        "//pkg/volume/hugepages:all-srcs",
         "//pkg/volume/iscsi:all-srcs",
         "//pkg/volume/local:all-srcs",
         "//pkg/volume/nfs:all-srcs",
