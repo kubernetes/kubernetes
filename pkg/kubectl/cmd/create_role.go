@@ -267,6 +267,19 @@ func (c *CreateRoleOptions) validateResource() error {
 			return err
 		}
 	}
+
+	if len(c.ResourceNames) > 0 {
+		illegalVerbs := []string{}
+		for _, verb := range c.Verbs {
+			switch verb {
+			case "list", "watch", "create", "deletecollection":
+				illegalVerbs = append(illegalVerbs, verb)
+			}
+		}
+		if len(illegalVerbs) > 0 {
+			return fmt.Errorf("verbs %v do not have names available", illegalVerbs)
+		}
+	}
 	return nil
 }
 
