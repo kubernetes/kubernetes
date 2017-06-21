@@ -139,6 +139,9 @@ var (
 	// Returning container command exit codes in kubectl run/exec was introduced in #26541 (v1.4)
 	// so we don't expect tests that verifies return code to work on kubectl clients before that.
 	kubectlContainerExitCodeVersion = utilversion.MustParseSemantic("v1.4.0-alpha.3")
+
+	// kubectl describe behavior change in #42849 (v1.7)
+	kubectlControllerRefVersion = utilversion.MustParseSemantic("v1.7.0-alpha.2")
 )
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
@@ -784,9 +787,27 @@ metadata:
 			waitForOrFailWithDebug(1)
 
 			// Pod
-			forEachPod(func(pod v1.Pod) {
-				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
-				requiredStrings := [][]string{
+			requiredStrings := [][]string{}
+			gte, err := framework.KubectlVersionGTE(kubectlControllerRefVersion)
+			Expect(err).NotTo(HaveOccurred())
+			if gte {
+				requiredStrings = [][]string{
+					{"Name:", "redis-master-"},
+					{"Namespace:", ns},
+					{"Node:"},
+					{"Labels:", "app=redis"},
+					{"role=master"},
+					{"Annotations:"},
+					{"Status:", "Running"},
+					{"IP:"},
+					{"Created By:", "ReplicationController/redis-master"},
+					{"Controlled By:", "ReplicationController/redis-master"},
+					{"Image:", redisImage},
+					{"State:", "Running"},
+					{"QoS Class:", "BestEffort"},
+				}
+			} else {
+				requiredStrings = [][]string{
 					{"Name:", "redis-master-"},
 					{"Namespace:", ns},
 					{"Node:"},
@@ -800,12 +821,15 @@ metadata:
 					{"State:", "Running"},
 					{"QoS Class:", "BestEffort"},
 				}
+			}
+			forEachPod(func(pod v1.Pod) {
+				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
 				checkOutput(output, requiredStrings)
 			})
 
 			// Rc
 			output := framework.RunKubectlOrDie("describe", "rc", "redis-master", nsFlag)
-			requiredStrings := [][]string{
+			requiredStrings = [][]string{
 				{"Name:", "redis-master"},
 				{"Namespace:", ns},
 				{"Selector:", "app=redis,role=master"},
