@@ -153,7 +153,7 @@ while true; do
   componentstatuses=$(echo "${cs_status}" | grep -c 'Healthy:') || true
   healthy=$(echo "${cs_status}" | grep -c 'Healthy:True') || true
 
-  if ((componentstatuses > healthy)); then
+  if ((componentstatuses > healthy)) || ((componentstatuses == 0)); then
     if ((attempt < 5)); then
       echo -e "${color_yellow}Cluster not working yet.${color_norm}"
       attempt=$((attempt+1))
@@ -170,7 +170,7 @@ while true; do
 done
 
 echo "Validate output:"
-kubectl_retry get cs
+kubectl_retry get cs || true
 if [ "${return_value}" == "0" ]; then
   echo -e "${color_green}Cluster validation succeeded${color_norm}"
 else
