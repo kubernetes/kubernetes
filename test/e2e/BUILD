@@ -74,7 +74,6 @@ go_library(
         "gke_node_pools.go",
         "ha_master.go",
         "ingress.go",
-        "initial_resources.go",
         "job.go",
         "kibana_logging.go",
         "kube_proxy.go",
