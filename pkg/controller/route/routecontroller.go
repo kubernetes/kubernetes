@@ -118,7 +118,9 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	// routeMap maps routeTargetNode->route
 	routeMap := make(map[types.NodeName]*cloudprovider.Route)
 	for _, route := range routes {
-		routeMap[route.TargetNode] = route
+		if route.TargetNode != "" {
+			routeMap[route.TargetNode] = route
+		}
 	}
 
 	wg := sync.WaitGroup{}
@@ -171,8 +173,8 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	}
 	for _, route := range routes {
 		if rc.isResponsibleForRoute(route) {
-			// Check if this route applies to a node we know about & has correct CIDR.
-			if nodeCIDRs[route.TargetNode] != route.DestinationCIDR {
+			// Check if this route is a blackhole, or applies to a node we know about & has an incorrect CIDR.
+			if route.Blackhole || (nodeCIDRs[route.TargetNode] != route.DestinationCIDR) {
 				wg.Add(1)
 				// Delete the route.
 				go func(route *cloudprovider.Route, startTime time.Time) {
