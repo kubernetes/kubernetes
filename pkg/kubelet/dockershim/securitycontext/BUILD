@@ -36,7 +36,6 @@ go_test(
         "//pkg/api/testing:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//vendor/github.com/docker/engine-api/types/container:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 
