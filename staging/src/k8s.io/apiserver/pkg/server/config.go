@@ -258,6 +258,8 @@ func DefaultSwaggerConfig() *swagger.Config {
 			switch typeName {
 			case "metav1.Time", "*metav1.Time":
 				return "date-time"
+			case "types.UnixUserID", "types.UnixGroupID":
+				return "int64"
 			}
 			return ""
 		},
