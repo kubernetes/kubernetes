@@ -123,7 +123,9 @@ func TestPSPAllowsHostVolumePath(t *testing.T) {
 		"non-matching": {
 			psp: &extensions.PodSecurityPolicy{
 				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []string{"/foo"},
+					AllowedHostPaths: []extensions.AllowedHostPath{
+						{Path: "/foo"},
+					},
 				},
 			},
 			path:   "/foobar",
@@ -132,7 +134,9 @@ func TestPSPAllowsHostVolumePath(t *testing.T) {
 		"match on direct match": {
 			psp: &extensions.PodSecurityPolicy{
 				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []string{"/foo"},
+					AllowedHostPaths: []extensions.AllowedHostPath{
+						{Path: "/foo"},
+					},
 				},
 			},
 			path:   "/foo",
@@ -141,7 +145,9 @@ func TestPSPAllowsHostVolumePath(t *testing.T) {
 		"match with trailing slash on host path": {
 			psp: &extensions.PodSecurityPolicy{
 				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []string{"/foo"},
+					AllowedHostPaths: []extensions.AllowedHostPath{
+						{Path: "/foo"},
+					},
 				},
 			},
 			path:   "/foo/",
@@ -150,7 +156,9 @@ func TestPSPAllowsHostVolumePath(t *testing.T) {
 		"match with trailing slash on allowed path": {
 			psp: &extensions.PodSecurityPolicy{
 				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []string{"/foo/"},
+					AllowedHostPaths: []extensions.AllowedHostPath{
+						{Path: "/foo/"},
+					},
 				},
 			},
 			path:   "/foo",
@@ -159,7 +167,9 @@ func TestPSPAllowsHostVolumePath(t *testing.T) {
 		"match child directory": {
 			psp: &extensions.PodSecurityPolicy{
 				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []string{"/foo/"},
+					AllowedHostPaths: []extensions.AllowedHostPath{
+						{Path: "/foo/"},
+					},
 				},
 			},
 			path:   "/foo/bar",
@@ -168,7 +178,9 @@ func TestPSPAllowsHostVolumePath(t *testing.T) {
 		"non-matching parent directory": {
 			psp: &extensions.PodSecurityPolicy{
 				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []string{"/foo/bar"},
+					AllowedHostPaths: []extensions.AllowedHostPath{
+						{Path: "/foo/bar"},
+					},
 				},
 			},
 			path:   "/foo",

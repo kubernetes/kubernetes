@@ -248,7 +248,7 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 				if !psputil.PSPAllowsHostVolumePath(s.psp, v.HostPath.Path) {
 					allErrs = append(allErrs, field.Invalid(
 						field.NewPath("spec", "volumes").Index(i), string(fsType),
-						fmt.Sprintf("host path %s is not allowed to be used. allowed host paths: %v", v.HostPath.Path, s.psp.Spec.AllowedHostPaths)))
+						fmt.Sprintf("host path %s is not allowed to be used. allowed host paths", v.HostPath.Path)))
 				}
 			}
 		}
