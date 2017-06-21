@@ -57,7 +57,8 @@ spec:
             - >
               LIVENESS_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-300};
               STUCK_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-900};
-              LAST_MODIFIED_DATE=`stat /var/log/es-containers.log.pos | grep Modify | sed -r "s/Modify: (.*)/\1/"`;
+              POS_FILE=${POS_FILE:-/var/log/es-containers.log.pos}
+              LAST_MODIFIED_DATE=`stat ${POS_FILE} | grep Modify | sed -r "s/Modify: (.*)/\1/"`;
               LAST_MODIFIED_TIMESTAMP=`date -d "$LAST_MODIFIED_DATE" +%s`;
               if [ `date +%s` -gt `expr $LAST_MODIFIED_TIMESTAMP + $STUCK_THRESHOLD_SECONDS` ];
               then
