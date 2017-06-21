@@ -75,6 +75,7 @@ go_library(
         "//pkg/volume/azure_dd:go_default_library",
         "//pkg/volume/azure_file:go_default_library",
         "//pkg/volume/cinder:go_default_library",
+        "//pkg/volume/fc:go_default_library",
         "//pkg/volume/flexvolume:go_default_library",
         "//pkg/volume/flocker:go_default_library",
         "//pkg/volume/gce_pd:go_default_library",

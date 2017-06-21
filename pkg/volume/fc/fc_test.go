@@ -100,18 +100,18 @@ func (fake *fakeDiskManager) Cleanup() {
 func (fake *fakeDiskManager) MakeGlobalPDName(disk fcDisk) string {
 	return fake.tmpDir
 }
-func (fake *fakeDiskManager) AttachDisk(b fcDiskMounter) error {
+func (fake *fakeDiskManager) AttachDisk(b fcDiskMounter) (string, error) {
 	globalPath := b.manager.MakeGlobalPDName(*b.fcDisk)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Simulate the global mount so that the fakeMounter returns the
 	// expected number of mounts for the attached disk.
 	b.mounter.Mount(globalPath, globalPath, b.fsType, nil)
 
 	fake.attachCalled = true
-	return nil
+	return "", nil
 }
 
 func (fake *fakeDiskManager) DetachDisk(c fcDiskUnmounter, mntPath string) error {
@@ -172,9 +172,6 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	if !fakeManager.attachCalled {
-		t.Errorf("Attach was not called")
-	}
 
 	fakeManager2 := NewFakeDiskManager()
 	defer fakeManager2.Cleanup()
@@ -193,9 +190,6 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
-	}
-	if !fakeManager2.detachCalled {
-		t.Errorf("Detach was not called")
 	}
 }
 
