@@ -54,7 +54,14 @@ func pullerTestCases() []pullerTestCase {
 			expected: []pullerExpects{
 				{[]string{"GetImageRef", "PullImage"}, nil},
 			}},
-
+		{ // image is corrupt, pull, but then delete image
+			containerImage: "missing_image",
+			policy:         v1.PullIfNotPresent,
+			inspectErr:     nil,
+			pullerErr:      errors.New("rename /var/lib/docker/image/aufs/layerdb/tmp/layer-760383641 /var/lib/docker/image/aufs/layerdb/sha256/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855: directory not empty"),
+			expected: []pullerExpects{
+				{[]string{"GetImageRef", "PullImage", "RemoveImage"}, ErrCorruptImage},
+			}},
 		{ // image present, don't pull
 			containerImage: "present_image",
 			policy:         v1.PullIfNotPresent,

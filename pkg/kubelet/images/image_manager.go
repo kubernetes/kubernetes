@@ -19,6 +19,8 @@ package images
 import (
 	"fmt"
 
+	"strings"
+
 	dockerref "github.com/docker/distribution/reference"
 	"github.com/golang/glog"
 	"k8s.io/client-go/tools/record"
@@ -135,6 +137,19 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		if imagePullResult.err == RegistryUnavailable {
 			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
 			return "", msg, imagePullResult.err
+		}
+		// Pull image failure because image is corrupt: https://github.com/kubernetes/kubernetes/issues/46184
+		if strings.Contains(imagePullResult.err.Error(), "rename") && strings.Contains(imagePullResult.err.Error(), "directory not empty") {
+			msg := fmt.Sprintf("Failed to pull image %q due to corruption: %v", container.Image, imagePullResult.err)
+			m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, msg, glog.Warning)
+
+			// Delete corrupt image
+			errDeleteImage := m.imageService.RemoveImage(spec)
+			if errDeleteImage != nil {
+				m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to delete corrupt image %q: %v", container.Image, errDeleteImage.Error()), glog.Warning)
+			}
+
+			return "", msg, ErrCorruptImage
 		}
 
 		return "", imagePullResult.err.Error(), ErrImagePull

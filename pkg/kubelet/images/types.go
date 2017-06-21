@@ -40,6 +40,9 @@ var (
 
 	// Unable to parse the image name.
 	ErrInvalidImageName = errors.New("InvalidImageName")
+
+	// The Image is Corrupt
+	ErrCorruptImage = errors.New("CorruptImage")
 )
 
 // ImageManager provides an interface to manage the lifecycle of images.
