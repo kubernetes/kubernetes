@@ -505,6 +505,7 @@ func (s *podStorage) MergedState() interface{} {
 			pod, err := api.Scheme.Copy(podRef)
 			if err != nil {
 				glog.Errorf("unable to copy pod: %v", err)
+				continue
 			}
 			pods = append(pods, pod.(*v1.Pod))
 		}
@@ -519,6 +520,7 @@ func copyPods(sourcePods []*v1.Pod) []*v1.Pod {
 		pod, err := api.Scheme.Copy(source)
 		if err != nil {
 			glog.Errorf("unable to copy pod: %v", err)
+			continue
 		}
 		pods = append(pods, pod.(*v1.Pod))
 	}
