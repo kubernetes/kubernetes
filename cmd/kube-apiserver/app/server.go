@@ -469,11 +469,20 @@ func BuildAuthenticator(s *options.ServerRunOptions, storageFactory serverstorag
 	if s.Authentication.ServiceAccounts.Lookup {
 		// we have to go direct to storage because the clientsets fail when they're initialized with some API versions excluded
 		// we should stop trying to control them like that.
-		storageConfig, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
+		storageConfigServiceAccounts, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to get serviceaccounts storage: %v", err)
 		}
-		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
+		storageConfigSecrets, err := storageFactory.NewConfig(api.Resource("secrets"))
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to get secrets storage: %v", err)
+		}
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(
+			storageConfigServiceAccounts,
+			storageFactory.ResourcePrefix(api.Resource("serviceaccounts")),
+			storageConfigSecrets,
+			storageFactory.ResourcePrefix(api.Resource("secrets")),
+		)
 	}
 	if client == nil || reflect.ValueOf(client).IsNil() {
 		// TODO: Remove check once client can never be nil.
