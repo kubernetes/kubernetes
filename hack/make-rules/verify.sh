@@ -25,7 +25,6 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 EXCLUDED_PATTERNS=(
   "verify-all.sh"                # this script calls the make rule and would cause a loop
   "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
-  "verify-govet.sh"              # it has a separate make vet target
   "verify-test-owners.sh"        # TODO(rmmh): figure out how to avoid endless conflicts
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   )

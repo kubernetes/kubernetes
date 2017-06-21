@@ -54,7 +54,7 @@ KUBE_GOLDFLAGS := $(GOLDFLAGS)
 KUBE_GOGCFLAGS = $(GOGCFLAGS)
 
 # Extra options for the release or quick-release options:
-KUBE_RELEASE_RUN_TESTS := $(KUBE_RELEASE_RUN_TESTS) 
+KUBE_RELEASE_RUN_TESTS := $(KUBE_RELEASE_RUN_TESTS)
 KUBE_FASTBUILD := $(KUBE_FASTBUILD)
 
 # This controls the verbosity of the build.  Higher numbers mean more output.
@@ -121,7 +121,6 @@ verify:
 else
 verify: verify_generated_files
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
-	hack/make-rules/vet.sh
 endif
 
 define UPDATE_HELP_INFO
@@ -340,8 +339,8 @@ ifeq ($(PRINT_HELP),y)
 vet:
 	@echo "$$VET_HELP_INFO"
 else
-vet:
-	hack/make-rules/vet.sh $(WHAT)
+vet: generated_files
+	CALLED_FROM_MAIN_MAKEFILE=1 hack/make-rules/vet.sh $(WHAT)
 endif
 
 define RELEASE_HELP_INFO
@@ -361,7 +360,7 @@ endif
 
 define RELEASE_SKIP_TESTS_HELP_INFO
 # Build a release, but skip tests
-# 
+#
 # Args:
 #   KUBE_RELEASE_RUN_TESTS: Whether to run tests. Set to 'y' to run tests anyways.
 #   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'true' to do so.
