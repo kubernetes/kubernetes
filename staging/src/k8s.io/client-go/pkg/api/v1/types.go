@@ -2517,9 +2517,9 @@ type PodSpec struct {
 	// HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
 	// file if specified. This is only valid for non-hostNetwork pods.
 	// +optional
-	// +patchMergeKey=IP
+	// +patchMergeKey=ip
 	// +patchStrategy=merge
-	HostAliases []HostAlias `json:"hostMappings,omitempty" patchStrategy:"merge" patchMergeKey:"IP" protobuf:"bytes,23,rep,name=hostMappings"`
+	HostAliases []HostAlias `json:"hostAliases,omitempty" patchStrategy:"merge" patchMergeKey:"ip" protobuf:"bytes,23,rep,name=hostAliases"`
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
