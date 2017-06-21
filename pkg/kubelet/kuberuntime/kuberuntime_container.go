@@ -82,6 +82,11 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	// Step 1: pull the image.
 	imageRef, msg, err := m.imagePuller.EnsureImageExists(pod, container, pullSecrets)
 	if err != nil {
+		// Pull image failure because image is corrupt: https://github.com/kubernetes/kubernetes/issues/46184
+		// The corrupt image has been deleted, force a retry
+		if err == ErrCorruptImage {
+			return msg, ErrImagePullBackOff
+		}
 		return msg, err
 	}
 
