@@ -11,7 +11,7 @@
     "containers": [
       {
         "name": "nimbus",
-        "image": "mattf/storm-nimbus",
+        "image": "gcr.io/google-samples/storm-nimbus:1.0",
         "ports": [
           {
             "containerPort": 6627
