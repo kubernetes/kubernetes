@@ -183,7 +183,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Using pod capacity: %vm", milliCpuPerPod)
 		for name, leftAllocatable := range nodeToAllocatableMap {
 			framework.Logf("Node: %v has cpu allocatable: %vm", name, leftAllocatable)
-			podsNeededForSaturation += (int)(leftleftAllocatable / milliCpuPerPod)
+			podsNeededForSaturation += (int)(leftAllocatable / milliCpuPerPod)
 		}
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster CPU and trying to start another one", podsNeededForSaturation))
