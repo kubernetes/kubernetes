@@ -54,10 +54,10 @@ type RequestInfo struct {
 // CRUDdy GET/POST/PUT/DELETE actions on REST objects.
 // TODO: find a way to keep this up to date automatically.  Maybe dynamically populate list as handlers added to
 // master's Mux.
-var specialVerbs = sets.NewString("proxy", "redirect", "watch")
+var specialVerbs = sets.NewString("proxy", "watch")
 
 // specialVerbsNoSubresources contains root verbs which do not allow subresources
-var specialVerbsNoSubresources = sets.NewString("proxy", "redirect")
+var specialVerbsNoSubresources = sets.NewString("proxy")
 
 // namespaceSubresources contains subresources of namespace
 // this list allows the parser to distinguish between a namespace subresource, and a namespaced resource
@@ -87,8 +87,6 @@ type RequestInfoFactory struct {
 // Special verbs without subresources:
 // /api/{version}/proxy/{resource}/{resourceName}
 // /api/{version}/proxy/namespaces/{namespace}/{resource}/{resourceName}
-// /api/{version}/redirect/namespaces/{namespace}/{resource}/{resourceName}
-// /api/{version}/redirect/{resource}/{resourceName}
 //
 // Special verbs with subresources:
 // /api/{version}/watch/{resource}
