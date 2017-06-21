@@ -181,12 +181,12 @@ func (m *localVolumeMounter) CanMount() error {
 }
 
 // SetUp bind mounts the directory to the volume path
-func (m *localVolumeMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (m *localVolumeMounter) SetUp(fsGroup *int64) error {
 	return m.SetUpAt(m.GetPath(), fsGroup)
 }
 
 // SetUpAt bind mounts the directory to the volume path and sets up volume ownership
-func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if m.globalPath == "" {
 		err := fmt.Errorf("LocalVolume volume %q path is empty", m.volName)
 		return err

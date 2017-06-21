@@ -206,7 +206,7 @@ func (b *hostPathMounter) CanMount() error {
 }
 
 // SetUp does nothing.
-func (b *hostPathMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (b *hostPathMounter) SetUp(fsGroup *int64) error {
 	err := validation.ValidatePathNoBacksteps(b.GetPath())
 	if err != nil {
 		return fmt.Errorf("invalid HostPath `%s`: %v", b.GetPath(), err)
@@ -215,7 +215,7 @@ func (b *hostPathMounter) SetUp(fsGroup *types.UnixGroupID) error {
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
-func (b *hostPathMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (b *hostPathMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return fmt.Errorf("SetUpAt() does not make sense for host paths")
 }
 

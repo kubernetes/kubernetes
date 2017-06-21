@@ -31,7 +31,6 @@ package extensions
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -980,17 +979,17 @@ type RunAsUserStrategyOptions struct {
 // UserIDRange provides a min/max of an allowed range of UserIDs.
 type UserIDRange struct {
 	// Min is the start of the range, inclusive.
-	Min types.UnixUserID
+	Min int64
 	// Max is the end of the range, inclusive.
-	Max types.UnixUserID
+	Max int64
 }
 
 // GroupIDRange provides a min/max of an allowed range of GroupIDs.
 type GroupIDRange struct {
 	// Min is the start of the range, inclusive.
-	Min types.UnixGroupID
+	Min int64
 	// Max is the end of the range, inclusive.
-	Max types.UnixGroupID
+	Max int64
 }
 
 // RunAsUserStrategy denotes strategy types for generating RunAsUser values for a

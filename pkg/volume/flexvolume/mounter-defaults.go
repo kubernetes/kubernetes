@@ -21,7 +21,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -29,7 +28,7 @@ type mounterDefaults flexVolumeMounter
 
 // SetUpAt is part of the volume.Mounter interface.
 // This implementation relies on the attacher's device mount path and does a bind mount to dir.
-func (f *mounterDefaults) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (f *mounterDefaults) SetUpAt(dir string, fsGroup *int64) error {
 	glog.Warning(logPrefix(f.plugin), "using default SetUpAt to ", dir)
 
 	a, err := f.plugin.NewAttacher()
