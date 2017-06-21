@@ -54,7 +54,7 @@ type proxyHandler struct {
 	proxyTransport  *http.Transport
 
 	// Endpoints based routing to map from cluster IP to routable IP
-	routing ServiceResolver
+	serviceResolver ServiceResolver
 
 	handlingInfo atomic.Value
 }
@@ -111,7 +111,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// write a new location based on the existing request pointed at the target service
 	location := &url.URL{}
 	location.Scheme = "https"
-	rloc, err := r.routing.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName)
+	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("missing route (%s)", err.Error()), http.StatusInternalServerError)
 		return
