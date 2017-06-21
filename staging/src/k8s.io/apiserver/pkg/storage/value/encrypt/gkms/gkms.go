@@ -18,8 +18,11 @@ limitations under the License.
 package gkms
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
+
+	"golang.org/x/oauth2/google"
 
 	cloudkms "google.golang.org/api/cloudkms/v1"
 	"google.golang.org/api/googleapi"
@@ -43,25 +46,33 @@ func NewGoogleKMSTransformer(projectID, location, keyRing, cryptoKey string, clo
 	if err != nil {
 		return nil, err
 	}
-	if cloud == nil {
-		return nil, fmt.Errorf("cannot use gkms provider outside GCE/GKE cloud")
-	}
 
-	// Hosting on GCE/GKE with Google KMS encryption provider
-	gke, ok := cloud.(*gce.GCECloud)
-	if !ok {
-		return nil, fmt.Errorf("cannot use gkms provider with cloud %s", cloud.ProviderName())
-	}
-	cloudkmsService = gke.GetKMSService()
+	// Safe when cloud is nil too.
+	if gke, ok := cloud.(*gce.GCECloud); ok {
+		// Hosting on GCE/GKE with Google KMS encryption provider
+		cloudkmsService = gke.GetKMSService()
 
-	// Unless there is an override in the configuration file
-	if projectID == "" {
-		projectID = gke.GetProjectID()
-	}
+		// Project ID is assumed to be the user's project unless there
+		// is an override in the configuration file
+		if projectID == "" {
+			projectID = gke.GetProjectID()
+		}
 
-	// Default location for keys
-	if location == "" {
-		location = "global"
+		// Default location for keys
+		if location == "" {
+			location = "global"
+		}
+	} else {
+		// Outside GCE/GKE. Requires GOOGLE_APPLICATION_CREDENTIALS environment variable.
+		ctx := context.Background()
+		client, err := google.DefaultClient(ctx, cloudkms.CloudPlatformScope)
+		if err != nil {
+			return nil, err
+		}
+		cloudkmsService, err = cloudkms.New(client)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	parentName := fmt.Sprintf("projects/%s/locations/%s", projectID, location)
