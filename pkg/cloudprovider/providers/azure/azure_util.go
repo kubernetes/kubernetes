@@ -180,6 +180,7 @@ func getPrimaryIPConfig(nic network.Interface) (*network.InterfaceIPConfiguratio
 // For a load balancer, all frontend ip should reference either a subnet or publicIpAddress.
 // Thus Azure do not allow mixed type (public and internal) load balancer.
 // So we'd have a separate name for internal load balancer.
+// This would be the name for Azure LoadBalancer resource.
 func getLoadBalancerName(clusterName string, isInternal bool) string {
 	if isInternal {
 		return fmt.Sprintf("%s-internal", clusterName)
@@ -210,6 +211,10 @@ func getServiceName(service *v1.Service) string {
 // This returns a prefix for loadbalancer/security rules.
 func getRulePrefix(service *v1.Service) string {
 	return cloudprovider.GetLoadBalancerName(service)
+}
+
+func getPublicIPName(clusterName string, service *v1.Service) string {
+	return fmt.Sprintf("%s-%s", clusterName, cloudprovider.GetLoadBalancerName(service))
 }
 
 func serviceOwnsRule(service *v1.Service, rule string) bool {
