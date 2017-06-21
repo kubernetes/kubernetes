@@ -1219,7 +1219,6 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySp
 		return err
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
-	out.AllowedHostPaths = *(*[]string)(unsafe.Pointer(&in.AllowedHostPaths))
 	return nil
 }
 
@@ -1261,7 +1260,6 @@ func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySp
 		return err
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
-	out.AllowedHostPaths = *(*[]string)(unsafe.Pointer(&in.AllowedHostPaths))
 	return nil
 }
 
