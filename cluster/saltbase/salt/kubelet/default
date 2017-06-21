@@ -175,6 +175,11 @@
   {% set node_labels="--node-labels=" + pillar['node_labels'] %}
 {% endif -%}
 
+{% set node_taints = "" %}
+{% if pillar['node_taints'] is defined -%}
+  {% set node_taints="--register-with-taints=" + pillar['node_taints'] %}
+{% endif -%}
+
 {% set eviction_hard = "" %}
 {% if pillar['eviction_hard'] is defined -%}
   {% set eviction_hard="--eviction-hard=" + pillar['eviction_hard'] %}
@@ -184,4 +189,4 @@
 {% set pki=" --cert-dir=/var/lib/kubelet/pki" -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{eviction_hard}} {{kubelet_auth}} {{pki}} {{feature_gates}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{node_taints}} {{eviction_hard}} {{kubelet_auth}} {{pki}} {{feature_gates}} {{test_args}}"
