@@ -831,11 +831,6 @@ func DeepCopy_extensions_PodSecurityPolicySpec(in interface{}, out interface{}, 
 		if err := DeepCopy_extensions_FSGroupStrategyOptions(&in.FSGroup, &out.FSGroup, c); err != nil {
 			return err
 		}
-		if in.AllowedHostPaths != nil {
-			in, out := &in.AllowedHostPaths, &out.AllowedHostPaths
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
 		return nil
 	}
 }

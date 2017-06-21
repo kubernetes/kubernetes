@@ -723,11 +723,6 @@ message PodSecurityPolicySpec {
   // will not be forced to.
   // +optional
   optional bool readOnlyRootFilesystem = 14;
-
-  // AllowedHostPaths is a white list of allowed host path prefixes. Empty indicates that all
-  // host paths may be used.
-  // +optional
-  repeated string allowedHostPaths = 15;
 }
 
 // ReplicaSet represents the configuration of a ReplicaSet.
