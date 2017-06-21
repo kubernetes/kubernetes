@@ -455,7 +455,10 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 			}
 
 			var left, right interface{}
-			if len(lefts) != 1 {
+			switch {
+			case len(lefts) == 0:
+				continue
+			case len(lefts) > 1:
 				return input, fmt.Errorf("can only compare one element at a time")
 			}
 			left = lefts[0].Interface()
@@ -464,7 +467,10 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 			if err != nil {
 				return input, err
 			}
-			if len(rights) != 1 {
+			switch {
+			case len(rights) == 0:
+				continue
+			case len(rights) > 1:
 				return input, fmt.Errorf("can only compare one element at a time")
 			}
 			right = rights[0].Interface()
