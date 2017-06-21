@@ -428,8 +428,6 @@ func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType st
 	// We have both here so that kubectl can work with both old and new api servers.
 	case "object":
 	case "any":
-	default:
-		return append(allErrs, fmt.Errorf("unexpected type: %v", fieldType))
 	}
 	return allErrs
 }

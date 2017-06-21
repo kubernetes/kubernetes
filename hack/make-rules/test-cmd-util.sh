@@ -2851,6 +2851,16 @@ run_deployment_tests() {
   # Clean up
   kubectl delete deployment test-nginx-apps "${kube_flags[@]}"
 
+  ### Test kubectl create deployment should not fail validation
+  # Pre-Condition: No deployment exists.
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f hack/testdata/deployment-with-UnixUserID.yaml "${kube_flags[@]}"
+  # Post-Condition: Deployment "deployment-with-unixuserid" is created.
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'deployment-with-unixuserid:'
+  # Clean up
+  kubectl delete deployment deployment-with-unixuserid "${kube_flags[@]}"
+
   ### Test cascading deletion
   ## Test that rs is deleted when deployment is deleted.
   # Pre-condition: no deployment exists
