@@ -36,10 +36,10 @@ spec:
         command:
           - '/bin/sh'
           - '-c'
-          - '/run.sh $FLUENTD_ARGS 2>&1 >>/var/log/fluentd.log'
+          - '/run.sh $FLUENTD_ARGS'
         env:
         - name: FLUENTD_ARGS
-          value: --no-supervisor
+          value: --no-supervisor -q
         resources:
           limits:
             memory: 300Mi
