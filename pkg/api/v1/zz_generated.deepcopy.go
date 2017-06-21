@@ -2469,7 +2469,7 @@ func DeepCopy_v1_PodSecurityContext(in interface{}, out interface{}, c *conversi
 		}
 		if in.RunAsUser != nil {
 			in, out := &in.RunAsUser, &out.RunAsUser
-			*out = new(types.UnixUserID)
+			*out = new(int64)
 			**out = **in
 		}
 		if in.RunAsNonRoot != nil {
@@ -2479,12 +2479,12 @@ func DeepCopy_v1_PodSecurityContext(in interface{}, out interface{}, c *conversi
 		}
 		if in.SupplementalGroups != nil {
 			in, out := &in.SupplementalGroups, &out.SupplementalGroups
-			*out = make([]types.UnixGroupID, len(*in))
+			*out = make([]int64, len(*in))
 			copy(*out, *in)
 		}
 		if in.FSGroup != nil {
 			in, out := &in.FSGroup, &out.FSGroup
-			*out = new(types.UnixGroupID)
+			*out = new(int64)
 			**out = **in
 		}
 		return nil
@@ -3264,7 +3264,7 @@ func DeepCopy_v1_SecurityContext(in interface{}, out interface{}, c *conversion.
 		}
 		if in.RunAsUser != nil {
 			in, out := &in.RunAsUser, &out.RunAsUser
-			*out = new(types.UnixUserID)
+			*out = new(int64)
 			**out = **in
 		}
 		if in.RunAsNonRoot != nil {

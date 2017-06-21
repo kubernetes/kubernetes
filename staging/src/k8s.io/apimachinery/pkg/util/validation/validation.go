@@ -22,8 +22,6 @@ import (
 	"net"
 	"regexp"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const qnameCharFmt string = "[A-Za-z0-9]"
@@ -200,7 +198,7 @@ const (
 )
 
 // IsValidGroupID tests that the argument is a valid Unix GID.
-func IsValidGroupID(gid types.UnixGroupID) []string {
+func IsValidGroupID(gid int64) []string {
 	if minGroupID <= gid && gid <= maxGroupID {
 		return nil
 	}
@@ -208,7 +206,7 @@ func IsValidGroupID(gid types.UnixGroupID) []string {
 }
 
 // IsValidUserID tests that the argument is a valid Unix UID.
-func IsValidUserID(uid types.UnixUserID) []string {
+func IsValidUserID(uid int64) []string {
 	if minUserID <= uid && uid <= maxUserID {
 		return nil
 	}

@@ -19,7 +19,6 @@ package group
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -54,26 +53,26 @@ func TestMustRunAsOptions(t *testing.T) {
 func TestGenerate(t *testing.T) {
 	tests := map[string]struct {
 		ranges   []extensions.GroupIDRange
-		expected []types.UnixGroupID
+		expected []int64
 	}{
 		"multi value": {
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 2},
 			},
-			expected: []types.UnixGroupID{1},
+			expected: []int64{1},
 		},
 		"single value": {
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 1},
 			},
-			expected: []types.UnixGroupID{1},
+			expected: []int64{1},
 		},
 		"multi range": {
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 1},
 				{Min: 2, Max: 500},
 			},
-			expected: []types.UnixGroupID{1},
+			expected: []int64{1},
 		},
 	}
 
@@ -121,7 +120,7 @@ func TestValidate(t *testing.T) {
 	tests := map[string]struct {
 		ranges []extensions.GroupIDRange
 		pod    *api.Pod
-		groups []types.UnixGroupID
+		groups []int64
 		pass   bool
 	}{
 		"nil security context": {
@@ -138,7 +137,7 @@ func TestValidate(t *testing.T) {
 		},
 		"not in range": {
 			pod:    validPod(),
-			groups: []types.UnixGroupID{5},
+			groups: []int64{5},
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 				{Min: 4, Max: 4},
@@ -146,7 +145,7 @@ func TestValidate(t *testing.T) {
 		},
 		"in range 1": {
 			pod:    validPod(),
-			groups: []types.UnixGroupID{2},
+			groups: []int64{2},
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
@@ -154,7 +153,7 @@ func TestValidate(t *testing.T) {
 		},
 		"in range boundry min": {
 			pod:    validPod(),
-			groups: []types.UnixGroupID{1},
+			groups: []int64{1},
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
@@ -162,7 +161,7 @@ func TestValidate(t *testing.T) {
 		},
 		"in range boundry max": {
 			pod:    validPod(),
-			groups: []types.UnixGroupID{3},
+			groups: []int64{3},
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
@@ -170,7 +169,7 @@ func TestValidate(t *testing.T) {
 		},
 		"singular range": {
 			pod:    validPod(),
-			groups: []types.UnixGroupID{4},
+			groups: []int64{4},
 			ranges: []extensions.GroupIDRange{
 				{Min: 4, Max: 4},
 			},

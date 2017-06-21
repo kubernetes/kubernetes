@@ -392,7 +392,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		volumeAttacher, _ = attachableVolumePlugin.NewAttacher()
 	}
 
-	var fsGroup *types.UnixGroupID
+	var fsGroup *int64
 	if volumeToMount.Pod.Spec.SecurityContext != nil &&
 		volumeToMount.Pod.Spec.SecurityContext.FSGroup != nil {
 		fsGroup = volumeToMount.Pod.Spec.SecurityContext.FSGroup

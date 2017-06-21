@@ -67,6 +67,6 @@ func TestSetUpAt(t *testing.T) {
 	m, _ := plugin.newMounterInternal(spec, pod, mounter, plugin.runner)
 	m.SetUpAt(rootDir+"/mount-dir", nil)
 
-	fsGroup := types.UnixGroupID(42)
+	fsGroup := int64(42)
 	m.SetUpAt(rootDir+"/mount-dir", &fsGroup)
 }

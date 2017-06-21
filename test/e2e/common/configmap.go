@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -523,8 +522,8 @@ func newEnvFromConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 }
 
 func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
-	userID := types.UnixUserID(uid)
-	groupID := types.UnixGroupID(fsGroup)
+	userID := int64(uid)
+	groupID := int64(fsGroup)
 
 	var (
 		name            = "configmap-test-volume-" + string(uuid.NewUUID())
@@ -602,8 +601,8 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 }
 
 func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
-	userID := types.UnixUserID(uid)
-	groupID := types.UnixGroupID(fsGroup)
+	userID := int64(uid)
+	groupID := int64(fsGroup)
 
 	var (
 		name            = "configmap-test-volume-map-" + string(uuid.NewUUID())

@@ -177,11 +177,11 @@ func (s *projectedVolumeMounter) CanMount() error {
 	return nil
 }
 
-func (s *projectedVolumeMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (s *projectedVolumeMounter) SetUp(fsGroup *int64) error {
 	return s.SetUpAt(s.GetPath(), fsGroup)
 }
 
-func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", s.volName, s.pod.UID, dir)
 
 	wrapped, err := s.plugin.host.NewWrapperMounter(s.volName, wrappedVolumeSpec(), s.pod, *s.opts)
