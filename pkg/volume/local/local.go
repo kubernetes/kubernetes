@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/validation"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -190,6 +191,11 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) err
 	if m.globalPath == "" {
 		err := fmt.Errorf("LocalVolume volume %q path is empty", m.volName)
 		return err
+	}
+
+	err := validation.ValidatePathNoBacksteps(m.globalPath)
+	if err != nil {
+		return fmt.Errorf("invalid path: %s %v", m.globalPath, err)
 	}
 
 	notMnt, err := m.mounter.IsLikelyNotMountPoint(dir)
