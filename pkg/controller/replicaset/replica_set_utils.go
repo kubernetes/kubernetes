@@ -139,8 +139,7 @@ func NewReplicaSetCondition(condType extensions.ReplicaSetConditionType, status 
 
 // GetCondition returns a replica set condition with the provided type if it exists.
 func GetCondition(status extensions.ReplicaSetStatus, condType extensions.ReplicaSetConditionType) *extensions.ReplicaSetCondition {
-	for i := range status.Conditions {
-		c := status.Conditions[i]
+	for _, c := range status.Conditions {
 		if c.Type == condType {
 			return &c
 		}
