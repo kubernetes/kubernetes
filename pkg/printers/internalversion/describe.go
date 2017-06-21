@@ -1382,7 +1382,7 @@ func describeVolumeClaimTemplates(templates []api.PersistentVolumeClaim, w Prefi
 		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.NewString())
 		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.NewString())
 		if capacity, ok := pvc.Spec.Resources.Requests[api.ResourceStorage]; ok {
-			w.Write(LEVEL_1, "Capacity:\t%s\n", capacity)
+			w.Write(LEVEL_1, "Capacity:\t%s\n", capacity.String())
 		} else {
 			w.Write(LEVEL_1, "Capacity:\t%s\n", "<default>")
 		}
