@@ -125,6 +125,10 @@ ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 # TODO(piosz): remove this in 1.8
 NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
 
+# To avoid running the DaemonSet on older version make sure the ip-masq-agent
+# only runs when the readiness label is set.
+NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/masq-agent-ds-ready=true"
+
 # To avoid running Calico on a node that is not configured appropriately, 
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
