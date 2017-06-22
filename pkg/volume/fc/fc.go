@@ -204,11 +204,11 @@ func (b *fcDiskMounter) CanMount() error {
 	return nil
 }
 
-func (b *fcDiskMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (b *fcDiskMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *fcDiskMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (b *fcDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
 	if err != nil {

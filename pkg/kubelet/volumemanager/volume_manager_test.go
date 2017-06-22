@@ -24,7 +24,6 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -239,7 +238,7 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 				},
 			},
 			SecurityContext: &v1.PodSecurityContext{
-				SupplementalGroups: []kubetypes.UnixGroupID{555},
+				SupplementalGroups: []int64{555},
 			},
 		},
 	}

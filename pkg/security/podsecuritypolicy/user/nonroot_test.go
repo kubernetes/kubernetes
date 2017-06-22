@@ -19,7 +19,6 @@ package user
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -50,8 +49,8 @@ func TestNonRootGenerate(t *testing.T) {
 }
 
 func TestNonRootValidate(t *testing.T) {
-	goodUID := types.UnixUserID(1)
-	badUID := types.UnixUserID(0)
+	goodUID := int64(1)
+	badUID := int64(0)
 	untrue := false
 	unfalse := true
 	s, err := NewRunAsNonRoot(&extensions.RunAsUserStrategyOptions{})

@@ -90,21 +90,34 @@ func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	}
 
 	for _, r := range table.Routes {
-		instanceID := orEmpty(r.InstanceId)
-		destinationCIDR := orEmpty(r.DestinationCidrBlock)
-
-		if instanceID == "" || destinationCIDR == "" {
+		destinationCIDR := aws.StringValue(r.DestinationCidrBlock)
+		if destinationCIDR == "" {
 			continue
 		}
 
-		instance, found := instances[instanceID]
-		if !found {
-			glog.Warningf("unable to find instance ID %s in the list of instances being routed to", instanceID)
+		route := &cloudprovider.Route{
+			Name:            clusterName + "-" + destinationCIDR,
+			DestinationCIDR: destinationCIDR,
+		}
+
+		// Capture blackhole routes
+		if aws.StringValue(r.State) == ec2.RouteStateBlackhole {
+			route.Blackhole = true
+			routes = append(routes, route)
 			continue
 		}
-		nodeName := mapInstanceToNodeName(instance)
-		routeName := clusterName + "-" + destinationCIDR
-		routes = append(routes, &cloudprovider.Route{Name: routeName, TargetNode: nodeName, DestinationCIDR: destinationCIDR})
+
+		// Capture instance routes
+		instanceID := aws.StringValue(r.InstanceId)
+		if instanceID != "" {
+			instance, found := instances[instanceID]
+			if found {
+				route.TargetNode = mapInstanceToNodeName(instance)
+				routes = append(routes, route)
+			} else {
+				glog.Warningf("unable to find instance ID %s in the list of instances being routed to", instanceID)
+			}
+		}
 	}
 
 	return routes, nil

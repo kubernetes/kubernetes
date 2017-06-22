@@ -3450,10 +3450,10 @@ func Convert_api_PodProxyOptions_To_v1_PodProxyOptions(in *api.PodProxyOptions, 
 
 func autoConvert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurityContext, out *api.PodSecurityContext, s conversion.Scope) error {
 	out.SELinuxOptions = (*api.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
-	out.RunAsUser = (*types.UnixUserID)(unsafe.Pointer(in.RunAsUser))
+	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
-	out.SupplementalGroups = *(*[]types.UnixGroupID)(unsafe.Pointer(&in.SupplementalGroups))
-	out.FSGroup = (*types.UnixGroupID)(unsafe.Pointer(in.FSGroup))
+	out.SupplementalGroups = *(*[]int64)(unsafe.Pointer(&in.SupplementalGroups))
+	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
 	return nil
 }
 
@@ -3462,10 +3462,10 @@ func autoConvert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecu
 	// INFO: in.HostPID opted out of conversion generation
 	// INFO: in.HostIPC opted out of conversion generation
 	out.SELinuxOptions = (*SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
-	out.RunAsUser = (*types.UnixUserID)(unsafe.Pointer(in.RunAsUser))
+	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
-	out.SupplementalGroups = *(*[]types.UnixGroupID)(unsafe.Pointer(&in.SupplementalGroups))
-	out.FSGroup = (*types.UnixGroupID)(unsafe.Pointer(in.FSGroup))
+	out.SupplementalGroups = *(*[]int64)(unsafe.Pointer(&in.SupplementalGroups))
+	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
 	return nil
 }
 
@@ -4525,7 +4525,7 @@ func autoConvert_v1_SecurityContext_To_api_SecurityContext(in *SecurityContext, 
 	out.Capabilities = (*api.Capabilities)(unsafe.Pointer(in.Capabilities))
 	out.Privileged = (*bool)(unsafe.Pointer(in.Privileged))
 	out.SELinuxOptions = (*api.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
-	out.RunAsUser = (*types.UnixUserID)(unsafe.Pointer(in.RunAsUser))
+	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
 	out.ReadOnlyRootFilesystem = (*bool)(unsafe.Pointer(in.ReadOnlyRootFilesystem))
 	return nil
@@ -4540,7 +4540,7 @@ func autoConvert_api_SecurityContext_To_v1_SecurityContext(in *api.SecurityConte
 	out.Capabilities = (*Capabilities)(unsafe.Pointer(in.Capabilities))
 	out.Privileged = (*bool)(unsafe.Pointer(in.Privileged))
 	out.SELinuxOptions = (*SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
-	out.RunAsUser = (*types.UnixUserID)(unsafe.Pointer(in.RunAsUser))
+	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
 	out.ReadOnlyRootFilesystem = (*bool)(unsafe.Pointer(in.ReadOnlyRootFilesystem))
 	return nil

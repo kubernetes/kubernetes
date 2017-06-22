@@ -19,8 +19,6 @@ package validation
 import (
 	"strings"
 	"testing"
-
-	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestIsDNS1123Label(t *testing.T) {
@@ -156,18 +154,18 @@ func TestIsValidPortNum(t *testing.T) {
 	}
 }
 
-func createGroupIDs(ids ...int64) []types.UnixGroupID {
-	var output []types.UnixGroupID
+func createGroupIDs(ids ...int64) []int64 {
+	var output []int64
 	for _, id := range ids {
-		output = append(output, types.UnixGroupID(id))
+		output = append(output, int64(id))
 	}
 	return output
 }
 
-func createUserIDs(ids ...int64) []types.UnixUserID {
-	var output []types.UnixUserID
+func createUserIDs(ids ...int64) []int64 {
+	var output []int64
 	for _, id := range ids {
-		output = append(output, types.UnixUserID(id))
+		output = append(output, int64(id))
 	}
 	return output
 }

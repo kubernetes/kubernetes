@@ -87,6 +87,6 @@ func Run(s *GKECertificatesController) error {
 	}
 
 	sharedInformers.Start(nil)
-	controller.Run(1, nil) // runs forever
-	return nil
+	controller.Run(5, nil) // runs forever
+	panic("unreachable")
 }

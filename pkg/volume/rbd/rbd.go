@@ -403,11 +403,11 @@ func (b *rbdMounter) CanMount() error {
 	return nil
 }
 
-func (b *rbdMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (b *rbdMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *rbdMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (b *rbdMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	glog.V(4).Infof("rbd: attempting to SetUp and mount %s", dir)
 	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)

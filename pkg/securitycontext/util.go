@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -120,7 +119,7 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 	}
 
 	if containerSc.RunAsUser != nil {
-		effectiveSc.RunAsUser = new(types.UnixUserID)
+		effectiveSc.RunAsUser = new(int64)
 		*effectiveSc.RunAsUser = *containerSc.RunAsUser
 	}
 
@@ -149,7 +148,7 @@ func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
 		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
 	}
 	if pod.Spec.SecurityContext.RunAsUser != nil {
-		synthesized.RunAsUser = new(types.UnixUserID)
+		synthesized.RunAsUser = new(int64)
 		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
 	}
 
@@ -192,7 +191,7 @@ func InternalDetermineEffectiveSecurityContext(pod *api.Pod, container *api.Cont
 	}
 
 	if containerSc.RunAsUser != nil {
-		effectiveSc.RunAsUser = new(types.UnixUserID)
+		effectiveSc.RunAsUser = new(int64)
 		*effectiveSc.RunAsUser = *containerSc.RunAsUser
 	}
 
@@ -221,7 +220,7 @@ func internalSecurityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityCo
 		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
 	}
 	if pod.Spec.SecurityContext.RunAsUser != nil {
-		synthesized.RunAsUser = new(types.UnixUserID)
+		synthesized.RunAsUser = new(int64)
 		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
 	}
 

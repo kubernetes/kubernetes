@@ -26,7 +26,6 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -66,14 +65,14 @@ var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", fun
 	It("should support pod.Spec.SecurityContext.SupplementalGroups", func() {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].Command = []string{"id", "-G"}
-		pod.Spec.SecurityContext.SupplementalGroups = []types.UnixGroupID{1234, 5678}
+		pod.Spec.SecurityContext.SupplementalGroups = []int64{1234, 5678}
 		groups := []string{"1234", "5678"}
 		f.TestContainerOutput("pod.Spec.SecurityContext.SupplementalGroups", pod, 0, groups)
 	})
 
 	It("should support pod.Spec.SecurityContext.RunAsUser", func() {
 		pod := scTestPod(false, false)
-		userID := types.UnixUserID(1001)
+		userID := int64(1001)
 		pod.Spec.SecurityContext.RunAsUser = &userID
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id -u"}
 
@@ -84,8 +83,8 @@ var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", fun
 
 	It("should support container.SecurityContext.RunAsUser", func() {
 		pod := scTestPod(false, false)
-		userID := types.UnixUserID(1001)
-		overrideUserID := types.UnixUserID(1002)
+		userID := int64(1001)
+		overrideUserID := int64(1002)
 		pod.Spec.SecurityContext.RunAsUser = &userID
 		pod.Spec.Containers[0].SecurityContext = new(v1.SecurityContext)
 		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUserID
