@@ -28,6 +28,7 @@ import (
 
 	"reflect"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/apiserver/pkg/apis/audit"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	authenticationv1 "k8s.io/client-go/pkg/apis/authentication/v1"
 )
 
 func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {

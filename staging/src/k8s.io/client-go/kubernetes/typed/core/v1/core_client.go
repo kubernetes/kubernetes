@@ -17,9 +17,9 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	rest "k8s.io/client-go/rest"
 )
 

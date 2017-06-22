@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
 )
 
 func newInitializer(name string, rules ...v1alpha1.Rule) *v1alpha1.InitializerConfiguration {

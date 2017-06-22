@@ -17,7 +17,7 @@ limitations under the License.
 package util
 
 import (
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 // GetUsedPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair

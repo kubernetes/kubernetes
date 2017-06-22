@@ -46,9 +46,9 @@ import (
 	"golang.org/x/net/context"
 
 	pbm "github.com/vmware/govmomi/pbm"
+	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	k8runtime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"

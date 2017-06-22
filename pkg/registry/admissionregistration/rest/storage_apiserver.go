@@ -17,13 +17,13 @@ limitations under the License.
 package rest
 
 import (
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
-	admissionregistrationv1alpha1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
 	externaladmissionhookconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/externaladmissionhookconfiguration/storage"
 	initializerconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/initializerconfiguration/storage"
 )

@@ -18,6 +18,7 @@ package v1
 
 import (
 	"fmt"
+	"k8s.io/api/core/v1"
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 )
@@ -31,10 +32,10 @@ type NameGenerator interface {
 	GenerateName(base string) string
 }
 
-// GenerateName will resolve the object name of the provided ObjectMeta to a generated version if
-// necessary. It expects that validation for ObjectMeta has already completed (that Base is a
+// GenerateName will resolve the object name of the provided v1.ObjectMeta to a generated version if
+// necessary. It expects that validation for v1.ObjectMeta has already completed (that Base is a
 // valid name) and that the NameGenerator generates a name that is also valid.
-func GenerateName(u NameGenerator, meta *ObjectMeta) {
+func GenerateName(u NameGenerator, meta *v1.ObjectMeta) {
 	if len(meta.GenerateName) == 0 || len(meta.Name) != 0 {
 		return
 	}

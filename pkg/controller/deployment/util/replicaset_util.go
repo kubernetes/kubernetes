@@ -21,10 +21,10 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/retry"

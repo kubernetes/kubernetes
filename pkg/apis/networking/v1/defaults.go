@@ -17,15 +17,16 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_NetworkPolicyPort(obj *NetworkPolicyPort) {
+func SetDefaults_NetworkPolicyPort(obj *networkingv1.NetworkPolicyPort) {
 	// Default any undefined Protocol fields to TCP.
 	if obj.Protocol == nil {
 		proto := v1.ProtocolTCP

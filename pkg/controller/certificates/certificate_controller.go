@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	certificatesinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/certificates/v1beta1"
 	certificateslisters "k8s.io/kubernetes/pkg/client/listers/certificates/v1beta1"

@@ -19,7 +19,7 @@ package util
 import (
 	"reflect"
 
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	api_v1 "k8s.io/api/core/v1"
 )
 
 // Checks if cluster-independent, user provided data in two given Secrets are equal. If in

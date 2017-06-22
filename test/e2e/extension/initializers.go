@@ -24,11 +24,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	clientretry "k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/test/e2e/framework"

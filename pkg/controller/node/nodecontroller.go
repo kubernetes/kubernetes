@@ -32,14 +32,14 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	clientv1 "k8s.io/api/core/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"

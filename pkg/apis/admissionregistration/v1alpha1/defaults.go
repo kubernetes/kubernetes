@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -24,16 +25,16 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_Initializer(obj *Initializer) {
+func SetDefaults_Initializer(obj *admissionregistrationv1alpha1.Initializer) {
 	if obj.FailurePolicy == nil {
-		policy := Ignore
+		policy := admissionregistrationv1alpha1.Ignore
 		obj.FailurePolicy = &policy
 	}
 }
 
-func SetDefaults_ExternalAdmissionHook(obj *ExternalAdmissionHook) {
+func SetDefaults_ExternalAdmissionHook(obj *admissionregistrationv1alpha1.ExternalAdmissionHook) {
 	if obj.FailurePolicy == nil {
-		policy := Ignore
+		policy := admissionregistrationv1alpha1.Ignore
 		obj.FailurePolicy = &policy
 	}
 }

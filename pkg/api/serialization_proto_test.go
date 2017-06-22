@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/gogo/protobuf/proto"
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )

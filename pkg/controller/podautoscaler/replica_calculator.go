@@ -21,12 +21,12 @@ import (
 	"math"
 	"time"
 
+	autoscaling "k8s.io/api/autoscaling/v2alpha1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
 	v1coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 )

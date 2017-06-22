@@ -100,6 +100,8 @@ save "plugin"
 save "util"
 save "examples"
 save "OWNERS"
+save "Godeps"
+save "LICENSE"
 
 # mkcp copies file from the main repo to the client repo, it creates the directory if it doesn't exist in the client repo.
 function mkcp() {
@@ -115,54 +117,16 @@ find "${MAIN_REPO}/pkg/version" -maxdepth 1 -type f | xargs -I{} cp {} "${CLIENT
 # need to copy clientsets, though later we should copy APIs and later generate clientsets
 mkcp "pkg/client/clientset_generated/${CLIENTSET}" "pkg/client/clientset_generated"
 mkcp "pkg/client/informers/informers_generated/externalversions" "pkg/client/informers/informers_generated"
-mkcp "pkg/api/helper" "pkg/api"
-mkcp "pkg/api/v1/resource" "pkg/api/v1"
-mkcp "pkg/api/v1/node" "pkg/api/v1"
-
-pushd "${CLIENT_REPO_TEMP}" > /dev/null
-  echo "generating vendor/"
-  # make snapshots for repos in staging/"
-  for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
-    cp -a "${KUBE_ROOT}/staging/src/k8s.io/${repo}" "${TMP_GOPATH}/src/k8s.io/"
-    pushd "${TMP_GOPATH}/src/k8s.io/${repo}" >/dev/null
-      git init >/dev/null
-      git config --local user.email "nobody@k8s.io"
-      git config --local user.name "$0"
-      git add . >/dev/null
-      git commit -q -m "Snapshot" >/dev/null
-    popd >/dev/null
-  done
-  # client-go depends on some apimachinery packages. Adding ${TMP_GOPATH} to the
-  # GOPATH so that if client-go has new dependencies on apimachinery, `godep save`
-  # can find the dependent packages from ${TMP_GOPATH}, instead of failing. Note
-  # that in Godeps.json, the "Rev"s of the entries for k8s.io/apimachinery will be
-  # invalid, they will be updated later by the publish robot to point to the real
-  # k8s.io/apimachinery commit.
-  GOPATH="${TMP_GOPATH}:${GOPATH}" godep save ./...
-popd > /dev/null
-
-echo "moving vendor/k8s.io/kubernetes"
-cp -r "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes/* "${CLIENT_REPO_TEMP}"/
-# the publish robot will refill the vendor/
-rm -rf "${CLIENT_REPO_TEMP}"/vendor
-
-echo "rewriting Godeps.json"
-# The entries for k8s.io/apimahcinery are not removed from Godeps.json, though
-# they contain the invalid commit revision. The publish robot will set the
-# correct commit revision.
-go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --override-import-path="${CLIENT_REPO_FROM_SRC}" --ignored-prefixes="k8s.io/client-go,k8s.io/kubernetes" --rewritten-prefixes="k8s.io/apimachinery"
+mkcp "pkg/client/listers" "pkg/client"
+# remove internalversion listers
+find "${CLIENT_REPO_TEMP}/pkg/client/listers/" -maxdepth 2 -mindepth 2 -name internalversion -exec rm -r {} \;
+mkcp "pkg/api/v1/ref" "pkg/api/v1"
 
 echo "rewriting imports"
 grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \
   grep "\.go" | \
   grep -v "vendor/" | \
   xargs ${SED} -i "s|\"${MAIN_REPO_FROM_SRC}|\"${CLIENT_REPO_FROM_SRC}|g"
-
-echo "rewrite proto names in proto.RegisterType"
-find "${CLIENT_REPO_TEMP}" -type f -name "generated.pb.go" -print0 | xargs -0 ${SED} -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
-
-echo "rewrite proto IDL package names"
-find "${CLIENT_REPO_TEMP}" -type f -name "generated.proto" -print0 | xargs -0 ${SED} -i "s/k8s\.io\.kubernetes/k8s.io.client_go/g"
 
 # strip all generator tags from client-go
 find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 ${SED} -i '/^\/\/ +k8s:openapi-gen=true/d'
@@ -238,5 +202,5 @@ echo "move to the client repo"
 if [ "${DRY_RUN}" = false ]; then
   ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
   mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
-  git checkout HEAD -- $(find "${CLIENT_REPO}" -name BUILD)
+  git checkout HEAD -- $(find "${CLIENT_REPO}" -name BUILD) || true
 fi

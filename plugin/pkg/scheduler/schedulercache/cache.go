@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 var (

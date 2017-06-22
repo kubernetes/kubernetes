@@ -21,11 +21,11 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.federation.apis.federation.v1beta1;
 
+import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
-import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
@@ -119,7 +119,7 @@ message ClusterSpec {
   // This will later be changed to a reference to secret in federation control plane when the federation control plane supports secrets.
   // This can be left empty if the cluster allows insecure access.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.LocalObjectReference secretRef = 2;
+  optional k8s.io.api.core.v1.LocalObjectReference secretRef = 2;
 }
 
 // ClusterStatus is information about the current status of a cluster updated by cluster controller periodically.

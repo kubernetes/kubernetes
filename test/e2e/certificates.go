@@ -22,10 +22,10 @@ import (
 	"encoding/pem"
 	"time"
 
+	"k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	v1beta1client "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 

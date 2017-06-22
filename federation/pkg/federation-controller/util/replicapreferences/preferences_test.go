@@ -19,9 +19,9 @@ package replicapreferences
 import (
 	"testing"
 
+	extensionsv1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime"

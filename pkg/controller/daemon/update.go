@@ -23,6 +23,9 @@ import (
 
 	"github.com/golang/glog"
 
+	apps "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -30,10 +33,7 @@ import (
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"

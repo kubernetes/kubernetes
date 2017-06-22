@@ -17,13 +17,13 @@ limitations under the License.
 package rest
 
 import (
+	appsapiv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	appsapiv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	controllerrevisionsstore "k8s.io/kubernetes/pkg/registry/apps/controllerrevision/storage"
 	statefulsetstore "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
 	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"

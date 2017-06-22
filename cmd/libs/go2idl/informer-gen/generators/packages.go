@@ -99,6 +99,13 @@ func packageForInternalInterfaces(base string) string {
 	return filepath.Join(base, "internalinterfaces")
 }
 
+func vendorless(p string) string {
+	if pos := strings.LastIndex(p, "/vendor/"); pos != -1 {
+		return p[pos+len("/vendor/"):]
+	}
+	return p
+}
+
 // Packages makes the client package definition.
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	boilerplate, err := arguments.LoadGoBoilerplate()
@@ -122,7 +129,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	externalGroupVersions := make(map[string]clientgentypes.GroupVersions)
 	internalGroupVersions := make(map[string]clientgentypes.GroupVersions)
 	for _, inputDir := range arguments.InputDirs {
-		p := context.Universe.Package(inputDir)
+		p := context.Universe.Package(vendorless(inputDir))
 
 		objectMeta, internal, err := objectMetaForPackage(p)
 		if err != nil {

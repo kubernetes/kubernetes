@@ -28,6 +28,7 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/api/install"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,7 +41,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"

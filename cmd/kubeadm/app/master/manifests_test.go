@@ -25,9 +25,9 @@ import (
 	"sort"
 	"testing"
 
+	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"

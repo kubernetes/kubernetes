@@ -23,7 +23,7 @@ import (
 	"sort"
 	"strconv"
 
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"
 	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"

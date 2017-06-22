@@ -17,13 +17,13 @@ limitations under the License.
 package rest
 
 import (
+	networkingapiv1 "k8s.io/api/networking/v1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/networking"
-	networkingapiv1 "k8s.io/kubernetes/pkg/apis/networking/v1"
 	networkpolicystore "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage"
 )
 

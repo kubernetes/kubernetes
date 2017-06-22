@@ -20,13 +20,13 @@ import (
 	"errors"
 	"testing"
 
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	fedtest "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 
 	"github.com/stretchr/testify/require"
 )

@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )

@@ -23,13 +23,13 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
 	"k8s.io/kubernetes/federation/pkg/federation-controller/service/ingress"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // NewClusterWithRegionZone builds a new cluster object with given region and zone attributes.

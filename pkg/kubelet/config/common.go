@@ -22,13 +22,14 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/hash"
@@ -124,7 +125,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 		return true, pod, err
 	}
 	v1Pod := &v1.Pod{}
-	if err := v1.Convert_api_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
+	if err := k8s_api_v1.Convert_api_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
 		return true, nil, err
 	}
 	return true, v1Pod, nil
@@ -153,7 +154,7 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 		}
 	}
 	v1Pods := &v1.PodList{}
-	if err := v1.Convert_api_PodList_To_v1_PodList(newPods, v1Pods, nil); err != nil {
+	if err := k8s_api_v1.Convert_api_PodList_To_v1_PodList(newPods, v1Pods, nil); err != nil {
 		return true, pods, err
 	}
 	return true, *v1Pods, err

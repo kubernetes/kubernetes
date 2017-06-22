@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/service/ingress"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 )
 

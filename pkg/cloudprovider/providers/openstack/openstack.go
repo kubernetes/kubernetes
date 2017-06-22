@@ -39,10 +39,10 @@ import (
 	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"

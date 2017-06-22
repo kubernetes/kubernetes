@@ -83,14 +83,6 @@
 			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
 		},
 		{
-			"ImportPath": "github.com/docker/distribution/digest",
-			"Rev": "cd27f179f2c10c5d300e6d09025b538c475b0d51"
-		},
-		{
-			"ImportPath": "github.com/docker/distribution/reference",
-			"Rev": "cd27f179f2c10c5d300e6d09025b538c475b0d51"
-		},
-		{
 			"ImportPath": "github.com/docker/spdystream",
 			"Rev": "449fdfce4d962303d702fec724ef0ad181c92528"
 		},

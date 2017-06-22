@@ -23,6 +23,8 @@ import (
 
 	"github.com/golang/glog"
 
+	rbacapiv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	rbacapiv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -34,8 +36,6 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	rbacapiv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	rbacapiv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	rbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"

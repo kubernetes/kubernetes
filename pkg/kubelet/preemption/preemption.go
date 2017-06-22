@@ -21,9 +21,9 @@ import (
 	"math"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"

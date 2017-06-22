@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/listers/core/v1"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )
@@ -51,7 +51,7 @@ func newNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duratio
 				return client.CoreV1().Namespaces().Watch(options)
 			},
 		},
-		&api_v1.Namespace{},
+		&core_v1.Namespace{},
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -60,7 +60,7 @@ func newNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duratio
 }
 
 func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api_v1.Namespace{}, newNamespaceInformer)
+	return f.factory.InformerFor(&core_v1.Namespace{}, newNamespaceInformer)
 }
 
 func (f *namespaceInformer) Lister() v1.NamespaceLister {

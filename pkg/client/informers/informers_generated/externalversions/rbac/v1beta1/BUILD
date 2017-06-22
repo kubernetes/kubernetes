@@ -18,10 +18,10 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/rbac/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/internalinterfaces:go_default_library",
         "//pkg/client/listers/rbac/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",

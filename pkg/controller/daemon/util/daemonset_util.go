@@ -19,12 +19,12 @@ package util
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )

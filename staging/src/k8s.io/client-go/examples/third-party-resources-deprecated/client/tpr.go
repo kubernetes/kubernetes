@@ -19,13 +19,13 @@ package client
 import (
 	"time"
 
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	tprv1 "k8s.io/client-go/examples/third-party-resources-deprecated/apis/tpr/v1"
 	"k8s.io/client-go/kubernetes"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"

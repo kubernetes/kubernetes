@@ -20,10 +20,10 @@ import (
 	"testing"
 	"time"
 
+	api_v1 "k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 
 	"github.com/stretchr/testify/assert"
 )

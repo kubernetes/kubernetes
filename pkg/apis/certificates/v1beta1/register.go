@@ -17,8 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -39,10 +38,7 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
-	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
-	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
-	SchemeBuilder      runtime.SchemeBuilder
-	localSchemeBuilder = &SchemeBuilder
+	localSchemeBuilder = &certificatesv1beta1.SchemeBuilder
 	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
@@ -50,17 +46,5 @@ func init() {
 	// We only register manually written functions here. The registration of the
 	// generated functions takes place in the generated files. The separation
 	// makes the code compile even when the generated files are missing.
-	localSchemeBuilder.Register(addKnownTypes, addConversionFuncs, addDefaultingFuncs)
-}
-
-// Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&CertificateSigningRequest{},
-		&CertificateSigningRequestList{},
-	)
-
-	// Add the watch version that applies
-	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
-	return nil
+	localSchemeBuilder.Register(addConversionFuncs, addDefaultingFuncs)
 }

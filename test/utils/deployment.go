@@ -22,11 +22,11 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"

@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
@@ -28,7 +29,6 @@ import (
 	federation_v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )

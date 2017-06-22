@@ -19,11 +19,11 @@ limitations under the License.
 package v1alpha1
 
 import (
+	admissionregistration_v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	admissionregistration_v1alpha1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/internalinterfaces"
 	v1alpha1 "k8s.io/kubernetes/pkg/client/listers/admissionregistration/v1alpha1"

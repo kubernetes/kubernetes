@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	batch "k8s.io/api/batch/v1"
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -32,8 +34,6 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"

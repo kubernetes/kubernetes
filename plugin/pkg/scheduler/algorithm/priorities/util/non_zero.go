@@ -16,7 +16,7 @@ limitations under the License.
 
 package util
 
-import "k8s.io/kubernetes/pkg/api/v1"
+import "k8s.io/api/core/v1"
 
 // For each of these resources, a pod that doesn't request the resource explicitly
 // will be treated as having requested the amount indicated below, for the purpose

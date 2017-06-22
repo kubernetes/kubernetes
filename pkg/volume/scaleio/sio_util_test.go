@@ -23,8 +23,8 @@ import (
 	"reflect"
 	"testing"
 
+	api "k8s.io/api/core/v1"
 	utiltesting "k8s.io/client-go/util/testing"
-	api "k8s.io/kubernetes/pkg/api/v1"
 )
 
 var (

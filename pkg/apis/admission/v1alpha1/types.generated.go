@@ -25,11 +25,11 @@ import (
 	"errors"
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
+	pkg4_v1 "k8s.io/api/authentication/v1"
 	pkg1_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkg2_runtime "k8s.io/apimachinery/pkg/runtime"
 	pkg5_types "k8s.io/apimachinery/pkg/types"
 	pkg3_admission "k8s.io/apiserver/pkg/admission"
-	pkg4_v1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 	"reflect"
 	"runtime"
 )
@@ -64,11 +64,11 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg1_v1.TypeMeta
-		var v1 pkg2_runtime.RawExtension
-		var v2 pkg5_types.UID
-		var v3 pkg3_admission.Operation
-		var v4 pkg4_v1.UserInfo
+		var v0 pkg4_v1.UserInfo
+		var v1 pkg1_v1.TypeMeta
+		var v2 pkg2_runtime.RawExtension
+		var v3 pkg5_types.UID
+		var v4 pkg3_admission.Operation
 		_, _, _, _, _ = v0, v1, v2, v3, v4
 	}
 }

@@ -21,6 +21,7 @@ go_test(
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
@@ -28,7 +29,6 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/features:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/proxy:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
     ],
 )
 

@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
 // verifies the cacheWatcher.process goroutine is properly cleaned up even if

@@ -17,6 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -24,8 +26,6 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/authorization"
-	authorizationv1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
-	authorizationv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/registry/authorization/localsubjectaccessreview"
 	"k8s.io/kubernetes/pkg/registry/authorization/selfsubjectaccessreview"
 	"k8s.io/kubernetes/pkg/registry/authorization/subjectaccessreview"

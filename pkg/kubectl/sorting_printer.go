@@ -24,13 +24,13 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/jsonpath"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/printers"
 
 	"vbom.ml/util/sortorder"

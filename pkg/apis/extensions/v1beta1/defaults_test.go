@@ -20,6 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
@@ -57,82 +59,82 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		original *DaemonSet
-		expected *DaemonSet
+		original *extensionsv1beta1.DaemonSet
+		expected *extensionsv1beta1.DaemonSet
 	}{
 		{ // Labels change/defaulting test.
-			original: &DaemonSet{
-				Spec: DaemonSetSpec{
+			original: &extensionsv1beta1.DaemonSet{
+				Spec: extensionsv1beta1.DaemonSetSpec{
 					Template: defaultTemplate,
 				},
 			},
-			expected: &DaemonSet{
+			expected: &extensionsv1beta1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: defaultLabels,
 				},
-				Spec: DaemonSetSpec{
+				Spec: extensionsv1beta1.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: defaultLabels,
 					},
 					Template: defaultTemplate,
-					UpdateStrategy: DaemonSetUpdateStrategy{
-						Type: OnDeleteDaemonSetStrategyType,
+					UpdateStrategy: extensionsv1beta1.DaemonSetUpdateStrategy{
+						Type: extensionsv1beta1.OnDeleteDaemonSetStrategyType,
 					},
 					RevisionHistoryLimit: newInt32(10),
 				},
 			},
 		},
 		{ // Labels change/defaulting test.
-			original: &DaemonSet{
+			original: &extensionsv1beta1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
 				},
-				Spec: DaemonSetSpec{
+				Spec: extensionsv1beta1.DaemonSetSpec{
 					Template:             defaultTemplate,
 					RevisionHistoryLimit: newInt32(1),
 				},
 			},
-			expected: &DaemonSet{
+			expected: &extensionsv1beta1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
 				},
-				Spec: DaemonSetSpec{
+				Spec: extensionsv1beta1.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: defaultLabels,
 					},
 					Template: defaultTemplate,
-					UpdateStrategy: DaemonSetUpdateStrategy{
-						Type: OnDeleteDaemonSetStrategyType,
+					UpdateStrategy: extensionsv1beta1.DaemonSetUpdateStrategy{
+						Type: extensionsv1beta1.OnDeleteDaemonSetStrategyType,
 					},
 					RevisionHistoryLimit: newInt32(1),
 				},
 			},
 		},
 		{ // Update strategy.
-			original: &DaemonSet{},
-			expected: &DaemonSet{
-				Spec: DaemonSetSpec{
+			original: &extensionsv1beta1.DaemonSet{},
+			expected: &extensionsv1beta1.DaemonSet{
+				Spec: extensionsv1beta1.DaemonSetSpec{
 					Template: templateNoLabel,
-					UpdateStrategy: DaemonSetUpdateStrategy{
-						Type: OnDeleteDaemonSetStrategyType,
+					UpdateStrategy: extensionsv1beta1.DaemonSetUpdateStrategy{
+						Type: extensionsv1beta1.OnDeleteDaemonSetStrategyType,
 					},
 					RevisionHistoryLimit: newInt32(10),
 				},
 			},
 		},
 		{ // Custom unique label key.
-			original: &DaemonSet{
-				Spec: DaemonSetSpec{},
+			original: &extensionsv1beta1.DaemonSet{
+				Spec: extensionsv1beta1.DaemonSetSpec{},
 			},
-			expected: &DaemonSet{
-				Spec: DaemonSetSpec{
+			expected: &extensionsv1beta1.DaemonSet{
+				Spec: extensionsv1beta1.DaemonSetSpec{
 					Template: templateNoLabel,
-					UpdateStrategy: DaemonSetUpdateStrategy{
-						Type: OnDeleteDaemonSetStrategyType,
+					UpdateStrategy: extensionsv1beta1.DaemonSetUpdateStrategy{
+						Type: extensionsv1beta1.OnDeleteDaemonSetStrategyType,
 					},
 					RevisionHistoryLimit: newInt32(10),
 				},
@@ -144,7 +146,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 		original := test.original
 		expected := test.expected
 		obj2 := roundTrip(t, runtime.Object(original))
-		got, ok := obj2.(*DaemonSet)
+		got, ok := obj2.(*extensionsv1beta1.DaemonSet)
 		if !ok {
 			t.Errorf("(%d) unexpected object: %v", i, got)
 			t.FailNow()
@@ -169,17 +171,17 @@ func TestSetDefaultDeployment(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		original *Deployment
-		expected *Deployment
+		original *extensionsv1beta1.Deployment
+		expected *extensionsv1beta1.Deployment
 	}{
 		{
-			original: &Deployment{},
-			expected: &Deployment{
-				Spec: DeploymentSpec{
+			original: &extensionsv1beta1.Deployment{},
+			expected: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
 					Replicas: newInt32(1),
-					Strategy: DeploymentStrategy{
-						Type: RollingUpdateDeploymentStrategyType,
-						RollingUpdate: &RollingUpdateDeployment{
+					Strategy: extensionsv1beta1.DeploymentStrategy{
+						Type: extensionsv1beta1.RollingUpdateDeploymentStrategyType,
+						RollingUpdate: &extensionsv1beta1.RollingUpdateDeployment{
 							MaxSurge:       &defaultIntOrString,
 							MaxUnavailable: &defaultIntOrString,
 						},
@@ -189,22 +191,22 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 		},
 		{
-			original: &Deployment{
-				Spec: DeploymentSpec{
+			original: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
-					Strategy: DeploymentStrategy{
-						RollingUpdate: &RollingUpdateDeployment{
+					Strategy: extensionsv1beta1.DeploymentStrategy{
+						RollingUpdate: &extensionsv1beta1.RollingUpdateDeployment{
 							MaxSurge: &differentIntOrString,
 						},
 					},
 				},
 			},
-			expected: &Deployment{
-				Spec: DeploymentSpec{
+			expected: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
-					Strategy: DeploymentStrategy{
-						Type: RollingUpdateDeploymentStrategyType,
-						RollingUpdate: &RollingUpdateDeployment{
+					Strategy: extensionsv1beta1.DeploymentStrategy{
+						Type: extensionsv1beta1.RollingUpdateDeploymentStrategyType,
+						RollingUpdate: &extensionsv1beta1.RollingUpdateDeployment{
 							MaxSurge:       &differentIntOrString,
 							MaxUnavailable: &defaultIntOrString,
 						},
@@ -214,21 +216,21 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 		},
 		{
-			original: &Deployment{
-				Spec: DeploymentSpec{
+			original: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
 					Replicas: newInt32(3),
-					Strategy: DeploymentStrategy{
-						Type:          RollingUpdateDeploymentStrategyType,
+					Strategy: extensionsv1beta1.DeploymentStrategy{
+						Type:          extensionsv1beta1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: nil,
 					},
 				},
 			},
-			expected: &Deployment{
-				Spec: DeploymentSpec{
+			expected: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
 					Replicas: newInt32(3),
-					Strategy: DeploymentStrategy{
-						Type: RollingUpdateDeploymentStrategyType,
-						RollingUpdate: &RollingUpdateDeployment{
+					Strategy: extensionsv1beta1.DeploymentStrategy{
+						Type: extensionsv1beta1.RollingUpdateDeploymentStrategyType,
+						RollingUpdate: &extensionsv1beta1.RollingUpdateDeployment{
 							MaxSurge:       &defaultIntOrString,
 							MaxUnavailable: &defaultIntOrString,
 						},
@@ -238,39 +240,39 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 		},
 		{
-			original: &Deployment{
-				Spec: DeploymentSpec{
+			original: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
-					Strategy: DeploymentStrategy{
-						Type: RecreateDeploymentStrategyType,
+					Strategy: extensionsv1beta1.DeploymentStrategy{
+						Type: extensionsv1beta1.RecreateDeploymentStrategyType,
 					},
 				},
 			},
-			expected: &Deployment{
-				Spec: DeploymentSpec{
+			expected: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
-					Strategy: DeploymentStrategy{
-						Type: RecreateDeploymentStrategyType,
+					Strategy: extensionsv1beta1.DeploymentStrategy{
+						Type: extensionsv1beta1.RecreateDeploymentStrategyType,
 					},
 					Template: defaultTemplate,
 				},
 			},
 		},
 		{
-			original: &Deployment{
-				Spec: DeploymentSpec{
+			original: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
-					Strategy: DeploymentStrategy{
-						Type: RecreateDeploymentStrategyType,
+					Strategy: extensionsv1beta1.DeploymentStrategy{
+						Type: extensionsv1beta1.RecreateDeploymentStrategyType,
 					},
 					ProgressDeadlineSeconds: newInt32(30),
 				},
 			},
-			expected: &Deployment{
-				Spec: DeploymentSpec{
+			expected: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
 					Replicas: newInt32(5),
-					Strategy: DeploymentStrategy{
-						Type: RecreateDeploymentStrategyType,
+					Strategy: extensionsv1beta1.DeploymentStrategy{
+						Type: extensionsv1beta1.RecreateDeploymentStrategyType,
 					},
 					Template:                defaultTemplate,
 					ProgressDeadlineSeconds: newInt32(30),
@@ -283,7 +285,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 		original := test.original
 		expected := test.expected
 		obj2 := roundTrip(t, runtime.Object(original))
-		got, ok := obj2.(*Deployment)
+		got, ok := obj2.(*extensionsv1beta1.Deployment)
 		if !ok {
 			t.Errorf("unexpected object: %v", got)
 			t.FailNow()
@@ -296,13 +298,13 @@ func TestSetDefaultDeployment(t *testing.T) {
 
 func TestSetDefaultReplicaSet(t *testing.T) {
 	tests := []struct {
-		rs             *ReplicaSet
+		rs             *extensionsv1beta1.ReplicaSet
 		expectLabels   bool
 		expectSelector bool
 	}{
 		{
-			rs: &ReplicaSet{
-				Spec: ReplicaSetSpec{
+			rs: &extensionsv1beta1.ReplicaSet{
+				Spec: extensionsv1beta1.ReplicaSetSpec{
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -316,13 +318,13 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 			expectSelector: true,
 		},
 		{
-			rs: &ReplicaSet{
+			rs: &extensionsv1beta1.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
 				},
-				Spec: ReplicaSetSpec{
+				Spec: extensionsv1beta1.ReplicaSetSpec{
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -336,13 +338,13 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 			expectSelector: true,
 		},
 		{
-			rs: &ReplicaSet{
+			rs: &extensionsv1beta1.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
 				},
-				Spec: ReplicaSetSpec{
+				Spec: extensionsv1beta1.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"some": "other",
@@ -361,8 +363,8 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 			expectSelector: false,
 		},
 		{
-			rs: &ReplicaSet{
-				Spec: ReplicaSetSpec{
+			rs: &extensionsv1beta1.ReplicaSet{
+				Spec: extensionsv1beta1.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"some": "other",
@@ -385,7 +387,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 	for _, test := range tests {
 		rs := test.rs
 		obj2 := roundTrip(t, runtime.Object(rs))
-		rs2, ok := obj2.(*ReplicaSet)
+		rs2, ok := obj2.(*extensionsv1beta1.ReplicaSet)
 		if !ok {
 			t.Errorf("unexpected object: %v", rs2)
 			t.FailNow()
@@ -409,12 +411,12 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 
 func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 	tests := []struct {
-		rs             ReplicaSet
+		rs             extensionsv1beta1.ReplicaSet
 		expectReplicas int32
 	}{
 		{
-			rs: ReplicaSet{
-				Spec: ReplicaSetSpec{
+			rs: extensionsv1beta1.ReplicaSet{
+				Spec: extensionsv1beta1.ReplicaSetSpec{
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -427,8 +429,8 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 			expectReplicas: 1,
 		},
 		{
-			rs: ReplicaSet{
-				Spec: ReplicaSetSpec{
+			rs: extensionsv1beta1.ReplicaSet{
+				Spec: extensionsv1beta1.ReplicaSetSpec{
 					Replicas: newInt32(0),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -442,8 +444,8 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 			expectReplicas: 0,
 		},
 		{
-			rs: ReplicaSet{
-				Spec: ReplicaSetSpec{
+			rs: extensionsv1beta1.ReplicaSet{
+				Spec: extensionsv1beta1.ReplicaSetSpec{
 					Replicas: newInt32(3),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -461,7 +463,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 	for _, test := range tests {
 		rs := &test.rs
 		obj2 := roundTrip(t, runtime.Object(rs))
-		rs2, ok := obj2.(*ReplicaSet)
+		rs2, ok := obj2.(*extensionsv1beta1.ReplicaSet)
 		if !ok {
 			t.Errorf("unexpected object: %v", rs2)
 			t.FailNow()
@@ -485,8 +487,8 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 			},
 		},
 	}
-	rs := &ReplicaSet{
-		Spec: ReplicaSetSpec{
+	rs := &extensionsv1beta1.ReplicaSet{
+		Spec: extensionsv1beta1.ReplicaSetSpec{
 			Replicas: newInt32(3),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -499,7 +501,7 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 		},
 	}
 	output := roundTrip(t, runtime.Object(rs))
-	rs2 := output.(*ReplicaSet)
+	rs2 := output.(*extensionsv1beta1.ReplicaSet)
 	defaultRequest := rs2.Spec.Template.Spec.Containers[0].Resources.Requests
 	requestValue := defaultRequest[v1.ResourceCPU]
 	if requestValue.String() != "0" {

@@ -14,10 +14,10 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/registry/apps/controllerrevision/storage:go_default_library",
         "//pkg/registry/apps/statefulset/storage:go_default_library",
         "//pkg/registry/extensions/deployment/storage:go_default_library",
+        "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",

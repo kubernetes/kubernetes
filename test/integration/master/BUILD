@@ -17,12 +17,12 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",

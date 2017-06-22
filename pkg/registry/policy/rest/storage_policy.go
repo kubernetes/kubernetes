@@ -17,13 +17,13 @@ limitations under the License.
 package rest
 
 import (
+	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	policyapiv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	poddisruptionbudgetstore "k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/storage"
 )
 

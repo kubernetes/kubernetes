@@ -21,11 +21,11 @@ syntax = 'proto2';
 
 package k8s.io.apiserver.pkg.apis.audit.v1alpha1;
 
+import "k8s.io/api/authentication/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
-import "k8s.io/client-go/pkg/apis/authentication/v1/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
@@ -56,11 +56,11 @@ message Event {
   optional string verb = 7;
 
   // Authenticated user information.
-  optional k8s.io.client_go.pkg.apis.authentication.v1.UserInfo user = 8;
+  optional k8s.io.api.authentication.v1.UserInfo user = 8;
 
   // Impersonated user information.
   // +optional
-  optional k8s.io.client_go.pkg.apis.authentication.v1.UserInfo impersonatedUser = 9;
+  optional k8s.io.api.authentication.v1.UserInfo impersonatedUser = 9;
 
   // Source IPs, from where the request originated and intermediate proxies.
   // +optional

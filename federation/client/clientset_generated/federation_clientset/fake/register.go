@@ -17,15 +17,15 @@ limitations under the License.
 package fake
 
 import (
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	corev1 "k8s.io/kubernetes/pkg/api/v1"
-	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 var scheme = runtime.NewScheme()
@@ -52,9 +52,9 @@ func init() {
 // After this, RawExtensions in Kubernetes types will serialize kube-aggregator types
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
-	corev1.AddToScheme(scheme)
 	autoscalingv1.AddToScheme(scheme)
 	batchv1.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
 	extensionsv1beta1.AddToScheme(scheme)
 	federationv1beta1.AddToScheme(scheme)
 

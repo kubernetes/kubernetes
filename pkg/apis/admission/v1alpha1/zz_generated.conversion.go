@@ -30,7 +30,7 @@ import (
 )
 
 func init() {
-	SchemeBuilder.Register(RegisterConversions)
+	localSchemeBuilder.Register(RegisterConversions)
 }
 
 // RegisterConversions adds conversion functions to the given scheme.

@@ -24,17 +24,18 @@ import (
 	"sort"
 	"syscall"
 
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	externalextensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	externalextensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -180,7 +181,7 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 		}
 		buf := bytes.NewBuffer([]byte{})
 		internalTemplate := &api.PodTemplateSpec{}
-		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 		}
 		w := printersinternal.NewPrefixWriter(buf)
@@ -199,7 +200,7 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 	buf := bytes.NewBuffer([]byte{})
 	buf.WriteString("\n")
 	internalTemplate := &api.PodTemplateSpec{}
-	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
+	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 	}
 	w := printersinternal.NewPrefixWriter(buf)
@@ -257,7 +258,7 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 		content := bytes.NewBuffer([]byte{})
 		w := printersinternal.NewPrefixWriter(content)
 		internalTemplate := &api.PodTemplateSpec{}
-		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&appliedDS.Spec.Template, internalTemplate, nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&appliedDS.Spec.Template, internalTemplate, nil); err != nil {
 			return "", fmt.Errorf("failed to convert podtemplate while printing: %v", err)
 		}
 		printersinternal.DescribePodTemplate(internalTemplate, w)

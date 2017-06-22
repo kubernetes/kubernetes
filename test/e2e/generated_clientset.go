@@ -20,6 +20,10 @@ import (
 	"strconv"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	"k8s.io/api/core/v1"
+	clientv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,10 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"

@@ -16,7 +16,6 @@ go_test(
     ],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions:go_default_library",
@@ -29,6 +28,7 @@ go_test(
         "//plugin/pkg/admission/resourcequota:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",

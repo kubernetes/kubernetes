@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -33,8 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
 	"k8s.io/kubernetes/test/e2e/framework"

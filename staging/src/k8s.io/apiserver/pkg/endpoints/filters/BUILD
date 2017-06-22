@@ -21,6 +21,8 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//vendor/k8s.io/api/authentication/v1:go_default_library",
+        "//vendor/k8s.io/api/batch/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/audit:go_default_library",
@@ -31,8 +33,6 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/audit/log:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/apis/authentication/v1:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/apis/batch/v1:go_default_library",
     ],
 )
 
@@ -52,6 +52,8 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/k8s.io/api/authentication/v1:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
@@ -65,7 +67,5 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/httplog:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/apis/authentication/v1:go_default_library",
     ],
 )

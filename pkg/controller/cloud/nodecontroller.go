@@ -22,16 +22,16 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
+	clientv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"

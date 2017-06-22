@@ -21,11 +21,11 @@ import (
 	"sort"
 	"testing"
 
+	apps "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"

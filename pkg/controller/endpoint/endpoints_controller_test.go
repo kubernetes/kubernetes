@@ -22,6 +22,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -30,7 +31,6 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"

@@ -21,6 +21,7 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/batch/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 )
@@ -29,12 +30,12 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&Job{}, func(obj interface{}) { SetObjectDefaults_Job(obj.(*Job)) })
-	scheme.AddTypeDefaultingFunc(&JobList{}, func(obj interface{}) { SetObjectDefaults_JobList(obj.(*JobList)) })
+	scheme.AddTypeDefaultingFunc(&v1.Job{}, func(obj interface{}) { SetObjectDefaults_Job(obj.(*v1.Job)) })
+	scheme.AddTypeDefaultingFunc(&v1.JobList{}, func(obj interface{}) { SetObjectDefaults_JobList(obj.(*v1.JobList)) })
 	return nil
 }
 
-func SetObjectDefaults_Job(in *Job) {
+func SetObjectDefaults_Job(in *v1.Job) {
 	SetDefaults_Job(in)
 	api_v1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
@@ -168,7 +169,7 @@ func SetObjectDefaults_Job(in *Job) {
 	}
 }
 
-func SetObjectDefaults_JobList(in *JobList) {
+func SetObjectDefaults_JobList(in *v1.JobList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Job(a)
