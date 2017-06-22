@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,22 +23,14 @@ import (
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
-	for _, k := range []string{"SubjectAccessReview", "SelfSubjectAccessReview", "LocalSubjectAccessReview"} {
-		kind := k // don't close over range variables
-		err := scheme.AddFieldLabelConversionFunc("authorization/v1beta1", kind,
-			func(label, value string) (string, string, error) {
-				switch label {
-				case "metadata.name":
-					return label, value, nil
-				default:
-					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
-				}
-			},
-		)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return scheme.AddFieldLabelConversionFunc("storage/v1beta1", "StorageClass",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label %q not supported for %q", label, "StorageClass")
+			}
+		},
+	)
 }

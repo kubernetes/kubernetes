@@ -19,6 +19,7 @@ package v1
 import (
 	"encoding/json"
 
+	"fmt"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
@@ -39,7 +40,16 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		return err
 	}
 
-	return nil
+	return scheme.AddFieldLabelConversionFunc("autoscaling/v1", "HorizontalPodAutoscaler",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name", "metadata.namespace":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label %q not supported for %q", label, "HorizontalPodAutoscaler")
+			}
+		},
+	)
 }
 
 func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(in *autoscaling.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v2alpha1
 
 import (
 	"fmt"
@@ -23,22 +23,14 @@ import (
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
-	for _, k := range []string{"SubjectAccessReview", "SelfSubjectAccessReview", "LocalSubjectAccessReview"} {
-		kind := k // don't close over range variables
-		err := scheme.AddFieldLabelConversionFunc("authorization/v1beta1", kind,
-			func(label, value string) (string, string, error) {
-				switch label {
-				case "metadata.name":
-					return label, value, nil
-				default:
-					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
-				}
-			},
-		)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return scheme.AddFieldLabelConversionFunc("autoscaling/v2alpha1", "HorizontalPodAutoscaler",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name", "metadata.namespace":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label %q not supported for %q", label, "HorizontalPodAutoscaler")
+			}
+		},
+	)
 }

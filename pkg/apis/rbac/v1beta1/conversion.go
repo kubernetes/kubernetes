@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,10 +22,28 @@ import (
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
-	// Add non-generated conversion functions
-	for _, k := range []string{"SubjectAccessReview", "SelfSubjectAccessReview", "LocalSubjectAccessReview"} {
+	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
+	for _, k := range []string{"Role", "RoleBinding"} {
 		kind := k // don't close over range variables
-		err := scheme.AddFieldLabelConversionFunc("authorization/v1beta1", kind,
+		err := scheme.AddFieldLabelConversionFunc("rbac/v1beta1", kind,
+			func(label, value string) (string, string, error) {
+				switch label {
+				case "metadata.name", "metadata.namespace":
+					return label, value, nil
+				default:
+					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
+				}
+			},
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Add field label conversions for non-namespace scoped objects.
+	for _, k := range []string{"ClusterRole", "ClusterRoleBinding"} {
+		kind := k // don't close over range variables
+		err := scheme.AddFieldLabelConversionFunc("rbac/v1beta1", kind,
 			func(label, value string) (string, string, error) {
 				switch label {
 				case "metadata.name":
