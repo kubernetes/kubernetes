@@ -51,7 +51,7 @@
                 # TODO: Make resource requirements depend on the size of the cluster
                 "resources": {
                     "requests": {
-                        "cpu": "20m",
+                        "cpu": "10m",
                         "memory": "300Mi"
                     }
                 },
