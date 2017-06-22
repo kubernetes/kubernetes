@@ -21,12 +21,12 @@ limitations under the License.
 package v1alpha1
 
 import (
+	authentication_v1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	audit "k8s.io/apiserver/pkg/apis/audit"
-	authentication_v1 "k8s.io/api/authentication/v1"
 	unsafe "unsafe"
 )
 
