@@ -231,6 +231,10 @@ func TestRunChecks(t *testing.T) {
 		{[]Checker{preflightCheckTest{"warning"}}, true, "[preflight] WARNING: warning\n"}, // should just print warning
 		{[]Checker{preflightCheckTest{"error"}}, false, ""},
 		{[]Checker{preflightCheckTest{"test"}}, false, ""},
+		{[]Checker{HostResolvesLocalCheck{"localhost"}}, true, ""},
+		{[]Checker{HostResolvesLocalCheck{""}}, false, ""},
+		{[]Checker{HostResolvesLocalCheck{"127.0.0.1"}}, true, ""},
+		{[]Checker{HostResolvesLocalCheck{"randomsubdomain.k8s.io"}}, false, ""},
 		{[]Checker{DirAvailableCheck{Path: "/does/not/exist"}}, true, ""},
 		{[]Checker{DirAvailableCheck{Path: "/"}}, false, ""},
 		{[]Checker{FileAvailableCheck{Path: "/does/not/exist"}}, true, ""},
