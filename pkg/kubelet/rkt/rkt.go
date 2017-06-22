@@ -281,7 +281,7 @@ func New(
 		apisvcConn:          apisvcConn,
 		apisvc:              rktapi.NewPublicAPIClient(apisvcConn),
 		config:              config,
-		dockerKeyring:       credentialprovider.NewDockerKeyring(),
+		dockerKeyring:       credentialprovider.NewDockerKeyring(nil),
 		containerRefManager: containerRefManager,
 		podGetter:           podGetter,
 		runtimeHelper:       runtimeHelper,

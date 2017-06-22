@@ -23,7 +23,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,6 +36,7 @@ import (
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
 	dockerapi "github.com/docker/engine-api/client"
 	dockertypes "github.com/docker/engine-api/types"
+	"github.com/docker/go-connections/sockets"
 	"golang.org/x/net/context"
 )
 
@@ -50,6 +54,8 @@ import (
 // TODO(random-liu): Swith to new docker interface by refactoring the functions in the old Interface
 // one by one.
 type kubeDockerClient struct {
+	// TODO(runcom): document
+	dockerEndpoint string
 	// timeout is the timeout of short running docker operations.
 	timeout time.Duration
 	// If no pulling progress is made before imagePullProgressDeadline, the image pulling will be cancelled.
@@ -83,12 +89,14 @@ const (
 
 // newKubeDockerClient creates an kubeDockerClient from an existing docker client. If requestTimeout is 0,
 // defaultTimeout will be applied.
-func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePullProgressDeadline time.Duration) Interface {
+func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePullProgressDeadline time.Duration, dockerEndpoint string) Interface {
 	if requestTimeout == 0 {
 		requestTimeout = defaultTimeout
 	}
 
 	k := &kubeDockerClient{
+		// TODO(runcom): document this is just for RHEL/CentOS/Fedora!
+		dockerEndpoint:            dockerEndpoint,
 		client:                    dockerClient,
 		timeout:                   requestTimeout,
 		imagePullProgressDeadline: imagePullProgressDeadline,
@@ -477,6 +485,76 @@ func (d *kubeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecIns
 		return nil, err
 	}
 	return &resp, nil
+}
+
+// TODO(runcom): move elsewhere the two functions below
+
+func defaultTransport(proto, addr string) *http.Transport {
+	tr := new(http.Transport)
+	sockets.ConfigureTransport(tr, proto, addr)
+	return tr
+}
+
+func parseHost(host string) (string, string, string, error) {
+	protoAddrParts := strings.SplitN(host, "://", 2)
+	if len(protoAddrParts) == 1 {
+		return "", "", "", fmt.Errorf("unable to parse docker host `%s`", host)
+	}
+
+	var basePath string
+	proto, addr := protoAddrParts[0], protoAddrParts[1]
+	if proto == "tcp" {
+		parsed, err := url.Parse("tcp://" + addr)
+		if err != nil {
+			return "", "", "", err
+		}
+		addr = parsed.Host
+		basePath = parsed.Path
+	}
+	return proto, addr, basePath, nil
+}
+
+func (d *kubeDockerClient) DefaultRegistry() (string, error) {
+	proto, addr, basePath, err := parseHost(d.dockerEndpoint)
+	if err != nil {
+		return "", err
+	}
+	// TODO(runcom): find a way to read TLS stuff for docker as the official
+	// client does already
+	transport := defaultTransport(proto, addr)
+	client := &http.Client{
+		Transport: transport,
+	}
+	apiPath := fmt.Sprintf("%s%s", basePath, "/info")
+	req, err := http.NewRequest(http.MethodGet, apiPath, nil)
+	if err != nil {
+		return "", err
+	}
+	if proto == "unix" {
+		req.Host = "docker"
+	}
+	req.URL.Host = addr
+	req.URL.Scheme = "http"
+	if transport.TLSClientConfig != nil {
+		req.URL.Scheme = "https"
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	type customInfo struct {
+		Registries []struct {
+			Name string
+		}
+	}
+	ci := customInfo{}
+	if err := json.NewDecoder(resp.Body).Decode(&ci); err != nil {
+		return "", err
+	}
+	if len(ci.Registries) != 0 {
+		return ci.Registries[0].Name, nil
+	}
+	return "", fmt.Errorf("no default registry")
 }
 
 func (d *kubeDockerClient) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {

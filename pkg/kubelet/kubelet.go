@@ -632,6 +632,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			kubeCfg.CPUCFSQuota,
 			runtimeService,
 			imageService,
+			kubeDeps.DockerClient,
 		)
 		if err != nil {
 			return nil, err
