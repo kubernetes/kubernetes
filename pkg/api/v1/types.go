@@ -2096,16 +2096,16 @@ type NodeSelector struct {
 // A null or empty node selector term matches no objects.
 type NodeSelectorTerm struct {
 	//Required. A list of node selector requirements. The requirements are ANDed.
-	MatchExpressions []NodeSelectorRequirement `json:"matchExpressions" protobuf:"bytes,1,rep,name=matchExpressions"`
+	// +patchMergeKey=key
+	// +patchStrategy=merge
+	MatchExpressions []NodeSelectorRequirement `json:"matchExpressions" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,rep,name=matchExpressions"`
 }
 
 // A node selector requirement is a selector that contains values, a key, and an operator
 // that relates the key and values.
 type NodeSelectorRequirement struct {
 	// The label key that the selector applies to.
-	// +patchMergeKey=key
-	// +patchStrategy=merge
-	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// Represents a key's relationship to a set of values.
 	// Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
 	Operator NodeSelectorOperator `json:"operator" protobuf:"bytes,2,opt,name=operator,casttype=NodeSelectorOperator"`
@@ -2289,9 +2289,7 @@ type PreferredSchedulingTerm struct {
 // any pod that that does not tolerate the Taint.
 type Taint struct {
 	// Required. The taint key to be applied to a node.
-	// +patchMergeKey=key
-	// +patchStrategy=merge
-	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// Required. The taint value corresponding to the taint key.
 	// +optional
 	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
@@ -2333,9 +2331,7 @@ type Toleration struct {
 	// Key is the taint key that the toleration applies to. Empty means match all taint keys.
 	// If the key is empty, operator must be Exists; this combination means to match all values and all keys.
 	// +optional
-	// +patchMergeKey=key
-	// +patchStrategy=merge
-	Key string `json:"key,omitempty" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	Key string `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
 	// Operator represents a key's relationship to the value.
 	// Valid operators are Exists and Equal. Defaults to Equal.
 	// Exists is equivalent to wildcard for value, so that a pod can
@@ -2513,7 +2509,9 @@ type PodSpec struct {
 	SchedulerName string `json:"schedulerName,omitempty" protobuf:"bytes,19,opt,name=schedulerName"`
 	// If specified, the pod's tolerations.
 	// +optional
-	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
+	// +patchMergeKey=key
+	// +patchStrategy=merge
+	Tolerations []Toleration `json:"tolerations,omitempty" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,22,opt,name=tolerations"`
 	// HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
 	// file if specified. This is only valid for non-hostNetwork pods.
 	// +optional
@@ -3291,7 +3289,9 @@ type NodeSpec struct {
 	Unschedulable bool `json:"unschedulable,omitempty" protobuf:"varint,4,opt,name=unschedulable"`
 	// If specified, the node's taints.
 	// +optional
-	Taints []Taint `json:"taints,omitempty" protobuf:"bytes,5,opt,name=taints"`
+	// +patchMergeKey=key
+	// +patchStrategy=merge
+	Taints []Taint `json:"taints,omitempty" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,5,opt,name=taints"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
