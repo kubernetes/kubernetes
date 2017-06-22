@@ -15,6 +15,7 @@ go_library(
         "configmap.go",
         "daemonset.go",
         "deployment.go",
+        "qualifiedname.go",
         "registry.go",
         "replicaset.go",
         "scheduling.go",
