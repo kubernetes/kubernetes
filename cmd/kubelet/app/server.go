@@ -205,7 +205,7 @@ func initConfigz(kc *kubeletconfiginternal.KubeletConfiguration) (*configz.Confi
 }
 
 // makeEventRecorder sets up kubeDeps.Recorder if its nil. Its a no-op otherwise.
-func makeEventRecorder(s *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, nodeName types.NodeName) {
+func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) {
 	if kubeDeps.Recorder != nil {
 		return
 	}
@@ -384,7 +384,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	}
 
 	// Setup event recorder if required.
-	makeEventRecorder(&s.KubeletConfiguration, kubeDeps, nodeName)
+	makeEventRecorder(kubeDeps, nodeName)
 
 	if kubeDeps.ContainerManager == nil {
 		if s.CgroupsPerQOS && s.CgroupRoot == "" {
@@ -616,7 +616,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		return err
 	}
 	// Setup event recorder if required.
-	makeEventRecorder(kubeCfg, kubeDeps, nodeName)
+	makeEventRecorder(kubeDeps, nodeName)
 
 	// TODO(mtaufen): I moved the validation of these fields here, from UnsecuredKubeletConfig,
 	//                so that I could remove the associated fields from KubeletConfiginternal. I would
