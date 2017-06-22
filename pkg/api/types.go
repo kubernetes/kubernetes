@@ -316,6 +316,9 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
 	// +optional
 	StorageOS *StorageOSVolumeSource
+	// HugePages represensts a hugepage resource.
+	// +optional
+	HugePages *HugePagesVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -1210,6 +1213,21 @@ type StorageOSPersistentVolumeSource struct {
 	// credentials.  If not specified, default values will be attempted.
 	// +optional
 	SecretRef *ObjectReference
+}
+
+// HugePagesSource represents Linux HugeTlbPage https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt
+type HugePagesVolumeSource struct {
+	// Defaults to 2M
+	// +optional
+	PageSize string
+	// The MaxSize option sets the maximum value of memory (huge pages).
+	// The MaxSize option is specified as resource.Quantity
+	MaxSize string
+	// The MinSize option sets the minimum
+	// value of memory (huge pages) allowed for the filesystem and reserves them.
+	// The size option is specified as resource.Quantity
+	// +optional
+	MinSize string
 }
 
 // Adapts a ConfigMap into a volume.

@@ -351,6 +351,9 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
 	// +optional
 	StorageOS *StorageOSVolumeSource `json:"storageos,omitempty" protobuf:"bytes,27,opt,name=storageos"`
+	// HugePages represensts a hugepage resource.
+	// +optional
+	HugePages *HugePagesVolumeSource `json:"hugePages,omitempty" protobuf:"bytes,28,opt,name=hugePages"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -1289,6 +1292,21 @@ type StorageOSPersistentVolumeSource struct {
 	// credentials.  If not specified, default values will be attempted.
 	// +optional
 	SecretRef *ObjectReference `json:"secretRef,omitempty" protobuf:"bytes,5,opt,name=secretRef"`
+}
+
+// HugePagesSource represents Linux HugeTlbPage https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt
+type HugePagesVolumeSource struct {
+	// Defaults to 2M
+	// +optional
+	PageSize string `json:"pageSize,omitempty" protobuf:"bytes,1,opt,name=pageSize"`
+	// The MaxSize option sets the maximum value of memory (huge pages).
+	// The MaxSize option is specified as resource.Quantity
+	MaxSize string `json:"size,omitempty" protobuf:"bytes,2,opt,name=size"`
+	// The MinSize option sets the minimum
+	// value of memory (huge pages) allowed for the filesystem and reserves them.
+	// The size option is specified as resource.Quantity
+	// +optional
+	MinSize string `json:"minSize,omitempty" protobuf:"bytes,3,opt,name=minSize"`
 }
 
 // Adapts a ConfigMap into a volume.

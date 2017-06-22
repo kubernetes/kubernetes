@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ubuntu
+spec:
+  containers:
+  - image: ubuntu
+    name: ubuntu
+    command:
+    - sleep
+    - inf
+    volumeMounts:
+    - mountPath: /hugepages
+      name: hugepage
+  volumes:
+  - name: hugepage
+    hugePages: 
+      pageSize: "2M"
+      size: "200M"
+  hostNetwork: true
