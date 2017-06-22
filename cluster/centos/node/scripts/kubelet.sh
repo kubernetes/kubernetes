@@ -61,7 +61,7 @@ KUBE_PROXY_OPTS="   \${KUBE_LOGTOSTDERR}     \\
                     \${KUBE_ALLOW_PRIV}      \\
                     \${KUBELET__DNS_IP}      \\
                     \${KUBELET_DNS_DOMAIN}      \\
-                    \${KUBELET_ARGS}"
+                    \$KUBELET_ARGS"
 
 cat <<EOF >/usr/lib/systemd/system/kubelet.service
 [Unit]
