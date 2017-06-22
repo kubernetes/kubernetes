@@ -975,10 +975,11 @@ function start-node-problem-detector {
   echo "Start node problem detector"
   local -r npd_bin="${KUBE_HOME}/bin/node-problem-detector"
   local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
+  local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
   echo "Using node problem detector binary at ${npd_bin}"
   local flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
   flags+=" --logtostderr"
-  flags+=" --system-log-monitors=${km_config}"
+  flags+=" --system-log-monitors=${km_config},${dm_config}"
   flags+=" --apiserver-override=https://${KUBERNETES_MASTER_NAME}?inClusterConfig=false&auth=/var/lib/node-problem-detector/kubeconfig"
 
   # Write the systemd service file for node problem detector.
