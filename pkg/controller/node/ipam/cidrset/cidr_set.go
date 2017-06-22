@@ -226,3 +226,7 @@ func (s *CidrSet) getIndexForIP(ip net.IP) (int, error) {
 
 	return 0, fmt.Errorf("invalid IP: %v", ip)
 }
+
+func (s *CidrSet) Contains(ip net.IP) bool {
+	return s.clusterCIDR.Contains(ip)
+}

@@ -45,9 +45,9 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 	testCases := []struct {
 		description           string
 		fakeNodeHandler       *testutil.FakeNodeHandler
-		clusterCIDR           *net.IPNet
+		clusterCIDR           []*net.IPNet
 		serviceCIDR           *net.IPNet
-		subNetMaskSize        int
+		subNetMaskSize        []int
 		expectedAllocatedCIDR string
 		allocatedCIDRs        []string
 	}{
@@ -63,13 +63,35 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 				},
 				Clientset: fake.NewSimpleClientset(),
 			},
-			clusterCIDR: func() *net.IPNet {
+			clusterCIDR: func() []*net.IPNet {
 				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/24")
-				return clusterCIDR
+				c := []*net.IPNet{clusterCIDR}
+				return c
 			}(),
 			serviceCIDR:           nil,
-			subNetMaskSize:        30,
+			subNetMaskSize:        []int{30},
 			expectedAllocatedCIDR: "127.123.234.0/30",
+		},
+		{
+			description: "When there's no ServiceCIDR return first CIDR in range for v6",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			clusterCIDR: func() []*net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("2001:abcd:1234:5600::/56")
+				c := []*net.IPNet{clusterCIDR}
+				return c
+			}(),
+			serviceCIDR:           nil,
+			subNetMaskSize:        []int{62},
+			expectedAllocatedCIDR: "2001:abcd:1234:5600::/62",
 		},
 		{
 			description: "Correctly filter out ServiceCIDR",
@@ -83,17 +105,44 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 				},
 				Clientset: fake.NewSimpleClientset(),
 			},
-			clusterCIDR: func() *net.IPNet {
+			clusterCIDR: func() []*net.IPNet {
 				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/24")
-				return clusterCIDR
+				_, v6clusterCIDR, _ := net.ParseCIDR("2001:abcd:1234:5600::/56")
+				c := []*net.IPNet{clusterCIDR, v6clusterCIDR}
+				return c
 			}(),
 			serviceCIDR: func() *net.IPNet {
 				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/26")
 				return clusterCIDR
 			}(),
-			subNetMaskSize: 30,
+			subNetMaskSize: []int{30, 62},
 			// it should return first /30 CIDR after service range
 			expectedAllocatedCIDR: "127.123.234.64/30",
+		},
+		{
+			description: "Correctly filter out ServiceCIDR for v6",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			clusterCIDR: func() []*net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("2001:abcd:1234:5600::/56")
+				c := []*net.IPNet{clusterCIDR}
+				return c
+			}(),
+			serviceCIDR: func() *net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("2001:abcd:1234:5600::/58")
+				return clusterCIDR
+			}(),
+			subNetMaskSize: []int{62},
+			// it should return first /62 CIDR after service range
+			expectedAllocatedCIDR: "2001:abcd:1234:5640::/62",
 		},
 		{
 			description: "Correctly ignore already allocated CIDRs",
@@ -107,26 +156,79 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 				},
 				Clientset: fake.NewSimpleClientset(),
 			},
-			clusterCIDR: func() *net.IPNet {
+			clusterCIDR: func() []*net.IPNet {
 				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/24")
-				return clusterCIDR
+				c := []*net.IPNet{clusterCIDR}
+				return c
 			}(),
 			serviceCIDR: func() *net.IPNet {
 				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/26")
 				return clusterCIDR
 			}(),
-			subNetMaskSize:        30,
+			subNetMaskSize:        []int{30},
 			allocatedCIDRs:        []string{"127.123.234.64/30", "127.123.234.68/30", "127.123.234.72/30", "127.123.234.80/30"},
 			expectedAllocatedCIDR: "127.123.234.76/30",
+		},
+		{
+			description: "Correctly ignore already allocated CIDRs for v6",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			clusterCIDR: func() []*net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("2001:abcd:1234:5600::/56")
+				c := []*net.IPNet{clusterCIDR}
+				return c
+			}(),
+			serviceCIDR: func() *net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("2001:abcd:1234:5600::/58")
+				return clusterCIDR
+			}(),
+			subNetMaskSize:        []int{62},
+			allocatedCIDRs:        []string{"2001:abcd:1234:5640::/62", "2001:abcd:1234:5644::/62", "2001:abcd:1234:5648::/62", "2001:abcd:1234:5650::/62"},
+			expectedAllocatedCIDR: "2001:abcd:1234:564c::/62",
+		},
+		{
+			description: "Correctly ignore already allocated CIDRs for v4 and v6",
+			// Note, only the first is allocated until nodes accept two
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			clusterCIDR: func() []*net.IPNet {
+				_, v6clusterCIDR, _ := net.ParseCIDR("2001:abcd:1234:5600::/56")
+				_, v4clusterCIDR, _ := net.ParseCIDR("127.123.234.0/24")
+				c := []*net.IPNet{v6clusterCIDR, v4clusterCIDR}
+				return c
+			}(),
+			serviceCIDR: func() *net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("2001:abcd:1234:5600::/58")
+				return clusterCIDR
+			}(),
+			subNetMaskSize:        []int{62, 30},
+			allocatedCIDRs:        []string{"2001:abcd:1234:5640::/62", "2001:abcd:1234:5644::/62", "2001:abcd:1234:5648::/62", "2001:abcd:1234:5650::/62"},
+			expectedAllocatedCIDR: "2001:abcd:1234:564c::/62",
 		},
 	}
 
 	testFunc := func(tc struct {
 		description           string
 		fakeNodeHandler       *testutil.FakeNodeHandler
-		clusterCIDR           *net.IPNet
+		clusterCIDR           []*net.IPNet
 		serviceCIDR           *net.IPNet
-		subNetMaskSize        int
+		subNetMaskSize        []int
 		expectedAllocatedCIDR string
 		allocatedCIDRs        []string
 	}) {
@@ -143,8 +245,12 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 				return
 			}
 			rangeAllocator.recorder = testutil.NewFakeRecorder()
-			if err = rangeAllocator.cidrs.Occupy(cidr); err != nil {
-				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
+			for _, c := range rangeAllocator.cidrs {
+				if c.Contains(cidr.IP) {
+					if err = c.Occupy(cidr); err != nil {
+						t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
+					}
+				}
 			}
 		}
 		if err := allocator.AllocateOrOccupyCIDR(tc.fakeNodeHandler.Existing[0]); err != nil {
@@ -177,9 +283,9 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 	testCases := []struct {
 		description     string
 		fakeNodeHandler *testutil.FakeNodeHandler
-		clusterCIDR     *net.IPNet
+		clusterCIDR     []*net.IPNet
 		serviceCIDR     *net.IPNet
-		subNetMaskSize  int
+		subNetMaskSize  []int
 		allocatedCIDRs  []string
 	}{
 		{
@@ -194,12 +300,13 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 				},
 				Clientset: fake.NewSimpleClientset(),
 			},
-			clusterCIDR: func() *net.IPNet {
+			clusterCIDR: func() []*net.IPNet {
 				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/28")
-				return clusterCIDR
+				c := []*net.IPNet{clusterCIDR}
+				return c
 			}(),
 			serviceCIDR:    nil,
-			subNetMaskSize: 30,
+			subNetMaskSize: []int{30},
 			allocatedCIDRs: []string{"127.123.234.0/30", "127.123.234.4/30", "127.123.234.8/30", "127.123.234.12/30"},
 		},
 	}
@@ -207,9 +314,9 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 	testFunc := func(tc struct {
 		description     string
 		fakeNodeHandler *testutil.FakeNodeHandler
-		clusterCIDR     *net.IPNet
+		clusterCIDR     []*net.IPNet
 		serviceCIDR     *net.IPNet
-		subNetMaskSize  int
+		subNetMaskSize  []int
 		allocatedCIDRs  []string
 	}) {
 		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
@@ -225,9 +332,13 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 				return
 			}
 			rangeAllocator.recorder = testutil.NewFakeRecorder()
-			err = rangeAllocator.cidrs.Occupy(cidr)
-			if err != nil {
-				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
+			for _, c := range rangeAllocator.cidrs {
+				if c.Contains(cidr.IP) {
+					err = c.Occupy(cidr)
+					if err != nil {
+						t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
+					}
+				}
 			}
 		}
 		if err := allocator.AllocateOrOccupyCIDR(tc.fakeNodeHandler.Existing[0]); err == nil {
@@ -258,9 +369,9 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 	testCases := []struct {
 		description                      string
 		fakeNodeHandler                  *testutil.FakeNodeHandler
-		clusterCIDR                      *net.IPNet
+		clusterCIDR                      []*net.IPNet
 		serviceCIDR                      *net.IPNet
-		subNetMaskSize                   int
+		subNetMaskSize                   []int
 		expectedAllocatedCIDRFirstRound  string
 		expectedAllocatedCIDRSecondRound string
 		allocatedCIDRs                   []string
@@ -278,12 +389,13 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 				},
 				Clientset: fake.NewSimpleClientset(),
 			},
-			clusterCIDR: func() *net.IPNet {
+			clusterCIDR: func() []*net.IPNet {
 				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/28")
-				return clusterCIDR
+				c := []*net.IPNet{clusterCIDR}
+				return c
 			}(),
 			serviceCIDR:                      nil,
-			subNetMaskSize:                   30,
+			subNetMaskSize:                   []int{30},
 			allocatedCIDRs:                   []string{"127.123.234.0/30", "127.123.234.4/30", "127.123.234.8/30", "127.123.234.12/30"},
 			expectedAllocatedCIDRFirstRound:  "",
 			cidrsToRelease:                   []string{"127.123.234.4/30"},
@@ -301,12 +413,14 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 				},
 				Clientset: fake.NewSimpleClientset(),
 			},
-			clusterCIDR: func() *net.IPNet {
+			clusterCIDR: func() []*net.IPNet {
 				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/28")
-				return clusterCIDR
+				c := []*net.IPNet{clusterCIDR}
+				return c
+				//return clusterCIDR
 			}(),
 			serviceCIDR:                      nil,
-			subNetMaskSize:                   30,
+			subNetMaskSize:                   []int{30},
 			expectedAllocatedCIDRFirstRound:  "127.123.234.0/30",
 			cidrsToRelease:                   []string{"127.123.234.0/30"},
 			expectedAllocatedCIDRSecondRound: "127.123.234.0/30",
@@ -316,9 +430,9 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 	testFunc := func(tc struct {
 		description                      string
 		fakeNodeHandler                  *testutil.FakeNodeHandler
-		clusterCIDR                      *net.IPNet
+		clusterCIDR                      []*net.IPNet
 		serviceCIDR                      *net.IPNet
-		subNetMaskSize                   int
+		subNetMaskSize                   []int
 		expectedAllocatedCIDRFirstRound  string
 		expectedAllocatedCIDRSecondRound string
 		allocatedCIDRs                   []string
@@ -337,7 +451,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 				return
 			}
 			rangeAllocator.recorder = testutil.NewFakeRecorder()
-			err = rangeAllocator.cidrs.Occupy(cidr)
+			err = rangeAllocator.cidrs[0].Occupy(cidr)
 			if err != nil {
 				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
 			}
