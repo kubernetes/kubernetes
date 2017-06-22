@@ -74,11 +74,11 @@ set-node-image
 
 # Verfiy cluster autoscaler configuration.
 if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
-  if [ -z $AUTOSCALER_MIN_NODES ]; then
+  if [[ -z $AUTOSCALER_MIN_NODES ]]; then
     echo "AUTOSCALER_MIN_NODES not set."
     exit 1
   fi
-  if [ -z $AUTOSCALER_MAX_NODES ]; then
+  if [[ -z $AUTOSCALER_MAX_NODES ]]; then
     echo "AUTOSCALER_MAX_NODES not set."
     exit 1
   fi
@@ -434,7 +434,7 @@ function create-static-ip() {
       while true; do
         now="$(date +%s)"
         # Timeout set to 15 minutes
-        if [ $((now - start)) -gt 900 ]; then
+        if [[ $((now - start)) -gt 900 ]]; then
           echo "Timeout while waiting for master IP visibility"
           exit 2
         fi
@@ -570,7 +570,7 @@ function create-node-template() {
   fi
 
   local local_ssds=""
-  if [ ! -z ${NODE_LOCAL_SSDS+x} ]; then
+  if [[ ! -z ${NODE_LOCAL_SSDS+x} ]]; then
       for i in $(seq ${NODE_LOCAL_SSDS}); do
           local_ssds="$local_ssds--local-ssd=interface=SCSI "
       done
@@ -726,7 +726,7 @@ function kube-up() {
 function check-existing() {
   local running_in_terminal=false
   # May be false if tty is not allocated (for example with ssh -T).
-  if [ -t 1 ]; then
+  if [[ -t 1 ]]; then
     running_in_terminal=true
   fi
 
@@ -827,7 +827,7 @@ function create-subnetworks() {
       exit 1
     fi
 
-    if [ -z ${NODE_IP_RANGE:-} ]; then
+    if [[ -z ${NODE_IP_RANGE:-} ]]; then
       echo "${color_red}NODE_IP_RANGE must be specified{color_norm}"
       exit 1
     fi
@@ -1242,7 +1242,7 @@ function create-nodes-template() {
 
   # TODO(zmerlynn): Refactor setting scope flags.
   local scope_flags=
-  if [ -n "${NODE_SCOPES}" ]; then
+  if [[ -n "${NODE_SCOPES}" ]]; then
     scope_flags="--scopes ${NODE_SCOPES}"
   else
     scope_flags="--no-scopes"
@@ -1877,7 +1877,7 @@ function prepare-push() {
 
     # TODO(zmerlynn): Refactor setting scope flags.
     local scope_flags=
-    if [ -n "${NODE_SCOPES}" ]; then
+    if [[ -n "${NODE_SCOPES}" ]]; then
       scope_flags="--scopes ${NODE_SCOPES}"
     else
       scope_flags="--no-scopes"
