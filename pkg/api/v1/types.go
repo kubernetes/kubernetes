@@ -1315,12 +1315,6 @@ type RookVolumeSource struct {
 	// Defaults to false.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
-	// Cluster is the name of the rook cluster. Default is rook.
-	// +optional
-	Cluster string `json:"cluster,omitempty" protobuf:"varint,5,opt,name=cluster"`
-	// Extra Rook metadata if any.
-	// +optional
-	VolumeMetadata map[string]string `json:"options,omitempty" protobuf:"bytes,10,rep,name=volumeMetadata"`
 }
 
 // Adapts a ConfigMap into a volume.

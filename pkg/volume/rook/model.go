@@ -36,10 +36,9 @@ type VolumeAttachSpec struct {
 }
 
 type VolumeAttachStatus struct {
-	State        VolumeAttachState `json:"state,omitempty"`
-	DevicePath   string            `json:"devicePath,omitempty"`
-	MountOptions string            `json:"mountOptions,omitempty"`
-	Message      string            `json:"message,omitempty"`
+	State      VolumeAttachState `json:"state,omitempty"`
+	DevicePath string            `json:"devicePath,omitempty"`
+	Message    string            `json:"message,omitempty"`
 }
 
 type VolumeAttachState string

@@ -23,9 +23,10 @@ import (
 	rstring "strings"
 
 	"github.com/golang/glog"
-
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -49,13 +50,13 @@ const (
 )
 
 type rookVolume struct {
-	pvName      string
-	podUID      types.UID
-	volumeID    string
-	volumeGroup string
-	cluster     string
-	mounter     mount.Interface
-	plugin      *rookPlugin
+	pvName       string
+	podUID       types.UID
+	volumeID     string
+	volumeGroup  string
+	storageClass string
+	mounter      mount.Interface
+	plugin       *rookPlugin
 	volume.MetricsProvider
 }
 
@@ -106,7 +107,7 @@ func (plugin *rookPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return generateVolumeName(volumeSource.Cluster, volumeSource.VolumeGroup, volumeSource.VolumeID), nil
+	return generateVolumeName(spec.PersistentVolume.Spec.StorageClassName, volumeSource.VolumeGroup, volumeSource.VolumeID), nil
 }
 
 func (plugin *rookPlugin) CanSupport(spec *volume.Spec) bool {
@@ -133,7 +134,7 @@ func (plugin *rookPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID
 			pvName:          spec.Name(),
 			volumeID:        volumeSource.VolumeID,
 			volumeGroup:     volumeSource.VolumeGroup,
-			cluster:         volumeSource.Cluster,
+			storageClass:    spec.PersistentVolume.Spec.StorageClassName,
 			mounter:         plugin.host.GetMounter(),
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
@@ -167,7 +168,7 @@ func (b *rookMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
 		options = append(options, "ro")
 	}
 
-	devName := generateVolumeName(b.cluster, b.volumeGroup, b.volumeID)
+	devName := generateVolumeName(b.storageClass, b.volumeGroup, b.volumeID)
 	globalPDPath := makeGlobalPDName(b.plugin.host, devName)
 	glog.V(4).Infof("attempting to mount %s to %s ", globalPDPath, dir)
 
@@ -247,21 +248,25 @@ func (plugin *rookPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vo
 	if err != nil {
 		return nil, err
 	}
-
-	// sourceName is in the form of xxx/cluster-group-id
+	// sourceName is in the form of xxx/storageclass-group-id
 	devName := path.Base(sourceName)
 	volumeSource := rstring.Split(devName, "-")
-	rookVolume := &v1.Volume{
-		Name: volumeName,
-		VolumeSource: v1.VolumeSource{
-			Rook: &v1.RookVolumeSource{
-				Cluster:     volumeSource[0],
-				VolumeGroup: volumeSource[1],
-				VolumeID:    volumeSource[2],
+
+	rookVolume := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: volumeName,
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				Rook: &v1.RookVolumeSource{
+					VolumeGroup: volumeSource[1],
+					VolumeID:    volumeSource[2],
+				},
 			},
+			StorageClassName: volumeSource[0],
 		},
 	}
-	return volume.NewSpecFromVolume(rookVolume), nil
+	return volume.NewSpecFromPersistentVolume(rookVolume, false), nil
 }
 
 func (plugin *rookPlugin) RequiresRemount() bool {
@@ -285,8 +290,9 @@ func (plugin *rookPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.RookVolumeSource, bool, error) {
+	// Rook plugin can only be used for volumes created dynamically.
 	if spec.Volume != nil && spec.Volume.Rook != nil {
-		return spec.Volume.Rook, spec.Volume.Rook.ReadOnly, nil
+		return nil, false, fmt.Errorf("Rook volume must be a Persistent Volume type")
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.Rook != nil {
 		return spec.PersistentVolume.Spec.Rook, spec.ReadOnly, nil
@@ -310,6 +316,19 @@ func (b *rookMounter) GetPath() string {
 	return getPath(b.podUID, b.pvName, b.plugin.host)
 }
 
-func generateVolumeName(cluster, group, id string) string {
-	return fmt.Sprintf("%s-%s-%s", cluster, group, id)
+func generateVolumeName(storageClass, group, id string) string {
+	return fmt.Sprintf("%s-%s-%s", storageClass, group, id)
+}
+
+// getClusterNamespace find the storage class given by the storageClassName and parses for the Rook cluster namespace.
+func getClusterNamespace(client clientset.Interface, storageClassName string) (string, error) {
+	sc, err := client.Storage().StorageClasses().Get(storageClassName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	clusterNamespace, ok := sc.Parameters["clusterNamespace"]
+	if !ok {
+		return "", fmt.Errorf("Rook: Unable to get cluster name from storage class %s", storageClassName)
+	}
+	return clusterNamespace, nil
 }

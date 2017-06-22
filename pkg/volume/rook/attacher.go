@@ -54,7 +54,12 @@ func (attacher *rookAttacher) Attach(spec *volume.Spec, nodeName types.NodeName)
 	}
 
 	// Create a VolumeAttach TPR instance
-	tprName := generateTPRName(volumeSource.Cluster, volumeSource.VolumeGroup, volumeSource.VolumeID, string(nodeName))
+	storageClassName := spec.PersistentVolume.Spec.StorageClassName
+	clusterNamespace, err := getClusterNamespace(attacher.host.GetKubeClient(), storageClassName)
+	if err != nil {
+		return "", err
+	}
+	tprName := generateTPRName(storageClassName, volumeSource.VolumeGroup, volumeSource.VolumeID, string(nodeName))
 	volumeAttach := &VolumeAttach{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: tprName,
@@ -74,7 +79,7 @@ func (attacher *rookAttacher) Attach(spec *volume.Spec, nodeName types.NodeName)
 
 	var result VolumeAttach
 	body, _ := json.Marshal(volumeAttach)
-	uri := fmt.Sprintf("apis/%s/%s/namespaces/%s/%s", tprGroup, tprVersion, volumeSource.Cluster, attachmentPluralResources)
+	uri := fmt.Sprintf("apis/%s/%s/namespaces/%s/%s", tprGroup, tprVersion, clusterNamespace, attachmentPluralResources)
 
 	glog.V(4).Infof("Rook: Creating TPR %s.", body)
 	err = attacher.host.GetKubeClient().Core().RESTClient().Post().
@@ -119,7 +124,7 @@ func (attacher *rookAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName 
 			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
 			continue
 		}
-		tprName := generateTPRName(volumeSource.Cluster, volumeSource.VolumeGroup, volumeSource.VolumeID, string(nodeName))
+		tprName := generateTPRName(spec.PersistentVolume.Spec.StorageClassName, volumeSource.VolumeGroup, volumeSource.VolumeID, string(nodeName))
 		_, ok := volumesAttached[tprName]
 		volumesAttachedCheck[spec] = ok
 	}
@@ -137,12 +142,17 @@ func (attacher *rookAttacher) WaitForAttach(spec *volume.Spec, tprName string, t
 		return "", err
 	}
 
+	clusterNamespace, err := getClusterNamespace(attacher.host.GetKubeClient(), spec.PersistentVolume.Spec.StorageClassName)
+	if err != nil {
+		return "", err
+	}
+
 	for {
 		select {
 		case <-ticker.C:
 			glog.V(5).Infof("Rook: Fetching TPR %s.", tprName)
 			volumeAttachTPR := VolumeAttach{}
-			uri := fmt.Sprintf("apis/%s/%s/namespaces/%s/%s", tprGroup, tprVersion, volumeSource.Cluster, attachmentPluralResources)
+			uri := fmt.Sprintf("apis/%s/%s/namespaces/%s/%s", tprGroup, tprVersion, clusterNamespace, attachmentPluralResources)
 			err = attacher.host.GetKubeClient().Core().RESTClient().Get().
 				RequestURI(uri).
 				Name(tprName).
@@ -169,7 +179,7 @@ func (attacher *rookAttacher) GetDeviceMountPath(spec *volume.Spec) (string, err
 		return "", err
 	}
 
-	devName := generateVolumeName(volumeSource.Cluster, volumeSource.VolumeGroup, volumeSource.VolumeID)
+	devName := generateVolumeName(spec.PersistentVolume.Spec.StorageClassName, volumeSource.VolumeGroup, volumeSource.VolumeID)
 	return makeGlobalPDName(attacher.host, devName), nil
 }
 
@@ -201,20 +211,6 @@ func (attacher *rookAttacher) MountDevice(spec *volume.Spec, devicePath string, 
 		mountOptions := volume.MountOptionFromSpec(spec, options...)
 		mountOptions = volume.JoinMountOptions(mountOptions, options)
 
-		// Get extra mounting option from the volumeattach TPR (if any)
-		volumeAttachTPR := VolumeAttach{}
-		tprName := generateTPRName(volumeSource.Cluster, volumeSource.VolumeGroup, volumeSource.VolumeID, attacher.host.GetHostName())
-		uri := fmt.Sprintf("apis/%s/%s/namespaces/%s/%s", tprGroup, tprVersion, volumeSource.Cluster, attachmentPluralResources)
-		attacher.host.GetKubeClient().Core().RESTClient().Get().
-			RequestURI(uri).
-			Name(tprName).
-			Do().
-			Into(&volumeAttachTPR)
-		extraOptions := volumeAttachTPR.Status.MountOptions
-		if extraOptions != "" {
-			mountOptions = volume.JoinMountOptions(strings.Split(",", extraOptions), mountOptions)
-		}
-
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
@@ -233,12 +229,17 @@ var _ volume.Detacher = &rookDetacher{}
 
 // Detach unmaps a rook image from the host
 func (detacher *rookDetacher) Detach(volumeName string, nodeName types.NodeName) error {
-	// volumeName is in the form of cluster-group-id
+	// volumeName is in the form of storageclass-group-id
 	names := strings.Split(volumeName, "-")
-	namespace := names[0]
+	storageClass := names[0]
 	group := names[1]
 	id := names[2]
-	tprName := generateTPRName(namespace, group, id, string(nodeName))
+	tprName := generateTPRName(storageClass, group, id, string(nodeName))
+
+	namespace, err := getClusterNamespace(detacher.host.GetKubeClient(), storageClass)
+	if err != nil {
+		return err
+	}
 
 	glog.Infof("Rook: Deleting TPR %s from namespace %s", tprName, namespace)
 	uri := fmt.Sprintf("apis/%s/%s/namespaces/%s/%s", tprGroup, tprVersion, namespace, attachmentPluralResources)
@@ -253,7 +254,7 @@ func (detacher *rookDetacher) UnmountDevice(deviceMountPath string) error {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.host.GetMounter())
 }
 
-func generateTPRName(cluster, group, id, nodeName string) string {
-	tprName := fmt.Sprintf("attach-%s-%s-%s-%s", cluster, group, id, nodeName)
+func generateTPRName(storageClass, group, id, nodeName string) string {
+	tprName := fmt.Sprintf("attach-%s-%s-%s-%s", storageClass, group, id, nodeName)
 	return strings.ToLower(strings.Replace(tprName, ".", "-", -1))
 }

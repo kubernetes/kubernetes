@@ -1235,13 +1235,6 @@ type RookVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
-	// Optional: Cluster is the namespace where the Rook cluster is deployed. This is used to discover
-	// the rook-api. Default is rook.
-	// +optional
-	Cluster string
-	// Optional: Extra Rook metadata if any.
-	// +optional
-	VolumeMetadata map[string]string
 }
 
 // Adapts a ConfigMap into a volume.
