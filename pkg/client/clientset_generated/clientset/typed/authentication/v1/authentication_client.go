@@ -19,7 +19,7 @@ package v1
 import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	v1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
+	v1 "k8s.io/api/authentication/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 

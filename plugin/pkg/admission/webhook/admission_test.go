@@ -32,7 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/admission/v1alpha1"
-	registrationv1alpha1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
+	registrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 )

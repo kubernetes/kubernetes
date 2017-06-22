@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/api/core/v1"
-	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	extensions "k8s.io/api/extensions/v1beta1"
 )
 
 // GetControllerOf returns the controllerRef if controllee has a controller,

@@ -16,7 +16,7 @@ limitations under the License.
 
 package certificates
 
-import certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+import certificates "k8s.io/api/certificates/v1beta1"
 
 // IsCertificateRequestApproved returns true if a certificate request has the
 // "Approved" condition and no "Denied" conditions; false otherwise.

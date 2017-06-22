@@ -34,7 +34,7 @@ import (
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/api/extensions/v1beta1"
 )
 
 type thirdPartyObjectConverter struct {

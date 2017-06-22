@@ -30,7 +30,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	kv1 "k8s.io/api/core/v1"
-	autoscalingapi "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
+	autoscalingapi "k8s.io/api/autoscaling/v2alpha1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 

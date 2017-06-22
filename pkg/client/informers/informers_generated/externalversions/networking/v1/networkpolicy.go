@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	networking_v1 "k8s.io/kubernetes/pkg/apis/networking/v1"
+	networking_v1 "k8s.io/api/networking/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/internalinterfaces"
 	v1 "k8s.io/kubernetes/pkg/client/listers/networking/v1"

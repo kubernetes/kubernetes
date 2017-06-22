@@ -23,7 +23,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/networking"
-	networkingapiv1 "k8s.io/kubernetes/pkg/apis/networking/v1"
+	networkingapiv1 "k8s.io/api/networking/v1"
 	networkpolicystore "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage"
 )
 

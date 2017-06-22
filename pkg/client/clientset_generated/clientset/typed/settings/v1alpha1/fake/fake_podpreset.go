@@ -23,7 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	v1alpha1 "k8s.io/kubernetes/pkg/apis/settings/v1alpha1"
+	v1alpha1 "k8s.io/api/settings/v1alpha1"
 )
 
 // FakePodPresets implements PodPresetInterface

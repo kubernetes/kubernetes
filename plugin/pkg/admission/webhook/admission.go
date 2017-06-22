@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	admissionv1alpha1 "k8s.io/kubernetes/pkg/apis/admission/v1alpha1"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	admissioninit "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/configuration"

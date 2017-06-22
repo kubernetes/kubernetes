@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
-	capi "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	capi "k8s.io/api/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 )

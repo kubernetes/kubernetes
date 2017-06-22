@@ -23,7 +23,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	policyapiv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
+	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	poddisruptionbudgetstore "k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/storage"
 )
 

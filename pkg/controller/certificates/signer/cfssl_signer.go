@@ -25,7 +25,7 @@ import (
 	"os"
 	"time"
 
-	capi "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	capi "k8s.io/api/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	certificatesinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/controller/certificates"

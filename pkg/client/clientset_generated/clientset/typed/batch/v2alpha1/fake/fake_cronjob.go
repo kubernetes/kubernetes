@@ -23,7 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	v2alpha1 "k8s.io/api/batch/v2alpha1"
 )
 
 // FakeCronJobs implements CronJobInterface

@@ -22,7 +22,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	scheme "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/scheme"
-	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 )
 
 // DaemonSetsGetter has a method to return a DaemonSetInterface.

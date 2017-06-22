@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
