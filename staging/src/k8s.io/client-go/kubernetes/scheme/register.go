@@ -17,11 +17,6 @@ limitations under the License.
 package scheme
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	corev1 "k8s.io/api/core/v1"
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -33,6 +28,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -41,6 +37,10 @@ import (
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
 var Scheme = runtime.NewScheme()
@@ -68,7 +68,6 @@ func init() {
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
 	admissionregistrationv1alpha1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
 	appsv1beta1.AddToScheme(scheme)
 	authenticationv1.AddToScheme(scheme)
 	authenticationv1beta1.AddToScheme(scheme)
@@ -79,6 +78,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	batchv1.AddToScheme(scheme)
 	batchv2alpha1.AddToScheme(scheme)
 	certificatesv1beta1.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
 	extensionsv1beta1.AddToScheme(scheme)
 	networkingv1.AddToScheme(scheme)
 	policyv1beta1.AddToScheme(scheme)

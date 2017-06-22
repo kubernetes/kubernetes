@@ -22,9 +22,25 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/apis/authorization/v1beta1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/scheme:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/apis/authorization/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1/fake:all-srcs",
+    ],
+    tags = ["automanaged"],
 )
