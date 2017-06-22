@@ -83,7 +83,7 @@ type NetworkPolicyPort struct {
 	// The protocol (TCP or UDP) which traffic must match. If not specified, this
 	// field defaults to TCP.
 	// +optional
-	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,1,opt,name=protocol,casttype=k8s.io/kubernetes/pkg/api/v1.Protocol"`
+	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,1,opt,name=protocol,casttype=k8s.io/api/core/v1.Protocol"`
 
 	// The port on the given protocol. This can either be a numerical or named port on
 	// a pod. If this field is not provided, this matches all port names and numbers.
