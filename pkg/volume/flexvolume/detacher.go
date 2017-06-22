@@ -28,7 +28,7 @@ import (
 )
 
 type flexVolumeDetacher struct {
-	plugin *flexVolumePlugin
+	plugin *flexVolumeAttachablePlugin
 }
 
 var _ volume.Detacher = &flexVolumeDetacher{}
