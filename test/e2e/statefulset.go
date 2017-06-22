@@ -282,66 +282,6 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			sst.VerifyPodAtIndex(updateIndex, ss, verify)
 		})
 
-		It("Scaling down before scale up is finished should wait until current pod will be running and ready before it will be removed", func() {
-			By("Creating stateful set " + ssName + " in namespace " + ns + ", and pausing scale operations after each pod")
-			testProbe := &v1.Probe{Handler: v1.Handler{HTTPGet: &v1.HTTPGetAction{
-				Path: "/index.html",
-				Port: intstr.IntOrString{IntVal: 80}}}}
-			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
-			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
-			framework.SetStatefulSetInitializedAnnotation(ss, "false")
-			ss, err := c.Apps().StatefulSets(ns).Create(ss)
-			Expect(err).NotTo(HaveOccurred())
-			sst := framework.NewStatefulSetTester(c)
-			sst.WaitForRunningAndReady(1, ss)
-
-			By("Scaling up stateful set " + ssName + " to 3 replicas and pausing after 2nd pod")
-			sst.SetHealthy(ss)
-			sst.UpdateReplicas(ss, 3)
-			sst.WaitForRunningAndReady(2, ss)
-
-			By("Before scale up finished setting 2nd pod to be not ready by breaking readiness probe")
-			sst.BreakProbe(ss, testProbe)
-			sst.WaitForStatus(ss, 0)
-			sst.WaitForRunningAndNotReady(2, ss)
-
-			By("Continue scale operation after the 2nd pod, and scaling down to 1 replica")
-			sst.SetHealthy(ss)
-			sst.UpdateReplicas(ss, 1)
-
-			By("Verifying that the 2nd pod wont be removed if it is not running and ready")
-			sst.ConfirmStatefulPodCount(2, ss, 10*time.Second)
-			expectedPodName := ss.Name + "-1"
-			expectedPod, err := f.ClientSet.Core().Pods(ns).Get(expectedPodName, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			watcher, err := f.ClientSet.Core().Pods(ns).Watch(metav1.SingleObject(
-				metav1.ObjectMeta{
-					Name:            expectedPod.Name,
-					ResourceVersion: expectedPod.ResourceVersion,
-				},
-			))
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Verifying the 2nd pod is removed only when it becomes running and ready")
-			sst.RestoreProbe(ss, testProbe)
-			_, err = watch.Until(framework.StatefulSetTimeout, watcher, func(event watch.Event) (bool, error) {
-				pod := event.Object.(*v1.Pod)
-				if event.Type == watch.Deleted && pod.Name == expectedPodName {
-					return false, fmt.Errorf("Pod %v was deleted before enter running", pod.Name)
-				}
-				framework.Logf("Observed event %v for pod %v. Phase %v, Pod is ready %v",
-					event.Type, pod.Name, pod.Status.Phase, v1.IsPodReady(pod))
-				if pod.Name != expectedPodName {
-					return false, nil
-				}
-				if pod.Status.Phase == v1.PodRunning && v1.IsPodReady(pod) {
-					return true, nil
-				}
-				return false, nil
-			})
-			Expect(err).NotTo(HaveOccurred())
-		})
-
 		It("Scaling should happen in predictable order and halt if any stateful pod is unhealthy", func() {
 			psLabels := klabels.Set(labels)
 			By("Initializing watcher for selector " + psLabels.String())
