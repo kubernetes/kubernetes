@@ -35,7 +35,7 @@ import (
 
 var _ = framework.KubeDescribe("LocalStorageAllocatableEviction [Slow] [Serial] [Disruptive] [Flaky]", func() {
 	f := framework.NewDefaultFramework("localstorageallocatable-eviction-test")
-	evictionTestTimeout := 15 * time.Minute
+	evictionTestTimeout := 25 * time.Minute
 	testCondition := "Evict pod due to local storage allocatable violation"
 	conditionType := v1.NodeDiskPressure
 	var podTestSpecs []podTestSpec

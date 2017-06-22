@@ -97,7 +97,7 @@ func (r *Resource) Add(rl v1.ResourceList) {
 			r.NvidiaGPU += rQuant.Value()
 		case v1.ResourcePods:
 			r.AllowedPodNumber += int(rQuant.Value())
-		case v1.ResourceStorage:
+		case v1.ResourceStorageScratch:
 			r.StorageScratch += rQuant.Value()
 		case v1.ResourceStorageOverlay:
 			r.StorageOverlay += rQuant.Value()
@@ -116,7 +116,7 @@ func (r *Resource) ResourceList() v1.ResourceList {
 		v1.ResourceNvidiaGPU:      *resource.NewQuantity(r.NvidiaGPU, resource.DecimalSI),
 		v1.ResourcePods:           *resource.NewQuantity(int64(r.AllowedPodNumber), resource.BinarySI),
 		v1.ResourceStorageOverlay: *resource.NewQuantity(r.StorageOverlay, resource.BinarySI),
-		v1.ResourceStorage:        *resource.NewQuantity(r.StorageScratch, resource.BinarySI),
+		v1.ResourceStorageScratch: *resource.NewQuantity(r.StorageScratch, resource.BinarySI),
 	}
 	for rName, rQuant := range r.OpaqueIntResources {
 		result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)

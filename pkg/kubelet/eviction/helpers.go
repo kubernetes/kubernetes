@@ -728,7 +728,7 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, nodeProvider 
 		}
 	}
 
-	if storageScratchAllocatableCapacity, ok := node.Status.Allocatable[v1.ResourceStorage]; ok {
+	if storageScratchAllocatableCapacity, ok := node.Status.Allocatable[v1.ResourceStorageScratch]; ok {
 		storageScratchAllocatable := storageScratchAllocatableCapacity.Copy()
 		for _, pod := range pods {
 			podStat, ok := statsFunc(pod)
