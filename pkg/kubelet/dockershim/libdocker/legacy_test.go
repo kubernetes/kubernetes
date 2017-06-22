@@ -23,8 +23,8 @@ import (
 
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 

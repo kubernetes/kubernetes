@@ -21,8 +21,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"

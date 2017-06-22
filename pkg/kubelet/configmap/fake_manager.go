@@ -17,7 +17,7 @@ limitations under the License.
 package configmap
 
 import (
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 // fakeManager implements Manager interface for testing purposes.

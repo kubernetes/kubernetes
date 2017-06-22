@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,10 +34,8 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	versionedfake "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -102,8 +102,11 @@ func TestDescribePodTolerations(t *testing.T) {
 		},
 		Spec: api.PodSpec{
 			Tolerations: []api.Toleration{
+				{Key: "key0", Operator: api.TolerationOpExists},
 				{Key: "key1", Value: "value1"},
-				{Key: "key2", Value: "value2", Effect: api.TaintEffectNoExecute, TolerationSeconds: &[]int64{300}[0]},
+				{Key: "key2", Operator: api.TolerationOpEqual, Value: "value2", Effect: api.TaintEffectNoSchedule},
+				{Key: "key3", Value: "value3", Effect: api.TaintEffectNoExecute, TolerationSeconds: &[]int64{300}[0]},
+				{Key: "key4", Effect: api.TaintEffectNoExecute, TolerationSeconds: &[]int64{60}[0]},
 			},
 		},
 	})
@@ -113,8 +116,13 @@ func TestDescribePodTolerations(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "key1=value1") || !strings.Contains(out, "key2=value2:NoExecute for 300s") || !strings.Contains(out, "Tolerations:") {
-		t.Errorf("unexpected out: %s", out)
+	if !strings.Contains(out, "key0\n") ||
+		!strings.Contains(out, "key1=value1\n") ||
+		!strings.Contains(out, "key2=value2:NoSchedule\n") ||
+		!strings.Contains(out, "key3=value3:NoExecute for 300s\n") ||
+		!strings.Contains(out, "key4:NoExecute for 60s\n") ||
+		!strings.Contains(out, "Tolerations:") {
+		t.Errorf("unexpected out:\n%s", out)
 	}
 }
 

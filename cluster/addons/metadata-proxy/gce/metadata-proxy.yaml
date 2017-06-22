@@ -27,7 +27,7 @@ spec:
       dnsPolicy: Default
       containers:
       - name: metadata-proxy
-        image: gcr.io/google-containers/metadata-proxy:0.1.1
+        image: gcr.io/google-containers/metadata-proxy:0.1.2
         imagePullPolicy: Always
         securityContext:
           privileged: true

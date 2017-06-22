@@ -11,10 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = ["event.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
-    ],
+    deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
 )
 
 filegroup(

@@ -19,11 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/internalinterfaces"
 	v1 "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -51,7 +51,7 @@ func newNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cac
 				return client.CoreV1().Nodes().Watch(options)
 			},
 		},
-		&api_v1.Node{},
+		&core_v1.Node{},
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -60,7 +60,7 @@ func newNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cac
 }
 
 func (f *nodeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api_v1.Node{}, newNodeInformer)
+	return f.factory.InformerFor(&core_v1.Node{}, newNodeInformer)
 }
 
 func (f *nodeInformer) Lister() v1.NodeLister {

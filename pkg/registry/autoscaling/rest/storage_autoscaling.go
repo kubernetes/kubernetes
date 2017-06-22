@@ -17,14 +17,14 @@ limitations under the License.
 package rest
 
 import (
+	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
+	autoscalingapiv2alpha1 "k8s.io/api/autoscaling/v2alpha1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	autoscalingapiv2alpha1 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
 	horizontalpodautoscalerstore "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
 )
 

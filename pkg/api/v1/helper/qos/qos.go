@@ -17,9 +17,9 @@ limitations under the License.
 package qos
 
 import (
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // QOSList is a set of (resource name, QoS class) pairs.

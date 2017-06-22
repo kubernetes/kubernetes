@@ -77,7 +77,7 @@ type Kind struct {
 	// Name is the lookup key given to this Kind by the open API spec.
 	// May not contain any semantic meaning or relation to the API definition,
 	// simply must be unique for each object definition in the Open API spec.
-	// e.g. io.k8s.kubernetes.pkg.apis.apps.v1beta1.Deployment
+	// e.g. io.k8s.api.apps.v1beta1.Deployment
 	Name string
 
 	// IsResource is true if the Kind is a Resource (it has API endpoints)

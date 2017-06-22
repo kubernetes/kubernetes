@@ -19,13 +19,14 @@ package apiconfig
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
-	rbac "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	"k8s.io/kubernetes/pkg/util/version"
 )
@@ -105,7 +106,7 @@ func createRoles(clientset *clientset.Clientset) error {
 				Namespace: metav1.NamespacePublic,
 			},
 			Rules: []rbac.PolicyRule{
-				rbac.NewRule("get").Groups("").Resources("configmaps").RuleOrDie(),
+				rbachelper.NewRule("get").Groups("").Resources("configmaps").RuleOrDie(),
 			},
 		},
 	}
@@ -165,7 +166,7 @@ func createClusterRoles(clientset *clientset.Clientset) error {
 				Name: nodeAutoApproveBootstrap,
 			},
 			Rules: []rbac.PolicyRule{
-				rbac.NewRule("create").Groups("certificates.k8s.io").Resources("certificatesigningrequests/nodeclient").RuleOrDie(),
+				rbachelper.NewRule("create").Groups("certificates.k8s.io").Resources("certificatesigningrequests/nodeclient").RuleOrDie(),
 			},
 		},
 	}

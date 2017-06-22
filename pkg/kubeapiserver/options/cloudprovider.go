@@ -22,8 +22,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/api/core/v1"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 

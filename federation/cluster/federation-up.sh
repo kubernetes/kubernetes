@@ -81,6 +81,18 @@ function init() {
   kube::log::status "DNS_ZONE_NAME: \"${DNS_ZONE_NAME}\", DNS_PROVIDER: \"${DNS_PROVIDER}\""
   kube::log::status "Image: \"${kube_registry}/hyperkube-amd64:${kube_version}\""
 
+  # The very first thing that kubefed does when it comes up is run RBAC
+  # API discovery. We believe this sometimes fail on new clusters and as
+  # a result causes kubefed to assume that the RBAC API doesn't exist.
+  # Therefore, we are applying this workaround for now to ensure that the
+  # RBAC API is available before running kubefed.
+  timeout 1m bash <<EOF
+    while [[ ! "$(${KUBE_ROOT}/cluster/kubectl.sh api-versions)" =~ "rbac.authorization.k8s.io/" ]]; do
+      kube::log::status "Waiting for rbac.authorization.k8s.io API group to appear"
+      sleep 2
+    done
+EOF
+
   # Send INT after 20m and KILL 1m after that if process is still alive.
   timeout --signal=INT --kill-after=1m 20m \
       "${KUBE_ROOT}/federation/develop/kubefed.sh" init \

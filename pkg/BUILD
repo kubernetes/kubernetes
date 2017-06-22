@@ -72,7 +72,6 @@ filegroup(
         "//pkg/client/listers/networking/internalversion:all-srcs",
         "//pkg/client/listers/networking/v1:all-srcs",
         "//pkg/client/listers/policy/internalversion:all-srcs",
-        "//pkg/client/listers/policy/v1alpha1:all-srcs",
         "//pkg/client/listers/policy/v1beta1:all-srcs",
         "//pkg/client/listers/rbac/internalversion:all-srcs",
         "//pkg/client/listers/rbac/v1alpha1:all-srcs",

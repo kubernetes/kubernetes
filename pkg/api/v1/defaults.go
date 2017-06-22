@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util"
@@ -27,26 +28,26 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_ResourceList(obj *ResourceList) {
+func SetDefaults_ResourceList(obj *v1.ResourceList) {
 	for key, val := range *obj {
 		// TODO(#18538): We round up resource values to milli scale to maintain API compatibility.
 		// In the future, we should instead reject values that need rounding.
 		const milliScale = -3
 		val.RoundUp(milliScale)
 
-		(*obj)[ResourceName(key)] = val
+		(*obj)[v1.ResourceName(key)] = val
 	}
 }
 
-func SetDefaults_PodExecOptions(obj *PodExecOptions) {
+func SetDefaults_PodExecOptions(obj *v1.PodExecOptions) {
 	obj.Stdout = true
 	obj.Stderr = true
 }
-func SetDefaults_PodAttachOptions(obj *PodAttachOptions) {
+func SetDefaults_PodAttachOptions(obj *v1.PodAttachOptions) {
 	obj.Stdout = true
 	obj.Stderr = true
 }
-func SetDefaults_ReplicationController(obj *ReplicationController) {
+func SetDefaults_ReplicationController(obj *v1.ReplicationController) {
 	var labels map[string]string
 	if obj.Spec.Template != nil {
 		labels = obj.Spec.Template.Labels
@@ -65,48 +66,48 @@ func SetDefaults_ReplicationController(obj *ReplicationController) {
 		*obj.Spec.Replicas = 1
 	}
 }
-func SetDefaults_Volume(obj *Volume) {
+func SetDefaults_Volume(obj *v1.Volume) {
 	if util.AllPtrFieldsNil(&obj.VolumeSource) {
-		obj.VolumeSource = VolumeSource{
-			EmptyDir: &EmptyDirVolumeSource{},
+		obj.VolumeSource = v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}
 	}
 }
-func SetDefaults_ContainerPort(obj *ContainerPort) {
+func SetDefaults_ContainerPort(obj *v1.ContainerPort) {
 	if obj.Protocol == "" {
-		obj.Protocol = ProtocolTCP
+		obj.Protocol = v1.ProtocolTCP
 	}
 }
-func SetDefaults_Container(obj *Container) {
+func SetDefaults_Container(obj *v1.Container) {
 	if obj.ImagePullPolicy == "" {
 		// Ignore error and assume it has been validated elsewhere
 		_, tag, _, _ := parsers.ParseImageName(obj.Image)
 
 		// Check image tag
 		if tag == "latest" {
-			obj.ImagePullPolicy = PullAlways
+			obj.ImagePullPolicy = v1.PullAlways
 		} else {
-			obj.ImagePullPolicy = PullIfNotPresent
+			obj.ImagePullPolicy = v1.PullIfNotPresent
 		}
 	}
 	if obj.TerminationMessagePath == "" {
-		obj.TerminationMessagePath = TerminationMessagePathDefault
+		obj.TerminationMessagePath = v1.TerminationMessagePathDefault
 	}
 	if obj.TerminationMessagePolicy == "" {
-		obj.TerminationMessagePolicy = TerminationMessageReadFile
+		obj.TerminationMessagePolicy = v1.TerminationMessageReadFile
 	}
 }
-func SetDefaults_Service(obj *Service) {
+func SetDefaults_Service(obj *v1.Service) {
 	if obj.Spec.SessionAffinity == "" {
-		obj.Spec.SessionAffinity = ServiceAffinityNone
+		obj.Spec.SessionAffinity = v1.ServiceAffinityNone
 	}
 	if obj.Spec.Type == "" {
-		obj.Spec.Type = ServiceTypeClusterIP
+		obj.Spec.Type = v1.ServiceTypeClusterIP
 	}
 	for i := range obj.Spec.Ports {
 		sp := &obj.Spec.Ports[i]
 		if sp.Protocol == "" {
-			sp.Protocol = ProtocolTCP
+			sp.Protocol = v1.ProtocolTCP
 		}
 		if sp.TargetPort == intstr.FromInt(0) || sp.TargetPort == intstr.FromString("") {
 			sp.TargetPort = intstr.FromInt(int(sp.Port))
@@ -114,24 +115,24 @@ func SetDefaults_Service(obj *Service) {
 	}
 	// Defaults ExternalTrafficPolicy field for NodePort / LoadBalancer service
 	// to Global for consistency.
-	if _, ok := obj.Annotations[BetaAnnotationExternalTraffic]; ok {
+	if _, ok := obj.Annotations[v1.BetaAnnotationExternalTraffic]; ok {
 		// Don't default this field if beta annotation exists.
 		return
-	} else if (obj.Spec.Type == ServiceTypeNodePort ||
-		obj.Spec.Type == ServiceTypeLoadBalancer) &&
+	} else if (obj.Spec.Type == v1.ServiceTypeNodePort ||
+		obj.Spec.Type == v1.ServiceTypeLoadBalancer) &&
 		obj.Spec.ExternalTrafficPolicy == "" {
-		obj.Spec.ExternalTrafficPolicy = ServiceExternalTrafficPolicyTypeCluster
+		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 	}
 }
-func SetDefaults_Pod(obj *Pod) {
+func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits
-	// This is done here rather than a more specific defaulting pass on ResourceRequirements
-	// because we only want this defaulting semantic to take place on a Pod and not a PodTemplate
+	// This is done here rather than a more specific defaulting pass on v1.ResourceRequirements
+	// because we only want this defaulting semantic to take place on a v1.Pod and not a v1.PodTemplate
 	for i := range obj.Spec.Containers {
 		// set requests to limits if requests are not specified, but limits are
 		if obj.Spec.Containers[i].Resources.Limits != nil {
 			if obj.Spec.Containers[i].Resources.Requests == nil {
-				obj.Spec.Containers[i].Resources.Requests = make(ResourceList)
+				obj.Spec.Containers[i].Resources.Requests = make(v1.ResourceList)
 			}
 			for key, value := range obj.Spec.Containers[i].Resources.Limits {
 				if _, exists := obj.Spec.Containers[i].Resources.Requests[key]; !exists {
@@ -143,7 +144,7 @@ func SetDefaults_Pod(obj *Pod) {
 	for i := range obj.Spec.InitContainers {
 		if obj.Spec.InitContainers[i].Resources.Limits != nil {
 			if obj.Spec.InitContainers[i].Resources.Requests == nil {
-				obj.Spec.InitContainers[i].Resources.Requests = make(ResourceList)
+				obj.Spec.InitContainers[i].Resources.Requests = make(v1.ResourceList)
 			}
 			for key, value := range obj.Spec.InitContainers[i].Resources.Limits {
 				if _, exists := obj.Spec.InitContainers[i].Resources.Requests[key]; !exists {
@@ -153,29 +154,29 @@ func SetDefaults_Pod(obj *Pod) {
 		}
 	}
 }
-func SetDefaults_PodSpec(obj *PodSpec) {
+func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	if obj.DNSPolicy == "" {
-		obj.DNSPolicy = DNSClusterFirst
+		obj.DNSPolicy = v1.DNSClusterFirst
 	}
 	if obj.RestartPolicy == "" {
-		obj.RestartPolicy = RestartPolicyAlways
+		obj.RestartPolicy = v1.RestartPolicyAlways
 	}
 	if obj.HostNetwork {
 		defaultHostNetworkPorts(&obj.Containers)
 		defaultHostNetworkPorts(&obj.InitContainers)
 	}
 	if obj.SecurityContext == nil {
-		obj.SecurityContext = &PodSecurityContext{}
+		obj.SecurityContext = &v1.PodSecurityContext{}
 	}
 	if obj.TerminationGracePeriodSeconds == nil {
-		period := int64(DefaultTerminationGracePeriodSeconds)
+		period := int64(v1.DefaultTerminationGracePeriodSeconds)
 		obj.TerminationGracePeriodSeconds = &period
 	}
 	if obj.SchedulerName == "" {
-		obj.SchedulerName = DefaultSchedulerName
+		obj.SchedulerName = v1.DefaultSchedulerName
 	}
 }
-func SetDefaults_Probe(obj *Probe) {
+func SetDefaults_Probe(obj *v1.Probe) {
 	if obj.TimeoutSeconds == 0 {
 		obj.TimeoutSeconds = 1
 	}
@@ -189,61 +190,61 @@ func SetDefaults_Probe(obj *Probe) {
 		obj.FailureThreshold = 3
 	}
 }
-func SetDefaults_SecretVolumeSource(obj *SecretVolumeSource) {
+func SetDefaults_SecretVolumeSource(obj *v1.SecretVolumeSource) {
 	if obj.DefaultMode == nil {
-		perm := int32(SecretVolumeSourceDefaultMode)
+		perm := int32(v1.SecretVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
 }
-func SetDefaults_ConfigMapVolumeSource(obj *ConfigMapVolumeSource) {
+func SetDefaults_ConfigMapVolumeSource(obj *v1.ConfigMapVolumeSource) {
 	if obj.DefaultMode == nil {
-		perm := int32(ConfigMapVolumeSourceDefaultMode)
+		perm := int32(v1.ConfigMapVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
 }
-func SetDefaults_DownwardAPIVolumeSource(obj *DownwardAPIVolumeSource) {
+func SetDefaults_DownwardAPIVolumeSource(obj *v1.DownwardAPIVolumeSource) {
 	if obj.DefaultMode == nil {
-		perm := int32(DownwardAPIVolumeSourceDefaultMode)
+		perm := int32(v1.DownwardAPIVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
 }
-func SetDefaults_Secret(obj *Secret) {
+func SetDefaults_Secret(obj *v1.Secret) {
 	if obj.Type == "" {
-		obj.Type = SecretTypeOpaque
+		obj.Type = v1.SecretTypeOpaque
 	}
 }
-func SetDefaults_ProjectedVolumeSource(obj *ProjectedVolumeSource) {
+func SetDefaults_ProjectedVolumeSource(obj *v1.ProjectedVolumeSource) {
 	if obj.DefaultMode == nil {
-		perm := int32(ProjectedVolumeSourceDefaultMode)
+		perm := int32(v1.ProjectedVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
 }
-func SetDefaults_PersistentVolume(obj *PersistentVolume) {
+func SetDefaults_PersistentVolume(obj *v1.PersistentVolume) {
 	if obj.Status.Phase == "" {
-		obj.Status.Phase = VolumePending
+		obj.Status.Phase = v1.VolumePending
 	}
 	if obj.Spec.PersistentVolumeReclaimPolicy == "" {
-		obj.Spec.PersistentVolumeReclaimPolicy = PersistentVolumeReclaimRetain
+		obj.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
 	}
 }
-func SetDefaults_PersistentVolumeClaim(obj *PersistentVolumeClaim) {
+func SetDefaults_PersistentVolumeClaim(obj *v1.PersistentVolumeClaim) {
 	if obj.Status.Phase == "" {
-		obj.Status.Phase = ClaimPending
+		obj.Status.Phase = v1.ClaimPending
 	}
 }
-func SetDefaults_ISCSIVolumeSource(obj *ISCSIVolumeSource) {
+func SetDefaults_ISCSIVolumeSource(obj *v1.ISCSIVolumeSource) {
 	if obj.ISCSIInterface == "" {
 		obj.ISCSIInterface = "default"
 	}
 }
-func SetDefaults_AzureDiskVolumeSource(obj *AzureDiskVolumeSource) {
+func SetDefaults_AzureDiskVolumeSource(obj *v1.AzureDiskVolumeSource) {
 	if obj.CachingMode == nil {
-		obj.CachingMode = new(AzureDataDiskCachingMode)
-		*obj.CachingMode = AzureDataDiskCachingReadWrite
+		obj.CachingMode = new(v1.AzureDataDiskCachingMode)
+		*obj.CachingMode = v1.AzureDataDiskCachingReadWrite
 	}
 	if obj.Kind == nil {
-		obj.Kind = new(AzureDataDiskKind)
-		*obj.Kind = AzureSharedBlobDisk
+		obj.Kind = new(v1.AzureDataDiskKind)
+		*obj.Kind = v1.AzureSharedBlobDisk
 	}
 	if obj.FSType == nil {
 		obj.FSType = new(string)
@@ -254,58 +255,58 @@ func SetDefaults_AzureDiskVolumeSource(obj *AzureDiskVolumeSource) {
 		*obj.ReadOnly = false
 	}
 }
-func SetDefaults_Endpoints(obj *Endpoints) {
+func SetDefaults_Endpoints(obj *v1.Endpoints) {
 	for i := range obj.Subsets {
 		ss := &obj.Subsets[i]
 		for i := range ss.Ports {
 			ep := &ss.Ports[i]
 			if ep.Protocol == "" {
-				ep.Protocol = ProtocolTCP
+				ep.Protocol = v1.ProtocolTCP
 			}
 		}
 	}
 }
-func SetDefaults_HTTPGetAction(obj *HTTPGetAction) {
+func SetDefaults_HTTPGetAction(obj *v1.HTTPGetAction) {
 	if obj.Path == "" {
 		obj.Path = "/"
 	}
 	if obj.Scheme == "" {
-		obj.Scheme = URISchemeHTTP
+		obj.Scheme = v1.URISchemeHTTP
 	}
 }
-func SetDefaults_NamespaceStatus(obj *NamespaceStatus) {
+func SetDefaults_NamespaceStatus(obj *v1.NamespaceStatus) {
 	if obj.Phase == "" {
-		obj.Phase = NamespaceActive
+		obj.Phase = v1.NamespaceActive
 	}
 }
-func SetDefaults_Node(obj *Node) {
+func SetDefaults_Node(obj *v1.Node) {
 	if obj.Spec.ExternalID == "" {
 		obj.Spec.ExternalID = obj.Name
 	}
 }
-func SetDefaults_NodeStatus(obj *NodeStatus) {
+func SetDefaults_NodeStatus(obj *v1.NodeStatus) {
 	if obj.Allocatable == nil && obj.Capacity != nil {
-		obj.Allocatable = make(ResourceList, len(obj.Capacity))
+		obj.Allocatable = make(v1.ResourceList, len(obj.Capacity))
 		for key, value := range obj.Capacity {
 			obj.Allocatable[key] = *(value.Copy())
 		}
 		obj.Allocatable = obj.Capacity
 	}
 }
-func SetDefaults_ObjectFieldSelector(obj *ObjectFieldSelector) {
+func SetDefaults_ObjectFieldSelector(obj *v1.ObjectFieldSelector) {
 	if obj.APIVersion == "" {
 		obj.APIVersion = "v1"
 	}
 }
-func SetDefaults_LimitRangeItem(obj *LimitRangeItem) {
+func SetDefaults_LimitRangeItem(obj *v1.LimitRangeItem) {
 	// for container limits, we apply default values
-	if obj.Type == LimitTypeContainer {
+	if obj.Type == v1.LimitTypeContainer {
 
 		if obj.Default == nil {
-			obj.Default = make(ResourceList)
+			obj.Default = make(v1.ResourceList)
 		}
 		if obj.DefaultRequest == nil {
-			obj.DefaultRequest = make(ResourceList)
+			obj.DefaultRequest = make(v1.ResourceList)
 		}
 
 		// If a default limit is unspecified, but the max is specified, default the limit to the max
@@ -328,14 +329,14 @@ func SetDefaults_LimitRangeItem(obj *LimitRangeItem) {
 		}
 	}
 }
-func SetDefaults_ConfigMap(obj *ConfigMap) {
+func SetDefaults_ConfigMap(obj *v1.ConfigMap) {
 	if obj.Data == nil {
 		obj.Data = make(map[string]string)
 	}
 }
 
 // With host networking default all container ports to host ports.
-func defaultHostNetworkPorts(containers *[]Container) {
+func defaultHostNetworkPorts(containers *[]v1.Container) {
 	for i := range *containers {
 		for j := range (*containers)[i].Ports {
 			if (*containers)[i].Ports[j].HostPort == 0 {
@@ -345,7 +346,7 @@ func defaultHostNetworkPorts(containers *[]Container) {
 	}
 }
 
-func SetDefaults_RBDVolumeSource(obj *RBDVolumeSource) {
+func SetDefaults_RBDVolumeSource(obj *v1.RBDVolumeSource) {
 	if obj.RBDPool == "" {
 		obj.RBDPool = "rbd"
 	}
@@ -357,7 +358,7 @@ func SetDefaults_RBDVolumeSource(obj *RBDVolumeSource) {
 	}
 }
 
-func SetDefaults_ScaleIOVolumeSource(obj *ScaleIOVolumeSource) {
+func SetDefaults_ScaleIOVolumeSource(obj *v1.ScaleIOVolumeSource) {
 	if obj.ProtectionDomain == "" {
 		obj.ProtectionDomain = "default"
 	}

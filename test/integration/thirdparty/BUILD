@@ -19,9 +19,10 @@ go_test(
     ],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -33,7 +34,6 @@ go_test(
         "//vendor/k8s.io/client-go/examples/third-party-resources-deprecated/client:go_default_library",
         "//vendor/k8s.io/client-go/examples/third-party-resources-deprecated/controller:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )

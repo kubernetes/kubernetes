@@ -28,8 +28,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -596,10 +596,7 @@ func (asw *actualStateOfWorld) GetAttachedVolumesPerNode() map[types.NodeName][]
 	attachedVolumesPerNode := make(map[types.NodeName][]operationexecutor.AttachedVolume)
 	for _, volumeObj := range asw.attachedVolumes {
 		for nodeName, nodeObj := range volumeObj.nodesAttachedTo {
-			volumes, exists := attachedVolumesPerNode[nodeName]
-			if !exists {
-				volumes = []operationexecutor.AttachedVolume{}
-			}
+			volumes := attachedVolumesPerNode[nodeName]
 			volumes = append(volumes, getAttachedVolume(&volumeObj, &nodeObj).AttachedVolume)
 			attachedVolumesPerNode[nodeName] = volumes
 		}

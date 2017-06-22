@@ -14,9 +14,9 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/storage:go_default_library",
-        "//pkg/apis/storage/v1:go_default_library",
-        "//pkg/apis/storage/v1beta1:go_default_library",
         "//pkg/registry/storage/storageclass/storage:go_default_library",
+        "//vendor/k8s.io/api/storage/v1:go_default_library",
+        "//vendor/k8s.io/api/storage/v1beta1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",

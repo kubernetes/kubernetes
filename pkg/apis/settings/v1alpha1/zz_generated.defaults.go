@@ -21,6 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1alpha1 "k8s.io/api/settings/v1alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
@@ -29,12 +30,12 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&PodPreset{}, func(obj interface{}) { SetObjectDefaults_PodPreset(obj.(*PodPreset)) })
-	scheme.AddTypeDefaultingFunc(&PodPresetList{}, func(obj interface{}) { SetObjectDefaults_PodPresetList(obj.(*PodPresetList)) })
+	scheme.AddTypeDefaultingFunc(&v1alpha1.PodPreset{}, func(obj interface{}) { SetObjectDefaults_PodPreset(obj.(*v1alpha1.PodPreset)) })
+	scheme.AddTypeDefaultingFunc(&v1alpha1.PodPresetList{}, func(obj interface{}) { SetObjectDefaults_PodPresetList(obj.(*v1alpha1.PodPresetList)) })
 	return nil
 }
 
-func SetObjectDefaults_PodPreset(in *PodPreset) {
+func SetObjectDefaults_PodPreset(in *v1alpha1.PodPreset) {
 	for i := range in.Spec.Env {
 		a := &in.Spec.Env[i]
 		if a.ValueFrom != nil {
@@ -90,7 +91,7 @@ func SetObjectDefaults_PodPreset(in *PodPreset) {
 	}
 }
 
-func SetObjectDefaults_PodPresetList(in *PodPresetList) {
+func SetObjectDefaults_PodPresetList(in *v1alpha1.PodPresetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_PodPreset(a)

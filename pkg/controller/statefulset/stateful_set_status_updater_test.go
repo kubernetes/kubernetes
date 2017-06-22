@@ -26,7 +26,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
 )

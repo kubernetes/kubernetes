@@ -20,24 +20,26 @@ import (
 	"encoding/json"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )
 
-func testPlugin() (*flexVolumePlugin, string) {
+func testPlugin() (*flexVolumeAttachablePlugin, string) {
 	rootDir, err := utiltesting.MkTmpdir("flexvolume_test")
 	if err != nil {
 		panic("error creating temp dir: " + err.Error())
 	}
-	return &flexVolumePlugin{
-		driverName:          "test",
-		execPath:            "/plugin",
-		host:                volumetesting.NewFakeVolumeHost(rootDir, nil, nil),
-		unsupportedCommands: []string{},
+	return &flexVolumeAttachablePlugin{
+		flexVolumePlugin: &flexVolumePlugin{
+			driverName:          "test",
+			execPath:            "/plugin",
+			host:                volumetesting.NewFakeVolumeHost(rootDir, nil, nil),
+			unsupportedCommands: []string{},
+		},
 	}, rootDir
 }
 
@@ -77,11 +79,11 @@ func fakeResultOutput(result interface{}) exec.FakeCombinedOutputAction {
 }
 
 func successOutput() exec.FakeCombinedOutputAction {
-	return fakeResultOutput(&DriverStatus{StatusSuccess, "", "", "", true})
+	return fakeResultOutput(&DriverStatus{StatusSuccess, "", "", "", true, nil})
 }
 
 func notSupportedOutput() exec.FakeCombinedOutputAction {
-	return fakeResultOutput(&DriverStatus{StatusNotSupported, "", "", "", false})
+	return fakeResultOutput(&DriverStatus{StatusNotSupported, "", "", "", false, nil})
 }
 
 func sameArgs(args, expectedArgs []string) bool {
@@ -126,7 +128,7 @@ func fakePersistentVolumeSpec() *volume.Spec {
 	return volume.NewSpecFromPersistentVolume(vol, false)
 }
 
-func specJson(plugin *flexVolumePlugin, spec *volume.Spec, extraOptions map[string]string) string {
+func specJson(plugin *flexVolumeAttachablePlugin, spec *volume.Spec, extraOptions map[string]string) string {
 	o, err := NewOptionsForDriver(spec, plugin.host, extraOptions)
 	if err != nil {
 		panic("Failed to convert spec: " + err.Error())

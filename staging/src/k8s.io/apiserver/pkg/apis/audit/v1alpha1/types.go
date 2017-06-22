@@ -17,10 +17,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	authnv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	authnv1 "k8s.io/client-go/pkg/apis/authentication/v1"
 )
 
 // Header keys used by the audit system.

@@ -20,9 +20,9 @@ import (
 	"context"
 	"testing"
 
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/test/integration/testserver"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
 
 	examplecrv1 "k8s.io/apiextensions-apiserver/examples/client-go/apis/cr/v1"
 	exampleclient "k8s.io/apiextensions-apiserver/examples/client-go/client"

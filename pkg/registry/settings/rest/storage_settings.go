@@ -17,13 +17,13 @@ limitations under the License.
 package rest
 
 import (
+	settingsapiv1alpha1 "k8s.io/api/settings/v1alpha1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/settings"
-	settingsapiv1alpha1 "k8s.io/kubernetes/pkg/apis/settings/v1alpha1"
 	podpresetstore "k8s.io/kubernetes/pkg/registry/settings/podpreset/storage"
 )
 

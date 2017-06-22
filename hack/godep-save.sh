@@ -38,6 +38,9 @@ pushd "${KUBE_ROOT}" > /dev/null
 
   # create a symlink in vendor directory pointing to the staging client. This
   # let other packages use the staging client as if it were vendored.
+  if [ ! -e "vendor/k8s.io/api" ]; then
+    ln -s ../../staging/src/k8s.io/api vendor/k8s.io/api
+  fi
   if [ ! -e "vendor/k8s.io/client-go" ]; then
     ln -s ../../staging/src/k8s.io/client-go vendor/k8s.io/client-go
   fi

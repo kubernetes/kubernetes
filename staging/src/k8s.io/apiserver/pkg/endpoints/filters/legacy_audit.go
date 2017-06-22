@@ -29,10 +29,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 
+	authenticationapi "k8s.io/api/authentication/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	authenticationapi "k8s.io/client-go/pkg/apis/authentication/v1"
 )
 
 var _ http.ResponseWriter = &legacyAuditResponseWriter{}

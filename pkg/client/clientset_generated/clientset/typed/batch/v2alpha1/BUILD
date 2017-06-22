@@ -17,8 +17,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/client/clientset_generated/clientset/scheme:go_default_library",
+        "//vendor/k8s.io/api/batch/v2alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",

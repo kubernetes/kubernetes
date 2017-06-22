@@ -20,8 +20,8 @@ package webhook
 import (
 	"strings"
 
+	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
 )
 
 type RuleMatcher struct {

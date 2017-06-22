@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"testing"
 
+	certificates "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
-	certificates "k8s.io/client-go/pkg/apis/certificates/v1beta1"
 	certutil "k8s.io/client-go/util/cert"
 )
 

@@ -19,8 +19,8 @@ package job
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batch "k8s.io/api/batch/v1"
+	"k8s.io/api/core/v1"
 )
 
 func TestIsJobFinished(t *testing.T) {

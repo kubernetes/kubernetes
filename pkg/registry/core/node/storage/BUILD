@@ -38,6 +38,7 @@ go_library(
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/node:go_default_library",
         "//pkg/registry/core/node/rest:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",

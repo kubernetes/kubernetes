@@ -16,7 +16,7 @@ limitations under the License.
 
 package gce
 
-import "k8s.io/kubernetes/pkg/api/v1"
+import "k8s.io/api/core/v1"
 
 type LoadBalancerType string
 

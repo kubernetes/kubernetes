@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -183,7 +183,7 @@ func (j *joinFederation) Run(f cmdutil.Factory, cmdOut io.Writer, config util.Ad
 	joiningClusterName := j.commonOptions.Name
 	secretName := j.options.secretName
 	if secretName == "" {
-		secretName = v1.SimpleNameGenerator.GenerateName(j.commonOptions.Name + "-")
+		secretName = k8s_api_v1.SimpleNameGenerator.GenerateName(j.commonOptions.Name + "-")
 	}
 
 	joiningClusterFactory := j.joningClusterFactory(config)

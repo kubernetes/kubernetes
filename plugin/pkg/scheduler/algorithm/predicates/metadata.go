@@ -18,7 +18,7 @@ package predicates
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"

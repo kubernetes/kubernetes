@@ -23,9 +23,10 @@ import (
 	"reflect"
 	"strings"
 
+	authorization "k8s.io/api/authorization/v1beta1"
+	capi "k8s.io/api/certificates/v1beta1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	authorization "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
-	capi "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	k8s_certificates_v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	certificatesinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/controller/certificates"
@@ -85,7 +86,7 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 	if approved, denied := certificates.GetCertApprovalCondition(&csr.Status); approved || denied {
 		return nil
 	}
-	x509cr, err := capi.ParseCSR(csr)
+	x509cr, err := k8s_certificates_v1beta1.ParseCSR(csr)
 	if err != nil {
 		return fmt.Errorf("unable to parse csr %q: %v", csr.Name, err)
 	}
