@@ -416,6 +416,17 @@ func (s *FederationSyncController) objFromCache(kind, key string) (pkgruntime.Ob
 // delete deletes the given resource or returns error if the deletion was not complete.
 func (s *FederationSyncController) delete(obj pkgruntime.Object, kind string, qualifiedName federatedtypes.QualifiedName) error {
 	glog.V(3).Infof("Handling deletion of %s %q", kind, qualifiedName)
+
+	// Perform pre-deletion cleanup for the namespace adapter
+	namespaceAdapter, ok := s.adapter.(*federatedtypes.NamespaceAdapter)
+	if ok {
+		var err error
+		obj, err = namespaceAdapter.CleanUpNamespace(obj, s.eventRecorder)
+		if err != nil {
+			return err
+		}
+	}
+
 	_, err := s.deletionHelper.HandleObjectInUnderlyingClusters(obj)
 	if err != nil {
 		return err
