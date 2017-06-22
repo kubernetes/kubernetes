@@ -540,7 +540,7 @@ func TestSyncPod(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(pod, v1.PodStatus{}, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, v1.PodStatus{})
 	assert.NoError(t, result.Error())
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 2, len(fakeImage.Images))
@@ -642,7 +642,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 1. should only create the init container.
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(pod, podStatus, []v1.Secret{}, backOff, v1.PodStatus{})
 	assert.NoError(t, result.Error())
 	assert.Equal(t, 1, len(fakeRuntime.Containers))
 	initContainerID := buildContainerID(pod, initContainers[0])
@@ -654,7 +654,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 2. should not create app container because init container is still running.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff, v1.PodStatus{})
 	assert.NoError(t, result.Error())
 	assert.Equal(t, 1, len(fakeRuntime.Containers))
 	expectedContainers = []string{initContainerID}
@@ -666,7 +666,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	fakeRuntime.StopContainer(initContainerID, 0)
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff, v1.PodStatus{})
 	assert.NoError(t, result.Error())
 	assert.Equal(t, 3, len(fakeRuntime.Containers))
 	expectedContainers = []string{initContainerID, buildContainerID(pod, containers[0]),

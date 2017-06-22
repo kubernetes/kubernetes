@@ -31,6 +31,10 @@ const (
 	PreemptContainer        = "Preempting"
 	BackOffStartContainer   = "BackOff"
 	ExceededGracePeriod     = "ExceededGracePeriod"
+	ExitFailure             = "ExitFailure"
+	ExitSuccess             = "ExitSuccess"
+	ContainerRestarting     = "Restarting"
+	SandboxChanged          = "SandboxChanged"
 
 	// Image event reason list
 	PullingImage            = "Pulling"

@@ -86,8 +86,11 @@ type Runtime interface {
 	// that are terminated, but not deleted will be evicted.  Otherwise, only deleted pods will be GC'd.
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(gcPolicy ContainerGCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
-	// Syncs the running pod into the desired pod.
-	SyncPod(pod *v1.Pod, apiPodStatus v1.PodStatus, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
+	// SyncPod takes a desired pod and syncs the running pod into it.
+	// prevObservedStatus should be the last known status of the pod sent
+	// to the API server, so that the runtime can know if a pod went from
+	// healthy to unhealthy since the API server was last notified.
+	SyncPod(pod *v1.Pod, observedStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, prevObservedStatus v1.PodStatus) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
