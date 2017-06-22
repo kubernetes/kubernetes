@@ -123,6 +123,11 @@ func SetObjectDefaults_CronJob(in *CronJob) {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
+				}
+			}
 		}
 	}
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Containers {
@@ -163,6 +168,11 @@ func SetObjectDefaults_CronJob(in *CronJob) {
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
 				}
 			}
 		}
@@ -263,6 +273,11 @@ func SetObjectDefaults_JobTemplate(in *JobTemplate) {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
+				}
+			}
 		}
 	}
 	for i := range in.Template.Spec.Template.Spec.Containers {
@@ -303,6 +318,11 @@ func SetObjectDefaults_JobTemplate(in *JobTemplate) {
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
 				}
 			}
 		}

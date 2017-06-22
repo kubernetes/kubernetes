@@ -251,6 +251,11 @@ func SetObjectDefaults_Pod(in *Pod) {
 					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
+				}
+			}
 		}
 	}
 	for i := range in.Spec.Containers {
@@ -291,6 +296,11 @@ func SetObjectDefaults_Pod(in *Pod) {
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
 					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
 				}
 			}
 		}
@@ -399,6 +409,11 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
+				}
+			}
 		}
 	}
 	for i := range in.Template.Spec.Containers {
@@ -439,6 +454,11 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 			if a.Lifecycle.PreStop != nil {
 				if a.Lifecycle.PreStop.HTTPGet != nil {
 					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+			if a.Lifecycle.RetryUntilSuccess != nil {
+				if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
 				}
 			}
 		}
@@ -541,6 +561,11 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 						SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 					}
 				}
+				if a.Lifecycle.RetryUntilSuccess != nil {
+					if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+						SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
+					}
+				}
 			}
 		}
 		for i := range in.Spec.Template.Spec.Containers {
@@ -581,6 +606,11 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 				if a.Lifecycle.PreStop != nil {
 					if a.Lifecycle.PreStop.HTTPGet != nil {
 						SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					}
+				}
+				if a.Lifecycle.RetryUntilSuccess != nil {
+					if a.Lifecycle.RetryUntilSuccess.HTTPGet != nil {
+						SetDefaults_HTTPGetAction(a.Lifecycle.RetryUntilSuccess.HTTPGet)
 					}
 				}
 			}
