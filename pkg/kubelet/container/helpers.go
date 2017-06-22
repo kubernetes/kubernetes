@@ -200,6 +200,9 @@ func (irecorder *innerEventRecorder) Event(object runtime.Object, eventtype, rea
 	}
 }
 
+func (irecorder *innerEventRecorder) EventV2(subject clientv1.EventSubject, action string, object runtime.Object, severity clientv1.EventSeverity, reason string) {
+}
+
 func (irecorder *innerEventRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
 	if ref, ok := irecorder.shouldRecordEvent(object); ok {
 		irecorder.recorder.Eventf(ref, eventtype, reason, messageFmt, args...)

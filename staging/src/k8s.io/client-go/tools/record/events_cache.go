@@ -84,6 +84,7 @@ func EventAggregatorByReasonFunc(event *v1.Event) (string, string) {
 		event.InvolvedObject.APIVersion,
 		event.Type,
 		event.Reason,
+		event.Message,
 	},
 		""), event.Message
 }

@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 // FakeRecorder is used as a fake during tests. It is thread safe. It is usable
@@ -28,6 +29,9 @@ import (
 // thrown away in this case.
 type FakeRecorder struct {
 	Events chan string
+}
+
+func (f *FakeRecorder) EventV2(subject v1.EventSubject, action string, object runtime.Object, severity v1.EventSeverity, reason string) {
 }
 
 func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {

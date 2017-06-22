@@ -72,6 +72,8 @@ type EventRecorder interface {
 
 	// PastEventf is just like Eventf, but with an option to specify the event's 'timestamp' field.
 	PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{})
+
+	EventV2(subject v1.EventSubject, action string, object runtime.Object, severity v1.EventSeverity, reason string)
 }
 
 // EventBroadcaster knows how to receive events and send them to any EventSink, watcher, or log.
@@ -254,7 +256,7 @@ type recorderImpl struct {
 	clock clock.Clock
 }
 
-func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp metav1.Time, eventtype, reason, message string) {
+func (recorder *recorderImpl) generateEvent(subject *v1.EventSubject, action string, object runtime.Object, timestamp metav1.Time, eventtype, reason, message string) {
 	ref, err := ref.GetReference(recorder.scheme, object)
 	if err != nil {
 		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v' '%v'", object, err, eventtype, reason, message)
@@ -266,7 +268,7 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp met
 		return
 	}
 
-	event := recorder.makeEvent(ref, eventtype, reason, message)
+	event := recorder.makeEvent(subject, action, ref, eventtype, reason, message)
 	event.Source = recorder.source
 
 	go func() {
@@ -285,7 +287,20 @@ func validateEventType(eventtype string) bool {
 }
 
 func (recorder *recorderImpl) Event(object runtime.Object, eventtype, reason, message string) {
-	recorder.generateEvent(object, metav1.Now(), eventtype, reason, message)
+	recorder.generateEvent(nil, "", object, metav1.Now(), eventtype, reason, message)
+}
+
+func (recorder *recorderImpl) EventV2(subject v1.EventSubject, action string, object runtime.Object, severity v1.EventSeverity, reason string) {
+	var eventtype string
+	switch severity {
+	case v1.SeverityNormal:
+		eventtype = v1.EventTypeNormal
+	case v1.SeverityAbnormal, v1.SeverityCritical:
+		eventtype = v1.EventTypeWarning
+	default:
+		eventtype = v1.EventTypeNormal
+	}
+	recorder.generateEvent(nil, "", object, metav1.Now(), eventtype, reason, "")
 }
 
 func (recorder *recorderImpl) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
@@ -293,26 +308,58 @@ func (recorder *recorderImpl) Eventf(object runtime.Object, eventtype, reason, m
 }
 
 func (recorder *recorderImpl) PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
-	recorder.generateEvent(object, timestamp, eventtype, reason, fmt.Sprintf(messageFmt, args...))
+	recorder.generateEvent(nil, "", object, timestamp, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
-func (recorder *recorderImpl) makeEvent(ref *v1.ObjectReference, eventtype, reason, message string) *v1.Event {
+func (recorder *recorderImpl) makeEvent(subject *v1.EventSubject, action string, ref *v1.ObjectReference, eventtype, reason, message string) *v1.Event {
 	t := metav1.Time{Time: recorder.clock.Now()}
 	namespace := ref.Namespace
 	if namespace == "" {
 		namespace = metav1.NamespaceDefault
 	}
-	return &v1.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
-			Namespace: namespace,
-		},
-		InvolvedObject: *ref,
-		Reason:         reason,
-		Message:        message,
-		FirstTimestamp: t,
-		LastTimestamp:  t,
-		Count:          1,
-		Type:           eventtype,
+	if subject == nil {
+		return &v1.Event{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
+				Namespace: namespace,
+			},
+			InvolvedObject: *ref,
+			Reason:         reason,
+			Message:        message,
+			FirstTimestamp: t,
+			LastTimestamp:  t,
+			Count:          1,
+			Type:           eventtype,
+		}
+	} else {
+		var severity v1.EventSeverity
+		switch eventtype {
+		case v1.EventTypeNormal:
+			severity = v1.SeverityNormal
+		case v1.EventTypeWarning:
+			severity = v1.SeverityAbnormal
+		default:
+			severity = v1.SeverityNormal
+		}
+
+		return &v1.Event{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
+				Namespace: namespace,
+			},
+			InvolvedObject:      *ref,
+			Reason:              reason,
+			Message:             message,
+			FirstTimestamp:      t,
+			FirstTimestampMicro: metav1.MicroTime{Time: t.Time},
+			LastTimestamp:       t,
+			LastTimestampMicro:  metav1.MicroTime{Time: t.Time},
+			Count:               1,
+			Type:                eventtype,
+			Subject:             *subject,
+			Action:              action,
+			Severity:            severity,
+			Object:              ref,
+		}
 	}
 }

@@ -58,7 +58,7 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 	}
 
 	if len(pods.Items) > 0 {
-		recordNodeEvent(recorder, nodeName, nodeUID, v1.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
+		recordNodeEvent(recorder, nodeName, nodeUID, clientv1.SeverityNormal, "DeletingAllPods", "NodeUnrachable")
 	}
 
 	for _, pod := range pods.Items {
@@ -264,15 +264,21 @@ func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.Nod
 	return true, nil
 }
 
-func recordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
+func recordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID string, severity clientv1.EventSeverity, action, reason string) {
 	ref := &clientv1.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
 		UID:       types.UID(nodeUID),
 		Namespace: "",
 	}
-	glog.V(2).Infof("Recording %s event message for node %s", event, nodeName)
-	recorder.Eventf(ref, eventtype, reason, "Node %s event: %s", nodeName, event)
+	subject := clientv1.EventSubject{
+		Component: &clientv1.EventSource{
+			Component: "node-controller",
+			Host:      "kubernetes-master",
+		},
+	}
+
+	recorder.EventV2(subject, action, ref, clientv1.SeverityNormal, reason)
 }
 
 func recordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, new_status string) {
