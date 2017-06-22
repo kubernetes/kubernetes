@@ -27,7 +27,7 @@ import (
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	kubev1 "k8s.io/kubernetes/pkg/api/v1"
+	kubev1 "k8s.io/api/core/v1"
 )
 
 // Implements k8s.io/client-go/tools/record.EventSink.

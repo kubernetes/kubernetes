@@ -33,7 +33,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 const defaultClusterName = "mesos"

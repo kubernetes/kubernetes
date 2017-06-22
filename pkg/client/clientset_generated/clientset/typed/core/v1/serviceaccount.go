@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1 "k8s.io/api/core/v1"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/scheme"
 )
 

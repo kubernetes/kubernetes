@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/service/ingress"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 )
 

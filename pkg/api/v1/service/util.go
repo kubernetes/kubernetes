@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 
 	"github.com/golang/glog"

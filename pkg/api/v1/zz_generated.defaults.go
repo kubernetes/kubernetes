@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-"k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -41,7 +41,9 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1.NodeList{}, func(obj interface{}) { SetObjectDefaults_NodeList(obj.(*v1.NodeList)) })
 	scheme.AddTypeDefaultingFunc(&v1.PersistentVolume{}, func(obj interface{}) { SetObjectDefaults_PersistentVolume(obj.(*v1.PersistentVolume)) })
 	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeClaim{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeClaim(obj.(*v1.PersistentVolumeClaim)) })
-	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeClaimList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeClaimList(obj.(*v1.PersistentVolumeClaimList)) })
+	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeClaimList{}, func(obj interface{}) {
+		SetObjectDefaults_PersistentVolumeClaimList(obj.(*v1.PersistentVolumeClaimList))
+	})
 	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeList(obj.(*v1.PersistentVolumeList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Pod{}, func(obj interface{}) { SetObjectDefaults_Pod(obj.(*v1.Pod)) })
 	scheme.AddTypeDefaultingFunc(&v1.PodAttachOptions{}, func(obj interface{}) { SetObjectDefaults_PodAttachOptions(obj.(*v1.PodAttachOptions)) })
@@ -50,7 +52,9 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1.PodTemplate{}, func(obj interface{}) { SetObjectDefaults_PodTemplate(obj.(*v1.PodTemplate)) })
 	scheme.AddTypeDefaultingFunc(&v1.PodTemplateList{}, func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*v1.PodTemplateList)) })
 	scheme.AddTypeDefaultingFunc(&v1.ReplicationController{}, func(obj interface{}) { SetObjectDefaults_ReplicationController(obj.(*v1.ReplicationController)) })
-	scheme.AddTypeDefaultingFunc(&v1.ReplicationControllerList{}, func(obj interface{}) { SetObjectDefaults_ReplicationControllerList(obj.(*v1.ReplicationControllerList)) })
+	scheme.AddTypeDefaultingFunc(&v1.ReplicationControllerList{}, func(obj interface{}) {
+		SetObjectDefaults_ReplicationControllerList(obj.(*v1.ReplicationControllerList))
+	})
 	scheme.AddTypeDefaultingFunc(&v1.ResourceQuota{}, func(obj interface{}) { SetObjectDefaults_ResourceQuota(obj.(*v1.ResourceQuota)) })
 	scheme.AddTypeDefaultingFunc(&v1.ResourceQuotaList{}, func(obj interface{}) { SetObjectDefaults_ResourceQuotaList(obj.(*v1.ResourceQuotaList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Secret{}, func(obj interface{}) { SetObjectDefaults_Secret(obj.(*v1.Secret)) })

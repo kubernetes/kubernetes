@@ -21,12 +21,13 @@ limitations under the License.
 package networking
 
 import (
+	reflect "reflect"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/kubernetes/pkg/api"
-	reflect "reflect"
 )
 
 func init() {

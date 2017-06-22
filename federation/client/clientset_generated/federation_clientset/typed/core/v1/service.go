@@ -22,7 +22,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	scheme "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/scheme"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // ServicesGetter has a method to return a ServiceInterface.

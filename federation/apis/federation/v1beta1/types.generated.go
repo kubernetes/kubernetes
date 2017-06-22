@@ -27,7 +27,7 @@ import (
 	codec1978 "github.com/ugorji/go/codec"
 	pkg2_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkg3_types "k8s.io/apimachinery/pkg/types"
-	pkg1_v1 "k8s.io/kubernetes/pkg/api/v1"
+	pkg1_v1 "k8s.io/api/core/v1"
 	"reflect"
 	"runtime"
 	time "time"

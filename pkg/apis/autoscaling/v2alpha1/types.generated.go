@@ -28,7 +28,7 @@ import (
 	pkg1_resource "k8s.io/apimachinery/pkg/api/resource"
 	pkg3_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkg4_types "k8s.io/apimachinery/pkg/types"
-	pkg2_v1 "k8s.io/kubernetes/pkg/api/v1"
+	pkg2_v1 "k8s.io/api/core/v1"
 	"reflect"
 	"runtime"
 	time "time"
