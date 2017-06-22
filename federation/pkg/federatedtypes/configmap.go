@@ -22,6 +22,7 @@ import (
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -40,7 +41,7 @@ type ConfigMapAdapter struct {
 	client federationclientset.Interface
 }
 
-func NewConfigMapAdapter(client federationclientset.Interface) FederatedTypeAdapter {
+func NewConfigMapAdapter(client federationclientset.Interface, config *restclient.Config) FederatedTypeAdapter {
 	return &ConfigMapAdapter{client: client}
 }
 

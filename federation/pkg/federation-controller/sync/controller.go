@@ -96,7 +96,7 @@ type FederationSyncController struct {
 func StartFederationSyncController(kind string, adapterFactory federatedtypes.AdapterFactory, config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
 	restclient.AddUserAgent(config, fmt.Sprintf("federation-%s-controller", kind))
 	client := federationclientset.NewForConfigOrDie(config)
-	adapter := adapterFactory(client)
+	adapter := adapterFactory(client, config)
 	controller := newFederationSyncController(client, adapter)
 	if minimizeLatency {
 		controller.minimizeLatency()
