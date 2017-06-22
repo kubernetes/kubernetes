@@ -25,8 +25,8 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/client-go/pkg/api"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
-	batch "k8s.io/client-go/pkg/apis/batch"
+	api_v1 "k8s.io/api/core/v1"
+	batch "k8s.io/api/batch"
 	unsafe "unsafe"
 )
 

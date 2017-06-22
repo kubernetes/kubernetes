@@ -24,9 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/apis/rbac"
-	"k8s.io/client-go/pkg/apis/rbac/v1alpha1"
-	"k8s.io/client-go/pkg/apis/rbac/v1beta1"
+	"k8s.io/api/rbac"
+	"k8s.io/api/rbac/v1alpha1"
+	"k8s.io/api/rbac/v1beta1"
 )
 
 func init() {
@@ -39,7 +39,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  rbac.GroupName,
 			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version, v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/client-go/pkg/apis/rbac",
+			ImportPrefix:               "k8s.io/api/rbac",
 			RootScopedKinds:            sets.NewString("ClusterRole", "ClusterRoleBinding"),
 			AddInternalObjectsToScheme: rbac.AddToScheme,
 		},

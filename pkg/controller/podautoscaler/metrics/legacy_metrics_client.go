@@ -28,7 +28,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	clientgov1 "k8s.io/client-go/pkg/api/v1"
+	clientgov1 "k8s.io/api/core/v1"
 	"k8s.io/api/core/v1"
 	autoscaling "k8s.io/api/autoscaling/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"

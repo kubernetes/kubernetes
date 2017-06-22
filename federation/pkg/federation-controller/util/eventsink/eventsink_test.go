@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
+	clientv1 "k8s.io/api/core/v1"
 	core "k8s.io/client-go/testing"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"

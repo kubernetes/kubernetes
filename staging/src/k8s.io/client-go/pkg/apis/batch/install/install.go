@@ -23,9 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/apis/batch"
-	"k8s.io/client-go/pkg/apis/batch/v1"
-	"k8s.io/client-go/pkg/apis/batch/v2alpha1"
+	"k8s.io/api/batch"
+	"k8s.io/api/batch/v1"
+	"k8s.io/api/batch/v2alpha1"
 )
 
 func init() {
@@ -38,7 +38,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  batch.GroupName,
 			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v2alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/client-go/pkg/apis/batch",
+			ImportPrefix:               "k8s.io/api/batch",
 			AddInternalObjectsToScheme: batch.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

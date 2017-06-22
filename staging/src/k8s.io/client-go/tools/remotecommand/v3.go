@@ -23,7 +23,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 // streamProtocolV3 implements version 3 of the streaming protocol for attach

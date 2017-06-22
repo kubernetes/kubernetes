@@ -26,8 +26,8 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/client-go/pkg/api"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
-	networking "k8s.io/client-go/pkg/apis/networking"
+	api_v1 "k8s.io/api/core/v1"
+	networking "k8s.io/api/networking"
 	unsafe "unsafe"
 )
 

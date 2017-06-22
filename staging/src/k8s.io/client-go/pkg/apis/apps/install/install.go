@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/apis/apps"
-	"k8s.io/client-go/pkg/apis/apps/v1beta1"
+	"k8s.io/api/apps"
+	"k8s.io/api/apps/v1beta1"
 )
 
 func init() {
@@ -37,7 +37,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  apps.GroupName,
 			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/client-go/pkg/apis/apps",
+			ImportPrefix:               "k8s.io/api/apps",
 			AddInternalObjectsToScheme: apps.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

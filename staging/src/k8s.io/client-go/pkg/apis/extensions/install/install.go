@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/apis/extensions"
-	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/api/extensions"
+	"k8s.io/api/extensions/v1beta1"
 )
 
 func init() {
@@ -38,7 +38,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  extensions.GroupName,
 			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/client-go/pkg/apis/extensions",
+			ImportPrefix:               "k8s.io/api/extensions",
 			RootScopedKinds:            sets.NewString("PodSecurityPolicy", "ThirdPartyResource"),
 			AddInternalObjectsToScheme: extensions.AddToScheme,
 		},

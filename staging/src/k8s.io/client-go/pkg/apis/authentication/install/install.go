@@ -24,9 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/apis/authentication"
-	"k8s.io/client-go/pkg/apis/authentication/v1"
-	"k8s.io/client-go/pkg/apis/authentication/v1beta1"
+	"k8s.io/api/authentication"
+	"k8s.io/api/authentication/v1"
+	"k8s.io/api/authentication/v1beta1"
 )
 
 func init() {
@@ -39,7 +39,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  authentication.GroupName,
 			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v1beta1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/client-go/pkg/apis/authentication",
+			ImportPrefix:               "k8s.io/api/authentication",
 			RootScopedKinds:            sets.NewString("TokenReview"),
 			AddInternalObjectsToScheme: authentication.AddToScheme,
 		},

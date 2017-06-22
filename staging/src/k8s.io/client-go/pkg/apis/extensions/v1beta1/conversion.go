@@ -24,9 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/pkg/api"
-	v1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/extensions"
-	"k8s.io/client-go/pkg/apis/networking"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/extensions"
+	"k8s.io/api/networking"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {

@@ -42,7 +42,7 @@ import math "math"
 import k8s_io_apimachinery_pkg_apis_meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 import k8s_io_apimachinery_pkg_runtime "k8s.io/apimachinery/pkg/runtime"
 
-import k8s_io_client_go_pkg_apis_authentication_v1 "k8s.io/client-go/pkg/apis/authentication/v1"
+import k8s_io_client_go_pkg_apis_authentication_v1 "k8s.io/api/authentication/v1"
 
 import k8s_io_apimachinery_pkg_types "k8s.io/apimachinery/pkg/types"
 

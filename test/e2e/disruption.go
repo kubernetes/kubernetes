@@ -26,9 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 

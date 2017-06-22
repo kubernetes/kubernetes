@@ -42,7 +42,7 @@ import k8s_io_apimachinery_pkg_apis_meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v
 
 import k8s_io_apimachinery_pkg_util_intstr "k8s.io/apimachinery/pkg/util/intstr"
 
-import k8s_io_kubernetes_pkg_api_v1 "k8s.io/client-go/pkg/api/v1"
+import k8s_io_kubernetes_pkg_api_v1 "k8s.io/api/core/v1"
 
 import strings "strings"
 import reflect "reflect"
@@ -1295,7 +1295,7 @@ var (
 )
 
 func init() {
-	proto.RegisterFile("k8s.io/client-go/pkg/apis/networking/v1/generated.proto", fileDescriptorGenerated)
+	proto.RegisterFile("k8s.io/api/networking/v1/generated.proto", fileDescriptorGenerated)
 }
 
 var fileDescriptorGenerated = []byte{

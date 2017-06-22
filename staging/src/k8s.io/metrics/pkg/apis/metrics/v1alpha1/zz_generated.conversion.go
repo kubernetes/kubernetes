@@ -23,7 +23,7 @@ package v1alpha1
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/client-go/pkg/api/v1"
+	v1 "k8s.io/api/core/v1"
 	metrics "k8s.io/metrics/pkg/apis/metrics"
 	unsafe "unsafe"
 )

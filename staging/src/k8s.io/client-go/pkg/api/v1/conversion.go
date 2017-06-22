@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/apis/extensions"
+	"k8s.io/api/extensions"
 )
 
 // This is a "fast-path" that avoids reflection for common types. It focuses on the objects that are

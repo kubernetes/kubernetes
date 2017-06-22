@@ -2165,7 +2165,7 @@ var (
 )
 
 func init() {
-	proto.RegisterFile("k8s.io/client-go/pkg/apis/admissionregistration/v1alpha1/generated.proto", fileDescriptorGenerated)
+	proto.RegisterFile("k8s.io/api/admissionregistration/v1alpha1/generated.proto", fileDescriptorGenerated)
 }
 
 var fileDescriptorGenerated = []byte{

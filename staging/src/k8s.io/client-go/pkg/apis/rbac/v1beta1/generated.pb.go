@@ -2762,7 +2762,7 @@ var (
 )
 
 func init() {
-	proto.RegisterFile("k8s.io/client-go/pkg/apis/rbac/v1beta1/generated.proto", fileDescriptorGenerated)
+	proto.RegisterFile("k8s.io/api/rbac/v1beta1/generated.proto", fileDescriptorGenerated)
 }
 
 var fileDescriptorGenerated = []byte{

@@ -23,7 +23,7 @@ package v1alpha1
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	admissionregistration "k8s.io/client-go/pkg/apis/admissionregistration"
+	admissionregistration "k8s.io/api/admissionregistration"
 	unsafe "unsafe"
 )
 

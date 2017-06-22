@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	clientset "k8s.io/client-go/kubernetes"
-	certsapi "k8s.io/client-go/pkg/apis/certificates/v1beta1"
+	certsapi "k8s.io/api/certificates/v1beta1"
 )
 
 // ValidateAPIServer makes sure the server we're connecting to supports the Beta Certificates API

@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
-	certificates "k8s.io/client-go/pkg/apis/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1beta1"
 	certutil "k8s.io/client-go/util/cert"
 )
 

@@ -19,7 +19,7 @@ package apps
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/apis/extensions"
+	"k8s.io/api/extensions"
 )
 
 var (

@@ -28,7 +28,7 @@ import (
 	pkg1_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkg4_runtime "k8s.io/apimachinery/pkg/runtime"
 	pkg2_types "k8s.io/apimachinery/pkg/types"
-	pkg3_v1 "k8s.io/client-go/pkg/apis/authentication/v1"
+	pkg3_v1 "k8s.io/api/authentication/v1"
 	"reflect"
 	"runtime"
 	time "time"

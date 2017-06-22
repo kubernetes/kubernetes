@@ -31,7 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
-	authorization "k8s.io/client-go/pkg/apis/authorization/v1beta1"
+	authorization "k8s.io/api/authorization/v1beta1"
 )
 
 var (

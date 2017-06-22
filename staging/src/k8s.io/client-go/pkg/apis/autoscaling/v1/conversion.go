@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/apis/autoscaling"
+	"k8s.io/api/autoscaling"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {

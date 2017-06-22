@@ -23,7 +23,7 @@ package v1beta1
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	storage "k8s.io/client-go/pkg/apis/storage"
+	storage "k8s.io/api/storage"
 	unsafe "unsafe"
 )
 

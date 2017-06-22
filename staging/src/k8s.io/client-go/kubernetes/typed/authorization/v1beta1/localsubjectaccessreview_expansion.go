@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	authorizationapi "k8s.io/client-go/pkg/apis/authorization/v1beta1"
+	authorizationapi "k8s.io/api/authorization/v1beta1"
 )
 
 type LocalSubjectAccessReviewExpansion interface {

@@ -30,7 +30,7 @@ import (
 	pkg6_runtime "k8s.io/apimachinery/pkg/runtime"
 	pkg2_types "k8s.io/apimachinery/pkg/types"
 	pkg5_intstr "k8s.io/apimachinery/pkg/util/intstr"
-	pkg3_v1 "k8s.io/client-go/pkg/api/v1"
+	pkg3_v1 "k8s.io/api/core/v1"
 	"reflect"
 	"runtime"
 	time "time"

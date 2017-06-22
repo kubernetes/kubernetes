@@ -35,7 +35,7 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 
-import k8s_io_kubernetes_pkg_api_v1 "k8s.io/client-go/pkg/api/v1"
+import k8s_io_kubernetes_pkg_api_v1 "k8s.io/api/core/v1"
 
 import strings "strings"
 import reflect "reflect"
@@ -887,7 +887,7 @@ var (
 )
 
 func init() {
-	proto.RegisterFile("k8s.io/client-go/pkg/apis/settings/v1alpha1/generated.proto", fileDescriptorGenerated)
+	proto.RegisterFile("k8s.io/api/settings/v1alpha1/generated.proto", fileDescriptorGenerated)
 }
 
 var fileDescriptorGenerated = []byte{

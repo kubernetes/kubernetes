@@ -23,7 +23,7 @@ package v1
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	authentication "k8s.io/client-go/pkg/apis/authentication"
+	authentication "k8s.io/api/authentication"
 	unsafe "unsafe"
 )
 

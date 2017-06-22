@@ -26,8 +26,8 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/client-go/pkg/api"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
-	autoscaling "k8s.io/client-go/pkg/apis/autoscaling"
+	api_v1 "k8s.io/api/core/v1"
+	autoscaling "k8s.io/api/autoscaling"
 	unsafe "unsafe"
 )
 

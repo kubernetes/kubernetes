@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	v1alpha1 "k8s.io/client-go/pkg/apis/admissionregistration/v1alpha1"
+	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	rest "k8s.io/client-go/rest"
 )
 

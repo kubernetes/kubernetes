@@ -23,9 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/apis/autoscaling"
-	"k8s.io/client-go/pkg/apis/autoscaling/v1"
-	"k8s.io/client-go/pkg/apis/autoscaling/v2alpha1"
+	"k8s.io/api/autoscaling"
+	"k8s.io/api/autoscaling/v1"
+	"k8s.io/api/autoscaling/v2alpha1"
 )
 
 func init() {
@@ -38,7 +38,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  autoscaling.GroupName,
 			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v2alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/client-go/pkg/apis/autoscaling",
+			ImportPrefix:               "k8s.io/api/autoscaling",
 			AddInternalObjectsToScheme: autoscaling.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

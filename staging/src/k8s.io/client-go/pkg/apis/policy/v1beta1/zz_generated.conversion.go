@@ -25,7 +25,7 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
-	policy "k8s.io/client-go/pkg/apis/policy"
+	policy "k8s.io/api/policy"
 	unsafe "unsafe"
 )
 

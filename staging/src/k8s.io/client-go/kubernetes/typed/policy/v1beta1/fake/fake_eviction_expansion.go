@@ -18,7 +18,7 @@ package fake
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
+	policy "k8s.io/api/policy/v1beta1"
 	core "k8s.io/client-go/testing"
 )
 
