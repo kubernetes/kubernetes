@@ -17,6 +17,7 @@ limitations under the License.
 package v1_test
 
 import (
+"k8s.io/api/core/v1"
 	"fmt"
 	"reflect"
 	"testing"
@@ -60,7 +61,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 			rc: &v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -73,14 +74,14 @@ func TestSetDefaultReplicationController(t *testing.T) {
 		},
 		{
 			rc: &v1.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{
+				v1.ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
 				},
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -93,7 +94,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 		},
 		{
 			rc: &v1.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{
+				v1.ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
@@ -103,7 +104,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 						"some": "other",
 					},
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -121,7 +122,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 						"some": "other",
 					},
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -174,7 +175,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -189,7 +190,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: newInt(0),
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -204,7 +205,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: newInt(3),
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -363,7 +364,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": `
                                 [
@@ -389,7 +390,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": `
                                 [
@@ -436,7 +437,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": `
                                 [
@@ -460,7 +461,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 					Ports: []v1.ContainerPort{
 						{
 							Name:     "default",
-							Protocol: v1.ProtocolTCP,
+							v1.Protocol: v1.ProtocolTCP,
 						},
 					},
 				},
@@ -472,7 +473,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": `
                                 [
@@ -517,7 +518,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": `
                                 [
@@ -544,7 +545,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			expected: []v1.Container{
 				{
 					LivenessProbe: &v1.Probe{
-						Handler: v1.Handler{
+						v1.Handler: v1.Handler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path:   "/",
 								Scheme: v1.URISchemeHTTP,
@@ -556,7 +557,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 						FailureThreshold: 3,
 					},
 					ReadinessProbe: &v1.Probe{
-						Handler: v1.Handler{
+						v1.Handler: v1.Handler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path:   "/",
 								Scheme: v1.URISchemeHTTP,
@@ -576,7 +577,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
+						v1.ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": `
                                 [
@@ -604,7 +605,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			},
 			expected: []v1.Container{
 				{
-					Lifecycle: &v1.Lifecycle{
+					v1.Lifecycle: &v1.Lifecycle{
 						PostStart: &v1.Handler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path:   "/",
@@ -675,8 +676,8 @@ func TestSetDefaultSecretVolumeSource(t *testing.T) {
 	s := v1.PodSpec{}
 	s.Volumes = []v1.Volume{
 		{
-			VolumeSource: v1.VolumeSource{
-				Secret: &v1.SecretVolumeSource{},
+			v1.VolumeSource: v1.VolumeSource{
+				v1.Secret: &v1.SecretVolumeSource{},
 			},
 		},
 	}
@@ -697,8 +698,8 @@ func TestSetDefaultConfigMapVolumeSource(t *testing.T) {
 	s := v1.PodSpec{}
 	s.Volumes = []v1.Volume{
 		{
-			VolumeSource: v1.VolumeSource{
-				ConfigMap: &v1.ConfigMapVolumeSource{},
+			v1.VolumeSource: v1.VolumeSource{
+				v1.ConfigMap: &v1.ConfigMapVolumeSource{},
 			},
 		},
 	}
@@ -711,7 +712,7 @@ func TestSetDefaultConfigMapVolumeSource(t *testing.T) {
 	expectedMode := v1.ConfigMapVolumeSourceDefaultMode
 
 	if defaultMode == nil || *defaultMode != expectedMode {
-		t.Errorf("Expected ConfigMap DefaultMode %v, got %v", expectedMode, defaultMode)
+		t.Errorf("Expected v1.ConfigMap DefaultMode %v, got %v", expectedMode, defaultMode)
 	}
 }
 
@@ -719,7 +720,7 @@ func TestSetDefaultDownwardAPIVolumeSource(t *testing.T) {
 	s := v1.PodSpec{}
 	s.Volumes = []v1.Volume{
 		{
-			VolumeSource: v1.VolumeSource{
+			v1.VolumeSource: v1.VolumeSource{
 				DownwardAPI: &v1.DownwardAPIVolumeSource{},
 			},
 		},
@@ -741,7 +742,7 @@ func TestSetDefaultProjectedVolumeSource(t *testing.T) {
 	s := v1.PodSpec{}
 	s.Volumes = []v1.Volume{
 		{
-			VolumeSource: v1.VolumeSource{
+			v1.VolumeSource: v1.VolumeSource{
 				Projected: &v1.ProjectedVolumeSource{},
 			},
 		},
@@ -755,7 +756,7 @@ func TestSetDefaultProjectedVolumeSource(t *testing.T) {
 	expectedMode := v1.ProjectedVolumeSourceDefaultMode
 
 	if defaultMode == nil || *defaultMode != expectedMode {
-		t.Errorf("Expected ProjectedVolumeSource DefaultMode %v, got %v", expectedMode, defaultMode)
+		t.Errorf("Expected v1.ProjectedVolumeSource DefaultMode %v, got %v", expectedMode, defaultMode)
 	}
 }
 
@@ -898,7 +899,7 @@ func TestSetDefaulServiceExternalTraffic(t *testing.T) {
 
 	in = &v1.Service{
 		Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
-		ObjectMeta: metav1.ObjectMeta{
+		v1.ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficLocal},
 		},
 	}
@@ -927,7 +928,7 @@ func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 		{
 			Ports: []v1.ContainerPort{
 				{
-					ContainerPort: portNum,
+					v1.ContainerPort: portNum,
 				},
 			},
 		},
@@ -936,7 +937,7 @@ func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 		{
 			Ports: []v1.ContainerPort{
 				{
-					ContainerPort: portNum,
+					v1.ContainerPort: portNum,
 				},
 			},
 		},
@@ -1042,7 +1043,7 @@ func TestSetDefaultNodeStatusAllocatable(t *testing.T) {
 		actual := node2.Status.Allocatable
 		expected := testcase.expectedAllocatable
 		if !resourceListsEqual(expected, actual) {
-			t.Errorf("[%d] Expected NodeStatus.Allocatable: %+v; Got: %+v", i, expected, actual)
+			t.Errorf("[%d] Expected v1.NodeStatus.Allocatable: %+v; Got: %+v", i, expected, actual)
 		}
 	}
 }
@@ -1197,7 +1198,7 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 		Spec: v1.ReplicationControllerSpec{
 			Replicas: newInt(3),
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
+				v1.ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -1217,7 +1218,7 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 
 func TestSetDefaultLimitRangeItem(t *testing.T) {
 	limitRange := &v1.LimitRange{
-		ObjectMeta: metav1.ObjectMeta{
+		v1.ObjectMeta: metav1.ObjectMeta{
 			Name: "test-defaults",
 		},
 		Spec: v1.LimitRangeSpec{
