@@ -20,8 +20,8 @@ import (
 	"strconv"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (

@@ -19,9 +19,9 @@ package daemon
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestDaemonSetUpdatesPods(t *testing.T) {

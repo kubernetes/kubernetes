@@ -16,12 +16,10 @@ limitations under the License.
 
 package v1beta1
 
-
 import (
-"k8s.io/apimachinery/pkg/runtime"
-certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
-
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)

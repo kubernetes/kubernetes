@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
-	core "k8s.io/client-go/testing"
 	"k8s.io/api/core/v1"
+	core "k8s.io/client-go/testing"
 )
 
 func (c *FakeNamespaces) Finalize(namespace *v1.Namespace) (*v1.Namespace, error) {

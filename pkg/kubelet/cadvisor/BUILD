@@ -18,7 +18,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/cache/memory:go_default_library",
@@ -31,6 +30,7 @@ go_library(
         "//vendor/github.com/google/cadvisor/manager:go_default_library",
         "//vendor/github.com/google/cadvisor/metrics:go_default_library",
         "//vendor/github.com/google/cadvisor/utils/sysfs:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
     ],

@@ -21,8 +21,8 @@ import (
 	"sort"
 	"strings"
 
-	fedapi "k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/api/core/v1"
+	fedapi "k8s.io/kubernetes/federation/apis/federation"
 )
 
 // Compile time check for interface adherence

@@ -19,9 +19,9 @@ package metrics
 import (
 	"time"
 
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/api/core/v1"
 	autoscaling "k8s.io/api/autoscaling/v2alpha1"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // PodMetricsInfo contains pod metric values as a map from pod names to

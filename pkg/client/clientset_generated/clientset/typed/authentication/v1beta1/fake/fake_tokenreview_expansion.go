@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
-	core "k8s.io/client-go/testing"
 	authenticationapi "k8s.io/api/authentication/v1beta1"
+	core "k8s.io/client-go/testing"
 )
 
 func (c *FakeTokenReviews) Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error) {

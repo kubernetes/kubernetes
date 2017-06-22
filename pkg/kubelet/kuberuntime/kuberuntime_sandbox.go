@@ -23,8 +23,8 @@ import (
 	"sort"
 
 	"github.com/golang/glog"
-	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/api/core/v1"
+	kubetypes "k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"

@@ -19,8 +19,8 @@ package util
 import (
 	"reflect"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	extensions_v1 "k8s.io/api/extensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	deputils "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 

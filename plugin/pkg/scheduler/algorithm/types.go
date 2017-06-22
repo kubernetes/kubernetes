@@ -17,10 +17,10 @@ limitations under the License.
 package algorithm
 
 import (
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/api/core/v1"
 	apps "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/labels"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )

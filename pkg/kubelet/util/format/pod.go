@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type podHandler func(*v1.Pod) string

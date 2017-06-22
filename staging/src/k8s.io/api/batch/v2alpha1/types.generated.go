@@ -25,12 +25,12 @@ import (
 	"errors"
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
+	pkg3_v1 "k8s.io/api/batch/v1"
+	pkg4_v1 "k8s.io/api/core/v1"
 	pkg5_resource "k8s.io/apimachinery/pkg/api/resource"
 	pkg1_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkg2_types "k8s.io/apimachinery/pkg/types"
 	pkg6_intstr "k8s.io/apimachinery/pkg/util/intstr"
-	pkg4_v1 "k8s.io/api/core/v1"
-	pkg3_v1 "k8s.io/api/batch/v1"
 	"reflect"
 	"runtime"
 	time "time"
@@ -66,12 +66,12 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg5_resource.Quantity
-		var v1 pkg1_v1.TypeMeta
-		var v2 pkg2_types.UID
-		var v3 pkg6_intstr.IntOrString
-		var v4 pkg4_v1.PodTemplateSpec
-		var v5 pkg3_v1.JobSpec
+		var v0 pkg3_v1.JobSpec
+		var v1 pkg4_v1.PodTemplateSpec
+		var v2 pkg5_resource.Quantity
+		var v3 pkg1_v1.TypeMeta
+		var v4 pkg2_types.UID
+		var v5 pkg6_intstr.IntOrString
 		var v6 time.Time
 		_, _, _, _, _, _, _ = v0, v1, v2, v3, v4, v5, v6
 	}

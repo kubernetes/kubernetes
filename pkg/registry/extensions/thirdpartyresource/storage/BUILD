@@ -15,8 +15,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
+        "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

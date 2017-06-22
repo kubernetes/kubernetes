@@ -23,6 +23,7 @@ go_test(
     deps = [
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/examples/client-go/apis/cr/v1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/examples/client-go/client:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/examples/client-go/controller:go_default_library",
@@ -37,6 +38,5 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
-        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
     ],
 )

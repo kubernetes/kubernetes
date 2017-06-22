@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
-	core "k8s.io/client-go/testing"
 	"k8s.io/api/extensions/v1beta1"
+	core "k8s.io/client-go/testing"
 )
 
 func (c *FakeDeployments) Rollback(deploymentRollback *v1beta1.DeploymentRollback) error {
