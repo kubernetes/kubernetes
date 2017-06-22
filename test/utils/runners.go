@@ -111,6 +111,7 @@ type RunObjectConfig interface {
 }
 
 type RCConfig struct {
+	Affinity       *v1.Affinity
 	Client         clientset.Interface
 	InternalClient internalclientset.Interface
 	Image          string
@@ -519,6 +520,7 @@ func (config *RCConfig) create() error {
 					Labels: map[string]string{"name": config.Name},
 				},
 				Spec: v1.PodSpec{
+					Affinity: config.Affinity,
 					Containers: []v1.Container{
 						{
 							Name:           config.Name,

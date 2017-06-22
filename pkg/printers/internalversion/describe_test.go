@@ -102,8 +102,11 @@ func TestDescribePodTolerations(t *testing.T) {
 		},
 		Spec: api.PodSpec{
 			Tolerations: []api.Toleration{
+				{Key: "key0", Operator: api.TolerationOpExists},
 				{Key: "key1", Value: "value1"},
-				{Key: "key2", Value: "value2", Effect: api.TaintEffectNoExecute, TolerationSeconds: &[]int64{300}[0]},
+				{Key: "key2", Operator: api.TolerationOpEqual, Value: "value2", Effect: api.TaintEffectNoSchedule},
+				{Key: "key3", Value: "value3", Effect: api.TaintEffectNoExecute, TolerationSeconds: &[]int64{300}[0]},
+				{Key: "key4", Effect: api.TaintEffectNoExecute, TolerationSeconds: &[]int64{60}[0]},
 			},
 		},
 	})
@@ -113,8 +116,13 @@ func TestDescribePodTolerations(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "key1=value1") || !strings.Contains(out, "key2=value2:NoExecute for 300s") || !strings.Contains(out, "Tolerations:") {
-		t.Errorf("unexpected out: %s", out)
+	if !strings.Contains(out, "key0\n") ||
+		!strings.Contains(out, "key1=value1\n") ||
+		!strings.Contains(out, "key2=value2:NoSchedule\n") ||
+		!strings.Contains(out, "key3=value3:NoExecute for 300s\n") ||
+		!strings.Contains(out, "key4:NoExecute for 60s\n") ||
+		!strings.Contains(out, "Tolerations:") {
+		t.Errorf("unexpected out:\n%s", out)
 	}
 }
 
