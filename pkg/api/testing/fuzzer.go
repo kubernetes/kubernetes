@@ -40,6 +40,7 @@ import (
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policyfuzzer "k8s.io/kubernetes/pkg/apis/policy/fuzzer"
 	rbacfuzzer "k8s.io/kubernetes/pkg/apis/rbac/fuzzer"
+	storagefuzzer "k8s.io/kubernetes/pkg/apis/storage/fuzzer"
 )
 
 // overrideGenericFuncs override some generic fuzzer funcs from k8s.io/apiserver in order to have more realistic
@@ -100,4 +101,5 @@ var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
 	policyfuzzer.Funcs,
 	certificatesfuzzer.Funcs,
 	admissionregistrationfuzzer.Funcs,
+	storagefuzzer.Funcs,
 )
