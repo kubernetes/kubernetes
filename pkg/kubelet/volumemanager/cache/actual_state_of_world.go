@@ -26,8 +26,10 @@ import (
 
 	"github.com/golang/glog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -273,12 +275,45 @@ type mountedPod struct {
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
-	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName, devicePath string) error {
+	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error {
+	// TODO do this somewhere else
+	if volumeSpec.PersistentVolume != nil && len(volumeSpec.PersistentVolume.Spec.AccessModes) == 1 && volumeSpec.PersistentVolume.Spec.AccessModes[0] == v1.ReadWriteOnce {
+		pv := volumeSpec.PersistentVolume
+		desiredAffinity := &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      "kubernetes.io/hostname",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{string(nodeName)},
+							},
+						},
+					},
+				},
+			},
+		}
+		affinity, err := helper.GetStorageNodeAffinityFromAnnotation(pv.Annotations)
+		if err != nil {
+			return err
+		} else if affinity == nil {
+			kubeClient := asw.volumePluginMgr.Host.GetKubeClient()
+			pv, _ := kubeClient.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+			helper.StorageNodeAffinityToAlphaAnnotation(pv.Annotations, desiredAffinity)
+			kubeClient.CoreV1().PersistentVolumes().Update(pv)
+		} else {
+		}
+	}
 	return asw.addVolume(volumeName, volumeSpec, devicePath)
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsDetached(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
+	// TODO do this somewhere else
+	volumeSpec := asw.attachedVolumes[volumeName].spec
+	if volumeSpec.PersistentVolume != nil && len(volumeSpec.PersistentVolume.Spec.AccessModes) == 1 && volumeSpec.PersistentVolume.Spec.AccessModes[0] == v1.ReadWriteOnce {
+	}
 	asw.DeleteVolume(volumeName)
 }
 
