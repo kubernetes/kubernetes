@@ -81,6 +81,8 @@ function init() {
   kube::log::status "DNS_ZONE_NAME: \"${DNS_ZONE_NAME}\", DNS_PROVIDER: \"${DNS_PROVIDER}\""
   kube::log::status "Image: \"${kube_registry}/hyperkube-amd64:${kube_version}\""
 
+  debug_apiserver_service &
+
   # Send INT after 20m and KILL 1m after that if process is still alive.
   timeout --signal=INT --kill-after=1m 20m \
       "${KUBE_ROOT}/federation/develop/kubefed.sh" init \
@@ -111,6 +113,31 @@ function join_clusters() {
         --context="${FEDERATION_KUBE_CONTEXT}" \
         --v=4
   done
+}
+
+# debug_apiserver_service is a function purely used for debugging federation
+# apiserver service that occasionally times out due to failure in obtaining
+# loadbalancer address from GCP. This function should be deleted after
+# its purpose is served.
+function debug_apiserver_service() {
+  while ! svc_uid=$("${KUBE_ROOT}/cluster/kubectl.sh" \
+    --context="${HOST_CLUSTER_CONTEXT}" \
+    --namespace=${FEDERATION_NAMESPACE} \
+    -o jsonpath='{.metadata.uid}' \
+    get svc \
+    "${FEDERATION_NAME}-apiserver" 2>/dev/null); do
+    sleep 10
+  done
+
+  fwid_full="a${svc_uid//-/}"
+  fwid="${fwid_full:0:32}"
+
+  # region is hard-coded but it's Ok for now since this is only used for
+  # debugging
+  gcloud compute forwarding-rules describe \
+    --project "${PROJECT}" \
+    --region us-central1 \
+    "${fwid}"
 }
 
 USE_KUBEFED="${USE_KUBEFED:-}"
