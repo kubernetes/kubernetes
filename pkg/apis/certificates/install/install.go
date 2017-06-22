@@ -38,7 +38,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  certificates.GroupName,
 			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/certificates",
+			ImportPrefix:               "k8s.io/api/certificates",
 			RootScopedKinds:            sets.NewString("CertificateSigningRequest"),
 			AddInternalObjectsToScheme: certificates.AddToScheme,
 		},

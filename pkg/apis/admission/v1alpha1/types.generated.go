@@ -29,7 +29,7 @@ import (
 	pkg2_runtime "k8s.io/apimachinery/pkg/runtime"
 	pkg5_types "k8s.io/apimachinery/pkg/types"
 	pkg3_admission "k8s.io/apiserver/pkg/admission"
-	pkg4_v1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
+	pkg4_v1 "k8s.io/api/authentication/v1"
 	"reflect"
 	"runtime"
 )

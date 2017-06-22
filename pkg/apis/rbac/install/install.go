@@ -39,7 +39,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  rbac.GroupName,
 			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version, v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/rbac",
+			ImportPrefix:               "k8s.io/api/rbac",
 			RootScopedKinds:            sets.NewString("ClusterRole", "ClusterRoleBinding"),
 			AddInternalObjectsToScheme: rbac.AddToScheme,
 		},

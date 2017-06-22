@@ -21,6 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -28,41 +29,43 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&ExternalAdmissionHookConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_ExternalAdmissionHookConfiguration(obj.(*ExternalAdmissionHookConfiguration))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1alpha1.ExternalAdmissionHookConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_ExternalAdmissionHookConfiguration(obj.(*admissionregistrationv1alpha1.ExternalAdmissionHookConfiguration))
 	})
-	scheme.AddTypeDefaultingFunc(&ExternalAdmissionHookConfigurationList{}, func(obj interface{}) {
-		SetObjectDefaults_ExternalAdmissionHookConfigurationList(obj.(*ExternalAdmissionHookConfigurationList))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1alpha1.ExternalAdmissionHookConfigurationList{}, func(obj interface{}) {
+		SetObjectDefaults_ExternalAdmissionHookConfigurationList(obj.(*admissionregistrationv1alpha1.ExternalAdmissionHookConfigurationList))
 	})
-	scheme.AddTypeDefaultingFunc(&InitializerConfiguration{}, func(obj interface{}) { SetObjectDefaults_InitializerConfiguration(obj.(*InitializerConfiguration)) })
-	scheme.AddTypeDefaultingFunc(&InitializerConfigurationList{}, func(obj interface{}) {
-		SetObjectDefaults_InitializerConfigurationList(obj.(*InitializerConfigurationList))
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1alpha1.InitializerConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_InitializerConfiguration(obj.(*admissionregistrationv1alpha1.InitializerConfiguration))
+	})
+	scheme.AddTypeDefaultingFunc(&admissionregistrationv1alpha1.InitializerConfigurationList{}, func(obj interface{}) {
+		SetObjectDefaults_InitializerConfigurationList(obj.(*admissionregistrationv1alpha1.InitializerConfigurationList))
 	})
 	return nil
 }
 
-func SetObjectDefaults_ExternalAdmissionHookConfiguration(in *ExternalAdmissionHookConfiguration) {
+func SetObjectDefaults_ExternalAdmissionHookConfiguration(in *admissionregistrationv1alpha1.ExternalAdmissionHookConfiguration) {
 	for i := range in.ExternalAdmissionHooks {
 		a := &in.ExternalAdmissionHooks[i]
 		SetDefaults_ExternalAdmissionHook(a)
 	}
 }
 
-func SetObjectDefaults_ExternalAdmissionHookConfigurationList(in *ExternalAdmissionHookConfigurationList) {
+func SetObjectDefaults_ExternalAdmissionHookConfigurationList(in *admissionregistrationv1alpha1.ExternalAdmissionHookConfigurationList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ExternalAdmissionHookConfiguration(a)
 	}
 }
 
-func SetObjectDefaults_InitializerConfiguration(in *InitializerConfiguration) {
+func SetObjectDefaults_InitializerConfiguration(in *admissionregistrationv1alpha1.InitializerConfiguration) {
 	for i := range in.Initializers {
 		a := &in.Initializers[i]
 		SetDefaults_Initializer(a)
 	}
 }
 
-func SetObjectDefaults_InitializerConfigurationList(in *InitializerConfigurationList) {
+func SetObjectDefaults_InitializerConfigurationList(in *admissionregistrationv1alpha1.InitializerConfigurationList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_InitializerConfiguration(a)

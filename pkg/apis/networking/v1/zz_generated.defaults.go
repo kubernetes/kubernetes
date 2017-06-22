@@ -21,6 +21,7 @@ limitations under the License.
 package v1
 
 import (
+	networkingv1 "k8s.io/api/networking/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -28,12 +29,12 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*NetworkPolicy)) })
-	scheme.AddTypeDefaultingFunc(&NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*NetworkPolicyList)) })
+	scheme.AddTypeDefaultingFunc(&networkingv1.NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*networkingv1.NetworkPolicy)) })
+	scheme.AddTypeDefaultingFunc(&networkingv1.NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*networkingv1.NetworkPolicyList)) })
 	return nil
 }
 
-func SetObjectDefaults_NetworkPolicy(in *NetworkPolicy) {
+func SetObjectDefaults_NetworkPolicy(in *networkingv1.NetworkPolicy) {
 	for i := range in.Spec.Ingress {
 		a := &in.Spec.Ingress[i]
 		for j := range a.Ports {
@@ -43,7 +44,7 @@ func SetObjectDefaults_NetworkPolicy(in *NetworkPolicy) {
 	}
 }
 
-func SetObjectDefaults_NetworkPolicyList(in *NetworkPolicyList) {
+func SetObjectDefaults_NetworkPolicyList(in *networkingv1.NetworkPolicyList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_NetworkPolicy(a)
