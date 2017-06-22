@@ -100,7 +100,6 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//pkg/util/i18n:go_default_library",
         "//pkg/util/interrupt:go_default_library",
         "//pkg/util/taints:go_default_library",

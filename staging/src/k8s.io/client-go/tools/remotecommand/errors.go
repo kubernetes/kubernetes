@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package exec
+package remotecommand
 
 // ExitError is an interface that presents an API similar to os.ProcessState, which is
 // what ExitError from os/exec is.  This is designed to make testing a bit easier and
@@ -43,10 +43,12 @@ func (e CodeExitError) String() string {
 	return e.Err.Error()
 }
 
+// Exited reports whether the program has exited.
 func (e CodeExitError) Exited() bool {
 	return true
 }
 
+// ExitStatus returns exit code of the program.
 func (e CodeExitError) ExitStatus() int {
 	return e.Code
 }

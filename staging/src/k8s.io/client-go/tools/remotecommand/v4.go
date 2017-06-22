@@ -25,7 +25,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
-	"k8s.io/client-go/util/exec"
 )
 
 // streamProtocolV4 implements version 4 of the streaming protocol for attach
@@ -76,7 +75,7 @@ func (p *streamProtocolV4) stream(conn streamCreator) error {
 }
 
 // errorDecoderV4 interprets the json-marshaled metav1.Status on the error channel
-// and creates an exec.ExitError from it.
+// and creates an ExitError from it.
 type errorDecoderV4 struct{}
 
 func (d *errorDecoderV4) decode(message []byte) error {
@@ -103,7 +102,7 @@ func (d *errorDecoderV4) decode(message []byte) error {
 				if err != nil {
 					return fmt.Errorf("error stream protocol error: invalid exit code value %q", c.Message)
 				}
-				return exec.CodeExitError{
+				return CodeExitError{
 					Err:  fmt.Errorf("command terminated with exit code %d", rc),
 					Code: int(rc),
 				}
