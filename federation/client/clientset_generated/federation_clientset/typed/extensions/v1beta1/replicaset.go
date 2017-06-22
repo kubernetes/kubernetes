@@ -17,12 +17,12 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	scheme "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/scheme"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
 )
 
 // ReplicaSetsGetter has a method to return a ReplicaSetInterface.

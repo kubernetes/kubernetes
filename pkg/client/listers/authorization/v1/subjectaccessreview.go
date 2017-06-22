@@ -19,11 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	v1 "k8s.io/api/authorization/v1"
 )
 
 // SubjectAccessReviewLister helps list SubjectAccessReviews.

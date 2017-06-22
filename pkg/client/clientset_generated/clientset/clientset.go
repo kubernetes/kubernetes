@@ -48,9 +48,6 @@ type Interface interface {
 	AdmissionregistrationV1alpha1() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Admissionregistration() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface
-	CoreV1() corev1.CoreV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Core() corev1.CoreV1Interface
 	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Apps() appsv1beta1.AppsV1beta1Interface
@@ -73,6 +70,9 @@ type Interface interface {
 	CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Certificates() certificatesv1beta1.CertificatesV1beta1Interface
+	CoreV1() corev1.CoreV1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Core() corev1.CoreV1Interface
 	ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Extensions() extensionsv1beta1.ExtensionsV1beta1Interface
@@ -100,7 +100,6 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	*admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Client
-	*corev1.CoreV1Client
 	*appsv1beta1.AppsV1beta1Client
 	*authenticationv1.AuthenticationV1Client
 	*authenticationv1beta1.AuthenticationV1beta1Client
@@ -111,6 +110,7 @@ type Clientset struct {
 	*batchv1.BatchV1Client
 	*batchv2alpha1.BatchV2alpha1Client
 	*certificatesv1beta1.CertificatesV1beta1Client
+	*corev1.CoreV1Client
 	*extensionsv1beta1.ExtensionsV1beta1Client
 	*networkingv1.NetworkingV1Client
 	*policyv1beta1.PolicyV1beta1Client
@@ -136,23 +136,6 @@ func (c *Clientset) Admissionregistration() admissionregistrationv1alpha1.Admiss
 		return nil
 	}
 	return c.AdmissionregistrationV1alpha1Client
-}
-
-// CoreV1 retrieves the CoreV1Client
-func (c *Clientset) CoreV1() corev1.CoreV1Interface {
-	if c == nil {
-		return nil
-	}
-	return c.CoreV1Client
-}
-
-// Deprecated: Core retrieves the default version of CoreClient.
-// Please explicitly pick a version.
-func (c *Clientset) Core() corev1.CoreV1Interface {
-	if c == nil {
-		return nil
-	}
-	return c.CoreV1Client
 }
 
 // AppsV1beta1 retrieves the AppsV1beta1Client
@@ -287,6 +270,23 @@ func (c *Clientset) Certificates() certificatesv1beta1.CertificatesV1beta1Interf
 		return nil
 	}
 	return c.CertificatesV1beta1Client
+}
+
+// CoreV1 retrieves the CoreV1Client
+func (c *Clientset) CoreV1() corev1.CoreV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.CoreV1Client
+}
+
+// Deprecated: Core retrieves the default version of CoreClient.
+// Please explicitly pick a version.
+func (c *Clientset) Core() corev1.CoreV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.CoreV1Client
 }
 
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
@@ -427,10 +427,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.CoreV1Client, err = corev1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
 	cs.AppsV1beta1Client, err = appsv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -468,6 +464,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		return nil, err
 	}
 	cs.CertificatesV1beta1Client, err = certificatesv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.CoreV1Client, err = corev1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -517,7 +517,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.AdmissionregistrationV1alpha1Client = admissionregistrationv1alpha1.NewForConfigOrDie(c)
-	cs.CoreV1Client = corev1.NewForConfigOrDie(c)
 	cs.AppsV1beta1Client = appsv1beta1.NewForConfigOrDie(c)
 	cs.AuthenticationV1Client = authenticationv1.NewForConfigOrDie(c)
 	cs.AuthenticationV1beta1Client = authenticationv1beta1.NewForConfigOrDie(c)
@@ -528,6 +527,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.BatchV1Client = batchv1.NewForConfigOrDie(c)
 	cs.BatchV2alpha1Client = batchv2alpha1.NewForConfigOrDie(c)
 	cs.CertificatesV1beta1Client = certificatesv1beta1.NewForConfigOrDie(c)
+	cs.CoreV1Client = corev1.NewForConfigOrDie(c)
 	cs.ExtensionsV1beta1Client = extensionsv1beta1.NewForConfigOrDie(c)
 	cs.NetworkingV1Client = networkingv1.NewForConfigOrDie(c)
 	cs.PolicyV1beta1Client = policyv1beta1.NewForConfigOrDie(c)
@@ -545,7 +545,6 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.AdmissionregistrationV1alpha1Client = admissionregistrationv1alpha1.New(c)
-	cs.CoreV1Client = corev1.New(c)
 	cs.AppsV1beta1Client = appsv1beta1.New(c)
 	cs.AuthenticationV1Client = authenticationv1.New(c)
 	cs.AuthenticationV1beta1Client = authenticationv1beta1.New(c)
@@ -556,6 +555,7 @@ func New(c rest.Interface) *Clientset {
 	cs.BatchV1Client = batchv1.New(c)
 	cs.BatchV2alpha1Client = batchv2alpha1.New(c)
 	cs.CertificatesV1beta1Client = certificatesv1beta1.New(c)
+	cs.CoreV1Client = corev1.New(c)
 	cs.ExtensionsV1beta1Client = extensionsv1beta1.New(c)
 	cs.NetworkingV1Client = networkingv1.New(c)
 	cs.PolicyV1beta1Client = policyv1beta1.New(c)

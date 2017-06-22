@@ -21,15 +21,14 @@ limitations under the License.
 package v1alpha1
 
 import (
-	unsafe "unsafe"
-
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	resourcequota "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
+	unsafe "unsafe"
 )
 
 func init() {
-	SchemeBuilder.Register(RegisterConversions)
+	localSchemeBuilder.Register(RegisterConversions)
 }
 
 // RegisterConversions adds conversion functions to the given scheme.

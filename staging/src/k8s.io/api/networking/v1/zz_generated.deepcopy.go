@@ -21,13 +21,12 @@ limitations under the License.
 package v1
 
 import (
-	reflect "reflect"
-
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
+	reflect "reflect"
 )
 
 func init() {
@@ -146,7 +145,7 @@ func DeepCopy_v1_NetworkPolicyPort(in interface{}, out interface{}, c *conversio
 		*out = *in
 		if in.Protocol != nil {
 			in, out := &in.Protocol, &out.Protocol
-			*out = new(api_v1.Protocol)
+			*out = new(core_v1.Protocol)
 			**out = **in
 		}
 		if in.Port != nil {
