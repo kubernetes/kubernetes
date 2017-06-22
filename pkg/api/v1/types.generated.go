@@ -36415,7 +36415,7 @@ func (x *PodSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq2[22] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("hostMappings"))
+					r.EncodeString(codecSelferC_UTF81234, string("hostAliases"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					if x.HostAliases == nil {
 						r.EncodeNil()
@@ -36754,7 +36754,7 @@ func (x *PodSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 					h.decSliceToleration((*[]Toleration)(yyv42), d)
 				}
 			}
-		case "hostMappings":
+		case "hostAliases":
 			if r.TryDecodeAsNil() {
 				x.HostAliases = nil
 			} else {

@@ -2650,7 +2650,7 @@
       },
       "description": "If specified, the pod's tolerations."
      },
-     "hostMappings": {
+     "hostAliases": {
       "type": "array",
       "items": {
        "$ref": "v1.HostAlias"
