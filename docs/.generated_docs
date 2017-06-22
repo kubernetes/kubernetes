@@ -1,4 +1,5 @@
 docs/.generated_docs
+docs/admin/cloud-controller-manager.md
 docs/admin/federation-apiserver.md
 docs/admin/federation-controller-manager.md
 docs/admin/kube-apiserver.md
@@ -6,6 +7,7 @@ docs/admin/kube-controller-manager.md
 docs/admin/kube-proxy.md
 docs/admin/kube-scheduler.md
 docs/admin/kubelet.md
+docs/man/man1/cloud-controller-manager.1
 docs/man/man1/kube-apiserver.1
 docs/man/man1/kube-controller-manager.1
 docs/man/man1/kube-proxy.1
