@@ -17,10 +17,12 @@ limitations under the License.
 package benchmark
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
@@ -33,7 +35,27 @@ import (
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
+	"strconv"
 )
+
+var running_metrics_server bool
+
+// setupMetricsServer starts a metrics server so we can monitor scheduling latency/throughput/etc
+func setupMetricsServer() {
+	if !running_server {
+		running_server = true
+		glog.V(2).Info("starting metrics server")
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", prometheus.Handler())
+		server := &http.Server{
+			Addr:    net.JoinHostPort("127.0.0.1", strconv.Itoa(int(9091))),
+			Handler: mux,
+		}
+		glog.Fatal(server.ListenAndServe())
+	} else {
+		glog.V(2).Info("Not starting a new metrics server: already running.")
+	}
+}
 
 // mustSetupScheduler starts the following components:
 // - k8s api server (a.k.a. master)
@@ -43,7 +65,8 @@ import (
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
 func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroyFunc func()) {
-
+	glog.V(2).Info("Setting up a new scheduler")
+	go setupMetricsServer()
 	h := &framework.MasterHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
