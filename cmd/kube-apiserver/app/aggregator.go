@@ -34,7 +34,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	kubeclientset "k8s.io/client-go/kubernetes"
+	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/thirdparty"
 )
 
-func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, commandOptions *options.ServerRunOptions, proxyTransport *http.Transport) (*aggregatorapiserver.Config, error) {
+func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, commandOptions *options.ServerRunOptions, externalInformers kubeexternalinformers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver, proxyTransport *http.Transport) (*aggregatorapiserver.Config, error) {
 	// make a shallow copy to let us twiddle a few things
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the aggregator
 	genericConfig := kubeAPIServerConfig
@@ -60,11 +60,7 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 	etcdOptions.StorageConfig.Copier = aggregatorapiserver.Scheme
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
-	client, err := kubeclientset.NewForConfig(genericConfig.LoopbackClientConfig)
-	if err != nil {
-		return nil, err
-	}
-
+	var err error
 	var certBytes, keyBytes []byte
 	if len(commandOptions.ProxyClientCertFile) > 0 && len(commandOptions.ProxyClientKeyFile) > 0 {
 		certBytes, err = ioutil.ReadFile(commandOptions.ProxyClientCertFile)
@@ -78,12 +74,12 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 	}
 
 	aggregatorConfig := &aggregatorapiserver.Config{
-		GenericConfig:           &genericConfig,
-		CoreAPIServerClient:     client,
-		ProxyClientCert:         certBytes,
-		ProxyClientKey:          keyBytes,
-		ProxyTransport:          proxyTransport,
-		EnableAggregatorRouting: commandOptions.EnableAggregatorRouting,
+		GenericConfig:     &genericConfig,
+		CoreKubeInformers: externalInformers,
+		ProxyClientCert:   certBytes,
+		ProxyClientKey:    keyBytes,
+		ServiceResolver:   serviceResolver,
+		ProxyTransport:    proxyTransport,
 	}
 
 	return aggregatorConfig, nil

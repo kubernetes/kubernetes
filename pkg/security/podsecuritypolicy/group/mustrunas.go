@@ -19,7 +19,6 @@ package group
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -47,14 +46,14 @@ func NewMustRunAs(ranges []extensions.GroupIDRange, field string) (GroupStrategy
 
 // Generate creates the group based on policy rules.  By default this returns the first group of the
 // first range (min val).
-func (s *mustRunAs) Generate(pod *api.Pod) ([]types.UnixGroupID, error) {
-	return []types.UnixGroupID{s.ranges[0].Min}, nil
+func (s *mustRunAs) Generate(pod *api.Pod) ([]int64, error) {
+	return []int64{s.ranges[0].Min}, nil
 }
 
 // Generate a single value to be applied.  This is used for FSGroup.  This strategy will return
 // the first group of the first range (min val).
-func (s *mustRunAs) GenerateSingle(pod *api.Pod) (*types.UnixGroupID, error) {
-	single := new(types.UnixGroupID)
+func (s *mustRunAs) GenerateSingle(pod *api.Pod) (*int64, error) {
+	single := new(int64)
 	*single = s.ranges[0].Min
 	return single, nil
 }
@@ -62,7 +61,7 @@ func (s *mustRunAs) GenerateSingle(pod *api.Pod) (*types.UnixGroupID, error) {
 // Validate ensures that the specified values fall within the range of the strategy.
 // Groups are passed in here to allow this strategy to support multiple group fields (fsgroup and
 // supplemental groups).
-func (s *mustRunAs) Validate(pod *api.Pod, groups []types.UnixGroupID) field.ErrorList {
+func (s *mustRunAs) Validate(pod *api.Pod, groups []int64) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if pod.Spec.SecurityContext == nil {
@@ -84,7 +83,7 @@ func (s *mustRunAs) Validate(pod *api.Pod, groups []types.UnixGroupID) field.Err
 	return allErrs
 }
 
-func (s *mustRunAs) isGroupValid(group types.UnixGroupID) bool {
+func (s *mustRunAs) isGroupValid(group int64) bool {
 	for _, rng := range s.ranges {
 		if psputil.GroupFallsInRange(group, rng) {
 			return true

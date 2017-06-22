@@ -333,7 +333,7 @@ func (b *storageosMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *storageosMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (b *storageosMounter) SetUp(fsGroup *int64) error {
 	// Need a namespace to find the volume, try pod's namespace if not set.
 	if b.volNamespace == "" {
 		glog.V(2).Infof("Setting StorageOS volume namespace to pod namespace: %s", b.podNamespace)
@@ -360,7 +360,7 @@ func (b *storageosMounter) SetUp(fsGroup *types.UnixGroupID) error {
 }
 
 // SetUp bind mounts the disk global mount to the give volume path.
-func (b *storageosMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (b *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("StorageOS volume set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {

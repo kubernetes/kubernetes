@@ -21,15 +21,17 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 8Mi
+            memory: 16Mi
           requests:
             cpu: 10m
-            memory: 8Mi
+            memory: 16Mi
         securityContext:
           privileged: true
         volumeMounts:
           - name: config
             mountPath: /etc/config
+      nodeSelector:
+        beta.kubernetes.io/masq-agent-ds-ready: "true"  
       volumes:
         - name: config
           configMap:

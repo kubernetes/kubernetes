@@ -15,7 +15,6 @@ go_library(
         "nodename.go",
         "patch.go",
         "uid.go",
-        "unix_user_id.go",
     ],
     tags = ["automanaged"],
 )

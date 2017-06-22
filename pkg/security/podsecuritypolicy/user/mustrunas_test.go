@@ -20,7 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -85,8 +84,8 @@ func TestValidate(t *testing.T) {
 		},
 	}
 
-	validID := types.UnixUserID(15)
-	invalidID := types.UnixUserID(21)
+	validID := int64(15)
+	invalidID := int64(21)
 
 	tests := map[string]struct {
 		container   *api.Container

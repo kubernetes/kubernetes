@@ -234,12 +234,12 @@ func (mounter *quobyteMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (mounter *quobyteMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (mounter *quobyteMounter) SetUp(fsGroup *int64) error {
 	pluginDir := mounter.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
 	return mounter.SetUpAt(pluginDir, fsGroup)
 }
 
-func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// Check if Quobyte is already mounted on the host in the Plugin Dir
 	// if so we can use this mountpoint instead of creating a new one
 	// IsLikelyNotMountPoint wouldn't check the mount type

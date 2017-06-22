@@ -24,7 +24,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -63,7 +62,7 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 		}
 	} else {
 		// TODO: Consider also read address from lb's FrontendIPConfigurations
-		pipName, err := az.getPublicIPName(clusterName, service)
+		pipName, err := az.determinePublicIPName(clusterName, service)
 		if err != nil {
 			return nil, false, err
 		}
@@ -86,10 +85,10 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 	}, true, nil
 }
 
-func (az *Cloud) getPublicIPName(clusterName string, service *v1.Service) (string, error) {
+func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) (string, error) {
 	loadBalancerIP := service.Spec.LoadBalancerIP
 	if len(loadBalancerIP) == 0 {
-		return fmt.Sprintf("%s-%s", clusterName, cloudprovider.GetLoadBalancerName(service)), nil
+		return getPublicIPName(clusterName, service), nil
 	}
 
 	az.operationPollRateLimiter.Accept()
@@ -123,14 +122,6 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	err := az.cleanupLoadBalancer(clusterName, service, !isInternal)
 	if err != nil {
 		return nil, err
-	}
-
-	// Also clean up public ip resource, since service might be switched from public load balancer type.
-	if isInternal {
-		err = az.cleanupPublicIP(clusterName, service)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	serviceName := getServiceName(service)
@@ -209,7 +200,7 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 
 		fipConfigurationProperties = &configProperties
 	} else {
-		pipName, err := az.getPublicIPName(clusterName, service)
+		pipName, err := az.determinePublicIPName(clusterName, service)
 		if err != nil {
 			return nil, err
 		}
@@ -308,13 +299,6 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 		return err
 	}
 
-	if !isInternal {
-		err = az.cleanupPublicIP(clusterName, service)
-		if err != nil {
-			return err
-		}
-	}
-
 	sg, existsSg, err := az.getSecurityGroup()
 	if err != nil {
 		return err
@@ -361,6 +345,22 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 		return err
 	}
 	if existsLb {
+		var publicIPToCleanup *string
+
+		if !isInternalLb {
+			// Find public ip resource to clean up from IP configuration
+			lbFrontendIPConfigName := getFrontendIPConfigName(service)
+			for _, config := range *lb.FrontendIPConfigurations {
+				if strings.EqualFold(*config.Name, lbFrontendIPConfigName) {
+					if config.PublicIPAddress != nil {
+						// Only ID property is available
+						publicIPToCleanup = config.PublicIPAddress.ID
+					}
+					break
+				}
+			}
+		}
+
 		lb, lbNeedsUpdate, reconcileErr := az.reconcileLoadBalancer(lb, nil, clusterName, service, []*v1.Node{})
 		if reconcileErr != nil {
 			return reconcileErr
@@ -399,23 +399,23 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 				}
 			}
 		}
-	}
 
-	return nil
-}
-
-func (az *Cloud) cleanupPublicIP(clusterName string, service *v1.Service) error {
-	serviceName := getServiceName(service)
-
-	// Only delete an IP address if we created it.
-	if service.Spec.LoadBalancerIP == "" {
-		pipName, err := az.getPublicIPName(clusterName, service)
-		if err != nil {
-			return err
-		}
-		err = az.ensurePublicIPDeleted(serviceName, pipName)
-		if err != nil {
-			return err
+		// Public IP can be deleted after frontend ip configuration rule deleted.
+		if publicIPToCleanup != nil {
+			// Only delete an IP address if we created it, deducing by name.
+			if index := strings.LastIndex(*publicIPToCleanup, "/"); index != -1 {
+				managedPipName := getPublicIPName(clusterName, service)
+				pipName := (*publicIPToCleanup)[index+1:]
+				if strings.EqualFold(managedPipName, pipName) {
+					glog.V(5).Infof("Deleting public IP resource %q.", pipName)
+					err = az.ensurePublicIPDeleted(serviceName, pipName)
+					if err != nil {
+						return err
+					}
+				} else {
+					glog.V(5).Infof("Public IP resource %q found, but it does not match managed name %q, skip deleting.", pipName, managedPipName)
+				}
+			}
 		}
 	}
 

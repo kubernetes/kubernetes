@@ -49509,18 +49509,18 @@
       "description": "Set DNS policy for containers within the pod. One of 'ClusterFirstWithHostNet', 'ClusterFirst' or 'Default'. Defaults to \"ClusterFirst\". To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.",
       "type": "string"
      },
-     "hostIPC": {
-      "description": "Use the host's ipc namespace. Optional: Default to false.",
-      "type": "boolean"
-     },
-     "hostMappings": {
+     "hostAliases": {
       "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.kubernetes.pkg.api.v1.HostAlias"
       },
-      "x-kubernetes-patch-merge-key": "IP",
+      "x-kubernetes-patch-merge-key": "ip",
       "x-kubernetes-patch-strategy": "merge"
+     },
+     "hostIPC": {
+      "description": "Use the host's ipc namespace. Optional: Default to false.",
+      "type": "boolean"
      },
      "hostNetwork": {
       "description": "Host networking requested for this pod. Use the host's network namespace. If this option is set, the ports that will be used must be specified. Default to false.",
@@ -54394,13 +54394,6 @@
     "properties": {
      "allowedCapabilities": {
       "description": "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.",
-      "type": "array",
-      "items": {
-       "type": "string"
-      }
-     },
-     "allowedHostPaths": {
-      "description": "AllowedHostPaths is a white list of allowed host path prefixes. Empty indicates that all host paths may be used.",
       "type": "array",
       "items": {
        "type": "string"

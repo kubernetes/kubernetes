@@ -354,7 +354,7 @@ func (fv *FakeVolume) CanMount() error {
 	return nil
 }
 
-func (fv *FakeVolume) SetUp(fsGroup *types.UnixGroupID) error {
+func (fv *FakeVolume) SetUp(fsGroup *int64) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.SetUpCallCount++
@@ -367,7 +367,7 @@ func (fv *FakeVolume) GetSetUpCallCount() int {
 	return fv.SetUpCallCount
 }
 
-func (fv *FakeVolume) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (fv *FakeVolume) SetUpAt(dir string, fsGroup *int64) error {
 	return os.MkdirAll(dir, 0750)
 }
 

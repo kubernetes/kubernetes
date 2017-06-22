@@ -566,11 +566,6 @@ func getOperationsToPerformOnCluster(informer fedutil.FederatedInformer, cluster
 				}
 			}
 		}
-		// If ExternalTrafficPolicy is not set in federated service, use the ExternalTrafficPolicy
-		// defaulted to in federated cluster.
-		if desiredService.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyType("") {
-			desiredService.Spec.ExternalTrafficPolicy = clusterService.Spec.ExternalTrafficPolicy
-		}
 
 		// Update existing service, if needed.
 		if !Equivalent(desiredService, clusterService) {

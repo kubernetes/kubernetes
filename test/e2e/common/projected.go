@@ -29,7 +29,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = framework.KubeDescribe("Projected", func() {
@@ -47,8 +46,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 
 	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Conformance] [Volume]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
-		fsGroup := types.UnixGroupID(1001)
-		uid := types.UnixUserID(1000)
+		fsGroup := int64(1001)
+		uid := int64(1000)
 		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), &fsGroup, &uid)
 	})
 
@@ -834,8 +833,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 
 	It("should provide podname as non-root with fsgroup [Feature:FSGroup] [Volume]", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
-		uid := types.UnixUserID(1001)
-		gid := types.UnixGroupID(1234)
+		uid := int64(1001)
+		gid := int64(1234)
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			RunAsUser: &uid,
@@ -848,8 +847,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 
 	It("should provide podname as non-root with fsgroup and defaultMode [Feature:FSGroup] [Volume]", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
-		uid := types.UnixUserID(1001)
-		gid := types.UnixGroupID(1234)
+		uid := int64(1001)
+		gid := int64(1234)
 		mode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		pod := projectedDownwardAPIVolumePodForModeTest(podName, "/etc/podname", &mode, nil)
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
@@ -1025,7 +1024,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 })
 
 func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32,
-	secretName string, fsGroup *types.UnixGroupID, uid *types.UnixUserID) {
+	secretName string, fsGroup *int64, uid *int64) {
 	var (
 		volumeName      = "projected-secret-volume"
 		volumeMountPath = "/etc/projected-secret-volume"
@@ -1185,8 +1184,8 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 }
 
 func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
-	userID := types.UnixUserID(uid)
-	groupID := types.UnixGroupID(fsGroup)
+	userID := int64(uid)
+	groupID := int64(fsGroup)
 
 	var (
 		name            = "projected-configmap-test-volume-" + string(uuid.NewUUID())
@@ -1269,8 +1268,8 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup
 }
 
 func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
-	userID := types.UnixUserID(uid)
-	groupID := types.UnixGroupID(fsGroup)
+	userID := int64(uid)
+	groupID := int64(fsGroup)
 
 	var (
 		name            = "projected-configmap-test-volume-map-" + string(uuid.NewUUID())

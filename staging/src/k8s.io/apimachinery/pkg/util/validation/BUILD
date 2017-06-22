@@ -13,12 +13,10 @@ go_test(
     srcs = ["validation_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/types:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
     tags = ["automanaged"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/types:go_default_library"],
 )
