@@ -43,7 +43,7 @@ const (
 // data for the test into the file with the specified prefix.
 func dumpDataToFile(data interface{}, labels map[string]string, prefix string) {
 	testName := labels["test"]
-	fileName := path.Join(framework.TestContext.ReportDir, fmt.Sprintf("%s-%s.json", prefix, testName))
+	fileName := path.Join(framework.TestContext.ReportDir, fmt.Sprintf("%s-%s-%s.json", prefix, framework.TestContext.ReportPrefix, testName))
 	labels["timestamp"] = strconv.FormatInt(time.Now().UTC().Unix(), 10)
 	framework.Logf("Dumping perf data for test %q to %q.", testName, fileName)
 	if err := ioutil.WriteFile(fileName, []byte(framework.PrettyPrintJSON(data)), 0644); err != nil {
