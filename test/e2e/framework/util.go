@@ -605,7 +605,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 				notReady++
 				badPods = append(badPods, pod)
 			default:
-				if _, ok := pod.Annotations[v1.CreatedByAnnotation]; !ok {
+				if controller.GetControllerOf(&pod) == nil {
 					Logf("Pod %s is Failed, but it's not controlled by a controller", pod.ObjectMeta.Name)
 					badPods = append(badPods, pod)
 				}
