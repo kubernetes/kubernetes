@@ -2334,17 +2334,17 @@ func TestPrintService(t *testing.T) {
 						{Protocol: "tcp",
 							Port: 2233},
 					},
-					ClusterIP: "0.0.0.0",
+					ClusterIP: "10.9.8.7",
 				},
 			},
-			"test1\t0.0.0.0\t<none>\t2233/tcp\t<unknown>\n",
+			"test1\tClusterIP\t10.9.8.7\t<none>\t2233/tcp\t<unknown>\n",
 		},
 		{
 			// Test name, cluster ip, port:nodePort with protocol
 			api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "test2"},
 				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
+					Type: api.ServiceTypeNodePort,
 					Ports: []api.ServicePort{
 						{Protocol: "tcp",
 							Port:     8888,
@@ -2354,7 +2354,7 @@ func TestPrintService(t *testing.T) {
 					ClusterIP: "10.9.8.7",
 				},
 			},
-			"test2\t10.9.8.7\t<none>\t8888:9999/tcp\t<unknown>\n",
+			"test2\tNodePort\t10.9.8.7\t<none>\t8888:9999/tcp\t<unknown>\n",
 		},
 	}
 
