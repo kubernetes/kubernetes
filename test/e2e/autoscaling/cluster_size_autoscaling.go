@@ -233,7 +233,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	})
 
-	It("should increase cluster size if pods are pending due to pod anti-affinity [Feature:ClusterSizeAutoscalingAntiAffinityScaleUp]", func() {
+	It("should increase cluster size if pods are pending due to pod anti-affinity [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		pods := nodeCount
 		newPods := 2
 		labels := map[string]string{
