@@ -48,8 +48,8 @@ var _ = framework.KubeDescribe("Monitoring", func() {
 const (
 	influxdbService       = "monitoring-influxdb"
 	influxdbDatabaseName  = "k8s"
-	podlistQuery          = "show tag values from \"cpu/usage\" with key = pod_id"
-	nodelistQuery         = "show tag values from \"cpu/usage\" with key = hostname"
+	podlistQuery          = "show tag values from \"cpu/usage\" with key = pod_name"
+	nodelistQuery         = "show tag values from \"cpu/usage\" with key = nodename"
 	sleepBetweenAttempts  = 5 * time.Second
 	testTimeout           = 5 * time.Minute
 	initializationTimeout = 5 * time.Minute
@@ -161,7 +161,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 				if pod.DeletionTimestamp != nil {
 					continue
 				}
-				expectedPods = append(expectedPods, string(pod.UID))
+				expectedPods = append(expectedPods, pod.Name)
 			}
 		}
 		// Do the same for all deployments.
@@ -176,7 +176,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 				if pod.DeletionTimestamp != nil {
 					continue
 				}
-				expectedPods = append(expectedPods, string(pod.UID))
+				expectedPods = append(expectedPods, pod.Name)
 			}
 		}
 		// And for pet sets.
@@ -191,7 +191,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 				if pod.DeletionTimestamp != nil {
 					continue
 				}
-				expectedPods = append(expectedPods, string(pod.UID))
+				expectedPods = append(expectedPods, pod.Name)
 			}
 		}
 	}
