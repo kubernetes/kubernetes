@@ -361,6 +361,16 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 	}
 }
 
+func SkipUnlessServerVersionLT(v *utilversion.Version, c discovery.ServerVersionInterface) {
+	lt, err := ServerVersionLT(v, c)
+	if err != nil {
+		Failf("Failed to get server version: %v", err)
+	}
+	if !lt {
+		Skipf("Not supported for server versions newer than %q", v)
+	}
+}
+
 func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr schema.GroupVersionResource, namespace string) {
 	dynamicClient, err := clientPool.ClientForGroupVersionResource(gvr)
 	if err != nil {
@@ -1678,6 +1688,19 @@ func ServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface
 		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
 	}
 	return sv.AtLeast(v), nil
+}
+
+// ServerVersionLT returns true if v is less than the server version.
+func ServerVersionLT(v *utilversion.Version, c discovery.ServerVersionInterface) (bool, error) {
+	serverVersion, err := c.ServerVersion()
+	if err != nil {
+		return false, fmt.Errorf("Unable to get server version: %v", err)
+	}
+	sv, err := utilversion.ParseSemantic(serverVersion.GitVersion)
+	if err != nil {
+		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
+	}
+	return sv.LessThan(v), nil
 }
 
 func SkipUnlessKubectlVersionGTE(v *utilversion.Version) {

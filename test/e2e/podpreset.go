@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	settings "k8s.io/kubernetes/pkg/apis/settings/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -37,10 +38,20 @@ var _ = framework.KubeDescribe("PodPreset", func() {
 	f := framework.NewDefaultFramework("podpreset")
 
 	var podClient *framework.PodClient
+	var c clientset.Interface
 	BeforeEach(func() {
+		c = f.ClientSet
+
 		// only run on gce for the time being til we find an easier way to update
 		// the admission controllers used on the others
 		framework.SkipUnlessProviderIs("gce")
+
+		// Alpha features are disabled 1.7 onwards by default.
+		// PodPreset being an Alpha feature is disabled 1.7 onwards, so we skip
+		// this test for such servers.
+		podPresetDisabledVersion := utilversion.MustParseSemantic("v1.7.0")
+		framework.SkipUnlessServerVersionLT(podPresetDisabledVersion, c.Discovery())
+
 		podClient = f.PodClient()
 	})
 
