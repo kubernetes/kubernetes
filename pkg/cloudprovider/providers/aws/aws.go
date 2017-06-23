@@ -504,10 +504,13 @@ func (p *awsSDKProvider) getCrossRequestRetryDelay(regionName string) *CrossRequ
 }
 
 func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
-	service := ec2.New(session.New(&aws.Config{
+	awsConfig := &aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
-	}))
+	}
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+
+	service := ec2.New(session.New(awsConfig))
 
 	p.addHandlers(regionName, &service.Handlers)
 
@@ -518,10 +521,13 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 }
 
 func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
-	elbClient := elb.New(session.New(&aws.Config{
+	awsConfig := &aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
-	}))
+	}
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+
+	elbClient := elb.New(session.New(awsConfig))
 
 	p.addHandlers(regionName, &elbClient.Handlers)
 
@@ -529,10 +535,13 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 }
 
 func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
-	client := autoscaling.New(session.New(&aws.Config{
+	awsConfig := &aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
-	}))
+	}
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+
+	client := autoscaling.New(session.New(awsConfig))
 
 	p.addHandlers(regionName, &client.Handlers)
 
