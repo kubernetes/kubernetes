@@ -144,7 +144,7 @@ func GetHollowKubeletConfig(
 	c.LowDiskSpaceThresholdMB = 256
 	c.VolumeStatsAggPeriod.Duration = time.Minute
 	c.CgroupRoot = ""
-	c.ContainerRuntime = "docker"
+	c.ContainerRuntime = kubetypes.DockerContainerRuntime
 	c.CPUCFSQuota = true
 	c.RuntimeCgroups = ""
 	c.EnableControllerAttachDetach = false
