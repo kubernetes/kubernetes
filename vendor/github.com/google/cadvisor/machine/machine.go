@@ -42,6 +42,10 @@ var (
 	cpuClockSpeedMHz     = regexp.MustCompile(`(?:cpu MHz|clock)\s*:\s*([0-9]+\.[0-9]+)(?:MHz)?`)
 	memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
 	swapCapacityRegexp   = regexp.MustCompile(`SwapTotal:\s*([0-9]+) kB`)
+
+	// size of hugepages on machine
+	hugepageSizeRegExp  = regexp.MustCompile(`^Hugepagesize:\s*([0-9]+) kB`)
+	hugepageTotalRegExp = regexp.MustCompile(`^HugePages_Total:\s*([0-9]+)$`)
 )
 
 const maxFreqFile = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
@@ -93,6 +97,40 @@ func GetMachineMemoryCapacity() (uint64, error) {
 		return 0, err
 	}
 	return memoryCapacity, err
+}
+
+// GetHugePagesTotal returns the machine's huge page total from /proc/meminfo.
+func GetHugePagesTotal(meminfo string) (uint64, error) {
+	for _, line := range strings.Split(string(meminfo), "\n") {
+		if line == "" {
+			continue
+		}
+		ok, val, err := extractValue(line, hugepageTotalRegExp)
+		if err != nil {
+			return uint64(0), fmt.Errorf("could not parse huge page total from %q: %v", line, err)
+		}
+		if ok {
+			return uint64(val), err
+		}
+	}
+	return uint64(0), nil
+}
+
+// GetHugePageSize returns the machine's huge page size from /proc/meminfo.
+func GetHugePageSize(meminfo string) (uint64, error) {
+	for _, line := range strings.Split(string(meminfo), "\n") {
+		if line == "" {
+			continue
+		}
+		ok, val, err := extractValue(line, hugepageSizeRegExp)
+		if err != nil {
+			return uint64(0), fmt.Errorf("could not parse huge page size from %q: %v", line, err)
+		}
+		if ok {
+			return uint64(val), err
+		}
+	}
+	return uint64(0), nil
 }
 
 // GetMachineSwapCapacity returns the machine's total swap from /proc/meminfo.

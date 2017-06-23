@@ -1,0 +1,36 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    run: hugepages
+  name: hugepages
+spec:
+  selector:
+    matchLabels:
+      run: hugepages
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        run: hugepages
+    spec:
+      containers:
+      - env:
+        - name: ENABLE_HUGEPAGES
+          value: "true"
+        image: java-oom:v1
+        imagePullPolicy: IfNotPresent
+        name: hugepages
+        resources:
+          requests:
+            alpha.kubernetes.io/hugepages-2048kB: 512
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        securityContext:
+          privileged: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always

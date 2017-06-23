@@ -72,6 +72,7 @@ type Resource struct {
 	StorageScratch     int64
 	StorageOverlay     int64
 	OpaqueIntResources map[v1.ResourceName]int64
+	HugePages          map[v1.ResourceName]int64
 }
 
 func (r *Resource) ResourceList() v1.ResourceList {
@@ -82,6 +83,9 @@ func (r *Resource) ResourceList() v1.ResourceList {
 		v1.ResourceStorageOverlay: *resource.NewQuantity(r.StorageOverlay, resource.BinarySI),
 	}
 	for rName, rQuant := range r.OpaqueIntResources {
+		result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
+	}
+	for rName, rQuant := range r.HugePages {
 		result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
 	}
 	return result
@@ -101,6 +105,10 @@ func (r *Resource) Clone() *Resource {
 			res.OpaqueIntResources[k] = v
 		}
 	}
+	res.HugePages = make(map[v1.ResourceName]int64)
+	for k, v := range r.HugePages {
+		res.HugePages[k] = v
+	}
 	return res
 }
 
@@ -114,6 +122,18 @@ func (r *Resource) SetOpaque(name v1.ResourceName, quantity int64) {
 		r.OpaqueIntResources = map[v1.ResourceName]int64{}
 	}
 	r.OpaqueIntResources[name] = quantity
+}
+
+func (r *Resource) AddHugePages(name v1.ResourceName, quantity int64) {
+	r.SetHugePages(name, r.HugePages[name]+quantity)
+}
+
+func (r *Resource) SetHugePages(name v1.ResourceName, quantity int64) {
+	// Lazily allocate opaque integer resource map.
+	if r.HugePages == nil {
+		r.HugePages = map[v1.ResourceName]int64{}
+	}
+	r.HugePages[name] = quantity
 }
 
 // NewNodeInfo returns a ready to use empty NodeInfo object.
@@ -275,6 +295,12 @@ func (n *NodeInfo) addPod(pod *v1.Pod) {
 	for rName, rQuant := range res.OpaqueIntResources {
 		n.requestedResource.OpaqueIntResources[rName] += rQuant
 	}
+	if n.requestedResource.HugePages == nil && len(res.HugePages) > 0 {
+		n.requestedResource.HugePages = map[v1.ResourceName]int64{}
+	}
+	for rName, rQuant := range res.HugePages {
+		n.requestedResource.HugePages[rName] += rQuant
+	}
 	n.nonzeroRequest.MilliCPU += non0_cpu
 	n.nonzeroRequest.Memory += non0_mem
 	n.pods = append(n.pods, pod)
@@ -330,6 +356,12 @@ func (n *NodeInfo) removePod(pod *v1.Pod) error {
 			for rName, rQuant := range res.OpaqueIntResources {
 				n.requestedResource.OpaqueIntResources[rName] -= rQuant
 			}
+			if len(res.HugePages) > 0 && n.requestedResource.HugePages == nil {
+				n.requestedResource.HugePages = map[v1.ResourceName]int64{}
+			}
+			for rName, rQuant := range res.HugePages {
+				n.requestedResource.HugePages[rName] -= rQuant
+			}
 			n.nonzeroRequest.MilliCPU -= non0_cpu
 			n.nonzeroRequest.Memory -= non0_mem
 
@@ -359,6 +391,9 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 			default:
 				if v1helper.IsOpaqueIntResourceName(rName) {
 					res.AddOpaque(rName, rQuant.Value())
+				}
+				if v1helper.IsHugePageResourceName(rName) {
+					res.AddHugePages(rName, rQuant.Value())
 				}
 			}
 		}
@@ -414,6 +449,9 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 		default:
 			if v1helper.IsOpaqueIntResourceName(rName) {
 				n.allocatableResource.SetOpaque(rName, rQuant.Value())
+			}
+			if v1helper.IsHugePageResourceName(rName) {
+				n.allocatableResource.SetHugePages(rName, rQuant.Value())
 			}
 		}
 	}
