@@ -30,10 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/gkms"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/kms"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
-	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	"k8s.io/apiserver/pkg/storage/value/transformhelpers"
 )
 
 const (
@@ -44,14 +44,14 @@ const (
 )
 
 // GetTransformerOverrides returns the transformer overrides by reading and parsing the encryption provider configuration file
-func GetTransformerOverrides(filepath string, cloudProvider *kubeoptions.CloudProviderOptions) (map[schema.GroupResource]value.Transformer, error) {
+func GetTransformerOverrides(filepath string, cs *transformhelpers.CloudAndStorage) (map[schema.GroupResource]value.Transformer, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening encryption provider configuration file %q: %v", filepath, err)
 	}
 	defer f.Close()
 
-	result, err := ParseEncryptionConfiguration(f, cloudProvider)
+	result, err := ParseEncryptionConfiguration(f, cs)
 	if err != nil {
 		return nil, fmt.Errorf("error while parsing encryption provider configuration file %q: %v", filepath, err)
 	}
@@ -59,7 +59,7 @@ func GetTransformerOverrides(filepath string, cloudProvider *kubeoptions.CloudPr
 }
 
 // ParseEncryptionConfiguration parses configuration data and returns the transformer overrides
-func ParseEncryptionConfiguration(f io.Reader, cloudProvider *kubeoptions.CloudProviderOptions) (map[schema.GroupResource]value.Transformer, error) {
+func ParseEncryptionConfiguration(f io.Reader, cs *transformhelpers.CloudAndStorage) (map[schema.GroupResource]value.Transformer, error) {
 	configFileContents, err := ioutil.ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("could not read contents: %v", err)
@@ -83,7 +83,7 @@ func ParseEncryptionConfiguration(f io.Reader, cloudProvider *kubeoptions.CloudP
 
 	// For each entry in the configuration
 	for _, resourceConfig := range config.Resources {
-		transformers, err := GetPrefixTransformers(&resourceConfig, cloudProvider)
+		transformers, err := GetPrefixTransformers(&resourceConfig, cs)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +104,7 @@ func ParseEncryptionConfiguration(f io.Reader, cloudProvider *kubeoptions.CloudP
 }
 
 // GetPrefixTransformer constructs and returns the appropriate prefix transformers for the passed resource using its configuration
-func GetPrefixTransformers(config *ResourceConfig, cloudProvider *kubeoptions.CloudProviderOptions) ([]value.PrefixTransformer, error) {
+func GetPrefixTransformers(config *ResourceConfig, cs *transformhelpers.CloudAndStorage) ([]value.PrefixTransformer, error) {
 	var result []value.PrefixTransformer
 	multipleProviderError := fmt.Errorf("more than one encryption provider specified in a single element, should split into different list elements")
 	for _, provider := range config.Providers {
@@ -141,11 +141,16 @@ func GetPrefixTransformers(config *ResourceConfig, cloudProvider *kubeoptions.Cl
 			if found == true {
 				return result, multipleProviderError
 			}
-			kmsTransformer, err := gkms.NewGoogleKMSTransformer(provider.Gkms.ProjectID, provider.Gkms.Location,
-				provider.Gkms.KeyRing, provider.Gkms.CryptoKey, cloudProvider)
+
+			// CloudAndStorage will only have one GoogleKMSService instance at any time.
+			// This ensures safety because all rotations and refreshes will be guarded by locks.
+			// TODO: We need to allow multiple GKMS services for different keys. For that, we need to
+			// namespace the data of each GKMS service separately.
+			gkmsService, err := cs.GetGoogleKMSService(provider.Gkms.ProjectID, provider.Gkms.Location, provider.Gkms.KeyRing, provider.Gkms.CryptoKey)
 			if err != nil {
 				return result, err
 			}
+			kmsTransformer := kms.NewKMSTransformer(gkmsService)
 			transformer = value.PrefixTransformer{
 				Transformer: kmsTransformer,
 				Prefix:      []byte(gkmsTransformerPrefixV1),
