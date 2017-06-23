@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"text/template"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,10 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-const testConfig = `apiVersion: v1
+var testConfigTempl = template.Must(template.New("test").Parse(`apiVersion: v1
 clusters:
 - cluster:
-    server: https://10.128.0.6:6443
+    server: {{.Server}}
   name: kubernetes
 contexts:
 - context:
@@ -42,7 +43,7 @@ current-context: kubernetes-admin@kubernetes
 kind: Config
 preferences: {}
 users:
-- name: kubernetes-admin`
+- name: kubernetes-admin`))
 
 func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 	tests := []struct {
@@ -71,32 +72,42 @@ func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 		},
 	}
 
-	file, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatalf("could not create tempfile: %v", err)
+	servers := []struct {
+		Server string
+	}{
+		{Server: "https://10.128.0.6:6443"},
+		{Server: "https://[2001:db8::6]:3446"},
 	}
-	defer os.Remove(file.Name())
 
-	file.Write([]byte(testConfig))
-
-	for _, tc := range tests {
-		client := clientsetfake.NewSimpleClientset()
-		if tc.createErr != nil {
-			client.PrependReactor("create", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
-				return true, nil, tc.createErr
-			})
+	for _, server := range servers {
+		file, err := ioutil.TempFile("", "")
+		if err != nil {
+			t.Fatalf("could not create tempfile: %v", err)
 		}
-		if tc.updateErr != nil {
-			client.PrependReactor("update", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
-				return true, nil, tc.updateErr
-			})
+		defer os.Remove(file.Name())
+
+		if err := testConfigTempl.Execute(file, server); err != nil {
+			t.Fatalf("could not write to tempfile: %v", err)
 		}
 
-		err = CreateBootstrapConfigMapIfNotExists(client, file.Name())
-		if tc.expectErr && err == nil {
-			t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) wanted error, got nil", tc.name)
-		} else if !tc.expectErr && err != nil {
-			t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) returned unexpected error: %v", tc.name, err)
+		if err := file.Close(); err != nil {
+			t.Fatalf("could not close tempfile: %v", err)
+		}
+
+		for _, tc := range tests {
+			client := clientsetfake.NewSimpleClientset()
+			if tc.createErr != nil {
+				client.PrependReactor("create", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+					return true, nil, tc.createErr
+				})
+			}
+
+			err := CreateBootstrapConfigMapIfNotExists(client, file.Name())
+			if tc.expectErr && err == nil {
+				t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) wanted error, got nil", tc.name)
+			} else if !tc.expectErr && err != nil {
+				t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) returned unexpected error: %v", tc.name, err)
+			}
 		}
 	}
 }
