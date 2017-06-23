@@ -17,10 +17,10 @@ limitations under the License.
 package kubectl
 
 import (
-	externalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
-	core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	extensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
+	externalclientset "k8s.io/client-go/kubernetes"
+	apps "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
+	core "k8s.io/client-go/kubernetes/typed/core/v1"
+	extensions "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 

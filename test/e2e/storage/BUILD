@@ -34,8 +34,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/cloudprovider/providers/vsphere:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
@@ -65,6 +63,8 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
     ],
 )
 

@@ -35,10 +35,10 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	admissionv1alpha1 "k8s.io/kubernetes/pkg/apis/admission/v1alpha1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	admissioninit "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/configuration"
 
