@@ -154,6 +154,9 @@ kube::swagger::gen_api_ref_docs() {
 
   echo "Moving api reference docs from ${output_tmp} to ${output_dir}"
 
+  # Create output_dir if doesn't exist. Prevents error on copy.
+  mkdir -p "${output_dir}"
+
   cp -af "${output_tmp}"/* "${output_dir}"
   rm -r "${output_tmp}"
 }
