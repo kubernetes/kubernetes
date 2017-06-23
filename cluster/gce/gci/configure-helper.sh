@@ -912,7 +912,11 @@ function start-kubelet {
     flags+=" --cni-bin-dir=/home/kubernetes/bin"
     if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
       # Calico uses CNI always.
-      flags+=" --network-plugin=cni"
+      if [[ "${KUBERNETES_PRIVATE_MASTER:-}" == "true" ]]; then
+        flags+=" --network-plugin=${NETWORK_PROVIDER}"
+      else
+        flags+=" --network-plugin=cni"
+      fi
     else
       # Otherwise use the configured value.
       flags+=" --network-plugin=${NETWORK_PROVIDER}"
