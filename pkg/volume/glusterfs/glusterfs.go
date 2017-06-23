@@ -81,6 +81,9 @@ const (
 	absoluteGidMin          = 2000
 	absoluteGidMax          = math.MaxInt32
 	linuxGlusterMountBinary = "mount.glusterfs"
+	heketiAnn               = "heketi-dynamic-provisioner"
+	glusterTypeAnn          = "gluster.org/type"
+	glusterDescAnn          = "Gluster-Internal: Dynamically provisioned PV"
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -720,11 +723,11 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	gidStr := strconv.FormatInt(int64(gid), 10)
 
 	pv.Annotations = map[string]string{
-		volumehelper.VolumeGidAnnotationKey: gidStr,
-		"kubernetes.io/createdby":           "heketi-dynamic-provisioner",
-		"gluster.org/type":                  "file",
-		"Description":                       "Gluster: Dynamically provisioned PV",
-		v1.MountOptionAnnotation:            "auto_unmount",
+		volumehelper.VolumeGidAnnotationKey:        gidStr,
+		volumehelper.VolumeDynamicallyCreatedByKey: heketiAnn,
+		glusterTypeAnn:                             "file",
+		"Description":                              glusterDescAnn,
+		v1.MountOptionAnnotation:                   "auto_unmount",
 	}
 
 	pv.Spec.Capacity = v1.ResourceList{
