@@ -22,10 +22,10 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	"k8s.io/kubernetes/test/integration/framework"

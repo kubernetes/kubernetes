@@ -29,14 +29,14 @@ go_library(
     srcs = ["cfssl_signer.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/informers/informers_generated/externalversions/certificates/v1beta1:go_default_library",
         "//pkg/controller/certificates:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/config:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/helpers:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/signer:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/signer/local:go_default_library",
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",
+        "//vendor/k8s.io/client-go/informers/certificates/v1beta1:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )
 

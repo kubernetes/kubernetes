@@ -21,11 +21,11 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
+	listers "k8s.io/client-go/listers/core/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
 
 	"github.com/stretchr/testify/assert"
 )

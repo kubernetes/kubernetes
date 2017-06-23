@@ -23,8 +23,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	apps "k8s.io/api/apps/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
+	clientset "k8s.io/client-go/kubernetes"
+	appslisters "k8s.io/client-go/listers/apps/v1beta1"
 
 	"k8s.io/kubernetes/pkg/client/retry"
 )

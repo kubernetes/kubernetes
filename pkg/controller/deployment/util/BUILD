@@ -19,11 +19,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/extensions/v1beta1:go_default_library",
-        "//pkg/client/listers/core/v1:go_default_library",
-        "//pkg/client/listers/extensions/v1beta1:go_default_library",
         "//pkg/client/retry:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/labels:go_default_library",
@@ -38,6 +33,11 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/typed/extensions/v1beta1:go_default_library",
+        "//vendor/k8s.io/client-go/listers/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/listers/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/util/integer:go_default_library",
     ],
 )
@@ -53,7 +53,6 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -63,6 +62,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
     ],
 )
