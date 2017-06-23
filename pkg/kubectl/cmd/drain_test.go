@@ -58,6 +58,8 @@ const (
 var node *api.Node
 var cordoned_node *api.Node
 
+func boolptr(b bool) *bool { return &b }
+
 func TestMain(m *testing.M) {
 	// Create a node.
 	node = &api.Node{
@@ -244,7 +246,18 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
+			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			Annotations:       rc_anno,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "v1",
+					Kind:               "ReplicationController",
+					Name:               "rc",
+					UID:                "123",
+					BlockOwnerDeletion: boolptr(true),
+					Controller:         boolptr(true),
+				},
+			},
 		},
 		Spec: api.PodSpec{
 			NodeName: "node",
@@ -256,7 +269,7 @@ func TestDrain(t *testing.T) {
 			Name:              "ds",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
-			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/daemonsets/ds",
+			SelfLink:          testapi.Default.SelfLink("daemonsets", "ds"),
 		},
 		Spec: extensions.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
@@ -272,7 +285,17 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
+			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			Annotations:       ds_anno,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "extensions/v1beta1",
+					Kind:               "DaemonSet",
+					Name:               "ds",
+					BlockOwnerDeletion: boolptr(true),
+					Controller:         boolptr(true),
+				},
+			},
 		},
 		Spec: api.PodSpec{
 			NodeName: "node",
@@ -284,7 +307,7 @@ func TestDrain(t *testing.T) {
 			Name:              "missing-ds",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
-			SelfLink:          "/apis/extensions/v1beta1/namespaces/default/daemonsets/missing-ds",
+			SelfLink:          testapi.Default.SelfLink("daemonsets", "missing-ds"),
 		},
 		Spec: extensions.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
@@ -300,7 +323,17 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
+			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			Annotations:       missing_ds_anno,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "extensions/v1beta1",
+					Kind:               "DaemonSet",
+					Name:               "missing-ds",
+					BlockOwnerDeletion: boolptr(true),
+					Controller:         boolptr(true),
+				},
+			},
 		},
 		Spec: api.PodSpec{
 			NodeName: "node",
@@ -312,7 +345,7 @@ func TestDrain(t *testing.T) {
 			Name:              "job",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
-			SelfLink:          "/apis/batch/v1/namespaces/default/jobs/job",
+			SelfLink:          testapi.Default.SelfLink("jobs", "job"),
 		},
 		Spec: batch.JobSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
@@ -325,7 +358,17 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
+			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			Annotations:       map[string]string{api.CreatedByAnnotation: refJson(t, &job)},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "v1",
+					Kind:               "Job",
+					Name:               "job",
+					BlockOwnerDeletion: boolptr(true),
+					Controller:         boolptr(true),
+				},
+			},
 		},
 	}
 
@@ -351,7 +394,17 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
+			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			Annotations:       rs_anno,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "v1",
+					Kind:               "ReplicaSet",
+					Name:               "rs",
+					BlockOwnerDeletion: boolptr(true),
+					Controller:         boolptr(true),
+				},
+			},
 		},
 		Spec: api.PodSpec{
 			NodeName: "node",
