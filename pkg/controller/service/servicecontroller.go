@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -94,6 +95,7 @@ type ServiceController struct {
 	nodeListerSynced    cache.InformerSynced
 	// services that need to be synced
 	workingQueue workqueue.DelayingInterface
+	endpoints map[string][]string
 }
 
 // New returns a new service controller to keep cloud provider service resources
@@ -124,6 +126,7 @@ func New(
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
 		workingQueue:     workqueue.NewNamedDelayingQueue("service"),
+		endpoints: make(map[string][]string),
 	}
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -476,7 +479,13 @@ func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.S
 			oldService.Spec.HealthCheckNodePort, newService.Spec.HealthCheckNodePort)
 		return true
 	}
-
+	// Check if endpoints have changed
+	oldEndpoints := s.endpoints[oldService.ObjectMeta.Name]
+	newEndpoints := s.getEndpoints(oldService)
+	if !reflect.DeepEqual(oldEndpoints, newEndpoints) {
+		s.endpoints[oldService.ObjectMeta.Name] = newEndpoints
+		return true
+	}
 	return false
 }
 
@@ -745,6 +754,7 @@ func (s *ServiceController) syncService(key string) error {
 		return err
 	default:
 		cachedService = s.cache.getOrCreate(key)
+		s.endpoints[service.ObjectMeta.Name] = s.getEndpoints(service)
 		err, retryDelay = s.processServiceUpdate(cachedService, service, key)
 	}
 
@@ -788,4 +798,23 @@ func (s *ServiceController) processServiceDeletion(key string) (error, time.Dura
 
 	cachedService.resetRetryDelay()
 	return nil, doNotRetry
+}
+
+// This functions gets the number of endpoints for a given service name
+func (s *ServiceController) getEndpoints(service *v1.Service) []string {
+	var podIps []string
+	endpoints, err := s.kubeClient.Core().Endpoints(service.Namespace).Get(service.Name, metav1.GetOptions{})
+	if err == nil {
+		subsets := endpoints.Subsets
+		if len(subsets) > 0 {
+			subset := subsets[0]
+			addresses := subset.Addresses
+			for _, address:= range addresses {
+				ip := address.IP
+			        podIps = append(podIps, ip)
+			}
+			return podIps
+		}
+	}
+	return podIps
 }
