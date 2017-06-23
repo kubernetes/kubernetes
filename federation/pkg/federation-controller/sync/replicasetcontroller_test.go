@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package replicaset
+package sync
 
 import (
 	"flag"
@@ -29,7 +29,8 @@ import (
 	core "k8s.io/client-go/testing"
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
+	"k8s.io/kubernetes/federation/pkg/federatedtypes"
+	testutil "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubeclientfake "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 
@@ -47,11 +48,6 @@ func TestReplicaSetController(t *testing.T) {
 	flag.Set("logtostderr", "true")
 	flag.Set("v", "5")
 	flag.Parse()
-
-	replicaSetReviewDelay = 10 * time.Millisecond
-	clusterAvailableDelay = 20 * time.Millisecond
-	clusterUnavailableDelay = 60 * time.Millisecond
-	allReplicaSetReviewDelay = 120 * time.Millisecond
 
 	fedclientset := fedclientfake.NewSimpleClientset()
 	fedrswatch := watch.NewFake()
@@ -81,20 +77,19 @@ func TestReplicaSetController(t *testing.T) {
 			return nil, fmt.Errorf("Unknown cluster: %v", cluster.Name)
 		}
 	}
-	replicaSetController := NewReplicaSetController(fedclientset)
-	rsFedinformer := testutil.ToFederatedInformerForTestOnly(replicaSetController.fedReplicaSetInformer)
+	replicaSetController := newFederationSyncController(fedclientset, federatedtypes.NewReplicaSetAdapter(fedclientset))
+	replicaSetController.minimizeLatency()
+	rsFedinformer := testutil.ToFederatedInformerForTestOnly(replicaSetController.informer)
 	rsFedinformer.SetClientFactory(fedInformerClientFactory)
-	podFedinformer := testutil.ToFederatedInformerForTestOnly(replicaSetController.fedPodInformer)
-	podFedinformer.SetClientFactory(fedInformerClientFactory)
 
 	stopChan := make(chan struct{})
 	defer close(stopChan)
-	go replicaSetController.Run(1, stopChan)
+	go replicaSetController.Run(stopChan)
 
 	rs := newReplicaSetWithReplicas("rs", 9)
 	rs, _ = fedclientset.Extensions().ReplicaSets(metav1.NamespaceDefault).Create(rs)
 	fedrswatch.Add(rs)
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	rs1, _ := kube1clientset.Extensions().ReplicaSets(metav1.NamespaceDefault).Get(rs.Name, metav1.GetOptions{})
 	kube1rswatch.Add(rs1)
@@ -114,7 +109,7 @@ func TestReplicaSetController(t *testing.T) {
 	rs2, _ = kube2clientset.Extensions().ReplicaSets(metav1.NamespaceDefault).UpdateStatus(rs2)
 	kube2rswatch.Modify(rs2)
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 	rs, _ = fedclientset.Extensions().ReplicaSets(metav1.NamespaceDefault).Get(rs.Name, metav1.GetOptions{})
 	assert.Equal(t, *rs.Spec.Replicas, *rs1.Spec.Replicas+*rs2.Spec.Replicas)
 	assert.Equal(t, rs.Status.Replicas, rs1.Status.Replicas+rs2.Status.Replicas)
@@ -126,7 +121,7 @@ func TestReplicaSetController(t *testing.T) {
 	rs.Spec.Replicas = &replicas
 	rs, _ = fedclientset.Extensions().ReplicaSets(metav1.NamespaceDefault).Update(rs)
 	fedrswatch.Modify(rs)
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	rs1, _ = kube1clientset.Extensions().ReplicaSets(metav1.NamespaceDefault).Get(rs.Name, metav1.GetOptions{})
 	rs1.Status.Replicas = *rs1.Spec.Replicas

@@ -84,10 +84,11 @@ type FederationSyncController struct {
 
 	deletionHelper *deletionhelper.DeletionHelper
 
-	reviewDelay           time.Duration
-	clusterAvailableDelay time.Duration
-	smallDelay            time.Duration
-	updateTimeout         time.Duration
+	reviewDelay             time.Duration
+	clusterAvailableDelay   time.Duration
+	clusterUnavailableDelay time.Duration
+	smallDelay              time.Duration
+	updateTimeout           time.Duration
 
 	adapter federatedtypes.FederatedTypeAdapter
 }
@@ -112,14 +113,15 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: fmt.Sprintf("federation-%v-controller", adapter.Kind())})
 
 	s := &FederationSyncController{
-		reviewDelay:           time.Second * 10,
-		clusterAvailableDelay: time.Second * 20,
-		smallDelay:            time.Second * 3,
-		updateTimeout:         time.Second * 30,
-		workQueue:             workqueue.New(),
-		backoff:               flowcontrol.NewBackOff(5*time.Second, time.Minute),
-		eventRecorder:         recorder,
-		adapter:               adapter,
+		reviewDelay:             time.Second * 10,
+		clusterAvailableDelay:   time.Second * 20,
+		clusterUnavailableDelay: time.Second * 60,
+		smallDelay:              time.Second * 3,
+		updateTimeout:           time.Second * 30,
+		workQueue:               workqueue.New(),
+		backoff:                 flowcontrol.NewBackOff(5*time.Second, time.Minute),
+		eventRecorder:           recorder,
+		adapter:                 adapter,
 	}
 
 	// Build delivereres for triggering reconciliations.
@@ -169,6 +171,10 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 				// When new cluster becomes available process all the target resources again.
 				s.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(s.clusterAvailableDelay))
 			},
+			// When a cluster becomes unavailable process all the target resources again.
+			ClusterUnavailable: func(cluster *federationapi.Cluster, _ []interface{}) {
+				s.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(s.clusterUnavailableDelay))
+			},
 		},
 	)
 
@@ -205,6 +211,7 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 // minimizeLatency reduces delays and timeouts to make the controller more responsive (useful for testing).
 func (s *FederationSyncController) minimizeLatency() {
 	s.clusterAvailableDelay = time.Second
+	s.clusterUnavailableDelay = time.Second
 	s.reviewDelay = 50 * time.Millisecond
 	s.smallDelay = 20 * time.Millisecond
 	s.updateTimeout = 5 * time.Second
@@ -327,6 +334,10 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 
 	kind := s.adapter.Kind()
 	key := namespacedName.String()
+
+	glog.V(4).Infof("Starting to reconcile %v %v", kind, key)
+	startTime := time.Now()
+	defer glog.V(4).Infof("Finished reconciling %v %v (duration: %v)", kind, key, time.Now().Sub(startTime))
 
 	obj, err := s.objFromCache(kind, key)
 	if err != nil {
