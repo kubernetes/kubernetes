@@ -40,10 +40,18 @@ func makeTestPod(namespace, name, node string, mirror bool) *api.Pod {
 	return pod
 }
 
+func makeTestEvent(component, host, message string) *api.Event {
+	event := &api.Event{}
+	event.Source.Component = component
+	event.Source.Host = host
+	event.Message = message
+	return event
+}
 func Test_nodePlugin_Admit(t *testing.T) {
 	var (
-		mynode = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
-		bob    = &user.DefaultInfo{Name: "bob"}
+		mynode            = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
+		bob               = &user.DefaultInfo{Name: "bob"}
+		controllermanager = &user.DefaultInfo{Name: "controllermanager"}
 
 		mynodeObj    = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "mynode"}}
 		othernodeObj = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "othernode"}}
@@ -55,6 +63,11 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		otherpod         = makeTestPod("ns", "otherpod", "othernode", false)
 		unboundpod       = makeTestPod("ns", "unboundpod", "", false)
 
+		oldNodeEvent   = makeTestEvent("kubelet", "mynode", "foo")
+		newNodeEvent   = makeTestEvent("kubelet", "mynode", "bar")
+		otherNodeEvent = makeTestEvent("kubelet", "othernode", "foo")
+		otherEvent     = makeTestEvent("controllermanager", "", "foobar")
+
 		configmapResource = api.Resource("configmap").WithVersion("v1")
 		configmapKind     = api.Kind("ConfigMap").WithVersion("v1")
 
@@ -63,6 +76,9 @@ func Test_nodePlugin_Admit(t *testing.T) {
 
 		nodeResource = api.Resource("nodes").WithVersion("v1")
 		nodeKind     = api.Kind("Node").WithVersion("v1")
+
+		eventResource = api.Resource("events").WithVersion("v1")
+		eventKind     = api.Kind("Event").WithVersion("v1")
 
 		noExistingPods = fake.NewSimpleClientset().Core()
 		existingPods   = fake.NewSimpleClientset(mymirrorpod, othermirrorpod, unboundmirrorpod, mypod, otherpod, unboundpod).Core()
@@ -467,6 +483,62 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "allow unrelated user delete of normal pod status unbound",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nil, nil, podKind, unboundpod.Namespace, unboundpod.Name, podResource, "status", admission.Delete, bob),
+			err:        "",
+		},
+
+		// Events
+		{
+			name:       "allow node create events from the node itself",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(oldNodeEvent, nil, eventKind, "", "", eventResource, "", admission.Create, mynode),
+			err:        "",
+		},
+		{
+			name:       "allow node update events from the node itself",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(oldNodeEvent, newNodeEvent, eventKind, "", "", eventResource, "", admission.Update, mynode),
+			err:        "",
+		},
+		{
+			name:       "forbid node create events of other node",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(otherNodeEvent, nil, eventKind, "", "", eventResource, "", admission.Create, mynode),
+			err:        "can only create or modify events with event.Source.Host set to itself",
+		},
+		{
+			name:       "forbid node update events of other node",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(otherNodeEvent, newNodeEvent, eventKind, "", "", eventResource, "", admission.Update, mynode),
+			err:        "can only create or modify events with event.Source.Host set to itself",
+		},
+		{
+			name:       "forbid node update events into other node",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(oldNodeEvent, otherNodeEvent, eventKind, "", "", eventResource, "", admission.Update, mynode),
+			err:        "can only create or modify events with event.Source.Host set to itself",
+		},
+		{
+			name:       "forbid node delete events",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(oldNodeEvent, nil, eventKind, "", "", eventResource, "", admission.Delete, mynode),
+			err:        "unexpected operation DELETE",
+		},
+		{
+			name:       "allow unrelated user create events",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(otherEvent, nil, eventKind, "", "", eventResource, "", admission.Create, controllermanager),
+			err:        "",
+		},
+		{
+			name:       "allow unrelated user update events",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(oldNodeEvent, otherEvent, eventKind, "", "", eventResource, "", admission.Update, controllermanager),
+			err:        "",
+		},
+		{
+			name:       "allow unrelated user delete events",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(otherEvent, nil, eventKind, "", "", eventResource, "", admission.Delete, bob),
 			err:        "",
 		},
 	}

@@ -78,8 +78,9 @@ func (p *nodePlugin) Validate() error {
 }
 
 var (
-	podResource  = api.Resource("pods")
-	nodeResource = api.Resource("nodes")
+	podResource   = api.Resource("pods")
+	nodeResource  = api.Resource("nodes")
+	eventResource = api.Resource("events")
 )
 
 func (c *nodePlugin) Admit(a admission.Attributes) error {
@@ -108,6 +109,9 @@ func (c *nodePlugin) Admit(a admission.Attributes) error {
 
 	case nodeResource:
 		return c.admitNode(nodeName, a)
+
+	case eventResource:
+		return c.admitEvent(nodeName, a)
 
 	default:
 		return nil
@@ -209,6 +213,44 @@ func (c *nodePlugin) admitNode(nodeName string, a admission.Attributes) error {
 
 	if requestedName != nodeName {
 		return admission.NewForbidden(a, fmt.Errorf("node %s cannot modify node %s", nodeName, requestedName))
+	}
+	return nil
+}
+
+func (c *nodePlugin) admitEvent(nodeName string, a admission.Attributes) error {
+	switch a.GetOperation() {
+	case admission.Create:
+		// require a event object
+		event, ok := a.GetObject().(*api.Event)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+		return checkEventSource(nodeName, event, a)
+	case admission.Update:
+		// require an existing event
+		event, ok := a.GetOldObject().(*api.Event)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+		if err := checkEventSource(nodeName, event, a); err != nil {
+			return err
+		}
+		event, ok = a.GetObject().(*api.Event)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+		return checkEventSource(nodeName, event, a)
+	default:
+		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %s", a.GetOperation()))
+	}
+}
+
+func checkEventSource(nodeName string, event *api.Event, a admission.Attributes) error {
+	if event.Source.Component != "kubelet" {
+		return admission.NewForbidden(a, fmt.Errorf("kubelet node can only create or modify events with event.Source.Component set to \"kubelet\""))
+	}
+	if event.Source.Host != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("node %s can only create or modify events with event.Source.Host set to itself", nodeName))
 	}
 	return nil
 }
