@@ -19,9 +19,6 @@ spec:
       - name: ip-masq-agent
         image: gcr.io/google-containers/ip-masq-agent-amd64:v2.0.2
         resources:
-          limits:
-            cpu: 100m
-            memory: 16Mi
           requests:
             cpu: 10m
             memory: 16Mi

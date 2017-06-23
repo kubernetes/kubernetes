@@ -568,12 +568,14 @@ rules:
       - group: "" # core
         resources: ["events"]
 
-  # Secrets & ConfigMaps can contain sensitive & binary data,
+  # Secrets, ConfigMaps, and TokenReviews can contain sensitive & binary data,
   # so only log at the Metadata level.
   - level: Metadata
     resources:
       - group: "" # core
         resources: ["secrets", "configmaps"]
+      - group: authentication.k8s.io
+        resources: ["tokenreviews"]
   # Get repsonses can be large; skip them.
   - level: Request
     verbs: ["get", "list", "watch"]

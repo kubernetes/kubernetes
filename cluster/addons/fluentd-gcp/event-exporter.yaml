@@ -29,7 +29,7 @@ subjects:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: event-exporter-v0.1.0
+  name: event-exporter-v0.1.4
   namespace: kube-system
   labels:
     k8s-app: event-exporter
