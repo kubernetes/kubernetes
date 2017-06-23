@@ -160,6 +160,7 @@ go_test(
         "create_configmap_test.go",
         "create_deployment_test.go",
         "create_namespace_test.go",
+        "create_pdb_test.go",
         "create_quota_test.go",
         "create_role_test.go",
         "create_rolebinding_test.go",
