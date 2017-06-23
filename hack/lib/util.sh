@@ -824,6 +824,18 @@ function kube::util::ensure-cfssl {
   popd > /dev/null
 }
 
+# kube::util::ensure_dockerized
+# Confirms that the script is being run inside a kube-build image
+#
+function kube::util::ensure_dockerized {
+  if [[ -f /kube-build-image ]]; then
+    return 0
+  else
+    echo "ERROR: This script is designed to be run inside a kube-build container"
+    exit 1
+  fi
+}
+
 # Some useful colors.
 if [[ -z "${color_start-}" ]]; then
   declare -r color_start="\033["
