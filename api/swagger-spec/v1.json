@@ -15895,7 +15895,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "allow name as 'svcname', 'svcname:port', or 'scheme:svcname:port'. svcname is name of the service and must be non-empty or valid. scheme must be 'http' or 'https' if specified. port is not required to be numeric (could be used for a named port, for example).",
         "required": true,
         "allowMultiple": false
        },
@@ -16167,7 +16167,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "allow name as 'svcname', 'svcname:port', or 'scheme:svcname:port'. svcname is name of the service and must be non-empty or valid. scheme must be 'http' or 'https' if specified. port is not required to be numeric (could be used for a named port, for example).",
         "required": true,
         "allowMultiple": false
        }
@@ -16565,7 +16565,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "allow name as 'svcname', 'svcname:port', or 'scheme:svcname:port'. svcname is name of the service and must be non-empty or valid. scheme must be 'http' or 'https' if specified. port is not required to be numeric (could be used for a named port, for example).",
         "required": true,
         "allowMultiple": false
        }
@@ -16793,7 +16793,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "allow name as 'svcname', 'svcname:port', or 'scheme:svcname:port'. svcname is name of the service and must be non-empty or valid. scheme must be 'http' or 'https' if specified. port is not required to be numeric (could be used for a named port, for example).",
         "required": true,
         "allowMultiple": false
        }
@@ -16837,7 +16837,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "allow name as 'svcname', 'svcname:port', or 'scheme:svcname:port'. svcname is name of the service and must be non-empty or valid. scheme must be 'http' or 'https' if specified. port is not required to be numeric (could be used for a named port, for example).",
         "required": true,
         "allowMultiple": false
        },
@@ -16929,7 +16929,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the Service",
+        "description": "allow name as 'svcname', 'svcname:port', or 'scheme:svcname:port'. svcname is name of the service and must be non-empty or valid. scheme must be 'http' or 'https' if specified. port is not required to be numeric (could be used for a named port, for example).",
         "required": true,
         "allowMultiple": false
        },
