@@ -84,52 +84,6 @@ var _ = framework.KubeDescribe("SchedulerPriorities [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("Pods created by ReplicationController should spread to different node", func() {
-		By("Create a pod for each node to make the nodes have almost same cpu/mem usage ratio")
-
-		createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.6)
-
-		By("Create an RC with the same number of replicas as the schedualble nodes. One pod should be scheduled on each node.")
-		config := testutils.RCConfig{
-			Client:         f.ClientSet,
-			InternalClient: f.InternalClientset,
-			Name:           "scheduler-priority-selector-spreading",
-			Namespace:      ns,
-			Image:          framework.GetPauseImageName(f.ClientSet),
-			Replicas:       len(nodeList.Items),
-			CreatedPods:    &[]*v1.Pod{},
-			Labels:         map[string]string{"name": "scheduler-priority-selector-spreading"},
-			CpuRequest:     podRequestedResource.Requests.Cpu().MilliValue(),
-			MemRequest:     podRequestedResource.Requests.Memory().Value(),
-		}
-		Expect(framework.RunRC(config)).NotTo(HaveOccurred())
-		// Cleanup the replication controller when we are done.
-		defer func() {
-			// Resize the replication controller to zero to get rid of pods.
-			if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "scheduler-priority-selector-spreading"); err != nil {
-				framework.Logf("Failed to cleanup replication controller %v: %v.", "scheduler-priority-selector-spreading", err)
-			}
-		}()
-		pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, "scheduler-priority-selector-spreading", int32(len(nodeList.Items)))
-		Expect(err).NotTo(HaveOccurred())
-		By("Ensuring each pod is running")
-
-		result := map[string]bool{}
-		for _, pod := range pods.Items {
-			if pod.DeletionTimestamp != nil {
-				continue
-			}
-			err = f.WaitForPodRunning(pod.Name)
-			Expect(err).NotTo(HaveOccurred())
-			result[pod.Spec.NodeName] = true
-			framework.PrintAllKubeletPods(cs, pod.Spec.NodeName)
-		}
-		By("Verify the pods were scheduled to each node")
-		if len(nodeList.Items) != len(result) {
-			framework.Failf("Pods are not spread to each node.")
-		}
-	})
-
 	It("Pod should be prefer scheduled to node that satisify the NodeAffinity", func() {
 		nodeName := GetNodeThatCanRunPod(f)
 		By("Trying to apply a label on the found node.")
