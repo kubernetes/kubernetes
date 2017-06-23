@@ -35,6 +35,7 @@ func makeObjectReference(kind, name, namespace string) v1.ObjectReference {
 		Namespace:  namespace,
 		UID:        "C934D34AFB20242",
 		APIVersion: "version",
+		FieldPath:  "spec.containers{mycontainer}",
 	}
 }
 
@@ -171,7 +172,10 @@ func TestEventCorrelator(t *testing.T) {
 	duplicateEvent := makeEvent("duplicate", "me again", makeObjectReference("Pod", "my-pod", "my-ns"))
 	uniqueEvent := makeEvent("unique", "snowflake", makeObjectReference("Pod", "my-pod", "my-ns"))
 	similarEvent := makeEvent("similar", "similar message", makeObjectReference("Pod", "my-pod", "my-ns"))
+	similarEvent.InvolvedObject.FieldPath = "spec.containers{container1}"
 	aggregateEvent := makeEvent(similarEvent.Reason, EventAggregatorByReasonMessageFunc(&similarEvent), similarEvent.InvolvedObject)
+	similarButDifferentContainerEvent := similarEvent
+	similarButDifferentContainerEvent.InvolvedObject.FieldPath = "spec.containers{container2}"
 	scenario := map[string]struct {
 		previousEvents  []v1.Event
 		newEvent        v1.Event
@@ -212,6 +216,12 @@ func TestEventCorrelator(t *testing.T) {
 			previousEvents:  makeSimilarEvents(defaultAggregateMaxEvents, similarEvent, similarEvent.Message),
 			newEvent:        similarEvent,
 			expectedEvent:   setCount(aggregateEvent, 2),
+			intervalSeconds: 5,
+		},
+		"events-from-different-containers-do-not-aggregate": {
+			previousEvents:  makeEvents(1, similarButDifferentContainerEvent),
+			newEvent:        similarEvent,
+			expectedEvent:   setCount(similarEvent, 1),
 			intervalSeconds: 5,
 		},
 		"similar-events-whose-interval-is-greater-than-aggregate-interval-do-not-aggregate": {
