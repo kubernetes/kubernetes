@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "alpha.go",
         "annotate.go",
         "apiversions.go",
         "apply.go",
