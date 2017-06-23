@@ -51,13 +51,13 @@ func MakeFirewallNameForLBService(name string) string {
 }
 
 // ConstructFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
-func ConstructFirewallForLBService(svc *v1.Service, nodesTags []string) *compute.Firewall {
+func ConstructFirewallForLBService(svc *v1.Service, nodeTag string) *compute.Firewall {
 	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
 		Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
 	fw.Name = MakeFirewallNameForLBService(cloudprovider.GetLoadBalancerName(svc))
-	fw.TargetTags = nodesTags
+	fw.TargetTags = []string{nodeTag}
 	if svc.Spec.LoadBalancerSourceRanges == nil {
 		fw.SourceRanges = []string{"0.0.0.0/0"}
 	} else {
@@ -77,13 +77,13 @@ func MakeHealthCheckFirewallNameForLBService(clusterID, name string, isNodesHeal
 }
 
 // ConstructHealthCheckFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
-func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service, nodesTags []string, isNodesHealthCheck bool) *compute.Firewall {
+func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service, nodeTag string, isNodesHealthCheck bool) *compute.Firewall {
 	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
 		Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
 	fw.Name = MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.GetLoadBalancerName(svc), isNodesHealthCheck)
-	fw.TargetTags = nodesTags
+	fw.TargetTags = []string{nodeTag}
 	fw.SourceRanges = gcecloud.LoadBalancerSrcRanges()
 	healthCheckPort := gcecloud.GetNodesHealthCheckPort()
 	if !isNodesHealthCheck {
@@ -98,14 +98,6 @@ func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service,
 	return &fw
 }
 
-// GetNodeTags gets tags from one of the Kubernetes nodes
-func GetNodeTags(c clientset.Interface, cloudConfig CloudConfig) *compute.Tags {
-	nodes := GetReadySchedulableNodesOrDie(c)
-	Expect(len(nodes.Items) > 0).Should(BeTrue())
-	nodeTags := GetInstanceTags(cloudConfig, nodes.Items[0].Name)
-	return nodeTags
-}
-
 // GetInstanceTags gets tags from GCE instance with given name.
 func GetInstanceTags(cloudConfig CloudConfig, instanceName string) *compute.Tags {
 	gceCloud := cloudConfig.Provider.(*gcecloud.GCECloud)
@@ -118,12 +110,12 @@ func GetInstanceTags(cloudConfig CloudConfig, instanceName string) *compute.Tags
 }
 
 // SetInstanceTags sets tags on GCE instance with given name.
-func SetInstanceTags(cloudConfig CloudConfig, instanceName string, tags []string) []string {
+func SetInstanceTags(cloudConfig CloudConfig, instanceName, zone string, tags []string) []string {
 	gceCloud := cloudConfig.Provider.(*gcecloud.GCECloud)
 	// Re-get instance everytime because we need the latest fingerprint for updating metadata
 	resTags := GetInstanceTags(cloudConfig, instanceName)
 	_, err := gceCloud.GetComputeService().Instances.SetTags(
-		cloudConfig.ProjectID, cloudConfig.Zone, instanceName,
+		cloudConfig.ProjectID, zone, instanceName,
 		&compute.Tags{Fingerprint: resTags.Fingerprint, Items: tags}).Do()
 	if err != nil {
 		Failf("failed to set instance tags: %v", err)

@@ -452,6 +452,7 @@ manifest-url-header
 masquerade-all
 master-os-distro
 master-service-namespace
+master-tag
 max-concurrency
 max-connection-bytes-per-sec
 maximum-dead-containers
@@ -512,6 +513,7 @@ node-schedulable-timeout
 node-startup-grace-period
 node-status-update-frequency
 node-sync-period
+node-tag
 no-headers
 no-headers
 non-masquerade-cidr
