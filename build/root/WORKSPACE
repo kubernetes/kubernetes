@@ -24,9 +24,9 @@ http_archive(
 
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "261fbd8fda1d06a12a0479019b46acd302c6aaa8df8e49383dc37917f20492a1",
-    strip_prefix = "rules_docker-52d9faf209ff6d16eb850b6b66d03483735e0633",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/52d9faf209ff6d16eb850b6b66d03483735e0633.tar.gz"],
+    sha256 = "bbf0ea808ab6c599307b321f360aef2e6a31da4a35aaf14eca305c9878cca0b3",
+    strip_prefix = "rules_docker-d0cf5ea34a6f900370b91227b95e9f0a13722c70",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/d0cf5ea34a6f900370b91227b95e9f0a13722c70.tar.gz"],
 )
 
 load("@io_bazel_rules_go//go:def.bzl", "go_repositories")
@@ -38,22 +38,6 @@ go_repositories(
 
 docker_repositories()
 
-# for building docker base images
-debs = (
-    (
-        "busybox_deb",
-        "5f81f140777454e71b9e5bfdce9c89993de5ddf4a7295ea1cfda364f8f630947",
-        "http://ftp.us.debian.org/debian/pool/main/b/busybox/busybox-static_1.22.0-19+b3_amd64.deb",
-        "https://storage.googleapis.com/kubernetes-release/debs/busybox-static_1.22.0-19+b3_amd64.deb",
-    ),
-)
-
-[http_file(
-    name = name,
-    sha256 = sha256,
-    url = url,
-) for name, sha256, origin, url in debs]
-
 http_file(
     name = "kubernetes_cni",
     sha256 = "05ab3937bc68562e989dc143362ec4d4275262ba9f359338aed720fc914457a5",
@@ -62,7 +46,16 @@ http_file(
 
 docker_pull(
     name = "debian-iptables-amd64",
-    digest = "sha256:bc20977ac38abfb43071b4c61c4b7edb30af894c05eb06758dd61d05118d2842",  # v7
+    digest = "sha256:bc20977ac38abfb43071b4c61c4b7edb30af894c05eb06758dd61d05118d2842",
     registry = "gcr.io",
     repository = "google-containers/debian-iptables-amd64",
+    tag = "v7",  # ignored, but kept here for documentation
+)
+
+docker_pull(
+    name = "official_busybox",
+    digest = "sha256:be3c11fdba7cfe299214e46edc642e09514dbb9bbefcd0d3836c05a1e0cd0642",
+    registry = "index.docker.io",
+    repository = "library/busybox",
+    tag = "latest",  # ignored, but kept here for documentation
 )
