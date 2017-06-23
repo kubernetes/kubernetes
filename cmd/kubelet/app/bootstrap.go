@@ -73,18 +73,9 @@ func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir st
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap key path: %v", err)
 	}
-	keyData, generatedKeyFile, err := certutil.LoadOrGenerateKeyFile(keyPath)
+	keyData, _, err := certutil.LoadOrGenerateKeyFile(keyPath)
 	if err != nil {
 		return err
-	}
-	if generatedKeyFile {
-		defer func() {
-			if !success {
-				if err := os.Remove(keyPath); err != nil {
-					glog.Warningf("Cannot clean up the key file %q: %v", keyPath, err)
-				}
-			}
-		}()
 	}
 
 	// Get the cert.

@@ -156,7 +156,7 @@ func NewVolumeManager(
 	kubeletPodsDir string,
 	recorder record.EventRecorder,
 	checkNodeCapabilitiesBeforeMount bool,
-	keepTerminatedPodVolumes bool) (VolumeManager, error) {
+	keepTerminatedPodVolumes bool) VolumeManager {
 
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
@@ -195,7 +195,7 @@ func NewVolumeManager(
 		volumePluginMgr,
 		kubeletPodsDir)
 
-	return vm, nil
+	return vm
 }
 
 // volumeManager implements the VolumeManager interface

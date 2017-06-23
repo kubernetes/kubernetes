@@ -67,13 +67,13 @@ var (
 	jobColumns                       = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
 	cronJobColumns                   = []string{"NAME", "SCHEDULE", "SUSPEND", "ACTIVE", "LAST-SCHEDULE"}
 	batchJobWideColumns              = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
-	serviceColumns                   = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
+	serviceColumns                   = []string{"NAME", "TYPE", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
 	serviceWideColumns               = []string{"SELECTOR"}
 	ingressColumns                   = []string{"NAME", "HOSTS", "ADDRESS", "PORTS", "AGE"}
 	statefulSetColumns               = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 	endpointColumns                  = []string{"NAME", "ENDPOINTS", "AGE"}
 	nodeColumns                      = []string{"NAME", "STATUS", "AGE", "VERSION"}
-	nodeWideColumns                  = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION"}
+	nodeWideColumns                  = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION", "CONTAINER-RUNTIME"}
 	daemonSetColumns                 = []string{"NAME", "DESIRED", "CURRENT", "READY", "UP-TO-DATE", "AVAILABLE", "NODE-SELECTOR", "AGE"}
 	daemonSetWideColumns             = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 	eventColumns                     = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
@@ -92,7 +92,7 @@ var (
 	clusterRoleColumns               = []string{"NAME", "AGE"}
 	clusterRoleBindingColumns        = []string{"NAME", "AGE"}
 	clusterRoleBindingWideColumns    = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
-	storageClassColumns              = []string{"NAME", "TYPE"}
+	storageClassColumns              = []string{"NAME", "PROVISIONER"}
 	statusColumns                    = []string{"STATUS", "REASON", "MESSAGE"}
 
 	// TODO: consider having 'KIND' for third party resource data
@@ -711,7 +711,7 @@ func getServiceExternalIP(svc *api.Service, wide bool) string {
 		if len(svc.Spec.ExternalIPs) > 0 {
 			return strings.Join(svc.Spec.ExternalIPs, ",")
 		}
-		return "<nodes>"
+		return "<none>"
 	case api.ServiceTypeLoadBalancer:
 		lbIps := loadBalancerStatusStringer(svc.Status.LoadBalancer, wide)
 		if len(svc.Spec.ExternalIPs) > 0 {
@@ -742,9 +742,8 @@ func makePortString(ports []api.ServicePort) string {
 
 func printService(svc *api.Service, w io.Writer, options printers.PrintOptions) error {
 	name := printers.FormatResourceName(options.Kind, svc.Name, options.WithKind)
-
 	namespace := svc.Namespace
-
+	svcType := svc.Spec.Type
 	internalIP := svc.Spec.ClusterIP
 	externalIP := getServiceExternalIP(svc, options.Wide)
 
@@ -753,8 +752,9 @@ func printService(svc *api.Service, w io.Writer, options printers.PrintOptions) 
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s",
 		name,
+		string(svcType),
 		internalIP,
 		externalIP,
 		makePortString(svc.Spec.Ports),
@@ -1122,14 +1122,17 @@ func printNode(node *api.Node, w io.Writer, options printers.PrintOptions) error
 	}
 
 	if options.Wide {
-		osImage, kernelVersion := node.Status.NodeInfo.OSImage, node.Status.NodeInfo.KernelVersion
+		osImage, kernelVersion, crVersion := node.Status.NodeInfo.OSImage, node.Status.NodeInfo.KernelVersion, node.Status.NodeInfo.ContainerRuntimeVersion
 		if osImage == "" {
 			osImage = "<unknown>"
 		}
 		if kernelVersion == "" {
 			kernelVersion = "<unknown>"
 		}
-		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s", getNodeExternalIP(node), osImage, kernelVersion); err != nil {
+		if crVersion == "" {
+			crVersion = "<unknown>"
+		}
+		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s\t%s", getNodeExternalIP(node), osImage, kernelVersion, crVersion); err != nil {
 			return err
 		}
 	}

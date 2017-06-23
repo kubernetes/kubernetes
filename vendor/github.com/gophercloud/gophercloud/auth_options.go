@@ -21,13 +21,13 @@ type AuthOptions struct {
 	// control panel to discover your account's username. In Identity V3, either
 	// UserID or a combination of Username and DomainID or DomainName are needed.
 	Username string `json:"username,omitempty"`
-	UserID   string `json:"id,omitempty"`
+	UserID   string `json:"-"`
 
 	Password string `json:"password,omitempty"`
 
 	// At most one of DomainID and DomainName must be provided if using Username
 	// with Identity V3. Otherwise, either are optional.
-	DomainID   string `json:"id,omitempty"`
+	DomainID   string `json:"-"`
 	DomainName string `json:"name,omitempty"`
 
 	// The TenantID and TenantName fields are optional for the Identity V2 API.

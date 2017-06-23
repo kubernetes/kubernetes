@@ -19,11 +19,18 @@ limitations under the License.
 package dockershim
 
 import (
+	"bytes"
+	"crypto/md5"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
+	"k8s.io/api/core/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
@@ -39,6 +46,59 @@ func (ds *dockerService) getSecurityOpts(containerName string, sandboxConfig *ru
 	}
 
 	return seccompSecurityOpts, nil
+}
+
+func getSeccompDockerOpts(annotations map[string]string, ctrName, profileRoot string) ([]dockerOpt, error) {
+	profile, profileOK := annotations[v1.SeccompContainerAnnotationKeyPrefix+ctrName]
+	if !profileOK {
+		// try the pod profile
+		profile, profileOK = annotations[v1.SeccompPodAnnotationKey]
+		if !profileOK {
+			// return early the default
+			return defaultSeccompOpt, nil
+		}
+	}
+
+	if profile == "unconfined" {
+		// return early the default
+		return defaultSeccompOpt, nil
+	}
+
+	if profile == "docker/default" {
+		// return nil so docker will load the default seccomp profile
+		return nil, nil
+	}
+
+	if !strings.HasPrefix(profile, "localhost/") {
+		return nil, fmt.Errorf("unknown seccomp profile option: %s", profile)
+	}
+
+	name := strings.TrimPrefix(profile, "localhost/") // by pod annotation validation, name is a valid subpath
+	fname := filepath.Join(profileRoot, filepath.FromSlash(name))
+	file, err := ioutil.ReadFile(fname)
+	if err != nil {
+		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", name, err)
+	}
+
+	b := bytes.NewBuffer(nil)
+	if err := json.Compact(b, file); err != nil {
+		return nil, err
+	}
+	// Rather than the full profile, just put the filename & md5sum in the event log.
+	msg := fmt.Sprintf("%s(md5:%x)", name, md5.Sum(file))
+
+	return []dockerOpt{{"seccomp", b.String(), msg}}, nil
+}
+
+// getSeccompSecurityOpts gets container seccomp options from container and sandbox
+// config, currently from sandbox annotations.
+// It is an experimental feature and may be promoted to official runtime api in the future.
+func getSeccompSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string, separator rune) ([]string, error) {
+	seccompOpts, err := getSeccompDockerOpts(sandboxConfig.GetAnnotations(), containerName, seccompProfileRoot)
+	if err != nil {
+		return nil, err
+	}
+	return fmtDockerOpts(seccompOpts, separator), nil
 }
 
 func (ds *dockerService) updateCreateConfig(

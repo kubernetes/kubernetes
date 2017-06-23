@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -266,40 +267,38 @@ func (o *DrainOptions) deleteOrEvictPodsSimple() error {
 	return err
 }
 
-func (o *DrainOptions) getController(sr *api.SerializedReference) (interface{}, error) {
-	switch sr.Reference.Kind {
+func (o *DrainOptions) getController(namespace string, controllerRef *metav1.OwnerReference) (interface{}, error) {
+	switch controllerRef.Kind {
 	case "ReplicationController":
-		return o.client.Core().ReplicationControllers(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		return o.client.Core().ReplicationControllers(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "DaemonSet":
-		return o.client.Extensions().DaemonSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		return o.client.Extensions().DaemonSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "Job":
-		return o.client.Batch().Jobs(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		return o.client.Batch().Jobs(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "ReplicaSet":
-		return o.client.Extensions().ReplicaSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		return o.client.Extensions().ReplicaSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "StatefulSet":
-		return o.client.Apps().StatefulSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		return o.client.Apps().StatefulSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	}
-	return nil, fmt.Errorf("Unknown controller kind %q", sr.Reference.Kind)
+	return nil, fmt.Errorf("Unknown controller kind %q", controllerRef.Kind)
 }
 
-func (o *DrainOptions) getPodCreator(pod api.Pod) (*api.SerializedReference, error) {
-	creatorRef, found := pod.ObjectMeta.Annotations[api.CreatedByAnnotation]
-	if !found {
+func (o *DrainOptions) getPodController(pod api.Pod) (*metav1.OwnerReference, error) {
+	controllerRef := controller.GetControllerOf(&pod)
+	if controllerRef == nil {
 		return nil, nil
 	}
-	// Now verify that the specified creator actually exists.
-	sr := &api.SerializedReference{}
-	if err := runtime.DecodeInto(o.Factory.Decoder(true), []byte(creatorRef), sr); err != nil {
-		return nil, err
-	}
+
 	// We assume the only reason for an error is because the controller is
-	// gone/missing, not for any other cause.  TODO(mml): something more
-	// sophisticated than this
-	_, err := o.getController(sr)
+	// gone/missing, not for any other cause.
+	// TODO(mml): something more sophisticated than this
+	// TODO(juntee): determine if it's safe to remove getController(),
+	// so that drain can work for controller types that we don't know about
+	_, err := o.getController(pod.Namespace, controllerRef)
 	if err != nil {
 		return nil, err
 	}
-	return sr, nil
+	return controllerRef, nil
 }
 
 func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) {
@@ -308,7 +307,7 @@ func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) 
 		return true, nil, nil
 	}
 
-	sr, err := o.getPodCreator(pod)
+	controllerRef, err := o.getPodController(pod)
 	if err != nil {
 		// if we're forcing, remove orphaned pods with a warning
 		if apierrors.IsNotFound(err) && o.Force {
@@ -316,7 +315,7 @@ func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) 
 		}
 		return false, nil, &fatal{err.Error()}
 	}
-	if sr != nil {
+	if controllerRef != nil {
 		return true, nil, nil
 	}
 	if !o.Force {
@@ -333,7 +332,7 @@ func (o *DrainOptions) daemonsetFilter(pod api.Pod) (bool, *warning, *fatal) {
 	// The exception is for pods that are orphaned (the referencing
 	// management resource - including DaemonSet - is not found).
 	// Such pods will be deleted if --force is used.
-	sr, err := o.getPodCreator(pod)
+	controllerRef, err := o.getPodController(pod)
 	if err != nil {
 		// if we're forcing, remove orphaned pods with a warning
 		if apierrors.IsNotFound(err) && o.Force {
@@ -341,10 +340,10 @@ func (o *DrainOptions) daemonsetFilter(pod api.Pod) (bool, *warning, *fatal) {
 		}
 		return false, nil, &fatal{err.Error()}
 	}
-	if sr == nil || sr.Reference.Kind != "DaemonSet" {
+	if controllerRef == nil || controllerRef.Kind != "DaemonSet" {
 		return true, nil, nil
 	}
-	if _, err := o.client.Extensions().DaemonSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{}); err != nil {
+	if _, err := o.client.Extensions().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
 		return false, nil, &fatal{err.Error()}
 	}
 	if !o.IgnoreDaemonsets {

@@ -147,7 +147,7 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 	}
 
 	var dockerClient libdocker.Interface
-	if s.ContainerRuntime == "docker" {
+	if s.ContainerRuntime == kubetypes.DockerContainerRuntime {
 		dockerClient = libdocker.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration,
 			s.ImagePullProgressDeadline.Duration)
 	} else {
@@ -522,7 +522,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps.CAdvisorInterface == nil {
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(uint(s.CAdvisorPort), s.ContainerRuntime, s.RootDirectory)
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(s.Address, uint(s.CAdvisorPort), s.ContainerRuntime, s.RootDirectory)
 		if err != nil {
 			return err
 		}

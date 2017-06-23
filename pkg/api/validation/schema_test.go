@@ -38,10 +38,7 @@ import (
 
 func readPod(filename string) ([]byte, error) {
 	data, err := ioutil.ReadFile("testdata/" + api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version + "/" + filename)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
+	return data, err
 }
 
 func readSwaggerFile() ([]byte, error) {

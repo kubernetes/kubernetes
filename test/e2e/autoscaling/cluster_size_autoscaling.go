@@ -233,7 +233,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	})
 
-	It("should increase cluster size if pods are pending due to pod anti-affinity [Feature:ClusterSizeAutoscalingAntiAffinityScaleUp]", func() {
+	It("should increase cluster size if pods are pending due to pod anti-affinity [Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		pods := nodeCount
 		newPods := 2
 		labels := map[string]string{
@@ -1144,6 +1144,7 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 		{label: "kube-dns-autoscaler", min_available: 1},
 		{label: "kube-dns", min_available: 1},
 		{label: "event-exporter", min_available: 0},
+		{label: "kubernetes-dashboard", min_available: 0},
 	}
 	for _, pdbData := range pdbsToAdd {
 		By(fmt.Sprintf("Create PodDisruptionBudget for %v", pdbData.label))

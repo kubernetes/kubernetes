@@ -13,6 +13,7 @@ go_library(
         "es.go",
         "es_utils.go",
         "sd.go",
+        "sd_events.go",
         "sd_load.go",
         "sd_utils.go",
         "utils.go",

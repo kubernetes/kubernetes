@@ -44,4 +44,8 @@ type SchedulingAdapter interface {
 	GetSchedule(obj pkgruntime.Object, key string, clusters []*federationapi.Cluster, informer fedutil.FederatedInformer) (*SchedulingInfo, error)
 	ScheduleObject(cluster *federationapi.Cluster, clusterObj pkgruntime.Object, federationObjCopy pkgruntime.Object, schedulingInfo *SchedulingInfo) (pkgruntime.Object, bool, error)
 	UpdateFederatedStatus(obj pkgruntime.Object, status SchedulingStatus) error
+
+	// EquivalentIgnoringSchedule returns whether obj1 and obj2 are
+	// equivalent ignoring differences due to scheduling.
+	EquivalentIgnoringSchedule(obj1, obj2 pkgruntime.Object) bool
 }

@@ -564,7 +564,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	pluginSettings.LegacyRuntimeHost = nl
 
 	// rktnetes cannot be run with CRI.
-	if kubeCfg.ContainerRuntime != "rkt" {
+	if kubeCfg.ContainerRuntime != kubetypes.RktContainerRuntime {
 		// kubelet defers to the runtime shim to setup networking. Setting
 		// this to nil will prevent it from trying to invoke the plugin.
 		// It's easier to always probe and initialize plugins till cri
@@ -572,7 +572,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		klet.networkPlugin = nil
 
 		switch kubeCfg.ContainerRuntime {
-		case "docker":
+		case kubetypes.DockerContainerRuntime:
 			// Create and start the CRI shim running as a grpc server.
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
 			ds, err := dockershim.NewDockerService(kubeDeps.DockerClient, kubeCfg.SeccompProfileRoot, crOptions.PodSandboxImage,
@@ -606,7 +606,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			if !supported {
 				klet.dockerLegacyService = dockershim.NewDockerLegacyService(kubeDeps.DockerClient)
 			}
-		case "remote":
+		case kubetypes.RemoteContainerRuntime:
 			// No-op.
 			break
 		default:
@@ -743,7 +743,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount = false
 	}
 	// setup volumeManager
-	klet.volumeManager, err = volumemanager.NewVolumeManager(
+	klet.volumeManager = volumemanager.NewVolumeManager(
 		kubeCfg.EnableControllerAttachDetach,
 		nodeName,
 		klet.podManager,
@@ -814,7 +814,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.appArmorValidator = apparmor.NewValidator(kubeCfg.ContainerRuntime)
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	if utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
-		if kubeCfg.ContainerRuntime == "docker" {
+		if kubeCfg.ContainerRuntime == kubetypes.DockerContainerRuntime {
 			if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, kubeDeps.DockerClient); err != nil {
 				return nil, err
 			}
@@ -2122,7 +2122,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 	}
 	// rkt uses the legacy, non-CRI integration. Don't check the runtime
 	// conditions for it.
-	if kl.kubeletConfiguration.ContainerRuntime != "rkt" {
+	if kl.kubeletConfiguration.ContainerRuntime != kubetypes.RktContainerRuntime {
 		if s == nil {
 			glog.Errorf("Container runtime status is nil")
 			return

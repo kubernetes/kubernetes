@@ -30,7 +30,7 @@ type cadvisorClient struct {
 var _ Interface = new(cadvisorClient)
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(port uint, runtime string, rootPath string) (Interface, error) {
+func New(address string, port uint, runtime string, rootPath string) (Interface, error) {
 	return &cadvisorClient{}, nil
 }
 

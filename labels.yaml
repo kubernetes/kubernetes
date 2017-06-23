@@ -92,8 +92,6 @@ labels:
   color: d4c5f9
 - name: area/platform/gke
   color: d4c5f9
-- name: area/platform/mesos
-  color: d4c5f9
 - name: area/platform/vagrant
   color: d4c5f9
 - name: area/platform/vsphere
@@ -182,8 +180,6 @@ labels:
   color: f7c6c7
 - name: kind/friction
   color: c7def8
-- name: kind/mesos-flake
-  color: f7c6c7
 - name: kind/new-api
   color: c7def8
 - name: kind/old-docs
@@ -323,8 +319,6 @@ labels:
 - name: team/gke
   color: d2b48c
 - name: team/huawei
-  color: d2b48c
-- name: team/mesosphere
   color: d2b48c
 - name: team/redhat
   color: d2b48c

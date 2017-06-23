@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "alpha.go",
         "annotate.go",
         "apiversions.go",
         "apply.go",
@@ -79,6 +80,7 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/client/unversioned:go_default_library",
+        "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/auth:go_default_library",
         "//pkg/kubectl/cmd/config:go_default_library",
@@ -160,6 +162,7 @@ go_test(
         "create_configmap_test.go",
         "create_deployment_test.go",
         "create_namespace_test.go",
+        "create_pdb_test.go",
         "create_quota_test.go",
         "create_role_test.go",
         "create_rolebinding_test.go",

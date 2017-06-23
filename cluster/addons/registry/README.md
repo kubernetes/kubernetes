@@ -249,7 +249,7 @@ You can use `kubectl` to set up a port-forward from your local node to a
 running Pod:
 
 ```console
-$ POD=$(kubectl get pods --namespace kube-system -l k8s-app=kube-registry \
+$ POD=$(kubectl get pods --namespace kube-system -l k8s-app=kube-registry-upstream \
             -o template --template '{{range .items}}{{.metadata.name}} {{.status.phase}}{{"\n"}}{{end}}' \
             | grep Running | head -1 | cut -f1 -d' ')
 

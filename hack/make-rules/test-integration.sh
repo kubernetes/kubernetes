@@ -70,7 +70,7 @@ runTests() {
   KUBE_RACE="-race"
   make -C "${KUBE_ROOT}" test \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
-      KUBE_GOFLAGS="${KUBE_GOFLAGS:-}" \
+      GOFLAGS="${GOFLAGS:-}" \
       KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=garbage*collector*=6 --alsologtostderr=true" \
       KUBE_RACE="" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
@@ -83,7 +83,8 @@ checkEtcdOnPath() {
   kube::log::status "Checking etcd is on PATH"
   which etcd && return
   kube::log::status "Cannot find etcd, cannot run integration tests."
-  kube::log::status "Please see docs/devel/testing.md for instructions."
+  kube::log::status "Please see https://github.com/kubernetes/community/blob/master/contributors/devel/testing.md#install-etcd-dependency for instructions."
+  kube::log::usage "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
   return 1
 }
 
