@@ -122,7 +122,7 @@ func TestReplicationControllerStop(t *testing.T) {
 					},
 				},
 			},
-			StopError:       fmt.Errorf("Detected overlapping controllers for rc foo: baz, please manage deletion individually with --cascade=false."),
+			StopError:       fmt.Errorf("overlapped controllers are detected for rc foo: baz, please manage deletion individually with --cascade=false."),
 			ExpectedActions: []string{"get", "list"},
 		},
 
@@ -163,7 +163,7 @@ func TestReplicationControllerStop(t *testing.T) {
 				},
 			},
 
-			StopError:       fmt.Errorf("Detected overlapping controllers for rc foo: baz,zaz, please manage deletion individually with --cascade=false."),
+			StopError:       fmt.Errorf("overlapped controllers are detected for rc foo: baz,zaz, please manage deletion individually with --cascade=false."),
 			ExpectedActions: []string{"get", "list"},
 		},
 
