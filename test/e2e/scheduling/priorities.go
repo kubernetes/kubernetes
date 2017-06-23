@@ -84,29 +84,6 @@ var _ = framework.KubeDescribe("SchedulerPriorities [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("Pods should be scheduled to low resource use rate node", func() {
-		//Make sure all the schedulable nodes are balanced (have the same cpu/mem usage ratio)
-		By("Create pods on each node except the last one to raise cpu and memory usage to the same high level")
-		var expectedNodeName string
-		expectedNodeName = nodeList.Items[len(nodeList.Items)-1].Name
-		nodes := nodeList.Items[:len(nodeList.Items)-1]
-		// make the nodes except last have cpu,mem usage to 90%
-		createBalancedPodForNodes(f, cs, ns, nodes, podRequestedResource, 0.9)
-		By("Create a pod,pod should schedule to the least requested nodes")
-		createPausePod(f, pausePodConfig{
-			Name:      "priority-least-requested",
-			Labels:    map[string]string{"name": "priority-least-requested"},
-			Resources: podRequestedResource,
-		})
-		By("Wait for all the pods are running")
-		err := f.WaitForPodRunning("priority-least-requested")
-		framework.ExpectNoError(err)
-		By("Verify the pod is scheduled to the expected node")
-		testPod, err := cs.CoreV1().Pods(ns).Get("priority-least-requested", metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		Expect(testPod.Spec.NodeName).Should(Equal(expectedNodeName))
-	})
-
 	It("Pods created by ReplicationController should spread to different node", func() {
 		By("Create a pod for each node to make the nodes have almost same cpu/mem usage ratio")
 
