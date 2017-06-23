@@ -28,6 +28,7 @@ go_library(
         "//federation/pkg/federation-controller/sync:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/master:go_default_library",
+        "//test/e2e_node/services:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

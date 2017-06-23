@@ -20,6 +20,8 @@ import (
 	"io/ioutil"
 	"os"
 
+	"k8s.io/kubernetes/test/e2e/framework"
+
 	"github.com/golang/glog"
 )
 
@@ -128,7 +130,7 @@ func (es *e2eServices) startApiServer() error {
 // startNamespaceController starts the embedded namespace controller or returns an error.
 func (es *e2eServices) startNamespaceController() error {
 	glog.Info("Starting namespace controller")
-	es.nsController = NewNamespaceController()
+	es.nsController = NewNamespaceController(framework.TestContext.Host)
 	return es.nsController.Start()
 }
 
