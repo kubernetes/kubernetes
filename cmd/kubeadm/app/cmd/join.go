@@ -147,11 +147,6 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks")
 
-		// First, check if we're root separately from the other preflight checks and fail fast
-		if err := preflight.RunRootCheckOnly(); err != nil {
-			return nil, err
-		}
-
 		// Then continue with the others...
 		if err := preflight.RunJoinNodeChecks(cfg); err != nil {
 			return nil, err
