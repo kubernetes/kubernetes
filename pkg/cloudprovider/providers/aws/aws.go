@@ -2046,17 +2046,22 @@ func ipPermissionExists(newPermission, existing *ec2.IpPermission, compareGroupU
 				break
 			}
 		}
-		if found == false {
+		if !found {
 			return false
 		}
 	}
+
 	for _, leftPair := range newPermission.UserIdGroupPairs {
+		found := false
 		for _, rightPair := range existing.UserIdGroupPairs {
 			if isEqualUserGroupPair(leftPair, rightPair, compareGroupUserIDs) {
-				return true
+				found = true
+				break
 			}
 		}
-		return false
+		if !found {
+			return false
+		}
 	}
 
 	return true
