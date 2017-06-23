@@ -65,5 +65,10 @@ type IndexLister struct {
 
 // ServeHTTP serves the available paths.
 func (i IndexLister) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	responsewriters.WriteRawJSON(i.StatusCode, metav1.RootPaths{Paths: i.PathProvider.ListedPaths()}, w)
+
+	if i.StatusCode == http.StatusOK {
+		responsewriters.WriteRawJSONWithETag(metav1.RootPaths{Paths: i.PathProvider.ListedPaths()}, w, r)
+	} else {
+		responsewriters.WriteRawJSON(i.StatusCode, metav1.RootPaths{Paths: i.PathProvider.ListedPaths()}, w)
+	}
 }

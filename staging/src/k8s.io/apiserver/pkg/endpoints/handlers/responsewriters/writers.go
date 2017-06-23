@@ -17,11 +17,14 @@ limitations under the License.
 package responsewriters
 
 import (
+	"bytes"
+	"crypto/sha512"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -164,4 +167,17 @@ func WriteRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	w.Write(output)
+}
+
+// WriteRawJSON writes a non-API object in JSON with eTag support.
+func WriteRawJSONWithETag(object interface{}, w http.ResponseWriter, r *http.Request) {
+	output, err := json.MarshalIndent(object, "", "  ")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Etag", fmt.Sprintf("\"%X\"", sha512.Sum512(output)))
+	w.Header().Set("Content-Type", "application/json")
+	// ServeContent will take care of caching using eTag.
+	http.ServeContent(w, r, "", time.Unix(0, 0), bytes.NewReader(output))
 }
