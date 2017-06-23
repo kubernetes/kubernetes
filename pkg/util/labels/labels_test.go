@@ -37,8 +37,13 @@ func TestCloneAndAddLabel(t *testing.T) {
 		want       map[string]string
 	}{
 		{
-			labels: labels,
-			want:   labels,
+			labels:   labels,
+			labelKey: "", // this case will add an empty label key
+			want: map[string]string{
+				"foo1": "bar1",
+				"foo2": "bar2",
+				"foo3": "bar3",
+			},
 		},
 		{
 			labels:     labels,
@@ -58,10 +63,44 @@ func TestCloneAndAddLabel(t *testing.T) {
 		if !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("[Add] got %v, want %v", got, tc.want)
 		}
-		// now test the inverse.
-		got_rm := CloneAndRemoveLabel(got, tc.labelKey)
-		if !reflect.DeepEqual(got_rm, tc.labels) {
-			t.Errorf("[RM] got %v, want %v", got_rm, tc.labels)
+	}
+}
+
+func TestCloneAndRemoveLabel(t *testing.T) {
+	labels := map[string]string{
+		"foo1": "bar1",
+		"foo2": "bar2",
+		"foo3": "bar3",
+	}
+
+	cases := []struct {
+		labels   map[string]string
+		labelKey string
+		want     map[string]string
+	}{
+		{
+			labels:   labels,
+			labelKey: "", // this case will remove an empty label key
+			want: map[string]string{
+				"foo1": "bar1",
+				"foo2": "bar2",
+				"foo3": "bar3",
+			},
+		},
+		{
+			labels:   labels,
+			labelKey: "foo3",
+			want: map[string]string{
+				"foo1": "bar1",
+				"foo2": "bar2",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		got := CloneAndRemoveLabel(tc.labels, tc.labelKey)
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("[Add] got %v, want %v", got, tc.want)
 		}
 	}
 }
