@@ -43,6 +43,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
+	"k8s.io/kubernetes/pkg/controller/volume/events"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -407,9 +408,7 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 			}
 		})
 
-		// NOTE: Slow!  The test will wait up to 5 minutes (framework.ClaimProvisionTimeout)
-		// when there is no regression.
-		It("should not provision a volume in an unmanaged GCE zone. [Slow]", func() {
+		It("should not provision a volume in an unmanaged GCE zone.", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			var suffix string = "unmananged"
 
@@ -452,7 +451,7 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 			Expect(err).NotTo(HaveOccurred())
 			defer deleteStorageClass(c, sc.Name)
 
-			By("Creating a claim and expecting it to timeout")
+			By("Creating a claim and expecting it to receive a ProvisioningFailed event")
 			pvc := newClaim(test, ns, suffix)
 			pvc.Spec.StorageClassName = &sc.Name
 			pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
@@ -461,10 +460,9 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
 			}()
 
-			// The claim should timeout phase:Pending
-			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionTimeout)
-			Expect(err).To(HaveOccurred())
-			framework.Logf(err.Error())
+			// The claim should receive a ProvisioningFailed event with message mentioning the unmanaged zone
+			err = framework.WaitForParticularEvent(c, ns, pvc, events.ProvisioningFailed, "kubernetes does not manage zone")
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("should test that deleting a claim before the volume is provisioned deletes the volume.", func() {

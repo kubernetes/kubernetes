@@ -3055,6 +3055,22 @@ func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds in
 	})
 }
 
+// Waits for an event on the given object generated for the desired reason and containing the given message
+func WaitForParticularEvent(c clientset.Interface, ns string, objOrRef runtime.Object, desiredReason, substrMessage string) error {
+	return wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
+		events, err := c.Core().Events(ns).Search(api.Scheme, objOrRef)
+		if err != nil {
+			return false, fmt.Errorf("error in listing events: %s", err)
+		}
+		for _, e := range events.Items {
+			if e.Reason == desiredReason && strings.Contains(e.Message, substrMessage) {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+}
+
 // Waits for the number of events on the given object to reach a desired count.
 func WaitForEvents(c clientset.Interface, ns string, objOrRef runtime.Object, desiredEventsCount int) error {
 	return wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
