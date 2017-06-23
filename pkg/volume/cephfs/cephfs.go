@@ -107,7 +107,7 @@ func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.
 		}
 		for name, data := range secretName.Data {
 			secret = string(data)
-			glog.V(1).Infof("found ceph secret info: %s", name)
+			glog.V(4).Infof("found ceph secret info: %s", name)
 		}
 	}
 	return plugin.newMounterInternal(spec, pod.UID, plugin.host.GetMounter(), secret)
