@@ -402,6 +402,7 @@ func deprecatedAlias(deprecatedVersion string, cmd *cobra.Command) *cobra.Comman
 
 	cmd.Use = deprecatedVersion
 	cmd.Deprecated = fmt.Sprintf("use %q instead", originalName)
+	cmd.Short = fmt.Sprintf("%s. This command is deprecated, use %q instead", cmd.Short, originalName)
 	cmd.Hidden = true
 	return cmd
 }
