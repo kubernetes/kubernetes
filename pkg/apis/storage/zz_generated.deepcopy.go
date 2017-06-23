@@ -23,6 +23,7 @@ package storage
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	api "k8s.io/kubernetes/pkg/api"
 	reflect "reflect"
 )
 
@@ -57,6 +58,15 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
+		}
+	}
+	if in.ReclaimPolicy != nil {
+		in, out := &in.ReclaimPolicy, &out.ReclaimPolicy
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(api.PersistentVolumeReclaimPolicy)
+			**out = **in
 		}
 	}
 	return

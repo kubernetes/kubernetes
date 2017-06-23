@@ -8,13 +8,16 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "defaults.go",
         "doc.go",
         "register.go",
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/apis/storage:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/storage/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

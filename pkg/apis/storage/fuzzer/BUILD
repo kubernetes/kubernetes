@@ -8,7 +8,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fuzzer.go"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/apis/storage:go_default_library",
+        "//vendor/github.com/google/gofuzz:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+    ],
 )
 
 filegroup(
