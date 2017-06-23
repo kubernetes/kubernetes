@@ -98,6 +98,10 @@ func (c *fakeClient) Create(*certificates.CertificateSigningRequest) (*certifica
 	return &csr, nil
 }
 
+func (c *fakeClient) List(opts v1.ListOptions) (*certificates.CertificateSigningRequestList, error) {
+	return &certificates.CertificateSigningRequestList{}, nil
+}
+
 func (c *fakeClient) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	c.watch = watch.NewFakeWithChanSize(1, false)
 	c.watch.Add(c.generateCSR())
