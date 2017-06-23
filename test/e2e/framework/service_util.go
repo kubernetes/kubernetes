@@ -1300,17 +1300,17 @@ func VerifyServeHostnameServiceDown(c clientset.Interface, host string, serviceI
 	return fmt.Errorf("waiting for service to be down timed out")
 }
 
-func CleanupServiceResources(loadBalancerName, zone string) {
+func CleanupServiceResources(c clientset.Interface, loadBalancerName, zone string) {
 	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
-		CleanupServiceGCEResources(loadBalancerName, zone)
+		CleanupServiceGCEResources(c, loadBalancerName, zone)
 	}
 
 	// TODO: we need to add this function with other cloud providers, if there is a need.
 }
 
-func CleanupServiceGCEResources(loadBalancerName, zone string) {
+func CleanupServiceGCEResources(c clientset.Interface, loadBalancerName, zone string) {
 	if pollErr := wait.Poll(5*time.Second, LoadBalancerCleanupTimeout, func() (bool, error) {
-		if err := CleanupGCEResources(loadBalancerName, zone); err != nil {
+		if err := CleanupGCEResources(c, loadBalancerName, zone); err != nil {
 			Logf("Still waiting for glbc to cleanup: %v", err)
 			return false, nil
 		}
