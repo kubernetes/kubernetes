@@ -32,7 +32,6 @@ func NewCmdPhase(out io.Writer) *cobra.Command {
 
 	cmd.AddCommand(NewCmdKubeConfig(out))
 	cmd.AddCommand(NewCmdCerts())
-	cmd.AddCommand(NewCmdValidate())
 	cmd.AddCommand(NewCmdPreFlight())
 
 	return cmd
