@@ -50,8 +50,6 @@ func (defaultNodeIdentifier) NodeIdentity(u user.Info) (string, bool) {
 		return "", false
 	}
 
-	nodeName := strings.TrimPrefix(userName, nodeUserNamePrefix)
-
 	isNode := false
 	for _, g := range u.GetGroups() {
 		if g == user.NodesGroup {
@@ -63,5 +61,6 @@ func (defaultNodeIdentifier) NodeIdentity(u user.Info) (string, bool) {
 		return "", false
 	}
 
-	return nodeName, isNode
+	nodeName := strings.TrimPrefix(userName, nodeUserNamePrefix)
+	return nodeName, true
 }
