@@ -16,8 +16,12 @@ limitations under the License.
 
 package apis
 
+import (
+	"k8s.io/kubernetes/pkg/api"
+)
+
 const (
-	LabelHostname          = "kubernetes.io/hostname"
+	LabelHostname          = api.HostNameAnnotationKey
 	LabelZoneFailureDomain = "failure-domain.beta.kubernetes.io/zone"
 	LabelZoneRegion        = "failure-domain.beta.kubernetes.io/region"
 

@@ -29,6 +29,9 @@ const (
 	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
 	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
 
+	// HostNameAnnotationKey represents the annotation key of hostname set by kubelets
+	HostNameAnnotationKey string = "kubernetes.io/hostname"
+
 	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
 	// in the Annotations of a Pod.
 	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
