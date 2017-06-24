@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -272,53 +271,6 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(len(finishedJobs) == 1).To(BeTrue())
 
 		By("Removing cronjob")
-		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	// Adopt Jobs it owns that don't have ControllerRef yet.
-	// That is, the Jobs were created by a pre-v1.6.0 master.
-	It("should adopt Jobs it owns that don't have ControllerRef yet", func() {
-		By("Creating a cronjob")
-		cronJob := newTestCronJob("adopt", "*/1 * * * ?", batchv2alpha1.ForbidConcurrent,
-			sleepCommand, nil)
-		// Replace cronJob with the one returned from Create() so it has the UID.
-		// Save Kind since it won't be populated in the returned cronJob.
-		kind := cronJob.Kind
-		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		Expect(err).NotTo(HaveOccurred())
-		cronJob.Kind = kind
-
-		By("Ensuring a Job is running")
-		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Orphaning a Job")
-		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		Expect(jobs.Items).To(HaveLen(1))
-		job := jobs.Items[0]
-		framework.UpdateJobFunc(f.ClientSet, f.Namespace.Name, job.Name, func(job *batchv1.Job) {
-			job.OwnerReferences = nil
-		})
-
-		By("Checking that the CronJob readopts the Job")
-		Expect(wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-			job, err := framework.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
-			if err != nil {
-				return false, err
-			}
-			controllerRef := controller.GetControllerOf(job)
-			if controllerRef == nil {
-				return false, nil
-			}
-			if controllerRef.Kind != cronJob.Kind || controllerRef.Name != cronJob.Name || controllerRef.UID != cronJob.UID {
-				return false, fmt.Errorf("Job has wrong controllerRef: got %v, want %v", controllerRef, cronJob)
-			}
-			return true, nil
-		})).To(Succeed(), "wait for Job %q to be readopted", job.Name)
-
-		By("Removing CronJob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
 		Expect(err).NotTo(HaveOccurred())
 	})
