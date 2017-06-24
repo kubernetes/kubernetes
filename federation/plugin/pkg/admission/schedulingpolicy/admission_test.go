@@ -343,6 +343,7 @@ func newControllerWithTestServer(f func(w http.ResponseWriter, r *http.Request),
 	if err != nil {
 		return nil, err
 	}
+	defer file.Close()
 
 	controller, err := newAdmissionController(file)
 	if err != nil {
