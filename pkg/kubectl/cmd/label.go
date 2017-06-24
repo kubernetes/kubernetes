@@ -308,7 +308,7 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 	labels := map[string]string{}
 	var remove []string
 	for _, labelSpec := range spec {
-		if strings.Index(labelSpec, "=") != -1 {
+		if strings.Contains(labelSpec, "=") {
 			parts := strings.Split(labelSpec, "=")
 			if len(parts) != 2 {
 				return nil, nil, fmt.Errorf("invalid label spec: %v", labelSpec)

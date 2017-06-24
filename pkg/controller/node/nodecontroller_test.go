@@ -51,7 +51,7 @@ const (
 	testNodeMonitorPeriod      = 5 * time.Second
 	testRateLimiterQPS         = float32(10000)
 	testLargeClusterThreshold  = 20
-	testUnhealtyThreshold      = float32(0.55)
+	testUnhealthyThreshold     = float32(0.55)
 )
 
 func alwaysReady() bool { return true }
@@ -559,7 +559,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			testRateLimiterQPS,
 			testRateLimiterQPS,
 			testLargeClusterThreshold,
-			testUnhealtyThreshold,
+			testUnhealthyThreshold,
 			testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod,
 			testNodeMonitorPeriod,
@@ -715,7 +715,7 @@ func TestPodStatusChange(t *testing.T) {
 
 	for _, item := range table {
 		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler,
-			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold, testNodeMonitorGracePeriod,
+			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
@@ -1232,7 +1232,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 			Clientset: fake.NewSimpleClientset(&v1.PodList{Items: item.podList}),
 		}
 		nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler,
-			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold, testNodeMonitorGracePeriod,
+			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.enterPartialDisruptionFunc = func(nodeNum int) float32 {
@@ -1326,7 +1326,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 		DeleteWaitChan: make(chan struct{}),
 	}
 	nodeController, _ := NewNodeControllerFromClient(nil, fnh, 10*time.Minute,
-		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
+		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
 		testNodeMonitorPeriod, nil, nil, 0, false, false)
 	nodeController.cloud = &fakecloud.FakeCloud{}
@@ -1596,7 +1596,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 
 	for i, item := range table {
 		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute,
-			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
+			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
 			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
@@ -1830,7 +1830,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 
 	for i, item := range table {
 		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute,
-			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
+			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
 			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
@@ -1941,7 +1941,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	updatedTaint := NotReadyTaintTemplate
 
 	nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler,
-		evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold, testNodeMonitorGracePeriod,
+		evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, true)
 	nodeController.now = func() metav1.Time { return fakeNow }
 	nodeController.recorder = testutil.NewFakeRecorder()
@@ -2032,7 +2032,7 @@ func TestNodeEventGeneration(t *testing.T) {
 	}
 
 	nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler, 5*time.Minute,
-		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
+		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
 		testNodeMonitorPeriod, nil, nil, 0, false, false)
 	nodeController.cloud = &fakecloud.FakeCloud{}

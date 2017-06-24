@@ -41,6 +41,12 @@ const (
 	// pluggable output backends and an audit policy specifying how different requests should be
 	// audited.
 	AdvancedAuditing utilfeature.Feature = "AdvancedAuditing"
+
+	// owner: @ilackams
+	// alpha: v1.7
+	//
+	// Enables compression of REST responses (GET and LIST only)
+	APIResponseCompression utilfeature.Feature = "APIResponseCompression"
 )
 
 func init() {
@@ -53,4 +59,5 @@ func init() {
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
 	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
 	AdvancedAuditing:        {Default: false, PreRelease: utilfeature.Alpha},
+	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 }

@@ -178,7 +178,7 @@ func parseTaints(spec []string) ([]v1.Taint, []v1.Taint, error) {
 	uniqueTaints := map[v1.TaintEffect]sets.String{}
 
 	for _, taintSpec := range spec {
-		if strings.Index(taintSpec, "=") != -1 && strings.Index(taintSpec, ":") != -1 {
+		if strings.Contains(taintSpec, "=") && strings.Contains(taintSpec, ":") {
 			newTaint, err := utiltaints.ParseTaint(taintSpec)
 			if err != nil {
 				return nil, nil, err
@@ -197,7 +197,7 @@ func parseTaints(spec []string) ([]v1.Taint, []v1.Taint, error) {
 		} else if strings.HasSuffix(taintSpec, "-") {
 			taintKey := taintSpec[:len(taintSpec)-1]
 			var effect v1.TaintEffect
-			if strings.Index(taintKey, ":") != -1 {
+			if strings.Contains(taintKey, ":") {
 				parts := strings.Split(taintKey, ":")
 				taintKey = parts[0]
 				effect = v1.TaintEffect(parts[1])

@@ -21,12 +21,10 @@ import (
 	"net"
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
-	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -56,10 +54,6 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
 	}
 
-	// Defaulting is made here because it's dependent on the version currently, which is determined above
-	// TODO(luxas): Cleanup this once we have dropped v1.6 support and move this code into the API group defaulting
-	cfg.AuthorizationModes = defaultAuthorizationModes(cfg.AuthorizationModes, k8sVersion)
-
 	fmt.Printf("[init] Using Kubernetes version: %s\n", cfg.KubernetesVersion)
 	fmt.Printf("[init] Using Authorization modes: %v\n", cfg.AuthorizationModes)
 
@@ -78,14 +72,4 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 
 	return nil
-}
-
-func defaultAuthorizationModes(authzModes []string, k8sVersion *version.Version) []string {
-	if kubeadmutil.IsNodeAuthorizerSupported(k8sVersion) {
-		strset := sets.NewString(authzModes...)
-		if !strset.Has(authzmodes.ModeNode) {
-			return append([]string{authzmodes.ModeNode}, authzModes...)
-		}
-	}
-	return authzModes
 }

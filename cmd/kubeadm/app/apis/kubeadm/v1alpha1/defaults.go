@@ -18,21 +18,21 @@ package v1alpha1
 
 import (
 	"net/url"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const (
-	DefaultServiceDNSDomain  = "cluster.local"
-	DefaultServicesSubnet    = "10.96.0.0/12"
-	DefaultKubernetesVersion = "stable-1.7"
-	DefaultAPIBindPort       = 6443
-	DefaultDiscoveryBindPort = 9898
-	DefaultAuthorizationMode = "RBAC"
-	DefaultCACertPath        = "/etc/kubernetes/pki/ca.crt"
-	DefaultCertificatesDir   = "/etc/kubernetes/pki"
-	DefaultEtcdDataDir       = "/var/lib/etcd"
+	DefaultServiceDNSDomain   = "cluster.local"
+	DefaultServicesSubnet     = "10.96.0.0/12"
+	DefaultKubernetesVersion  = "stable-1.7"
+	DefaultAPIBindPort        = 6443
+	DefaultAuthorizationModes = "Node,RBAC"
+	DefaultCACertPath         = "/etc/kubernetes/pki/ca.crt"
+	DefaultCertificatesDir    = "/etc/kubernetes/pki"
+	DefaultEtcdDataDir        = "/var/lib/etcd"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -57,7 +57,7 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	}
 
 	if len(obj.AuthorizationModes) == 0 {
-		obj.AuthorizationModes = []string{DefaultAuthorizationMode}
+		obj.AuthorizationModes = strings.Split(DefaultAuthorizationModes, ",")
 	}
 
 	if obj.CertificatesDir == "" {

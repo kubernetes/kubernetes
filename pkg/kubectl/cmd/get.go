@@ -289,8 +289,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 					first = false
 					return false, nil
 				}
-				err := printer.PrintObj(e.Object, out)
-				return false, err
+				return false, printer.PrintObj(e.Object, out)
 			})
 			return err
 		})

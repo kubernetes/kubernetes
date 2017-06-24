@@ -135,8 +135,8 @@ function install-node-problem-detector {
       local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
       local -r npd_sha1="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
   else
-      local -r npd_version="v0.4.0"
-      local -r npd_sha1="e56eda32121c1c23e839556443f21d04f41b0269"
+      local -r npd_version="v0.4.1"
+      local -r npd_sha1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
   fi
   local -r npd_release_path="https://storage.googleapis.com/kubernetes-release"
   local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"

@@ -160,6 +160,10 @@ type Config struct {
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc apirequest.LongRunningRequestCheck
 
+	// EnableAPIResponseCompression indicates whether API Responses should support compression
+	// if the client requests it via Accept-Encoding
+	EnableAPIResponseCompression bool
+
 	//===========================================================================
 	// values below here are targets for removal
 	//===========================================================================
@@ -206,19 +210,20 @@ type SecureServingInfo struct {
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	return &Config{
-		Serializer:                  codecs,
-		ReadWritePort:               443,
-		RequestContextMapper:        apirequest.NewRequestContextMapper(),
-		BuildHandlerChainFunc:       DefaultBuildHandlerChain,
-		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
-		DisabledPostStartHooks:      sets.NewString(),
-		HealthzChecks:               []healthz.HealthzChecker{healthz.PingHealthz},
-		EnableIndex:                 true,
-		EnableDiscovery:             true,
-		EnableProfiling:             true,
-		MaxRequestsInFlight:         400,
-		MaxMutatingRequestsInFlight: 200,
-		MinRequestTimeout:           1800,
+		Serializer:                   codecs,
+		ReadWritePort:                443,
+		RequestContextMapper:         apirequest.NewRequestContextMapper(),
+		BuildHandlerChainFunc:        DefaultBuildHandlerChain,
+		LegacyAPIGroupPrefixes:       sets.NewString(DefaultLegacyAPIPrefix),
+		DisabledPostStartHooks:       sets.NewString(),
+		HealthzChecks:                []healthz.HealthzChecker{healthz.PingHealthz},
+		EnableIndex:                  true,
+		EnableDiscovery:              true,
+		EnableProfiling:              true,
+		MaxRequestsInFlight:          400,
+		MaxMutatingRequestsInFlight:  200,
+		MinRequestTimeout:            1800,
+		EnableAPIResponseCompression: utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression),
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
@@ -412,6 +417,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		healthzChecks: c.HealthzChecks,
 
 		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer, c.RequestContextMapper),
+
+		enableAPIResponseCompression: c.EnableAPIResponseCompression,
 	}
 
 	for k, v := range delegationTarget.PostStartHooks() {

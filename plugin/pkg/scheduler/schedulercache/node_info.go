@@ -257,7 +257,7 @@ func (n *NodeInfo) String() string {
 }
 
 func hasPodAffinityConstraints(pod *v1.Pod) bool {
-	affinity := ReconcileAffinity(pod)
+	affinity := pod.Spec.Affinity
 	return affinity != nil && (affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil)
 }
 

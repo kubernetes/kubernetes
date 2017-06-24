@@ -31,12 +31,8 @@ import (
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
-	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -45,7 +41,7 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
-	"k8s.io/kubernetes/test/e2e/generated"
+	"k8s.io/kubernetes/test/e2e/manifest"
 	federationtest "k8s.io/kubernetes/test/e2e_federation"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -341,25 +337,12 @@ func RunE2ETests(t *testing.T) {
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
 
-func podFromManifest(filename string) (*v1.Pod, error) {
-	var pod v1.Pod
-	framework.Logf("Parsing pod from %v", filename)
-	data := generated.ReadOrDie(filename)
-	json, err := utilyaml.ToJSON(data)
-	if err != nil {
-		return nil, err
-	}
-	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &pod); err != nil {
-		return nil, err
-	}
-	return &pod, nil
-}
-
 // Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
 // to flip to Ready, log its output and delete it.
 func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 	path := "test/images/clusterapi-tester/pod.yaml"
-	p, err := podFromManifest(path)
+	framework.Logf("Parsing pod from %v", path)
+	p, err := manifest.PodFromManifest(path)
 	if err != nil {
 		framework.Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
 		return

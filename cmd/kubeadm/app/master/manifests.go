@@ -34,7 +34,6 @@ import (
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -46,7 +45,6 @@ import (
 const (
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 
-	defaultv16AdmissionControl = "NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota"
 	defaultv17AdmissionControl = "Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota"
 
 	etcd                  = "etcd"
@@ -333,7 +331,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 
 	defaultArguments := map[string]string{
 		"insecure-port":                     "0",
-		"admission-control":                 defaultv16AdmissionControl,
+		"admission-control":                 defaultv17AdmissionControl,
 		"service-cluster-ip-range":          cfg.Networking.ServiceSubnet,
 		"service-account-key-file":          filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
 		"client-ca-file":                    filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
@@ -357,10 +355,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 		// add options which allow the kube-apiserver to act as a front-proxy to aggregated API servers
 		defaultArguments["proxy-client-cert-file"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientCertName)
 		defaultArguments["proxy-client-key-file"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName)
-	}
-	if kubeadmutil.IsNodeAuthorizerSupported(k8sVersion) {
-		// enable the NodeRestriction admission plugin
-		defaultArguments["admission-control"] = defaultv17AdmissionControl
 	}
 
 	command = getComponentBaseCommand(apiServer)
@@ -514,17 +508,15 @@ func getSelfHostedAPIServerEnv() []api.EnvVar {
 	return append(getProxyEnvVars(), podIPEnvVar)
 }
 
+// getAuthzParameters gets the authorization-related parameters to the api server
+// At this point, we can assume the list of authorization modes is valid (due to that it has been validated in the API machinery code already)
+// If the list is empty; it's defaulted (mostly for unit testing)
 func getAuthzParameters(modes []string) []string {
 	command := []string{}
 	strset := sets.NewString(modes...)
 
-	// RBAC must always be set, prepend that if not present in the list
-	// TODO(luxas): In v1.8, require the Node and RBAC authorizers to be present
-	// In v1.8 we can utilize the API defaulting/validation to do enforce this,
-	// currently this logic has to be split up into two places, which is sub-optimal.
-	// Cleanup work is possible in and should be done in v1.8
-	if !strset.Has(authzmodes.ModeRBAC) {
-		modes = append([]string{authzmodes.ModeRBAC}, modes...)
+	if len(modes) == 0 {
+		return []string{fmt.Sprintf("--authorization-mode=%s", kubeadmapiext.DefaultAuthorizationModes)}
 	}
 
 	if strset.Has(authzmodes.ModeABAC) {

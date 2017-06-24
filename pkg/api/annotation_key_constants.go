@@ -72,11 +72,6 @@ const (
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
 
-	// AffinityAnnotationKey represents the key of affinity data (json serialized)
-	// in the Annotations of a Pod.
-	// TODO: remove when alpha support for affinity is removed
-	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
-
 	// annotation key prefix used to identify non-convertible json paths.
 	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"
 
