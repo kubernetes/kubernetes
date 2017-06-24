@@ -443,63 +443,6 @@ func TestSysctlsFromPodAnnotation(t *testing.T) {
 	}
 }
 
-// TODO: remove when alpha support for affinity is removed
-func TestGetAffinityFromPodAnnotations(t *testing.T) {
-	testCases := []struct {
-		pod       *v1.Pod
-		expectErr bool
-	}{
-		{
-			pod:       &v1.Pod{},
-			expectErr: false,
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			expectErr: false,
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-						`,
-					},
-				},
-			},
-			expectErr: true,
-		},
-	}
-
-	for i, tc := range testCases {
-		_, err := GetAffinityFromPodAnnotations(tc.pod.Annotations)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		}
-	}
-}
-
 // TODO: remove when alpha support for topology constraints is removed
 func TestGetNodeAffinityFromAnnotations(t *testing.T) {
 	testCases := []struct {
