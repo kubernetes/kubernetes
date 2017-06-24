@@ -34,15 +34,15 @@ import (
 )
 
 var (
-	cp_example = templates.Examples(i18n.T(`
-	    # !!!Important Note!!!
-	    # Requires that the 'tar' binary is present in your container
-	    # image.  If 'tar' is not present, 'kubectl cp' will fail.
+	cpExample = templates.Examples(i18n.T(`
+		# !!!Important Note!!!
+		# Requires that the 'tar' binary is present in your container
+		# image.  If 'tar' is not present, 'kubectl cp' will fail.
 
-	    # Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in the default namespace
+		# Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in the default namespace
 		kubectl cp /tmp/foo_dir <some-pod>:/tmp/bar_dir
 
-        # Copy /tmp/foo local file to /tmp/bar in a remote pod in a specific container
+		# Copy /tmp/foo local file to /tmp/bar in a remote pod in a specific container
 		kubectl cp /tmp/foo <some-pod>:/tmp/bar -c <specific-container>
 
 		# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>
@@ -52,8 +52,8 @@ var (
 		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`))
 
 	cpUsageStr = dedent.Dedent(`
-	    expected 'cp <file-spec-src> <file-spec-dest> [-c container]'.
-	    <file-spec> is:
+		expected 'cp <file-spec-src> <file-spec-dest> [-c container]'.
+		<file-spec> is:
 		[namespace/]pod-name:/file/path for a remote file
 		/file/path for a local file`)
 )
@@ -64,7 +64,7 @@ func NewCmdCp(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
 		Use:     "cp <file-spec-src> <file-spec-dest>",
 		Short:   i18n.T("Copy files and directories to and from containers."),
 		Long:    "Copy files and directories to and from containers.",
-		Example: cp_example,
+		Example: cpExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(runCopy(f, cmd, cmdOut, cmdErr, args))
 		},

@@ -38,7 +38,9 @@ var (
     kubectl create deployment my-dep --image=busybox`))
 )
 
-// NewCmdCreateDeployment is a macro command to create a new deployment
+// NewCmdCreateDeployment is a macro command to create a new deployment.
+// This command is better known to users as `kubectl create deployment`.
+// Note that this command overlaps significantly with the `kubectl run` command.
 func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deployment NAME --image=image [--dry-run]",
@@ -47,7 +49,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.
 		Long:    deploymentLong,
 		Example: deploymentExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := CreateDeployment(f, cmdOut, cmdErr, cmd, args)
+			err := createDeployment(f, cmdOut, cmdErr, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -60,8 +62,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.
 	return cmd
 }
 
-// CreateDeployment implements the behavior to run the create deployment command
-func CreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
+func createDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -91,7 +92,7 @@ func CreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer, cmd *cobra.Co
 	case cmdutil.DeploymentBasicV1Beta1GeneratorName:
 		generator = &kubectl.DeploymentBasicGeneratorV1{Name: name, Images: cmdutil.GetFlagStringSlice(cmd, "image")}
 	default:
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
+		return errUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,

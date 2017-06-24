@@ -46,11 +46,12 @@ const (
 	Timeout  = time.Minute * 5
 )
 
-// A Reaper handles terminating an object as gracefully as possible.
-// timeout is how long we'll wait for the termination to be successful
-// gracePeriod is time given to an API object for it to delete itself cleanly,
-// e.g., pod shutdown. It may or may not be supported by the API object.
+// A Reaper terminates an object as gracefully as possible.
 type Reaper interface {
+	// Stop a given object within a namespace. timeout is how long we'll
+	// wait for the termination to be successful. gracePeriod is time given
+	// to an API object for it to delete itself cleanly (e.g., pod
+	// shutdown). It may or may not be supported by the API object.
 	Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error
 }
 
@@ -133,11 +134,6 @@ type StatefulSetReaper struct {
 	client                appsclient.StatefulSetsGetter
 	podClient             coreclient.PodsGetter
 	pollInterval, timeout time.Duration
-}
-
-type objInterface interface {
-	Delete(name string) error
-	Get(name string) (metav1.Object, error)
 }
 
 // getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.
@@ -336,6 +332,8 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	}
 	if timeout == 0 {
 		numReplicas := ss.Spec.Replicas
+
+		// BUG: this timeout is never used.
 		timeout = Timeout + time.Duration(10*numReplicas)*time.Second
 	}
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)

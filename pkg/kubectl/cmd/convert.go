@@ -158,11 +158,7 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 	}
 	o.encoder = f.JSONEncoder()
 	o.printer, err = f.PrinterForCommand(cmd, o.local, nil, printers.PrintOptions{})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // RunConvert implements the generic Convert command
