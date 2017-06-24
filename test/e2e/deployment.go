@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -46,6 +47,12 @@ const (
 	nginxImageName = "nginx"
 	redisImage     = "gcr.io/google_containers/redis:e2e"
 	redisImageName = "redis"
+)
+
+var (
+	// Overlapping annotation has been removed in #42175 (v1.6).
+	// We don't expect the test for overlapping annotation to work with v1.6 or later.
+	deploymentControllerRefVersion = version.MustParse("v1.6.0-beta.2")
 )
 
 var _ = framework.KubeDescribe("Deployment", func() {
@@ -1196,6 +1203,9 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 func testOverlappingDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
+
+	// Overlapping annotation is removed in 1.6 so skipping the test for server >= 1.6
+	framework.SkipIfServerVersionGTE(deploymentControllerRefVersion, c.Discovery())
 
 	deploymentName := "first-deployment"
 	podLabels := map[string]string{"name": redisImageName}
