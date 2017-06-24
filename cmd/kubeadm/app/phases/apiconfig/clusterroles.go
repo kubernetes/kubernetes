@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	"k8s.io/kubernetes/pkg/util/version"
@@ -254,33 +253,28 @@ func createClusterRoleBindings(clientset *clientset.Clientset) error {
 
 func deletePermissiveNodesBindingWhenUsingNodeAuthorization(clientset *clientset.Clientset, k8sVersion *version.Version) error {
 
-	// If the server version is higher than the Node Authorizer's minimum, try to delete the Group=system:nodes->ClusterRole=system:node binding
-	// which is much more permissive than the Node Authorizer
-	if kubeadmutil.IsNodeAuthorizerSupported(k8sVersion) {
-
-		nodesRoleBinding, err := clientset.RbacV1beta1().ClusterRoleBindings().Get(kubeadmconstants.NodesClusterRoleBinding, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				// Nothing to do; the RoleBinding doesn't exist
-				return nil
-			}
-			return err
+	nodesRoleBinding, err := clientset.RbacV1beta1().ClusterRoleBindings().Get(kubeadmconstants.NodesClusterRoleBinding, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// Nothing to do; the RoleBinding doesn't exist
+			return nil
 		}
+		return err
+	}
 
-		newSubjects := []rbac.Subject{}
-		for _, subject := range nodesRoleBinding.Subjects {
-			// Skip the subject that binds to the system:nodes group
-			if subject.Name == kubeadmconstants.NodesGroup && subject.Kind == "Group" {
-				continue
-			}
-			newSubjects = append(newSubjects, subject)
+	newSubjects := []rbac.Subject{}
+	for _, subject := range nodesRoleBinding.Subjects {
+		// Skip the subject that binds to the system:nodes group
+		if subject.Name == kubeadmconstants.NodesGroup && subject.Kind == "Group" {
+			continue
 		}
+		newSubjects = append(newSubjects, subject)
+	}
 
-		nodesRoleBinding.Subjects = newSubjects
+	nodesRoleBinding.Subjects = newSubjects
 
-		if _, err := clientset.RbacV1beta1().ClusterRoleBindings().Update(nodesRoleBinding); err != nil {
-			return err
-		}
+	if _, err := clientset.RbacV1beta1().ClusterRoleBindings().Update(nodesRoleBinding); err != nil {
+		return err
 	}
 
 	return nil
