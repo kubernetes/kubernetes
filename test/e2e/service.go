@@ -1411,7 +1411,16 @@ var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
 		jig := framework.NewServiceTestJig(cs, serviceName)
 		nodes := jig.GetNodes(framework.MaxNodesForEndpointsTests)
 
-		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, false, nil)
+		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, false,
+			func(svc *v1.Service) {
+				// Change service port to avoid collision with opened hostPorts
+				// in other tests that run in parallel.
+				if len(svc.Spec.Ports) != 0 {
+					svc.Spec.Ports[0].TargetPort = intstr.FromInt(int(svc.Spec.Ports[0].Port))
+					svc.Spec.Ports[0].Port = 8081
+				}
+
+			})
 		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
