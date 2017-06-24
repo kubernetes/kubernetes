@@ -32,6 +32,9 @@ func TestValidateTokenDiscovery(t *testing.T) {
 		{&kubeadm.NodeConfiguration{Token: "772ef5.6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:9898"}}, nil, true},
 		{&kubeadm.NodeConfiguration{Token: ".6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:9898"}}, nil, false},
 		{&kubeadm.NodeConfiguration{Token: "772ef5.", DiscoveryTokenAPIServers: []string{"192.168.122.100:9898"}}, nil, false},
+		{&kubeadm.NodeConfiguration{Token: "772ef5.6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"2001:db8::100:9898"}}, nil, true},
+		{&kubeadm.NodeConfiguration{Token: ".6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"2001:db8::100:9898"}}, nil, false},
+		{&kubeadm.NodeConfiguration{Token: "772ef5.", DiscoveryTokenAPIServers: []string{"2001:db8::100:9898"}}, nil, false},
 	}
 	for _, rt := range tests {
 		err := ValidateToken(rt.c.Token, rt.f).ToAggregate()
@@ -101,11 +104,13 @@ func TestValidateAPIServerCertSANs(t *testing.T) {
 		sans     []string
 		expected bool
 	}{
-		{[]string{}, true},                                                  // ok if not provided
-		{[]string{"1,2,,3"}, false},                                         // not a DNS label or IP
-		{[]string{"my-hostname", "???&?.garbage"}, false},                   // not valid
-		{[]string{"my-hostname", "my.subdomain", "1.2.3.4"}, true},          // supported
-		{[]string{"my-hostname2", "my.other.subdomain", "10.0.0.10"}, true}, // supported
+		{[]string{}, true},                                                     // ok if not provided
+		{[]string{"1,2,,3"}, false},                                            // not a DNS label or IP
+		{[]string{"my-hostname", "???&?.garbage"}, false},                      // not valid
+		{[]string{"my-hostname", "my.subdomain", "1.2.3.4"}, true},             // supported
+		{[]string{"my-hostname2", "my.other.subdomain", "10.0.0.10"}, true},    // supported
+		{[]string{"my-hostname", "my.subdomain", "2001:db8::4"}, true},         // supported
+		{[]string{"my-hostname2", "my.other.subdomain", "2001:db8::10"}, true}, // supported
 	}
 	for _, rt := range tests {
 		actual := ValidateAPIServerCertSANs(rt.sans, nil)
@@ -186,6 +191,23 @@ func TestValidateMasterConfiguration(t *testing.T) {
 			AuthorizationModes: []string{"RBAC"},
 			Networking: kubeadm.Networking{
 				ServiceSubnet: "10.96.0.1/12",
+				DNSDomain:     "cluster.local",
+			},
+			CertificatesDir: "/some/other/cert/dir",
+			Token:           "abcdef.0123456789abcdef",
+		}, true},
+		{&kubeadm.MasterConfiguration{
+			AuthorizationModes: []string{"RBAC"},
+			Networking: kubeadm.Networking{
+				ServiceSubnet: "2001:db8::/98",
+				DNSDomain:     "cluster.local",
+			},
+			CertificatesDir: "/some/cert/dir",
+		}, false},
+		{&kubeadm.MasterConfiguration{
+			AuthorizationModes: []string{"RBAC"},
+			Networking: kubeadm.Networking{
+				ServiceSubnet: "2001:db8::/98",
 				DNSDomain:     "cluster.local",
 			},
 			CertificatesDir: "/some/other/cert/dir",
