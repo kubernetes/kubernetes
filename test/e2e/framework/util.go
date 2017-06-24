@@ -361,6 +361,16 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 	}
 }
 
+func SkipUnlessServerVersionLT(v *utilversion.Version, c discovery.ServerVersionInterface) {
+	gte, err := ServerVersionGTE(v, c)
+	if err != nil {
+		Failf("Failed to get server version: %v", err)
+	}
+	if gte {
+		Skipf("Not supported for server versions starting %q", v)
+	}
+}
+
 func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr schema.GroupVersionResource, namespace string) {
 	dynamicClient, err := clientPool.ClientForGroupVersionResource(gvr)
 	if err != nil {
