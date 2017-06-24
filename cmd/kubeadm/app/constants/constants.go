@@ -114,7 +114,4 @@ var (
 
 	// MinimumAPIAggregationVersion specifies the minimum kubernetes version that can be used enabling the API aggregation in the apiserver and the front proxy flags
 	MinimumAPIAggregationVersion = version.MustParseSemantic("v1.7.0-alpha.1")
-
-	// MinimumNodeAuthorizerVersion specifies the minimum kubernetes version that can be used for enabling the node authorizer
-	MinimumNodeAuthorizerVersion = version.MustParseSemantic("v1.7.0-beta.1")
 )
