@@ -55,7 +55,7 @@ type Metadata struct {
 	// .. and other fields we don't care about.  Expand as necessary.
 }
 
-// parseMetadataUUID reads JSON from OpenStack metadata server and parses
+// parseMetadata reads JSON from OpenStack metadata server and parses
 // instance ID out of it.
 func parseMetadata(r io.Reader) (*Metadata, error) {
 	var metadata Metadata
