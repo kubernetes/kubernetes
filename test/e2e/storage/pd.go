@@ -43,7 +43,7 @@ import (
 const (
 	gcePDDetachTimeout  = 10 * time.Minute
 	gcePDDetachPollTime = 10 * time.Second
-	nodeStatusTimeout   = 5 * time.Minute
+	nodeStatusTimeout   = 10 * time.Minute
 	nodeStatusPollTime  = 1 * time.Second
 	maxReadRetry        = 3
 )
