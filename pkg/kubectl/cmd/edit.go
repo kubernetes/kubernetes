@@ -19,7 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
-	gruntime "runtime"
+	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -108,7 +108,9 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddValidateOptionFlags(cmd, &options.ValidateOptions)
 	cmd.Flags().StringVarP(&options.Output, "output", "o", "yaml", "Output format. One of: yaml|json.")
 
-	cmd.Flags().BoolVar(&options.WindowsLineEndings, "windows-line-endings", gruntime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
+	cmd.Flags().BoolVar(&options.WindowsLineEndings, "windows-line-endings", runtime.GOOS == "windows",
+		"Defaults to the line ending native to your platform.")
+
 	cmdutil.AddApplyAnnotationVarFlags(cmd, &options.ApplyAnnotation)
 	cmdutil.AddRecordVarFlag(cmd, &options.Record)
 	cmdutil.AddInclude3rdPartyVarFlags(cmd, &options.Include3rdParty)

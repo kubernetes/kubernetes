@@ -5044,7 +5044,7 @@ func TestValidatePod(t *testing.T) {
 	}
 }
 
-func TestValidatePodWithDisabledAffinityInAnnotations(t *testing.T) {
+func TestValidatePodWithAffinity(t *testing.T) {
 	validPodSpec := func(affinity *api.Affinity) api.PodSpec {
 		spec := api.PodSpec{
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
@@ -5057,7 +5057,6 @@ func TestValidatePodWithDisabledAffinityInAnnotations(t *testing.T) {
 		return spec
 	}
 
-	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=False")
 	errorCases := []api.Pod{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
@@ -5129,29 +5128,30 @@ func TestValidatePodWithDisabledAffinityInAnnotations(t *testing.T) {
 			}),
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: validPodSpec(&api.Affinity{
-				PodAntiAffinity: &api.PodAntiAffinity{
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{
-							Weight: 10,
-							PodAffinityTerm: api.PodAffinityTerm{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "key2",
-											Operator: metav1.LabelSelectorOpNotIn,
-											Values:   []string{"value1", "value2"},
-										},
+		/* TODO: Re-enable if/when topologykey is required.
+		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+		Spec: validPodSpec(&api.Affinity{
+			PodAntiAffinity: &api.PodAntiAffinity{
+				PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+					{
+						Weight: 10,
+						PodAffinityTerm: api.PodAffinityTerm{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: metav1.LabelSelectorOpNotIn,
+										Values:   []string{"value1", "value2"},
 									},
 								},
-								Namespaces:  []string{"ns"},
-								TopologyKey: "",
 							},
+							Namespaces:  []string{"ns"},
+							TopologyKey: "",
 						},
 					},
 				},
-			}),
+			},
+		}),*/
 		},
 	}
 

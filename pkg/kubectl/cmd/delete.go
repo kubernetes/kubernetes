@@ -327,7 +327,7 @@ func deleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper
 	return nil
 }
 
-// objectDeletionWaitInterval is the interval to wait between checks for deletion. Exposed for testing.
+// objectDeletionWaitInterval is the interval to wait between checks for deletion.
 var objectDeletionWaitInterval = time.Second
 
 // waitForObjectDeletion refreshes the object, waiting until it is deleted, a timeout is reached, or

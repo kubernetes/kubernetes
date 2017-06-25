@@ -224,10 +224,10 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error
 	}
 	dir := cmdutil.GetFlagString(cmd, "output-directory")
 	if len(dir) == 0 {
-		dir = "."
+		dir = "standard output"
 	}
 	if dir != "-" {
-		fmt.Fprintf(out, "Cluster info dumped to %s", dir)
+		fmt.Fprintf(out, "Cluster info dumped to %s\n", dir)
 	}
 	return nil
 }

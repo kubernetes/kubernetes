@@ -110,10 +110,6 @@ func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList
 func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if annotations[api.AffinityAnnotationKey] != "" {
-		allErrs = append(allErrs, ValidateAffinityInPodAnnotations(annotations, fldPath)...)
-	}
-
 	if value, isMirror := annotations[api.MirrorPodAnnotationKey]; isMirror {
 		if len(spec.NodeName) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Key(api.MirrorPodAnnotationKey), value, "must set spec.nodeName if mirror pod annotation is set"))
@@ -161,23 +157,6 @@ func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath 
 		allErrs = append(allErrs, ValidateTolerations(tolerations, fldPath.Child(api.TolerationsAnnotationKey))...)
 	}
 
-	return allErrs
-}
-
-// ValidateAffinityInPodAnnotations tests that the serialized Affinity in Pod.Annotations has valid data
-func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	affinity, err := helper.GetAffinityFromPodAnnotations(annotations)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, api.AffinityAnnotationKey, err.Error()))
-		return allErrs
-	}
-	if affinity == nil {
-		return allErrs
-	}
-
-	allErrs = append(allErrs, validateAffinity(affinity, fldPath.Child("affinity"))...)
 	return allErrs
 }
 
@@ -2430,9 +2409,7 @@ func ValidatePreferredSchedulingTerms(terms []api.PreferredSchedulingTerm, fldPa
 // validatePodAffinityTerm tests that the specified podAffinityTerm fields have valid data
 func validatePodAffinityTerm(podAffinityTerm api.PodAffinityTerm, allowEmptyTopologyKey bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AffinityInAnnotations) && len(podAffinityTerm.TopologyKey) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("topologyKey"), "can not be empty"))
-	}
+
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, fldPath.Child("matchExpressions"))...)
 	for _, name := range podAffinityTerm.Namespaces {
 		for _, msg := range ValidateNamespaceName(name, false) {

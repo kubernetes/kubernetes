@@ -80,6 +80,6 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	cmd := NewCmdCreateDeployment(f, buf, buf)
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", "name")
-	err := CreateDeployment(f, buf, buf, cmd, []string{depName})
+	err := createDeployment(f, buf, buf, cmd, []string{depName})
 	assert.Error(t, err, "at least one image must be specified")
 }

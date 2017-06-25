@@ -18,6 +18,7 @@ package endpoints
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -66,6 +67,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/server/filters"
 )
 
 // alwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.
@@ -905,25 +907,23 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 		ErrCode int
 	}
 	cases := map[string]T{
-		"groupless GET object":      {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"groupless GET list":        {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
-		"groupless POST list":       {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
-		"groupless PUT object":      {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"groupless DELETE object":   {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"groupless watch list":      {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo", http.StatusNotFound},
-		"groupless watch object":    {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
-		"groupless proxy object":    {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
-		"groupless redirect object": {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/redirect/foo/bar", http.StatusNotFound},
+		"groupless GET object":    {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"groupless GET list":      {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
+		"groupless POST list":     {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
+		"groupless PUT object":    {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"groupless DELETE object": {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"groupless watch list":    {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo", http.StatusNotFound},
+		"groupless watch object":  {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
+		"groupless proxy object":  {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
 
-		"GET object":      {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"GET list":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
-		"POST list":       {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
-		"PUT object":      {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"DELETE object":   {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"watch list":      {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo", http.StatusNotFound},
-		"watch object":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
-		"proxy object":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
-		"redirect object": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/redirect/foo/bar", http.StatusNotFound},
+		"GET object":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"GET list":      {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
+		"POST list":     {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
+		"PUT object":    {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"DELETE object": {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"watch list":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo", http.StatusNotFound},
+		"watch object":  {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
+		"proxy object":  {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
 	}
 	handler := handle(map[string]rest.Storage{
 		"foo": UnimplementedRESTStorage{},
@@ -1203,6 +1203,110 @@ func TestRequestsWithInvalidQuery(t *testing.T) {
 				continue
 			}
 			t.Logf("%d: body: %s", i, string(body))
+		}
+	}
+}
+
+func TestListCompression(t *testing.T) {
+	testCases := []struct {
+		url            string
+		namespace      string
+		selfLink       string
+		legacy         bool
+		label          string
+		field          string
+		acceptEncoding string
+	}{
+		// list items in a namespace in the path
+		{
+			url:            "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
+			namespace:      "default",
+			selfLink:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
+			acceptEncoding: "",
+		},
+		{
+			url:            "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
+			namespace:      "default",
+			selfLink:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
+			acceptEncoding: "gzip",
+		},
+	}
+	for i, testCase := range testCases {
+		storage := map[string]rest.Storage{}
+		simpleStorage := SimpleRESTStorage{expectedResourceNamespace: testCase.namespace}
+		storage["simple"] = &simpleStorage
+		selfLinker := &setTestSelfLinker{
+			t:           t,
+			namespace:   testCase.namespace,
+			expectedSet: testCase.selfLink,
+		}
+		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
+
+		requestContextMapper = request.NewRequestContextMapper()
+
+		handler = filters.WithCompression(handler, requestContextMapper)
+		handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
+		handler = request.WithRequestContext(handler, requestContextMapper)
+
+		server := httptest.NewServer(handler)
+
+		defer server.Close()
+
+		req, err := http.NewRequest("GET", server.URL+testCase.url, nil)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		// It's necessary to manually set Accept-Encoding here
+		// to prevent http.DefaultClient from automatically
+		// decoding responses
+		req.Header.Set("Accept-Encoding", testCase.acceptEncoding)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, testCase.url, http.StatusOK, resp)
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
+			t.Logf("%d: body: %s", i, string(body))
+			continue
+		}
+		// TODO: future, restore get links
+		if !selfLinker.called {
+			t.Errorf("%d: never set self link", i)
+		}
+		if !simpleStorage.namespacePresent {
+			t.Errorf("%d: namespace not set", i)
+		} else if simpleStorage.actualNamespace != testCase.namespace {
+			t.Errorf("%d: %q unexpected resource namespace: %s", i, testCase.url, simpleStorage.actualNamespace)
+		}
+		if simpleStorage.requestedLabelSelector == nil || simpleStorage.requestedLabelSelector.String() != testCase.label {
+			t.Errorf("%d: unexpected label selector: %v", i, simpleStorage.requestedLabelSelector)
+		}
+		if simpleStorage.requestedFieldSelector == nil || simpleStorage.requestedFieldSelector.String() != testCase.field {
+			t.Errorf("%d: unexpected field selector: %v", i, simpleStorage.requestedFieldSelector)
+		}
+
+		var decoder *json.Decoder
+		if testCase.acceptEncoding == "gzip" {
+			gzipReader, err := gzip.NewReader(resp.Body)
+			if err != nil {
+				t.Fatalf("unexpected error creating gzip reader: %v", err)
+			}
+			decoder = json.NewDecoder(gzipReader)
+		} else {
+			decoder = json.NewDecoder(resp.Body)
+		}
+		var itemOut genericapitesting.SimpleList
+		err = decoder.Decode(&itemOut)
+		if err != nil {
+			t.Errorf("failed to read response body as SimpleList: %v", err)
 		}
 	}
 }
@@ -1519,6 +1623,82 @@ func TestGet(t *testing.T) {
 	}
 	if !selfLinker.called {
 		t.Errorf("Never set self link")
+	}
+}
+
+func TestGetCompression(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		item: genericapitesting.Simple{
+			Other: "foo",
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		name:        "id",
+		namespace:   "default",
+	}
+
+	requestContextMapper = request.NewRequestContextMapper()
+
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	handler = filters.WithCompression(handler, requestContextMapper)
+	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
+	handler = request.WithRequestContext(handler, requestContextMapper)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	tests := []struct {
+		acceptEncoding string
+	}{
+		{acceptEncoding: ""},
+		{acceptEncoding: "gzip"},
+	}
+
+	for _, test := range tests {
+		req, err := http.NewRequest("GET", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/id", nil)
+		if err != nil {
+			t.Fatalf("unexpected error cretaing request: %v", err)
+		}
+		// It's necessary to manually set Accept-Encoding here
+		// to prevent http.DefaultClient from automatically
+		// decoding responses
+		req.Header.Set("Accept-Encoding", test.acceptEncoding)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("unexpected response: %#v", resp)
+		}
+		var decoder *json.Decoder
+		if test.acceptEncoding == "gzip" {
+			gzipReader, err := gzip.NewReader(resp.Body)
+			if err != nil {
+				t.Fatalf("unexpected error creating gzip reader: %v", err)
+			}
+			decoder = json.NewDecoder(gzipReader)
+		} else {
+			decoder = json.NewDecoder(resp.Body)
+		}
+		var itemOut genericapitesting.Simple
+		err = decoder.Decode(&itemOut)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Errorf("unexpected error reading body: %v", err)
+		}
+
+		if itemOut.Name != simpleStorage.item.Name {
+			t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
+		}
+		if !selfLinker.called {
+			t.Errorf("Never set self link")
+		}
 	}
 }
 

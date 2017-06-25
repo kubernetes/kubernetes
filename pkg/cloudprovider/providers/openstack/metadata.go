@@ -35,7 +35,7 @@ import (
 // metadataUrl is URL to OpenStack metadata server. It's hardcoded IPv4
 // link-local address as documented in "OpenStack Cloud Administrator Guide",
 // chapter Compute - Networking with nova-network.
-// http://docs.openstack.org/admin-guide-cloud/compute-networking-nova.html#metadata-service
+// https://docs.openstack.org/admin-guide/compute-networking-nova.html#metadata-service
 const metadataUrl = "http://169.254.169.254/openstack/2012-08-10/meta_data.json"
 
 // Config drive is defined as an iso9660 or vfat (deprecated) drive
@@ -55,7 +55,7 @@ type Metadata struct {
 	// .. and other fields we don't care about.  Expand as necessary.
 }
 
-// parseMetadataUUID reads JSON from OpenStack metadata server and parses
+// parseMetadata reads JSON from OpenStack metadata server and parses
 // instance ID out of it.
 func parseMetadata(r io.Reader) (*Metadata, error) {
 	var metadata Metadata

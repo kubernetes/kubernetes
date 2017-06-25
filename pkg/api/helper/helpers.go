@@ -519,21 +519,6 @@ func PodAnnotationsFromSysctls(sysctls []api.Sysctl) string {
 	return strings.Join(kvs, ",")
 }
 
-// GetAffinityFromPodAnnotations gets the json serialized affinity data from Pod.Annotations
-// and converts it to the Affinity type in api.
-// TODO: remove when alpha support for affinity is removed
-func GetAffinityFromPodAnnotations(annotations map[string]string) (*api.Affinity, error) {
-	if len(annotations) > 0 && annotations[api.AffinityAnnotationKey] != "" {
-		var affinity api.Affinity
-		err := json.Unmarshal([]byte(annotations[api.AffinityAnnotationKey]), &affinity)
-		if err != nil {
-			return nil, err
-		}
-		return &affinity, nil
-	}
-	return nil, nil
-}
-
 // GetPersistentVolumeClass returns StorageClassName.
 func GetPersistentVolumeClass(volume *api.PersistentVolume) string {
 	// Use beta annotation first
