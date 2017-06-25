@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/kubelet-cri-logging.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/kubelet-cri-logging.md)

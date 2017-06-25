@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/devel/faster_reviews.md](https://github.com/kubernetes/community/blob/master/contributors/devel/faster_reviews.md)
