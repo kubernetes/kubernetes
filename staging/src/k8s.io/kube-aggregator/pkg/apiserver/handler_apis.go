@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 
 	apiregistrationapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	apiregistrationv1beta1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
@@ -36,9 +37,14 @@ import (
 // apisHandler serves the `/apis` endpoint.
 // This is registered as a filter so that it never collides with any explictly registered endpoints
 type apisHandler struct {
-	codecs serializer.CodecFactory
-	lister listers.APIServiceLister
-	mapper request.RequestContextMapper
+	codecs           serializer.CodecFactory
+	lister           listers.APIServiceLister
+	mapper           request.RequestContextMapper
+	genericAPIServer *genericapiserver.GenericAPIServer
+
+	// Adding this flag to minimize behaviour change and only report
+	// unhealthy server on startup.
+	wasServerHealthy bool
 }
 
 var discoveryGroup = metav1.APIGroup{
@@ -55,10 +61,29 @@ var discoveryGroup = metav1.APIGroup{
 	},
 }
 
+func (r *apisHandler) wasServerEverHealthy(req *http.Request) bool {
+	if r.wasServerHealthy {
+		return true
+	}
+	for _, check := range r.genericAPIServer.HealthzChecks() {
+		if check.Check(req) != nil {
+			return false
+		}
+	}
+	r.wasServerHealthy = true
+	return true
+}
+
 func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx, ok := r.mapper.Get(req)
 	if !ok {
 		responsewriters.InternalError(w, req, errors.New("no context found for request"))
+		return
+	}
+
+	// Check if server was/is healthy on startup
+	if !r.wasServerEverHealthy(req) {
+		responsewriters.InternalError(w, req, errors.New("API Server is not healthy yet."))
 		return
 	}
 

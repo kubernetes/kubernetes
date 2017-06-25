@@ -220,9 +220,10 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	}
 
 	apisHandler := &apisHandler{
-		codecs: Codecs,
-		lister: s.lister,
-		mapper: s.contextMapper,
+		codecs:           Codecs,
+		lister:           s.lister,
+		mapper:           s.contextMapper,
+		genericAPIServer: s.GenericAPIServer,
 	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
