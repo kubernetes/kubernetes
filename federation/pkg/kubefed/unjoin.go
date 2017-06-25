@@ -40,12 +40,12 @@ import (
 
 var (
 	unjoin_long = templates.LongDesc(`
-		Unjoin removes a cluster from a federation.
+		Unjoin a cluster from a federation.
 
         Current context is assumed to be a federation endpoint.
         Please use the --context flag otherwise.`)
 	unjoin_example = templates.Examples(`
-		# Unjoin removes the specified cluster from a federation.
+		# Unjoin the specified cluster from a federation.
 		# Federation control plane's host cluster context name
 		# must be specified via the --host-cluster-context flag
 		# to properly cleanup the credentials.
