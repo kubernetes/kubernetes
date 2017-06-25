@@ -69,6 +69,39 @@ func (obj *Unstructured) IsList() bool {
 }
 func (obj *UnstructuredList) IsList() bool { return true }
 
+func (obj *Unstructured) EachListItem(fn func(runtime.Object) error) error {
+	if obj.Object == nil {
+		return fmt.Errorf("content is not a list")
+	}
+	field, ok := obj.Object["items"]
+	if !ok {
+		return fmt.Errorf("content is not a list")
+	}
+	items, ok := field.([]interface{})
+	if !ok {
+		return nil
+	}
+	for _, item := range items {
+		child, ok := item.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("items member is not an object")
+		}
+		if err := fn(&Unstructured{Object: child}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (obj *UnstructuredList) EachListItem(fn func(runtime.Object) error) error {
+	for i := range obj.Items {
+		if err := fn(&obj.Items[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (obj *Unstructured) UnstructuredContent() map[string]interface{} {
 	if obj.Object == nil {
 		obj.Object = make(map[string]interface{})
