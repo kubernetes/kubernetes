@@ -28,13 +28,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	pods        = "pods"
-	replicasets = "replicasets"
-	k8s1        = "k8s-1"
-	k8s2        = "k8s-2"
-)
-
 func TestClusterReplicaState(t *testing.T) {
 	uncalledPodsGetter := func(clusterName string, replicaSet *extensionsv1.ReplicaSet) (*apiv1.PodList, error) {
 		t.Fatal("podsGetter should not be called when replica sets are all ready.")
