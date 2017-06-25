@@ -8,7 +8,7 @@ If you don't have a Ceph cluster, you can set up a [containerized Ceph cluster](
 
 Then get the keyring from the Ceph cluster and copy it to */etc/ceph/keyring*.
 
-Once you have installed Ceph and new Kubernetes, you can create a pod based on my examples [rbd.json](rbd.json)  [rbd-with-secret.json](rbd-with-secret.json). In the pod JSON, you need to provide the following information.
+Once you have installed Ceph and new Kubernetes, you can create a pod based on my examples [rbd.yaml](rbd.yaml)  [rbd-with-secret.yaml](rbd-with-secret.yaml). In the pod YAML, you need to provide the following information.
 
 - *monitors*:  Ceph monitors.
 - *pool*: The name of the RADOS pool, if not provided, default *rbd* pool is used.
@@ -39,7 +39,7 @@ An example yaml is provided [here](secret/ceph-secret.yaml). Then post the secre
 Here are my commands:
 
 ```console
-    # kubectl create -f examples/volumes/rbd/rbd.json
+    # kubectl create -f examples/volumes/rbd/rbd.yaml
     # kubectl get pods
 ```
 
