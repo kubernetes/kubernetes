@@ -614,25 +614,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return dc.syncStatusOnly(d, rsList, podMap)
 	}
 
-	// Why run the cleanup policy only when there is no rollback request?
-	// The thing with the cleanup policy currently is that it is far from smart because it takes into account
-	// the latest replica sets while it should instead retain the latest *working* replica sets. This means that
-	// you can have a cleanup policy of 1 but your last known working replica set may be 2 or 3 versions back
-	// in the history.
-	// Eventually we will want to find a way to recognize replica sets that have worked at some point in time
-	// (and chances are higher that they will work again as opposed to others that didn't) for candidates to
-	// automatically roll back to (#23211) and the cleanup policy should help.
-	if d.Spec.RollbackTo == nil {
-		_, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, podMap, false)
-		if err != nil {
-			return err
-		}
-		// So far the cleanup policy was executed once a deployment was paused, scaled up/down, or it
-		// successfully completed deploying a replica set. Decouple it from the strategies and have it
-		// run almost unconditionally - cleanupDeployment is safe by default.
-		dc.cleanupDeployment(oldRSs, d)
-	}
-
 	// Update deployment conditions with an Unknown condition when pausing/resuming
 	// a deployment. In this way, we can be sure that we won't timeout when a user
 	// resumes a Deployment with a set progressDeadlineSeconds.
