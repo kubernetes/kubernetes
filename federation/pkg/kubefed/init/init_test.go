@@ -1418,7 +1418,7 @@ func tlsHandshake(t *testing.T, sCfg, cCfg *tls.Config) error {
 	// clients hang. Since TCP is non-blocking we use that as transport
 	// instead. One could have as well used a Unix Domain Socket, but TCP is
 	// more portable.
-	s, err := tls.Listen("tcp", "", sCfg)
+	s, err := tls.Listen("tcp4", "", sCfg) // specify tcp4 for the guys who disable ipv6
 	if err != nil {
 		return fmt.Errorf("failed to create a test TLS server: %v", err)
 	}
@@ -1444,7 +1444,7 @@ func tlsHandshake(t *testing.T, sCfg, cCfg *tls.Config) error {
 		}
 	}()
 
-	c, err := tls.Dial("tcp", s.Addr().String(), cCfg)
+	c, err := tls.Dial("tcp4", s.Addr().String(), cCfg)
 	if err != nil {
 		// Intentionally not serializing the error received because we want to
 		// test for the failure case in the caller test function.
