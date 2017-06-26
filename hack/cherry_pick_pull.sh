@@ -29,6 +29,7 @@ cd "${KUBE_ROOT}"
 declare -r STARTINGBRANCH=$(git symbolic-ref --short HEAD)
 declare -r REBASEMAGIC="${KUBE_ROOT}/.git/rebase-apply"
 DRY_RUN=${DRY_RUN:-""}
+REGENERATE_DOCS=${REGENERATE_DOCS:-""}
 UPSTREAM_REMOTE=${UPSTREAM_REMOTE:-upstream}
 FORK_REMOTE=${FORK_REMOTE:-origin}
 
@@ -53,6 +54,9 @@ if [[ "$#" -lt 2 ]]; then
   echo "  Set the DRY_RUN environment var to skip git push and creating PR."
   echo "  This is useful for creating patches to a release branch without making a PR."
   echo "  When DRY_RUN is set the script will leave you in a branch containing the commits you cherry-picked."
+  echo
+  echo "  Set the REGENERATE_DOCS environment var to regenerate documentation for the target branch after picking the specified commits."
+  echo "  This is useful when picking commits containing changes to API documentation."
   echo
   echo " Set UPSTREAM_REMOTE (default: upstream) and FORK_REMOTE (default: origin)"
   echo " To override the default remote names to what you have locally."
@@ -184,12 +188,14 @@ done
 gitamcleanup=false
 
 # Re-generate docs (if needed)
-echo
-echo "Regenerating docs..."
-if ! hack/generate-docs.sh; then
+if [[ -n "${REGENERATE_DOCS}" ]]; then
   echo
-  echo "hack/generate-docs.sh FAILED to complete."
-  exit 1
+  echo "Regenerating docs..."
+  if ! hack/generate-docs.sh; then
+    echo
+    echo "hack/generate-docs.sh FAILED to complete."
+    exit 1
+  fi
 fi
 
 if [[ -n "${DRY_RUN}" ]]; then
