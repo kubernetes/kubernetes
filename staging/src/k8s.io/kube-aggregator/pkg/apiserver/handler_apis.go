@@ -39,6 +39,13 @@ type apisHandler struct {
 	codecs serializer.CodecFactory
 	lister listers.APIServiceLister
 	mapper request.RequestContextMapper
+
+	// This is the list of API services of the deligated server. It may take
+	// some time for them to get registered as internal with aggregator but
+	// we can return them as part of API discovery anyway as they are served
+	// regardless of their registration state (all unknown API calls will be
+	// sent to delegated server anyway).
+	internalServices []*apiregistrationapi.APIService
 }
 
 var discoveryGroup = metav1.APIGroup{
@@ -72,6 +79,18 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if r.internalServices != nil {
+		apiServicesMap := map[string]bool{}
+		for _, i := range apiServices {
+			apiServicesMap[toGroupVersionString(i)] = true
+		}
+		for _, i := range r.internalServices {
+			groupVersion := toGroupVersionString(i)
+			if !apiServicesMap[groupVersion] {
+				apiServices = append(apiServices, i)
+			}
+		}
 	}
 	apiServicesByGroup := apiregistrationapi.SortedByGroupAndVersion(apiServices)
 	for _, apiGroupServers := range apiServicesByGroup {
@@ -120,6 +139,10 @@ func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService) *m
 	}
 
 	return discoveryGroup
+}
+
+func toGroupVersionString(apiService *apiregistrationapi.APIService) string {
+	return apiService.Spec.Group + "/" + apiService.Spec.Version
 }
 
 // apiGroupHandler serves the `/apis/<group>` endpoint.
