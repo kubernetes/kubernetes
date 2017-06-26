@@ -19703,9 +19703,14 @@
       },
       "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods."
      },
-     "priorityName": {
+     "priorityClassName": {
       "type": "string",
-      "description": "If specified, indicates the pod's priority. `system` is a special keyword which indicates the highest priority. Any other name must be defined in Admission Controller config or pod will be rejected. If not specified, the pod priority will be zero."
+      "description": "If specified, indicates the pod's priority. \"SYSTEM\" is a special keyword which indicates the highest priority. Any other name must be defined by creating a PriorityClass object with that name. If not specified, the pod priority will be default or zero if there is no default."
+     },
+     "priority": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The priority value. Various system components use this field to find the priority of the pod. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority."
      }
     }
    },
@@ -21005,11 +21010,6 @@
      "qosClass": {
       "type": "string",
       "description": "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md"
-     },
-     "priority": {
-      "type": "integer",
-      "format": "int32",
-      "description": "The priority value which is resolved by the Admission Controller from PodSpec.PriorityName. The higher the value, the higher the priority."
      }
     }
    },

@@ -3532,6 +3532,8 @@ func autoConvert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s c
 	out.SchedulerName = in.SchedulerName
 	out.Tolerations = *(*[]api.Toleration)(unsafe.Pointer(&in.Tolerations))
 	out.HostAliases = *(*[]api.HostAlias)(unsafe.Pointer(&in.HostAliases))
+	out.PriorityClassName = in.PriorityClassName
+	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
 	return nil
 }
 
@@ -3577,6 +3579,8 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s c
 	out.SchedulerName = in.SchedulerName
 	out.Tolerations = *(*[]v1.Toleration)(unsafe.Pointer(&in.Tolerations))
 	out.HostAliases = *(*[]v1.HostAlias)(unsafe.Pointer(&in.HostAliases))
+	out.PriorityClassName = in.PriorityClassName
+	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
 	return nil
 }
 
