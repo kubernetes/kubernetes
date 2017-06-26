@@ -257,8 +257,8 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAME      DESIRED   CURRENT   READY     AGE       CONTAINER(S)   IMAGE(S)               SELECTOR
-	// foo       1         1         0         10y       foo,foo2       someimage,someimage2   foo=bar
+	// NAME      DESIRED   CURRENT   READY     AGE       CONTAINERS   IMAGES                 SELECTOR
+	// foo       1         1         0         10y       foo,foo2     someimage,someimage2   foo=bar
 }
 
 func Example_printReplicationController() {
