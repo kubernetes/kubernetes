@@ -305,6 +305,11 @@ def start_master(etcd):
     hookenv.status_set('maintenance',
                        'Configuring the Kubernetes master services.')
     freeze_service_cidr()
+    if not etcd.get_connection_string():
+        # etcd is not returning a connection string. This hapens when
+        # the master unit disconnects from etcd and is ready to terminate.
+        # No point in trying to start master services and fail. Just return.
+        return
     handle_etcd_relation(etcd)
     configure_master_services()
     hookenv.status_set('maintenance',
