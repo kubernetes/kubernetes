@@ -341,9 +341,8 @@ func (m *ReplicaSetControllerRefManager) ClaimReplicaSets(sets []*extensions.Rep
 	return claimed, utilerrors.NewAggregate(errlist)
 }
 
-// AdoptReplicaSet sends a patch to take control of the ReplicaSet and also
-// sets the finalizers to foregroundDeletion. It returns the error if
-// the patching fails.
+// AdoptReplicaSet sends a patch to take control of the ReplicaSet. It returns
+// the error if the patching fails.
 func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(rs *extensions.ReplicaSet) error {
 	if err := m.canAdopt(); err != nil {
 		return fmt.Errorf("can't adopt ReplicaSet %v/%v (%v): %v", rs.Namespace, rs.Name, rs.UID, err)
@@ -351,14 +350,7 @@ func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(rs *extensions.ReplicaS
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
 	addControllerPatch := fmt.Sprintf(
-		`{
-			"metadata":
-			{	
-				"ownerReferences": [{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],
-				"uid":"%s",
-				"finalizers": ["foregroundDeletion"]
-			}
-		}`,
+		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
 		m.controllerKind.GroupVersion(), m.controllerKind.Kind,
 		m.controller.GetName(), m.controller.GetUID(), rs.UID)
 	return m.rsControl.PatchReplicaSet(rs.Namespace, rs.Name, []byte(addControllerPatch))
