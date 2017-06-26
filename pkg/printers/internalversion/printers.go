@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
@@ -1112,10 +1111,6 @@ func printNode(node *api.Node, w io.Writer, options printers.PrintOptions) error
 	if node.Spec.Unschedulable {
 		status = append(status, "SchedulingDisabled")
 	}
-	role := findNodeRole(node)
-	if role != "" {
-		status = append(status, role)
-	}
 
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", name, strings.Join(status, ","), translateTimestamp(node.CreationTimestamp), node.Status.NodeInfo.KubeletVersion); err != nil {
 		return err
@@ -1153,19 +1148,6 @@ func getNodeExternalIP(node *api.Node) string {
 	}
 
 	return "<none>"
-}
-
-// findNodeRole returns the role of a given node, or "" if none found.
-// The role is determined by looking in order for:
-// * a kubernetes.io/role label
-// * a kubeadm.alpha.kubernetes.io/role label
-// If no role is found, ("", nil) is returned
-func findNodeRole(node *api.Node) string {
-	if role := node.Labels[kubeadm.NodeLabelKubeadmAlphaRole]; role != "" {
-		return role
-	}
-	// No role found
-	return ""
 }
 
 func printNodeList(list *api.NodeList, w io.Writer, options printers.PrintOptions) error {
