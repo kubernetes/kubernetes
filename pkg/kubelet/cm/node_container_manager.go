@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
@@ -228,14 +229,26 @@ func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.Res
 // validateNodeAllocatable ensures that the user specified Node Allocatable Configuration doesn't reserve more than the node capacity.
 // Returns error if the configuration is invalid, nil otherwise.
 func (cm *containerManagerImpl) validateNodeAllocatable() error {
-	na := cm.GetNodeAllocatableReservation()
-	zeroValue := resource.MustParse("0")
 	var errors []string
-	for key, val := range na {
-		if val.Cmp(zeroValue) <= 0 {
-			errors = append(errors, fmt.Sprintf("Resource %q has an allocatable of %v", key, val))
+	nar := cm.GetNodeAllocatableReservation()
+	for k, v := range nar {
+		capacityClone, err := api.Scheme.DeepCopy(cm.capacity[k])
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("DeepCopy capacity error"))
+		}
+		value, ok := capacityClone.(resource.Quantity)
+		if !ok {
+			return fmt.Errorf(
+				"failed to cast object %#v to Quantity",
+				capacityClone)
+		}
+		value.Sub(v)
+
+		if value.Sign() < 0 {
+			errors = append(errors, fmt.Sprintf("Resource %q has an allocatable of %v, capacity of %v", k, v, value))
 		}
 	}
+
 	if len(errors) > 0 {
 		return fmt.Errorf("Invalid Node Allocatable configuration. %s", strings.Join(errors, " "))
 	}
