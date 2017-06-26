@@ -44,6 +44,13 @@ import (
 )
 
 const (
+	// maxRetries is the number of times a service will be retried before it is dropped out of the queue.
+	// With the current rate-limiter in use (5ms*2^(maxRetries-1)) the following numbers represent the
+	// sequence of delays between successive queuings of a service.
+	//
+	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
+	maxRetries = 15
+
 	// An annotation on the Service denoting if the endpoints controller should
 	// go ahead and create endpoints for unready pods. This annotation is
 	// currently only used by StatefulSets, where we need the pod to be DNS
@@ -265,15 +272,26 @@ func (e *EndpointController) processNextWorkItem() bool {
 	defer e.queue.Done(eKey)
 
 	err := e.syncService(eKey.(string))
-	if err == nil {
-		e.queue.Forget(eKey)
-		return true
-	}
-
-	utilruntime.HandleError(fmt.Errorf("Sync %v failed with %v", eKey, err))
-	e.queue.AddRateLimited(eKey)
+	e.handleErr(err, eKey)
 
 	return true
+}
+
+func (e *EndpointController) handleErr(err error, key interface{}) {
+	if err == nil {
+		e.queue.Forget(key)
+		return
+	}
+
+	if e.queue.NumRequeues(key) < maxRetries {
+		glog.V(2).Infof("Error syncing endpoints for service %q: %v", key, err)
+		e.queue.AddRateLimited(key)
+		return
+	}
+
+	glog.Warningf("Dropping service %q out of the queue: %v", key, err)
+	e.queue.Forget(key)
+	utilruntime.HandleError(err)
 }
 
 func (e *EndpointController) syncService(key string) error {
