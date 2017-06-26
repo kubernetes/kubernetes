@@ -32,6 +32,21 @@ type Context interface {
 	AuthenticatedData() []byte
 }
 
+// KMSStorage allows storing and retreiving Data-Encryption-Keys (DEKs) for implementing envelope encryption
+// based transformers.
+type KMSStorage interface {
+	Setup() error
+	GetAllDEKs() (map[string]string, error)
+	StoreNewDEKs(newDEKs map[string]string) error
+}
+
+// KMSService allows encrypting and decrypting secrets using an external service, which provides a
+// Key-Encryption-Key (KEK). This is needed to implement envelope encryption based transformers.
+type KMSService interface {
+	Decrypt(data string) ([]byte, error)
+	Encrypt(data []byte) (string, error)
+}
+
 // Transformer allows a value to be transformed before being read from or written to the underlying store. The methods
 // must be able to undo the transformation caused by the other.
 type Transformer interface {

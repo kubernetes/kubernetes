@@ -43,7 +43,6 @@ type StorageCodecConfig struct {
 // NewStorageCodec assembles a storage codec for the provided storage media type, the provided serializer, and the requested
 // storage and memory versions.
 func NewStorageCodec(opts StorageCodecConfig) (runtime.Codec, error) {
-	fmt.Println("Creating storage codec")
 	mediaType, _, err := mime.ParseMediaType(opts.StorageMediaType)
 	if err != nil {
 		return nil, fmt.Errorf("%q is not a valid mime-type", opts.StorageMediaType)

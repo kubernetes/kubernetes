@@ -18,42 +18,24 @@ package kms
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"strings"
-	"sync"
 
 	"golang.org/x/oauth2/google"
 	cloudkms "google.golang.org/api/cloudkms/v1"
 	"google.golang.org/api/googleapi"
-	randutil "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apiserver/pkg/storage/value"
-	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-)
-
-const (
-	keyNameLength    = 5
-	primaryKeyPrefix = "-"
 )
 
 type gkmsTransformer struct {
 	parentName      string
 	cloudkmsService *cloudkms.Service
-
-	transformers   map[string]value.Transformer
-	primaryKeyName string
-
-	storage value.KmsStorage
-
-	rotateLock  sync.RWMutex
-	refreshLock sync.RWMutex
 }
 
-func NewGoogleKMSTransformer(projectID, location, keyRing, cryptoKey string, cloud *cloudprovider.Interface, storage value.KmsStorage) (value.KmsService, error) {
+// NewGoogleKMSService creates a Google KMS connection and returns a KMSService instance which can encrypt and decrypt data.
+func NewGoogleKMSService(projectID, location, keyRing, cryptoKey string, cloud *cloudprovider.Interface) (value.KMSService, error) {
 	var cloudkmsService *cloudkms.Service
 	var err error
 
@@ -87,7 +69,6 @@ func NewGoogleKMSTransformer(projectID, location, keyRing, cryptoKey string, clo
 
 	parentName := fmt.Sprintf("projects/%s/locations/%s", projectID, location)
 
-	// TODO(sakshams): Change the code below to a Get followed by a create.
 	// Create the keyRing if it does not exist yet
 	_, err = cloudkmsService.Projects.Locations.KeyRings.Create(parentName,
 		&cloudkms.KeyRing{}).KeyRingId(keyRing).Do()
@@ -118,104 +99,10 @@ func NewGoogleKMSTransformer(projectID, location, keyRing, cryptoKey string, clo
 	}
 	parentName = parentName + "/cryptoKeys/" + cryptoKey
 
-	err = storage.Setup()
-	if err != nil {
-		return nil, err
-	}
-
-	kmsService := &gkmsTransformer{
+	return &gkmsTransformer{
 		parentName:      parentName,
 		cloudkmsService: cloudkmsService,
-		storage:         storage,
-	}
-	// If there are no keys, rotate(false) will create one.
-	if err = kmsService.Rotate(false); err != nil {
-		return nil, err
-	}
-
-	return kmsService, nil
-}
-
-// TODO(sakshams): Should be moved to kms transformer as this is common for all implementations of kms.
-func (t *gkmsTransformer) Rotate(rotateIfNotEmpty bool) error {
-	t.rotateLock.Lock()
-	defer t.rotateLock.Unlock()
-
-	deks, err := t.storage.GetAllDEKs()
-	if err != nil {
-		return err
-	}
-
-	// If this is during setup, don't rotate if a key already exists.
-	if !rotateIfNotEmpty && len(deks) != 0 {
-		return t.Refresh()
-	}
-
-	newDEKs := map[string]string{}
-	for keyname, dek := range deks {
-		// Qualify the primary key with a "-" prefix for consistent accesses and updates.
-		if strings.HasPrefix(keyname, "-") {
-			keyname = keyname[1:]
-		}
-		newDEKs[keyname] = dek
-	}
-
-	keyname := "-" + generateName(newDEKs)
-	dekBytes, err := generateKey(32)
-	if err != nil {
-		return err
-	}
-
-	newDEKs[keyname], err = t.Encrypt(dekBytes)
-	if err != nil {
-		return err
-	}
-	t.storage.StoreNewDEKs(newDEKs)
-
-	return t.Refresh()
-}
-
-// TODO(sakshams): Should be moved to kms transformer as this is common for all implementations of kms.
-func (t *gkmsTransformer) Refresh() error {
-	t.refreshLock.Lock()
-	defer t.refreshLock.Unlock()
-
-	deks, err := t.storage.GetAllDEKs()
-	if err != nil {
-		return err
-	}
-	transformers := map[string]value.Transformer{}
-	primaryKeyName := ""
-	for keyname, encDek := range deks {
-		if strings.HasPrefix(keyname, "-") {
-			// This is the primary keyname
-			keyname = keyname[1:]
-			primaryKeyName = keyname
-		}
-		dekBytes, err := t.Decrypt(encDek)
-		if err != nil {
-			return err
-		}
-		block, err := aes.NewCipher(dekBytes)
-		if err != nil {
-			return err
-		}
-		// TODO(sakshams): Define a singleton prefix transformer as well
-		prefixTransformer := value.PrefixTransformer{
-			Prefix:      []byte(keyname + ":"),
-			Transformer: aestransformer.NewCBCTransformer(block),
-		}
-		transformers[keyname] = value.NewPrefixTransformers(nil, prefixTransformer)
-	}
-	if primaryKeyName == "" {
-		return fmt.Errorf("no primary key found for kms transformer")
-	}
-	// Transformers need to be re-assigned before re-assigning primary key to avoid a race condition.
-	// This also means that we can NOT allow deleting the primary key and adding a new one in the same operation.
-	t.transformers = transformers
-	t.primaryKeyName = primaryKeyName
-
-	return nil
+	}, nil
 }
 
 // Decrypt decrypts a base64 representation of encrypted bytes.
@@ -240,41 +127,4 @@ func (t *gkmsTransformer) Encrypt(data []byte) (string, error) {
 		return "", err
 	}
 	return resp.Ciphertext, nil
-}
-
-func (t *gkmsTransformer) GetReadingTransformer(keyname string) (value.Transformer, error) {
-	if transformer, ok := t.transformers[keyname]; ok {
-		return transformer, nil
-	}
-	// TODO(sakshams): Fill this up
-	return nil, fmt.Errorf("did not find a transformer for key: %s", keyname)
-}
-
-func (t *gkmsTransformer) GetWritingTransformer() (value.Transformer, error) {
-	if transformer, ok := t.transformers[t.primaryKeyName]; ok {
-		return transformer, nil
-	}
-	return nil, fmt.Errorf("primary key transformer not found, keyname: %s", t.primaryKeyName)
-}
-
-func generateName(existingNames map[string]string) string {
-	name := randutil.String(keyNameLength)
-
-	_, ok := existingNames[name]
-	for ok {
-		name := randutil.String(keyNameLength)
-		_, ok = existingNames[name]
-	}
-
-	return name
-}
-
-func generateKey(length int) ([]byte, error) {
-	key := make([]byte, length)
-	_, err := rand.Read(key)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return key, nil
 }

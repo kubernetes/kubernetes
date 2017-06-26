@@ -23,6 +23,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/core/configmap"
 	configmapregistry "k8s.io/kubernetes/pkg/registry/core/configmap"
@@ -38,17 +39,19 @@ type keyStore struct {
 	lock       sync.RWMutex
 }
 
-func NewKeyStore(config *storagebackend.Config, dekPrefix string) *keyStore {
+// NewKeyStore returns a KMSStorage instance which uses etcd to store KMS specific information as a configmap,
+// but under a different path on the disk.
+func NewKeyStore(config *storagebackend.Config, dekPrefix string) value.KMSStorage {
 	dekOpts := generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: dekPrefix}
 	return &keyStore{configmaps: configmapregistry.NewRegistry(configmapstore.NewREST(dekOpts))}
 }
 
+// Setup creates the empty configmap on disk if it did not already exist.
 func (p *keyStore) Setup() error {
 	ctx := genericapirequest.NewDefaultContext()
 
 	_, err := p.GetAllDEKs()
-	// TODO(sakshams): Only do this if NotFound error
-	// if serr, ok := err.(*storage.StorageError); ok && serr.Code == storage.ErrCodeKeyNotFound {
+	// TODO(sakshams): Should we do this if err is 404, or should we do this as long as err is not nil?
 	if err != nil {
 		// We need to create the configmap
 		cfg := &api.ConfigMap{
@@ -67,6 +70,7 @@ func (p *keyStore) Setup() error {
 	return nil
 }
 
+// GetAllDEKs reads and returns all available DEKs from etcd as a map.
 func (p *keyStore) GetAllDEKs() (map[string]string, error) {
 	ctx := genericapirequest.NewDefaultContext()
 	cfg, err := p.configmaps.GetConfigMap(ctx, dekMapName, &metav1.GetOptions{})
@@ -76,9 +80,10 @@ func (p *keyStore) GetAllDEKs() (map[string]string, error) {
 	return cfg.Data, nil
 }
 
+// StoreNewDEKs writes the provided DEKs to disk.
 func (p *keyStore) StoreNewDEKs(newDEKs map[string]string) error {
 	// This function is invoked only by Rotate() calls, which are already lock protected.
-	// TODO(sakshams): Check if this function requires locks.
+	// TODO(sakshams): Investigate if locks are really needed here.
 	p.lock.Lock()
 	defer p.lock.Unlock()
 

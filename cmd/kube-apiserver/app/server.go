@@ -571,12 +571,12 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 
 	if s.Etcd.EncryptionProviderConfigFilepath != "" {
 		// Storage factory has to be ready by this point
-		cs, err := transformhelpers.NewCloudAndStorageGetterSetter(s, storageFactory)
+		kmsFactory, err := transformhelpers.NewKMSFactory(s, storageFactory)
 		if err != nil {
 			return nil, err
 		}
 		transformerOverrides, err := encryptionconfig.GetTransformerOverrides(
-			s.Etcd.EncryptionProviderConfigFilepath, cs)
+			s.Etcd.EncryptionProviderConfigFilepath, kmsFactory)
 		if err != nil {
 			return nil, err
 		}
