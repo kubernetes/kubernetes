@@ -549,6 +549,7 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
 				int64(kl.maxPods), resource.DecimalSI)
 		}
+
 		if node.Status.NodeInfo.BootID != "" &&
 			node.Status.NodeInfo.BootID != info.BootID {
 			// TODO: This requires a transaction, either both node status is updated
@@ -557,25 +558,16 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 				"Node %s has been rebooted, boot id: %s", kl.nodeName, info.BootID)
 		}
 		node.Status.NodeInfo.BootID = info.BootID
-	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		rootfs, err := kl.GetCachedRootFsInfo()
-		if err != nil {
-			node.Status.Capacity[v1.ResourceStorageScratch] = resource.MustParse("0Gi")
-		} else {
-			for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
-				node.Status.Capacity[rName] = rCap
-			}
-		}
-
-		if hasDedicatedImageFs, _ := kl.HasDedicatedImageFs(); hasDedicatedImageFs {
-			imagesfs, err := kl.ImagesFsInfo()
-			if err != nil {
-				node.Status.Capacity[v1.ResourceStorageOverlay] = resource.MustParse("0Gi")
-			} else {
-				for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(imagesfs) {
-					node.Status.Capacity[rName] = rCap
+		if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+			// TODO: all the node resources should use GetCapacity instead of deriving the
+			// capacity for every node status request
+			initialCapacity := kl.containerManager.GetCapacity()
+			if initialCapacity != nil {
+				node.Status.Capacity[v1.ResourceStorageScratch] = initialCapacity[v1.ResourceStorageScratch]
+				imageCapacity, ok := initialCapacity[v1.ResourceStorageOverlay]
+				if ok {
+					node.Status.Capacity[v1.ResourceStorageOverlay] = imageCapacity
 				}
 			}
 		}
