@@ -209,7 +209,7 @@ func (os *OpenStack) OperationPending(diskName string) (bool, string, error) {
 	return true, volumeStatus, nil
 }
 
-// Attaches given cinder volume to the compute running kubelet
+// AttachDisk attaches given cinder volume to the compute running kubelet
 func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 	volume, err := os.getVolume(volumeID)
 	if err != nil {
