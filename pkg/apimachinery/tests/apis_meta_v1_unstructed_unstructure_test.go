@@ -87,13 +87,13 @@ func TestDecode(t *testing.T) {
 			},
 		},
 		{
-			json: []byte(`{"items": [{"metadata": {"name": "object1"}, "apiVersion": "test", "kind": "test_kind"}, {"metadata": {"name": "object2"}, "apiVersion": "test", "kind": "test_kind"}], "apiVersion": "test", "kind": "test_list"}`),
+			json: []byte(`{"items": [{"metadata": {"name": "object1", "deletionGracePeriodSeconds": 10}, "apiVersion": "test", "kind": "test_kind"}, {"metadata": {"name": "object2"}, "apiVersion": "test", "kind": "test_kind"}], "apiVersion": "test", "kind": "test_list"}`),
 			want: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{"apiVersion": "test", "kind": "test_list"},
 				Items: []unstructured.Unstructured{
 					{
 						Object: map[string]interface{}{
-							"metadata":   map[string]interface{}{"name": "object1"},
+							"metadata":   map[string]interface{}{"name": "object1", "deletionGracePeriodSeconds": int64(10)},
 							"apiVersion": "test",
 							"kind":       "test_kind",
 						},
@@ -125,19 +125,22 @@ func TestDecode(t *testing.T) {
 
 func TestUnstructuredGetters(t *testing.T) {
 	trueVar := true
+	ten := int64(10)
 	unstruct := unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "test_kind",
 			"apiVersion": "test_version",
 			"metadata": map[string]interface{}{
-				"name":              "test_name",
-				"namespace":         "test_namespace",
-				"generateName":      "test_generateName",
-				"uid":               "test_uid",
-				"resourceVersion":   "test_resourceVersion",
-				"selfLink":          "test_selfLink",
-				"creationTimestamp": "2009-11-10T23:00:00Z",
-				"deletionTimestamp": "2010-11-10T23:00:00Z",
+				"name":                       "test_name",
+				"namespace":                  "test_namespace",
+				"generateName":               "test_generateName",
+				"uid":                        "test_uid",
+				"resourceVersion":            "test_resourceVersion",
+				"generation":                 ten,
+				"deletionGracePeriodSeconds": ten,
+				"selfLink":                   "test_selfLink",
+				"creationTimestamp":          "2009-11-10T23:00:00Z",
+				"deletionTimestamp":          "2010-11-10T23:00:00Z",
 				"labels": map[string]interface{}{
 					"test_label": "test_value",
 				},
@@ -244,25 +247,34 @@ func TestUnstructuredGetters(t *testing.T) {
 	if got, want := unstruct.GetClusterName(), "cluster123"; got != want {
 		t.Errorf("GetClusterName()=%v, want %v", got, want)
 	}
+	if got, want := unstruct.GetDeletionGracePeriodSeconds(), &ten; !reflect.DeepEqual(got, want) {
+		t.Errorf("GetDeletionGracePeriodSeconds()=%v, want %v", got, want)
+	}
+	if got, want := unstruct.GetGeneration(), ten; !reflect.DeepEqual(got, want) {
+		t.Errorf("GetGeneration()=%v, want %v", got, want)
+	}
 }
 
 func TestUnstructuredSetters(t *testing.T) {
 	unstruct := unstructured.Unstructured{}
 	trueVar := true
+	ten := int64(10)
 
 	want := unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "test_kind",
 			"apiVersion": "test_version",
 			"metadata": map[string]interface{}{
-				"name":              "test_name",
-				"namespace":         "test_namespace",
-				"generateName":      "test_generateName",
-				"uid":               "test_uid",
-				"resourceVersion":   "test_resourceVersion",
-				"selfLink":          "test_selfLink",
-				"creationTimestamp": "2009-11-10T23:00:00Z",
-				"deletionTimestamp": "2010-11-10T23:00:00Z",
+				"name":                       "test_name",
+				"namespace":                  "test_namespace",
+				"generateName":               "test_generateName",
+				"uid":                        "test_uid",
+				"resourceVersion":            "test_resourceVersion",
+				"selfLink":                   "test_selfLink",
+				"creationTimestamp":          "2009-11-10T23:00:00Z",
+				"deletionTimestamp":          "2010-11-10T23:00:00Z",
+				"deletionGracePeriodSeconds": &ten,
+				"generation":                 ten,
 				"labels": map[string]interface{}{
 					"test_label": "test_value",
 				},
@@ -326,6 +338,8 @@ func TestUnstructuredSetters(t *testing.T) {
 	unstruct.SetOwnerReferences(newOwnerReferences)
 	unstruct.SetFinalizers([]string{"finalizer.1", "finalizer.2"})
 	unstruct.SetClusterName("cluster123")
+	unstruct.SetDeletionGracePeriodSeconds(&ten)
+	unstruct.SetGeneration(ten)
 
 	if !reflect.DeepEqual(unstruct, want) {
 		t.Errorf("Wanted: \n%s\n Got:\n%s", want, unstruct)
@@ -491,5 +505,74 @@ func TestDecodeNumbers(t *testing.T) {
 	// ensure round-trip preserved large integers
 	if !reflect.DeepEqual(pod, pod2) {
 		t.Fatalf("Expected\n\t%#v, got \n\t%#v", pod, pod2)
+	}
+}
+
+// TestAccessorMethods does opaque roundtrip testing against an Unstructured
+// instance's Object methods to ensure that what is "Set" matches what you
+// subsequently "Get" without any assertions against internal state.
+func TestAccessorMethods(t *testing.T) {
+	int64p := func(i int) *int64 {
+		v := int64(i)
+		return &v
+	}
+	tests := []struct {
+		accessor string
+		val      interface{}
+		nilVal   reflect.Value
+	}{
+		{accessor: "Namespace", val: "foo"},
+		{accessor: "Name", val: "bar"},
+		{accessor: "GenerateName", val: "baz"},
+		{accessor: "UID", val: types.UID("uid")},
+		{accessor: "ResourceVersion", val: "1"},
+		{accessor: "Generation", val: int64(5)},
+		{accessor: "SelfLink", val: "/foo"},
+		// TODO: Handle timestamps, which are being marshalled as UTC and
+		// unmarshalled as Local.
+		// https://github.com/kubernetes/kubernetes/issues/21402
+		// {accessor: "CreationTimestamp", val: someTime},
+		// {accessor: "DeletionTimestamp", val: someTimeP},
+		{accessor: "DeletionTimestamp", nilVal: reflect.ValueOf((*metav1.Time)(nil))},
+		{accessor: "DeletionGracePeriodSeconds", val: int64p(10)},
+		{accessor: "DeletionGracePeriodSeconds", val: int64p(0)},
+		{accessor: "DeletionGracePeriodSeconds", nilVal: reflect.ValueOf((*int64)(nil))},
+		{accessor: "Labels", val: map[string]string{"foo": "bar"}},
+		{accessor: "Annotations", val: map[string]string{"foo": "bar"}},
+		{accessor: "Initializers", val: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "foo"}}}},
+		{accessor: "Initializers", val: &metav1.Initializers{}},
+		{accessor: "Initializers", nilVal: reflect.ValueOf((*metav1.Initializers)(nil))},
+		{accessor: "Finalizers", val: []string{"foo"}},
+		{accessor: "OwnerReferences", val: []metav1.OwnerReference{{Name: "foo"}}},
+		{accessor: "ClusterName", val: "foo"},
+	}
+	for i, test := range tests {
+		t.Logf("evaluating test %d (%s)", i, test.accessor)
+
+		u := &unstructured.Unstructured{}
+		setter := reflect.ValueOf(u).MethodByName("Set" + test.accessor)
+		getter := reflect.ValueOf(u).MethodByName("Get" + test.accessor)
+
+		args := []reflect.Value{}
+		if test.val != nil {
+			args = append(args, reflect.ValueOf(test.val))
+		} else {
+			args = append(args, test.nilVal)
+		}
+		setter.Call(args)
+
+		ret := getter.Call([]reflect.Value{})
+		actual := ret[0].Interface()
+
+		var expected interface{}
+		if test.val != nil {
+			expected = test.val
+		} else {
+			expected = test.nilVal.Interface()
+		}
+
+		if e, a := expected, actual; !reflect.DeepEqual(e, a) {
+			t.Fatalf("%s: expected %v (%T), got %v (%T)", test.accessor, e, e, a, a)
+		}
 	}
 }
