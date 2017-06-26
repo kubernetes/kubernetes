@@ -31,6 +31,7 @@ release_filegroup(
     ],
 ) for binary in [
     "cloud-controller-manager",
+    "gke-certificates-controller",
     "kubectl",
     "kube-apiserver",
     "kube-controller-manager",
@@ -89,6 +90,11 @@ pkg_tar(
 k8s_deb(
     name = "cloud-controller-manager",
     description = "Kubernetes Cloud Controller Manager",
+)
+
+k8s_deb(
+    name = "gke-certificates-controller",
+    description = "GKE Certificates Controller",
 )
 
 k8s_deb(

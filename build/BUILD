@@ -41,6 +41,10 @@ DOCKERIZED_BINARIES = {
         "base": ":busybox",
         "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
     },
+    "gke-certificates-controller": {
+        "base": ":busybox",
+        "target": "//cmd/gke-certificates-controller:gke-certificates-controller",
+    },
     "kube-apiserver": {
         "base": ":busybox",
         "target": "//cmd/kube-apiserver:kube-apiserver",

@@ -39,6 +39,12 @@ filegroup(
 
 go_binary(
     name = "gke-certificates-controller",
+    gc_linkopts = [
+        "-linkmode",
+        "external",
+        "-extldflags",
+        "-static",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
 )
