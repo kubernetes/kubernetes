@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -34,6 +35,7 @@ import (
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -259,14 +261,21 @@ func buildConfigFromSecret(secret *api.Secret, serverAddress string) (*restclien
 // clientset for either the preferred version or the first listed version (if no preference listed)
 // TODO: We need to evaluate the usage of RESTMapper interface to achieve te same functionality
 func GetVersionedClientForRBACOrFail(hostFactory cmdutil.Factory) (client.Interface, error) {
-	discoveryclient, err := hostFactory.DiscoveryClient()
+	cfg, err := hostFactory.BareClientConfig()
 	if err != nil {
 		return nil, err
 	}
-	groupList, err := discoveryclient.ServerGroups()
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	groupList, err := discoveryClient.ServerGroups()
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't get clientset to create RBAC roles in the host cluster: %v", err)
 	}
+
+	glog.V(4).Infof("API groups from discovery: %#v", groupList)
 
 	for _, g := range groupList.Groups {
 		if g.Name == rbac.GroupName {
