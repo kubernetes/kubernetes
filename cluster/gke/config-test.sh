@@ -26,3 +26,6 @@ KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-true}
 # For ease of maintenance, extract any pieces that do not vary between default
 # and test in a common config.
 source $(dirname "${BASH_SOURCE}")/config-common.sh
+
+# Default the ABAC authorizer to off
+ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-false}" # true, false
