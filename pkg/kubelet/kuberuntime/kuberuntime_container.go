@@ -446,7 +446,7 @@ func (m *kubeGenericRuntimeManager) generateContainerEvent(containerID kubeconta
 		glog.Warningf("No ref for container %q", containerID)
 		return
 	}
-	m.recorder.Event(ref, eventType, reason, message)
+	m.recorder.Event(events.ToObjectReference(ref), eventType, reason, message)
 }
 
 // executePreStopHook runs the pre-stop lifecycle hooks if applicable and returns the duration it takes.
