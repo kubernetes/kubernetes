@@ -59,6 +59,8 @@ spec:
   selector:
     matchLabels:
       k8s-app: kube-proxy
+  updateStrategy:
+    type: RollingUpdate
   template:
     metadata:
       labels:
