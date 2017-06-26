@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -49,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 const (
@@ -393,25 +395,25 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 	return timeout, nil
 }
 
-func AddValidateFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
-	cmd.Flags().String("schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
+type ValidateOptions struct {
+	EnableValidation bool
+	SchemaCacheDir   string
+}
+
+func addSchemaCacheDirVarFlag(cmd *cobra.Command, s *string) {
+	defaultCacheDir := filepath.Join("~", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName)
+	cmd.Flags().StringVar(s, "schema-cache-dir", defaultCacheDir, "If set, load/store cached API schemas in this directory.")
 	cmd.MarkFlagFilename("schema-cache-dir")
 }
 
+func AddValidateFlags(cmd *cobra.Command) { AddValidateOptionFlags(cmd, new(ValidateOptions)) }
 func AddValidateOptionFlags(cmd *cobra.Command, options *ValidateOptions) {
 	cmd.Flags().BoolVar(&options.EnableValidation, "validate", true, "If true, use a schema to validate the input before sending it")
-	cmd.Flags().StringVar(&options.SchemaCacheDir, "schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
-	cmd.MarkFlagFilename("schema-cache-dir")
+	addSchemaCacheDirVarFlag(cmd, &options.SchemaCacheDir)
 }
 
 func AddOpenAPIFlags(cmd *cobra.Command) {
-	cmd.Flags().String("schema-cache-dir",
-		fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName),
-		fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'",
-			clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName),
-	)
-	cmd.MarkFlagFilename("schema-cache-dir")
+	addSchemaCacheDirVarFlag(cmd, new(string))
 }
 
 func GetOpenAPICacheDir(cmd *cobra.Command) string {
@@ -432,10 +434,7 @@ func AddPodRunningTimeoutFlag(cmd *cobra.Command, defaultTimeout time.Duration) 
 	cmd.Flags().Duration("pod-running-timeout", defaultTimeout, "The length of time (like 5s, 2m, or 3h, higher than zero) to wait until at least one pod is running")
 }
 
-func AddApplyAnnotationFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool(ApplyAnnotationsFlag, false, "If true, the configuration of current object will be saved in its annotation. Otherwise, the annotation will be unchanged. This flag is useful when you want to perform kubectl apply on this object in the future.")
-}
-
+func AddApplyAnnotationFlags(cmd *cobra.Command) { AddApplyAnnotationVarFlags(cmd, new(bool)) }
 func AddApplyAnnotationVarFlags(cmd *cobra.Command, applyAnnotation *bool) {
 	cmd.Flags().BoolVar(applyAnnotation, ApplyAnnotationsFlag, false, "If true, the configuration of current object will be saved in its annotation. Otherwise, the annotation will be unchanged. This flag is useful when you want to perform kubectl apply on this object in the future.")
 }
@@ -445,11 +444,6 @@ func AddApplyAnnotationVarFlags(cmd *cobra.Command, applyAnnotation *bool) {
 func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
 	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
 	AddDryRunFlag(cmd)
-}
-
-type ValidateOptions struct {
-	EnableValidation bool
-	SchemaCacheDir   string
 }
 
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
@@ -531,7 +525,7 @@ func UpdateObject(info *resource.Info, codec runtime.Codec, updateFn func(runtim
 }
 
 func AddRecordFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
+	AddRecordVarFlag(cmd, new(bool))
 }
 
 func AddRecordVarFlag(cmd *cobra.Command, record *bool) {
@@ -606,11 +600,7 @@ func ShouldRecord(cmd *cobra.Command, info *resource.Info) bool {
 	return GetRecordFlag(cmd) || (ContainsChangeCause(info) && !cmd.Flags().Changed("record"))
 }
 
-func AddInclude3rdPartyFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("include-extended-apis", true, "If true, include definitions of new APIs via calls to the API server. [default true]")
-	cmd.Flags().MarkDeprecated("include-extended-apis", "No longer required.")
-}
-
+func AddInclude3rdPartyFlags(cmd *cobra.Command) { AddInclude3rdPartyVarFlags(cmd, new(bool)) }
 func AddInclude3rdPartyVarFlags(cmd *cobra.Command, include3rdParty *bool) {
 	cmd.Flags().BoolVar(include3rdParty, "include-extended-apis", true, "If true, include definitions of new APIs via calls to the API server. [default true]")
 	cmd.Flags().MarkDeprecated("include-extended-apis", "No longer required.")
@@ -832,4 +822,19 @@ func ManualStrip(file []byte) []byte {
 		}
 	}
 	return stripped
+}
+
+// These are flags shared by the creation commands. For instance, all creation
+// commands need to be able to record to the resource annotation.
+func AddCommonCreationFlags(cmd *cobra.Command) {
+	AddPrinterFlags(cmd)
+	AddApplyAnnotationFlags(cmd)
+	AddRecordFlag(cmd)
+	AddInclude3rdPartyFlags(cmd)
+}
+
+// Add the required StringSlice flag "--image".
+func AddImageFlag(cmd *cobra.Command) {
+	cmd.Flags().String("image", "", i18n.T("The image for the container to run."))
+	cmd.MarkFlagRequired("image")
 }

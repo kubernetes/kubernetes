@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 func TestGetRestartPolicy(t *testing.T) {
@@ -82,7 +81,7 @@ func TestGetRestartPolicy(t *testing.T) {
 	}
 	for _, test := range tests {
 		cmd := &cobra.Command{}
-		cmd.Flags().String("restart", "", i18n.T("dummy restart flag)"))
+		cmd.Flags().String("restart", "", "dummy restart flag")
 		cmd.Flags().Lookup("restart").Value.Set(test.input)
 		policy, err := getRestartPolicy(cmd, test.interactive)
 		if test.expectErr && err == nil {
@@ -320,10 +319,6 @@ func TestGenerateService(t *testing.T) {
 			}),
 		}
 		cmd := &cobra.Command{}
-		cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
-		cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
-		cmdutil.AddPrinterFlags(cmd)
-		cmdutil.AddInclude3rdPartyFlags(cmd)
 		addRunFlags(cmd)
 
 		if !test.expectPOST {

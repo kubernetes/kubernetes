@@ -88,7 +88,7 @@ var (
 
 func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
+		Use:     `run NAME --image=image [--env="key=value"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]`,
 		Short:   i18n.T("Run a particular image on the cluster"),
 		Long:    runLong,
 		Example: runExample,
@@ -98,20 +98,21 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 			cmdutil.CheckErr(err)
 		},
 	}
-	cmdutil.AddPrinterFlags(cmd)
+
 	addRunFlags(cmd)
-	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddRecordFlag(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
-	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 	return cmd
 }
 
 func addRunFlags(cmd *cobra.Command) {
-	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().String("generator", "", i18n.T("The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."))
-	cmd.Flags().String("image", "", i18n.T("The image for the container to run."))
-	cmd.MarkFlagRequired("image")
+	// Flags that are common enough we share the definition with other
+	// commands.
+	// For example, "kubectl create" also supports "pod-running-timeout"
+	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
+	cmdutil.AddGeneratorFlags(cmd, "")
+	cmdutil.AddCommonCreationFlags(cmd)
+	cmdutil.AddImageFlag(cmd)
+
+	// Flags that are (supposed to be) specific to "kubectl run".
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"))
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
 	cmd.Flags().Bool("rm", false, "If true, delete resources created in this command for attached containers.")
@@ -562,7 +563,11 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 	return nil
 }
 
-func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kubectl.Generator, names []kubectl.GeneratorParam, params map[string]interface{}, overrides, namespace string) (runtime.Object, string, meta.RESTMapper, *meta.RESTMapping, error) {
+func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command,
+	generator kubectl.Generator, names []kubectl.GeneratorParam,
+	params map[string]interface{}, overrides, namespace string,
+) (runtime.Object, string, meta.RESTMapper, *meta.RESTMapping, error) {
+
 	err := kubectl.ValidateParams(names, params)
 	if err != nil {
 		return nil, "", nil, nil, err

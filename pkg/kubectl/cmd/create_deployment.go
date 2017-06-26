@@ -58,8 +58,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.DeploymentBasicV1Beta1GeneratorName)
-	cmd.Flags().StringSlice("image", []string{}, "Image name to run.")
-	cmd.MarkFlagRequired("image")
+	cmdutil.AddImageFlag(cmd)
 	return cmd
 }
 
@@ -79,9 +78,7 @@ func fallbackGeneratorNameIfNecessary(
 		!contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
 
 		fmt.Fprintf(cmdErr,
-			"WARNING: New deployments generator %q specified, "+
-				"but apps/v1beta1.Deployments are not available. "+
-				"Falling back to %q.\n",
+			"WARNING: New deployments generator %q specified, but apps/v1beta1.Deployments are not available. Falling back to %q.\n",
 			cmdutil.DeploymentBasicAppsV1Beta1GeneratorName,
 			cmdutil.DeploymentBasicV1Beta1GeneratorName,
 		)
