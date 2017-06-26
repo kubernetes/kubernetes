@@ -259,7 +259,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	if err == nil {
 		setHairpin := plugin.hairpinMode == componentconfig.HairpinVeth
 		// Set bridge address to first address in IPNet
-		cidr.IP.To4()[3] += 1
+		cidr.IP[len(cidr.IP)-1] += 1
 
 		json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, podCIDR, cidr.IP.String())
 		glog.V(2).Infof("CNI network config set to %v", json)
