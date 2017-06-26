@@ -23,6 +23,8 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
+// TODO: Move all these methods into the cAdvisor package to make kubelet package a consumer of libraries rather than a source.
+
 // GetContainerInfo returns stats (from Cadvisor) for a container.
 func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 
@@ -43,19 +45,6 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, contai
 		return nil, err
 	}
 	return &ci, nil
-}
-
-// HasDedicatedImageFs returns true if the imagefs has a dedicated device.
-func (kl *Kubelet) HasDedicatedImageFs() (bool, error) {
-	imageFsInfo, err := kl.ImagesFsInfo()
-	if err != nil {
-		return false, err
-	}
-	rootFsInfo, err := kl.RootFsInfo()
-	if err != nil {
-		return false, err
-	}
-	return imageFsInfo.Device != rootFsInfo.Device, nil
 }
 
 // GetContainerInfoV2 returns stats (from Cadvisor) for containers.

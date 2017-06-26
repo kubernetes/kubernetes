@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -538,16 +537,23 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
 
-		for rName, rCap := range cadvisor.CapacityFromMachineInfo(info) {
-			node.Status.Capacity[rName] = rCap
+		node.Status.Capacity = kl.containerManager.GetCapacity()
+		if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+			// Remove Storage resources from capacity since it is an alpha feature.
+			// The rest of kubelet requires storage capacity for features like Node Allocatable enforcement.
+			// That's the reason why storage capacity is handled explicitly here.
+			delete(node.Status.Capacity, v1.ResourceStorageScratch)
+			delete(node.Status.Capacity, v1.ResourceStorageOverlay)
 		}
-
-		if kl.podsPerCore > 0 {
-			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
-				int64(math.Min(float64(info.NumCores*kl.podsPerCore), float64(kl.maxPods))), resource.DecimalSI)
-		} else {
-			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
-				int64(kl.maxPods), resource.DecimalSI)
+		// Tests may end up returning nil for GetCapacity call above.
+		if node.Status.Capacity != nil {
+			if kl.podsPerCore > 0 {
+				node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
+					int64(math.Min(float64(info.NumCores*kl.podsPerCore), float64(kl.maxPods))), resource.DecimalSI)
+			} else {
+				node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
+					int64(kl.maxPods), resource.DecimalSI)
+			}
 		}
 		if node.Status.NodeInfo.BootID != "" &&
 			node.Status.NodeInfo.BootID != info.BootID {
@@ -557,28 +563,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 				"Node %s has been rebooted, boot id: %s", kl.nodeName, info.BootID)
 		}
 		node.Status.NodeInfo.BootID = info.BootID
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		rootfs, err := kl.GetCachedRootFsInfo()
-		if err != nil {
-			node.Status.Capacity[v1.ResourceStorageScratch] = resource.MustParse("0Gi")
-		} else {
-			for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
-				node.Status.Capacity[rName] = rCap
-			}
-		}
-
-		if hasDedicatedImageFs, _ := kl.HasDedicatedImageFs(); hasDedicatedImageFs {
-			imagesfs, err := kl.ImagesFsInfo()
-			if err != nil {
-				node.Status.Capacity[v1.ResourceStorageOverlay] = resource.MustParse("0Gi")
-			} else {
-				for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(imagesfs) {
-					node.Status.Capacity[rName] = rCap
-				}
-			}
-		}
 	}
 
 	// Set Allocatable.

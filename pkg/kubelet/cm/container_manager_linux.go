@@ -224,6 +224,25 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	} else {
 		return nil, err
 	}
+	rootfs, err := cadvisorInterface.RootFsInfo()
+	if err != nil {
+		capacity[v1.ResourceStorageScratch] = resource.MustParse("0Gi")
+	} else {
+		for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
+			capacity[rName] = rCap
+		}
+	}
+
+	if hasDedicatedImageFs, _ := cadvisorInterface.HasDedicatedImageFs(); hasDedicatedImageFs {
+		imagesfs, err := cadvisorInterface.ImagesFsInfo()
+		if err != nil {
+			glog.Errorf("Failed to get Image filesystem information: %v", err)
+		} else {
+			for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(imagesfs) {
+				capacity[rName] = rCap
+			}
+		}
+	}
 
 	cgroupRoot := nodeConfig.CgroupRoot
 	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)

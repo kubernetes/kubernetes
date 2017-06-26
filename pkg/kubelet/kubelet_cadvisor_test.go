@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/apimachinery/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -250,35 +249,4 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, result, 2)
 	mockCadvisor.AssertExpectations(t)
-}
-
-func TestHasDedicatedImageFs(t *testing.T) {
-	testCases := map[string]struct {
-		imageFsInfo cadvisorapiv2.FsInfo
-		rootFsInfo  cadvisorapiv2.FsInfo
-		expected    bool
-	}{
-		"has-dedicated-image-fs": {
-			imageFsInfo: cadvisorapiv2.FsInfo{Device: "123"},
-			rootFsInfo:  cadvisorapiv2.FsInfo{Device: "456"},
-			expected:    true,
-		},
-		"has-unified-image-fs": {
-			imageFsInfo: cadvisorapiv2.FsInfo{Device: "123"},
-			rootFsInfo:  cadvisorapiv2.FsInfo{Device: "123"},
-			expected:    false,
-		},
-	}
-	for testName, testCase := range testCases {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
-		mockCadvisor := testKubelet.fakeCadvisor
-		mockCadvisor.On("Start").Return(nil)
-		mockCadvisor.On("ImagesFsInfo").Return(testCase.imageFsInfo, nil)
-		mockCadvisor.On("RootFsInfo").Return(testCase.rootFsInfo, nil)
-		actual, err := kubelet.HasDedicatedImageFs()
-		assert.NoError(t, err, "test [%s]", testName)
-		assert.Equal(t, testCase.expected, actual, "test [%s]", testName)
-	}
 }
