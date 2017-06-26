@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-REGISTRY?=gcr.io/google_containers
-REGISTRY_TAG?=1.0.1
-ARCH?=amd64
-NAME?=no-snat-test-proxy
+BIN=no-snat-test-proxy
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
 
-build:
-	go build --ldflags '-linkmode external -extldflags "-static"' -o $(NAME) main.go
-	docker build -t $(REGISTRY)/$(NAME)-$(ARCH):$(REGISTRY_TAG) .
-	rm $(NAME)
+bin:
+	docker run --rm -it -v $(TARGET):$(TARGET):Z -v `pwd`/../../../:/go/src/k8s.io/kubernetes:Z \
+	golang:$(GOLANG_VERSION) \
+	/bin/bash -c "\
+		cd /go/src/k8s.io/kubernetes/test/images/no-snat-test-proxy && \
+		CGO_ENABLED=0 GOARM=$(GOARM) GOARCH=$(ARCH) go build -a -installsuffix cgo --ldflags '-w' -o $(TARGET)/$(BIN)" 
 
-push: build
-	gcloud docker -- push $(REGISTRY)/$(NAME)-$(ARCH):$(REGISTRY_TAG)
-
-all: build
-.PHONY: build push
+.PHONY: bin

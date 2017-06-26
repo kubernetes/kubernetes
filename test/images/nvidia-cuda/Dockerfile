@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM nvidia/cuda:8.0-devel-ubuntu16.04
+FROM BASEIMAGE
+
+CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         cuda-samples-$CUDA_PKG_VERSION && \
