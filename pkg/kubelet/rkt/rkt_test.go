@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
-	"strings"
 )
 
 func mustMarshalPodManifest(man *appcschema.PodManifest) []byte {
@@ -938,6 +938,7 @@ func baseImageManifest(t *testing.T) *appcschema.ImageManifest {
 func baseAppWithRootUserGroup(t *testing.T) *appctypes.App {
 	app := baseApp(t)
 	app.User, app.Group = "0", "0"
+	app.Isolators = append(app.Isolators)
 	return app
 }
 

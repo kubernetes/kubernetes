@@ -176,3 +176,100 @@ func TestHasRootRunAsUser(t *testing.T) {
 		}
 	}
 }
+
+func TestAddNoNewPrivileges(t *testing.T) {
+	var nonRoot int64 = 1000
+	var root int64 = 0
+	pfalse := false
+	ptrue := true
+
+	tests := map[string]struct {
+		sc     v1.SecurityContext
+		expect bool
+	}{
+		"allowPrivilegeEscalation nil security context nil": {},
+		"allowPrivilegeEscalation nil capAddSysadmin": {
+			sc: v1.SecurityContext{
+				Capabilities: &v1.Capabilities{
+					Add: []v1.Capability{"CAP_SYS_ADMIN"},
+				},
+			},
+		},
+		"allowPrivilegeEscalation nil privileged": {
+			sc: v1.SecurityContext{
+				Privileged: &ptrue,
+			},
+		},
+		"allowPrivilegeEscalation nil nonRoot": {
+			sc: v1.SecurityContext{
+				RunAsUser: &nonRoot,
+			},
+		},
+		"allowPrivilegeEscalation nil root": {
+			sc: v1.SecurityContext{
+				RunAsUser: &root,
+			},
+		},
+		"allowPrivilegeEscalation false capAddSysadmin": {
+			sc: v1.SecurityContext{
+				Capabilities: &v1.Capabilities{
+					Add: []v1.Capability{"CAP_SYS_ADMIN"},
+				},
+				AllowPrivilegeEscalation: &pfalse,
+			},
+		},
+		"allowPrivilegeEscalation false privileged": {
+			sc: v1.SecurityContext{
+				Privileged:               &ptrue,
+				AllowPrivilegeEscalation: &pfalse,
+			},
+		},
+		"allowPrivilegeEscalation false nonRoot": {
+			sc: v1.SecurityContext{
+				RunAsUser:                &nonRoot,
+				AllowPrivilegeEscalation: &pfalse,
+			},
+			expect: true,
+		},
+		"allowPrivilegeEscalation false root": {
+			sc: v1.SecurityContext{
+				RunAsUser:                &root,
+				AllowPrivilegeEscalation: &pfalse,
+			},
+			expect: true,
+		},
+		"allowPrivilegeEscalation true capAddSysadmin": {
+			sc: v1.SecurityContext{
+				Capabilities: &v1.Capabilities{
+					Add: []v1.Capability{"CAP_SYS_ADMIN"},
+				},
+				AllowPrivilegeEscalation: &ptrue,
+			},
+		},
+		"allowPrivilegeEscalation true privileged": {
+			sc: v1.SecurityContext{
+				Privileged:               &ptrue,
+				AllowPrivilegeEscalation: &ptrue,
+			},
+		},
+		"allowPrivilegeEscalation true nonRoot": {
+			sc: v1.SecurityContext{
+				RunAsUser:                &nonRoot,
+				AllowPrivilegeEscalation: &ptrue,
+			},
+		},
+		"allowPrivilegeEscalation true root": {
+			sc: v1.SecurityContext{
+				RunAsUser:                &root,
+				AllowPrivilegeEscalation: &ptrue,
+			},
+		},
+	}
+
+	for k, v := range tests {
+		actual := AddNoNewPrivileges(&v.sc)
+		if actual != v.expect {
+			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
+		}
+	}
+}
