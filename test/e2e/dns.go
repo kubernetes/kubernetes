@@ -280,29 +280,6 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 	framework.Logf("DNS probes using %s succeeded\n", pod.Name)
 }
 
-func createServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *v1.Service {
-	headlessService := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: serviceName,
-		},
-		Spec: v1.ServiceSpec{
-			Selector: selector,
-		},
-	}
-	if externalName != "" {
-		headlessService.Spec.Type = v1.ServiceTypeExternalName
-		headlessService.Spec.ExternalName = externalName
-	} else {
-		headlessService.Spec.Ports = []v1.ServicePort{
-			{Port: 80, Name: "http", Protocol: "TCP"},
-		}
-	}
-	if isHeadless {
-		headlessService.Spec.ClusterIP = "None"
-	}
-	return headlessService
-}
-
 func reverseArray(arr []string) []string {
 	for i := 0; i < len(arr)/2; i++ {
 		j := len(arr) - i - 1
@@ -346,7 +323,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 		testServiceSelector := map[string]string{
 			"dns-test": "true",
 		}
-		headlessService := createServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
+		headlessService := framework.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
@@ -355,7 +332,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 			f.ClientSet.Core().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
-		regularService := createServiceSpec("test-service-2", "", false, testServiceSelector)
+		regularService := framework.CreateServiceSpec("test-service-2", "", false, testServiceSelector)
 		regularService, err = f.ClientSet.Core().Services(f.Namespace.Name).Create(regularService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
@@ -396,7 +373,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 		}
 		serviceName := "dns-test-service-2"
 		podHostname := "dns-querier-2"
-		headlessService := createServiceSpec(serviceName, "", true, testServiceSelector)
+		headlessService := framework.CreateServiceSpec(serviceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
@@ -427,7 +404,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 		// Create a test ExternalName service.
 		By("Creating a test externalName service")
 		serviceName := "dns-test-service-3"
-		externalNameService := createServiceSpec(serviceName, "foo.example.com", false, nil)
+		externalNameService := framework.CreateServiceSpec(serviceName, "foo.example.com", false, nil)
 		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(externalNameService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {

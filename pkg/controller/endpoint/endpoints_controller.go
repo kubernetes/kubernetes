@@ -44,10 +44,12 @@ import (
 )
 
 const (
-	// We'll attempt to recompute EVERY service's endpoints at least this
-	// often. Higher numbers = lower CPU/network load; lower numbers =
-	// shorter amount of time before a mistaken endpoint is corrected.
-	FullServiceResyncPeriod = 30 * time.Second
+	// maxRetries is the number of times a service will be retried before it is dropped out of the queue.
+	// With the current rate-limiter in use (5ms*2^(maxRetries-1)) the following numbers represent the
+	// sequence of delays between successive queuings of a service.
+	//
+	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
+	maxRetries = 15
 
 	// An annotation on the Service denoting if the endpoints controller should
 	// go ahead and create endpoints for unready pods. This annotation is
@@ -76,17 +78,13 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint"),
 	}
 
-	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: e.enqueueService,
-			UpdateFunc: func(old, cur interface{}) {
-				e.enqueueService(cur)
-			},
-			DeleteFunc: e.enqueueService,
+	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: e.enqueueService,
+		UpdateFunc: func(old, cur interface{}) {
+			e.enqueueService(cur)
 		},
-		// TODO: Can we have much longer period here?
-		FullServiceResyncPeriod,
-	)
+		DeleteFunc: e.enqueueService,
+	})
 	e.serviceLister = serviceInformer.Lister()
 	e.servicesSynced = serviceInformer.Informer().HasSynced
 
@@ -231,14 +229,19 @@ func (e *EndpointController) deletePod(obj interface{}) {
 		e.addPod(obj)
 		return
 	}
-	podKey, err := keyFunc(obj)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", obj, err))
+	// If we reached here it means the pod was deleted but its final state is unrecorded.
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
 		return
 	}
-	glog.V(4).Infof("Pod %q was deleted but we don't have a record of its final state, so it will take up to %v before it will be removed from all endpoint records.", podKey, FullServiceResyncPeriod)
-
-	// TODO: keep a map of pods to services to handle this condition.
+	pod, ok := tombstone.Obj.(*v1.Pod)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod: %#v", obj))
+		return
+	}
+	glog.V(4).Infof("Enqueuing services of deleted pod %s having final state unrecorded", pod.Name)
+	e.addPod(pod)
 }
 
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
@@ -269,15 +272,26 @@ func (e *EndpointController) processNextWorkItem() bool {
 	defer e.queue.Done(eKey)
 
 	err := e.syncService(eKey.(string))
-	if err == nil {
-		e.queue.Forget(eKey)
-		return true
-	}
-
-	utilruntime.HandleError(fmt.Errorf("Sync %v failed with %v", eKey, err))
-	e.queue.AddRateLimited(eKey)
+	e.handleErr(err, eKey)
 
 	return true
+}
+
+func (e *EndpointController) handleErr(err error, key interface{}) {
+	if err == nil {
+		e.queue.Forget(key)
+		return
+	}
+
+	if e.queue.NumRequeues(key) < maxRetries {
+		glog.V(2).Infof("Error syncing endpoints for service %q: %v", key, err)
+		e.queue.AddRateLimited(key)
+		return
+	}
+
+	glog.Warningf("Dropping service %q out of the queue: %v", key, err)
+	e.queue.Forget(key)
+	utilruntime.HandleError(err)
 }
 
 func (e *EndpointController) syncService(key string) error {

@@ -364,7 +364,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 				break
 			}
 		}
-		glog.V(2).Infof("at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted with Foreground", item.identity)
+		glog.V(2).Infof("at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted in Foreground", item.identity)
 		// the deletion event will be observed by the graphBuilder, so the item
 		// will be processed again in processDeletingDependentsItem. If it
 		// doesn't have dependents, the function will remove the
@@ -375,9 +375,21 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	default:
 		// item doesn't have any solid owner, so it needs to be garbage
 		// collected. Also, none of item's owners is waiting for the deletion of
-		// the dependents, so GC deletes item with Default.
-		glog.V(2).Infof("delete object %s with Default", item.identity)
-		return gc.deleteObject(item.identity, nil)
+		// the dependents, so set propagationPolicy based on existing finalizers.
+		var policy metav1.DeletionPropagation
+		switch {
+		case hasOrphanFinalizer(latest):
+			// if an existing orphan finalizer is already on the object, honor it.
+			policy = metav1.DeletePropagationOrphan
+		case hasDeleteDependentsFinalizer(latest):
+			// if an existing foreground finalizer is already on the object, honor it.
+			policy = metav1.DeletePropagationForeground
+		default:
+			// otherwise, default to background.
+			policy = metav1.DeletePropagationBackground
+		}
+		glog.V(2).Infof("delete object %s with propagation policy %s", item.identity, policy)
+		return gc.deleteObject(item.identity, &policy)
 	}
 }
 

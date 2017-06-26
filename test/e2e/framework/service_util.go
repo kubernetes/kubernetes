@@ -1326,3 +1326,26 @@ func DescribeSvc(ns string) {
 		"describe", "svc", fmt.Sprintf("--namespace=%v", ns))
 	Logf(desc)
 }
+
+func CreateServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *v1.Service {
+	headlessService := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: serviceName,
+		},
+		Spec: v1.ServiceSpec{
+			Selector: selector,
+		},
+	}
+	if externalName != "" {
+		headlessService.Spec.Type = v1.ServiceTypeExternalName
+		headlessService.Spec.ExternalName = externalName
+	} else {
+		headlessService.Spec.Ports = []v1.ServicePort{
+			{Port: 80, Name: "http", Protocol: "TCP"},
+		}
+	}
+	if isHeadless {
+		headlessService.Spec.ClusterIP = "None"
+	}
+	return headlessService
+}

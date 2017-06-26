@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -138,5 +140,89 @@ func testVolumeWithNodeAffinity(t *testing.T, affinity *v1.NodeAffinity) *v1.Per
 
 	return &v1.PersistentVolume{
 		ObjectMeta: objMeta,
+	}
+}
+
+func TestLoadPodFromFile(t *testing.T) {
+	tests := []struct {
+		name        string
+		content     string
+		expectError bool
+	}{
+		{
+			"yaml",
+			`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: testpod
+spec:
+  containers:
+    - image: gcr.io/google_containers/busybox
+`,
+			false,
+		},
+
+		{
+			"json",
+			`
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "testpod"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "gcr.io/google_containers/busybox"
+      }
+    ]
+  }
+}`,
+			false,
+		},
+
+		{
+			"invalid pod",
+			`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: testpod
+spec:
+  - image: gcr.io/google_containers/busybox
+`,
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		tempFile, err := ioutil.TempFile("", "podfile")
+		defer os.Remove(tempFile.Name())
+		if err != nil {
+			t.Fatalf("cannot create temporary file: %v", err)
+		}
+		if _, err = tempFile.Write([]byte(test.content)); err != nil {
+			t.Fatalf("cannot save temporary file: %v", err)
+		}
+		if err = tempFile.Close(); err != nil {
+			t.Fatalf("cannot close temporary file: %v", err)
+		}
+
+		pod, err := LoadPodFromFile(tempFile.Name())
+		if test.expectError {
+			if err == nil {
+				t.Errorf("test %q expected error, got nil", test.name)
+			}
+		} else {
+			// no error expected
+			if err != nil {
+				t.Errorf("error loading pod %q: %v", test.name, err)
+			}
+			if pod == nil {
+				t.Errorf("test %q expected pod, got nil", test.name)
+			}
+		}
 	}
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package workload
 
 import (
 	"fmt"
@@ -275,7 +275,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash, templateGeneration)
 
 		By("Update daemon pods image.")
-		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, redisImage)
+		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, RedisImage)
 		ds, err = c.Extensions().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ds.Spec.TemplateGeneration).To(Equal(int64(2)))
@@ -330,14 +330,14 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash, fmt.Sprint(templateGeneration))
 
 		By("Update daemon pods image.")
-		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, redisImage)
+		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, RedisImage)
 		ds, err = c.Extensions().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
 		Expect(err).NotTo(HaveOccurred())
 		templateGeneration++
 		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration))
 
 		By("Check that daemon pods images are updated.")
-		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImageAndAvailability(c, ds, redisImage, 1))
+		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImageAndAvailability(c, ds, RedisImage, 1))
 		Expect(err).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("Make sure all daemon pods have correct template generation %d", templateGeneration))

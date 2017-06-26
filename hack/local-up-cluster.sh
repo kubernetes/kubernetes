@@ -149,7 +149,7 @@ do
             ;;
         O)
             GO_OUT=$(guess_built_binary_path)
-            if [ $GO_OUT == "" ]; then
+            if [ "$GO_OUT" == "" ]; then
                 echo "Could not guess the correct output directory to use."
                 exit 1
             fi

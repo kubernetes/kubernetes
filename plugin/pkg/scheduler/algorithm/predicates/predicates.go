@@ -17,7 +17,6 @@ limitations under the License.
 package predicates
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -621,11 +620,13 @@ func PodFitsResources(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 		}
 	}
 
-	if glog.V(10) && len(predicateFails) == 0 {
-		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
-		// not logged. There is visible performance gain from it.
-		glog.Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.",
-			podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber)
+	if glog.V(10) {
+		if len(predicateFails) == 0 {
+			// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+			// not logged. There is visible performance gain from it.
+			glog.Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.",
+				podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber)
+		}
 	}
 	return len(predicateFails) == 0, predicateFails, nil
 }
@@ -1008,7 +1009,7 @@ func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta interface
 // TODO: Do we really need any pod matching, or all pods matching? I think the latter.
 func (c *PodAffinityChecker) anyPodMatchesPodAffinityTerm(pod *v1.Pod, allPods []*v1.Pod, node *v1.Node, term *v1.PodAffinityTerm) (bool, bool, error) {
 	if len(term.TopologyKey) == 0 {
-		return false, false, errors.New("Empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
+		return false, false, fmt.Errorf("empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
 	}
 	matchingPodExists := false
 	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, term)
@@ -1248,7 +1249,7 @@ func PodToleratesNodeTaints(pod *v1.Pod, meta interface{}, nodeInfo *schedulerca
 	return false, []algorithm.PredicateFailureReason{ErrTaintsTolerationsNotMatch}, nil
 }
 
-// Determine if a pod is scheduled with best-effort QoS
+// isPodBestEffort checks if pod is scheduled with best-effort QoS
 func isPodBestEffort(pod *v1.Pod) bool {
 	return v1qos.GetPodQOS(pod) == v1.PodQOSBestEffort
 }
@@ -1268,7 +1269,7 @@ func CheckNodeMemoryPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 		return true, nil, nil
 	}
 
-	// is node under presure?
+	// check if node is under memory preasure
 	if nodeInfo.MemoryPressureCondition() == v1.ConditionTrue {
 		return false, []algorithm.PredicateFailureReason{ErrNodeUnderMemoryPressure}, nil
 	}
@@ -1278,7 +1279,7 @@ func CheckNodeMemoryPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 // CheckNodeDiskPressurePredicate checks if a pod can be scheduled on a node
 // reporting disk pressure condition.
 func CheckNodeDiskPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	// is node under presure?
+	// check if node is under disk preasure
 	if nodeInfo.DiskPressureCondition() == v1.ConditionTrue {
 		return false, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}, nil
 	}

@@ -28,12 +28,15 @@ spec:
         command:
           - '/bin/sh'
           - '-c'
-          - '/usr/sbin/td-agent 2>&1 >> /var/log/fluentd.log'
+          - '/usr/sbin/td-agent $FLUENTD_ARGS'
+        env:
+        - name: FLUENTD_AGRS
+          value: -q
         resources:
           limits:
             memory: 200Mi
           requests:
-            cpu: 90m
+            cpu: 100m
             memory: 200Mi
         volumeMounts:
         - name: varlog
