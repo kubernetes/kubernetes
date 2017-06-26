@@ -44,11 +44,6 @@ import (
 )
 
 const (
-	// We'll attempt to recompute EVERY service's endpoints at least this
-	// often. Higher numbers = lower CPU/network load; lower numbers =
-	// shorter amount of time before a mistaken endpoint is corrected.
-	FullServiceResyncPeriod = 30 * time.Second
-
 	// An annotation on the Service denoting if the endpoints controller should
 	// go ahead and create endpoints for unready pods. This annotation is
 	// currently only used by StatefulSets, where we need the pod to be DNS
@@ -76,17 +71,13 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint"),
 	}
 
-	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: e.enqueueService,
-			UpdateFunc: func(old, cur interface{}) {
-				e.enqueueService(cur)
-			},
-			DeleteFunc: e.enqueueService,
+	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: e.enqueueService,
+		UpdateFunc: func(old, cur interface{}) {
+			e.enqueueService(cur)
 		},
-		// TODO: Can we have much longer period here?
-		FullServiceResyncPeriod,
-	)
+		DeleteFunc: e.enqueueService,
+	})
 	e.serviceLister = serviceInformer.Lister()
 	e.servicesSynced = serviceInformer.Informer().HasSynced
 
@@ -231,14 +222,19 @@ func (e *EndpointController) deletePod(obj interface{}) {
 		e.addPod(obj)
 		return
 	}
-	podKey, err := keyFunc(obj)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", obj, err))
+	// If we reached here it means the pod was deleted but its final state is unrecorded.
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
 		return
 	}
-	glog.V(4).Infof("Pod %q was deleted but we don't have a record of its final state, so it will take up to %v before it will be removed from all endpoint records.", podKey, FullServiceResyncPeriod)
-
-	// TODO: keep a map of pods to services to handle this condition.
+	pod, ok := tombstone.Obj.(*v1.Pod)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod: %#v", obj))
+		return
+	}
+	glog.V(4).Infof("Enqueuing services of deleted pod %s having final state unrecorded", pod.Name)
+	e.addPod(pod)
 }
 
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
