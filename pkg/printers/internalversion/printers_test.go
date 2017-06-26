@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -2566,6 +2567,74 @@ func TestPrintReplicaSet(t *testing.T) {
 		buf.Reset()
 
 		printReplicaSet(&test.replicaSet, buf, printers.PrintOptions{Wide: true})
+		if buf.String() != test.wideExpect {
+			t.Fatalf("Expected: %s, got: %s", test.wideExpect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintInitializerConfiguration(t *testing.T) {
+	tests := []struct {
+		initializerConfiguration admissionregistration.InitializerConfiguration
+		expect                   string
+		wideExpect               string
+	}{
+		{
+			admissionregistration.InitializerConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+			},
+			"test1\t0s\n",
+			"test1\t0s\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printInitializerConfiguration(&test.initializerConfiguration, buf, printers.PrintOptions{})
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+
+		printInitializerConfiguration(&test.initializerConfiguration, buf, printers.PrintOptions{Wide: true})
+		if buf.String() != test.wideExpect {
+			t.Fatalf("Expected: %s, got: %s", test.wideExpect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintExternalAdmissionHookConfiguration(t *testing.T) {
+	tests := []struct {
+		externalAdmissionHookConfiguration admissionregistration.ExternalAdmissionHookConfiguration
+		expect                             string
+		wideExpect                         string
+	}{
+		{
+			admissionregistration.ExternalAdmissionHookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+			},
+			"test1\t0s\n",
+			"test1\t0s\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printExternalAdmissionHookConfiguration(&test.externalAdmissionHookConfiguration, buf, printers.PrintOptions{})
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+
+		printExternalAdmissionHookConfiguration(&test.externalAdmissionHookConfiguration, buf, printers.PrintOptions{Wide: true})
 		if buf.String() != test.wideExpect {
 			t.Fatalf("Expected: %s, got: %s", test.wideExpect, buf.String())
 		}

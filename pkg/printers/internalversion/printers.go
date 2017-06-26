@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/helper"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -96,17 +97,19 @@ var (
 	statusColumns                    = []string{"STATUS", "REASON", "MESSAGE"}
 
 	// TODO: consider having 'KIND' for third party resource data
-	thirdPartyResourceDataColumns    = []string{"NAME", "LABELS", "DATA"}
-	horizontalPodAutoscalerColumns   = []string{"NAME", "REFERENCE", "TARGETS", "MINPODS", "MAXPODS", "REPLICAS", "AGE"}
-	deploymentColumns                = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
-	deploymentWideColumns            = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
-	configMapColumns                 = []string{"NAME", "DATA", "AGE"}
-	podSecurityPolicyColumns         = []string{"NAME", "PRIV", "CAPS", "SELINUX", "RUNASUSER", "FSGROUP", "SUPGROUP", "READONLYROOTFS", "VOLUMES"}
-	clusterColumns                   = []string{"NAME", "STATUS", "AGE"}
-	networkPolicyColumns             = []string{"NAME", "POD-SELECTOR", "AGE"}
-	certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
-	podPresetColumns                 = []string{"NAME", "AGE"}
-	controllerRevisionColumns        = []string{"NAME", "CONTROLLER", "REVISION", "AGE"}
+	thirdPartyResourceDataColumns             = []string{"NAME", "LABELS", "DATA"}
+	horizontalPodAutoscalerColumns            = []string{"NAME", "REFERENCE", "TARGETS", "MINPODS", "MAXPODS", "REPLICAS", "AGE"}
+	deploymentColumns                         = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
+	deploymentWideColumns                     = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
+	configMapColumns                          = []string{"NAME", "DATA", "AGE"}
+	podSecurityPolicyColumns                  = []string{"NAME", "PRIV", "CAPS", "SELINUX", "RUNASUSER", "FSGROUP", "SUPGROUP", "READONLYROOTFS", "VOLUMES"}
+	clusterColumns                            = []string{"NAME", "STATUS", "AGE"}
+	networkPolicyColumns                      = []string{"NAME", "POD-SELECTOR", "AGE"}
+	certificateSigningRequestColumns          = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
+	podPresetColumns                          = []string{"NAME", "AGE"}
+	initializerConfigurationColumns           = []string{"NAME", "AGE"}
+	externalAdmissionHookConfigurationColumns = []string{"NAME", "AGE"}
+	controllerRevisionColumns                 = []string{"NAME", "CONTROLLER", "REVISION", "AGE"}
 )
 
 // AddHandlers adds print handlers for default Kubernetes types dealing with internal versions.
@@ -201,6 +204,10 @@ func AddHandlers(h printers.PrintHandler) {
 	h.Handler(statusColumns, nil, printStatus)
 	h.Handler(controllerRevisionColumns, nil, printControllerRevision)
 	h.Handler(controllerRevisionColumns, nil, printControllerRevisionList)
+	h.Handler(initializerConfigurationColumns, nil, printInitializerConfiguration)
+	h.Handler(initializerConfigurationColumns, nil, printInitializerConfigurationList)
+	h.Handler(externalAdmissionHookConfigurationColumns, nil, printExternalAdmissionHookConfiguration)
+	h.Handler(externalAdmissionHookConfigurationColumns, nil, printExternalAdmissionHookConfigurationList)
 }
 
 // Pass ports=nil for all ports.
@@ -2030,6 +2037,32 @@ func printControllerRevision(history *apps.ControllerRevision, w io.Writer, opti
 func printControllerRevisionList(list *apps.ControllerRevisionList, w io.Writer, options printers.PrintOptions) error {
 	for _, item := range list.Items {
 		if err := printControllerRevision(&item, w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printInitializerConfiguration(initializerConfiguration *admissionregistration.InitializerConfiguration, w io.Writer, options printers.PrintOptions) error {
+	return printObjectMeta(initializerConfiguration.ObjectMeta, w, options, false)
+}
+
+func printInitializerConfigurationList(list *admissionregistration.InitializerConfigurationList, w io.Writer, options printers.PrintOptions) error {
+	for i := range list.Items {
+		if err := printInitializerConfiguration(&list.Items[i], w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printExternalAdmissionHookConfiguration(initializerConfiguration *admissionregistration.ExternalAdmissionHookConfiguration, w io.Writer, options printers.PrintOptions) error {
+	return printObjectMeta(initializerConfiguration.ObjectMeta, w, options, false)
+}
+
+func printExternalAdmissionHookConfigurationList(list *admissionregistration.ExternalAdmissionHookConfigurationList, w io.Writer, options printers.PrintOptions) error {
+	for i := range list.Items {
+		if err := printExternalAdmissionHookConfiguration(&list.Items[i], w, options); err != nil {
 			return err
 		}
 	}
