@@ -45,6 +45,8 @@ const (
 	// We don't restart MySQL cluster regardless of restartCluster, since MySQL doesn't handle restart well
 	restartCluster = true
 
+	multivolumeZookeeperManifestPath = "test/e2e/testing-manifests/statefulset/multivolumezk"
+
 	// Timeout for reads from databases running on stateful pods.
 	readTimeout = 60 * time.Second
 )
@@ -887,6 +889,11 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			appTester.run()
 		})
 
+		It("should create a working multivolume zookeeper cluster", func() {
+			appTester.statefulPod = &multivolumeZookeeperTester{zookeeperTester{tester: sst}}
+			appTester.run()
+		})
+
 		It("should creating a working redis cluster", func() {
 			appTester.statefulPod = &redisTester{tester: sst}
 			appTester.run()
@@ -992,6 +999,19 @@ func (z *zookeeperTester) read(statefulPodIndex int, key string) string {
 	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
 	cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh get /%v", key)
 	return lastLine(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
+}
+
+type multivolumeZookeeperTester struct {
+	zookeeperTester
+}
+
+func (z *multivolumeZookeeperTester) name() string {
+	return "multivolumezk"
+}
+
+func (z *multivolumeZookeeperTester) deploy(ns string) *apps.StatefulSet {
+	z.ss = z.tester.CreateStatefulSet(multivolumeZookeeperManifestPath, ns)
+	return z.ss
 }
 
 type mysqlGaleraTester struct {
