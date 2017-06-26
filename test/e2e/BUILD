@@ -20,6 +20,7 @@ go_test(
     deps = [
         "//test/e2e/apimachinery:go_default_library",
         "//test/e2e/autoscaling:go_default_library",
+        "//test/e2e/bootstrap:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/instrumentation/logging:go_default_library",
         "//test/e2e/instrumentation/monitoring:go_default_library",
@@ -173,6 +174,7 @@ filegroup(
         ":package-srcs",
         "//test/e2e/apimachinery:all-srcs",
         "//test/e2e/autoscaling:all-srcs",
+        "//test/e2e/bootstrap:all-srcs",
         "//test/e2e/chaosmonkey:all-srcs",
         "//test/e2e/common:all-srcs",
         "//test/e2e/framework:all-srcs",
