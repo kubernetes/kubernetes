@@ -14,23 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package workload
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	"fmt"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 var _ = framework.KubeDescribe("Job", func() {

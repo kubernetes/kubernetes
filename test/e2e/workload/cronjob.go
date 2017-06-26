@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package workload
 
 import (
 	"fmt"
@@ -28,7 +28,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
@@ -41,11 +40,6 @@ import (
 const (
 	// How long to wait for a cronjob
 	cronJobTimeout = 5 * time.Minute
-)
-
-var (
-	CronJobGroupVersionResource      = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
-	ScheduledJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}
 )
 
 var _ = framework.KubeDescribe("CronJob", func() {
