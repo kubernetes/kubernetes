@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
@@ -184,17 +183,6 @@ func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
 // GetNodeAllocatable returns amount of compute or storage resource that have to be reserved on this node from scheduling.
 func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList {
 	evictionReservation := hardEvictionReservation(cm.HardEvictionThresholds, cm.capacity)
-	if _, ok := cm.capacity[v1.ResourceStorage]; !ok {
-		if cm.cadvisorInterface != nil {
-			if rootfs, err := cm.cadvisorInterface.RootFsInfo(); err == nil {
-				for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
-					cm.capacity[rName] = rCap
-				}
-			} else {
-				glog.Warning("Error getting rootfs info: %v", err)
-			}
-		}
-	}
 	result := make(v1.ResourceList)
 	for k := range cm.capacity {
 		value := resource.NewQuantity(0, resource.DecimalSI)
