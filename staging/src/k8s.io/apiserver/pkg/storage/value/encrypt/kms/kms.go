@@ -70,6 +70,8 @@ func NewKMSTransformer(kmsService value.KMSService, storage value.KMSStorage) (v
 		if err = transformer.Rotate(); err != nil {
 			return nil, err
 		}
+	} else {
+		transformer.Refresh()
 	}
 
 	return transformer, nil
@@ -151,6 +153,10 @@ func (t *kmsTransformer) Refresh() error {
 		} else {
 			transformers = append(transformers, prefixTransformer)
 		}
+	}
+
+	if len(transformers) == 0 {
+		return fmt.Errorf("did not find any DEKs for KMS transformer")
 	}
 
 	// TODO(sakshams): Confirm that this can be done safely without any race conditions.

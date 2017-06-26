@@ -54,6 +54,14 @@ func NewKMSFactory(s *options.ServerRunOptions, storageFactory serverstorage.Sto
 	}, nil
 }
 
+// NewKMSFactoryWithStorageAndGKMS allows creating a mockup KMSFactory for unit tests.
+func NewKMSFactoryWithStorageAndGKMS(storage value.KMSStorage, gkmsService value.KMSService) *KMSFactory {
+	return &KMSFactory{
+		storage:     storage,
+		gkmsService: gkmsService,
+	}
+}
+
 // getCloud creates and returns an instance of the underlying cloud provider to be used by the KMS transformer.
 // Ensures only one instance of the cloud at any time.
 func (kmsFactory *KMSFactory) getCloud() (*cloudprovider.Interface, error) {
