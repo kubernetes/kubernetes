@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 
@@ -26,6 +27,8 @@ import (
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -191,4 +194,25 @@ func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) er
 		}
 	}
 	return nil
+}
+
+// LoadPodFromFile will read, decode, and return a Pod from a file.
+func LoadPodFromFile(filePath string) (*v1.Pod, error) {
+	if filePath == "" {
+		return nil, fmt.Errorf("file path not specified")
+	}
+	podDef, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file path %s: %+v", filePath, err)
+	}
+	if len(podDef) == 0 {
+		return nil, fmt.Errorf("file was empty: %s", filePath)
+	}
+	pod := &v1.Pod{}
+
+	codec := api.Codecs.LegacyCodec(api.Registry.GroupOrDie(v1.GroupName).GroupVersion)
+	if err := runtime.DecodeInto(codec, podDef, pod); err != nil {
+		return nil, fmt.Errorf("failed decoding file: %v", err)
+	}
+	return pod, nil
 }
