@@ -67,6 +67,9 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return err
 	}
 
+	// Always request fresh data from the server
+	discoveryclient.Invalidate()
+
 	serverVersion, err := discoveryclient.ServerVersion()
 	if err != nil {
 		return err
