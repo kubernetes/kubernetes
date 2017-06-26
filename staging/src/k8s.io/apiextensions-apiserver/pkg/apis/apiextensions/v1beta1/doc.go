@@ -20,4 +20,4 @@ limitations under the License.
 
 // Package v1beta1 is the v1beta1 version of the API.
 // +groupName=apiextensions.k8s.io
-package v1beta1 // import "k8s.io/apiextension-server/pkg/apis/apiextensions/v1beta1"
+package v1beta1 // import "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
