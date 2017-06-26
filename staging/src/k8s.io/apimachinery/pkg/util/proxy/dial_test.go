@@ -28,6 +28,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/diff"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
 
@@ -96,7 +97,10 @@ func TestDialURL(t *testing.T) {
 			ts.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
 			ts.StartTLS()
 
-			tlsConfigCopy := tc.TLSConfig
+			// Make a copy of the config
+			tlsConfigCopy := tc.TLSConfig.Clone()
+			// Clone() mutates the receiver (!), so also call it on the copy
+			tlsConfigCopy.Clone()
 			transport := &http.Transport{
 				Dial:            tc.Dial,
 				TLSClientConfig: tlsConfigCopy,
@@ -125,7 +129,7 @@ func TestDialURL(t *testing.T) {
 
 			// Make sure dialing doesn't mutate the transport's TLSConfig
 			if !reflect.DeepEqual(tc.TLSConfig, tlsConfigCopy) {
-				t.Errorf("%s: transport's copy of TLSConfig was mutated\n%#v\n\n%#v", k, tc.TLSConfig, tlsConfigCopy)
+				t.Errorf("%s: transport's copy of TLSConfig was mutated\n%s", k, diff.ObjectReflectDiff(tc.TLSConfig, tlsConfigCopy))
 			}
 
 			if err != nil {
