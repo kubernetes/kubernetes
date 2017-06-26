@@ -344,7 +344,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 		})
 
 		It("Scaling should happen in predictable order and halt if any stateful pod is unhealthy", func() {
-			framework.SkipUnlessServerVersionLT(version.MustParseSemantic("v1.7.0"), f.ClientSet.Discovery())
+			framework.SkipUnlessServerVersionLT(version.MustParseSemantic("v1.7.0-alpha.0"), f.ClientSet.Discovery())
 
 			psLabels := klabels.Set(labels)
 			By("Initializing watcher for selector " + psLabels.String())
