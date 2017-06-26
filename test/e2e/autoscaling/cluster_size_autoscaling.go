@@ -447,6 +447,45 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		})
 	})
 
+	It("Should be able to scale a node group up from 0[Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		framework.SkipUnlessAtLeast(len(originalSizes), 2, "At least 2 node groups are needed for scale-to-0 tests")
+		By("Manually scale smallest node group to 0")
+		minMig := ""
+		minSize := nodeCount
+		for mig, size := range originalSizes {
+			if size <= minSize {
+				minMig = mig
+				minSize = size
+			}
+		}
+		err := framework.ResizeGroup(minMig, int32(0))
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount-minSize, resizeTimeout))
+
+		By("Make remaining nodes unschedulable")
+		nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
+			"spec.unschedulable": "false",
+		}.AsSelector().String()})
+
+		for _, node := range nodes.Items {
+			err = makeNodeUnschedulable(f.ClientSet, &node)
+
+			defer func(n v1.Node) {
+				makeNodeSchedulable(f.ClientSet, &n)
+			}(node)
+			framework.ExpectNoError(err)
+		}
+
+		By("Run a scale-up test")
+		ReserveMemory(f, "memory-reservation", 1, 100, false, 1*time.Second)
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
+
+		// Verify that cluster size is increased
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size >= len(nodes.Items)+1 }, scaleUpTimeout))
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+	})
+
 	It("Shouldn't perform scale up operation and should list unhealthy status if most of the cluster is broken[Feature:ClusterSizeAutoscalingScaleUp]", func() {
 		clusterSize := nodeCount
 		for clusterSize < unhealthyClusterThreshold+1 {
