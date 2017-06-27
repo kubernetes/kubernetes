@@ -146,7 +146,7 @@ func (p *setnsProcess) execSetns() error {
 }
 
 // terminate sends a SIGKILL to the forked process for the setns routine then waits to
-// avoid the process becomming a zombie.
+// avoid the process becoming a zombie.
 func (p *setnsProcess) terminate() error {
 	if p.cmd.Process == nil {
 		return nil
@@ -264,7 +264,7 @@ func (p *initProcess) start() error {
 		}
 	}()
 	if err := p.createNetworkInterfaces(); err != nil {
-		return newSystemErrorWithCause(err, "creating nework interfaces")
+		return newSystemErrorWithCause(err, "creating network interfaces")
 	}
 	if err := p.sendConfig(); err != nil {
 		return newSystemErrorWithCause(err, "sending config to init process")
