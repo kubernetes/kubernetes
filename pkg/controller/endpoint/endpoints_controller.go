@@ -368,9 +368,7 @@ func (e *EndpointController) syncService(key string) error {
 
 	readyEps := 0
 	notReadyEps := 0
-	for i := range pods {
-		// TODO: Do we need to copy here?
-		pod := &(*pods[i])
+	for _, pod := range pods {
 
 		for i := range service.Spec.Ports {
 			servicePort := &service.Spec.Ports[i]
