@@ -166,7 +166,9 @@ func startAttachDetachController(ctx ControllerContext) (bool, error) {
 			ctx.Cloud,
 			ProbeAttachableVolumePlugins(ctx.Options.VolumeConfiguration),
 			ctx.Options.DisableAttachDetachReconcilerSync,
-			ctx.Options.ReconcilerSyncLoopPeriod.Duration)
+			ctx.Options.ReconcilerSyncLoopPeriod.Duration,
+			attachdetach.DefaultTimerConfig,
+		)
 	if attachDetachControllerErr != nil {
 		return true, fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 	}
@@ -178,6 +180,7 @@ func startEndpointController(ctx ControllerContext) (bool, error) {
 	go endpointcontroller.NewEndpointController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Services(),
+		ctx.InformerFactory.Core().V1().Endpoints(),
 		ctx.ClientBuilder.ClientOrDie("endpoint-controller"),
 	).Run(int(ctx.Options.ConcurrentEndpointSyncs), ctx.Stop)
 	return true, nil

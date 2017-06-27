@@ -135,7 +135,7 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, svc *v1.Service, nod
 			case schemeInternal:
 				err = gce.ensureInternalLoadBalancerDeleted(clusterName, clusterID, svc)
 			default:
-				err = gce.ensureExternalLoadBalancerDeleted(clusterName, svc)
+				err = gce.ensureExternalLoadBalancerDeleted(clusterName, clusterID, svc)
 			}
 			glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): done deleting existing %v loadbalancer. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, existingScheme, err)
 			if err != nil {
@@ -149,7 +149,7 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, svc *v1.Service, nod
 	case schemeInternal:
 		status, err = gce.ensureInternalLoadBalancer(clusterName, clusterID, svc, existingFwdRule, nodes)
 	default:
-		status, err = gce.ensureExternalLoadBalancer(clusterName, svc, existingFwdRule, nodes)
+		status, err = gce.ensureExternalLoadBalancer(clusterName, clusterID, svc, existingFwdRule, nodes)
 	}
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): done ensuring loadbalancer. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, err)
 	return status, err
@@ -191,7 +191,7 @@ func (gce *GCECloud) EnsureLoadBalancerDeleted(clusterName string, svc *v1.Servi
 	case schemeInternal:
 		err = gce.ensureInternalLoadBalancerDeleted(clusterName, clusterID, svc)
 	default:
-		err = gce.ensureExternalLoadBalancerDeleted(clusterName, svc)
+		err = gce.ensureExternalLoadBalancerDeleted(clusterName, clusterID, svc)
 	}
 	glog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): done deleting loadbalancer. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, err)
 	return err

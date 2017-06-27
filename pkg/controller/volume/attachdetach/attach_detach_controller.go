@@ -50,26 +50,38 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
-const (
-	// loopPeriod is the amount of time the reconciler loop waits between
-	// successive executions
-	reconcilerLoopPeriod time.Duration = 100 * time.Millisecond
+// TimerConfig contains configuration of internal attach/detach timers and
+// should be used only to speed up tests. DefaultTimerConfig is the suggested
+// timer configuration for production.
+type TimerConfig struct {
+	// ReconcilerLoopPeriod is the amount of time the reconciler loop waits
+	// between successive executions
+	ReconcilerLoopPeriod time.Duration
 
-	// reconcilerMaxWaitForUnmountDuration is the maximum amount of time the
+	// ReconcilerMaxWaitForUnmountDuration is the maximum amount of time the
 	// attach detach controller will wait for a volume to be safely unmounted
 	// from its node. Once this time has expired, the controller will assume the
 	// node or kubelet are unresponsive and will detach the volume anyway.
-	reconcilerMaxWaitForUnmountDuration time.Duration = 6 * time.Minute
+	ReconcilerMaxWaitForUnmountDuration time.Duration
 
-	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
+	// DesiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
-	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 1 * time.Minute
+	DesiredStateOfWorldPopulatorLoopSleepPeriod time.Duration
 
-	// desiredStateOfWorldPopulatorListPodsRetryDuration is the amount of
+	// DesiredStateOfWorldPopulatorListPodsRetryDuration is the amount of
 	// time the DesiredStateOfWorldPopulator loop waits between list pods
 	// calls.
-	desiredStateOfWorldPopulatorListPodsRetryDuration time.Duration = 3 * time.Minute
-)
+	DesiredStateOfWorldPopulatorListPodsRetryDuration time.Duration
+}
+
+// DefaultTimerConfig is the default configuration of Attach/Detach controller
+// timers.
+var DefaultTimerConfig TimerConfig = TimerConfig{
+	ReconcilerLoopPeriod:                              100 * time.Millisecond,
+	ReconcilerMaxWaitForUnmountDuration:               6 * time.Minute,
+	DesiredStateOfWorldPopulatorLoopSleepPeriod:       1 * time.Minute,
+	DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Minute,
+}
 
 // AttachDetachController defines the operations supported by this controller.
 type AttachDetachController interface {
@@ -87,7 +99,8 @@ func NewAttachDetachController(
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	disableReconciliationSync bool,
-	reconcilerSyncDuration time.Duration) (AttachDetachController, error) {
+	reconcilerSyncDuration time.Duration,
+	timerConfig TimerConfig) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in
@@ -137,8 +150,8 @@ func NewAttachDetachController(
 
 	// Default these to values in options
 	adc.reconciler = reconciler.NewReconciler(
-		reconcilerLoopPeriod,
-		reconcilerMaxWaitForUnmountDuration,
+		timerConfig.ReconcilerLoopPeriod,
+		timerConfig.ReconcilerMaxWaitForUnmountDuration,
 		reconcilerSyncDuration,
 		disableReconciliationSync,
 		adc.desiredStateOfWorld,
@@ -148,8 +161,8 @@ func NewAttachDetachController(
 		recorder)
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
-		desiredStateOfWorldPopulatorLoopSleepPeriod,
-		desiredStateOfWorldPopulatorListPodsRetryDuration,
+		timerConfig.DesiredStateOfWorldPopulatorLoopSleepPeriod,
+		timerConfig.DesiredStateOfWorldPopulatorListPodsRetryDuration,
 		podInformer.Lister(),
 		adc.desiredStateOfWorld,
 		&adc.volumePluginMgr,

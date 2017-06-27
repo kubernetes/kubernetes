@@ -120,7 +120,7 @@ spec:
           path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-gcp-config-v1.0
+          name: fluentd-gcp-config-v1.1
       - name: ssl-certs
         hostPath:
           path: /etc/ssl/certs

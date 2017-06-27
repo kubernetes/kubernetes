@@ -328,6 +328,7 @@ def start_worker(kube_api, kube_control, cni):
     set_state('kubernetes-worker.config.created')
     restart_unit_services()
     update_kubelet_status()
+    apply_node_labels()
     remove_state('kubernetes-worker.restart-needed')
 
 
@@ -415,7 +416,7 @@ def apply_node_labels():
 
     # Atomically set a label
     for label in user_labels:
-        _apply_node_label(label)
+        _apply_node_label(label, overwrite=True)
 
 
 def arch():
