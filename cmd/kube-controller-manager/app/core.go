@@ -166,7 +166,9 @@ func startAttachDetachController(ctx ControllerContext) (bool, error) {
 			ctx.Cloud,
 			ProbeAttachableVolumePlugins(ctx.Options.VolumeConfiguration),
 			ctx.Options.DisableAttachDetachReconcilerSync,
-			ctx.Options.ReconcilerSyncLoopPeriod.Duration)
+			ctx.Options.ReconcilerSyncLoopPeriod.Duration,
+			attachdetach.DefaultTimerConfig,
+		)
 	if attachDetachControllerErr != nil {
 		return true, fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 	}
