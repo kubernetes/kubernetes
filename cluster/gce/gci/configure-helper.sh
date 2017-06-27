@@ -493,18 +493,18 @@ function create-master-audit-policy {
   # Known api groups
   local -r known_apis='
       - group: "" # core
-      - group: "admissionregistration.k8s.io/v1alpha1"
-      - group: "apps/v1beta1"
+      - group: "admissionregistration.k8s.io"
+      - group: "apps"
       - group: "authentication.k8s.io"
       - group: "authorization.k8s.io"
       - group: "autoscaling"
       - group: "batch"
-      - group: "certificates.k8s.io/v1beta1"
-      - group: "extensions/v1beta1"
-      - group: "networking.k8s.io/v1"
-      - group: "policy/v1beta1"
+      - group: "certificates.k8s.io"
+      - group: "extensions"
+      - group: "networking.k8s.io"
+      - group: "policy"
       - group: "rbac.authorization.k8s.io"
-      - group: "settings.k8s.io/v1alpha1"
+      - group: "settings.k8s.io"
       - group: "storage.k8s.io"'
 
   cat <<EOF >"${path}"
