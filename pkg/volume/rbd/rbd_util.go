@@ -142,7 +142,7 @@ func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 		glog.Infof("lock list output %q", output)
 		if cmd == nil {
 			err = fmt.Errorf(rbdCmdErr)
-			break;
+			continue
 		} else if err != nil {
 			continue
 		}
