@@ -824,8 +824,9 @@ func ManualStrip(file []byte) []byte {
 	return stripped
 }
 
-// These are flags shared by the creation commands. For instance, all creation
-// commands need to be able to record to the resource annotation.
+// AddCommonCreationFlags adds flags shared by the creation commands. For
+// instance, all creation commands need to be able to record to the resource
+// annotation.
 func AddCommonCreationFlags(cmd *cobra.Command) {
 	AddPrinterFlags(cmd)
 	AddApplyAnnotationFlags(cmd)
@@ -833,8 +834,11 @@ func AddCommonCreationFlags(cmd *cobra.Command) {
 	AddInclude3rdPartyFlags(cmd)
 }
 
-// Add the required StringSlice flag "--image".
-func AddImageFlag(cmd *cobra.Command) {
+// AddDeploymentFlags adds the flags that are specific to "kubectl create
+// deployment" and "kubectl run". Flags shared between "kubectl create" and
+// "kubectl run" are kept in AddCommonCreationFlags.
+func AddDeploymentFlags(cmd *cobra.Command, defaultGeneratorName string) {
 	cmd.Flags().StringSlice("image", []string{}, i18n.T("The image(s) for the container to run."))
 	cmd.MarkFlagRequired("image")
+	AddGeneratorFlags(cmd, defaultGeneratorName)
 }

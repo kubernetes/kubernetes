@@ -54,11 +54,13 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.
 			cmdutil.CheckErr(err)
 		},
 	}
-	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, cmdutil.DeploymentBasicV1Beta1GeneratorName)
-	cmdutil.AddImageFlag(cmd)
+
+	cmdutil.AddCommonCreationFlags(cmd)
+
+	// all the other flags we need already exist in our parent command
+	// "kubectl create"
+	cmdutil.AddDeploymentFlags(cmd, cmdutil.DeploymentBasicV1Beta1GeneratorName)
+
 	return cmd
 }
 
