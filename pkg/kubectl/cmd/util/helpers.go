@@ -835,6 +835,6 @@ func AddCommonCreationFlags(cmd *cobra.Command) {
 
 // Add the required StringSlice flag "--image".
 func AddImageFlag(cmd *cobra.Command) {
-	cmd.Flags().String("image", "", i18n.T("The image for the container to run."))
+	cmd.Flags().StringSlice("image", []string{}, i18n.T("The image(s) for the container to run."))
 	cmd.MarkFlagRequired("image")
 }

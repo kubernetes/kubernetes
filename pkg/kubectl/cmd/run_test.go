@@ -23,10 +23,10 @@ import (
 	"net/http"
 	"os"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -358,7 +358,7 @@ func TestRunValidations(t *testing.T) {
 		},
 		{
 			args:        []string{"test"},
-			expectedErr: "Invalid image name",
+			expectedErr: "Exactly one image name is required",
 		},
 		{
 			args: []string{"test"},
@@ -420,7 +420,11 @@ func TestRunValidations(t *testing.T) {
 		tf.Client = &fake.RESTClient{
 			APIRegistry:          api.Registry,
 			NegotiatedSerializer: ns,
-			Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", ""))},
+			Resp: &http.Response{
+				StatusCode: 200,
+				Header:     defaultHeader(),
+				Body:       objBody(codec, cmdtesting.NewInternalType("", "", "")),
+			},
 		}
 		tf.Namespace = "test"
 		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
@@ -428,15 +432,15 @@ func TestRunValidations(t *testing.T) {
 		outBuf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 
+		t.Logf("pretending to run kubectl with flags: %+v", test.flags)
 		cmd := NewCmdRun(f, inBuf, outBuf, errBuf)
 		for flagName, flagValue := range test.flags {
 			cmd.Flags().Set(flagName, flagValue)
 		}
+
 		err := RunRun(f, inBuf, outBuf, errBuf, cmd, test.args, cmd.ArgsLenAtDash())
 		if err != nil && len(test.expectedErr) > 0 {
-			if !strings.Contains(err.Error(), test.expectedErr) {
-				t.Errorf("unexpected error: %v", err)
-			}
+			assert.Contains(t, err.Error(), test.expectedErr)
 		}
 	}
 

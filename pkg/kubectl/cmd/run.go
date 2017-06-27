@@ -147,11 +147,17 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		return cmdutil.UsageErrorf(cmd, "%v", err)
 	}
 
-	// validate image name
-	imageName := cmdutil.GetFlagString(cmd, "image")
-	validImageRef := reference.ReferenceRegexp.MatchString(imageName)
-	if !validImageRef {
-		return fmt.Errorf("Invalid image name %q: %v", imageName, reference.ErrReferenceInvalidFormat)
+	// Validate image name.
+	// TODO(github.com/alexandercampbell): support multiple images here in
+	// "run", just as we do in "create deployment".
+	imageNames := cmdutil.GetFlagStringSlice(cmd, "image")
+	if len(imageNames) != 1 {
+		return fmt.Errorf("Exactly one image name is required")
+	}
+	imageName := imageNames[0]
+	if !reference.ReferenceRegexp.MatchString(imageName) {
+		return fmt.Errorf("Invalid image name %q: %v",
+			imageName, reference.ErrReferenceInvalidFormat)
 	}
 
 	interactive := cmdutil.GetFlagBool(cmd, "stdin")
