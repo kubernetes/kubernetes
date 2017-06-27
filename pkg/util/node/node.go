@@ -41,8 +41,9 @@ const (
 	NodeUnreachablePodMessage = "Node %v which was running pod %v is unresponsive"
 )
 
+// GetHostname returns OS's hostname if 'hostnameOverride' is empty; otherwise, return 'hostnameOverride'.
 func GetHostname(hostnameOverride string) string {
-	var hostname string = hostnameOverride
+	hostname := hostnameOverride
 	if hostname == "" {
 		nodename, err := os.Hostname()
 		if err != nil {
@@ -109,8 +110,8 @@ func InternalGetNodeHostIP(node *api.Node) (net.IP, error) {
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
 }
 
-// Helper function that builds a string identifier that is unique per failure-zone
-// Returns empty-string for no zone
+// GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;
+// it returns empty-string for no zone.
 func GetZoneKey(node *v1.Node) string {
 	labels := node.Labels
 	if labels == nil {
