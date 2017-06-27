@@ -281,11 +281,38 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	if !framework.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, rebootPodReadyAgainTimeout) {
 		newPods := ps.List()
 		printStatusAndLogsForNotReadyPods(c, ns, podNames, newPods)
-		return false
+		if isDockerImageCorrupt(c, name) {
+			framework.Logf("Docker image corruption detected for node %s, ignoring pod not ready error", name)
+		} else {
+			return false
+		}
 	}
 
 	framework.Logf("Reboot successful on node %s", name)
 	return true
+}
+
+func isDockerImageCorrupt(c clientset.Interface, name string) bool {
+	namespace := "default"
+	selector := fields.Set{
+		"involvedObject.kind":      "Node",
+		"involvedObject.name":      name,
+		"involvedObject.namespace": namespace,
+		"source":                   "docker-monitor",
+	}.AsSelector().String()
+	options := metav1.ListOptions{FieldSelector: selector}
+	events, err := c.Core().Events(namespace).List(options)
+
+	if err != nil || events == nil {
+		return false
+	}
+
+	for _, item := range events.Items {
+		if item.Reason == "CorruptDockerImage" {
+			return true
+		}
+	}
+	return false
 }
 
 type terminationHook func(provider string, nodes *v1.NodeList)
