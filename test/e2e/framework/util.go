@@ -4505,7 +4505,7 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 // CleanupGCEResources cleans up GCE Service Type=LoadBalancer resources with
 // the given name. The name is usually the UUID of the Service prefixed with an
 // alpha-numeric character ('a') to work around cloudprovider rules.
-func CleanupGCEResources(loadBalancerName, zone string) (retErr error) {
+func CleanupGCEResources(c clientset.Interface, loadBalancerName, zone string) (retErr error) {
 	gceCloud, err := GetGCECloud()
 	if err != nil {
 		return err
@@ -4536,7 +4536,12 @@ func CleanupGCEResources(loadBalancerName, zone string) (retErr error) {
 	if hc != nil {
 		hcNames = append(hcNames, hc.Name)
 	}
-	if err := gceCloud.DeleteExternalTargetPoolAndChecks(loadBalancerName, region, hcNames...); err != nil &&
+	clusterID, err := GetClusterID(c)
+	if err != nil {
+		retErr = fmt.Errorf("%v\n%v", retErr, err)
+		return
+	}
+	if err := gceCloud.DeleteExternalTargetPoolAndChecks(loadBalancerName, region, clusterID, hcNames...); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 	}
