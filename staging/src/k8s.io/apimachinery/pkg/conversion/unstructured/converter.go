@@ -39,7 +39,7 @@ import (
 // Converter is an interface for converting between interface{}
 // and map[string]interface representation.
 type Converter interface {
-	ToUnstructured(obj interface{}, u *map[string]interface{}) error
+	ToUnstructured(obj interface{}) (map[string]interface{}, error)
 	FromUnstructured(u map[string]interface{}, obj interface{}) error
 }
 
@@ -388,12 +388,13 @@ func interfaceFromUnstructured(sv, dv reflect.Value) error {
 	return nil
 }
 
-func (c *converterImpl) ToUnstructured(obj interface{}, u *map[string]interface{}) error {
+func (c *converterImpl) ToUnstructured(obj interface{}) (map[string]interface{}, error) {
 	t := reflect.TypeOf(obj)
 	value := reflect.ValueOf(obj)
 	if t.Kind() != reflect.Ptr || value.IsNil() {
-		return fmt.Errorf("ToUnstructured requires a non-nil pointer to an object, got %v", t)
+		return nil, fmt.Errorf("ToUnstructured requires a non-nil pointer to an object, got %v", t)
 	}
+	u := &map[string]interface{}{}
 	err := toUnstructured(value.Elem(), reflect.ValueOf(u).Elem())
 	if c.mismatchDetection {
 		newUnstr := &map[string]interface{}{}
@@ -405,7 +406,10 @@ func (c *converterImpl) ToUnstructured(obj interface{}, u *map[string]interface{
 			glog.Fatalf("ToUnstructured mismatch for %#v, diff: %v", u, diff.ObjectReflectDiff(u, newUnstr))
 		}
 	}
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return *u, nil
 }
 
 func toUnstructuredViaJSON(obj interface{}, u *map[string]interface{}) error {
