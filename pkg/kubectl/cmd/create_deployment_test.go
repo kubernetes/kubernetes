@@ -27,8 +27,38 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
+
+func Test_generatorFromName(t *testing.T) {
+	const (
+		nonsenseName   = "not-a-real-generator-name"
+		basicName      = cmdutil.DeploymentBasicV1Beta1GeneratorName
+		basicAppsName  = cmdutil.DeploymentBasicAppsV1Beta1GeneratorName
+		deploymentName = "deployment-name"
+	)
+	imageNames := []string{"image-1", "image-2"}
+
+	generator, ok := generatorFromName(nonsenseName, imageNames, deploymentName)
+	assert.Nil(t, generator)
+	assert.False(t, ok)
+
+	generator, ok = generatorFromName(basicName, imageNames, deploymentName)
+	assert.True(t, ok)
+	assert.Equal(t, &kubectl.DeploymentBasicGeneratorV1{
+		Name:   deploymentName,
+		Images: imageNames,
+	}, generator)
+
+	generator, ok = generatorFromName(basicAppsName, imageNames, deploymentName)
+	assert.True(t, ok)
+	assert.Equal(t, &kubectl.DeploymentBasicAppsGeneratorV1{
+		Name:   deploymentName,
+		Images: imageNames,
+	}, generator)
+}
 
 func TestCreateDeployment(t *testing.T) {
 	depName := "jonny-dep"

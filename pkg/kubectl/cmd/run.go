@@ -23,7 +23,6 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
 
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -233,12 +232,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	}
 
 	// TODO: this should be removed alongside with extensions/v1beta1 depployments generator
-	if generatorName == cmdutil.DeploymentAppsV1Beta1GeneratorName &&
-		!contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
-		fmt.Fprintf(cmdErr, "WARNING: New deployments generator specified (%s), but apps/v1beta1.Deployments are not available, falling back to the old one (%s).\n",
-			cmdutil.DeploymentAppsV1Beta1GeneratorName, cmdutil.DeploymentV1Beta1GeneratorName)
-		generatorName = cmdutil.DeploymentV1Beta1GeneratorName
-	}
+	generatorName = fallbackGeneratorNameIfNecessary(generatorName, resourcesList, cmdErr)
 
 	if generatorName == cmdutil.CronJobV2Alpha1GeneratorName &&
 		!contains(resourcesList, batchv2alpha1.SchemeGroupVersion.WithResource("cronjobs")) {
