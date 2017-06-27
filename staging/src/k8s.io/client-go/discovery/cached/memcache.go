@@ -14,28 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package memcachediscovery includes a Client which is a CachedDiscoveryInterface.
-package memcachediscovery
+package cached
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/emicklei/go-restful-swagger12"
-	"github.com/go-openapi/spec"
-	"github.com/golang/glog"
+	"github.com/googleapis/gnostic/OpenAPIv2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 )
 
-// Client can Refresh() to stay up-to-date with discovery information. Before
-// this is moved some place where it's easier to call, it needs to switch to a
-// watch interface. Right now it will poll anytime Refresh() is called.
-type Client struct {
+// memCacheClient can Invalidate() to stay up-to-date with discovery
+// information.
+//
+// TODO: Switch to a watch interface. Right now it will poll anytime
+// Invalidate() is called.
+type memCacheClient struct {
 	delegate discovery.DiscoveryInterface
 
 	lock                   sync.RWMutex
@@ -45,24 +47,28 @@ type Client struct {
 }
 
 var (
-	ErrCacheEmpty = errors.New("the cache has not been filled yet")
+	ErrCacheEmpty    = errors.New("the cache has not been filled yet")
+	ErrCacheNotFound = errors.New("not found")
 )
 
-var _ discovery.CachedDiscoveryInterface = &Client{}
+var _ discovery.CachedDiscoveryInterface = &memCacheClient{}
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
-func (d *Client) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+func (d *memCacheClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
+	if !d.cacheValid {
+		return nil, ErrCacheEmpty
+	}
 	cachedVal, ok := d.groupToServerResources[groupVersion]
 	if !ok {
-		return nil, ErrCacheEmpty
+		return nil, ErrCacheNotFound
 	}
 	return cachedVal, nil
 }
 
 // ServerResources returns the supported resources for all groups and versions.
-func (d *Client) ServerResources() ([]*metav1.APIResourceList, error) {
+func (d *memCacheClient) ServerResources() ([]*metav1.APIResourceList, error) {
 	apiGroups, err := d.ServerGroups()
 	if err != nil {
 		return nil, err
@@ -79,7 +85,7 @@ func (d *Client) ServerResources() ([]*metav1.APIResourceList, error) {
 	return result, nil
 }
 
-func (d *Client) ServerGroups() (*metav1.APIGroupList, error) {
+func (d *memCacheClient) ServerGroups() (*metav1.APIGroupList, error) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	if d.groupList == nil {
@@ -88,51 +94,60 @@ func (d *Client) ServerGroups() (*metav1.APIGroupList, error) {
 	return d.groupList, nil
 }
 
-func (d *Client) RESTClient() restclient.Interface {
+func (d *memCacheClient) RESTClient() restclient.Interface {
 	return d.delegate.RESTClient()
 }
 
-func (d *Client) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+// TODO: Should this also be cached? The results seem more likely to be
+// inconsistent with ServerGroups and ServerResources given the requirement to
+// actively Invalidate.
+func (d *memCacheClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return d.delegate.ServerPreferredResources()
 }
 
-func (d *Client) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+// TODO: Should this also be cached? The results seem more likely to be
+// inconsistent with ServerGroups and ServerResources given the requirement to
+// actively Invalidate.
+func (d *memCacheClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return d.delegate.ServerPreferredNamespacedResources()
 }
 
-func (d *Client) ServerVersion() (*version.Info, error) {
+func (d *memCacheClient) ServerVersion() (*version.Info, error) {
 	return d.delegate.ServerVersion()
 }
 
-func (d *Client) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
+func (d *memCacheClient) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
 	return d.delegate.SwaggerSchema(version)
 }
 
-func (d *Client) OpenAPISchema() (*spec.Swagger, error) {
+func (d *memCacheClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	return d.delegate.OpenAPISchema()
 }
 
-func (d *Client) Fresh() bool {
+func (d *memCacheClient) Fresh() bool {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
-	// Fresh is supposed to tell the caller whether or not to retry if the
-	// cache fails to find something. The idea here is that Refresh and/or
-	// Invalidate will be called periodically and therefore we'll always be
-	// returning the latest data. (And in the future we can watch and stay
-	// even more up-to-date.) So we only return false if the cache has
-	// never been filled.
+	// Fresh is supposed to tell the caller whether or not to retry if the cache
+	// fails to find something. The idea here is that Invalidate will be called
+	// periodically and therefore we'll always be returning the latest data. (And
+	// in the future we can watch and stay even more up-to-date.) So we only
+	// return false if the cache has never been filled.
 	return d.cacheValid
 }
 
 // Invalidate refreshes the cache, blocking calls until the cache has been
 // refreshed. It would be trivial to make a version that does this in the
 // background while continuing to respond to requests if needed.
-func (d *Client) Invalidate() {
+func (d *memCacheClient) Invalidate() {
 	d.lock.Lock()
 	defer d.lock.Unlock()
+
+	// TODO: Could this multiplicative set of calls be replaced by a single call
+	// to ServerResources? If it's possible for more than one resulting
+	// APIResourceList to have the same GroupVersion, the lists would need merged.
 	gl, err := d.delegate.ServerGroups()
 	if err != nil || len(gl.Groups) == 0 {
-		glog.V(2).Infof("Error getting current server API group list, will keep using cached value. (%v)", err)
+		utilruntime.HandleError(fmt.Errorf("couldn't get current server API group list; will keep using cached value. (%v)", err))
 		return
 	}
 
@@ -141,7 +156,7 @@ func (d *Client) Invalidate() {
 		for _, v := range g.Versions {
 			r, err := d.delegate.ServerResourcesForGroupVersion(v.GroupVersion)
 			if err != nil || len(r.APIResources) == 0 {
-				glog.V(2).Infof("Error getting resource list for %v: %v", v.GroupVersion, err)
+				utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", v.GroupVersion, err))
 				if cur, ok := d.groupToServerResources[v.GroupVersion]; ok {
 					// retain the existing list, if we had it.
 					r = cur
@@ -157,10 +172,13 @@ func (d *Client) Invalidate() {
 	d.cacheValid = true
 }
 
-// NewClient creates a new Client which caches discovery information in memory
-// and will stay up-to-date if Invalidate is called with regularity.
-func NewClient(delegate discovery.DiscoveryInterface) *Client {
-	return &Client{
+// NewMemCacheClient creates a new CachedDiscoveryInterface which caches
+// discovery information in memory and will stay up-to-date if Invalidate is
+// called with regularity.
+//
+// NOTE: The client will NOT resort to live lookups on cache misses.
+func NewMemCacheClient(delegate discovery.DiscoveryInterface) discovery.CachedDiscoveryInterface {
+	return &memCacheClient{
 		delegate:               delegate,
 		groupToServerResources: map[string]*metav1.APIResourceList{},
 	}

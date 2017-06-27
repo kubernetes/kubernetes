@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package memcachediscovery
+package cached
 
 import (
 	"errors"
@@ -77,7 +77,7 @@ func TestClient(t *testing.T) {
 		},
 	}
 
-	c := NewClient(fake)
+	c := NewMemCacheClient(fake)
 	g, err := c.ServerGroups()
 	if err == nil {
 		t.Errorf("Unexpected non-error.")
