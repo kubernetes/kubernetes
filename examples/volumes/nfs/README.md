@@ -85,7 +85,8 @@ Replace the invalid IP in the [nfs PV](nfs-pv.yaml). (In the future,
 we'll be able to tie these together using the service names, but for
 now, you have to hardcode the IP.)
 
-Create the the [persistent volume](https://kubernetes.io/docs/user-guide/persistent-volumes.md)
+Create the [persistent volume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
+
 and the persistent volume claim for your NFS server. The persistent volume and
 claim gives us an indirection that allow multiple pods to refer to the NFS
 server using a symbolic name rather than the hardcoded server address.
