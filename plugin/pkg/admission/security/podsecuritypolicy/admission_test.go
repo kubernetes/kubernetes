@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	v1kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1697,6 +1698,20 @@ func TestGetMatchingPolicies(t *testing.T) {
 		if !v.expectedPolicies.Equal(allowedPolicyNames) {
 			t.Errorf("%s received unexpected policies.  Expected %#v but got %#v", k, v.expectedPolicies.List(), allowedPolicyNames.List())
 		}
+	}
+}
+
+func TestFailClosedOnInvalidPod(t *testing.T) {
+	plugin := NewTestAdmission(nil)
+	pod := &v1kapi.Pod{}
+	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
+	err := plugin.Admit(attrs)
+
+	if err == nil {
+		t.Fatalf("expected versioned pod object to fail admission")
+	}
+	if !strings.Contains(err.Error(), "object was marked as kind pod but was unable to be converted") {
+		t.Errorf("expected error to be conversion erorr but got: %v", err)
 	}
 }
 

@@ -119,9 +119,11 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 	}
 
 	pod, ok := a.GetObject().(*api.Pod)
-	// if we can't convert then we don't handle this object so just return
+	// if we can't convert then fail closed since we've already checked that this is supposed to be a pod object.
+	// this shouldn't normally happen during admission but could happen if an integrator passes a versioned
+	// pod object rather than an internal object.
 	if !ok {
-		return nil
+		return admission.NewForbidden(a, fmt.Errorf("object was marked as kind pod but was unable to be converted: %v", a.GetObject()))
 	}
 
 	// get all constraints that are usable by the user
