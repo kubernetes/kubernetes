@@ -56,6 +56,8 @@ type Transformer interface {
 	TransformFromStorage(data []byte, context Context) (out []byte, stale bool, err error)
 	// TransformToStorage may transform the provided data into the appropriate form in storage or return an error.
 	TransformToStorage(data []byte, context Context) (out []byte, err error)
+	// Rotate may modify the keys in the transformer, or modify the underlying transformers.
+	Rotate() error
 }
 
 type identityTransformer struct{}
@@ -68,6 +70,9 @@ func (identityTransformer) TransformFromStorage(b []byte, ctx Context) ([]byte, 
 }
 func (identityTransformer) TransformToStorage(b []byte, ctx Context) ([]byte, error) {
 	return b, nil
+}
+func (identityTransformer) Rotate() error {
+	return nil
 }
 
 // DefaultContext is a simple implementation of Context for a slice of bytes.
@@ -105,6 +110,11 @@ func (t *MutableTransformer) TransformToStorage(data []byte, context Context) (o
 	transformer := t.transformer
 	t.lock.RUnlock()
 	return transformer.TransformToStorage(data, context)
+}
+func (t *MutableTransformer) Rotate() error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	return t.transformer.Rotate()
 }
 
 // PrefixTransformer holds a transformer interface and the prefix that the transformation is located under.
@@ -165,4 +175,15 @@ func (t *prefixTransformers) TransformToStorage(data []byte, context Context) ([
 	}
 	prefixedData = append(prefixedData, result...)
 	return prefixedData, nil
+}
+
+// Rotate attempst to rotate the underlying transformers.
+func (t *prefixTransformers) Rotate() error {
+	for _, transformer := range t.transformers {
+		err := transformer.Transformer.Rotate()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

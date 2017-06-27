@@ -67,3 +67,8 @@ func (t *secretboxTransformer) TransformToStorage(data []byte, context value.Con
 	}
 	return secretbox.Seal(nonce[:], data, &nonce, &t.key), nil
 }
+
+// Rotate does not do anything in secretboxTransformer.
+func (t *secretboxTransformer) Rotate() error {
+	return nil
+}

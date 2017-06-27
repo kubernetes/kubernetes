@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	randutil "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -167,7 +166,14 @@ func (t *kmsTransformer) Refresh() error {
 
 // TransformFromStorage implements value.Transformer
 func (t *kmsTransformer) TransformFromStorage(data []byte, context value.Context) ([]byte, bool, error) {
-	for attempt := 0; attempt < 5; attempt++ {
+	// Retry once, if the DEK was not found.
+	// Consider the scenario with 2 apiservers. One of them rotates the DEK, and stores some data
+	// encrypted with the new key.
+	// The second master shall notice the new data, and fail to decrypt it. It shall then re-read DEKs
+	// from etcd (Refresh), and be able to decrypt the data in its second attempt.
+	// We choose to fail fast in the (possibly unlikely) case where the encrypted data has propagated
+	// to the second apiserver, but the new DEK has not.
+	for attempt := 0; attempt < 2; attempt++ {
 		for i, transformer := range t.transformers {
 			if bytes.HasPrefix(data, transformer.Prefix) {
 				result, stale, err := transformer.Transformer.TransformFromStorage(data[len(transformer.Prefix):], context)
@@ -178,8 +184,6 @@ func (t *kmsTransformer) TransformFromStorage(data []byte, context value.Context
 			}
 		}
 		// A new key may have been added.
-		// TODO(saksham): Do we need the iterative back off?
-		time.Sleep(50 * time.Duration(attempt) * time.Millisecond)
 		t.Refresh()
 	}
 	return nil, false, fmt.Errorf("did not find a transformer to read key")

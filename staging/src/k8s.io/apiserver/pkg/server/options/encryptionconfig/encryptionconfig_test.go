@@ -242,6 +242,14 @@ func (t *testKMSStorage) StoreNewDEKs(newDEKs map[string]string) error {
 	return nil
 }
 
+func (t *testKMSStorage) Snapshot() *map[string]string {
+	return t.data
+}
+
+func (t *testKMSStorage) RestoreSnapshot(snapshot *map[string]string) {
+	t.data = snapshot
+}
+
 type testKMSService struct {
 }
 
@@ -339,5 +347,62 @@ func TestEncryptionProviderConfigNoSecretForKey(t *testing.T) {
 func TestEncryptionProviderConfigInvalidKey(t *testing.T) {
 	if _, err := ParseEncryptionConfiguration(strings.NewReader(incorrectConfigInvalidKey), nil); err == nil {
 		t.Fatalf("invalid configuration file (bad AES key) got parsed:\n%s", incorrectConfigInvalidKey)
+	}
+}
+
+func TestKMSTransformerRotate(t *testing.T) {
+	// Create a mock kmsFactory
+	mockStorage := testKMSStorage{}
+	kmsFactory := transformhelpers.NewKMSFactoryWithStorageAndGKMS(&mockStorage, &testKMSService{})
+
+	// We create two different transformer instances, with just the storage shared.
+	// Sharing the mocked cloud is insignificant, since it does not have any state.
+	kmsTransformerOverrides1, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithKMSFirst), kmsFactory)
+	if err != nil {
+		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSFirst)
+	}
+	kmsTransformerOverrides2, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithKMSFirst), kmsFactory)
+	if err != nil {
+		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSFirst)
+	}
+
+	// Two transformers simulate 2 masters
+	kmsTransformer1 := kmsTransformerOverrides1[schema.ParseGroupResource("secrets")]
+	kmsTransformer2 := kmsTransformerOverrides2[schema.ParseGroupResource("secrets")]
+
+	context := value.DefaultContext([]byte(sampleContextText))
+	originalText := []byte(sampleText)
+
+	// Sanity check that rotating does not break encryption at any point.
+	transformedData, err := kmsTransformer1.TransformToStorage(originalText, context)
+	if err != nil {
+		t.Fatalf("error while transforming data to storage using kmsTransformer1: %v", err)
+	}
+	err = kmsTransformer1.Rotate()
+	if err != nil {
+		t.Fatalf("error while rotating key: %v", err)
+	}
+	untransformedData, _, err := kmsTransformer2.TransformFromStorage(transformedData, context)
+	if err != nil {
+		t.Fatalf("error while transforming data from storage using kmsTransformer2 after rotation: %v", err)
+	}
+	if fmt.Sprintf("%v", untransformedData) != fmt.Sprintf("%v", originalText) {
+		t.Fatalf("untransformed data (\"%s\") did not match original text (\"%s\")", untransformedData, originalText)
+	}
+
+	// Check that if the new key had not propagated to the other master, decrypting new data fails.
+	snapshotBeforeRotation := mockStorage.Snapshot()
+	err = kmsTransformer1.Rotate()
+	if err != nil {
+		t.Fatalf("error while rotating key: %v", err)
+	}
+	transformedData, err = kmsTransformer1.TransformToStorage(originalText, context)
+	if err != nil {
+		t.Fatalf("error while transforming data to storage using kmsTransformer1: %v", err)
+	}
+	mockStorage.RestoreSnapshot(snapshotBeforeRotation)
+	untransformedData, _, err = kmsTransformer2.TransformFromStorage(transformedData, context)
+	if err == nil {
+		t.Fatalf("a transformer without the newly created key should not have been able to decrypt data encrypted with new key")
 	}
 }

@@ -48,3 +48,8 @@ func (identityTransformer) TransformFromStorage(b []byte, context value.Context)
 func (identityTransformer) TransformToStorage(b []byte, context value.Context) ([]byte, error) {
 	return b, nil
 }
+
+// Rotate does not do anything for identityTransformer.
+func (identityTransformer) Rotate() error {
+	return nil
+}

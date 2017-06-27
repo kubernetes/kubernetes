@@ -29,6 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 )
 
+const defaultGKMSKeyRing = "google-kubernetes"
+
 type gkmsTransformer struct {
 	parentName      string
 	cloudkmsService *cloudkms.Service
@@ -49,11 +51,6 @@ func NewGoogleKMSService(projectID, location, keyRing, cryptoKey string, cloud *
 		if projectID == "" {
 			projectID = gke.GetProjectID()
 		}
-
-		// Default location for keys
-		if location == "" {
-			location = "global"
-		}
 	} else {
 		// Outside GCE/GKE. Requires GOOGLE_APPLICATION_CREDENTIALS environment variable.
 		ctx := context.Background()
@@ -65,6 +62,21 @@ func NewGoogleKMSService(projectID, location, keyRing, cryptoKey string, cloud *
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// Default location and keyRing for keys
+	if location == "" {
+		location = "global"
+	}
+	if keyRing == "" {
+		keyRing = defaultGKMSKeyRing
+	}
+
+	if projectID == "" {
+		return nil, fmt.Errorf("missing projectID in encryption provider configuration for gkms provider")
+	}
+	if cryptoKey == "" {
+		return nil, fmt.Errorf("missing cryptoKey in encryption provider configuration for gkms provider")
 	}
 
 	parentName := fmt.Sprintf("projects/%s/locations/%s", projectID, location)
