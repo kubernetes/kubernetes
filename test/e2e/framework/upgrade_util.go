@@ -20,7 +20,10 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
@@ -38,8 +41,13 @@ func RealVersion(s string) (string, error) {
 
 func CheckMasterVersion(c clientset.Interface, want string) error {
 	Logf("Checking master version")
-	v, err := c.Discovery().ServerVersion()
-	if err != nil {
+	var err error
+	var v *version.Info
+	waitErr := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
+		v, err = c.Discovery().ServerVersion()
+		return err != nil, nil
+	})
+	if waitErr != nil {
 		return fmt.Errorf("CheckMasterVersion() couldn't get the master version: %v", err)
 	}
 	// We do prefix trimming and then matching because:
