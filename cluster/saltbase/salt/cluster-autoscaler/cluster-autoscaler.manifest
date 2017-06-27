@@ -40,6 +40,7 @@
                     "--v=4",
                     "--logtostderr=true",
                     "--write-status-configmap=true",
+                    "--balance-similar-node-groups=true,"
                     "{{params}}"
                 ],
                 "env": [
