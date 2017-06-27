@@ -55,7 +55,7 @@ spec:
           command:
             - /heapster
             - --source=kubernetes.summary_api:''
-            - --sink=stackdriver
+            - --sink=stackdriver:?cluster_name={{ cluster_name }}
               # TODO: add --disable_export when it's merged into Heapster release
           volumeMounts:
             - name: ssl-certs
