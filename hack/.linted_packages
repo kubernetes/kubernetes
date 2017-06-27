@@ -498,7 +498,6 @@ test/integration/quota
 test/integration/secrets
 test/integration/serviceaccount
 test/integration/storageclasses
-test/integration/thirdparty
 test/integration/ttlcontroller
 test/soak/cauldron
 test/soak/serve_hostnames
