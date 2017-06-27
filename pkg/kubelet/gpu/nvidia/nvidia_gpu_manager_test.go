@@ -20,23 +20,75 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/docker/engine-api/types"
+	"github.com/docker/engine-api/types/container"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 type testActivePodsLister struct {
-	activePods []*v1.Pod
+	activePods     []*v1.Pod
+	dockerClient   libdocker.Interface
+	nvidiaGPUPaths []string
 }
 
 func (tapl *testActivePodsLister) GetActivePods() []*v1.Pod {
 	return tapl.activePods
+}
+
+func (tapl *testActivePodsLister) InitiateActivePods() {
+	dockerClient := tapl.dockerClient
+
+	for i, pod := range tapl.activePods {
+		var gpusNeeded int64
+		for _, container := range pod.Spec.Containers {
+			gpusNeeded = container.Resources.Limits.NvidiaGPU().Value()
+		}
+		for j, containerStatus := range pod.Status.ContainerStatuses {
+			var gpuDevices []string
+			if gpusNeeded <= int64(len(tapl.nvidiaGPUPaths)) {
+				gpuDevices = tapl.nvidiaGPUPaths[:gpusNeeded]
+				tapl.nvidiaGPUPaths = tapl.nvidiaGPUPaths[gpusNeeded:]
+			}
+			devices := makeDevices(gpuDevices)
+
+			conConfig := types.ContainerCreateConfig{
+				Name: containerStatus.Name,
+				Config: &container.Config{
+					Image:  "foo",
+					Labels: make(map[string]string),
+				},
+				HostConfig: &container.HostConfig{
+					Resources: container.Resources{
+						Devices: devices,
+					},
+				},
+			}
+
+			cr, _ := dockerClient.CreateContainer(conConfig)
+			tapl.activePods[i].Status.ContainerStatuses[j].ContainerID = cr.ID
+			dockerClient.StartContainer(cr.ID)
+		}
+	}
+}
+
+func makeDevices(nvidiaGPUPaths []string) []container.DeviceMapping {
+	var devices []container.DeviceMapping
+	for _, path := range nvidiaGPUPaths {
+		// Devices have to be mapped one to one because of nvidia CUDA library requirements.
+		devices = append(devices, container.DeviceMapping{PathOnHost: path, PathInContainer: path, CgroupPermissions: "mrw"})
+	}
+
+	return devices
 }
 
 func makeTestPod(numContainers, gpusPerContainer int) *v1.Pod {
@@ -55,6 +107,7 @@ func makeTestPod(numContainers, gpusPerContainer int) *v1.Pod {
 		},
 	}
 	for ; numContainers > 0; numContainers-- {
+
 		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
 			Name:      string(uuid.NewUUID()),
 			Resources: resources,
@@ -89,6 +142,39 @@ func TestNewNvidiaGPUManager(t *testing.T) {
 		gpus := reflect.ValueOf(testGpuManager2).Elem().FieldByName("allGPUs").Len()
 		as.NotZero(gpus)
 	}
+}
+
+func makeTestPodWithStatuses(numContainers, gpusPerContainer int) *v1.Pod {
+	quantity := resource.NewQuantity(int64(gpusPerContainer), resource.DecimalSI)
+	resources := v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourceNvidiaGPU: *quantity,
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: uuid.NewUUID(),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{},
+		},
+	}
+	for ; numContainers > 0; numContainers-- {
+		con := string(uuid.NewUUID())
+
+		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+			Name:      con,
+			Resources: resources,
+		})
+
+		pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, v1.ContainerStatus{
+			Name:        con,
+			Ready:       true,
+			ContainerID: con,
+			State:       v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+		})
+	}
+	return pod
 }
 
 func TestMultiContainerPodGPUAllocation(t *testing.T) {
@@ -208,4 +294,48 @@ func TestPodContainerRestart(t *testing.T) {
 	as.Nil(err)
 	as.Equal(len(devicesA), 3)
 	as.True(sets.NewString(devicesA...).Equal(sets.NewString(devicesAretry...)))
+}
+
+func TestGpuAllocationWithActivePods(t *testing.T) {
+	fakeClock := clock.NewFakeClock(time.Time{})
+	dc := libdocker.NewFakeDockerClient().WithClock(fakeClock).WithVersion("1.11.2", "1.23")
+
+	// Make sure the GPUs in active pods match the numGpus
+	podLister := &testActivePodsLister{
+		activePods:     []*v1.Pod{makeTestPodWithStatuses(1, 2)},
+		dockerClient:   dc,
+		nvidiaGPUPaths: sets.NewString("/dev/nvidia0", "/dev/nvidia1", "/dev/nvidia2", "/dev/nvidia3").UnsortedList(),
+	}
+
+	testGpuManager := &nvidiaGPUManager{
+		activePodsLister: podLister,
+		allGPUs:          sets.NewString("/dev/nvidia0", "/dev/nvidia1", "/dev/nvidia2", "/dev/nvidia3"),
+		dockerClient:     dc,
+		allocated:        newPodGPUs(),
+	}
+
+	// At first initiate the active pods.
+	podLister.InitiateActivePods()
+
+	// Expect that no devices are in use.
+	gpusInUse := testGpuManager.gpusInUse()
+	as := assert.New(t)
+	as.Equal(len(gpusInUse.devices()), 2)
+
+	// Update the allocated list of GpuManager
+	testGpuManager.allocated = gpusInUse
+
+	// Make a pod with one containers that requests one GPU.
+	podA := makeTestPodWithStatuses(1, 1)
+	// Allocate GPUs
+	devices, err := testGpuManager.AllocateGPU(podA, &podA.Spec.Containers[0])
+	as.Nil(err)
+	as.Equal(len(devices), 1)
+	podLister.activePods = append(podLister.activePods, podA)
+
+	// Make a pod with one containers that requests two GPU.
+	podA = makeTestPodWithStatuses(1, 2)
+	// Gpu allocation will be failed as no more devices can be allocated.
+	_, err = testGpuManager.AllocateGPU(podA, &podA.Spec.Containers[0])
+	as.NotNil(err)
 }

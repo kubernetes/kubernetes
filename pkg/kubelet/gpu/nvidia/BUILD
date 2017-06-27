@@ -45,10 +45,13 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        "//vendor/github.com/docker/engine-api/types:go_default_library",
+        "//vendor/github.com/docker/engine-api/types/container:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
     ],
