@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/rescheduling-for-critical-pods.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/rescheduling-for-critical-pods.md)

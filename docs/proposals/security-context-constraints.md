@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/security-context-constraints.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/security-context-constraints.md)
