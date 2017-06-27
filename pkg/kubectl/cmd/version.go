@@ -116,10 +116,12 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 
 func retrieveServerVersion(f cmdutil.Factory) (*apimachineryversion.Info, error) {
 	discoveryClient, err := f.DiscoveryClient()
-
 	if err != nil {
 		return nil, err
 	}
+
+	// Always request fresh data from the server
+	discoveryClient.Invalidate()
 
 	serverVersion, err := discoveryClient.ServerVersion()
 	if err != nil {

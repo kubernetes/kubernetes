@@ -55,6 +55,9 @@ func RunApiVersions(f cmdutil.Factory, w io.Writer) error {
 		return err
 	}
 
+	// Always request fresh data from the server
+	discoveryclient.Invalidate()
+
 	groupList, err := discoveryclient.ServerGroups()
 	if err != nil {
 		return fmt.Errorf("Couldn't get available api versions from server: %v\n", err)
