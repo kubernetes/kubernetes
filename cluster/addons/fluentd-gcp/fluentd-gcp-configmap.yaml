@@ -314,7 +314,7 @@ data:
 
     # This filter is used to convert process start timestamp to integer
     # value for correct ingestion in the prometheus output plugin.
-    <filter>
+    <filter process_start>
       @type record_transformer
       enable_ruby true
       auto_typecast true
@@ -415,7 +415,7 @@ data:
       </store>
     </match>
 metadata:
-  name: fluentd-gcp-config-v1.0
+  name: fluentd-gcp-config-v1.1
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
