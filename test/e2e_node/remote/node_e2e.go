@@ -108,19 +108,9 @@ func tarAddCOSMounter(tar string) error {
 	return nil
 }
 
-// updateCOSKubeletFlags updates kubelet flags to set gci mounter path, and enables memcg notifications. This will only take effect for
-// GCI/COS image.
-func updateCOSKubeletFlags(args, host, workspace string) (string, error) {
-	// Determine if tests will run on a GCI/COS node.
-	output, err := SSH(host, "cat", "/etc/os-release")
-	if err != nil {
-		return args, fmt.Errorf("issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
-	}
-	if !strings.Contains(output, "ID=gci") && !strings.Contains(output, "ID=cos") {
-		// This is not a GCI/COS image
-		return args, nil
-	}
-
+// prependCOSMounterFlag prepends the flag for setting the GCI mounter path to
+// args and returns the result.
+func prependCOSMounterFlag(args, host, workspace string) (string, error) {
 	// If we are testing on a GCI/COS node, we chmod 544 the mounter and specify a different mounter path in the test args.
 	// We do this here because the local var `workspace` tells us which /tmp/node-e2e-%d is relevant to the current test run.
 
@@ -140,13 +130,35 @@ func updateCOSKubeletFlags(args, host, workspace string) (string, error) {
 	// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
 	// here will tell us to update the remote test runner.
 	mounterPath := filepath.Join(workspace, localCOSMounterPath)
-	output, err = SSH(host, "sh", "-c", fmt.Sprintf("'chmod 544 %s'", mounterPath))
+	output, err := SSH(host, "sh", "-c", fmt.Sprintf("'chmod 544 %s'", mounterPath))
 	if err != nil {
 		return args, fmt.Errorf("unabled to chmod 544 GCI/COS mounter script. Err: %v, Output:\n%s", err, output)
 	}
 	// Insert args at beginning of test args, so any values from command line take precedence
-	args = "--kubelet-flags=--experimental-kernel-memcg-notification=true " + args
 	args = fmt.Sprintf("--kubelet-flags=--experimental-mounter-path=%s ", mounterPath) + args
+	return args, nil
+}
+
+// prependMemcgNotificationFlag prepends the flag for enabling memcg
+// notification to args and returns the result.
+func prependMemcgNotificationFlag(args string) string {
+	return "--kubelet-flags=--experimental-kernel-memcg-notification=true " + args
+}
+
+// updateOSSpecificKubeletFlags updates the Kubelet args with OS specific
+// settings.
+func updateOSSpecificKubeletFlags(args, host, workspace string) (string, error) {
+	output, err := SSH(host, "cat", "/etc/os-release")
+	if err != nil {
+		return "", fmt.Errorf("issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
+	}
+	switch {
+	case strings.Contains(output, "ID=gci"), strings.Contains(output, "ID=cos"):
+		args = prependMemcgNotificationFlag(args)
+		return prependCOSMounterFlag(args, host, workspace)
+	case strings.Contains(output, "ID=ubuntu"):
+		return prependMemcgNotificationFlag(args), nil
+	}
 	return args, nil
 }
 
@@ -165,7 +177,7 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testA
 	// Kill any running node processes
 	cleanupNodeProcesses(host)
 
-	testArgs, err := updateCOSKubeletFlags(testArgs, host, workspace)
+	testArgs, err := updateOSSpecificKubeletFlags(testArgs, host, workspace)
 	if err != nil {
 		return "", err
 	}
