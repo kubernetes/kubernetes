@@ -138,12 +138,13 @@ func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 		// for defencing, get the locker name, something like "client.1234"
 		cmd, err = b.plugin.execCommand("rbd",
 			append([]string{"lock", "list", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon}, secret_opt...))
-		output = string(cmd)
-		glog.Infof("lock list output %q", output)
 		if cmd == nil {
 			err = fmt.Errorf(rbdCmdErr)
 			continue
-		} else if err != nil {
+		}
+		if err != nil {
+			output = string(cmd)
+			glog.Infof("lock list output %q", output)
 			continue
 		}
 
@@ -337,7 +338,8 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 		cmd, err = c.plugin.execCommand("rbd", []string{"unmap", device})
 		if cmd == nil {
 			return fmt.Errorf("rbd: rbd cmd not found")
-		} else if err != nil {
+		}
+		if err != nil {
 			return fmt.Errorf("rbd: failed to unmap device %s:Error: %v", device, err)
 		}
 
@@ -443,6 +445,10 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, error) {
 		glog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, b.adminId, b.adminSecret)
 		cmd, err = b.plugin.execCommand("rbd",
 			[]string{"status", b.Image, "--pool", b.Pool, "-m", mon, "--id", b.adminId, "--key=" + b.adminSecret})
+		if cmd == nil {
+			glog.Errorf("rbd cmd not found")
+		}
+
 		output = string(cmd)
 
 		if err != nil {
