@@ -164,7 +164,7 @@ type AuthInterface interface {
 }
 
 // HostInterface contains all the kubelet methods required by the server.
-// For testablitiy.
+// For testability.
 type HostInterface interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
 	GetContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error)
