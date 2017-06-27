@@ -170,6 +170,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
 		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		w.resultRun = 0
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}
