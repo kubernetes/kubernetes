@@ -100,7 +100,7 @@ func RegisterPrometheusHandler(mux httpmux.Mux, containerManager manager.Manager
 		prometheus.NewGoCollector(),
 		prometheus.NewProcessCollector(os.Getpid(), ""),
 	)
-	mux.Handle(prometheusEndpoint, promhttp.HandlerFor(r, promhttp.HandlerOpts{}))
+	mux.Handle(prometheusEndpoint, promhttp.HandlerFor(r, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}))
 }
 
 func staticHandlerNoAuth(w http.ResponseWriter, r *http.Request) {
