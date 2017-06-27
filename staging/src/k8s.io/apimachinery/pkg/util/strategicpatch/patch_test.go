@@ -86,7 +86,7 @@ type StrategicMergePatchRawTestCaseData struct {
 }
 
 type MergeItem struct {
-	Name                  string
+	Name                  string `json:"name"`
 	Value                 string
 	Other                 string
 	MergingList           []MergeItem `patchStrategy:"merge" patchMergeKey:"name"`
@@ -651,6 +651,86 @@ func TestCustomStrategicMergePatch(t *testing.T) {
 	for _, c := range customStrategicMergePatchRawTestCases {
 		original, expectedTwoWayPatch, _, expectedResult := twoWayRawTestCaseToJSONOrFail(t, c)
 		testPatchApplication(t, original, expectedTwoWayPatch, expectedResult, c.Description, c.ExpectedError)
+	}
+}
+
+// TestStrategicMergeTreatNilCollectionAsEmpty tests the behavior where nil and empty collections in
+// the Go struct are treated equivalently.
+func TestStrategicMergeTreatNilCollectionAsEmpty(t *testing.T) {
+	for i, tc := range []struct {
+		original *MergeItem
+		modified *MergeItem
+		current  *MergeItem
+		want     []byte
+	}{{
+		// original->modified deletes the last key, but current has a custom key.
+		original: &MergeItem{SimpleMap: map[string]string{"original-key": "1"}},
+		modified: &MergeItem{SimpleMap: map[string]string{}},
+		current:  &MergeItem{SimpleMap: map[string]string{"original-key": "1", "custom-key": "2"}},
+		want:     []byte(`{"SimpleMap":{"original-key":null}}`),
+	}, {
+		// original->modified deletes the last key (with simulated omitempty behavior), but current has
+		// a custom key.
+		original: &MergeItem{SimpleMap: map[string]string{"original-key": "1"}},
+		modified: &MergeItem{}, // SimpleMap is nil (simulated omitempty).
+		current:  &MergeItem{SimpleMap: map[string]string{"original-key": "1", "custom-key": "2"}},
+		want:     []byte(`{"SimpleMap":{"original-key":null}}`),
+	}, {
+		// original->modified deletes the last key (with simulated omitempty behavior).
+		original: &MergeItem{SimpleMap: map[string]string{"original-key": "1"}},
+		modified: &MergeItem{}, // SimpleMap is nil (simulated omitempty).
+		current:  &MergeItem{SimpleMap: map[string]string{"original-key": "1"}},
+		want:     []byte(`{"SimpleMap":{"original-key":null}}`), // Note: map could also be completely removed.
+	}, {
+		// original->modified and original->current delete the last key, but modified adds a new key.
+		original: &MergeItem{SimpleMap: map[string]string{"original-key": "1"}},
+		modified: &MergeItem{SimpleMap: map[string]string{"custom-key": "2"}},
+		current:  &MergeItem{SimpleMap: map[string]string{}},
+		want:     []byte(`{"SimpleMap":{"custom-key":"2","original-key":null}}`),
+	}, {
+		// original->modified and original->current delete the last key (with simulated omitempty
+		// behavior), but modified adds a new key.
+		original: &MergeItem{SimpleMap: map[string]string{"original-key": "1"}},
+		modified: &MergeItem{SimpleMap: map[string]string{"custom-key": "2"}},
+		current:  &MergeItem{}, // SimpleMap is nil (simulated omitempty).
+		want:     []byte(`{"SimpleMap":{"custom-key":"2","original-key":null}}`),
+	}, {
+		// original->modified deletes the last key from patchMergeKey slice, but current has a custom
+		// key.
+		original: &MergeItem{MergingList: []MergeItem{{Name: "original-key"}}},
+		modified: &MergeItem{MergingList: []MergeItem{}},
+		current:  &MergeItem{MergingList: []MergeItem{{Name: "original-key"}, {Name: "custom-key"}}},
+		want:     []byte(`{"MergingList":[{"$patch":"delete","name":"original-key"}]}`),
+	}, {
+		// original->modified deletes the last key from patchMergeKey slice (with simulated omitempty
+		// behavior), but current has a custom key.
+		original: &MergeItem{MergingList: []MergeItem{{Name: "original-key"}}},
+		modified: &MergeItem{}, // MergingList is nil (simulated omitempty).
+		current:  &MergeItem{MergingList: []MergeItem{{Name: "original-key"}, {Name: "custom-key"}}},
+		want:     []byte(`{"MergingList":[{"$patch":"delete","name":"original-key"}]}`),
+	}, {
+		// Ensure that non-map objects are still treated in accordance to RFC 6902.
+		original: &MergeItem{MergeItemPtr: &MergeItem{Name: "inner"}},
+		modified: &MergeItem{},
+		current:  &MergeItem{MergeItemPtr: &MergeItem{Name: "inner"}},
+		want:     []byte(`{"MergeItemPtr":null}`),
+	}} {
+		originalBytes, err := json.Marshal(tc.original)
+		if err != nil {
+			t.Fatal(err)
+		}
+		modifiedBytes, err := json.Marshal(tc.modified)
+		if err != nil {
+			t.Fatal(err)
+		}
+		currentBytes, err := json.Marshal(tc.current)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := CreateThreeWayMergePatch(originalBytes, modifiedBytes, currentBytes, &MergeItem{}, false)
+		if err != nil || !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%d: CreateThreeWayMergePatch(%s, %s, %s, &MergeItem{}, false) = %s, %v, want: %s, nil", i, string(originalBytes), string(modifiedBytes), string(currentBytes), got, err, tc.want)
+		}
 	}
 }
 

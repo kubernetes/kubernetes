@@ -186,6 +186,31 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, diffOpt
 			continue
 		}
 
+		// Treat empty and nil Go maps the same way for comparison purposes. This ensures that deleting
+		// the last key in one map patches correctly with another map that still has other keys.
+		if (originalValue == nil) != (modifiedValue == nil) {
+			fieldType, _, _, err := forkedjson.LookupPatchMetadata(t, key)
+			if err != nil {
+				return nil, err
+			}
+			if originalValue == nil {
+				switch fieldType.Kind() {
+				case reflect.Map:
+					originalValue = make(map[string]interface{})
+				case reflect.Slice:
+					originalValue = []interface{}{}
+				}
+			}
+			if modifiedValue == nil {
+				switch fieldType.Kind() {
+				case reflect.Map:
+					modifiedValue = make(map[string]interface{})
+				case reflect.Slice:
+					modifiedValue = []interface{}{}
+				}
+			}
+		}
+
 		if reflect.TypeOf(originalValue) != reflect.TypeOf(modifiedValue) {
 			// Types have changed, so add to patch
 			if !diffOptions.IgnoreChangesAndAdditions {
