@@ -188,6 +188,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"metadata.labels",
 				"metadata.name",
 				"metadata.namespace",
+				"metadata.uid",
 				"spec.nodeName",
 				"spec.restartPolicy",
 				"spec.serviceAccountName",
