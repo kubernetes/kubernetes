@@ -158,7 +158,7 @@ func getRecentUnmetScheduleTimes(sj batchv2alpha1.CronJob, now time.Time) ([]tim
 		// then there could be so many missed start times (it could be off
 		// by decades or more), that it would eat up all the CPU and memory
 		// of this controller. In that case, we want to not try to list
-		// all the misseded start times.
+		// all the missed start times.
 		//
 		// I've somewhat arbitrarily picked 100, as more than 80, but
 		// but less than "lots".
