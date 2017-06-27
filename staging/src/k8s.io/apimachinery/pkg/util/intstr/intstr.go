@@ -124,8 +124,7 @@ func (_ IntOrString) OpenAPIDefinition() openapi.OpenAPIDefinition {
 	return openapi.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type:   []string{"string"},
-				Format: "int-or-string",
+				Type: []string{"integer", "string"},
 			},
 		},
 	}
