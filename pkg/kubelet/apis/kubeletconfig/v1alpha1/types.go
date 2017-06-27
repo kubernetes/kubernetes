@@ -209,6 +209,8 @@ type KubeletConfiguration struct {
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
+	// CPU Manager policy to use.
+	CPUManagerPolicy string `json:"cpuManagerPolicy"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
 	// remoteRuntimeEndpoint is the endpoint of remote runtime service

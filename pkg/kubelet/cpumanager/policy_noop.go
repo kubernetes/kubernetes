@@ -24,13 +24,15 @@ import (
 
 type noopPolicy struct{}
 
+const PolicyNoop PolicyName = "noop"
+
 // NewNoopPolicy returns a cupset manager policy that does nothing
 func NewNoopPolicy() Policy {
 	return &noopPolicy{}
 }
 
 func (p *noopPolicy) Name() string {
-	return "noop"
+	return string(PolicyNoop)
 }
 
 func (p *noopPolicy) Start(s state.State) {

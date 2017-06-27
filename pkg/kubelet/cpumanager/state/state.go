@@ -17,12 +17,10 @@ limitations under the License.
 package state
 
 import (
-	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topo"
 	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
 type Reader interface {
-	Topology() *topo.CPUTopology
 	GetCPUSet(containerID string) (cpuset.CPUSet, bool)
 	GetDefaultCPUSet() cpuset.CPUSet
 	GetCPUSetOrDefault(containerID string) cpuset.CPUSet

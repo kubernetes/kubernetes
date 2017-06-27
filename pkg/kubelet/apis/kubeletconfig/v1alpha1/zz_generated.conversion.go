@@ -225,6 +225,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 		return err
 	}
 	out.CgroupDriver = in.CgroupDriver
+	out.CPUManagerPolicy = in.CPUManagerPolicy
 	out.ContainerRuntime = in.ContainerRuntime
 	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
 	out.RemoteImageEndpoint = in.RemoteImageEndpoint
@@ -406,6 +407,7 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
 	out.ContainerRuntime = in.ContainerRuntime
+	out.CPUManagerPolicy = in.CPUManagerPolicy
 	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
 	out.RemoteImageEndpoint = in.RemoteImageEndpoint
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout

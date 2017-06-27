@@ -18,12 +18,10 @@ package cpumanager
 
 import (
 	"fmt"
-	"io/ioutil"
-	"regexp"
-	"strings"
 	"sync"
 	"time"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -34,9 +32,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
-type podLister interface {
+type kletGetter interface {
 	GetPods() []*v1.Pod
+	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
 }
+
+type PolicyName string
 
 type Manager interface {
 	Start()
@@ -58,23 +59,34 @@ type Manager interface {
 	State() state.Reader
 }
 
-func NewManager(p Policy, cr internalapi.RuntimeService, lister podLister, statusProvider status.PodStatusProvider) (Manager, error) {
-	cpuInfoFile, err := ioutil.ReadFile("/proc/cpuinfo")
-	if err != nil {
-		return nil, err
-	}
-	topo, err := discoverTopology(cpuInfoFile)
-	if err != nil {
-		return nil, err
+func NewManager(policyType string, cr internalapi.RuntimeService, kletGetter kletGetter, statusProvider status.PodStatusProvider) (Manager, error) {
+	var newPolicy Policy
+
+	switch PolicyName(policyType) {
+	case PolicyNoop:
+		newPolicy = NewNoopPolicy()
+	case PolicyStatic:
+		machinInfo, err := kletGetter.GetCachedMachineInfo()
+		if err != nil {
+			return nil,err
+		}
+		topo, err := discoverTopology(machinInfo)
+		if err != nil {
+			return nil, err
+		}
+		glog.Infof("[cpumanager] detected CPU topology: %v", topo)
+		newPolicy = NewStaticPolicy(topo)
+	default:
+		glog.Warningf("[cpumanager] Invalid policy, fallback to default policy - 'noop'")
+		newPolicy = NewNoopPolicy()
 	}
 
-	glog.Infof("detected CPU topology: %v", topo)
 
 	return &manager{
-		policy:            p,
-		state:             state.NewMemoryState(topo),
+		policy:            newPolicy,
+		state:             state.NewMemoryState(),
 		containerRuntime:  cr,
-		podLister:         lister,
+		kletGetter:        kletGetter,
 		podStatusProvider: statusProvider,
 	}, nil
 }
@@ -90,16 +102,18 @@ type manager struct {
 
 	// podLister provides a method for listing all the pods on the node
 	// so all the containers can be updated in the reconciliation loop.
-	podLister podLister
+	kletGetter kletGetter
 
 	// podStatusProvider provides a method for obtaining pod statuses
 	// and the containerID of their containers
 	podStatusProvider status.PodStatusProvider
 }
-
 func (m *manager) Start() {
 	glog.Infof("[cpumanger] starting (policy: \"%s\")", m.policy.Name())
 	m.policy.Start(m.state)
+	if m.policy.Name() == string(PolicyNoop) {
+		return
+	}
 	go wait.Until(m.reconcileState, time.Second, wait.NeverStop)
 }
 
@@ -146,23 +160,41 @@ func (m *manager) State() state.Reader {
 	return m.state
 }
 
-var (
-	processorRegExp = regexp.MustCompile(`^processor\s*:\s*([0-9]+)$`)
-)
 
-func discoverTopology(cpuinfo []byte) (*topo.CPUTopology, error) {
-	cpus := 0
-	for _, line := range strings.Split(string(cpuinfo), "\n") {
-		matches := processorRegExp.FindSubmatch([]byte(line))
-		if len(matches) == 2 {
-			cpus++
-		}
-	}
-	if cpus == 0 {
+func discoverTopology(machineInfo *cadvisorapi.MachineInfo) (*topo.CPUTopology, error) {
+
+	if machineInfo.NumCores == 0 {
 		return nil, fmt.Errorf("could not detect number of cpus")
 	}
+
+	CPUtopoDetails := make(map[int]topo.CPUInfo)
+
+	numCPUs :=  machineInfo.NumCores
+	htEnabled := false
+	numPhysicalCores := 0
+	for _, socket := range machineInfo.Topology {
+		numPhysicalCores += len(socket.Cores)
+		for _, core := range socket.Cores {
+			for _, cpu := range core.Threads {
+				CPUtopoDetails[cpu] = topo.CPUInfo{
+					CoreId: core.Id,
+					SocketId: socket.Id,
+				}
+				// a little bit naive
+				if !htEnabled && len(core.Threads) != 1 {
+					htEnabled = true
+				}
+			}
+		}
+	}
+
+
 	return &topo.CPUTopology{
-		NumCPUs: cpus,
+		NumCPUs:        numCPUs,
+		NumSockets:     len(machineInfo.Topology),
+		NumCores:       numPhysicalCores,
+		HyperThreading: htEnabled,
+		CPUtopoDetails: CPUtopoDetails,
 	}, nil
 }
 
@@ -170,7 +202,7 @@ func (m *manager) reconcileState() {
 	m.Lock()
 	defer m.Unlock()
 
-	for _, pod := range m.podLister.GetPods() {
+	for _, pod := range m.kletGetter.GetPods() {
 		for _, container := range pod.Spec.Containers {
 			status, ok := m.podStatusProvider.GetPodStatus(pod.UID)
 			if !ok {

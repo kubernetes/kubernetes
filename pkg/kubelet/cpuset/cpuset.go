@@ -23,12 +23,12 @@ import (
 	"sort"
 	. "strconv"
 	"strings"
-
 	"github.com/golang/glog"
 )
 
 // CPUSet is a set-like data structure for CPU IDs.
 type CPUSet map[int]struct{}
+
 
 func NewCPUSet(cpus ...int) CPUSet {
 	res := CPUSet{}

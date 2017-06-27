@@ -18,28 +18,22 @@ package state
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topo"
 	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
 type stateMemory struct {
-	topology      *topo.CPUTopology
 	assignments   map[string]cpuset.CPUSet
 	defaultCPUSet cpuset.CPUSet
 }
 
-func NewMemoryState(topology *topo.CPUTopology) State {
+func NewMemoryState() State {
 	glog.Infof("[cpumanager] initializing new in-memory state store")
 	return &stateMemory{
-		topology:      topology,
 		assignments:   map[string]cpuset.CPUSet{},
 		defaultCPUSet: cpuset.NewCPUSet(),
 	}
 }
 
-func (s *stateMemory) Topology() *topo.CPUTopology {
-	return s.topology
-}
 
 func (s *stateMemory) GetCPUSet(containerID string) (cpuset.CPUSet, bool) {
 	res, ok := s.assignments[containerID]
