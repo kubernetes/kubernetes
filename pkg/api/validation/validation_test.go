@@ -9828,3 +9828,88 @@ func TestValidateFlexVolumeSource(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateLoadBalancerStatus(t *testing.T) {
+	testCases := []struct {
+		name      string
+		lbs       *api.LoadBalancerStatus
+		errtype   field.ErrorType
+		errfield  string
+		errdetail string
+	}{
+		{
+			name: "succee",
+			lbs: &api.LoadBalancerStatus{
+				Ingress: []api.LoadBalancerIngress{
+					{
+						IP:       "8.8.8.8",
+						Hostname: "example.com",
+					},
+					{
+						IP:       "6.6.6.6",
+						Hostname: "example2.com",
+					},
+				},
+			},
+		},
+		{
+			name: "invalid ip address",
+			lbs: &api.LoadBalancerStatus{
+				Ingress: []api.LoadBalancerIngress{
+					{
+						IP:       "8888",
+						Hostname: "example.com",
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "field.ingress[0].ip",
+			errdetail: "must be a valid IP address",
+		},
+		{
+			name: "DNS1123 subdomain failure",
+			lbs: &api.LoadBalancerStatus{
+				Ingress: []api.LoadBalancerIngress{
+					{
+						IP:       "8.8.8.8",
+						Hostname: "//example.com",
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "field.ingress[0].hostname",
+			errdetail: "a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')",
+		},
+		{
+			name: "hostname must use DNS name, not an IP address",
+			lbs: &api.LoadBalancerStatus{
+				Ingress: []api.LoadBalancerIngress{
+					{
+						IP:       "8.8.8.8",
+						Hostname: "8.8.8.8",
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "field.ingress[0].hostname",
+			errdetail: "must be a DNS name, not an IP address",
+		},
+	}
+
+	for i, tc := range testCases {
+		errs := ValidateLoadBalancerStatus(tc.lbs, field.NewPath("field"))
+		if len(errs) > 0 && tc.errtype == "" {
+			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
+		} else if len(errs) == 0 && tc.errtype != "" {
+			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
+		} else if len(errs) >= 1 {
+			if errs[0].Type != tc.errtype {
+				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
+			} else if !strings.Contains(errs[0].Field, tc.errfield) {
+				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
+			} else if !strings.Contains(errs[0].Detail, tc.errdetail) {
+				t.Errorf("[%d: %q] expected error detail %q, got %q", i, tc.name, tc.errdetail, errs[0].Detail)
+			}
+		}
+	}
+}
