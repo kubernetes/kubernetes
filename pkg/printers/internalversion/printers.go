@@ -68,8 +68,6 @@ var (
 	endpointColumns               = []string{"NAME", "ENDPOINTS", "AGE"}
 	nodeColumns                   = []string{"NAME", "STATUS", "AGE", "VERSION"}
 	nodeWideColumns               = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION", "CONTAINER-RUNTIME"}
-	daemonSetColumns              = []string{"NAME", "DESIRED", "CURRENT", "READY", "UP-TO-DATE", "AVAILABLE", "NODE-SELECTOR", "AGE"}
-	daemonSetWideColumns          = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 	eventColumns                  = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
 	limitRangeColumns             = []string{"NAME", "AGE"}
 	resourceQuotaColumns          = []string{"NAME", "AGE"}
@@ -163,8 +161,21 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(replicaSetColumnDefinitions, printReplicaSet)
 	h.TableHandler(replicaSetColumnDefinitions, printReplicaSetList)
 
-	h.Handler(daemonSetColumns, daemonSetWideColumns, printDaemonSet)
-	h.Handler(daemonSetColumns, daemonSetWideColumns, printDaemonSetList)
+	daemonSetColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Desired", Type: "integer", Description: extensionsv1beta1.DaemonSetStatus{}.SwaggerDoc()["desiredNumberScheduled"]},
+		{Name: "Current", Type: "integer", Description: extensionsv1beta1.DaemonSetStatus{}.SwaggerDoc()["currentNumberScheduled"]},
+		{Name: "Ready", Type: "integer", Description: extensionsv1beta1.DaemonSetStatus{}.SwaggerDoc()["numberReady"]},
+		{Name: "Up-to-date", Type: "integer", Description: extensionsv1beta1.DaemonSetStatus{}.SwaggerDoc()["updatedNumberScheduled"]},
+		{Name: "Available", Type: "integer", Description: extensionsv1beta1.DaemonSetStatus{}.SwaggerDoc()["numberAvailable"]},
+		{Name: "Node Selector", Type: "string", Description: apiv1.PodSpec{}.SwaggerDoc()["nodeSelector"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
+		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
+		{Name: "Selector", Type: "string", Priority: 1, Description: extensionsv1beta1.DaemonSetSpec{}.SwaggerDoc()["selector"]},
+	}
+	h.TableHandler(daemonSetColumnDefinitions, printDaemonSet)
+	h.TableHandler(daemonSetColumnDefinitions, printDaemonSetList)
 
 	jobColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -848,66 +859,35 @@ func printStatefulSetList(statefulSetList *apps.StatefulSetList, w io.Writer, op
 	return nil
 }
 
-func printDaemonSet(ds *extensions.DaemonSet, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, ds.Name, options.WithKind)
-
-	namespace := ds.Namespace
-
-	containers := ds.Spec.Template.Spec.Containers
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
+func printDaemonSet(obj *extensions.DaemonSet, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
 
-	desiredScheduled := ds.Status.DesiredNumberScheduled
-	currentScheduled := ds.Status.CurrentNumberScheduled
-	numberReady := ds.Status.NumberReady
-	numberUpdated := ds.Status.UpdatedNumberScheduled
-	numberAvailable := ds.Status.NumberAvailable
-	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
-	if err != nil {
-		// this shouldn't happen if LabelSelector passed validation
-		return err
-	}
-	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%d\t%s\t%s",
-		name,
-		desiredScheduled,
-		currentScheduled,
-		numberReady,
-		numberUpdated,
-		numberAvailable,
-		labels.FormatLabels(ds.Spec.Template.Spec.NodeSelector),
-		translateTimestamp(ds.CreationTimestamp),
-	); err != nil {
-		return err
-	}
+	desiredScheduled := obj.Status.DesiredNumberScheduled
+	currentScheduled := obj.Status.CurrentNumberScheduled
+	numberReady := obj.Status.NumberReady
+	numberUpdated := obj.Status.UpdatedNumberScheduled
+	numberAvailable := obj.Status.NumberAvailable
+
+	row.Cells = append(row.Cells, obj.Name, desiredScheduled, currentScheduled, numberReady, numberUpdated, numberAvailable, labels.FormatLabels(obj.Spec.Template.Spec.NodeSelector), translateTimestamp(obj.CreationTimestamp))
 	if options.Wide {
-		if err := layoutContainers(containers, w); err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintf(w, "\t%s", selector.String()); err != nil {
-			return err
-		}
+		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
+		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.Selector))
 	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(ds.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, ds.Labels)); err != nil {
-		return err
-	}
-
-	return nil
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printDaemonSetList(list *extensions.DaemonSetList, w io.Writer, options printers.PrintOptions) error {
-	for _, ds := range list.Items {
-		if err := printDaemonSet(&ds, w, options); err != nil {
-			return err
+func printDaemonSetList(list *extensions.DaemonSetList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printDaemonSet(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printEndpoints(endpoints *api.Endpoints, w io.Writer, options printers.PrintOptions) error {

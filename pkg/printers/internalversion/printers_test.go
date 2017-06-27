@@ -1825,7 +1825,13 @@ func TestPrintDaemonSet(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		printDaemonSet(&test.ds, buf, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.ds, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
 		if !strings.HasPrefix(buf.String(), test.startsWith) {
 			t.Fatalf("Expected to start with %s but got %s", test.startsWith, buf.String())
 		}
