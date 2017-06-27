@@ -4395,11 +4395,6 @@ const (
 	// - Secret.Data["password"] - password or token needed for authentication
 	SecretTypeBasicAuth SecretType = "kubernetes.io/basic-auth"
 
-	// SecretTypeBootstrapToken is used during the automated bootstrap process (first
-	// implemented by kubeadm). It stores tokens that are used to sign well known
-	// ConfigMaps. They may also eventually be used for authentication.
-	SecretTypeBootstrapToken SecretType = "bootstrap.kubernetes.io/token"
-
 	// BasicAuthUsernameKey is the key of the username for SecretTypeBasicAuth secrets
 	BasicAuthUsernameKey = "username"
 	// BasicAuthPasswordKey is the key of the password or token for SecretTypeBasicAuth secrets

@@ -17,13 +17,9 @@ limitations under the License.
 package bootstrap
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -31,15 +27,23 @@ import (
 )
 
 const (
-	TokenIDBytes = 3
+	TokenIDBytes     = 3
+	TokenSecretBytes = 8
 )
 
-var _ = framework.KubeDescribe("[Feature:BootstrapSigner]", func() {
+var _ = framework.KubeDescribe("[Feature:BootstrapTokens]", func() {
 
 	var c clientset.Interface
 
 	f := framework.NewDefaultFramework("bootstrap-signer")
-
+	AfterEach(func() {
+		if len(secretNeedClean) > 0 {
+			By("delete the bootstrap token secret")
+			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(secretNeedClean, &metav1.DeleteOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			secretNeedClean = ""
+		}
+	})
 	BeforeEach(func() {
 		c = f.ClientSet
 	})
@@ -50,15 +54,12 @@ var _ = framework.KubeDescribe("[Feature:BootstrapSigner]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		secret := newTokenSecret(tokenId, "tokenSecret")
 		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
-		defer func() {
-			By("delete the bootstrap token secret")
-			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(bootstrapapi.BootstrapTokenSecretPrefix+tokenId, &metav1.DeleteOptions{})
-			Expect(err).NotTo(HaveOccurred())
-		}()
+		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenId
+
 		Expect(err).NotTo(HaveOccurred())
 
 		By("wait for the bootstrap token secret be signed")
-		err = framework.WaitforSignedBootStrapToken(c, tokenId)
+		err = WaitforSignedClusterInfoByBootStrapToken(c, tokenId)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -68,13 +69,10 @@ var _ = framework.KubeDescribe("[Feature:BootstrapSigner]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		secret := newTokenSecret(tokenId, "tokenSecret")
 		secret, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
-		defer func() {
-			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(bootstrapapi.BootstrapTokenSecretPrefix+tokenId, &metav1.DeleteOptions{})
-			Expect(err).NotTo(HaveOccurred())
-		}()
+		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenId
 
 		By("wait for the bootstrap token secret be signed")
-		err = framework.WaitforSignedBootStrapToken(c, tokenId)
+		err = WaitforSignedClusterInfoByBootStrapToken(c, tokenId)
 
 		cfgMap, err := f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
@@ -83,7 +81,9 @@ var _ = framework.KubeDescribe("[Feature:BootstrapSigner]", func() {
 
 		By("update the cluster-info ConfigMap")
 		originalData := cfgMap.Data[bootstrapapi.KubeConfigKey]
-		cfgMap.Data[bootstrapapi.KubeConfigKey] = "updated"
+		updatedKubeConfig, err := randBytes(20)
+		Expect(err).NotTo(HaveOccurred())
+		cfgMap.Data[bootstrapapi.KubeConfigKey] = updatedKubeConfig
 		_, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Update(cfgMap)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
@@ -96,11 +96,11 @@ var _ = framework.KubeDescribe("[Feature:BootstrapSigner]", func() {
 		}()
 
 		By("wait for signed bootstrap token updated")
-		err = framework.WaitForSignedBootstrapTokenToGetUpdated(c, tokenId, signedToken)
+		err = WaitForSignedClusterInfoGetUpdatedByBootstrapToken(c, tokenId, signedToken)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("delete the signed bootstrap tokens from clusterInfo ConfigMap when bootstrap token is deleted", func() {
+	It("should delete the signed bootstrap tokens from clusterInfo ConfigMap when bootstrap token is deleted", func() {
 		By("create a new bootstrap token secret")
 		tokenId, err := generateTokenId()
 		Expect(err).NotTo(HaveOccurred())
@@ -109,7 +109,7 @@ var _ = framework.KubeDescribe("[Feature:BootstrapSigner]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("wait for the bootstrap secret be signed")
-		err = framework.WaitforSignedBootStrapToken(c, tokenId)
+		err = WaitforSignedClusterInfoByBootStrapToken(c, tokenId)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("delete the bootstrap token secret")
@@ -117,39 +117,7 @@ var _ = framework.KubeDescribe("[Feature:BootstrapSigner]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("wait for the bootstrap token removed from cluster-info ConfigMap")
-		err = framework.WaitForSignedBootstrapTokenToDisappear(c, tokenId)
+		err = WaitForSignedClusterInfoByBootstrapTokenToDisappear(c, tokenId)
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
-
-func newTokenSecret(tokenID, tokenSecret string) *v1.Secret {
-	return &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: metav1.NamespaceSystem,
-			Name:      bootstrapapi.BootstrapTokenSecretPrefix + tokenID,
-		},
-		Type: v1.SecretTypeBootstrapToken,
-		Data: map[string][]byte{
-			bootstrapapi.BootstrapTokenIDKey:           []byte(tokenID),
-			bootstrapapi.BootstrapTokenSecretKey:       []byte(tokenSecret),
-			bootstrapapi.BootstrapTokenUsageSigningKey: []byte("true"),
-		},
-	}
-}
-
-func generateTokenId() (string, error) {
-	tokenID, err := randBytes(TokenIDBytes)
-	if err != nil {
-		return "", err
-	}
-	return tokenID, nil
-}
-
-func randBytes(length int) (string, error) {
-	b := make([]byte, length)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
-}

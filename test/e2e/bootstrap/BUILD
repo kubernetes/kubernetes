@@ -9,7 +9,11 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["bootstrap_signer.go"],
+    srcs = [
+        "bootstrap_signer.go",
+        "bootstrap_token_cleaner.go",
+        "util.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/bootstrap/api:go_default_library",
@@ -18,7 +22,9 @@ go_library(
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
     ],
 )
 

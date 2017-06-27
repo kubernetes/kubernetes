@@ -1,14 +1,10 @@
-approvers:
-- errordeveloper
+approvers:  #sig-cluster-lifecycle is the owner of this feature
 - jbeda
 - luxas
-- mikedanese
-- krousey
+- wanghaoran1988
 reviewers:
 - mikedanese
 - luxas
-- justinsb
-- errordeveloper
-- lukemarsden
 - dmmcquay
 - krousey
+- wanghaoran1988
