@@ -14,27 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package memcachediscovery includes a Client which is a CachedDiscoveryInterface.
-package memcachediscovery
+package cached
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/emicklei/go-restful-swagger12"
 	"github.com/go-openapi/spec"
-	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 )
 
-// Client can Refresh() to stay up-to-date with discovery information. Before
-// this is moved some place where it's easier to call, it needs to switch to a
-// watch interface. Right now it will poll anytime Refresh() is called.
+// Client can Invalidate() to stay up-to-date with discovery information.
+//
+// TODO: Switch to a watch interface. Right now it will poll anytime
+// Invalidate() is called.
 type Client struct {
 	delegate discovery.DiscoveryInterface
 
@@ -45,7 +46,8 @@ type Client struct {
 }
 
 var (
-	ErrCacheEmpty = errors.New("the cache has not been filled yet")
+	ErrCacheEmpty    = errors.New("the cache has not been filled yet")
+	ErrCacheNotFound = errors.New("not found")
 )
 
 var _ discovery.CachedDiscoveryInterface = &Client{}
@@ -54,9 +56,12 @@ var _ discovery.CachedDiscoveryInterface = &Client{}
 func (d *Client) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
+	if !d.cacheValid {
+		return nil, ErrCacheEmpty
+	}
 	cachedVal, ok := d.groupToServerResources[groupVersion]
 	if !ok {
-		return nil, ErrCacheEmpty
+		return nil, ErrCacheNotFound
 	}
 	return cachedVal, nil
 }
@@ -92,10 +97,16 @@ func (d *Client) RESTClient() restclient.Interface {
 	return d.delegate.RESTClient()
 }
 
+// TODO: Should this also be cached? The results seem more likely to be
+// inconsistent with ServerGroups and ServerResources given the requirement to
+// actively Invalidate.
 func (d *Client) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return d.delegate.ServerPreferredResources()
 }
 
+// TODO: Should this also be cached? The results seem more likely to be
+// inconsistent with ServerGroups and ServerResources given the requirement to
+// actively Invalidate.
 func (d *Client) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return d.delegate.ServerPreferredNamespacedResources()
 }
@@ -115,12 +126,11 @@ func (d *Client) OpenAPISchema() (*spec.Swagger, error) {
 func (d *Client) Fresh() bool {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
-	// Fresh is supposed to tell the caller whether or not to retry if the
-	// cache fails to find something. The idea here is that Refresh and/or
-	// Invalidate will be called periodically and therefore we'll always be
-	// returning the latest data. (And in the future we can watch and stay
-	// even more up-to-date.) So we only return false if the cache has
-	// never been filled.
+	// Fresh is supposed to tell the caller whether or not to retry if the cache
+	// fails to find something. The idea here is that Invalidate will be called
+	// periodically and therefore we'll always be returning the latest data. (And
+	// in the future we can watch and stay even more up-to-date.) So we only
+	// return false if the cache has never been filled.
 	return d.cacheValid
 }
 
@@ -130,9 +140,13 @@ func (d *Client) Fresh() bool {
 func (d *Client) Invalidate() {
 	d.lock.Lock()
 	defer d.lock.Unlock()
+
+	// TODO: Could this multiplicative set of calls be replaced by a single call
+	// to ServerResources? If it's possible for more than one resulting
+	// APIResourceList to have the same GroupVersion, the lists would need merged.
 	gl, err := d.delegate.ServerGroups()
 	if err != nil || len(gl.Groups) == 0 {
-		glog.V(2).Infof("Error getting current server API group list, will keep using cached value. (%v)", err)
+		utilruntime.HandleError(fmt.Errorf("couldn't get current server API group list; will keep using cached value. (%v)", err))
 		return
 	}
 
@@ -141,7 +155,7 @@ func (d *Client) Invalidate() {
 		for _, v := range g.Versions {
 			r, err := d.delegate.ServerResourcesForGroupVersion(v.GroupVersion)
 			if err != nil || len(r.APIResources) == 0 {
-				glog.V(2).Infof("Error getting resource list for %v: %v", v.GroupVersion, err)
+				utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", v.GroupVersion, err))
 				if cur, ok := d.groupToServerResources[v.GroupVersion]; ok {
 					// retain the existing list, if we had it.
 					r = cur

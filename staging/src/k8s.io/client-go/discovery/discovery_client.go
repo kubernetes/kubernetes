@@ -55,7 +55,11 @@ type DiscoveryInterface interface {
 // CachedDiscoveryInterface is a DiscoveryInterface with cache invalidation and freshness.
 type CachedDiscoveryInterface interface {
 	DiscoveryInterface
-	// Fresh returns true if no cached data was used that had been retrieved before the instantiation.
+	// Fresh is supposed to tell the caller whether or not to retry if the cache
+	// fails to find something (false = retry, true = no need to retry).
+	//
+	// TODO: this needs to be revisited, this interface can't be locked properly
+	// and doesn't make a lot of sense.
 	Fresh() bool
 	// Invalidate enforces that no cached data is used in the future that is older than the current time.
 	Invalidate()
