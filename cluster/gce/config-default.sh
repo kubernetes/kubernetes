@@ -72,6 +72,7 @@ GCI_VERSION=${KUBE_GCI_VERSION:-cos-stable-59-9460-64-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
+KUBE_GCE_API_ENDPOINT=${KUBE_GCE_API_ENDPOINT:-}
 NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 RKT_VERSION=${KUBE_RKT_VERSION:-1.23.0}
@@ -125,7 +126,7 @@ ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 # TODO(piosz): remove this in 1.8
 NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
 
-# To avoid running Calico on a node that is not configured appropriately, 
+# To avoid running Calico on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
 	NODE_LABELS="${NODE_LABELS},projectcalico.org/ds-ready=true"
