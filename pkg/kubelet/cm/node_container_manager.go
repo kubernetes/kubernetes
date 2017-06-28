@@ -191,7 +191,7 @@ func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList 
 					cm.capacity[rName] = rCap
 				}
 			} else {
-				glog.Warning("Error getting rootfs info: %v", err)
+				glog.Warningf("Error getting rootfs info: %v", err)
 			}
 		}
 	}
