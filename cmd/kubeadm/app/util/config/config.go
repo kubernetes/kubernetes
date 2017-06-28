@@ -28,11 +28,8 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	"k8s.io/kubernetes/pkg/api"
-
-	"github.com/blang/semver"
+	"k8s.io/kubernetes/pkg/util/version"
 )
-
-var minK8sVersion = semver.MustParse(kubeadmconstants.MinimumControlPlaneVersion)
 
 // SetInitDynamicDefaults set defaults that the API group defaulting can't (by fetching information from the internet, looking up network interfaces, etc.)
 func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
@@ -52,13 +49,13 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 	cfg.KubernetesVersion = ver
 
-	// Validate version argument versus kubeadmconstants.MinimumControlPlaneVersion
-	k8sVersion, err := semver.Parse(cfg.KubernetesVersion[1:]) // Omit the "v" in the beginning, otherwise semver will fail
+	// Parse the given kubernetes version and make sure it's higher than the lowest supported
+	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
 	if err != nil {
 		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
 	}
-	if k8sVersion.LT(minK8sVersion) {
-		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= v%s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion, cfg.KubernetesVersion)
+	if k8sVersion.LessThan(kubeadmconstants.MinimumControlPlaneVersion) {
+		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
 	}
 
 	// Choose a random token
@@ -73,8 +70,8 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	return nil
 }
 
-// TryLoadCfg tries to loads a Master configuration from the given file (if defined)
-func TryLoadCfg(cfgPath string, cfg *kubeadmapi.MasterConfiguration) error {
+// TryLoadMasterConfiguration tries to loads a Master configuration from the given file (if defined)
+func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapi.MasterConfiguration) error {
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
