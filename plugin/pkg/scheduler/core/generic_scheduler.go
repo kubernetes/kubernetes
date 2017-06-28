@@ -44,7 +44,7 @@ type FitError struct {
 
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
-const NoNodeAvailableMsg = "No nodes are available that match all of the following predicates:"
+const NoNodeAvailableMsg = "No nodes are available that match all of the following predicates"
 
 // Error returns detailed information of why the pod failed to fit on each node
 func (f *FitError) Error() string {

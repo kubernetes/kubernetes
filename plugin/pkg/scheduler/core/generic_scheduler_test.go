@@ -410,7 +410,7 @@ func TestHumanReadableFitError(t *testing.T) {
 			"3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
 		},
 	}
-	if strings.Contains(error.Error(), "No nodes are available that match all of the following predicates") {
+	if strings.Contains(error.Error(), NoNodeAvailableMsg) {
 		if strings.Contains(error.Error(), "NodeUnderDiskPressure (2)") && strings.Contains(error.Error(), "NodeUnderMemoryPressure (1)") {
 			return
 		}
