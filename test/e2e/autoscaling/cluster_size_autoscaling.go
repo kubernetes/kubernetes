@@ -93,6 +93,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeCount = len(nodes.Items)
+		By(fmt.Sprintf("Initial number of schedulable nodes: %v", nodeCount))
 		Expect(nodeCount).NotTo(BeZero())
 		cpu := nodes.Items[0].Status.Capacity[v1.ResourceCPU]
 		mem := nodes.Items[0].Status.Capacity[v1.ResourceMemory]
@@ -114,7 +115,11 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	AfterEach(func() {
 		By(fmt.Sprintf("Restoring initial size of the cluster"))
 		setMigSizes(originalSizes)
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount, scaleDownTimeout))
+		expectedNodes := 0
+		for _, size := range originalSizes {
+			expectedNodes += size
+		}
+		framework.ExpectNoError(framework.WaitForClusterSize(c, expectedNodes, scaleDownTimeout))
 		nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, n := range nodes.Items {
