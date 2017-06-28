@@ -47,15 +47,16 @@ type DeploymentAdapter struct {
 func NewDeploymentAdapter(client federationclientset.Interface, config *restclient.Config) FederatedTypeAdapter {
 	schedulingAdapter := schedulingAdapter{
 		preferencesAnnotationName: FedDeploymentPreferencesAnnotation,
-		updateStatusFunc: func(obj pkgruntime.Object, status SchedulingStatus) error {
+		updateStatusFunc: func(obj pkgruntime.Object, status interface{}) error {
 			deployment := obj.(*extensionsv1.Deployment)
-			if status.Replicas != deployment.Status.Replicas || status.UpdatedReplicas != deployment.Status.UpdatedReplicas ||
-				status.ReadyReplicas != deployment.Status.ReadyReplicas || status.AvailableReplicas != deployment.Status.AvailableReplicas {
+			typedStatus := status.(ReplicaSchedulingStatus)
+			if typedStatus.Replicas != deployment.Status.Replicas || typedStatus.UpdatedReplicas != deployment.Status.UpdatedReplicas ||
+				typedStatus.ReadyReplicas != deployment.Status.ReadyReplicas || typedStatus.AvailableReplicas != deployment.Status.AvailableReplicas {
 				deployment.Status = extensionsv1.DeploymentStatus{
-					Replicas:          status.Replicas,
-					UpdatedReplicas:   status.UpdatedReplicas,
-					ReadyReplicas:     status.ReadyReplicas,
-					AvailableReplicas: status.AvailableReplicas,
+					Replicas:          typedStatus.Replicas,
+					UpdatedReplicas:   typedStatus.UpdatedReplicas,
+					ReadyReplicas:     typedStatus.ReadyReplicas,
+					AvailableReplicas: typedStatus.AvailableReplicas,
 				}
 				_, err := client.Extensions().Deployments(deployment.Namespace).UpdateStatus(deployment)
 				return err

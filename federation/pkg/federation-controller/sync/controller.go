@@ -366,7 +366,7 @@ func (s *FederationSyncController) reconcile(qualifiedName federatedtypes.Qualif
 		return statusError
 	}
 
-	operationsAccessor := func(adapter federatedtypes.FederatedTypeAdapter, selectedClusters []*federationapi.Cluster, unselectedClusters []*federationapi.Cluster, obj pkgruntime.Object, schedulingInfo *federatedtypes.SchedulingInfo) ([]util.FederatedOperation, error) {
+	operationsAccessor := func(adapter federatedtypes.FederatedTypeAdapter, selectedClusters []*federationapi.Cluster, unselectedClusters []*federationapi.Cluster, obj pkgruntime.Object, schedulingInfo interface{}) ([]util.FederatedOperation, error) {
 		operations, err := clusterOperations(adapter, selectedClusters, unselectedClusters, obj, key, schedulingInfo, func(clusterName string) (interface{}, bool, error) {
 			return s.informer.GetTargetStore().GetByKey(clusterName, key)
 		})
@@ -445,7 +445,7 @@ func (s *FederationSyncController) delete(obj pkgruntime.Object, kind string, qu
 }
 
 type clustersAccessorFunc func() ([]*federationapi.Cluster, error)
-type operationsFunc func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, []*federationapi.Cluster, pkgruntime.Object, *federatedtypes.SchedulingInfo) ([]util.FederatedOperation, error)
+type operationsFunc func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, []*federationapi.Cluster, pkgruntime.Object, interface{}) ([]util.FederatedOperation, error)
 type clusterSelectorFunc func(*metav1.ObjectMeta, func(map[string]string, map[string]string) (bool, error), []*federationapi.Cluster) ([]*federationapi.Cluster, []*federationapi.Cluster, error)
 type executionFunc func([]util.FederatedOperation) error
 
@@ -467,7 +467,7 @@ func syncToClusters(clustersAccessor clustersAccessorFunc, operationsAccessor op
 		return statusError
 	}
 
-	var schedulingInfo *federatedtypes.SchedulingInfo
+	var schedulingInfo interface{}
 	if adapter.IsSchedulingAdapter() {
 		schedulingAdapter, ok := adapter.(federatedtypes.SchedulingAdapter)
 		if !ok {
@@ -490,7 +490,8 @@ func syncToClusters(clustersAccessor clustersAccessorFunc, operationsAccessor op
 		if !ok {
 			glog.Fatalf("Adapter for kind %q does not properly implement SchedulingAdapter.", kind)
 		}
-		err = schedulingAdapter.UpdateFederatedStatus(obj, schedulingInfo.Status)
+		typedScheduleInfo := schedulingInfo.(*federatedtypes.ReplicaSchedulingInfo)
+		err = schedulingAdapter.UpdateFederatedStatus(obj, typedScheduleInfo.Status)
 		if err != nil {
 			runtime.HandleError(fmt.Errorf("adapter.UpdateFinished() failed on adapter for %s %q: %v", kind, key, err))
 			return statusError
@@ -532,7 +533,7 @@ func selectedClusters(objMeta *metav1.ObjectMeta, selector func(map[string]strin
 type clusterObjectAccessorFunc func(clusterName string) (interface{}, bool, error)
 
 // clusterOperations returns the list of operations needed to synchronize the state of the given object to the provided clusters
-func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, selectedClusters []*federationapi.Cluster, unselectedClusters []*federationapi.Cluster, obj pkgruntime.Object, key string, schedulingInfo *federatedtypes.SchedulingInfo, accessor clusterObjectAccessorFunc) ([]util.FederatedOperation, error) {
+func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, selectedClusters []*federationapi.Cluster, unselectedClusters []*federationapi.Cluster, obj pkgruntime.Object, key string, schedulingInfo interface{}, accessor clusterObjectAccessorFunc) ([]util.FederatedOperation, error) {
 	operations := make([]util.FederatedOperation, 0)
 
 	kind := adapter.Kind()
