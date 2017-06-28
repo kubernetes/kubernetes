@@ -27,8 +27,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -69,7 +69,7 @@ func scsiHostScan() {
 }
 
 func verifyDevicePath(path string) (string, error) {
-	if pathExists, err := volumeutil.PathExists(path); err != nil {
+	if pathExists, err := util.FileExists(path); err != nil {
 		return "", fmt.Errorf("Error checking if path exists: %v", err)
 	} else if pathExists {
 		return path, nil

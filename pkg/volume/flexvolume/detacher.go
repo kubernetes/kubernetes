@@ -23,8 +23,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 type flexVolumeDetacher struct {
@@ -60,9 +60,11 @@ func (d *flexVolumeDetacher) WaitForDetach(devicePath string, timeout time.Durat
 }
 
 // UnmountDevice is part of the volume.Detacher interface.
+// FIXME: this function is nearly identical to flexVolumeUnmounter.TearDownAt()
+// There are some good opportunities for consolidation.
 func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 
-	if pathExists, pathErr := util.PathExists(deviceMountPath); pathErr != nil {
+	if pathExists, pathErr := util.FileExists(deviceMountPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)
@@ -88,8 +90,9 @@ func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 		}
 	}
 
-	// Flexvolume driver may remove the directory. Ignore if it does.
-	if pathExists, pathErr := util.PathExists(deviceMountPath); pathErr != nil {
+	// Flexvolume driver will attempt to remove the directory. If the
+	// directory does not exist, do nothing.
+	if pathExists, pathErr := util.FileExists(deviceMountPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		return nil

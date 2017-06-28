@@ -30,7 +30,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -246,7 +245,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	volumes := []string{}
 	podVolDir := kl.getPodVolumesDir(podUID)
 
-	if pathExists, pathErr := volumeutil.PathExists(podVolDir); pathErr != nil {
+	if pathExists, pathErr := util.FileExists(podVolDir); pathErr != nil {
 		return volumes, fmt.Errorf("Error checking if path %q exists: %v", podVolDir, pathErr)
 	} else if !pathExists {
 		glog.Warningf("Warning: path %q does not exist: %q", podVolDir)

@@ -25,6 +25,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/util:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume/util:go_default_library",

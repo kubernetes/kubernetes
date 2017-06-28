@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -456,7 +457,7 @@ func (c *rbdUnmounter) TearDown() error {
 }
 
 func (c *rbdUnmounter) TearDownAt(dir string) error {
-	if pathExists, pathErr := volutil.PathExists(dir); pathErr != nil {
+	if pathExists, pathErr := util.FileExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)

@@ -31,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -84,7 +85,7 @@ func UnmountPath(mountPath string, mounter mount.Interface) error {
 // IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
 // IsNotMountPoint is more expensive but properly handles bind mounts.
 func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
-	if pathExists, pathErr := PathExists(mountPath); pathErr != nil {
+	if pathExists, pathErr := util.FileExists(mountPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
@@ -123,18 +124,6 @@ func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMount
 		return os.Remove(mountPath)
 	}
 	return fmt.Errorf("Failed to unmount path %v", mountPath)
-}
-
-// PathExists returns true if the specified path exists.
-func PathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else {
-		return false, err
-	}
 }
 
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map

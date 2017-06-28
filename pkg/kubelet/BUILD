@@ -103,7 +103,6 @@ go_library(
         "//pkg/util/removeall:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/volume:go_default_library",
-        "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//pkg/volume/validation:go_default_library",

@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -236,7 +237,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 				// Using the Cinder volume ID, find the real device path (See Issue #33128)
 				devicePath = attacher.cinderProvider.GetDevicePath(volumeID)
 			}
-			exists, err := volumeutil.PathExists(devicePath)
+			exists, err := util.FileExists(devicePath)
 			if exists && err == nil {
 				glog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
 				return devicePath, nil

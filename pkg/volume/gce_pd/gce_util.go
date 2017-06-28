@@ -28,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -160,7 +160,7 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String) (string, er
 	}
 
 	for _, path := range devicePaths {
-		if pathExists, err := volumeutil.PathExists(path); err != nil {
+		if pathExists, err := util.FileExists(path); err != nil {
 			return "", fmt.Errorf("Error checking if path exists: %v", err)
 		} else if pathExists {
 			return path, nil
@@ -178,7 +178,7 @@ func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
 			// udevadm errors should not block disk detachment, log and continue
 			glog.Errorf("%v", err)
 		}
-		if exists, err := volumeutil.PathExists(path); err != nil {
+		if exists, err := util.FileExists(path); err != nil {
 			return false, fmt.Errorf("Error checking if path exists: %v", err)
 		} else {
 			allPathsRemoved = allPathsRemoved && !exists
