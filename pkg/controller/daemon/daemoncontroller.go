@@ -1111,12 +1111,13 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		return false, false, false, err
 	}
 
+	var insufficientResourceErr error
+
 	for _, r := range reasons {
 		glog.V(4).Infof("DaemonSet Predicates failed on node %s for ds '%s/%s' for reason: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
 		switch reason := r.(type) {
 		case *predicates.InsufficientResourceError:
-			dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.Error())
-			shouldSchedule = false
+			insufficientResourceErr = reason
 		case *predicates.PredicateFailureError:
 			var emitEvent bool
 			// we try to partition predicates into two partitions here: intentional on the part of the operator and not.
@@ -1128,10 +1129,11 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				predicates.ErrNodeLabelPresenceViolated,
 				// this one is probably intentional since it's a workaround for not having
 				// pod hard anti affinity.
-				predicates.ErrPodNotFitsHostPorts,
-				// DaemonSet is expected to respect taints and tolerations
-				predicates.ErrTaintsTolerationsNotMatch:
+				predicates.ErrPodNotFitsHostPorts:
 				wantToRun, shouldSchedule, shouldContinueRunning = false, false, false
+			case predicates.ErrTaintsTolerationsNotMatch:
+				// DaemonSet is expected to respect taints and tolerations
+				wantToRun, shouldSchedule, shouldContinueRunning = false, false, true
 			// unintentional
 			case
 				predicates.ErrDiskConflict,
@@ -1159,6 +1161,12 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.GetReason())
 			}
 		}
+	}
+	// only emit this event if insufficient resource is the only thing
+	// preventing the daemon pod from scheduling
+	if shouldSchedule && insufficientResourceErr != nil {
+		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, insufficientResourceErr.Error())
+		shouldSchedule = false
 	}
 	return
 }
