@@ -356,7 +356,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 	if d := dc.getDeploymentForPod(pod); d != nil && d.Spec.Strategy.Type == extensions.RecreateDeploymentStrategyType {
 		// Sync if this Deployment now has no more Pods.
-		rsList, err := dc.getReplicaSetsForDeployment(d)
+		rsList, err := util.ListReplicaSets(d, util.RsListFromClient(dc.client))
 		if err != nil {
 			return
 		}
