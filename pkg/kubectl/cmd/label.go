@@ -115,10 +115,10 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: labelExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := options.Complete(out, cmd, args); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
 			}
 			if err := options.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
 			}
 			cmdutil.CheckErr(options.RunLabel(f, cmd))
 		},
@@ -162,7 +162,7 @@ func (o *LabelOptions) Complete(out io.Writer, cmd *cobra.Command, args []string
 
 // Validate checks to the LabelOptions to see if there is sufficient information run the command.
 func (o *LabelOptions) Validate() error {
-	if len(o.resources) < 1 && cmdutil.IsFilenameEmpty(o.FilenameOptions.Filenames) {
+	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if len(o.newLabels) < 1 && len(o.removeLabels) < 1 {

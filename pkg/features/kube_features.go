@@ -114,6 +114,12 @@ const (
 	//
 	// Allows running a "debug container" in a pod namespaces to troubleshoot a running pod.
 	DebugContainers utilfeature.Feature = "DebugContainers"
+
+	// owner: @bsalamat
+	// alpha: v1.8
+	//
+	// Add priority to pods. Priority affects scheduling and preemption of pods.
+	PodPriority utilfeature.Feature = "PodPriority"
 )
 
 func init() {
@@ -137,6 +143,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
 	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
+	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

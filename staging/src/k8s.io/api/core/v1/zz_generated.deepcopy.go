@@ -2601,6 +2601,11 @@ func DeepCopy_v1_PodSpec(in interface{}, out interface{}, c *conversion.Cloner) 
 				}
 			}
 		}
+		if in.Priority != nil {
+			in, out := &in.Priority, &out.Priority
+			*out = new(int32)
+			**out = **in
+		}
 		return nil
 	}
 }

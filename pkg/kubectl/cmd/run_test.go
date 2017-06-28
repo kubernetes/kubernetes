@@ -168,12 +168,11 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if req.URL.Path == "/namespaces/test/replicationcontrollers" {
 					return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, rc)}, nil
-				} else {
-					return &http.Response{
-						StatusCode: http.StatusOK,
-						Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
-					}, nil
 				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
+				}, nil
 			}),
 		}
 		tf.Namespace = "test"

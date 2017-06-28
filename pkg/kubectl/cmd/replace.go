@@ -103,8 +103,8 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 
 	force := cmdutil.GetFlagBool(cmd, "force")
-	if cmdutil.IsFilenameEmpty(options.Filenames) {
-		return cmdutil.UsageError(cmd, "Must specify --filename to replace")
+	if cmdutil.IsFilenameSliceEmpty(options.Filenames) {
+		return cmdutil.UsageErrorf(cmd, "Must specify --filename to replace")
 	}
 
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"

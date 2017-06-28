@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -48,13 +50,15 @@ import (
 )
 
 const (
-	defaultTimeout        = 3 * time.Minute
-	resizeTimeout         = 5 * time.Minute
-	scaleUpTimeout        = 5 * time.Minute
-	scaleUpTriggerTimeout = 2 * time.Minute
-	scaleDownTimeout      = 20 * time.Minute
-	podTimeout            = 2 * time.Minute
-	nodesRecoverTimeout   = 5 * time.Minute
+	defaultTimeout         = 3 * time.Minute
+	resizeTimeout          = 5 * time.Minute
+	scaleUpTimeout         = 5 * time.Minute
+	scaleUpTriggerTimeout  = 2 * time.Minute
+	scaleDownTimeout       = 20 * time.Minute
+	podTimeout             = 2 * time.Minute
+	nodesRecoverTimeout    = 5 * time.Minute
+	rcCreationRetryTimeout = 4 * time.Minute
+	rcCreationRetryDelay   = 20 * time.Second
 
 	gkeEndpoint      = "https://test-container.sandbox.googleapis.com"
 	gkeUpdateTimeout = 15 * time.Minute
@@ -93,6 +97,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeCount = len(nodes.Items)
+		By(fmt.Sprintf("Initial number of schedulable nodes: %v", nodeCount))
 		Expect(nodeCount).NotTo(BeZero())
 		cpu := nodes.Items[0].Status.Capacity[v1.ResourceCPU]
 		mem := nodes.Items[0].Status.Capacity[v1.ResourceMemory]
@@ -114,7 +119,11 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	AfterEach(func() {
 		By(fmt.Sprintf("Restoring initial size of the cluster"))
 		setMigSizes(originalSizes)
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount, scaleDownTimeout))
+		expectedNodes := 0
+		for _, size := range originalSizes {
+			expectedNodes += size
+		}
+		framework.ExpectNoError(framework.WaitForClusterSize(c, expectedNodes, scaleDownTimeout))
 		nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, n := range nodes.Items {
@@ -247,6 +256,100 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		By("scheduling extra pods with anti-affinity to existing ones")
 		framework.ExpectNoError(runAntiAffinityPods(f, f.Namespace.Name, newPods, "extra-pod", labels, labels))
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "extra-pod")
+
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+newPods, scaleUpTimeout))
+	})
+
+	It("should increase cluster size if pod requesting EmptyDir volume is pending [Feature:ClusterSizeAutoscalingScaleUp", func() {
+		By("creating pods")
+		pods := nodeCount
+		newPods := 1
+		labels := map[string]string{
+			"anti-affinity": "yes",
+		}
+		framework.ExpectNoError(runAntiAffinityPods(f, f.Namespace.Name, pods, "some-pod", labels, labels))
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "some-pod")
+
+		By("waiting for all pods before triggering scale up")
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+
+		By("creating a pod requesting EmptyDir")
+		framework.ExpectNoError(runVolumeAntiAffinityPods(f, f.Namespace.Name, newPods, "extra-pod", labels, labels, emptyDirVolumes))
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "extra-pod")
+
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+newPods, scaleUpTimeout))
+	})
+
+	It("should increase cluster size if pod requesting volume is pending [Feature:ClusterSizeAutoscalingScaleUp", func() {
+		framework.SkipUnlessProviderIs("gce", "gke")
+
+		volumeLabels := labels.Set{
+			framework.VolumeSelectorKey: f.Namespace.Name,
+		}
+		selector := metav1.SetAsLabelSelector(volumeLabels)
+
+		By("creating volume & pvc")
+		diskName, err := framework.CreatePDWithRetry()
+		framework.ExpectNoError(err)
+		pvConfig := framework.PersistentVolumeConfig{
+			NamePrefix: "gce-",
+			Labels:     volumeLabels,
+			PVSource: v1.PersistentVolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+					PDName:   diskName,
+					FSType:   "ext3",
+					ReadOnly: false,
+				},
+			},
+			Prebind: nil,
+		}
+		pvcConfig := framework.PersistentVolumeClaimConfig{
+			Annotations: map[string]string{
+				v1.BetaStorageClassAnnotation: "",
+			},
+			Selector: selector,
+		}
+
+		pv, pvc, err := framework.CreatePVPVC(c, pvConfig, pvcConfig, f.Namespace.Name, false)
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(framework.WaitOnPVandPVC(c, f.Namespace.Name, pv, pvc))
+
+		defer func() {
+			errs := framework.PVPVCCleanup(c, f.Namespace.Name, pv, pvc)
+			if len(errs) > 0 {
+				framework.Failf("failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+			}
+			pv, pvc = nil, nil
+			if diskName != "" {
+				framework.ExpectNoError(framework.DeletePDWithRetry(diskName))
+			}
+		}()
+
+		By("creating pods")
+		pods := nodeCount
+		labels := map[string]string{
+			"anti-affinity": "yes",
+		}
+		framework.ExpectNoError(runAntiAffinityPods(f, f.Namespace.Name, pods, "some-pod", labels, labels))
+		defer func() {
+			framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "some-pod")
+			glog.Infof("RC and pods not using volume deleted")
+		}()
+
+		By("waiting for all pods before triggering scale up")
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+
+		By("creating a pod requesting PVC")
+		pvcPodName := "pvc-pod"
+		newPods := 1
+		volumes := buildVolumes(pv, pvc)
+		framework.ExpectNoError(runVolumeAntiAffinityPods(f, f.Namespace.Name, newPods, pvcPodName, labels, labels, volumes))
+		defer func() {
+			framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, pvcPodName)
+			framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+		}()
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+newPods, scaleUpTimeout))
@@ -766,10 +869,18 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 		Replicas:       replicas,
 		MemRequest:     request,
 	}
-	err := framework.RunRC(*config)
-	if expectRunning {
-		framework.ExpectNoError(err)
+	for start := time.Now(); time.Since(start) < rcCreationRetryTimeout; time.Sleep(rcCreationRetryDelay) {
+		err := framework.RunRC(*config)
+		if err != nil && strings.Contains(err.Error(), "Error creating replication controller") {
+			glog.Warningf("Failed to create memory reservation: %v", err)
+			continue
+		}
+		if expectRunning {
+			framework.ExpectNoError(err)
+		}
+		return
 	}
+	framework.Failf("Failed to reserve memory within timeout")
 }
 
 // WaitForClusterSize waits until the cluster size matches the given function.
@@ -953,6 +1064,53 @@ func runAntiAffinityPods(f *framework.Framework, namespace string, pods int, id 
 		return err
 	}
 	return nil
+}
+
+func runVolumeAntiAffinityPods(f *framework.Framework, namespace string, pods int, id string, podLabels, antiAffinityLabels map[string]string, volumes []v1.Volume) error {
+	config := &testutils.RCConfig{
+		Affinity:       buildAntiAffinity(antiAffinityLabels),
+		Volumes:        volumes,
+		Client:         f.ClientSet,
+		InternalClient: f.InternalClientset,
+		Name:           id,
+		Namespace:      namespace,
+		Timeout:        scaleUpTimeout,
+		Image:          framework.GetPauseImageName(f.ClientSet),
+		Replicas:       pods,
+		Labels:         podLabels,
+	}
+	err := framework.RunRC(*config)
+	if err != nil {
+		return err
+	}
+	_, err = f.ClientSet.Core().ReplicationControllers(namespace).Get(id, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+var emptyDirVolumes = []v1.Volume{
+	{
+		Name: "empty-volume",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		},
+	},
+}
+
+func buildVolumes(pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) []v1.Volume {
+	return []v1.Volume{
+		{
+			Name: pv.Name,
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.Name,
+					ReadOnly:  false,
+				},
+			},
+		},
+	}
 }
 
 func buildAntiAffinity(labels map[string]string) *v1.Affinity {

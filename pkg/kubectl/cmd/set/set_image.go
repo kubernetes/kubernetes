@@ -158,7 +158,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 func (o *ImageOptions) Validate() error {
 	errors := []error{}
-	if len(o.Resources) < 1 && cmdutil.IsFilenameEmpty(o.Filenames) {
+	if len(o.Resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		errors = append(errors, fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>"))
 	}
 	if len(o.ContainerImages) < 1 {

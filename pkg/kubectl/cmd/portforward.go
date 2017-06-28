@@ -81,7 +81,7 @@ func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Comma
 				cmdutil.CheckErr(err)
 			}
 			if err := opts.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err.Error()))
 			}
 			if err := opts.RunPortForward(); err != nil {
 				cmdutil.CheckErr(err)
@@ -118,7 +118,7 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	var err error
 	o.PodName = cmdutil.GetFlagString(cmd, "pod")
 	if len(o.PodName) == 0 && len(args) == 0 {
-		return cmdutil.UsageError(cmd, "POD is required for port-forward")
+		return cmdutil.UsageErrorf(cmd, "POD is required for port-forward")
 	}
 
 	if len(o.PodName) != 0 {

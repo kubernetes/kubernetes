@@ -118,11 +118,5 @@ func retrieveServerVersion(f cmdutil.Factory) (*apimachineryversion.Info, error)
 
 	// Always request fresh data from the server
 	discoveryClient.Invalidate()
-
-	serverVersion, err := discoveryClient.ServerVersion()
-	if err != nil {
-		return nil, err
-	}
-
-	return serverVersion, nil
+	return discoveryClient.ServerVersion()
 }

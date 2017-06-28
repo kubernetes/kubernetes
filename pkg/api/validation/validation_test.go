@@ -3631,6 +3631,24 @@ func TestValidatePodSpec(t *testing.T) {
 	minGroupID := int64(0)
 	maxGroupID := int64(2147483647)
 
+	priorityEnabled := utilfeature.DefaultFeatureGate.Enabled("PodPriority")
+	defer func() {
+		var err error
+		// restoring the old value
+		if priorityEnabled {
+			err = utilfeature.DefaultFeatureGate.Set("PodPriority=true")
+		} else {
+			err = utilfeature.DefaultFeatureGate.Set("PodPriority=false")
+		}
+		if err != nil {
+			t.Errorf("Failed to restore feature gate for PodPriority: %v", err)
+		}
+	}()
+	err := utilfeature.DefaultFeatureGate.Set("PodPriority=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for PodPriority: %v", err)
+		return
+	}
 	successCases := []api.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
@@ -3738,6 +3756,13 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
+		},
+		{ // Populate PriorityClassName.
+			Volumes:           []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:        []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:     api.RestartPolicyAlways,
+			DNSPolicy:         api.DNSClusterFirst,
+			PriorityClassName: "valid-name",
 		},
 	}
 	for i := range successCases {
@@ -3909,10 +3934,45 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		"bad PriorityClassName": {
+			Volumes:           []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:        []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:     api.RestartPolicyAlways,
+			DNSPolicy:         api.DNSClusterFirst,
+			PriorityClassName: "InvalidName",
+		},
 	}
 	for k, v := range failureCases {
 		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
+		}
+	}
+
+	err = utilfeature.DefaultFeatureGate.Set("PodPriority=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for PodPriority: %v", err)
+		return
+	}
+	priority := int32(100)
+	featuregatedCases := map[string]api.PodSpec{
+		"set PriorityClassName": {
+			Volumes:           []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:        []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:     api.RestartPolicyAlways,
+			DNSPolicy:         api.DNSClusterFirst,
+			PriorityClassName: "valid-name",
+		},
+		"set Priority": {
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Priority:      &priority,
+		},
+	}
+	for k, v := range featuregatedCases {
+		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected failure due to gated feature: %q", k)
 		}
 	}
 }
@@ -5780,6 +5840,50 @@ func TestValidatePodUpdate(t *testing.T) {
 			api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{api.MirrorPodAnnotationKey: "bar"}}, Spec: api.PodSpec{NodeName: "foo"}},
 			"metadata.annotations[kubernetes.io/config.mirror]",
 			"changed mirror pod annotation",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:          "node1",
+					PriorityClassName: "bar-priority",
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:          "node1",
+					PriorityClassName: "foo-priority",
+				},
+			},
+			"spec: Forbidden: pod updates",
+			"changed priority class name",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:          "node1",
+					PriorityClassName: "",
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:          "node1",
+					PriorityClassName: "foo-priority",
+				},
+			},
+			"spec: Forbidden: pod updates",
+			"removed priority class name",
 		},
 	}
 
