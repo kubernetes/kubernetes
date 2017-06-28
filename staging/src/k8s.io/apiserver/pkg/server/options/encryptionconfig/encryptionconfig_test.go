@@ -220,7 +220,7 @@ type testKMSStorage struct {
 	data *map[string]string
 }
 
-func (t *testKMSStorage) Setup() error {
+func (t *testKMSStorage) Setup(_ string) error {
 	_, err := t.GetAllDEKs()
 	if err != nil {
 		cfg := &(map[string]string{})
@@ -270,6 +270,13 @@ func (t *testKMSService) Decrypt(data string) ([]byte, error) {
 func (t *testKMSService) Encrypt(data []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(data), nil
 }
+
+func (t *testKMSService) GetUniqueID() string {
+	return ""
+}
+
+var _ value.KMSStorage = &testKMSStorage{}
+var _ value.KMSService = &testKMSService{}
 
 func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	// Create a mock kmsFactory

@@ -35,16 +35,23 @@ type Context interface {
 // KMSStorage allows storing and retreiving Data-Encryption-Keys (DEKs) for implementing envelope encryption
 // based transformers.
 type KMSStorage interface {
-	Setup() error
+	// Setup creates required objects on disk before they get accessed. Object name is passed as argument.
+	Setup(name string) error
+	// GetAllDEKs lists all available DEKs.
 	GetAllDEKs() (map[string]string, error)
+	// StoreNewDEK creates a unique name for the DEK and makes it the primary DEK transactionally.
 	StoreNewDEK(encDEK string) error
 }
 
 // KMSService allows encrypting and decrypting secrets using an external service, which provides a
 // Key-Encryption-Key (KEK). This is needed to implement envelope encryption based transformers.
 type KMSService interface {
+	// Decrypt a given data string using KEK.
 	Decrypt(data string) ([]byte, error)
+	// Encrypte bytes using KEK.
 	Encrypt(data []byte) (string, error)
+	// Get a unique ID for this service for identification and separation of resources in database.
+	GetUniqueID() string
 }
 
 // Transformer allows a value to be transformed before being read from or written to the underlying store. The methods

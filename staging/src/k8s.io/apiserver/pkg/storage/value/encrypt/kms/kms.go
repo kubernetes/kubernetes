@@ -42,7 +42,7 @@ type kmsTransformer struct {
 // NewKMSTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
 // It uses kmsService to communicate with the KEK store, and storage to communicate with the DEK store.
 func NewKMSTransformer(kmsService value.KMSService, storage value.KMSStorage) (value.Transformer, error) {
-	err := storage.Setup()
+	err := storage.Setup(kmsService.GetUniqueID())
 	if err != nil {
 		return nil, err
 	}

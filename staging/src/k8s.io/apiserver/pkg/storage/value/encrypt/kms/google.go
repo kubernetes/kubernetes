@@ -27,7 +27,7 @@ import (
 
 const defaultGKMSKeyRing = "google-kubernetes"
 
-type gkmsTransformer struct {
+type gkmsService struct {
 	parentName      string
 	cloudkmsService *cloudkms.Service
 }
@@ -92,14 +92,14 @@ func NewGoogleKMSService(projectID, location, keyRing, cryptoKey string, cloud *
 	}
 	parentName = parentName + "/cryptoKeys/" + cryptoKey
 
-	return &gkmsTransformer{
+	return &gkmsService{
 		parentName:      parentName,
 		cloudkmsService: cloud.CloudkmsService,
 	}, nil
 }
 
 // Decrypt decrypts a base64 representation of encrypted bytes.
-func (t *gkmsTransformer) Decrypt(data string) ([]byte, error) {
+func (t *gkmsService) Decrypt(data string) ([]byte, error) {
 	resp, err := t.cloudkmsService.Projects.Locations.KeyRings.CryptoKeys.
 		Decrypt(t.parentName, &cloudkms.DecryptRequest{
 			Ciphertext: data,
@@ -111,7 +111,7 @@ func (t *gkmsTransformer) Decrypt(data string) ([]byte, error) {
 }
 
 // Encrypt encrypts bytes, and returns base64 representation of the ciphertext.
-func (t *gkmsTransformer) Encrypt(data []byte) (string, error) {
+func (t *gkmsService) Encrypt(data []byte) (string, error) {
 	resp, err := t.cloudkmsService.Projects.Locations.KeyRings.CryptoKeys.
 		Encrypt(t.parentName, &cloudkms.EncryptRequest{
 			Plaintext: base64.StdEncoding.EncodeToString(data),
@@ -121,3 +121,9 @@ func (t *gkmsTransformer) Encrypt(data []byte) (string, error) {
 	}
 	return resp.Ciphertext, nil
 }
+
+func (t *gkmsService) GetUniqueID() string {
+	return "gkms/" + t.parentName
+}
+
+var _ value.KMSService = &gkmsService{}
