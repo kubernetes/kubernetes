@@ -28,9 +28,13 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/version"
+
+	"github.com/blang/semver"
 )
 
+var minK8sVersion = semver.MustParse(kubeadmconstants.MinimumControlPlaneVersion)
+
+// SetInitDynamicDefaults set defaults that the API group defaulting can't (by fetching information from the internet, looking up network interfaces, etc.)
 func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0 or empty, the default interface's IP address is used
@@ -48,24 +52,16 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 	cfg.KubernetesVersion = ver
 
-	// Parse the given kubernetes version and make sure it's higher than the lowest supported
-	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
+	// Validate version argument versus kubeadmconstants.MinimumControlPlaneVersion
+	k8sVersion, err := semver.Parse(cfg.KubernetesVersion[1:]) // Omit the "v" in the beginning, otherwise semver will fail
 	if err != nil {
 		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
 	}
-	if k8sVersion.LessThan(kubeadmconstants.MinimumControlPlaneVersion) {
-		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
+	if k8sVersion.LT(minK8sVersion) {
+		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= v%s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion, cfg.KubernetesVersion)
 	}
 
-	fmt.Printf("[init] Using Kubernetes version: %s\n", cfg.KubernetesVersion)
-	fmt.Printf("[init] Using Authorization modes: %v\n", cfg.AuthorizationModes)
-
-	// Warn about the limitations with the current cloudprovider solution.
-	if cfg.CloudProvider != "" {
-		fmt.Println("[init] WARNING: For cloudprovider integrations to work --cloud-provider must be set for all kubelets in the cluster.")
-		fmt.Println("\t(/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)")
-	}
-
+	// Choose a random token
 	if cfg.Token == "" {
 		var err error
 		cfg.Token, err = tokenutil.GenerateToken()
@@ -77,8 +73,8 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	return nil
 }
 
-// TryLoadMasterConfiguration tries to loads a Master configuration from the given file (if defined)
-func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapi.MasterConfiguration) error {
+// TryLoadCfg tries to loads a Master configuration from the given file (if defined)
+func TryLoadCfg(cfgPath string, cfg *kubeadmapi.MasterConfiguration) error {
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
