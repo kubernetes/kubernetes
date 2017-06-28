@@ -103,8 +103,9 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 	return cmd
 }
 
-// addRunFlags is solely responsible for the options available on the "kubectl
-// run" command.
+// addRunFlags is responsible every option available on the "kubectl
+// run" command. However, to perform this task it calls many helpers, some of
+// which are shared with other kubectl commands.
 func addRunFlags(cmd *cobra.Command) {
 	// Flags that are common enough we share the definition with other
 	// commands.
@@ -134,13 +135,19 @@ func addFlagsForAttaching(cmd *cobra.Command) {
 	cmd.Flags().String("schedule", "", i18n.T("A schedule in the Cron format the job should be run with."))
 }
 
+// addFlagsForRunGenerator: add flags designed to modify the behavior of the
+// generator based on the user's command-line parameters.
+//
+// TODO(github.com/alexandercampbell): move these into "util/helpers.go" in the
+// function AddDeploymentFlags() and at the same time adjust "kubectl create
+// deployment" to make use of these flags.
 func addFlagsForRunGenerator(cmd *cobra.Command) {
 	// These flags correspond to the flags from the Generator.
-	cmd.Flags().String("overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
-	cmd.Flags().String("restart", "Always", i18n.T("The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`."))
+	cmd.Flags().String("overrides", "", i18n.T("Inline JSON override for the generated object. Requires a valid apiVersion field."))
+	cmd.Flags().String("restart", "Always", i18n.T("Legal values are [Always, OnFailure, Never]. If 'Always' create a deployment; if 'OnFailure' create a job; if 'Never', create a regular pod. For the latter two --replicas must be 1. Default 'Always', for CronJobs `Never`."))
 	cmd.Flags().Bool("expose", false, "If true, a public, external service is created for the container(s) which are run")
-	cmd.Flags().String("service-generator", "service/v2", i18n.T("The name of the generator to use for creating a service.  Only used if --expose is true"))
-	cmd.Flags().String("service-overrides", "", i18n.T("An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."))
+	cmd.Flags().String("service-generator", "service/v2", i18n.T("Select a service generator. Ignored unless --expose is provided."))
+	cmd.Flags().String("service-overrides", "", i18n.T("Inline JSON override for the generated service object. Requires a valid apiVersion field. Ignored unless --expose is provided."))
 	cmd.Flags().Bool("quiet", false, "If true, suppress prompt messages.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s).")
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"))
@@ -155,7 +162,35 @@ func addFlagsForRunGenerator(cmd *cobra.Command) {
 	cmd.Flags().String("limits", "", i18n.T("The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."))
 }
 
-func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
+// RunRun has the following responsibilities:
+//
+//  1. Extract a subset of the values of the flags added in addRunFlags()
+//  2. Validate the combination of flags given to ensure that the flags do not
+//     conflict with each other or represent an impossible state.
+//  3. Process the "generator" and "schedule" flags to determine the appropriate
+//     generator for the deployment.
+//  4. Check that said generator is available on the server (in the case of a
+//     cron generator).
+//  5. Scan through the list of generator parameter names. For each one, attempt
+//     to load a value from the command-line flags (Cobra).
+//  6. Call createGeneratedObject() to make a new deployment with the generator
+//     and parameters now set correctly.
+//  7. If the user provided the "expose" flag, load the "service-generator" flag
+//     and attempt to generate a service with the same namespace & generator
+//     parameters.
+//  8. If the user provided the "attach" flag, scan for a few additional flags
+//     (tty, interactive, quiet, and so on) then attempt to connect to the Pod
+//     containing the deployment. This block in the function seems to "pretend"
+//     it is "kubectl attach".
+//  9. Print a success message including the final object in accordance with the
+//     "output" flag.
+//
+// TODO(github.com/alexandercampbell) I am working to refactor this function
+// into smaller functions and to bring its behavior closer to the behavior of
+// the "kubectl create" family of commands.
+func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer,
+	cmd *cobra.Command, args []string, argsLenAtDash int) error {
+
 	// Let kubectl run follow rules for `--`, see #13004 issue
 	if len(args) == 0 || argsLenAtDash == 0 {
 		return cmdutil.UsageErrorf(cmd, "NAME is required for run")
