@@ -48,13 +48,15 @@ import (
 )
 
 const (
-	defaultTimeout        = 3 * time.Minute
-	resizeTimeout         = 5 * time.Minute
-	scaleUpTimeout        = 5 * time.Minute
-	scaleUpTriggerTimeout = 2 * time.Minute
-	scaleDownTimeout      = 20 * time.Minute
-	podTimeout            = 2 * time.Minute
-	nodesRecoverTimeout   = 5 * time.Minute
+	defaultTimeout         = 3 * time.Minute
+	resizeTimeout          = 5 * time.Minute
+	scaleUpTimeout         = 5 * time.Minute
+	scaleUpTriggerTimeout  = 2 * time.Minute
+	scaleDownTimeout       = 20 * time.Minute
+	podTimeout             = 2 * time.Minute
+	nodesRecoverTimeout    = 5 * time.Minute
+	rcCreationRetryTimeout = 4 * time.Minute
+	rcCreationRetryDelay   = 20 * time.Second
 
 	gkeEndpoint      = "https://test-container.sandbox.googleapis.com"
 	gkeUpdateTimeout = 15 * time.Minute
@@ -771,10 +773,18 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 		Replicas:       replicas,
 		MemRequest:     request,
 	}
-	err := framework.RunRC(*config)
-	if expectRunning {
-		framework.ExpectNoError(err)
+	for start := time.Now(); time.Since(start) < rcCreationRetryTimeout; time.Sleep(rcCreationRetryDelay) {
+		err := framework.RunRC(*config)
+		if err != nil && strings.Contains(err.Error(), "Error creating replication controller") {
+			glog.Warningf("Failed to create memory reservation: %v", err)
+			continue
+		}
+		if expectRunning {
+			framework.ExpectNoError(err)
+		}
+		return
 	}
+	framework.Failf("Failed to reserve memory within timeout")
 }
 
 // WaitForClusterSize waits until the cluster size matches the given function.
