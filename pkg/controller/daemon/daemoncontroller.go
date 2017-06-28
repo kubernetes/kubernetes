@@ -1040,7 +1040,14 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 
 	// Because these bools require an && of all their required conditions, we start
 	// with all bools set to true and set a bool to false if a condition is not met.
-	// A bool should probably not be set to true after this line.
+	// A bool should probably not be set to true after this line. We can
+	// return early if we are:
+	//
+	// 1. return false, false, false, err
+	// 2. return false, false, false, nil
+	//
+	// Otherwise if a condition is not met, we should set one of these
+	// bools to false.
 	wantToRun, shouldSchedule, shouldContinueRunning = true, true, true
 	// If the daemon set specifies a node name, check that it matches with node.Name.
 	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
@@ -1130,10 +1137,17 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				// this one is probably intentional since it's a workaround for not having
 				// pod hard anti affinity.
 				predicates.ErrPodNotFitsHostPorts:
-				wantToRun, shouldSchedule, shouldContinueRunning = false, false, false
+				return false, false, false, nil
 			case predicates.ErrTaintsTolerationsNotMatch:
 				// DaemonSet is expected to respect taints and tolerations
-				wantToRun, shouldSchedule, shouldContinueRunning = false, false, true
+				fitsNoExecute, _, err := predicates.PodToleratesNodeNoExecuteTaints(newPod, nil, nodeInfo)
+				if err != nil {
+					return false, false, false, err
+				}
+				if !fitsNoExecute {
+					return false, false, false, nil
+				}
+				wantToRun, shouldSchedule = false, false
 			// unintentional
 			case
 				predicates.ErrDiskConflict,
