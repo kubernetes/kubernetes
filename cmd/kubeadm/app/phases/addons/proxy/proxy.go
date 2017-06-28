@@ -49,10 +49,15 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 		return fmt.Errorf("error when creating kube-proxy service account: %v", err)
 	}
 
+	// Generate Master Enpoint kubeconfig file
+	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
+	if err != nil {
+		return err
+	}
+
 	proxyConfigMapBytes, err := kubeadmutil.ParseTemplate(KubeProxyConfigMap, struct{ MasterEndpoint string }{
 		// Fetch this value from the kubeconfig file
-		MasterEndpoint: fmt.Sprintf("https://%s:%d", cfg.API.AdvertiseAddress, cfg.API.BindPort),
-	})
+		MasterEndpoint: masterEndpoint})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
 	}
