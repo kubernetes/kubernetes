@@ -447,7 +447,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 
 	// We omit creation of pretty much everything if we run in cleanup mode
 	if cleanupAndExit {
-		return &ProxyServer{IptInterface: iptInterface}, nil
+		return &ProxyServer{IptInterface: iptInterface, CleanupAndExit: cleanupAndExit}, nil
 	}
 
 	client, eventClient, err := createClients(config.ClientConnection, master)
@@ -627,7 +627,9 @@ func (s *ProxyServer) Run() error {
 		}
 	}
 
-	s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
+	if s.Broadcaster != nil && s.EventClient != nil {
+		s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
+	}
 
 	// Start up a healthz server if requested
 	if s.HealthzServer != nil {
