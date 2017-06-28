@@ -229,12 +229,20 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
 		glog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
 
-		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false, defaultTimeout)
+		By("Get memory available on new node, so we can account for it when creating RC")
+		nodes, err := framework.GetGroupNodes(extraPoolName)
+		framework.ExpectNoError(err)
+		Expect(len(nodes)).Should(Equal(1))
+		node, err := f.ClientSet.Core().Nodes().Get(nodes[0], metav1.GetOptions{})
+		extraMem := node.Status.Capacity[v1.ResourceMemory]
+		extraMemMb := int((&extraMem).Value() / 1024 / 1024)
+
+		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb+extraMemMb, false, defaultTimeout)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
+			func(size int) bool { return size >= nodeCount+2 }, scaleUpTimeout))
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	})
 
@@ -586,6 +594,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
+		framework.ExpectNoError(err)
 
 		for _, node := range nodes.Items {
 			err = makeNodeUnschedulable(f.ClientSet, &node)
