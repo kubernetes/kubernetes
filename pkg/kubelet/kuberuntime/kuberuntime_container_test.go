@@ -69,6 +69,41 @@ func TestRemoveContainer(t *testing.T) {
 	assert.Empty(t, containers)
 }
 
+// TestKillContainer tests killing the container in a Pod.
+func TestKillContainer(t *testing.T) {
+	_, _, m, _ := createTestRuntimeManager()
+
+	tests := []struct {
+		caseName            string
+		pod                 *v1.Pod
+		containerID         kubecontainer.ContainerID
+		containerName       string
+		reason              string
+		gracePeriodOverride int64
+		succeed             bool
+	}{
+		{
+			caseName: "Failed to find container in pods, expect to return error",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "pod1_id", Name: "pod1", Namespace: "default"},
+				Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "empty_container"}}},
+			},
+			containerID:         kubecontainer.ContainerID{Type: "docker", ID: "not_exist_container_id"},
+			containerName:       "not_exist_container",
+			reason:              "unknown reason",
+			gracePeriodOverride: 0,
+			succeed:             false,
+		},
+	}
+
+	for _, test := range tests {
+		err := m.killContainer(test.pod, test.containerID, test.containerName, test.reason, &test.gracePeriodOverride)
+		if test.succeed != (err == nil) {
+			t.Errorf("%s: expected %v, got %v (%v)", test.caseName, test.succeed, (err == nil), err)
+		}
+	}
+}
+
 // TestToKubeContainerStatus tests the converting the CRI container status to
 // the internal type (i.e., toKubeContainerStatus()) for containers in
 // different states.
