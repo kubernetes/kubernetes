@@ -30,11 +30,11 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
-func TestAdmission(t *testing.T) {
-	empty := ""
-	foo := "foo"
+var (
+	empty = ""
+	foo   = "foo"
 
-	defaultClass1 := &storage.StorageClass{
+	defaultClass1 = &storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -46,7 +46,7 @@ func TestAdmission(t *testing.T) {
 		},
 		Provisioner: "default1",
 	}
-	defaultClass2 := &storage.StorageClass{
+	defaultClass2 = &storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -58,8 +58,33 @@ func TestAdmission(t *testing.T) {
 		},
 		Provisioner: "default2",
 	}
+	// this is defaultClass2 that was edited by user and made non-default
+	nonDefaultClass2 = &storage.StorageClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default2",
+			Annotations: map[string]string{
+				storageutil.IsDefaultStorageClassAnnotation: "false",
+			},
+		},
+		Provisioner: "default2",
+	}
+	defaultClass3 = &storage.StorageClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default3",
+			Annotations: map[string]string{
+				storageutil.IsDefaultStorageClassAnnotation: "true",
+			},
+		},
+		Provisioner: "default3",
+	}
 	// Class that has explicit default = false
-	classWithFalseDefault := &storage.StorageClass{
+	classWithFalseDefault = &storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -72,7 +97,7 @@ func TestAdmission(t *testing.T) {
 		Provisioner: "nondefault1",
 	}
 	// Class with missing default annotation (=non-default)
-	classWithNoDefault := &storage.StorageClass{
+	classWithNoDefault = &storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -82,7 +107,7 @@ func TestAdmission(t *testing.T) {
 		Provisioner: "nondefault1",
 	}
 	// Class with empty default annotation (=non-default)
-	classWithEmptyDefault := &storage.StorageClass{
+	classWithEmptyDefault = &storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -94,6 +119,9 @@ func TestAdmission(t *testing.T) {
 		},
 		Provisioner: "nondefault1",
 	}
+)
+
+func TestPVCAdmission(t *testing.T) {
 
 	claimWithClass := &api.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
@@ -232,6 +260,88 @@ func TestAdmission(t *testing.T) {
 		}
 		if test.expectedClassName == "" && class != "" {
 			t.Errorf("Test %q: expected class name %q, got %q", test.name, test.expectedClassName, class)
+		}
+	}
+}
+
+func TestClassAdmission(t *testing.T) {
+	tests := []struct {
+		name            string
+		existingClasses []*storage.StorageClass
+		newClass        *storage.StorageClass
+		expectError     bool
+	}{
+		{
+			"no classes, new default one is created",
+			[]*storage.StorageClass{},
+			defaultClass1,
+			false,
+		},
+		{
+			"no default classes, new default one is created",
+			[]*storage.StorageClass{classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			defaultClass1,
+			false,
+		},
+		{
+			"one default class, it gets edited",
+			[]*storage.StorageClass{defaultClass1},
+			defaultClass1,
+			false,
+		},
+		{
+			"one default class, new default one is created -> error",
+			[]*storage.StorageClass{defaultClass1},
+			defaultClass2,
+			true,
+		},
+		{
+			"two default classes, new default one is created -> error",
+			[]*storage.StorageClass{defaultClass1, defaultClass2},
+			defaultClass3,
+			true,
+		},
+		{
+			"two default classes, new non-default one is created",
+			[]*storage.StorageClass{defaultClass1, defaultClass2},
+			classWithFalseDefault,
+			false,
+		},
+		{
+			"two default classes, one of them gets non-default",
+			[]*storage.StorageClass{defaultClass1, defaultClass2},
+			nonDefaultClass2,
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		glog.V(4).Infof("starting test %q", test.name)
+
+		ctrl := newPlugin()
+		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+		ctrl.SetInternalKubeInformerFactory(informerFactory)
+		for _, c := range test.existingClasses {
+			informerFactory.Storage().InternalVersion().StorageClasses().Informer().GetStore().Add(c)
+		}
+		attrs := admission.NewAttributesRecord(
+			test.newClass, // new object
+			nil,           // old object
+			api.Kind("StorageClass").WithVersion("version"),
+			"",
+			test.newClass.Name,
+			storage.Resource("storageclasses").WithVersion("version"),
+			"", // subresource
+			admission.Create,
+			nil, // userInfo
+		)
+		err := ctrl.Admit(attrs)
+		glog.Infof("Got %v", err)
+		if err != nil && !test.expectError {
+			t.Errorf("Test %q: unexpected error received: %v", test.name, err)
+		}
+		if err == nil && test.expectError {
+			t.Errorf("Test %q: expected error and no error recevied", test.name)
 		}
 	}
 }
