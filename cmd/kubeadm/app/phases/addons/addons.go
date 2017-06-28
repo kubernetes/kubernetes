@@ -110,7 +110,6 @@ func CreateKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client *clients
 	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
 		return fmt.Errorf("unable to decode kube-proxy daemonset %v", err)
 	}
-	kubeproxyDaemonSet.Spec.Template.Spec.Tolerations = []v1.Toleration{kubeadmconstants.MasterToleration}
 
 	if _, err := client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Create(kubeproxyDaemonSet); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
@@ -128,13 +127,6 @@ func CreateKubeDNSAddon(deploymentBytes, serviceBytes []byte, client *clientset.
 	kubednsDeployment := &extensions.Deployment{}
 	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), deploymentBytes, kubednsDeployment); err != nil {
 		return fmt.Errorf("unable to decode kube-dns deployment %v", err)
-	}
-	kubednsDeployment.Spec.Template.Spec.Tolerations = []v1.Toleration{
-		kubeadmconstants.MasterToleration,
-		{
-			Key:      "CriticalAddonsOnly",
-			Operator: "Exists",
-		},
 	}
 
 	if _, err := client.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).Create(kubednsDeployment); err != nil {
