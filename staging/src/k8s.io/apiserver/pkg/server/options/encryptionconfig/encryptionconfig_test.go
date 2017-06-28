@@ -237,7 +237,17 @@ func (t *testKMSStorage) GetAllDEKs() (map[string]string, error) {
 	return *(t.data), nil
 }
 
-func (t *testKMSStorage) StoreNewDEKs(newDEKs map[string]string) error {
+func (t *testKMSStorage) StoreNewDEK(keyvalue string) error {
+	newDEKs := map[string]string{}
+	for dekname, dek := range *(t.data) {
+		// Remove the identifying prefix in front of the primary key.
+		if strings.HasPrefix(dekname, "-") {
+			dekname = dekname[1:]
+		}
+		newDEKs[dekname] = dek
+	}
+	newDEKname := transformhelpers.GenerateName(newDEKs)
+	newDEKs["-"+newDEKname] = keyvalue
 	t.data = &newDEKs
 	return nil
 }

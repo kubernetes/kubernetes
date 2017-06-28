@@ -37,7 +37,7 @@ type Context interface {
 type KMSStorage interface {
 	Setup() error
 	GetAllDEKs() (map[string]string, error)
-	StoreNewDEKs(newDEKs map[string]string) error
+	StoreNewDEK(encDEK string) error
 }
 
 // KMSService allows encrypting and decrypting secrets using an external service, which provides a

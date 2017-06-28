@@ -25,25 +25,17 @@ import (
 	"strings"
 	"sync"
 
-	randutil "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
-)
-
-const (
-	keyNameLength    = 5
-	primaryKeyPrefix = "-"
 )
 
 type kmsTransformer struct {
 	kmsService value.KMSService
 
-	transformers   []value.PrefixTransformer
-	primaryKeyName string
+	transformers []value.PrefixTransformer
 
 	storage value.KMSStorage
 
-	rotateLock  sync.RWMutex
 	refreshLock sync.RWMutex
 }
 
@@ -79,35 +71,21 @@ func NewKMSTransformer(kmsService value.KMSService, storage value.KMSStorage) (v
 // Rotate creates a new key and makes it the default for writing to disk. It refreshes the transformer
 // once the new key has been written to disk.
 func (t *kmsTransformer) Rotate() error {
-	t.rotateLock.Lock()
-	defer t.rotateLock.Unlock()
-
-	deks, err := t.storage.GetAllDEKs()
-	if err != nil {
-		return err
-	}
-
-	newDEKs := map[string]string{}
-	for keyname, dek := range deks {
-		// Remove the identifying prefix in front of the primary key.
-		if strings.HasPrefix(keyname, "-") {
-			keyname = keyname[1:]
-		}
-		newDEKs[keyname] = dek
-	}
-
-	// Now ensure the new primary key also has the identifying marker.
-	keyname := "-" + generateName(newDEKs)
+	// Creates, encrypts and stores a new DEK.
 	dekBytes, err := generateKey(32)
 	if err != nil {
 		return err
 	}
 
-	newDEKs[keyname], err = t.kmsService.Encrypt(dekBytes)
+	keyvalue, err := t.kmsService.Encrypt(dekBytes)
 	if err != nil {
 		return err
 	}
-	t.storage.StoreNewDEKs(newDEKs)
+
+	err = t.storage.StoreNewDEK(keyvalue)
+	if err != nil {
+		return err
+	}
 
 	return t.Refresh()
 }
@@ -200,19 +178,6 @@ func (t *kmsTransformer) TransformToStorage(data []byte, context value.Context) 
 	}
 	prefixedData = append(prefixedData, result...)
 	return prefixedData, nil
-}
-
-// generateName generates a unique new name for the new DEK.
-func generateName(existingNames map[string]string) string {
-	name := randutil.String(keyNameLength)
-
-	_, ok := existingNames[name]
-	for ok {
-		name := randutil.String(keyNameLength)
-		_, ok = existingNames[name]
-	}
-
-	return name
 }
 
 // generateKey generates a random key using system randomness.

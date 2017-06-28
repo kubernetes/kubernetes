@@ -17,9 +17,12 @@ limitations under the License.
 package transformhelpers
 
 import (
+	"strings"
 	"sync"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	randutil "k8s.io/apimachinery/pkg/util/rand"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -31,7 +34,10 @@ import (
 )
 
 const (
+	// dekMapName is the name of configmap which stores the DEKs.
 	dekMapName = "dek-map"
+	// keyNameLength is the length of names for DEKs.
+	keyNameLength = 5
 )
 
 type keyStore struct {
@@ -42,7 +48,10 @@ type keyStore struct {
 // NewKeyStore returns a KMSStorage instance which uses etcd to store KMS specific information as a configmap,
 // but under a different path on the disk.
 func NewKeyStore(config *storagebackend.Config, dekPrefix string) value.KMSStorage {
-	dekOpts := generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: dekPrefix}
+	// We need to disable any encryption on this keystore
+	newConfig := *config
+	newConfig.Transformer = nil
+	dekOpts := generic.RESTOptions{StorageConfig: &newConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: dekPrefix}
 	return &keyStore{configmaps: configmapregistry.NewRegistry(configmapstore.NewREST(dekOpts))}
 }
 
@@ -81,20 +90,50 @@ func (p *keyStore) GetAllDEKs() (map[string]string, error) {
 }
 
 // StoreNewDEKs writes the provided DEKs to disk.
-func (p *keyStore) StoreNewDEKs(newDEKs map[string]string) error {
+func (p *keyStore) StoreNewDEK(encDEK string) error {
 	// This function is invoked only by Rotate() calls, which are already lock protected.
 	// TODO(sakshams): Investigate if locks are really needed here.
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	ctx := genericapirequest.NewDefaultContext()
-	cfg := &api.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      dekMapName,
-			Namespace: metav1.NamespaceDefault,
-		},
-		Data: newDEKs,
+	cfg, err := p.configmaps.GetConfigMap(ctx, dekMapName, &metav1.GetOptions{})
+	if err != nil {
+		return err
 	}
-	_, err := p.configmaps.UpdateConfigMap(ctx, cfg)
+
+	updater := func(ctx genericapirequest.Context, _ runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
+		newDEKs := map[string]string{}
+		// Re-create the map because unsafe to modify map while iterating over it
+		for dekname, dek := range oldObj.(*api.ConfigMap).Data {
+			// Remove the identifying prefix in front of the primary key.
+			if strings.HasPrefix(dekname, "-") {
+				dekname = dekname[1:]
+			}
+			newDEKs[dekname] = dek
+		}
+
+		// Get a new and unique name
+		newDEKname := GenerateName(newDEKs)
+
+		newDEKs["-"+newDEKname] = encDEK
+		oldObj.(*api.ConfigMap).Data = newDEKs
+		return oldObj, nil
+	}
+
+	_, err = p.configmaps.UpdateConfigMap(ctx, cfg, updater)
 	return err
+}
+
+// GenerateName generates a unique new name for a DEK. Exposed for running encryptionconfig_test.
+func GenerateName(existingNames map[string]string) string {
+	name := randutil.String(keyNameLength)
+
+	_, ok := existingNames[name]
+	for ok {
+		name := randutil.String(keyNameLength)
+		_, ok = existingNames[name]
+	}
+
+	return name
 }

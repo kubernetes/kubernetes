@@ -15,12 +15,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/cloudprovider:go_default_library",
-        "//pkg/cloudprovider/providers/gce:go_default_library",
-        "//vendor/golang.org/x/oauth2/google:go_default_library",
         "//vendor/google.golang.org/api/cloudkms/v1:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/aes:go_default_library",
     ],
