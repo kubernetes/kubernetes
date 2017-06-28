@@ -44,6 +44,7 @@ import (
 const (
 	imageWatcherStr = "watcher="
 	kubeLockMagic   = "kubelet_lock_magic_"
+	rbdCmdErr       = "rbd_cmd_not_found"
 )
 
 // search /sys/bus for rbd device that matches given pool and image
@@ -137,9 +138,13 @@ func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 		// for defencing, get the locker name, something like "client.1234"
 		cmd, err = b.plugin.execCommand("rbd",
 			append([]string{"lock", "list", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon}, secret_opt...))
-		output = string(cmd)
-		glog.Infof("lock list output %q", output)
+		if cmd == nil {
+			err = fmt.Errorf(rbdCmdErr)
+			continue
+		}
 		if err != nil {
+			output = string(cmd)
+			glog.Infof("lock list output %q", output)
 			continue
 		}
 
@@ -269,7 +274,11 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) error {
 
 		// fence off other mappers
 		if err = util.fencing(b); err != nil {
-			return fmt.Errorf("rbd: image %s is locked by other nodes", b.Image)
+			if err.Error() == rbdCmdErr {
+				return fmt.Errorf("rbd: rbd cmd not found")
+			} else {
+				return fmt.Errorf("rbd: image %s is locked by other nodes", b.Image)
+			}
 		}
 		// rbd lock remove needs ceph and image config
 		// but kubelet doesn't get them from apiserver during teardown
@@ -315,6 +324,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) error {
 }
 
 func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
+	var cmd []byte
 	device, cnt, err := mount.GetDeviceNameFromMount(c.mounter, mntPath)
 	if err != nil {
 		return fmt.Errorf("rbd detach disk: failed to get device from mnt: %s\nError: %v", mntPath, err)
@@ -325,7 +335,10 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 	// if device is no longer used, see if can unmap
 	if cnt <= 1 {
 		// rbd unmap
-		_, err = c.plugin.execCommand("rbd", []string{"unmap", device})
+		cmd, err = c.plugin.execCommand("rbd", []string{"unmap", device})
+		if cmd == nil {
+			return fmt.Errorf("rbd: rbd cmd not found")
+		}
 		if err != nil {
 			return fmt.Errorf("rbd: failed to unmap device %s:Error: %v", device, err)
 		}
@@ -432,6 +445,10 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, error) {
 		glog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, b.adminId, b.adminSecret)
 		cmd, err = b.plugin.execCommand("rbd",
 			[]string{"status", b.Image, "--pool", b.Pool, "-m", mon, "--id", b.adminId, "--key=" + b.adminSecret})
+		if cmd == nil {
+			glog.Errorf("rbd cmd not found")
+		}
+
 		output = string(cmd)
 
 		if err != nil {
