@@ -18,15 +18,15 @@ package set
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"path"
 	"testing"
 
-	"fmt"
-
 	"github.com/stretchr/testify/assert"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest/fake"
@@ -52,7 +52,7 @@ func TestServiceAccountLocal(t *testing.T) {
 		{yaml: "../../../../test/fixtures/doc-yaml/user-guide/replicaset/redis-slave.yaml", apiGroup: extensions.GroupName},
 		{yaml: "../../../../test/fixtures/doc-yaml/user-guide/job.yaml", apiGroup: batch.GroupName},
 		{yaml: "../../../../test/fixtures/doc-yaml/user-guide/deployment.yaml", apiGroup: extensions.GroupName},
-		{yaml: "../../../../examples/storage/cassandra/cassandra-statefulset.yaml", apiGroup: apps.GroupName},
+		{yaml: "../../../../examples/storage/minio/minio-distributed-statefulset.yaml", apiGroup: apps.GroupName},
 	}
 
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
@@ -64,7 +64,7 @@ func TestServiceAccountLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	out := bytes.NewBuffer([]byte{})
+	out := new(bytes.Buffer)
 	cmd := NewCmdServiceAccount(f, out, out)
 	cmd.SetOutput(out)
 	cmd.Flags().Set("output", "yaml")
@@ -72,7 +72,7 @@ func TestServiceAccountLocal(t *testing.T) {
 	for _, input := range inputs {
 		testapi.Default = testapi.Groups[input.apiGroup]
 		tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, testapi.Default.Converter(), *testapi.Default.GroupVersion())
-		saConfig := ServiceAccountConfig{fileNameOptions: resource.FilenameOptions{
+		saConfig := serviceAccountConfig{fileNameOptions: resource.FilenameOptions{
 			Filenames: []string{input.yaml}},
 			out:   out,
 			local: true}
@@ -143,7 +143,6 @@ func TestServiceAccountRemote(t *testing.T) {
 	for _, input := range inputs {
 
 		groupVersion := api.Registry.GroupOrDie(input.apiGroup).GroupVersion
-		//input.object.GetObjectKind().SetGroupVersionKind(groupVersion.WithKind(input.args[0]))
 		testapi.Default = testapi.Groups[input.apiGroup]
 		f, tf, codec, _ := cmdtesting.NewAPIFactory()
 		tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, testapi.Default.Converter(), *testapi.Default.GroupVersion())
@@ -175,12 +174,12 @@ func TestServiceAccountRemote(t *testing.T) {
 			VersionedAPIPath: path.Join(input.apiPrefix, groupVersion.String()),
 			GroupName:        input.apiGroup,
 		}
-		out := bytes.NewBuffer([]byte{})
+		out := new(bytes.Buffer)
 		cmd := NewCmdServiceAccount(f, out, out)
 		cmd.SetOutput(out)
 		cmd.Flags().Set("output", "yaml")
 
-		saConfig := ServiceAccountConfig{
+		saConfig := serviceAccountConfig{
 			out:   out,
 			local: false}
 		err := saConfig.Complete(f, cmd, input.args)
@@ -214,7 +213,7 @@ func TestServiceAccountValidation(t *testing.T) {
 		cmd := NewCmdServiceAccount(f, out, out)
 		cmd.SetOutput(out)
 
-		saConfig := &ServiceAccountConfig{}
+		saConfig := &serviceAccountConfig{}
 		err := saConfig.Complete(f, cmd, input.args)
 		assert.NoError(t, err)
 		err = saConfig.Validate()
@@ -223,7 +222,7 @@ func TestServiceAccountValidation(t *testing.T) {
 }
 
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
+	return bytesBody([]byte(runtime.EncodeOrDie(codec, obj)))
 }
 
 func defaultHeader() http.Header {

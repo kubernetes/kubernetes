@@ -17,6 +17,7 @@ limitations under the License.
 package set
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -33,28 +34,29 @@ import (
 )
 
 var (
-	serviceaccount_resources = `
+	serviceaccountResources = `
 	replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs), statefulset`
 
-	serviceaccount_long = templates.LongDesc(`
+	serviceaccountLong = templates.LongDesc(`
 	Update ServiceAccount of pod template resources.
 
 	Possible resources (case insensitive) can be: 
-	` + serviceaccount_resources)
+	` + serviceaccountResources)
 
-	serviceaccount_example = templates.Examples(`
-	# Set ReplicationController nginx-controller's ServiceAccount to serviceaccount1
-	$kubectl set serviceaccount deployment nginx-deployment serviceaccount1
+	serviceaccountExample = templates.Examples(`
+	# Set Deployment nginx-deployment's ServiceAccount to serviceaccount1
+	$kubectl set service-account deployment nginx-deployment serviceaccount1
 
 	# Short form of the above command
 	$kubectl set sa deploy nginx-deployment serviceaccount1
 
-	# Print result in yaml format of updated nginx controller from local file, without hitting apiserver
+	# Print result in yaml format of updated nginx deployment from local file, without hitting apiserver
 	$kubectl set sa -f nginx-deployment.yaml serviceaccount1 --local --dry-run -o yaml
 	`)
 )
 
-type ServiceAccountConfig struct {
+// serviceAccountConfig encapsulates the data required to perform the operation.
+type serviceAccountConfig struct {
 	fileNameOptions resource.FilenameOptions
 
 	mapper                 meta.RESTMapper
@@ -75,30 +77,27 @@ type ServiceAccountConfig struct {
 	namespace              string
 	enforceNamespace       bool
 	args                   []string
-	print                  func(obj runtime.Object) error
+	_print                 func(obj runtime.Object) error
 	updatePodSpecForObject func(runtime.Object, func(*api.PodSpec) error) (bool, error)
 }
 
+// NewCmdServiceAccount returns the "set service-account" command.
 func NewCmdServiceAccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
-	saConfig := &ServiceAccountConfig{
+	saConfig := &serviceAccountConfig{
 		out: out,
 		err: err,
 	}
 
 	cmd := &cobra.Command{
-		Use:     "serviceaccount (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT",
+		Use:     "service-account (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT",
 		Aliases: []string{"sa"},
 		Short:   i18n.T("Update ServiceAccount of a resource"),
-		Long:    serviceaccount_long,
-		Example: serviceaccount_example,
+		Long:    serviceaccountLong,
+		Example: serviceaccountExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(saConfig.Complete(f, cmd, args))
-			if err := saConfig.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
-			}
-			if err := saConfig.Run(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
-			}
+			cmdutil.CheckErr(saConfig.Validate())
+			cmdutil.CheckErr(saConfig.Run())
 		},
 	}
 	cmdutil.AddPrinterFlags(cmd)
@@ -112,7 +111,8 @@ func NewCmdServiceAccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command 
 	return cmd
 }
 
-func (saConfig *ServiceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+// Complete configures serviceAccountConfig from command line args.
+func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	saConfig.mapper, saConfig.typer = f.Object()
 	saConfig.encoder = f.JSONEncoder()
 	saConfig.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
@@ -126,7 +126,7 @@ func (saConfig *ServiceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	saConfig.updatePodSpecForObject = f.UpdatePodSpecForObject
 	saConfig.clientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	saConfig.categoryExpander = f.CategoryExpander()
-	saConfig.print = func(obj runtime.Object) error {
+	saConfig._print = func(obj runtime.Object) error {
 		return f.PrintObject(cmd, saConfig.mapper, obj, saConfig.out)
 	}
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -137,14 +137,16 @@ func (saConfig *ServiceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	return nil
 }
 
-func (saConfig *ServiceAccountConfig) Validate() error {
+// Validate does basic validation on serviceAccountConfig
+func (saConfig *serviceAccountConfig) Validate() error {
 	if len(saConfig.args) == 0 {
-		return fmt.Errorf("serviceaccount is required")
+		return errors.New("serviceaccount is required")
 	}
 	return nil
 }
 
-func (saConfig *ServiceAccountConfig) Run() error {
+// Run creates and applies the patch either locally or calling apiserver.
+func (saConfig *serviceAccountConfig) Run() error {
 	serviceAccountName := saConfig.args[len(saConfig.args)-1]
 	resources := saConfig.args[:len(saConfig.args)-1]
 	builder := resource.NewBuilder(saConfig.mapper, saConfig.categoryExpander, saConfig.typer, saConfig.clientMapper, saConfig.decoder).
@@ -180,7 +182,8 @@ func (saConfig *ServiceAccountConfig) Run() error {
 			continue
 		}
 		if saConfig.local || saConfig.dryRun {
-			return saConfig.print(patch.Info.Object)
+			saConfig._print(patch.Info.Object)
+			continue
 		}
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
@@ -195,9 +198,8 @@ func (saConfig *ServiceAccountConfig) Run() error {
 				}
 			}
 		}
-		info.Refresh(patched, true)
 		if len(saConfig.output) > 0 {
-			return saConfig.print(patched)
+			saConfig._print(patched)
 		}
 		cmdutil.PrintSuccess(saConfig.mapper, saConfig.shortOutput, saConfig.out, info.Mapping.Resource, info.Name, saConfig.dryRun, "serviceaccount updated")
 	}
