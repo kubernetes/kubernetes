@@ -142,13 +142,13 @@ func (o *ViewLastAppliedOptions) RunApplyViewLastApplied() error {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(o.Out, string(jsonBuffer.Bytes()))
+			fmt.Fprint(o.Out, string(jsonBuffer.Bytes()))
 		case "yaml":
 			yamlOutput, err := yaml.JSONToYAML([]byte(str))
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(o.Out, string(yamlOutput))
+			fmt.Fprint(o.Out, string(yamlOutput))
 		}
 	}
 
