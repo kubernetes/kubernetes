@@ -59,11 +59,11 @@ const (
 var MaxContainerFailures = 0
 
 type DensityTestConfig struct {
-	Configs           []testutils.RunObjectConfig
-	ClientSet         clientset.Interface
-	InternalClientset internalclientset.Interface
-	PollInterval      time.Duration
-	PodCount          int
+	Configs            []testutils.RunObjectConfig
+	ClientSets         []clientset.Interface
+	InternalClientsets []internalclientset.Interface
+	PollInterval       time.Duration
+	PodCount           int
 	// What kind of resource we want to create
 	kind             schema.GroupKind
 	SecretConfigs    []*testutils.SecretConfig
@@ -220,7 +220,7 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 		}()
 	}
 	logStopCh := make(chan struct{})
-	go logPodStartupStatus(dtc.ClientSet, dtc.PodCount, map[string]string{"type": "densityPod"}, dtc.PollInterval, logStopCh)
+	go logPodStartupStatus(dtc.ClientSets[0], dtc.PodCount, map[string]string{"type": "densityPod"}, dtc.PollInterval, logStopCh)
 	wg.Wait()
 	startupTime := time.Now().Sub(startTime)
 	close(logStopCh)
@@ -229,7 +229,7 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 
 	// Print some data about Pod to Node allocation
 	By("Printing Pod to Node allocation data")
-	podList, err := dtc.ClientSet.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+	podList, err := dtc.ClientSets[0].Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	pausePodAllocation := make(map[string]int)
 	systemPodAllocation := make(map[string][]string)
@@ -254,6 +254,7 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 func cleanupDensityTest(dtc DensityTestConfig) {
 	defer GinkgoRecover()
 	By("Deleting created Collections")
+	numberOfClients := len(dtc.ClientSets)
 	// We explicitly delete all pods to have API calls necessary for deletion accounted in metrics.
 	for i := range dtc.Configs {
 		name := dtc.Configs[i].GetName()
@@ -261,11 +262,11 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 		kind := dtc.Configs[i].GetKind()
 		if framework.TestContext.GarbageCollectorEnabled && kindSupportsGarbageCollector(kind) {
 			By(fmt.Sprintf("Cleaning up only the %v, garbage collector will clean up the pods", kind))
-			err := framework.DeleteResourceAndWaitForGC(dtc.ClientSet, kind, namespace, name)
+			err := framework.DeleteResourceAndWaitForGC(dtc.ClientSets[i%numberOfClients], kind, namespace, name)
 			framework.ExpectNoError(err)
 		} else {
 			By(fmt.Sprintf("Cleaning up the %v and pods", kind))
-			err := framework.DeleteResourceAndPods(dtc.ClientSet, dtc.InternalClientset, kind, namespace, name)
+			err := framework.DeleteResourceAndPods(dtc.ClientSets[i%numberOfClients], dtc.InternalClientsets[i%numberOfClients], kind, namespace, name)
 			framework.ExpectNoError(err)
 		}
 	}
@@ -279,8 +280,8 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 	}
 	for i := range dtc.DaemonConfigs {
 		framework.ExpectNoError(framework.DeleteResourceAndPods(
-			dtc.ClientSet,
-			dtc.InternalClientset,
+			dtc.ClientSets[i%numberOfClients],
+			dtc.InternalClientsets[i%numberOfClients],
 			extensions.Kind("DaemonSet"),
 			dtc.DaemonConfigs[i].Namespace,
 			dtc.DaemonConfigs[i].Name,
@@ -535,15 +536,18 @@ var _ = framework.KubeDescribe("Density", func() {
 				}
 			}
 
+			// Single client is running out of http2 connections in delete phase, hence we need more.
+			clients, internalClients, err = createClients(2)
+
 			dConfig := DensityTestConfig{
-				ClientSet:         f.ClientSet,
-				InternalClientset: f.InternalClientset,
-				Configs:           configs,
-				PodCount:          totalPods,
-				PollInterval:      DensityPollInterval,
-				kind:              itArg.kind,
-				SecretConfigs:     secretConfigs,
-				ConfigMapConfigs:  configMapConfigs,
+				ClientSets:         clients,
+				InternalClientsets: internalClients,
+				Configs:            configs,
+				PodCount:           totalPods,
+				PollInterval:       DensityPollInterval,
+				kind:               itArg.kind,
+				SecretConfigs:      secretConfigs,
+				ConfigMapConfigs:   configMapConfigs,
 			}
 
 			for i := 0; i < itArg.daemonsPerNode; i++ {
@@ -804,7 +808,7 @@ var _ = framework.KubeDescribe("Density", func() {
 			}
 		}
 		dConfig := DensityTestConfig{
-			ClientSet:    f.ClientSet,
+			ClientSets:   []clientset.Interface{f.ClientSet},
 			Configs:      configs,
 			PodCount:     totalPods,
 			PollInterval: DensityPollInterval,

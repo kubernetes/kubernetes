@@ -288,9 +288,9 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	}
 })
 
-func createClients(numberOfClients int) ([]*clientset.Clientset, []*internalclientset.Clientset, error) {
-	clients := make([]*clientset.Clientset, numberOfClients)
-	internalClients := make([]*internalclientset.Clientset, numberOfClients)
+func createClients(numberOfClients int) ([]clientset.Interface, []internalclientset.Interface, error) {
+	clients := make([]clientset.Interface, numberOfClients)
+	internalClients := make([]internalclientset.Interface, numberOfClients)
 	for i := 0; i < numberOfClients; i++ {
 		config, err := framework.LoadConfig()
 		Expect(err).NotTo(HaveOccurred())
