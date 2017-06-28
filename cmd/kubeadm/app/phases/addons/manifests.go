@@ -85,10 +85,9 @@ spec:
           readOnly: false
       hostNetwork: true
       serviceAccountName: kube-proxy
-      # TODO: Why doesn't the Decoder recognize this new field and decode it properly? Right now it's ignored
-      # tolerations:
-      # - key: {{ .MasterTaintKey }}
-      #   effect: NoSchedule
+      tolerations:
+      - key: {{ .MasterTaintKey }}
+        effect: NoSchedule
       volumes:
       - name: kube-proxy
         configMap:
@@ -101,7 +100,6 @@ spec:
 	KubeDNSVersion = "1.14.4"
 
 	KubeDNSDeployment = `
-
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -125,8 +123,6 @@ spec:
     metadata:
       labels:
         k8s-app: kube-dns
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       volumes:
       - name: kube-dns-config
@@ -252,12 +248,11 @@ spec:
             cpu: 10m
       dnsPolicy: Default  # Don't use cluster DNS.
       serviceAccountName: kube-dns
-      # TODO: Why doesn't the Decoder recognize this new field and decode it properly? Right now it's ignored
-      # tolerations:
-      # - key: CriticalAddonsOnly
-      #   operator: Exists
-      # - key: {{ .MasterTaintKey }}
-      #   effect: NoSchedule
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: {{ .MasterTaintKey }}
+        effect: NoSchedule
       # TODO: Remove this affinity field as soon as we are using manifest lists
       affinity:
         nodeAffinity:
