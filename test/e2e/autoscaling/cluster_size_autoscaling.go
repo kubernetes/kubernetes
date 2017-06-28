@@ -50,13 +50,15 @@ import (
 )
 
 const (
-	defaultTimeout        = 3 * time.Minute
-	resizeTimeout         = 5 * time.Minute
-	scaleUpTimeout        = 5 * time.Minute
-	scaleUpTriggerTimeout = 2 * time.Minute
-	scaleDownTimeout      = 20 * time.Minute
-	podTimeout            = 2 * time.Minute
-	nodesRecoverTimeout   = 5 * time.Minute
+	defaultTimeout         = 3 * time.Minute
+	resizeTimeout          = 5 * time.Minute
+	scaleUpTimeout         = 5 * time.Minute
+	scaleUpTriggerTimeout  = 2 * time.Minute
+	scaleDownTimeout       = 20 * time.Minute
+	podTimeout             = 2 * time.Minute
+	nodesRecoverTimeout    = 5 * time.Minute
+	rcCreationRetryTimeout = 4 * time.Minute
+	rcCreationRetryDelay   = 20 * time.Second
 
 	gkeEndpoint      = "https://test-container.sandbox.googleapis.com"
 	gkeUpdateTimeout = 15 * time.Minute
@@ -95,6 +97,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeCount = len(nodes.Items)
+		By(fmt.Sprintf("Initial number of schedulable nodes: %v", nodeCount))
 		Expect(nodeCount).NotTo(BeZero())
 		cpu := nodes.Items[0].Status.Capacity[v1.ResourceCPU]
 		mem := nodes.Items[0].Status.Capacity[v1.ResourceMemory]
@@ -116,7 +119,11 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 	AfterEach(func() {
 		By(fmt.Sprintf("Restoring initial size of the cluster"))
 		setMigSizes(originalSizes)
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount, scaleDownTimeout))
+		expectedNodes := 0
+		for _, size := range originalSizes {
+			expectedNodes += size
+		}
+		framework.ExpectNoError(framework.WaitForClusterSize(c, expectedNodes, scaleDownTimeout))
 		nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, n := range nodes.Items {
@@ -862,10 +869,18 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 		Replicas:       replicas,
 		MemRequest:     request,
 	}
-	err := framework.RunRC(*config)
-	if expectRunning {
-		framework.ExpectNoError(err)
+	for start := time.Now(); time.Since(start) < rcCreationRetryTimeout; time.Sleep(rcCreationRetryDelay) {
+		err := framework.RunRC(*config)
+		if err != nil && strings.Contains(err.Error(), "Error creating replication controller") {
+			glog.Warningf("Failed to create memory reservation: %v", err)
+			continue
+		}
+		if expectRunning {
+			framework.ExpectNoError(err)
+		}
+		return
 	}
+	framework.Failf("Failed to reserve memory within timeout")
 }
 
 // WaitForClusterSize waits until the cluster size matches the given function.
