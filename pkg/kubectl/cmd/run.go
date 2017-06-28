@@ -103,10 +103,13 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 	return cmd
 }
 
+// addRunFlags is solely responsible for the options available on the "kubectl
+// run" command.
 func addRunFlags(cmd *cobra.Command) {
 	// Flags that are common enough we share the definition with other
 	// commands.
-	// For example, "kubectl create" also supports "pod-running-timeout"
+	// For example, "kubectl create" also supports "pod-running-timeout", a
+	// common creation flag.
 	cmdutil.AddCommonCreationFlags(cmd)
 	cmdutil.AddDeploymentFlags(cmd, "")
 
@@ -114,17 +117,31 @@ func addRunFlags(cmd *cobra.Command) {
 	// in different configurations by other commands.
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 
-	// These flags correspond to the flags from the Generator.
-	cmd.Flags().Bool("rm", false, "If true, delete resources created in this command for attached containers.")
-	cmd.Flags().String("overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
+	// See the docstrings on these function for details.
+	addFlagsForRunGenerator(cmd)
+	addFlagsForAttaching(cmd)
+}
+
+// addFlagsForAttaching does what it says on the tin.
+// Interestingly enough, we do not have to add the "tty" flag in this function.
+// Said flag is not specific to commands which are attaching. It causes the pod
+// to allocate a TTY, but that TTY may not be used until another command is
+// called.
+func addFlagsForAttaching(cmd *cobra.Command) {
 	cmd.Flags().Bool("attach", false, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true. With '--restart=Never' the exit code of the container process is returned.")
 	cmd.Flags().Bool("leave-stdin-open", false, "If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.")
+	cmd.Flags().Bool("rm", false, "If true, delete resources created in this command for attached containers.")
+	cmd.Flags().String("schedule", "", i18n.T("A schedule in the Cron format the job should be run with."))
+}
+
+func addFlagsForRunGenerator(cmd *cobra.Command) {
+	// These flags correspond to the flags from the Generator.
+	cmd.Flags().String("overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
 	cmd.Flags().String("restart", "Always", i18n.T("The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`."))
 	cmd.Flags().Bool("expose", false, "If true, a public, external service is created for the container(s) which are run")
 	cmd.Flags().String("service-generator", "service/v2", i18n.T("The name of the generator to use for creating a service.  Only used if --expose is true"))
 	cmd.Flags().String("service-overrides", "", i18n.T("An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."))
 	cmd.Flags().Bool("quiet", false, "If true, suppress prompt messages.")
-	cmd.Flags().String("schedule", "", i18n.T("A schedule in the Cron format the job should be run with."))
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s).")
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"))
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
