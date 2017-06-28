@@ -39,6 +39,7 @@ go_library(
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/util/token:go_default_library",
+        "//cmd/kubeadm/app/util/config:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/bootstrap/api:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
