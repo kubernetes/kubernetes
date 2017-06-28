@@ -107,6 +107,9 @@ spec:
         effect: "NoSchedule"
       - operator: "Exists"
         effect: "NoExecute"
+      #TODO: remove this toleration once #44445 is properly fixed.
+      - operator: "Exists"
+        effect: "NoSchedule"
       terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog
