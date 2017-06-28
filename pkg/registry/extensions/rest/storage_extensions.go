@@ -44,6 +44,7 @@ import (
 
 type RESTStorageProvider struct {
 	ResourceInterface ResourceInterface
+	thirdpartyresourcesEnabled bool
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
@@ -73,6 +74,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("thirdpartyresources")) {
 		thirdPartyResourceStorage := thirdpartyresourcestore.NewREST(restOptionsGetter)
 		storage["thirdpartyresources"] = thirdPartyResourceStorage
+		p.thirdpartyresourcesEnabled = true
 	}
 
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
@@ -114,6 +116,11 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 	return "extensions/third-party-resources", p.postStartHookFunc, nil
 }
 func (p RESTStorageProvider) postStartHookFunc(hookContext genericapiserver.PostStartHookContext) error {
+	if !p.thirdpartyresourcesEnabled {
+		glog.V(4).Info("third-party-resources disabled, need not to SyncResources.")
+		return nil
+	}
+
 	clientset, err := extensionsclient.NewForConfig(hookContext.LoopbackClientConfig)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to initialize client: %v", err))
