@@ -21,6 +21,8 @@ set -o pipefail
 TASK=$1
 IMAGE=$2
 
+KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd -P)"
+
 # Mapping of go ARCH to actual architectures shipped part of multiarch/qemu-user-static project
 declare -A QEMUARCHS=( ["amd64"]="x86_64" ["arm"]="arm" ["arm64"]="aarch64" ["ppc64le"]="ppc64le" ["s390x"]="s390x" )
 
@@ -109,4 +111,18 @@ push() {
   done
 }
 
-eval ${TASK}
+# This function is for building the go code
+bin() {
+  for SRC in $@;
+  do
+  docker run --rm -it -v ${TARGET}:${TARGET}:Z -v ${KUBE_ROOT}:/go/src/k8s.io/kubernetes:Z \
+        golang:${GOLANG_VERSION} \
+        /bin/bash -c "\
+                cd /go/src/k8s.io/kubernetes/test/images/${SRC_DIR} && \
+                CGO_ENABLED=0 GOARM=${GOARM} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags '-w' -o ${TARGET}/${SRC} ./$(dirname ${SRC})"
+  done
+}
+
+shift
+
+eval ${TASK} "$@"
