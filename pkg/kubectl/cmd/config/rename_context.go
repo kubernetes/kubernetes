@@ -70,7 +70,7 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 				cmdutil.CheckErr(err)
 			}
 			if err := options.Validate(); err != nil {
-				cmdutil.UsageError(cmd, err.Error())
+				cmdutil.UsageErrorf(cmd, err.Error())
 			}
 			if err := options.RunRenameContext(out); err != nil {
 				cmdutil.CheckErr(err)

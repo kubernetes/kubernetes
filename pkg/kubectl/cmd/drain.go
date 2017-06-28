@@ -197,7 +197,7 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 	var err error
 	if len(args) != 1 {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
+		return cmdutil.UsageErrorf(cmd, "USAGE: %s [flags]", cmd.Use)
 	}
 
 	if o.client, err = o.Factory.ClientSet(); err != nil {

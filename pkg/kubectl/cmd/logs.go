@@ -127,21 +127,21 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	switch len(args) {
 	case 0:
 		if len(selector) == 0 {
-			return cmdutil.UsageError(cmd, logsUsageStr)
+			return cmdutil.UsageErrorf(cmd, "%s", logsUsageStr)
 		}
 	case 1:
 		o.ResourceArg = args[0]
 		if len(selector) != 0 {
-			return cmdutil.UsageError(cmd, "only a selector (-l) or a POD name is allowed")
+			return cmdutil.UsageErrorf(cmd, "only a selector (-l) or a POD name is allowed")
 		}
 	case 2:
 		if cmd.Flag("container").Changed {
-			return cmdutil.UsageError(cmd, "only one of -c or an inline [CONTAINER] arg is allowed")
+			return cmdutil.UsageErrorf(cmd, "only one of -c or an inline [CONTAINER] arg is allowed")
 		}
 		o.ResourceArg = args[0]
 		containerName = args[1]
 	default:
-		return cmdutil.UsageError(cmd, logsUsageStr)
+		return cmdutil.UsageErrorf(cmd, "%s", logsUsageStr)
 	}
 	var err error
 	o.Namespace, _, err = f.DefaultNamespace()
@@ -183,7 +183,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 
 	if len(selector) != 0 {
 		if logOptions.Follow {
-			return cmdutil.UsageError(cmd, "only one of follow (-f) or selector (-l) is allowed")
+			return cmdutil.UsageErrorf(cmd, "only one of follow (-f) or selector (-l) is allowed")
 		}
 		if logOptions.TailLines == nil {
 			logOptions.TailLines = &selectorTail

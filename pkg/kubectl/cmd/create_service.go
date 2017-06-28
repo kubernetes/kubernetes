@@ -83,7 +83,7 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer) *cobra.Co
 }
 
 func errUnsupportedGenerator(cmd *cobra.Command, generatorName string) error {
-	return cmdutil.UsageError(cmd, "Generator %s not supported. ", generatorName)
+	return cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", generatorName)
 }
 
 // CreateServiceClusterIP implements the behavior to run the create service clusterIP command

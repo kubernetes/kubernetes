@@ -116,14 +116,14 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 
 func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		return cmdutil.UsageError(cmd, "Shell not specified.")
+		return cmdutil.UsageErrorf(cmd, "Shell not specified.")
 	}
 	if len(args) > 1 {
-		return cmdutil.UsageError(cmd, "Too many arguments. Expected only the shell type.")
+		return cmdutil.UsageErrorf(cmd, "Too many arguments. Expected only the shell type.")
 	}
 	run, found := completion_shells[args[0]]
 	if !found {
-		return cmdutil.UsageError(cmd, "Unsupported shell type %q.", args[0])
+		return cmdutil.UsageErrorf(cmd, "Unsupported shell type %q.", args[0])
 	}
 
 	if len(boilerPlate) == 0 {

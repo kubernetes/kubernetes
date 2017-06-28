@@ -100,7 +100,7 @@ func PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resou
 func ValidateOutputArgs(cmd *cobra.Command) error {
 	outputMode := GetFlagString(cmd, "output")
 	if outputMode != "" && outputMode != "name" {
-		return UsageError(cmd, "Unexpected -o output mode: %v. We only support '-o name'.", outputMode)
+		return UsageErrorf(cmd, "Unexpected -o output mode: %v. We only support '-o name'.", outputMode)
 	}
 	return nil
 }

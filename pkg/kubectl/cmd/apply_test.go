@@ -55,7 +55,7 @@ func TestApplyExtraArgsFail(t *testing.T) {
 
 func validateApplyArgs(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
-		return cmdutil.UsageError(cmd, "Unexpected args: %v", args)
+		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
 	return nil
 }

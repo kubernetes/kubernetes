@@ -138,12 +138,12 @@ func addRunFlags(cmd *cobra.Command) {
 func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
 	// Let kubectl run follow rules for `--`, see #13004 issue
 	if len(args) == 0 || argsLenAtDash == 0 {
-		return cmdutil.UsageError(cmd, "NAME is required for run")
+		return cmdutil.UsageErrorf(cmd, "NAME is required for run")
 	}
 
 	timeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
-		return cmdutil.UsageError(cmd, err.Error())
+		return cmdutil.UsageErrorf(cmd, "%v", err)
 	}
 
 	// validate image name
@@ -156,11 +156,11 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	interactive := cmdutil.GetFlagBool(cmd, "stdin")
 	tty := cmdutil.GetFlagBool(cmd, "tty")
 	if tty && !interactive {
-		return cmdutil.UsageError(cmd, "-i/--stdin is required for containers with -t/--tty=true")
+		return cmdutil.UsageErrorf(cmd, "-i/--stdin is required for containers with -t/--tty=true")
 	}
 	replicas := cmdutil.GetFlagInt(cmd, "replicas")
 	if interactive && replicas != 1 {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("-i/--stdin requires that replicas is 1, found %d", replicas))
+		return cmdutil.UsageErrorf(cmd, "-i/--stdin requires that replicas is 1, found %d", replicas)
 	}
 
 	namespace, _, err := f.DefaultNamespace()
@@ -172,7 +172,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		return err
 	}
 	if restartPolicy != api.RestartPolicyAlways && replicas != 1 {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("--restart=%s requires that --replicas=1, found %d", restartPolicy, replicas))
+		return cmdutil.UsageErrorf(cmd, "--restart=%s requires that --replicas=1, found %d", restartPolicy, replicas)
 	}
 
 	attachFlag := cmd.Flags().Lookup("attach")
@@ -184,11 +184,11 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 
 	remove := cmdutil.GetFlagBool(cmd, "rm")
 	if !attach && remove {
-		return cmdutil.UsageError(cmd, "--rm should only be used for attached containers")
+		return cmdutil.UsageErrorf(cmd, "--rm should only be used for attached containers")
 	}
 
 	if attach && cmdutil.GetDryRunFlag(cmd) {
-		return cmdutil.UsageError(cmd, "--dry-run can't be used with attached containers options (--attach, --stdin, or --tty)")
+		return cmdutil.UsageErrorf(cmd, "--dry-run can't be used with attached containers options (--attach, --stdin, or --tty)")
 	}
 
 	if err := verifyImagePullPolicy(cmd); err != nil {
@@ -242,7 +242,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	generators := f.Generators("run")
 	generator, found := generators[generatorName]
 	if !found {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
+		return cmdutil.UsageErrorf(cmd, "generator %q not found", generatorName)
 	}
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
@@ -261,7 +261,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	if cmdutil.GetFlagBool(cmd, "expose") {
 		serviceGenerator := cmdutil.GetFlagString(cmd, "service-generator")
 		if len(serviceGenerator) == 0 {
-			return cmdutil.UsageError(cmd, fmt.Sprintf("No service generator specified"))
+			return cmdutil.UsageErrorf(cmd, "No service generator specified")
 		}
 		if err := generateService(f, cmd, args, serviceGenerator, params, namespace, cmdOut); err != nil {
 			return err
@@ -368,6 +368,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		default:
 			return fmt.Errorf("pod %s/%s left in phase %s", pod.Namespace, pod.Name, pod.Status.Phase)
 		}
+
 	}
 
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
@@ -491,9 +492,8 @@ func getRestartPolicy(cmd *cobra.Command, interactive bool) (api.RestartPolicy, 
 		return api.RestartPolicyOnFailure, nil
 	case api.RestartPolicyNever:
 		return api.RestartPolicyNever, nil
-	default:
-		return "", cmdutil.UsageError(cmd, fmt.Sprintf("invalid restart policy: %s", restart))
 	}
+	return "", cmdutil.UsageErrorf(cmd, "invalid restart policy: %s")
 }
 
 func verifyImagePullPolicy(cmd *cobra.Command) error {
@@ -503,9 +503,8 @@ func verifyImagePullPolicy(cmd *cobra.Command) error {
 		return nil
 	case "":
 		return nil
-	default:
-		return cmdutil.UsageError(cmd, fmt.Sprintf("invalid image pull policy: %s", pullPolicy))
 	}
+	return cmdutil.UsageErrorf(cmd, "invalid image pull policy: %s", pullPolicy)
 }
 
 func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, serviceGenerator string, paramsIn map[string]interface{}, namespace string, out io.Writer) error {

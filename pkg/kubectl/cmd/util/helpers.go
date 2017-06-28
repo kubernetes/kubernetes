@@ -117,31 +117,32 @@ var ErrExit = fmt.Errorf("exit")
 // This method is generic to the command in use and may be used by non-Kubectl
 // commands.
 func CheckErr(err error) {
-	checkErr("", err, fatalErrHandler)
+	checkErr(err, fatalErrHandler)
 }
 
 // checkErrWithPrefix works like CheckErr, but adds a caller-defined prefix to non-nil errors
 func checkErrWithPrefix(prefix string, err error) {
-	checkErr(prefix, err, fatalErrHandler)
+	checkErr(err, fatalErrHandler)
 }
 
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an kubectl exit code.
-func checkErr(prefix string, err error, handleErr func(string, int)) {
+func checkErr(err error, handleErr func(string, int)) {
 	// unwrap aggregates of 1
 	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) == 1 {
 		err = agg.Errors()[0]
 	}
 
-	switch {
-	case err == nil:
+	if err == nil {
 		return
+	}
+
+	switch {
 	case err == ErrExit:
 		handleErr("", DefaultErrorExitCode)
-		return
 	case kerrors.IsInvalid(err):
 		details := err.(*kerrors.StatusError).Status().Details
-		s := fmt.Sprintf("%sThe %s %q is invalid", prefix, details.Kind, details.Name)
+		s := fmt.Sprintf("The %s %q is invalid", details.Kind, details.Name)
 		if len(details.Causes) > 0 {
 			errs := statusCausesToAggrError(details.Causes)
 			handleErr(MultilineError(s+": ", errs), DefaultErrorExitCode)
@@ -149,22 +150,22 @@ func checkErr(prefix string, err error, handleErr func(string, int)) {
 			handleErr(s, DefaultErrorExitCode)
 		}
 	case clientcmd.IsConfigurationInvalid(err):
-		handleErr(MultilineError(fmt.Sprintf("%sError in configuration: ", prefix), err), DefaultErrorExitCode)
+		handleErr(MultilineError("Error in configuration: ", err), DefaultErrorExitCode)
 	default:
 		switch err := err.(type) {
 		case *meta.NoResourceMatchError:
 			switch {
 			case len(err.PartialResource.Group) > 0 && len(err.PartialResource.Version) > 0:
-				handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in group %q and version %q", prefix, err.PartialResource.Resource, err.PartialResource.Group, err.PartialResource.Version), DefaultErrorExitCode)
+				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q and version %q", err.PartialResource.Resource, err.PartialResource.Group, err.PartialResource.Version), DefaultErrorExitCode)
 			case len(err.PartialResource.Group) > 0:
-				handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in group %q", prefix, err.PartialResource.Resource, err.PartialResource.Group), DefaultErrorExitCode)
+				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q", err.PartialResource.Resource, err.PartialResource.Group), DefaultErrorExitCode)
 			case len(err.PartialResource.Version) > 0:
-				handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in version %q", prefix, err.PartialResource.Resource, err.PartialResource.Version), DefaultErrorExitCode)
+				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in version %q", err.PartialResource.Resource, err.PartialResource.Version), DefaultErrorExitCode)
 			default:
-				handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q", prefix, err.PartialResource.Resource), DefaultErrorExitCode)
+				handleErr(fmt.Sprintf("the server doesn't have a resource type %q", err.PartialResource.Resource), DefaultErrorExitCode)
 			}
 		case utilerrors.Aggregate:
-			handleErr(MultipleErrors(prefix, err.Errors()), DefaultErrorExitCode)
+			handleErr(MultipleErrors(``, err.Errors()), DefaultErrorExitCode)
 		case utilexec.ExitError:
 			// do not print anything, only terminate with given error
 			handleErr("", err.ExitStatus())
@@ -297,26 +298,23 @@ func messageForError(err error) string {
 	return msg
 }
 
-func UsageError(cmd *cobra.Command, format string, args ...interface{}) error {
+func UsageErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
 	msg := fmt.Sprintf(format, args...)
 	return fmt.Errorf("%s\nSee '%s -h' for help and examples.", msg, cmd.CommandPath())
 }
 
-func IsFilenameEmpty(filenames []string) bool {
+func IsFilenameSliceEmpty(filenames []string) bool {
 	return len(filenames) == 0
 }
 
 // Whether this cmd need watching objects.
 func isWatch(cmd *cobra.Command) bool {
-	if w, err := cmd.Flags().GetBool("watch"); w && err == nil {
+	if w, err := cmd.Flags().GetBool("watch"); err == nil && w {
 		return true
 	}
 
-	if wo, err := cmd.Flags().GetBool("watch-only"); wo && err == nil {
-		return true
-	}
-
-	return false
+	wo, err := cmd.Flags().GetBool("watch-only")
+	return err == nil && wo
 }
 
 func GetFlagString(cmd *cobra.Command, flag string) string {
@@ -533,7 +531,6 @@ func UpdateObject(info *resource.Info, codec runtime.Codec, updateFn func(runtim
 	return info.Object, nil
 }
 
-// AddCmdRecordFlag adds --record flag to command
 func AddRecordFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
 }
@@ -802,7 +799,7 @@ func DefaultSubCommandRun(out io.Writer) func(c *cobra.Command, args []string) {
 // RequireNoArguments exits with a usage error if extra arguments are provided.
 func RequireNoArguments(c *cobra.Command, args []string) {
 	if len(args) > 0 {
-		CheckErr(UsageError(c, fmt.Sprintf(`unknown command %q`, strings.Join(args, " "))))
+		CheckErr(UsageErrorf(c, "unknown command %q", strings.Join(args, " ")))
 	}
 }
 
