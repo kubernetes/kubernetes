@@ -470,6 +470,7 @@ def configure_worker_services(api_servers, dns, cluster_cidr):
     kubelet_opts.add('port', '10250')
     kubelet_opts.add('cluster-dns', dns['sdn-ip'])
     kubelet_opts.add('cluster-domain', dns['domain'])
+    kubelet_opts.add('anonymous-auth', 'false')
     kubelet_opts.add('client-ca-file', ca_cert_path)
     kubelet_opts.add('tls-cert-file', server_cert_path)
     kubelet_opts.add('tls-private-key-file', server_key_path)
