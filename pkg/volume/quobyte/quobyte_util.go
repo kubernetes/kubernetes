@@ -36,7 +36,7 @@ func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProv
 	capacity := provisioner.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volumeSize := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
 	// Quobyte has the concept of Volumes which doen't have a specific size (they can grow unlimited)
-	// to simulate a size constraint we could set here a Quota
+	// to simulate a size constraint we set here a Quota for logical space
 	volumeRequest := &quobyteapi.CreateVolumeRequest{
 		Name:              provisioner.volume,
 		RootUserID:        provisioner.user,
@@ -45,7 +45,15 @@ func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProv
 		ConfigurationName: provisioner.config,
 	}
 
-	if _, err := manager.createQuobyteClient().CreateVolume(volumeRequest); err != nil {
+	quobyteClient := manager.createQuobyteClient()
+	volumeUUID, err := quobyteClient.CreateVolume(volumeRequest)
+	if err != nil {
+		return &v1.QuobyteVolumeSource{}, volumeSize, err
+	}
+
+	// Set Quoate for Volume with specified byte size
+	err = quobyteClient.SetVolumeQuota(volumeUUID, capacity.Value())
+	if err != nil {
 		return &v1.QuobyteVolumeSource{}, volumeSize, err
 	}
 
