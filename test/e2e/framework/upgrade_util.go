@@ -18,6 +18,7 @@ package framework
 
 import (
 	"fmt"
+	"os/exec"
 	"path"
 	"strings"
 	"time"
@@ -39,13 +40,34 @@ func RealVersion(s string) (string, error) {
 	return strings.TrimPrefix(strings.TrimSpace(v), "v"), nil
 }
 
+func traceRouteToMaster() {
+	path, err := exec.LookPath("traceroute")
+	if err != nil {
+		Logf("Could not find traceroute program")
+		return
+	}
+
+	cmd := exec.Command(path, "-I", GetMasterHost())
+	out, err := cmd.Output()
+	if len(out) != 0 {
+		Logf(string(out))
+	}
+	if exiterr, ok := err.(*exec.ExitError); err != nil && ok {
+		Logf("error while running traceroute: %s", exiterr.Stderr)
+	}
+}
+
 func CheckMasterVersion(c clientset.Interface, want string) error {
 	Logf("Checking master version")
 	var err error
 	var v *version.Info
 	waitErr := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
 		v, err = c.Discovery().ServerVersion()
-		return err != nil, nil
+		if err != nil {
+			traceRouteToMaster()
+			return false, nil
+		}
+		return true, nil
 	})
 	if waitErr != nil {
 		return fmt.Errorf("CheckMasterVersion() couldn't get the master version: %v", err)
