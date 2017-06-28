@@ -27,6 +27,7 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	// required for triggering api machinery startup when running unit tests
 	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
 
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -91,7 +92,7 @@ func TestSubCmdCertsCreateFiles(t *testing.T) {
 			subCmd := getSubCmd(t, subCmdName, subCmds)
 			subCmd.SetArgs([]string{fmt.Sprintf("--cert-dir=%s", tmpdir)})
 			if err := subCmd.Execute(); err != nil {
-				t.Fatalf("Could not execute command: %s", subCmdName)
+				t.Fatalf("Could not execute subcommand: %s", subCmdName)
 			}
 		}
 
@@ -118,7 +119,7 @@ func TestSubCmdApiServerFlags(t *testing.T) {
 	subCmd := getSubCmd(t, "ca", subCmds)
 	subCmd.SetArgs([]string{fmt.Sprintf("--cert-dir=%s", tmpdir)})
 	if err := subCmd.Execute(); err != nil {
-		t.Fatalf("Could not execute command sa")
+		t.Fatalf("Could not execute subcommand ca")
 	}
 
 	// creates apiserver cert
@@ -131,12 +132,12 @@ func TestSubCmdApiServerFlags(t *testing.T) {
 		"--apiserver-advertise-address=1.2.3.4",
 	})
 	if err := subCmd.Execute(); err != nil {
-		t.Fatalf("Could not execute command apiserver")
+		t.Fatalf("Could not execute subcommand apiserver")
 	}
 
 	APIserverCert, err := pkiutil.TryLoadCertFromDisk(tmpdir, kubeadmconstants.APIServerCertAndKeyBaseName)
 	if err != nil {
-		t.Fatalf("Error loading APIserverCert: %v", err)
+		t.Fatalf("Error loading API server certificate: %v", err)
 	}
 
 	hostname, err := os.Hostname()
@@ -164,20 +165,20 @@ func TestSubCmdReadsConfig(t *testing.T) {
 		expectedFileCount int
 	}{
 		{
-			subCmds:           []string{"all"},
-			expectedFileCount: 12,
-		},
-		{
-			subCmds:           []string{"ca", "apiserver", "apiserver-kubelet-client"},
-			expectedFileCount: 6,
-		},
-		{
 			subCmds:           []string{"sa"},
 			expectedFileCount: 2,
 		},
 		{
 			subCmds:           []string{"front-proxy-ca", "front-proxy-client"},
 			expectedFileCount: 4,
+		},
+		{
+			subCmds:           []string{"ca", "apiserver", "apiserver-kubelet-client"},
+			expectedFileCount: 6,
+		},
+		{
+			subCmds:           []string{"all"},
+			expectedFileCount: 12,
 		},
 	}
 
@@ -201,6 +202,8 @@ func TestSubCmdReadsConfig(t *testing.T) {
 		}
 
 		// verify expected files are there
+		// NB. test.expectedFileCount + 1 because in this test case the tempdir where key/certificates
+		//     are saved contains also the dummy configuration file
 		assertFilesCount(t, tmpdir, test.expectedFileCount+1)
 	}
 }

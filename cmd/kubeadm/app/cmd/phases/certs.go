@@ -143,16 +143,15 @@ func runCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration) error, cfgPath
 		api.Scheme.Convert(cfg, internalcfg, nil)
 
 		// Loads configuration from config file, if provided
-		// TODO: with current implementation --config overrides command line flag, and this is counter inutitive
-		// see https://github.com/kubernetes/kubeadm/issues/267
-		err := configutil.TryLoadCfg(*cfgPath, internalcfg)
+		// Nb. --config overrides command line flags
+		err := configutil.TryLoadMasterConfiguration(*cfgPath, internalcfg)
 		kubeadmutil.CheckErr(err)
 
 		// Applies dynamic defaults to settings not provided with flags
 		err = configutil.SetInitDynamicDefaults(internalcfg)
 		kubeadmutil.CheckErr(err)
 
-		// Validates cfg (flags/configs + defaults + dynamics defaults)
+		// Validates cfg (flags/configs + defaults + dynamic defaults)
 		err = validation.ValidateMasterConfiguration(internalcfg).ToAggregate()
 		kubeadmutil.CheckErr(err)
 
@@ -229,35 +228,12 @@ func createOrUseAPIServerKubeletClientCertAndKey(cfg *kubeadmapi.MasterConfigura
 // createOrUseServiceAccountKeyAndPublicKey create a new public/private key pairs for signing service account user, or use the existing one.
 func createOrUseServiceAccountKeyAndPublicKey(cfg *kubeadmapi.MasterConfiguration) error {
 
-	// Checks if the key exists in the PKI directory
-	if pkiutil.CertOrKeyExist(cfg.CertificatesDir, kubeadmconstants.ServiceAccountKeyBaseName) {
-
-		// Try to load .key from the PKI directory
-		_, err := pkiutil.TryLoadKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.ServiceAccountKeyBaseName)
-		if err != nil {
-			return fmt.Errorf("service account token signing key existed but they could not be loaded properly: %v", err)
-		}
-
-		fmt.Println("[certificates] Using the existing service account token signing key.")
-	} else {
-		// The key does NOT exist, let's generate it now
-		saTokenSigningKey, err := certphase.NewServiceAccountSigningKey()
-		if err != nil {
-			return fmt.Errorf("failure while generating service account token signing key: %v", err)
-		}
-
-		// Write .key and .pub files to disk
-		if err = pkiutil.WriteKey(cfg.CertificatesDir, kubeadmconstants.ServiceAccountKeyBaseName, saTokenSigningKey); err != nil {
-			return fmt.Errorf("failure while saving service account token signing key: %v", err)
-		}
-
-		if err = pkiutil.WritePublicKey(cfg.CertificatesDir, kubeadmconstants.ServiceAccountKeyBaseName, &saTokenSigningKey.PublicKey); err != nil {
-			return fmt.Errorf("failure while saving service account token signing public key: %v", err)
-		}
-		fmt.Println("[certificates] Generated service account token signing key and public key.")
-	}
-
-	return nil
+	return createOrUseKeyAndPublicKey(
+		cfg.CertificatesDir,
+		kubeadmconstants.ServiceAccountKeyBaseName,
+		"service account",
+		certphase.NewServiceAccountSigningKey,
+	)
 }
 
 // createOrUseFrontProxyCACertAndKey create a new self signed front proxy CA, or use the existing one.
@@ -285,7 +261,7 @@ func createOrUseFrontProxyClientCertAndKey(cfg *kubeadmapi.MasterConfiguration) 
 }
 
 // createOrUseCertificateAuthorithy is a generic function that will create a new certificate Authorithy using the given newFunc,
-// assign file names accoding to the given baseName, or use the existing one already presente in pkiDir.
+// assign file names according to the given baseName, or use the existing one already present in pkiDir.
 func createOrUseCertificateAuthorithy(pkiDir string, baseName string, UXName string, newFunc func() (*x509.Certificate, *rsa.PrivateKey, error)) error {
 
 	// If cert or key exists, we should try to load them
@@ -321,7 +297,7 @@ func createOrUseCertificateAuthorithy(pkiDir string, baseName string, UXName str
 }
 
 // createOrUseSignedCertificate is a generic function that will create a new signed certificate using the given newFunc,
-// assign file names accoding to the given baseName, or use the existing one already presente in pkiDir.
+// assign file names according to the given baseName, or use the existing one already present in pkiDir.
 func createOrUseSignedCertificate(pkiDir string, CABaseName string, baseName string, UXName string, newFunc func(*x509.Certificate, *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error)) error {
 
 	// Checks if certificate authorithy exists in the PKI directory
@@ -335,7 +311,7 @@ func createOrUseSignedCertificate(pkiDir string, CABaseName string, baseName str
 		return fmt.Errorf("failure loading certificate authorithy for %s: %v", UXName, err)
 	}
 
-	// The certificate and key could be loaded, but the certificate is not a CA
+	// Make sure the loaded CA cert actually is a CA
 	if !caCert.IsCA {
 		return fmt.Errorf("certificate authorithy for %s is not a CA", UXName)
 	}
@@ -370,6 +346,41 @@ func createOrUseSignedCertificate(pkiDir string, CABaseName string, baseName str
 		if pkiutil.HasServerAuth(signedCert) {
 			fmt.Printf("[certificates] %s serving cert is signed for DNS names %v and IPs %v\n", UXName, signedCert.DNSNames, signedCert.IPAddresses)
 		}
+	}
+
+	return nil
+}
+
+// createOrUseKeyAndPublicKey is a generic function that will create a new public/private key pairs using the given newFunc,
+// assign file names according to the given baseName, or use the existing one already present in pkiDir.
+func createOrUseKeyAndPublicKey(pkiDir string, baseName string, UXName string, newFunc func() (*rsa.PrivateKey, error)) error {
+
+	// Checks if the key exists in the PKI directory
+	if pkiutil.CertOrKeyExist(pkiDir, baseName) {
+
+		// Try to load .key from the PKI directory
+		_, err := pkiutil.TryLoadKeyFromDisk(pkiDir, baseName)
+		if err != nil {
+			return fmt.Errorf("%s key existed but they could not be loaded properly: %v", UXName, err)
+		}
+
+		fmt.Printf("[certificates] Using the existing %s key.\n", UXName)
+	} else {
+		// The key does NOT exist, let's generate it now
+		key, err := newFunc()
+		if err != nil {
+			return fmt.Errorf("failure while generating %s key: %v", UXName, err)
+		}
+
+		// Write .key and .pub files to disk
+		if err = pkiutil.WriteKey(pkiDir, baseName, key); err != nil {
+			return fmt.Errorf("failure while saving %s key: %v", UXName, err)
+		}
+
+		if err = pkiutil.WritePublicKey(pkiDir, baseName, &key.PublicKey); err != nil {
+			return fmt.Errorf("failure while saving %s public key: %v", UXName, err)
+		}
+		fmt.Printf("[certificates] Generated %s key and public key.\n", UXName)
 	}
 
 	return nil

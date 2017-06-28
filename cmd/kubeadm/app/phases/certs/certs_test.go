@@ -78,9 +78,13 @@ func TestNewAPIServerKubeletClientCertAndKey(t *testing.T) {
 
 func TestNewNewServiceAccountSigningKey(t *testing.T) {
 
-	_, err := NewServiceAccountSigningKey()
+	key, err := NewServiceAccountSigningKey()
 	if err != nil {
 		t.Fatalf("failed creation of key: %v", err)
+	}
+
+	if key.N.BitLen() < 2048 {
+		t.Error("Service account signing key has less than 2048 bits size")
 	}
 }
 
@@ -107,7 +111,7 @@ func TestNewFrontProxyClientCertAndKey(t *testing.T) {
 
 func assertIsCa(t *testing.T, cert *x509.Certificate) {
 	if !cert.IsCA {
-		t.Error("cert is not a validaCA")
+		t.Error("cert is not a valida CA")
 	}
 }
 
@@ -133,15 +137,6 @@ func assertHasServerAuth(t *testing.T, cert *x509.Certificate) {
 		}
 	}
 	t.Error("cert is not a ServerAuth")
-}
-
-func assertHasSubject(t *testing.T, cert *x509.Certificate, CN string) {
-	for i := range cert.Subject.Names {
-		if cert.Subject.Names[i].Value == CN {
-			return
-		}
-	}
-	t.Errorf("cert does not contain CN %s", CN)
 }
 
 func assertHasOrganization(t *testing.T, cert *x509.Certificate, OU string) {

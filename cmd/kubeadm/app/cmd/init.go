@@ -29,7 +29,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	certphase "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
+	cmdphases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	addonsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons"
@@ -147,7 +147,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 
 	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
 
-	err := configutil.TryLoadCfg(cfgPath, cfg)
+	err := configutil.TryLoadMasterConfiguration(cfgPath, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (i *Init) Validate() error {
 func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 1: Generate certificates
-	err := certphase.CreatePKIAssets(i.cfg)
+	err := cmdphases.CreatePKIAssets(i.cfg)
 	if err != nil {
 		return err
 	}

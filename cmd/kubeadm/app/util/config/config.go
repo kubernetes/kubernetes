@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
+func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0 or empty, the default interface's IP address is used
 	// This is the same logic as the API Server uses
@@ -77,8 +77,8 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	return nil
 }
 
-// TryLoadCfg tries to loads a Master configuration from the given file (if defined)
-func TryLoadCfg(cfgPath string, cfg *kubeadmapi.MasterConfiguration) error {
+// TryLoadMasterConfiguration tries to loads a Master configuration from the given file (if defined)
+func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapi.MasterConfiguration) error {
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)

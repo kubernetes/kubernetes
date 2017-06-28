@@ -51,7 +51,7 @@ func NewAPIServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Ce
 	}
 
 	config := certutil.Config{
-		CommonName: "kube-apiserver",
+		CommonName: kubeadmconstants.APIServerCommonName,
 		AltNames:   *altNames,
 		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
@@ -67,7 +67,7 @@ func NewAPIServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Ce
 func NewAPIServerKubeletClientCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
 	config := certutil.Config{
-		CommonName:   "kube-apiserver-kubelet-client",
+		CommonName:   kubeadmconstants.APIServerKubeletClientCommonName,
 		Organization: []string{kubeadmconstants.MastersGroup},
 		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
@@ -110,7 +110,7 @@ func NewFrontProxyCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 func NewFrontProxyClientCertAndKey(frontProxyCACert *x509.Certificate, frontProxyCAKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
 	config := certutil.Config{
-		CommonName: "front-proxy-client",
+		CommonName: kubeadmconstants.FrontProxyClientCommonName,
 		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 	frontProxyClientCert, frontProxyClientKey, err := pkiutil.NewCertAndKey(frontProxyCACert, frontProxyCAKey, config)
