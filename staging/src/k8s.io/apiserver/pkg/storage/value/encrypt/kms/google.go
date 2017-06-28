@@ -17,16 +17,12 @@ limitations under the License.
 package kms
 
 import (
-	"context"
 	"encoding/base64"
 	"fmt"
 
-	"golang.org/x/oauth2/google"
 	cloudkms "google.golang.org/api/cloudkms/v1"
 	"google.golang.org/api/googleapi"
 	"k8s.io/apiserver/pkg/storage/value"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 )
 
 const defaultGKMSKeyRing = "google-kubernetes"
@@ -36,32 +32,17 @@ type gkmsTransformer struct {
 	cloudkmsService *cloudkms.Service
 }
 
+// GCECloud contains information extracted from "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+// since that package cannot be imported, from within staging.
+type GCECloud struct {
+	CloudkmsService *cloudkms.Service
+	ProjectID       string
+}
+
 // NewGoogleKMSService creates a Google KMS connection and returns a KMSService instance which can encrypt and decrypt data.
-func NewGoogleKMSService(projectID, location, keyRing, cryptoKey string, cloud *cloudprovider.Interface) (value.KMSService, error) {
-	var cloudkmsService *cloudkms.Service
-	var err error
-
-	// Safe when cloud is nil too.
-	if gke, ok := (*cloud).(*gce.GCECloud); ok {
-		// Hosting on GCE/GKE with Google KMS encryption provider
-		cloudkmsService = gke.GetKMSService()
-
-		// Project ID is assumed to be the user's project unless there
-		// is an override in the configuration file
-		if projectID == "" {
-			projectID = gke.GetProjectID()
-		}
-	} else {
-		// Outside GCE/GKE. Requires GOOGLE_APPLICATION_CREDENTIALS environment variable.
-		ctx := context.Background()
-		client, err := google.DefaultClient(ctx, cloudkms.CloudPlatformScope)
-		if err != nil {
-			return nil, err
-		}
-		cloudkmsService, err = cloudkms.New(client)
-		if err != nil {
-			return nil, err
-		}
+func NewGoogleKMSService(projectID, location, keyRing, cryptoKey string, cloud *GCECloud) (value.KMSService, error) {
+	if projectID == "" {
+		projectID = cloud.ProjectID
 	}
 
 	// Default location and keyRing for keys
@@ -82,7 +63,7 @@ func NewGoogleKMSService(projectID, location, keyRing, cryptoKey string, cloud *
 	parentName := fmt.Sprintf("projects/%s/locations/%s", projectID, location)
 
 	// Create the keyRing if it does not exist yet
-	_, err = cloudkmsService.Projects.Locations.KeyRings.Create(parentName,
+	_, err := cloud.CloudkmsService.Projects.Locations.KeyRings.Create(parentName,
 		&cloudkms.KeyRing{}).KeyRingId(keyRing).Do()
 	if err != nil {
 		apiError, ok := err.(*googleapi.Error)
@@ -96,7 +77,7 @@ func NewGoogleKMSService(projectID, location, keyRing, cryptoKey string, cloud *
 	parentName = parentName + "/keyRings/" + keyRing
 
 	// Create the cryptoKey if it does not exist yet
-	_, err = cloudkmsService.Projects.Locations.KeyRings.CryptoKeys.Create(parentName,
+	_, err = cloud.CloudkmsService.Projects.Locations.KeyRings.CryptoKeys.Create(parentName,
 		&cloudkms.CryptoKey{
 			Purpose: "ENCRYPT_DECRYPT",
 		}).CryptoKeyId(cryptoKey).Do()
@@ -113,7 +94,7 @@ func NewGoogleKMSService(projectID, location, keyRing, cryptoKey string, cloud *
 
 	return &gkmsTransformer{
 		parentName:      parentName,
-		cloudkmsService: cloudkmsService,
+		cloudkmsService: cloud.CloudkmsService,
 	}, nil
 }
 
