@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	"k8s.io/kubernetes/pkg/util"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
@@ -163,11 +163,11 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 
 	// Check if cpu quota is available.
 	// CPU cgroup is required and so it expected to be mounted at this point.
-	periodExists, err := util.FileExists(path.Join(cpuMountPoint, "cpu.cfs_period_us"))
+	periodExists, err := utilfile.FileExists(path.Join(cpuMountPoint, "cpu.cfs_period_us"))
 	if err != nil {
 		glog.Errorf("failed to detect if CPU cgroup cpu.cfs_period_us is available - %v", err)
 	}
-	quotaExists, err := util.FileExists(path.Join(cpuMountPoint, "cpu.cfs_quota_us"))
+	quotaExists, err := utilfile.FileExists(path.Join(cpuMountPoint, "cpu.cfs_quota_us"))
 	if err != nil {
 		glog.Errorf("failed to detect if CPU cgroup cpu.cfs_quota_us is available - %v", err)
 	}

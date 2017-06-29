@@ -60,7 +60,7 @@ go_library(
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/kubectl/cmd:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/util:go_default_library",
+        "//pkg/util/template:go_default_library",
         "//pkg/version/prometheus:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//plugin/cmd/kube-scheduler/app:go_default_library",

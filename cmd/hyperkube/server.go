@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/util"
+	utiltemplate "k8s.io/kubernetes/pkg/util/template"
 
 	"github.com/spf13/pflag"
 )
@@ -49,7 +49,7 @@ func (s *Server) Usage() error {
 Available Flags:
 {{.Flags.FlagUsages}}`
 
-	return util.ExecuteTemplate(s.hk.Out(), tt, s)
+	return utiltemplate.ExecuteTemplate(s.hk.Out(), tt, s)
 }
 
 // Name returns the name of the command as derived from the usage line.
