@@ -87,7 +87,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 				return
 			}
 			By("Deleting ingress")
-			jig.DeleteIngress()
+			jig.TryDeleteIngress()
 
 			By("Cleaning up cloud resources")
 			framework.CleanupGCEIngressController(gceController)
@@ -177,7 +177,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 				return
 			}
 			By("Deleting ingress")
-			jig.DeleteIngress()
+			jig.TryDeleteIngress()
 		})
 
 		It("should conform to Ingress spec", func() {
