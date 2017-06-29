@@ -89,12 +89,3 @@ func TestShuffleStrings(t *testing.T) {
 		}
 	}
 }
-
-func TestSortInts64(t *testing.T) {
-	src := []int64{10, 1, 2, 3, 4, 5, 6}
-	expected := []int64{1, 2, 3, 4, 5, 6, 10}
-	SortInts64(src)
-	if !reflect.DeepEqual(src, expected) {
-		t.Errorf("func Ints64 didnt sort correctly, %v !- %v", src, expected)
-	}
-}
