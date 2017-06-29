@@ -34,8 +34,8 @@ func (s objectReference) String() string {
 	return fmt.Sprintf("[%s/%s, namespace: %s, name: %s, uid: %s]", s.APIVersion, s.Kind, s.Namespace, s.Name, s.UID)
 }
 
-// The single-threaded GraphBuilder.processEvent() is the sole writer of the
-// nodes. The multi-threaded GarbageCollector.processItem() reads the nodes.
+// The single-threaded GraphBuilder.processGraphChanges() is the sole writer of the
+// nodes. The multi-threaded GarbageCollector.attemptToDeleteItem() reads the nodes.
 // WARNING: node has different locks on different fields. setters and getters
 // use the respective locks, so the return values of the getters can be
 // inconsistent.
@@ -46,7 +46,7 @@ type node struct {
 	// dependents are the nodes that have node.identity as a
 	// metadata.ownerReference.
 	dependents map[*node]struct{}
-	// this is set by processEvent() if the object has non-nil DeletionTimestamp
+	// this is set by processGraphChanges() if the object has non-nil DeletionTimestamp
 	// and has the FinalizerDeleteDependents.
 	deletingDependents     bool
 	deletingDependentsLock sync.RWMutex
