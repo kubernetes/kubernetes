@@ -79,6 +79,10 @@ var (
 			},
 			{
 				Group:    "",
+				Resource: "serviceaccounts",
+			},
+			{
+				Group:    "",
 				Resource: "groups",
 			},
 			{
