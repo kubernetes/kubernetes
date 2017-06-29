@@ -379,9 +379,9 @@ function create-master-auth {
   cat <<EOF >/etc/gce.conf
 [global]
 EOF
-  if [[ -n "${KUBE_GCE_API_ENDPOINT:-}" ]]; then
+  if [[ -n "${GCE_API_ENDPOINT:-}" ]]; then
     cat <<EOF >>/etc/gce.conf
-api-endpoint = ${KUBE_GCE_API_ENDPOINT}
+api-endpoint = ${GCE_API_ENDPOINT}
 EOF
   fi
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
