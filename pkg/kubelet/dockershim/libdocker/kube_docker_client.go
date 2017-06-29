@@ -29,26 +29,17 @@ import (
 
 	"github.com/golang/glog"
 
+	dockertypes "github.com/docker/docker/api/types"
+	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerapi "github.com/docker/docker/client"
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
-	dockerapi "github.com/docker/engine-api/client"
-	dockertypes "github.com/docker/engine-api/types"
 	"golang.org/x/net/context"
 )
 
 // kubeDockerClient is a wrapped layer of docker client for kubelet internal use. This layer is added to:
 //	1) Redirect stream for exec and attach operations.
 //	2) Wrap the context in this layer to make the Interface cleaner.
-//	3) Stabilize the Interface. The engine-api is still under active development, the interface
-//	is not stabilized yet. However, the Interface is used in many files in Kubernetes, we may
-//	not want to change the interface frequently. With this layer, we can port the engine api to the
-//	Interface to avoid changing Interface as much as possible.
-//	(See
-//	  * https://github.com/docker/engine-api/issues/89
-//	  * https://github.com/docker/engine-api/issues/137
-//	  * https://github.com/docker/engine-api/pull/140)
-// TODO(random-liu): Swith to new docker interface by refactoring the functions in the old Interface
-// one by one.
 type kubeDockerClient struct {
 	// timeout is the timeout of short running docker operations.
 	timeout time.Duration
@@ -131,7 +122,7 @@ func (d *kubeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJS
 	return &containerJSON, nil
 }
 
-func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockertypes.ContainerCreateResponse, error) {
+func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockercontainer.ContainerCreateCreatedBody, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	// we provide an explicit default shm size as to not depend on docker daemon.
@@ -152,18 +143,18 @@ func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfi
 func (d *kubeDockerClient) StartContainer(id string) error {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
-	err := d.client.ContainerStart(ctx, id)
+	err := d.client.ContainerStart(ctx, id, dockertypes.ContainerStartOptions{})
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return ctxErr
 	}
 	return err
 }
 
-// Stopping an already stopped container will not cause an error in engine-v1.
-func (d *kubeDockerClient) StopContainer(id string, timeout int) error {
-	ctx, cancel := d.getCustomTimeoutContext(time.Duration(timeout) * time.Second)
+// Stopping an already stopped container will not cause an error in dockerapi.
+func (d *kubeDockerClient) StopContainer(id string, timeout time.Duration) error {
+	ctx, cancel := d.getCustomTimeoutContext(timeout)
 	defer cancel()
-	err := d.client.ContainerStop(ctx, id, timeout)
+	err := d.client.ContainerStop(ctx, id, &timeout)
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return ctxErr
 	}
@@ -183,7 +174,7 @@ func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 func (d *kubeDockerClient) inspectImageRaw(ref string) (*dockertypes.ImageInspect, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
-	resp, _, err := d.client.ImageInspectWithRaw(ctx, ref, true)
+	resp, _, err := d.client.ImageInspectWithRaw(ctx, ref)
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return nil, ctxErr
 	}
@@ -231,7 +222,7 @@ func (d *kubeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, 
 	return resp, err
 }
 
-func (d *kubeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.Image, error) {
+func (d *kubeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.ImageSummary, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	images, err := d.client.ImageList(ctx, opts)
@@ -429,7 +420,7 @@ func (d *kubeDockerClient) Info() (*dockertypes.Info, error) {
 }
 
 // TODO(random-liu): Add unit test for exec and attach functions, just like what go-dockerclient did.
-func (d *kubeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.ContainerExecCreateResponse, error) {
+func (d *kubeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.IDResponse, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ContainerExecCreate(ctx, id, opts)
@@ -493,7 +484,7 @@ func (d *kubeDockerClient) AttachToContainer(id string, opts dockertypes.Contain
 	return d.holdHijackedConnection(sopts.RawTerminal, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
 }
 
-func (d *kubeDockerClient) ResizeExecTTY(id string, height, width int) error {
+func (d *kubeDockerClient) ResizeExecTTY(id string, height, width uint) error {
 	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	return d.client.ContainerExecResize(ctx, id, dockertypes.ResizeOptions{
@@ -502,7 +493,7 @@ func (d *kubeDockerClient) ResizeExecTTY(id string, height, width int) error {
 	})
 }
 
-func (d *kubeDockerClient) ResizeContainerTTY(id string, height, width int) error {
+func (d *kubeDockerClient) ResizeContainerTTY(id string, height, width uint) error {
 	ctx, cancel := d.getCancelableContext()
 	defer cancel()
 	return d.client.ContainerResize(ctx, id, dockertypes.ResizeOptions{

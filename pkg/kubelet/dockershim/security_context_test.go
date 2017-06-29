@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/blang/semver"
-	dockercontainer "github.com/docker/engine-api/types/container"
+	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"

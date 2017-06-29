@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/blang/semver"
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"

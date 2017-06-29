@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
-	dockertypes "github.com/docker/engine-api/types"
-	dockercontainer "github.com/docker/engine-api/types/container"
-	dockerfilters "github.com/docker/engine-api/types/filters"
+	dockertypes "github.com/docker/docker/api/types"
+	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/golang/glog"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -41,11 +42,13 @@ const (
 	// Various default sandbox resources requests/limits.
 	defaultSandboxCPUshares int64 = 2
 
-	// Termination grace period
-	defaultSandboxGracePeriod int = 10
-
 	// Name of the underlying container runtime
 	runtimeName = "docker"
+)
+
+var (
+	// Termination grace period
+	defaultSandboxGracePeriod = time.Duration(10) * time.Second
 )
 
 // Returns whether the sandbox network is ready, and whether the sandbox is known
@@ -250,8 +253,8 @@ func (ds *dockerService) RemovePodSandbox(podSandboxID string) error {
 	var errs []error
 	opts := dockertypes.ContainerListOptions{All: true}
 
-	opts.Filter = dockerfilters.NewArgs()
-	f := newDockerFilter(&opts.Filter)
+	opts.Filters = dockerfilters.NewArgs()
+	f := newDockerFilter(&opts.Filters)
 	f.AddLabel(sandboxIDLabelKey, podSandboxID)
 
 	containers, err := ds.client.ListContainers(opts)
@@ -414,8 +417,8 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]
 	opts := dockertypes.ContainerListOptions{All: true}
 	filterOutReadySandboxes := false
 
-	opts.Filter = dockerfilters.NewArgs()
-	f := newDockerFilter(&opts.Filter)
+	opts.Filters = dockerfilters.NewArgs()
+	f := newDockerFilter(&opts.Filters)
 	// Add filter to select only sandbox containers.
 	f.AddLabel(containerTypeLabelKey, containerTypeLabelSandbox)
 
