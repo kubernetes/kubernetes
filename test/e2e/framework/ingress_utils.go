@@ -882,9 +882,12 @@ func (j *IngressTestJig) GetRootCA(secretName string) (rootCA []byte) {
 	return
 }
 
-// DeleteIngress deletes the ingress resource
-func (j *IngressTestJig) DeleteIngress() {
-	ExpectNoError(j.Client.Extensions().Ingresses(j.Ingress.Namespace).Delete(j.Ingress.Name, nil))
+// TryDeleteIngress attempts to delete the ingress resource and logs errors if they occur.
+func (j *IngressTestJig) TryDeleteIngress() {
+	err := j.Client.Extensions().Ingresses(j.Ingress.Namespace).Delete(j.Ingress.Name, nil)
+	if err != nil {
+		Logf("Error while deleting the ingress %v/%v: %v", j.Ingress.Namespace, j.Ingress.Name, err)
+	}
 }
 
 // WaitForIngress waits till the ingress acquires an IP, then waits for its
