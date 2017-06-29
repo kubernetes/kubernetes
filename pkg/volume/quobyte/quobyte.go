@@ -365,6 +365,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 	}
 	provisioner.config = "BASE"
 	provisioner.tenant = "DEFAULT"
+	createQuota := false
 
 	cfg, err := parseAPIConfig(provisioner.plugin, provisioner.options.Parameters)
 	if err != nil {
@@ -382,6 +383,8 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 			provisioner.tenant = v
 		case "quobyteconfig":
 			provisioner.config = v
+		case "createquota":
+			createQuota = gostrings.ToLower(v) == "true"
 		case "adminsecretname",
 			"adminsecretnamespace",
 			"quobyteapiserver":
@@ -402,7 +405,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 		config: cfg,
 	}
 
-	vol, sizeGB, err := manager.createVolume(provisioner)
+	vol, sizeGB, err := manager.createVolume(provisioner, createQuota)
 	if err != nil {
 		return nil, err
 	}

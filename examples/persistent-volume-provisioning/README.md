@@ -256,6 +256,7 @@ parameters:
 * **group** maps all access to this group. Default is `nfsnobody`.
 * **quobyteConfig** use the specified configuration to create the volume. You can create a new configuration or modify an existing one with the Web console or the quobyte CLI. Default is `BASE`
 * **quobyteTenant** use the specified tenant ID to create/delete the volume. This Quobyte tenant has to be already present in Quobyte. For Quobyte < 1.4 use an empty string `""` as `DEFAULT` tenant. Default is `DEFAULT`
+* **createQuota** if set all volumes created by this storage class will get a Quota for the specified size. The quota is set for the logical disk size (which can differ from the physical size e.q. if replication is used). Default is ``False
 
 First create Quobyte admin's Secret in the system namespace. Here the Secret is created in `kube-system`:
 

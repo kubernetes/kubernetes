@@ -32,7 +32,7 @@ type quobyteVolumeManager struct {
 	config *quobyteAPIConfig
 }
 
-func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProvisioner) (quobyte *v1.QuobyteVolumeSource, size int, err error) {
+func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProvisioner, createQuota bool) (quobyte *v1.QuobyteVolumeSource, size int, err error) {
 	capacity := provisioner.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volumeSize := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
 	// Quobyte has the concept of Volumes which doen't have a specific size (they can grow unlimited)
@@ -51,10 +51,12 @@ func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProv
 		return &v1.QuobyteVolumeSource{}, volumeSize, err
 	}
 
-	// Set Quoate for Volume with specified byte size
-	err = quobyteClient.SetVolumeQuota(volumeUUID, capacity.Value())
-	if err != nil {
-		return &v1.QuobyteVolumeSource{}, volumeSize, err
+	// Set Quota for Volume with specified byte size
+	if createQuota {
+		err = quobyteClient.SetVolumeQuota(volumeUUID, uint64(capacity.Value()))
+		if err != nil {
+			return &v1.QuobyteVolumeSource{}, volumeSize, err
+		}
 	}
 
 	glog.V(4).Infof("Created Quobyte volume %s", provisioner.volume)
