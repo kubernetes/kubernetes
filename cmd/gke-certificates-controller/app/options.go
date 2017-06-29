@@ -34,7 +34,7 @@ type GKECertificatesController struct {
 	ApproveAllKubeletCSRsForGroup string
 }
 
-// Create a new instance of a GKECertificatesController with default parameters.
+// NewGKECertificatesController return  a new instance of a GKECertificatesController with default parameters.
 func NewGKECertificatesController() *GKECertificatesController {
 	s := &GKECertificatesController{
 		ClusterSigningGKERetryBackoff: metav1.Duration{Duration: 500 * time.Millisecond},

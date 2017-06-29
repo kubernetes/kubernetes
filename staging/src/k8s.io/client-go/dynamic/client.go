@@ -212,6 +212,9 @@ func (rc *ResourceClient) Watch(opts metav1.ListOptions) (watch.Interface, error
 
 func (rc *ResourceClient) Patch(name string, pt types.PatchType, data []byte) (*unstructured.Unstructured, error) {
 	result := new(unstructured.Unstructured)
+	if len(name) == 0 {
+		return result, errors.New("name is empty")
+	}
 	err := rc.cl.Patch(pt).
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).

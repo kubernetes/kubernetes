@@ -429,7 +429,7 @@ func NewDiscoveryClientForConfig(c *restclient.Config) (*DiscoveryClient, error)
 	return &DiscoveryClient{restClient: client, LegacyPrefix: "/api"}, err
 }
 
-// NewDiscoveryClientForConfig creates a new DiscoveryClient for the given config. If
+// NewDiscoveryClientForConfigOrDie creates a new DiscoveryClient for the given config. If
 // there is an error, it panics.
 func NewDiscoveryClientForConfigOrDie(c *restclient.Config) *DiscoveryClient {
 	client, err := NewDiscoveryClientForConfig(c)

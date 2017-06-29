@@ -90,7 +90,7 @@ func (c *clientPoolImpl) ClientForGroupVersionResource(resource schema.GroupVers
 	return c.ClientForGroupVersionKind(kinds[0])
 }
 
-// ClientForGroupVersion returns a client for the specified groupVersion, creates one if none exists. Kind
+// ClientForGroupVersionKind returns a client for the specified groupVersion, creates one if none exists. Kind
 // in the GroupVersionKind may be empty.
 func (c *clientPoolImpl) ClientForGroupVersionKind(kind schema.GroupVersionKind) (*Client, error) {
 	c.lock.Lock()
