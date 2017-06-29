@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/exec"
 )
 
-func testEnsureChain(t *testing.T) {
+func TestEnsureChain(t *testing.T) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
 			// Does not Exists
@@ -75,7 +75,7 @@ func testEnsureChain(t *testing.T) {
 	}
 }
 
-func testEnsureRule(t *testing.T) {
+func TestEnsureRule(t *testing.T) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
 			// Exists
@@ -118,7 +118,7 @@ Bridge chain: TEST, entries: 0, policy: ACCEPT`), nil
 	if exists {
 		t.Errorf("expected exists = false")
 	}
-	errStr := "Failed to ensure rule: exist 2, output: "
+	errStr := "Failed to ensure rule: exit 2, output: "
 	if err == nil || err.Error() != errStr {
 		t.Errorf("expected error: %q", errStr)
 	}
