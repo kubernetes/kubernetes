@@ -413,8 +413,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			return len(rsList.Items) > 0, nil
 
 		})
-		if err == wait.ErrWaitTimeout {
-			err = fmt.Errorf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
+		if err != nil {
+			framework.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
 		}
 
 		By("delete the deployment")
@@ -464,8 +464,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			return len(rsList.Items) > 0, nil
 
 		})
-		if err == wait.ErrWaitTimeout {
-			err = fmt.Errorf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
+		if err != nil {
+			framework.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
 		}
 
 		By("delete the deployment")
