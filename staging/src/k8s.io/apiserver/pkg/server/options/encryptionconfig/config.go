@@ -32,23 +32,25 @@ import (
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
+	"k8s.io/apiserver/pkg/storage/value/transformhelpers"
 )
 
 const (
 	aesCBCTransformerPrefixV1    = "k8s:enc:aescbc:v1:"
 	aesGCMTransformerPrefixV1    = "k8s:enc:aesgcm:v1:"
 	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1:"
+	gkmsTransformerPrefixV1      = "k8s:enc:gkms:v1:"
 )
 
 // GetTransformerOverrides returns the transformer overrides by reading and parsing the encryption provider configuration file
-func GetTransformerOverrides(filepath string) (map[schema.GroupResource]value.Transformer, error) {
+func GetTransformerOverrides(filepath string, kmsFactory *transformhelpers.KMSFactory) (map[schema.GroupResource]value.Transformer, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening encryption provider configuration file %q: %v", filepath, err)
 	}
 	defer f.Close()
 
-	result, err := ParseEncryptionConfiguration(f)
+	result, err := ParseEncryptionConfiguration(f, kmsFactory)
 	if err != nil {
 		return nil, fmt.Errorf("error while parsing encryption provider configuration file %q: %v", filepath, err)
 	}
@@ -56,7 +58,7 @@ func GetTransformerOverrides(filepath string) (map[schema.GroupResource]value.Tr
 }
 
 // ParseEncryptionConfiguration parses configuration data and returns the transformer overrides
-func ParseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.Transformer, error) {
+func ParseEncryptionConfiguration(f io.Reader, kmsFactory *transformhelpers.KMSFactory) (map[schema.GroupResource]value.Transformer, error) {
 	configFileContents, err := ioutil.ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("could not read contents: %v", err)
@@ -80,7 +82,7 @@ func ParseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 
 	// For each entry in the configuration
 	for _, resourceConfig := range config.Resources {
-		transformers, err := GetPrefixTransformers(&resourceConfig)
+		transformers, err := GetPrefixTransformers(&resourceConfig, kmsFactory)
 		if err != nil {
 			return nil, err
 		}
@@ -101,8 +103,9 @@ func ParseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 }
 
 // GetPrefixTransformer constructs and returns the appropriate prefix transformers for the passed resource using its configuration
-func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, error) {
+func GetPrefixTransformers(config *ResourceConfig, kmsFactory *transformhelpers.KMSFactory) ([]value.PrefixTransformer, error) {
 	var result []value.PrefixTransformer
+	multipleProviderError := fmt.Errorf("more than one encryption provider specified in a single element, should split into different list elements")
 	for _, provider := range config.Providers {
 		found := false
 
@@ -119,7 +122,7 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 
 		if provider.AESCBC != nil {
 			if found == true {
-				return result, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
+				return result, multipleProviderError
 			}
 			transformer, err = GetAESPrefixTransformer(provider.AESCBC, aestransformer.NewCBCTransformer, aesCBCTransformerPrefixV1)
 			found = true
@@ -127,15 +130,35 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 
 		if provider.Secretbox != nil {
 			if found == true {
-				return result, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
+				return result, multipleProviderError
 			}
 			transformer, err = GetSecretboxPrefixTransformer(provider.Secretbox)
 			found = true
 		}
 
+		if provider.Gkms != nil {
+			if found == true {
+				return result, multipleProviderError
+			}
+
+			// KMSFactory will only have one GoogleKMSService instance at any time.
+			// This ensures safety because all rotations and refreshes will be guarded by locks.
+			// TODO: We need to allow multiple GKMS services for different keys. For that, we need to
+			// namespace the data of each GKMS service separately.
+			kmsTransformer, err := kmsFactory.GetGoogleKMSTransformer(provider.Gkms.ProjectID, provider.Gkms.Location, provider.Gkms.KeyRing, provider.Gkms.CryptoKey)
+			if err != nil {
+				return result, err
+			}
+			transformer = value.PrefixTransformer{
+				Transformer: kmsTransformer,
+				Prefix:      []byte(gkmsTransformerPrefixV1),
+			}
+			found = true
+		}
+
 		if provider.Identity != nil {
 			if found == true {
-				return result, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
+				return result, multipleProviderError
 			}
 			transformer = value.PrefixTransformer{
 				Transformer: identity.NewEncryptCheckTransformer(),

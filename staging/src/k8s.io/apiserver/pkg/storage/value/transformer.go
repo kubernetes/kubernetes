@@ -32,6 +32,28 @@ type Context interface {
 	AuthenticatedData() []byte
 }
 
+// KMSStorage allows storing and retreiving Data-Encryption-Keys (DEKs) for implementing envelope encryption
+// based transformers.
+type KMSStorage interface {
+	// Setup creates required objects on disk before they get accessed. Object name is passed as argument.
+	Setup(name string) error
+	// GetAllDEKs lists all available DEKs.
+	GetAllDEKs() (map[string]string, error)
+	// StoreNewDEK creates a unique name for the DEK and makes it the primary DEK transactionally.
+	StoreNewDEK(encDEK string) error
+}
+
+// KMSService allows encrypting and decrypting secrets using an external service, which provides a
+// Key-Encryption-Key (KEK). This is needed to implement envelope encryption based transformers.
+type KMSService interface {
+	// Decrypt a given data string using KEK.
+	Decrypt(data string) ([]byte, error)
+	// Encrypte bytes using KEK.
+	Encrypt(data []byte) (string, error)
+	// Get a unique ID for this service for identification and separation of resources in database.
+	GetUniqueID() string
+}
+
 // Transformer allows a value to be transformed before being read from or written to the underlying store. The methods
 // must be able to undo the transformation caused by the other.
 type Transformer interface {
@@ -41,6 +63,8 @@ type Transformer interface {
 	TransformFromStorage(data []byte, context Context) (out []byte, stale bool, err error)
 	// TransformToStorage may transform the provided data into the appropriate form in storage or return an error.
 	TransformToStorage(data []byte, context Context) (out []byte, err error)
+	// Rotate may modify the keys in the transformer, or modify the underlying transformers.
+	Rotate() error
 }
 
 type identityTransformer struct{}
@@ -53,6 +77,9 @@ func (identityTransformer) TransformFromStorage(b []byte, ctx Context) ([]byte, 
 }
 func (identityTransformer) TransformToStorage(b []byte, ctx Context) ([]byte, error) {
 	return b, nil
+}
+func (identityTransformer) Rotate() error {
+	return nil
 }
 
 // DefaultContext is a simple implementation of Context for a slice of bytes.
@@ -90,6 +117,11 @@ func (t *MutableTransformer) TransformToStorage(data []byte, context Context) (o
 	transformer := t.transformer
 	t.lock.RUnlock()
 	return transformer.TransformToStorage(data, context)
+}
+func (t *MutableTransformer) Rotate() error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	return t.transformer.Rotate()
 }
 
 // PrefixTransformer holds a transformer interface and the prefix that the transformation is located under.
@@ -150,4 +182,15 @@ func (t *prefixTransformers) TransformToStorage(data []byte, context Context) ([
 	}
 	prefixedData = append(prefixedData, result...)
 	return prefixedData, nil
+}
+
+// Rotate attempst to rotate the underlying transformers.
+func (t *prefixTransformers) Rotate() error {
+	for _, transformer := range t.transformers {
+		err := transformer.Transformer.Rotate()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

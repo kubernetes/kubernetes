@@ -83,6 +83,11 @@ func (t *gcm) TransformToStorage(data []byte, context value.Context) ([]byte, er
 	return result[:nonceSize+len(cipherText)], nil
 }
 
+// Rotate does not do anything in AES transformer.
+func (t *gcm) Rotate() error {
+	return nil
+}
+
 // cbc implements encryption at rest of the provided values given a cipher.Block algorithm.
 type cbc struct {
 	block cipher.Block
@@ -149,4 +154,9 @@ func (t *cbc) TransformToStorage(data []byte, context value.Context) ([]byte, er
 	mode := cipher.NewCBCEncrypter(t.block, iv)
 	mode.CryptBlocks(result[blockSize:], result[blockSize:])
 	return result, nil
+}
+
+// Rotate does not do anything in AES transformer.
+func (t *cbc) Rotate() error {
+	return nil
 }
