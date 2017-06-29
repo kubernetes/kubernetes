@@ -194,16 +194,16 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 			projectID = cfg.Global.ProjectID
 		}
 
-		if cfg.Global.NetworkName != "" && strings.Contains(cfg.Global.NetworkName, "/"){
+		if cfg.Global.NetworkName != "" && strings.Contains(cfg.Global.NetworkName, "/") {
 			networkURL = cfg.Global.NetworkName
-    }else {
+		} else {
 			networkURL = gceNetworkURL(apiEndpoint, projectID, networkName)
 		}
 
-		if cfg.Global.SubnetworkName != "" && strings.Contains(cfg.Global.SubnetworkName, "/"){
-				subnetworkURL = cfg.Global.SubnetworkName
-		}else {
-			 subnetworkURL = gceSubnetworkURL(apiEndpoint, cfg.Global.ProjectID, region, cfg.Global.SubnetworkName)
+		if cfg.Global.SubnetworkName != "" && strings.Contains(cfg.Global.SubnetworkName, "/") {
+			subnetworkURL = cfg.Global.SubnetworkName
+		} else {
+			subnetworkURL = gceSubnetworkURL(apiEndpoint, cfg.Global.ProjectID, region, cfg.Global.SubnetworkName)
 		}
 		if cfg.Global.TokenURL != "" {
 			tokenSource = NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
