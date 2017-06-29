@@ -15,6 +15,7 @@ go_library(
         "azure_backoff.go",
         "azure_blob.go",
         "azure_file.go",
+        "azure_instance_metadata.go",
         "azure_instances.go",
         "azure_loadbalancer.go",
         "azure_routes.go",
