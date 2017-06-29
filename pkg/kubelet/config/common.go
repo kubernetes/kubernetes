@@ -110,12 +110,14 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	if err != nil {
 		return false, pod, err
 	}
+
+	newPod, ok := obj.(*api.Pod)
 	// Check whether the object could be converted to single pod.
-	if _, ok := obj.(*api.Pod); !ok {
+	if !ok {
 		err = fmt.Errorf("invalid pod: %#v", obj)
 		return false, pod, err
 	}
-	newPod := obj.(*api.Pod)
+
 	// Apply default values and validate the pod.
 	if err = defaultFn(newPod); err != nil {
 		return true, pod, err
@@ -136,12 +138,14 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 	if err != nil {
 		return false, pods, err
 	}
+
+	newPods, ok := obj.(*api.PodList)
 	// Check whether the object could be converted to list of pods.
-	if _, ok := obj.(*api.PodList); !ok {
+	if !ok {
 		err = fmt.Errorf("invalid pods list: %#v", obj)
 		return false, pods, err
 	}
-	newPods := obj.(*api.PodList)
+
 	// Apply default values and validate pods.
 	for i := range newPods.Items {
 		newPod := &newPods.Items[i]

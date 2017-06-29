@@ -37,7 +37,7 @@ from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import is_state
 from charms.reactive import when, when_any, when_not
-from charms.reactive.helpers import data_changed
+from charms.reactive.helpers import data_changed, any_file_changed
 from charms.kubernetes.common import get_version
 from charms.kubernetes.common import retry
 from charms.kubernetes.flagmanager import FlagManager
@@ -77,8 +77,8 @@ def reset_states_for_delivery():
     '''An upgrade charm event was triggered by Juju, react to that here.'''
     migrate_from_pre_snaps()
     install_snaps()
+    set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
-    remove_state('kubernetes-master.components.started')
 
 
 def rename_file_idempotent(source, destination):
@@ -162,6 +162,22 @@ def channel_changed():
     install_snaps()
 
 
+@when('config.changed.client_password', 'leadership.is_leader')
+def password_changed():
+    """Handle password change via the charms config."""
+    password = hookenv.config('client_password')
+    if password == "" and is_state('client.password.initialised'):
+        # password_changed is called during an upgrade. Nothing to do.
+        return
+    elif password == "":
+        # Password not initialised
+        password = token_generator()
+    setup_basic_auth(password, "admin", "admin")
+    set_state('reconfigure.authentication.setup')
+    remove_state('authentication.setup')
+    set_state('client.password.initialised')
+
+
 @when('cni.connected')
 @when_not('cni.configured')
 def configure_cni(cni):
@@ -187,19 +203,23 @@ def setup_leader_authentication():
 
     keys = [service_key, basic_auth, known_tokens]
     # Try first to fetch data from an old leadership broadcast.
-    if not get_keys_from_leader(keys):
-        if not os.path.isfile(basic_auth):
-            setup_basic_auth('admin', 'admin', 'admin')
+    if not get_keys_from_leader(keys) \
+            or is_state('reconfigure.authentication.setup'):
+        last_pass = get_password('basic_auth.csv', 'admin')
+        setup_basic_auth(last_pass, 'admin', 'admin')
+
         if not os.path.isfile(known_tokens):
             setup_tokens(None, 'admin', 'admin')
             setup_tokens(None, 'kubelet', 'kubelet')
             setup_tokens(None, 'kube_proxy', 'kube_proxy')
+
         # Generate the default service account token key
         os.makedirs('/root/cdk', exist_ok=True)
         if not os.path.isfile(service_key):
             cmd = ['openssl', 'genrsa', '-out', service_key,
                    '2048']
             check_call(cmd)
+        remove_state('reconfigure.authentication.setup')
 
     api_opts.add('service-account-key-file', service_key)
     controller_opts.add('service-account-private-key-file', service_key)
@@ -215,32 +235,36 @@ def setup_leader_authentication():
     # eg:
     # {'/root/cdk/serviceaccount.key': 'RSA:2471731...'}
     charms.leadership.leader_set(leader_data)
-
+    remove_state('kubernetes-master.components.started')
     set_state('authentication.setup')
 
 
 @when_not('leadership.is_leader')
-@when_not('authentication.setup')
 def setup_non_leader_authentication():
-    api_opts = FlagManager('kube-apiserver')
-    controller_opts = FlagManager('kube-controller-manager')
 
     service_key = '/root/cdk/serviceaccount.key'
     basic_auth = '/root/cdk/basic_auth.csv'
     known_tokens = '/root/cdk/known_tokens.csv'
-
-    hookenv.status_set('maintenance', 'Rendering authentication templates.')
 
     keys = [service_key, basic_auth, known_tokens]
     if not get_keys_from_leader(keys):
         # the keys were not retrieved. Non-leaders have to retry.
         return
 
+    if not any_file_changed(keys) and is_state('authentication.setup'):
+        # No change detected and we have already setup the authentication
+        return
+
+    hookenv.status_set('maintenance', 'Rendering authentication templates.')
+    api_opts = FlagManager('kube-apiserver')
     api_opts.add('basic-auth-file', basic_auth)
     api_opts.add('token-auth-file', known_tokens)
     api_opts.add('service-account-key-file', service_key)
+
+    controller_opts = FlagManager('kube-controller-manager')
     controller_opts.add('service-account-private-key-file', service_key)
 
+    remove_state('kubernetes-master.components.started')
     set_state('authentication.setup')
 
 
@@ -351,6 +375,22 @@ def send_cluster_dns_detail(kube_control):
     kube_control.set_dns(53, hookenv.config('dns_domain'), dns_ip)
 
 
+@when('kube-control.auth.requested')
+@when('authentication.setup')
+@when('leadership.is_leader')
+def send_tokens(kube_control):
+    """Send the tokens to the workers."""
+    kubelet_token = get_token('kubelet')
+    proxy_token = get_token('kube_proxy')
+    admin_token = get_token('admin')
+
+    # Send the data
+    requests = kube_control.auth_user()
+    for request in requests:
+        kube_control.sign_auth_request(request[0], kubelet_token,
+                                       proxy_token, admin_token)
+
+
 @when_not('kube-control.connected')
 def missing_kube_control():
     """Inform the operator they need to add the kube-control relation.
@@ -448,7 +488,7 @@ def addons_ready():
 
 
 @when('loadbalancer.available', 'certificates.ca.available',
-      'certificates.client.cert.available')
+      'certificates.client.cert.available', 'authentication.setup')
 def loadbalancer_kubeconfig(loadbalancer, ca, client):
     # Get the potential list of loadbalancers from the relation object.
     hosts = loadbalancer.get_addresses_ports()
@@ -460,7 +500,8 @@ def loadbalancer_kubeconfig(loadbalancer, ca, client):
     build_kubeconfig(server)
 
 
-@when('certificates.ca.available', 'certificates.client.cert.available')
+@when('certificates.ca.available', 'certificates.client.cert.available',
+      'authentication.setup')
 @when_not('loadbalancer.available')
 def create_self_config(ca, client):
     '''Create a kubernetes configuration for the master unit.'''
@@ -669,37 +710,54 @@ def build_kubeconfig(server):
     # Get all the paths to the tls information required for kubeconfig.
     ca = layer_options.get('ca_certificate_path')
     ca_exists = ca and os.path.isfile(ca)
-    key = layer_options.get('client_key_path')
-    key_exists = key and os.path.isfile(key)
-    cert = layer_options.get('client_certificate_path')
-    cert_exists = cert and os.path.isfile(cert)
+    client_pass = get_password('basic_auth.csv', 'admin')
     # Do we have everything we need?
-    if ca_exists and key_exists and cert_exists:
-        # Cache last server string to know if we need to regenerate the config.
-        if not data_changed('kubeconfig.server', server):
-            return
+    if ca_exists and client_pass:
         # Create an absolute path for the kubeconfig file.
         kubeconfig_path = os.path.join(os.sep, 'home', 'ubuntu', 'config')
         # Create the kubeconfig on this system so users can access the cluster.
-        create_kubeconfig(kubeconfig_path, server, ca, key, cert)
+
+        create_kubeconfig(kubeconfig_path, server, ca,
+                          user='admin', password=client_pass)
         # Make the config file readable by the ubuntu users so juju scp works.
         cmd = ['chown', 'ubuntu:ubuntu', kubeconfig_path]
         check_call(cmd)
 
 
-def create_kubeconfig(kubeconfig, server, ca, key, certificate, user='ubuntu',
-                      context='juju-context', cluster='juju-cluster'):
+def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
+                      user='ubuntu', context='juju-context',
+                      cluster='juju-cluster', password=None, token=None):
     '''Create a configuration for Kubernetes based on path using the supplied
     arguments for values of the Kubernetes server, CA, key, certificate, user
     context and cluster.'''
+    if not key and not certificate and not password and not token:
+        raise ValueError('Missing authentication mechanism.')
+
+    # token and password are mutually exclusive. Error early if both are
+    # present. The developer has requested an impossible situation.
+    # see: kubectl config set-credentials --help
+    if token and password:
+        raise ValueError('Token and Password are mutually exclusive.')
     # Create the config file with the address of the master server.
     cmd = 'kubectl config --kubeconfig={0} set-cluster {1} ' \
           '--server={2} --certificate-authority={3} --embed-certs=true'
     check_call(split(cmd.format(kubeconfig, cluster, server, ca)))
+    # Delete old users
+    cmd = 'kubectl config --kubeconfig={0} unset users'
+    check_call(split(cmd.format(kubeconfig)))
     # Create the credentials using the client flags.
-    cmd = 'kubectl config --kubeconfig={0} set-credentials {1} ' \
-          '--client-key={2} --client-certificate={3} --embed-certs=true'
-    check_call(split(cmd.format(kubeconfig, user, key, certificate)))
+    cmd = 'kubectl config --kubeconfig={0} ' \
+          'set-credentials {1} '.format(kubeconfig, user)
+
+    if key and certificate:
+        cmd = '{0} --client-key={1} --client-certificate={2} '\
+              '--embed-certs=true'.format(cmd, key, certificate)
+    if password:
+        cmd = "{0} --username={1} --password={2}".format(cmd, user, password)
+    # This is mutually exclusive from password. They will not work together.
+    if token:
+        cmd = "{0} --token={1}".format(cmd, token)
+    check_call(split(cmd))
     # Create a default context with the cluster.
     cmd = 'kubectl config --kubeconfig={0} set-context {1} ' \
           '--cluster={2} --user={3}'
@@ -786,7 +844,6 @@ def configure_master_services():
     api_opts.add('service-cluster-ip-range', service_cidr())
     api_opts.add('min-request-timeout', '300')
     api_opts.add('v', '4')
-    api_opts.add('client-ca-file', ca_cert_path)
     api_opts.add('tls-cert-file', server_cert_path)
     api_opts.add('tls-private-key-file', server_key_path)
     api_opts.add('kubelet-certificate-authority', ca_cert_path)
@@ -826,6 +883,7 @@ def configure_master_services():
 
     cmd = ['snap', 'set', 'kube-apiserver'] + api_opts.to_s().split(' ')
     check_call(cmd)
+
     cmd = (
         ['snap', 'set', 'kube-controller-manager'] +
         controller_opts.to_s().split(' ')
@@ -835,14 +893,16 @@ def configure_master_services():
     check_call(cmd)
 
 
-def setup_basic_auth(username='admin', password='admin', user='admin'):
+def setup_basic_auth(password=None, username='admin', uid='admin'):
     '''Create the htacces file and the tokens.'''
     root_cdk = '/root/cdk'
     if not os.path.isdir(root_cdk):
         os.makedirs(root_cdk)
     htaccess = os.path.join(root_cdk, 'basic_auth.csv')
+    if not password:
+        password = token_generator()
     with open(htaccess, 'w') as stream:
-        stream.write('{0},{1},{2}'.format(username, password, user))
+        stream.write('{0},{1},{2}'.format(password, username, uid))
 
 
 def setup_tokens(token, username, user):
@@ -852,10 +912,47 @@ def setup_tokens(token, username, user):
         os.makedirs(root_cdk)
     known_tokens = os.path.join(root_cdk, 'known_tokens.csv')
     if not token:
-        alpha = string.ascii_letters + string.digits
-        token = ''.join(random.SystemRandom().choice(alpha) for _ in range(32))
+        token = token_generator()
     with open(known_tokens, 'a') as stream:
         stream.write('{0},{1},{2}\n'.format(token, username, user))
+
+
+def get_password(csv_fname, user):
+    '''Get the password of user within the csv file provided.'''
+    root_cdk = '/root/cdk'
+    if not os.path.isdir(root_cdk):
+        return None
+    tokens_fname = os.path.join(root_cdk, csv_fname)
+    with open(tokens_fname, 'r') as stream:
+        for line in stream:
+            record = line.split(',')
+            if record[1] == user:
+                return record[0]
+    return None
+
+
+def get_token(username):
+    """Grab a token from the static file if present. """
+    return get_password('known_tokens.csv', username)
+
+
+def set_token(password, save_salt):
+    ''' Store a token so it can be recalled later by token_generator.
+
+    param: password - the password to be stored
+    param: save_salt - the key to store the value of the token.'''
+    db = unitdata.kv()
+    db.set(save_salt, password)
+    return db.get(save_salt)
+
+
+def token_generator(length=32):
+    ''' Generate a random token for use in passwords and account tokens.
+
+    param: length - the length of the token to generate'''
+    alpha = string.ascii_letters + string.digits
+    token = ''.join(random.SystemRandom().choice(alpha) for _ in range(length))
+    return token
 
 
 @retry(times=3, delay_secs=10)
@@ -871,7 +968,6 @@ def all_kube_system_pods_running():
         return False
 
     result = json.loads(output)
-
     for pod in result['items']:
         status = pod['status']['phase']
         if status != 'Running':

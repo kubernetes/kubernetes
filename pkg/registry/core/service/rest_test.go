@@ -1276,3 +1276,269 @@ func TestServiceRegistryExternalTrafficAnnotationClusterIP(t *testing.T) {
 		t.Errorf("Unexpected allocation of health check node port annotation %s", api.BetaAnnotationHealthCheckNodePort)
 	}
 }
+
+func TestInitClusterIP(t *testing.T) {
+	storage, _ := NewTestREST(t, nil)
+
+	testCases := []struct {
+		name            string
+		svc             *api.Service
+		expectClusterIP bool
+	}{
+		{
+			name: "Allocate new ClusterIP",
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeClusterIP,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}},
+				},
+			},
+			expectClusterIP: true,
+		},
+		{
+			name: "Allocate specified ClusterIP",
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeClusterIP,
+					ClusterIP:       "1.2.3.4",
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}},
+				},
+			},
+			expectClusterIP: true,
+		},
+		{
+			name: "Shouldn't allocate ClusterIP",
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeClusterIP,
+					ClusterIP:       api.ClusterIPNone,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}},
+				},
+			},
+			expectClusterIP: false,
+		},
+	}
+
+	for _, test := range testCases {
+		hasAllocatedIP, err := storage.initClusterIP(test.svc)
+		if err != nil {
+			t.Errorf("%q: unexpected error: %v", test.name, err)
+		}
+
+		if hasAllocatedIP != test.expectClusterIP {
+			t.Errorf("%q: expected %v, but got %v", test.name, test.expectClusterIP, hasAllocatedIP)
+		}
+
+		if test.expectClusterIP {
+			if !storage.serviceIPs.Has(net.ParseIP(test.svc.Spec.ClusterIP)) {
+				t.Errorf("%q: unexpected ClusterIP %q, out of range", test.name, test.svc.Spec.ClusterIP)
+			}
+		}
+
+		if test.name == "Allocate specified ClusterIP" && test.svc.Spec.ClusterIP != "1.2.3.4" {
+			t.Errorf("%q: expected ClusterIP %q, but got %q", test.name, "1.2.3.4", test.svc.Spec.ClusterIP)
+		}
+	}
+}
+
+func TestUpdateNodePort(t *testing.T) {
+	storage, _ := NewTestREST(t, nil)
+	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts)
+	defer nodePortOp.Finish()
+
+	testCases := []struct {
+		name                     string
+		oldService               *api.Service
+		newService               *api.Service
+		expectSpecifiedNodePorts []int
+	}{
+		{
+			name: "Old service and new service have the same NodePort",
+			oldService: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+						NodePort:   30053,
+					}},
+				},
+			},
+			newService: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+						NodePort:   30053,
+					}},
+				},
+			},
+			expectSpecifiedNodePorts: []int{30053},
+		},
+		{
+			name: "Old service has more NodePorts than new service has",
+			oldService: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-tcp",
+							Port:       53,
+							TargetPort: intstr.FromInt(6502),
+							Protocol:   api.ProtocolTCP,
+							NodePort:   30053,
+						},
+						{
+							Name:       "port-udp",
+							Port:       53,
+							TargetPort: intstr.FromInt(6502),
+							Protocol:   api.ProtocolUDP,
+							NodePort:   30053,
+						},
+					},
+				},
+			},
+			newService: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-tcp",
+							Port:       53,
+							TargetPort: intstr.FromInt(6502),
+							Protocol:   api.ProtocolTCP,
+							NodePort:   30053,
+						},
+					},
+				},
+			},
+			expectSpecifiedNodePorts: []int{30053},
+		},
+		{
+			name: "Change protocol of ServicePort without changing NodePort",
+			oldService: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-tcp",
+							Port:       53,
+							TargetPort: intstr.FromInt(6502),
+							Protocol:   api.ProtocolTCP,
+							NodePort:   30053,
+						},
+					},
+				},
+			},
+			newService: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-udp",
+							Port:       53,
+							TargetPort: intstr.FromInt(6502),
+							Protocol:   api.ProtocolUDP,
+							NodePort:   30053,
+						},
+					},
+				},
+			},
+			expectSpecifiedNodePorts: []int{30053},
+		},
+		{
+			name: "Should allocate NodePort when changing service type to NodePort",
+			oldService: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeClusterIP,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}},
+				},
+			},
+			newService: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}},
+				},
+			},
+			expectSpecifiedNodePorts: []int{},
+		},
+	}
+
+	for _, test := range testCases {
+		err := storage.updateNodePort(test.oldService, test.newService, nodePortOp)
+		if err != nil {
+			t.Errorf("%q: unexpected error: %v", test.name, err)
+			continue
+		}
+		_ = nodePortOp.Commit()
+
+		serviceNodePorts := CollectServiceNodePorts(test.newService)
+
+		if len(test.expectSpecifiedNodePorts) == 0 {
+			for _, nodePort := range serviceNodePorts {
+				if !storage.serviceNodePorts.Has(nodePort) {
+					t.Errorf("%q: unexpected NodePort %d, out of range", test.name, nodePort)
+				}
+			}
+		} else if !reflect.DeepEqual(serviceNodePorts, test.expectSpecifiedNodePorts) {
+			t.Errorf("%q: expected NodePorts %v, but got %v", test.name, test.expectSpecifiedNodePorts, serviceNodePorts)
+		}
+
+	}
+}

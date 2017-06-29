@@ -38,15 +38,22 @@ def reset_delivery_states():
 
 
 @when('kubernetes-e2e.installed')
+def report_status():
+    ''' Report the status of the charm. '''
+    messaging()
+
+
 def messaging():
     ''' Probe our relations to determine the propper messaging to the
     end user '''
 
     missing_services = []
     if not is_state('kubernetes-master.available'):
-        missing_services.append('kubernetes-master')
+        missing_services.append('kubernetes-master:http')
     if not is_state('certificates.available'):
         missing_services.append('certificates')
+    if not is_state('kubeconfig.ready'):
+        missing_services.append('kubernetes-master:kube-control')
 
     if missing_services:
         if len(missing_services) > 1:
@@ -80,16 +87,15 @@ def install_snaps():
 
 @when('tls_client.ca.saved', 'tls_client.client.certificate.saved',
       'tls_client.client.key.saved', 'kubernetes-master.available',
-      'kubernetes-e2e.installed')
+      'kubernetes-e2e.installed', 'kube-control.auth.available')
 @when_not('kubeconfig.ready')
-def prepare_kubeconfig_certificates(master):
+def prepare_kubeconfig_certificates(master, kube_control):
     ''' Prepare the data to feed to create the kubeconfig file. '''
 
     layer_options = layer.options('tls-client')
     # Get all the paths to the tls information required for kubeconfig.
     ca = layer_options.get('ca_certificate_path')
-    key = layer_options.get('client_key_path')
-    cert = layer_options.get('client_certificate_path')
+    creds = kube_control.get_auth_credentials()
 
     servers = get_kube_api_servers(master)
 
@@ -97,15 +103,26 @@ def prepare_kubeconfig_certificates(master):
     kubeconfig_path = '/home/ubuntu/.kube/config'
 
     # Create kubernetes configuration in the default location for ubuntu.
-    create_kubeconfig('/root/.kube/config', servers[0], ca, key, cert,
-                      user='root')
-    create_kubeconfig(kubeconfig_path, servers[0], ca, key, cert,
-                      user='ubuntu')
+    create_kubeconfig('/root/.kube/config', servers[0], ca,
+                      token=creds['client_token'], user='root')
+    create_kubeconfig(kubeconfig_path, servers[0], ca,
+                      token=creds['client_token'], user='ubuntu')
     # Set permissions on the ubuntu users kubeconfig to ensure a consistent UX
     cmd = ['chown', 'ubuntu:ubuntu', kubeconfig_path]
     check_call(cmd)
-
+    messaging()
     set_state('kubeconfig.ready')
+
+
+@when('kube-control.connected')
+def request_credentials(kube_control):
+    """ Request authorization creds."""
+
+    # The kube-cotrol interface is created to support RBAC.
+    # At this point we might as well do the right thing and return the hostname
+    # even if it will only be used when we enable RBAC
+    user = 'system:masters'
+    kube_control.set_auth_request(user)
 
 
 @when('kubernetes-e2e.installed', 'kubeconfig.ready')
@@ -124,19 +141,40 @@ def set_app_version():
     hookenv.application_version_set(version_from.rstrip())
 
 
-def create_kubeconfig(kubeconfig, server, ca, key, certificate, user='ubuntu',
-                      context='juju-context', cluster='juju-cluster'):
+def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
+                      user='ubuntu', context='juju-context',
+                      cluster='juju-cluster', password=None, token=None):
     '''Create a configuration for Kubernetes based on path using the supplied
     arguments for values of the Kubernetes server, CA, key, certificate, user
     context and cluster.'''
+    if not key and not certificate and not password and not token:
+        raise ValueError('Missing authentication mechanism.')
+
+    # token and password are mutually exclusive. Error early if both are
+    # present. The developer has requested an impossible situation.
+    # see: kubectl config set-credentials --help
+    if token and password:
+        raise ValueError('Token and Password are mutually exclusive.')
     # Create the config file with the address of the master server.
     cmd = 'kubectl config --kubeconfig={0} set-cluster {1} ' \
           '--server={2} --certificate-authority={3} --embed-certs=true'
     check_call(split(cmd.format(kubeconfig, cluster, server, ca)))
+    # Delete old users
+    cmd = 'kubectl config --kubeconfig={0} unset users'
+    check_call(split(cmd.format(kubeconfig)))
     # Create the credentials using the client flags.
-    cmd = 'kubectl config --kubeconfig={0} set-credentials {1} ' \
-          '--client-key={2} --client-certificate={3} --embed-certs=true'
-    check_call(split(cmd.format(kubeconfig, user, key, certificate)))
+    cmd = 'kubectl config --kubeconfig={0} ' \
+          'set-credentials {1} '.format(kubeconfig, user)
+
+    if key and certificate:
+        cmd = '{0} --client-key={1} --client-certificate={2} '\
+              '--embed-certs=true'.format(cmd, key, certificate)
+    if password:
+        cmd = "{0} --username={1} --password={2}".format(cmd, user, password)
+    # This is mutually exclusive from password. They will not work together.
+    if token:
+        cmd = "{0} --token={1}".format(cmd, token)
+    check_call(split(cmd))
     # Create a default context with the cluster.
     cmd = 'kubectl config --kubeconfig={0} set-context {1} ' \
           '--cluster={2} --user={3}'

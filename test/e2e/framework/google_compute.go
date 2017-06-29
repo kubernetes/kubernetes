@@ -188,7 +188,7 @@ func LogClusterImageSources() {
 	}
 
 	outputBytes, _ := json.MarshalIndent(images, "", "  ")
-	filePath := filepath.Join(TestContext.OutputDir, "images.json")
+	filePath := filepath.Join(TestContext.ReportDir, "images.json")
 	if err := ioutil.WriteFile(filePath, outputBytes, 0644); err != nil {
 		Logf("cluster images sources, could not write to %q: %v", filePath, err)
 	}

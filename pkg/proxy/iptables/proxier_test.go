@@ -1154,6 +1154,10 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 			svc.Spec.ClusterIP = api.ClusterIPNone
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "rpc", "UDP", 1234, 0, 0)
 		}),
+		makeTestService("somewhere-else", "headless-without-port", func(svc *api.Service) {
+			svc.Spec.Type = api.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = api.ClusterIPNone
+		}),
 	)
 
 	// Headless service should be ignored

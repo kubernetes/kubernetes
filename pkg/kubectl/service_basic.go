@@ -179,6 +179,7 @@ func (s ServiceExternalNameGeneratorV1) Generate(params map[string]interface{}) 
 }
 
 // validate validates required fields are set to support structured generation
+// TODO(xiangpengzhao): validate ports are identity mapped for headless service when we enforce that in validation.validateServicePort.
 func (s ServiceCommonGeneratorV1) validate() error {
 	if len(s.Name) == 0 {
 		return fmt.Errorf("name must be specified")
@@ -188,9 +189,6 @@ func (s ServiceCommonGeneratorV1) validate() error {
 	}
 	if s.ClusterIP == api.ClusterIPNone && s.Type != api.ServiceTypeClusterIP {
 		return fmt.Errorf("ClusterIP=None can only be used with ClusterIP service type")
-	}
-	if s.ClusterIP == api.ClusterIPNone && len(s.TCP) > 0 {
-		return fmt.Errorf("can not map ports with clusterip=None")
 	}
 	if s.ClusterIP != api.ClusterIPNone && len(s.TCP) == 0 && s.Type != api.ServiceTypeExternalName {
 		return fmt.Errorf("at least one tcp port specifier must be provided")

@@ -128,6 +128,10 @@ ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 #   standalone     - Heapster only. Metrics available via Heapster REST API.
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
+# One special node out of NUM_NODES would be created of this type if specified.
+# Useful for scheduling heapster in large clusters with nodes of small size.
+HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
+
 # Set etcd image (e.g. 3.0.17-alpha.1) and version (e.g. 3.0.17) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"

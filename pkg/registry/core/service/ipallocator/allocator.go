@@ -33,6 +33,9 @@ type Interface interface {
 	AllocateNext() (net.IP, error)
 	Release(net.IP) error
 	ForEach(func(net.IP))
+
+	// For testing
+	Has(ip net.IP) bool
 }
 
 var (
