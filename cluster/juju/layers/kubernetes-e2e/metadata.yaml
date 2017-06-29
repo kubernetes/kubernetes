@@ -14,6 +14,8 @@ series:
 requires:
   kubernetes-master:
     interface: http
+  kube-control:
+    interface: kube-control
 resources:
   kubectl:
     type: file
@@ -23,3 +25,4 @@ resources:
     type: file
     filename: kubernetes-test.snap
     description: kubernetes-test snap
+
