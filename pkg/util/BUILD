@@ -13,7 +13,6 @@ go_library(
     srcs = [
         "doc.go",
         "template.go",
-        "umask.go",
         "util.go",
     ],
     tags = ["automanaged"],
