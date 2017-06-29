@@ -159,6 +159,16 @@ __kubectl_require_pod_and_container()
     return 0
 }
 
+# Print serviceaccounts across all namespaces in the format "<namespace>:<name>"
+__kubectl_get_serviceaccounts_all_namespaces()
+{
+    local template kubectl_out
+    template="{{ range .items }}{{ .metadata.namespace }}:{{ .metadata.name }} {{ end }}"
+    if kubectl_out=$(kubectl get -o template --template="${template}" serviceaccount --all-namespaces 2>/dev/null); then
+        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
+    fi
+}
+
 __custom_func() {
     case ${last_command} in
         kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop | kubectl_edit | kubectl_patch |\
