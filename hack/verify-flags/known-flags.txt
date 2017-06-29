@@ -105,6 +105,7 @@ cluster-context
 cluster-dns
 cluster-domain
 cluster-ip
+cluster-ip-range
 cluster-monitor-period
 cluster-name
 cluster-signing-cert-file
