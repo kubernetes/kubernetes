@@ -41,6 +41,8 @@ fi
 
 # Federation utils
 
+CLUSTER_CONTEXT_PREFIX="${CLUSTER_CONTEXT_PREFIX:-federation-e2e-${KUBERNETES_PROVIDER}}"
+CLUSTER_CONTEXT_POSTFIX="${CLUSTER_CONTEXT_POSTFIX:-}"
 # Sets the kubeconfig context value for the current cluster.
 # Args:
 #   $1: zone (required)
@@ -52,7 +54,7 @@ function kubeconfig-federation-context() {
     echo "zone parameter is required"
     exit 1
   fi
-  CLUSTER_CONTEXT="federation-e2e-${KUBERNETES_PROVIDER}-${1}"
+  CLUSTER_CONTEXT="${CLUSTER_CONTEXT_PREFIX}-${1}${CLUSTER_CONTEXT_POSTFIX}"
 }
 
 # Should NOT be called within the global scope, unless setting the desired global zone vars
@@ -89,6 +91,8 @@ function set-federation-zone-vars {
     # re-sourced so the change propogates to dependent computed values
     # (eg: MASTER_SG_NAME, NODE_SG_NAME, etc)
     source "${KUBE_ROOT}/cluster/aws/util.sh"
+  elif [[ "$KUBERNETES_PROVIDER" == "kube-aws" ]];then
+    export CLUSTER_NAME="${zone}"
   else
     echo "Provider \"${KUBERNETES_PROVIDER}\" is not supported"
     exit 1
