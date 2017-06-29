@@ -248,21 +248,6 @@ func newServerTest() *serverTestFramework {
 	return fw
 }
 
-// encodeJSON returns obj marshalled as a JSON string, panicing on any errors
-func encodeJSON(obj interface{}) string {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		panic(err)
-	}
-	return string(data)
-}
-
-func readResp(resp *http.Response) (string, error) {
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	return string(body), err
-}
-
 // A helper function to return the correct pod name.
 func getPodName(name, namespace string) string {
 	if namespace == "" {
