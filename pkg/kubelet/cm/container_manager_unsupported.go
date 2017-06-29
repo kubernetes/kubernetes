@@ -40,6 +40,10 @@ func (unsupportedContainerManager) SystemCgroupsLimit() v1.ResourceList {
 	return v1.ResourceList{}
 }
 
+func (cm *unsupportedContainerManager) GetCapacity() v1.ResourceList {
+	return v1.ResourceList{}
+}
+
 func (unsupportedContainerManager) GetNodeConfig() NodeConfig {
 	return NodeConfig{}
 }
