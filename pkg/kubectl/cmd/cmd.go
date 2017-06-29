@@ -130,6 +130,11 @@ __kubectl_get_resource_node()
     __kubectl_parse_get "node"
 }
 
+__kubectl_get_resource_clusterrole()
+{
+    __kubectl_parse_get "clusterrole"
+}
+
 # $1 is the name of the pod we want to get the list of containers inside
 __kubectl_get_containers()
 {
