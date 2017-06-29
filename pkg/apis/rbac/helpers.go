@@ -234,7 +234,7 @@ func (r *PolicyRuleBuilder) Rule() (PolicyRule, error) {
 				}
 			}
 			if len(illegalVerbs) > 0 {
-				return PolicyRule{}, fmt.Errorf("verbs %v do not have names available: %#v", illegalVerbs, r.PolicyRule)
+				return PolicyRule{}, fmt.Errorf("verbs %v do not support resource name: %#v", illegalVerbs, r.PolicyRule)
 			}
 		}
 
