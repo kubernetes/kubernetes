@@ -69,11 +69,7 @@ __kubectl_override_flags()
 
 __kubectl_get_namespaces()
 {
-    local template kubectl_out
-    template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
-    if kubectl_out=$(kubectl get -o template --template="${template}" namespace 2>/dev/null); then
-        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
-    fi
+    __kubectl_parse_get "namespace"
 }
 
 __kubectl_config_get_contexts()
