@@ -19,6 +19,7 @@ package gcp
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os/exec"
@@ -90,9 +91,11 @@ var execCommand = exec.Command
 // }
 //
 type gcpAuthProvider struct {
-	tokenSource oauth2.TokenSource
+	tokenSource restclient.BearerTokenSource
 	persister   restclient.AuthProviderConfigPersister
 }
+
+var _ restclient.BearerTokenSource = gcpAuthProvider{}.tokenSource
 
 func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
 	var ts oauth2.TokenSource
@@ -124,10 +127,14 @@ func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restcli
 }
 
 func (g *gcpAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
-	return &conditionalTransport{&oauth2.Transport{Source: g.tokenSource, Base: rt}, g.persister}
+	return &cleanConfigTransport{rt, g.persister}
 }
 
-func (g *gcpAuthProvider) Login() error { return nil }
+func (g *gcpAuthProvider) BearerTokenSource() restclient.BearerTokenSource {
+	return g.tokenSource
+}
+
+func (g *gcpAuthProvider) Login() error { return errors.New("not yet implemented") }
 
 type cachedTokenSource struct {
 	lk          sync.Mutex
@@ -155,14 +162,22 @@ func newCachedTokenSource(accessToken, expiry string, persister restclient.AuthP
 	}, nil
 }
 
-func (t *cachedTokenSource) Token() (*oauth2.Token, error) {
+func (t *cachedTokenSource) Token() (string, error) {
 	tok := t.cachedToken()
 	if tok.Valid() && !tok.Expiry.IsZero() {
-		return tok, nil
+		return tok.AccessToken, nil
 	}
+	_, err := t.Refresh()
+	if err != nil {
+		return "", err
+	}
+	tok = t.cachedToken()
+	return tok.AccessToken, nil
+}
+func (t *cachedTokenSource) Refresh() (bool, error) {
 	tok, err := t.source.Token()
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 	cache := t.update(tok)
 	if t.persister != nil {
@@ -170,7 +185,7 @@ func (t *cachedTokenSource) Token() (*oauth2.Token, error) {
 			glog.V(4).Infof("Failed to persist token: %v", err)
 		}
 	}
-	return tok, nil
+	return true, nil
 }
 
 func (t *cachedTokenSource) cachedToken() *oauth2.Token {
@@ -282,27 +297,21 @@ func parseJSONPath(input interface{}, name, template string) (string, error) {
 	return buf.String(), nil
 }
 
-type conditionalTransport struct {
-	oauthTransport *oauth2.Transport
-	persister      restclient.AuthProviderConfigPersister
+type cleanConfigTransport struct {
+	rt        http.RoundTripper
+	persister restclient.AuthProviderConfigPersister
 }
 
-func (t *conditionalTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if len(req.Header.Get("Authorization")) != 0 {
-		return t.oauthTransport.Base.RoundTrip(req)
-	}
-
-	res, err := t.oauthTransport.RoundTrip(req)
-
+func (t *cleanConfigTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	res, err := t.rt.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
 
-	if res.StatusCode == 401 {
+	if res.StatusCode == http.StatusUnauthorized {
 		glog.V(4).Infof("The credentials that were supplied are invalid for the target cluster")
 		emptyCache := make(map[string]string)
 		t.persister.Persist(emptyCache)
 	}
-
 	return res, nil
 }

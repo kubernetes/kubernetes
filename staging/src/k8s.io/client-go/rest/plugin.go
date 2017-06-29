@@ -33,6 +33,9 @@ type AuthProvider interface {
 	// Login allows the plugin to initialize its configuration. It must not
 	// require direct user interaction.
 	Login() error
+
+	// BearerTokenSource will return a BearerTokenSource from AuthProvider
+	BearerTokenSource() BearerTokenSource
 }
 
 // Factory generates an AuthProvider plugin.

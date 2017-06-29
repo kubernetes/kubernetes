@@ -28,13 +28,13 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/version"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/transport"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/flowcontrol"
 )
@@ -96,6 +96,9 @@ type Config struct {
 	// on top of the returned RoundTripper.
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
 
+	// BearerTokenSource will be used to get a token and refresh a new token.
+	BearerTokenSource BearerTokenSource
+
 	// QPS indicates the maximum QPS to the master from this client.
 	// If it's zero, the created RESTClient will use DefaultQPS: 5
 	QPS float32
@@ -113,6 +116,18 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+}
+
+// BearerTokenSource will be used to get a token and refresh a new token
+type BearerTokenSource interface {
+
+	// Token returns a bearer token for HTTP requests.
+	Token() (string, error)
+
+	// This will try to refresh a new token and bust the cache.
+	// Refresh can be called when the REST client experiences a
+	// 401, which implies that the token is invalid or has expired.
+	Refresh() (result bool, err error)
 }
 
 // ImpersonationConfig has all the available impersonation options
@@ -195,8 +210,11 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	transport, err := TransportFor(config)
+	cfg, err := config.TransportConfig()
+	if err != nil {
+		return nil, err
+	}
+	transport, err := transport.New(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -208,8 +226,9 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 			httpClient.Timeout = config.Timeout
 		}
 	}
-
-	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+	client, err := NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+	client.BearerTokenSource = cfg.BearerTokenSource
+	return client, err
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -224,7 +243,11 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	transport, err := TransportFor(config)
+	cfg, err := config.TransportConfig()
+	if err != nil {
+		return nil, err
+	}
+	transport, err := transport.New(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +266,9 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		versionConfig.GroupVersion = &v
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
+	client, err := NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
+	client.BearerTokenSource = cfg.BearerTokenSource
+	return client, err
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the
@@ -405,12 +430,13 @@ func AnonymousClientConfig(config *Config) *Config {
 			CAFile:     config.TLSClientConfig.CAFile,
 			CAData:     config.TLSClientConfig.CAData,
 		},
-		RateLimiter:   config.RateLimiter,
-		UserAgent:     config.UserAgent,
-		Transport:     config.Transport,
-		WrapTransport: config.WrapTransport,
-		QPS:           config.QPS,
-		Burst:         config.Burst,
-		Timeout:       config.Timeout,
+		RateLimiter:       config.RateLimiter,
+		UserAgent:         config.UserAgent,
+		Transport:         config.Transport,
+		WrapTransport:     config.WrapTransport,
+		QPS:               config.QPS,
+		Burst:             config.Burst,
+		Timeout:           config.Timeout,
+		BearerTokenSource: config.BearerTokenSource,
 	}
 }

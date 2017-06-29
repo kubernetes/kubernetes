@@ -173,46 +173,21 @@ type oidcAuthProvider struct {
 	persister restclient.AuthProviderConfigPersister
 }
 
+var _ restclient.BearerTokenSource = &oidcAuthProvider{}
+
 func (p *oidcAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
-	return &roundTripper{
-		wrapped:  rt,
-		provider: p,
-	}
+	return rt
 }
 
 func (p *oidcAuthProvider) Login() error {
 	return errors.New("not yet implemented")
 }
 
-type roundTripper struct {
-	provider *oidcAuthProvider
-	wrapped  http.RoundTripper
+func (p *oidcAuthProvider) BearerTokenSource() restclient.BearerTokenSource {
+	return p
 }
 
-func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if len(req.Header.Get("Authorization")) != 0 {
-		return r.wrapped.RoundTrip(req)
-	}
-	token, err := r.provider.idToken()
-	if err != nil {
-		return nil, err
-	}
-
-	// shallow copy of the struct
-	r2 := new(http.Request)
-	*r2 = *req
-	// deep copy of the Header so we don't modify the original
-	// request's Header (as per RoundTripper contract).
-	r2.Header = make(http.Header)
-	for k, s := range req.Header {
-		r2.Header[k] = s
-	}
-	r2.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-
-	return r.wrapped.RoundTrip(r2)
-}
-
-func (p *oidcAuthProvider) idToken() (string, error) {
+func (p *oidcAuthProvider) Token() (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -226,17 +201,26 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 			return idToken, nil
 		}
 	}
+	_, err := p.Refresh()
+	if err != nil {
+		return "", err
+	}
+	newToken, _ := p.cfg[cfgIDToken]
 
+	return newToken, nil
+}
+
+func (p *oidcAuthProvider) Refresh() (bool, error) {
 	// Try to request a new token using the refresh token.
 	rt, ok := p.cfg[cfgRefreshToken]
 	if !ok || len(rt) == 0 {
-		return "", errors.New("No valid id-token, and cannot refresh without refresh-token")
+		return false, errors.New("No valid id-token, and cannot refresh without refresh-token")
 	}
 
 	// Determine provider's OAuth2 token endpoint.
 	tokenURL, err := tokenEndpoint(p.client, p.cfg[cfgIssuerUrl])
 	if err != nil {
-		return "", err
+		return false, err
 	}
 
 	config := oauth2.Config{
@@ -248,12 +232,12 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, p.client)
 	token, err := config.TokenSource(ctx, &oauth2.Token{RefreshToken: rt}).Token()
 	if err != nil {
-		return "", fmt.Errorf("failed to refresh token: %v", err)
+		return false, fmt.Errorf("failed to refresh token: %v", err)
 	}
 
 	idToken, ok := token.Extra("id_token").(string)
 	if !ok {
-		return "", fmt.Errorf("token response did not contain an id_token")
+		return false, fmt.Errorf("token response did not contain an id_token")
 	}
 
 	// Create a new config to persist.
@@ -270,11 +254,10 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 
 	// Persist new config and if successful, update the in memory config.
 	if err = p.persister.Persist(newCfg); err != nil {
-		return "", fmt.Errorf("could not perist new tokens: %v", err)
+		return false, fmt.Errorf("could not perist new tokens: %v", err)
 	}
 	p.cfg = newCfg
-
-	return idToken, nil
+	return true, nil
 }
 
 // tokenEndpoint uses OpenID Connect discovery to determine the OAuth2 token

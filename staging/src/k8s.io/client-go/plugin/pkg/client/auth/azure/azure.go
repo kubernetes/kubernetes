@@ -88,12 +88,14 @@ func newAzureAuthProvider(_ string, cfg map[string]string, persister restclient.
 	cacheSource := newAzureTokenSource(ts, cache, cfg, persister)
 
 	return &azureAuthProvider{
-		tokenSource: cacheSource,
+		azureTokenSource: cacheSource,
 	}, nil
 }
 
+var _ restclient.BearerTokenSource = &azureAuthProvider{}
+
 type azureAuthProvider struct {
-	tokenSource tokenSource
+	azureTokenSource *azureTokenSource
 }
 
 func (p *azureAuthProvider) Login() error {
@@ -101,39 +103,31 @@ func (p *azureAuthProvider) Login() error {
 }
 
 func (p *azureAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
-	return &azureRoundTripper{
-		tokenSource:  p.tokenSource,
-		roundTripper: rt,
-	}
+	return rt
 }
 
-type azureRoundTripper struct {
-	tokenSource  tokenSource
-	roundTripper http.RoundTripper
+func (p *azureAuthProvider) BearerTokenSource() restclient.BearerTokenSource {
+	return p
 }
 
-func (r *azureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if len(req.Header.Get(authHeader)) != 0 {
-		return r.roundTripper.RoundTrip(req)
-	}
-
-	token, err := r.tokenSource.Token()
+func (p *azureAuthProvider) Token() (string, error) {
+	azureToken, err := p.azureTokenSource.Token()
 	if err != nil {
-		glog.Errorf("Failed to acquire a token: %v", err)
-		return nil, fmt.Errorf("acquiring a token for authorization header: %v", err)
+		return "", err
 	}
+	return azureToken.token.AccessToken, nil
+}
 
-	// clone the request in order to avoid modifying the headers of the original request
-	req2 := new(http.Request)
-	*req2 = *req
-	req2.Header = make(http.Header, len(req.Header))
-	for k, s := range req.Header {
-		req2.Header[k] = append([]string(nil), s...)
+func (p *azureAuthProvider) Refresh() (bool, error) {
+	azureToken, err := p.azureTokenSource.Token()
+	if err != nil {
+		return false, err
 	}
-
-	req2.Header.Set(authHeader, fmt.Sprintf("%s %s", tokenType, token.token.AccessToken))
-
-	return r.roundTripper.RoundTrip(req2)
+	_, err = p.azureTokenSource.refreshToken(azureToken)
+	if err != nil {
+		return false, err
+	}
+	return true, err
 }
 
 type azureToken struct {
@@ -155,7 +149,7 @@ type azureTokenSource struct {
 	persister restclient.AuthProviderConfigPersister
 }
 
-func newAzureTokenSource(source tokenSource, cache *azureTokenCache, cfg map[string]string, persister restclient.AuthProviderConfigPersister) tokenSource {
+func newAzureTokenSource(source tokenSource, cache *azureTokenCache, cfg map[string]string, persister restclient.AuthProviderConfigPersister) *azureTokenSource {
 	return &azureTokenSource{
 		source:    source,
 		cache:     cache,
