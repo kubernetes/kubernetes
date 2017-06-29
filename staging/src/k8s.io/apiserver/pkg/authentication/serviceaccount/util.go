@@ -59,8 +59,8 @@ func SplitUsername(username string) (string, string, error) {
 	return namespace, name, nil
 }
 
-// MakeGroupNames generates service account group names for the given namespace and ServiceAccount name
-func MakeGroupNames(namespace, name string) []string {
+// MakeGroupNames generates service account group names for the given namespace
+func MakeGroupNames(namespace string) []string {
 	return []string{
 		AllServiceAccountsGroup,
 		MakeNamespaceGroupName(namespace),
