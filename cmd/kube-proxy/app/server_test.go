@@ -195,6 +195,7 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 		assert.Nil(t, err, "unexpected error in NewProxyServer, addr: %s", addr)
 		assert.NotNil(t, proxyserver, "nil proxy server obj, addr: %s", addr)
 		assert.NotNil(t, proxyserver.IptInterface, "nil iptables intf, addr: %s", addr)
+		assert.True(t, proxyserver.CleanupAndExit, "false CleanupAndExit, addr: %s", addr)
 
 		// Clean up config for next test case
 		configz.Delete("componentconfig")
