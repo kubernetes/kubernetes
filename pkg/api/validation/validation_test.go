@@ -9463,6 +9463,14 @@ func TestValidateEndpoints(t *testing.T) {
 				},
 			},
 		},
+		"empty ports": {
+			ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+			Subsets: []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{{IP: "10.10.3.3"}},
+				},
+			},
+		},
 	}
 
 	for k, v := range successCases {
@@ -9500,17 +9508,6 @@ func TestValidateEndpoints(t *testing.T) {
 				Subsets: []api.EndpointSubset{
 					{
 						Ports: []api.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
-					},
-				},
-			},
-			errorType: "FieldValueRequired",
-		},
-		"empty ports": {
-			endpoints: api.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
-				Subsets: []api.EndpointSubset{
-					{
-						Addresses: []api.EndpointAddress{{IP: "10.10.3.3"}},
 					},
 				},
 			},
