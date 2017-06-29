@@ -96,11 +96,11 @@ func TestGKESigner(t *testing.T) {
 
 		data := struct{ Server string }{server.httpserver.URL}
 
-		if err := tmpl.Execute(kubeConfig, data); err != nil {
+		if err = tmpl.Execute(kubeConfig, data); err != nil {
 			t.Fatalf("error executing kubeconfig template: %v", err)
 		}
 
-		if err := kubeConfig.Close(); err != nil {
+		if err = kubeConfig.Close(); err != nil {
 			t.Fatalf("error closing kubeconfig template: %v", err)
 		}
 

@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 )
 
+// OutDir return the string of path which is directory and error
 func OutDir(path string) (string, error) {
 	outDir, err := filepath.Abs(path)
 	if err != nil {
@@ -34,7 +35,7 @@ func OutDir(path string) (string, error) {
 	}
 
 	if !stat.IsDir() {
-		return "", fmt.Errorf("output directory %s is not a directory\n", outDir)
+		return "", fmt.Errorf("output directory %s is not a directory", outDir)
 	}
 	outDir = outDir + "/"
 	return outDir, nil

@@ -23,7 +23,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-// Create a Server that implements the kubectl command
+// NewKubectlServer creates a Server that implements the kubectl command
 func NewKubectlServer() *Server {
 	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
 	localFlags := cmd.LocalFlags()
