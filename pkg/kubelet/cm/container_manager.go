@@ -60,6 +60,9 @@ type ContainerManager interface {
 	// GetNodeAllocatable returns the amount of compute resources that have to be reserved from scheduling.
 	GetNodeAllocatableReservation() v1.ResourceList
 
+	// GetCapacity returns the amount of compute resources tracked by container manager available on the node.
+	GetCapacity() v1.ResourceList
+
 	// UpdateQOSCgroups performs housekeeping updates to ensure that the top
 	// level QoS containers have their desired state in a thread-safe way
 	UpdateQOSCgroups() error
