@@ -29,14 +29,14 @@ func TestServiceBasicGenerate(t *testing.T) {
 	tests := []struct {
 		name        string
 		serviceType api.ServiceType
-		tcp         []string
+		ports       []string
 		clusterip   string
 		expected    *api.Service
 		expectErr   bool
 	}{
 		{
 			name:        "clusterip-ok",
-			tcp:         []string{"456", "321:908"},
+			ports:       []string{"tcp:456", "tcp:321:908"},
 			clusterip:   "",
 			serviceType: api.ServiceTypeClusterIP,
 			expected: &api.Service{
@@ -59,21 +59,21 @@ func TestServiceBasicGenerate(t *testing.T) {
 		},
 		{
 			name:        "clusterip-none and port mapping",
-			tcp:         []string{"456:9898"},
+			ports:       []string{"tcp:456:9898"},
 			clusterip:   "None",
 			serviceType: api.ServiceTypeClusterIP,
 			expectErr:   true,
 		},
 		{
 			name:        "clusterip-none-wrong-type",
-			tcp:         []string{},
+			ports:       []string{},
 			clusterip:   "None",
 			serviceType: api.ServiceTypeNodePort,
 			expectErr:   true,
 		},
 		{
 			name:        "clusterip-none-ok",
-			tcp:         []string{},
+			ports:       []string{},
 			clusterip:   "None",
 			serviceType: api.ServiceTypeClusterIP,
 			expected: &api.Service{
@@ -90,7 +90,7 @@ func TestServiceBasicGenerate(t *testing.T) {
 		},
 		{
 			name:        "loadbalancer-ok",
-			tcp:         []string{"456:9898"},
+			ports:       []string{"tcp:456:9898"},
 			clusterip:   "",
 			serviceType: api.ServiceTypeLoadBalancer,
 			expected: &api.Service{
@@ -112,7 +112,7 @@ func TestServiceBasicGenerate(t *testing.T) {
 	for _, test := range tests {
 		generator := ServiceCommonGeneratorV1{
 			Name:      test.name,
-			TCP:       test.tcp,
+			Ports:     test.ports,
 			Type:      test.serviceType,
 			ClusterIP: test.clusterip,
 		}
