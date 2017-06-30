@@ -170,14 +170,16 @@ func LogRequestPatch(ae *audit.Event, patch []byte) {
 // LogResponseObject fills in the response object into an audit event. The passed runtime.Object
 // will be converted to the given gv.
 func LogResponseObject(ae *audit.Event, obj runtime.Object, gv schema.GroupVersion, s runtime.NegotiatedSerializer) {
-	if ae == nil || ae.Level.Less(audit.LevelRequestResponse) {
+	if ae == nil || ae.Level.Less(audit.LevelMetadata) {
 		return
 	}
-
 	if status, ok := obj.(*metav1.Status); ok {
 		ae.ResponseStatus = status
 	}
 
+	if ae.Level.Less(audit.LevelRequestResponse) {
+		return
+	}
 	// TODO(audit): hook into the serializer to avoid double conversion
 	var err error
 	ae.ResponseObject, err = encodeObject(obj, gv, s)
