@@ -20,8 +20,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -229,7 +229,7 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 		return err
 	}
 
-	url := h.extenderURL + "/" + action
+	url := strings.TrimRight(h.extenderURL, "/") + "/" + action
 
 	req, err := http.NewRequest("POST", url, bytes.NewReader(out))
 	if err != nil {
@@ -242,19 +242,11 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Failed %v with extender at URL %v, code %v", action, h.extenderURL, resp.StatusCode)
 	}
 
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	if err := json.Unmarshal(body, result); err != nil {
-		return err
-	}
-	return nil
+	return json.NewDecoder(resp.Body).Decode(result)
 }
