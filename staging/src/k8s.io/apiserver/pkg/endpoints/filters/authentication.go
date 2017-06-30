@@ -99,19 +99,35 @@ func unauthorized(w http.ResponseWriter, req *http.Request) {
 // authorized_user_requests metric, and to avoid pushing actual usernames in the
 // metric.
 func compressUsername(username string) string {
-	switch {
-	// Known internal identities.
-	case username == "admin" ||
-		username == "client" ||
-		username == "kube_proxy" ||
-		username == "kubelet" ||
-		username == "system:serviceaccount:kube-system:default":
+	switch username {
+	// Known internal identities
+	case "admin",
+		"client",
+		"kube_proxy",        // version < 1.6
+		"system:kube-proxy", // version >= 1.6
+		"kubelet",
+		"system:kube-controller-manager",
+		"system:kube-scheduler",
+		"system:apiserver",
+		"system:anonymous":
 		return username
-	// Probably an email address.
-	case strings.Contains(username, "@"):
-		return "email_id"
-	// Anything else (custom service accounts, custom external identities, etc.)
-	default:
-		return "other"
 	}
+
+	// System daemons.
+	if strings.HasPrefix(username, "system:serviceaccount:kube-system:") {
+		return username
+	}
+
+	// Probably an email address.
+	if strings.Contains(username, "@") {
+		return "email_id"
+	}
+
+	// Compress non kube-system service accounts.
+	if strings.HasPrefix(username, "system:serviceaccount:") {
+		return "system:serviceaccount"
+	}
+
+	// Anything else (custom external identities, etc.)
+	return "other"
 }
