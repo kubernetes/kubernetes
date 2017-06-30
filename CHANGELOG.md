@@ -873,6 +873,8 @@ API fields previously capable of storing and returning either `[]` and `null` vi
 can now store only `null` when created using the protobuf content-type or stored in etcd using protobuf serialization (the default in 1.6).
 JSON API clients should tolerate `null` values for such fields, and treat `null` and `[]` as equivalent in meaning unless specifically documented otherwise for a particular field. ([#44593](https://github.com/kubernetes/kubernetes/pull/44593))
 
+* Local volume source paths that are directories and not mount points fail to unmount.  A fix is in process ([#48331](https://github.com/kubernetes/kubernetes/issues/48331)).
+
 ## **Deprecations**
 
 ### Cluster provisioning scripts
