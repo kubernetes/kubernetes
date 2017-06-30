@@ -124,7 +124,12 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 
 			By("should have correct firewall rule for ingress")
 			fw := gceController.GetFirewallRule()
-			expFw := jig.ConstructFirewallForIngress(gceController, cloudConfig.NodeTag)
+			nodeTags := []string{cloudConfig.NodeTag}
+			if framework.TestContext.Provider != "gce" {
+				// nodeTags would be different in GKE.
+				nodeTags = framework.GetNodeTags(jig.Client, cloudConfig)
+			}
+			expFw := jig.ConstructFirewallForIngress(gceController, nodeTags)
 			// Passed the last argument as `true` to verify the backend ports is a subset
 			// of the allowed ports in firewall rule, given there may be other existing
 			// ingress resources and backends we are not aware of.
