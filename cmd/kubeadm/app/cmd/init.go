@@ -51,8 +51,7 @@ var (
 		To start using your cluster, you need to run (as a regular user):
 
 		  mkdir -p $HOME/.kube
-		  sudo cp -i {{.KubeConfigPath}} $HOME/.kube/config
-		  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+		  sudo cat {{.KubeConfigPath}} | tee $HOME/.kube/config
 
 		You should now deploy a pod network to the cluster.
 		Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
