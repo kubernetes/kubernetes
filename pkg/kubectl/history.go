@@ -86,6 +86,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 	}
 
 	historyInfo := make(map[int64]*v1.PodTemplateSpec)
+	revisionTime := make(map[int64]string)
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
@@ -99,6 +100,10 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		if len(changeCause) > 0 {
 			historyInfo[v].Annotations[ChangeCauseAnnotation] = changeCause
 		}
+
+		if rs.Annotations != nil {
+			revisionTime[v] = rs.Annotations[deploymentutil.RevisionTimeAnnotation]
+		}
 	}
 
 	if len(historyInfo) == 0 {
@@ -111,7 +116,16 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		if !ok {
 			return "", fmt.Errorf("unable to find the specified revision")
 		}
-		return printTemplate(template)
+
+		templateString, err := printTemplate(template)
+		if err != nil {
+			return "", err
+		}
+
+		if len(revisionTime[revision]) > 0 {
+			return "Revision Time:\t" + revisionTime[revision] + "\n" + templateString, nil
+		}
+		return templateString, nil
 	}
 
 	// Sort the revisionToChangeCause map by revision

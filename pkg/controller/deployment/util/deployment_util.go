@@ -50,6 +50,8 @@ const (
 	RevisionAnnotation = "deployment.kubernetes.io/revision"
 	// RevisionHistoryAnnotation maintains the history of all old revisions that a replica set has served for a deployment.
 	RevisionHistoryAnnotation = "deployment.kubernetes.io/revision-history"
+	// RevisionTimeAnnotation records the time of when the revision starts
+	RevisionTimeAnnotation = "deployment.kubernetes.io/revision-time"
 	// DesiredReplicasAnnotation is the desired replicas for a deployment recorded as an annotation
 	// in its replica sets. Helps in separating scaling events from the rollout process and for
 	// determining if the new replica set for a deployment is really saturated.
@@ -270,9 +272,15 @@ func SetNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *exten
 			oldRevisions = append(oldRevisions, oldRevision)
 			newRS.Annotations[RevisionHistoryAnnotation] = strings.Join(oldRevisions, ",")
 		}
+
+		// For existing RS, need to update the revision time.
+		newRS.Annotations[RevisionTimeAnnotation] = time.Now().Format(time.RFC1123Z)
 	}
 	// If the new replica set is about to be created, we need to add replica annotations to it.
-	if !exists && SetReplicasAnnotations(newRS, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+MaxSurge(*deployment)) {
+	if !exists {
+		// For new RS, create RevisionTimeAnnotation to record the revision time.
+		newRS.Annotations[RevisionTimeAnnotation] = time.Now().Format(time.RFC1123Z)
+		SetReplicasAnnotations(newRS, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+MaxSurge(*deployment))
 		annotationChanged = true
 	}
 	return annotationChanged
@@ -282,6 +290,7 @@ var annotationsToSkip = map[string]bool{
 	v1.LastAppliedConfigAnnotation: true,
 	RevisionAnnotation:             true,
 	RevisionHistoryAnnotation:      true,
+	RevisionTimeAnnotation:         true,
 	DesiredReplicasAnnotation:      true,
 	MaxReplicasAnnotation:          true,
 }
