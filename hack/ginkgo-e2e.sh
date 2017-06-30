@@ -157,6 +157,7 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \
   ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \
+  ${CLUSTER_IP_RANGE:+"--cluster-ip-range=${CLUSTER_IP_RANGE}"} \
   ${E2E_CLEAN_START:+"--clean-start=true"} \
   ${E2E_MIN_STARTUP_PODS:+"--minStartupPods=${E2E_MIN_STARTUP_PODS}"} \
   ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \

@@ -141,21 +141,12 @@ func GetClusterName(instancePrefix string) string {
 	return instancePrefix
 }
 
-// GetClusterIpRange returns the CLUSTER_IP_RANGE env we set for e2e cluster.
-//
-// Warning: this MUST be consistent with the CLUSTER_IP_RANGE set in
-// gce/config-test.sh.
-func GetClusterIpRange() string {
-	return "10.100.0.0/14"
-}
-
 // GetE2eFirewalls returns all firewall rules we create for an e2e cluster.
 // From cluster/gce/util.sh, all firewall rules should be consistent with the ones created by startup scripts.
-func GetE2eFirewalls(masterName, masterTag, nodeTag, network string) []*compute.Firewall {
+func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIpRange string) []*compute.Firewall {
 	instancePrefix, err := GetInstancePrefix(masterName)
 	Expect(err).NotTo(HaveOccurred())
 	clusterName := GetClusterName(instancePrefix)
-	clusterIpRange := GetClusterIpRange()
 
 	fws := []*compute.Firewall{}
 	fws = append(fws, &compute.Firewall{
