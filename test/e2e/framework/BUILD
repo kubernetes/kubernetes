@@ -17,6 +17,7 @@ go_library(
         "exec_util.go",
         "federation_util.go",
         "framework.go",
+        "google_compute.go",
         "gobindata_util.go",
         "kubelet_stats.go",
         "log_size_monitoring.go",
