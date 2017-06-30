@@ -25,10 +25,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -244,51 +242,6 @@ func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, sear
 	return nameservers, searches, nil
 }
 
-// cleanupBandwidthLimits updates the status of bandwidth-limited containers
-// and ensures that only the appropriate CIDRs are active on the node.
-func (kl *Kubelet) cleanupBandwidthLimits(allPods []*v1.Pod) error {
-	if kl.shaper == nil {
-		return nil
-	}
-	currentCIDRs, err := kl.shaper.GetCIDRs()
-	if err != nil {
-		return err
-	}
-	possibleCIDRs := sets.String{}
-	for ix := range allPods {
-		pod := allPods[ix]
-		ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
-		if err != nil {
-			return err
-		}
-		if ingress == nil && egress == nil {
-			glog.V(8).Infof("Not a bandwidth limited container...")
-			continue
-		}
-		status, found := kl.statusManager.GetPodStatus(pod.UID)
-		if !found {
-			// TODO(random-liu): Cleanup status get functions. (issue #20477)
-			s, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
-			if err != nil {
-				return err
-			}
-			status = kl.generateAPIPodStatus(pod, s)
-		}
-		if status.Phase == v1.PodRunning {
-			possibleCIDRs.Insert(fmt.Sprintf("%s/32", status.PodIP))
-		}
-	}
-	for _, cidr := range currentCIDRs {
-		if !possibleCIDRs.Has(cidr) {
-			glog.V(2).Infof("Removing CIDR: %s (%v)", cidr, possibleCIDRs)
-			if err := kl.shaper.Reset(cidr); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 // syncNetworkStatus updates the network state
 func (kl *Kubelet) syncNetworkStatus() {
 	// For cri integration, network state will be updated in updateRuntimeUp,
@@ -325,25 +278,6 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 
 	glog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
 	kl.runtimeState.setPodCIDR(cidr)
-}
-
-// shapingEnabled returns whether traffic shaping is enabled.
-func (kl *Kubelet) shapingEnabled() bool {
-	// Disable shaping if a network plugin is defined and supports shaping
-	if kl.networkPlugin != nil && kl.networkPlugin.Capabilities().Has(network.NET_PLUGIN_CAPABILITY_SHAPING) {
-		return false
-	}
-	// This is not strictly true but we need to figure out how to handle
-	// bandwidth shaping anyway. If the kubelet doesn't have a networkPlugin,
-	// it could mean:
-	// a. the kubelet is responsible for bandwidth shaping
-	// b. the kubelet is using cri, and the cri has a network plugin
-	// Today, the only plugin that understands bandwidth shaping is kubenet, and
-	// it doesn't support bandwidth shaping when invoked through cri, so it
-	// effectively boils down to letting the kubelet decide how to handle
-	// shaping annotations. The combination of (cri + network plugin that
-	// handles bandwidth shaping) may not work because of this.
-	return true
 }
 
 // syncNetworkUtil ensures the network utility are present on host.

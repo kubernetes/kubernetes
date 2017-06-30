@@ -102,7 +102,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/security/apparmor"
-	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
@@ -1027,10 +1026,6 @@ type Kubelet struct {
 	// clusterDomain and clusterDNS.
 	resolverConfig string
 
-	// Optionally shape the bandwidth of a pod
-	// TODO: remove when kubenet plugin is ready
-	shaper bandwidth.BandwidthShaper
-
 	// Information about the ports which are opened by daemons on Node running this Kubelet server.
 	daemonEndpoints *v1.NodeDaemonEndpoints
 
@@ -1630,28 +1625,6 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		return err
-	}
-
-	// early successful exit if pod is not bandwidth-constrained
-	if !kl.shapingEnabled() {
-		return nil
-	}
-
-	// Update the traffic shaping for the pod's ingress and egress limits
-	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
-	if err != nil {
-		return err
-	}
-	if egress != nil || ingress != nil {
-		if kubecontainer.IsHostNetworkPod(pod) {
-			kl.recorder.Event(pod, v1.EventTypeWarning, events.HostNetworkNotSupported, "Bandwidth shaping is not currently supported on the host network")
-		} else if kl.shaper != nil {
-			if len(apiPodStatus.PodIP) > 0 {
-				err = kl.shaper.ReconcileCIDR(fmt.Sprintf("%s/32", apiPodStatus.PodIP), egress, ingress)
-			}
-		} else {
-			kl.recorder.Event(pod, v1.EventTypeWarning, events.UndefinedShaper, "Pod requests bandwidth shaping, but the shaper is undefined")
-		}
 	}
 
 	return nil
