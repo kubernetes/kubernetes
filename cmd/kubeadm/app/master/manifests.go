@@ -34,7 +34,6 @@ import (
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -48,14 +47,9 @@ const (
 	defaultv17AdmissionControl = "Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota"
 
 	etcd                  = "etcd"
-	apiServer             = "apiserver"
-	controllerManager     = "controller-manager"
-	scheduler             = "scheduler"
-	proxy                 = "proxy"
 	kubeAPIServer         = "kube-apiserver"
 	kubeControllerManager = "kube-controller-manager"
 	kubeScheduler         = "kube-scheduler"
-	kubeProxy             = "kube-proxy"
 )
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
@@ -313,22 +307,7 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 	}
 }
 
-func getComponentBaseCommand(component string) []string {
-	if kubeadmapi.GlobalEnvParams.HyperkubeImage != "" {
-		return []string{"/hyperkube", component}
-	}
-
-	return []string{"kube-" + component}
-}
-
 func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k8sVersion *version.Version) []string {
-	var command []string
-
-	// self-hosted apiserver needs to wait on a lock
-	if selfHosted {
-		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
-	}
-
 	defaultArguments := map[string]string{
 		"insecure-port":                     "0",
 		"admission-control":                 defaultv17AdmissionControl,
@@ -350,14 +329,11 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 		"requestheader-extra-headers-prefix": "X-Remote-Extra-",
 		"requestheader-client-ca-file":       filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName),
 		"requestheader-allowed-names":        "front-proxy-client",
-	}
-	if k8sVersion.AtLeast(kubeadmconstants.MinimumAPIAggregationVersion) {
-		// add options which allow the kube-apiserver to act as a front-proxy to aggregated API servers
-		defaultArguments["proxy-client-cert-file"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientCertName)
-		defaultArguments["proxy-client-key-file"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName)
+		"proxy-client-cert-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientCertName),
+		"proxy-client-key-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName),
 	}
 
-	command = getComponentBaseCommand(apiServer)
+	command := []string{"kube-apiserver"}
 	command = append(command, getExtraParameters(cfg.APIServerExtraArgs, defaultArguments)...)
 	command = append(command, getAuthzParameters(cfg.AuthorizationModes)...)
 
@@ -397,28 +373,18 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 }
 
 func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
-	var command []string
-
 	defaultArguments := map[string]string{
 		"listen-client-urls":    "http://127.0.0.1:2379",
 		"advertise-client-urls": "http://127.0.0.1:2379",
 		"data-dir":              cfg.Etcd.DataDir,
 	}
 
-	command = append(command, "etcd")
+	command := []string{"etcd"}
 	command = append(command, getExtraParameters(cfg.Etcd.ExtraArgs, defaultArguments)...)
-
 	return command
 }
 
 func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k8sVersion *version.Version) []string {
-	var command []string
-
-	// self-hosted controller-manager needs to wait on a lock
-	if selfHosted {
-		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/controller-manager.lock"}
-	}
-
 	defaultArguments := map[string]string{
 		"address":                          "127.0.0.1",
 		"leader-elect":                     "true",
@@ -430,13 +396,8 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 		"use-service-account-credentials":  "true",
 		"controllers":                      "*,bootstrapsigner,tokencleaner",
 	}
-	if k8sVersion.LessThan(kubeadmconstants.MinimumCSRSARApproverVersion) {
-		// enable the former CSR group approver for v1.6 clusters.
-		// TODO(luxas): Remove this once we're targeting v1.8 at HEAD
-		defaultArguments["insecure-experimental-approve-all-kubelet-csrs-for-group"] = bootstrapapi.BootstrapGroup
-	}
 
-	command = getComponentBaseCommand(controllerManager)
+	command := []string{"kube-controller-manager"}
 	command = append(command, getExtraParameters(cfg.ControllerManagerExtraArgs, defaultArguments)...)
 
 	if cfg.CloudProvider != "" {
@@ -453,27 +414,18 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 	if cfg.Networking.PodSubnet != "" {
 		command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+cfg.Networking.PodSubnet)
 	}
-
 	return command
 }
 
 func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
-	var command []string
-
-	// self-hosted apiserver needs to wait on a lock
-	if selfHosted {
-		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
-	}
-
 	defaultArguments := map[string]string{
 		"address":      "127.0.0.1",
 		"leader-elect": "true",
 		"kubeconfig":   filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
 	}
 
-	command = getComponentBaseCommand(scheduler)
+	command := []string{"kube-scheduler"}
 	command = append(command, getExtraParameters(cfg.SchedulerExtraArgs, defaultArguments)...)
-
 	return command
 }
 
