@@ -376,7 +376,6 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1alpha1.Table
 			reason = fmt.Sprintf("Init:%d/%d", i, len(pod.Spec.InitContainers))
 			initializing = true
 		}
-		break
 	}
 	if !initializing {
 		restarts = 0
