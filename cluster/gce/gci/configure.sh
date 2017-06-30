@@ -127,6 +127,7 @@ function install-gci-mounter-tools {
   tar xvf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
   rm /tmp/mounter.tar
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs/var/lib/kubelet"
+  cp /etc/resolv.conf "${CONTAINERIZED_MOUNTER_HOME}/rootfs/etc/"
 }
 
 # Install node problem detector binary.
