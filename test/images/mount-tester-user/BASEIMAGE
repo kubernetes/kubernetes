@@ -1,5 +1,0 @@
-amd64=gcr.io/google_containers/mounttest-amd64:0.9
-arm=gcr.io/google_containers/mounttest-arm:0.9
-arm64=gcr.io/google_containers/mounttest-arm64:0.9
-ppc64le=gcr.io/google_containers/mounttest-ppc64le:0.9
-s390x=gcr.io/google_containers/mounttest-s390x:0.9

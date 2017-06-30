@@ -63,8 +63,6 @@ build() {
     pushd ${temp_dir}
     # image tag
     TAG=$(<VERSION)
-    # image name
-    IMAGENAME=$(<NAME)
 
     if [[ -f BASEIMAGE ]]; then
       BASEIMAGE=$(getBaseImage ${arch})
@@ -84,12 +82,8 @@ build() {
       fi
     fi
 
-    docker build --pull -t ${REGISTRY}/${IMAGENAME}-${arch}:${TAG} .
+    docker build --pull -t ${REGISTRY}/${IMAGE}-${arch}:${TAG} .
 
-    # Image without any arch postfix will point to amd64 by default.
-    if [[ "${arch}" == "amd64" ]]; then
-      docker tag ${REGISTRY}/${IMAGENAME}-${arch}:${TAG} ${REGISTRY}/${IMAGENAME}:${TAG}
-    fi
     popd
   done
 }
@@ -102,12 +96,8 @@ push() {
     archs=${!QEMUARCHS[@]}
   fi
   for arch in ${archs}; do
-    IMAGENAME=$(<${IMAGE}/NAME)
     TAG=$(<${IMAGE}/VERSION)
-    gcloud docker -- push ${REGISTRY}/${IMAGENAME}-${arch}:${TAG}
-    if [[ "${arch}" == "amd64" ]]; then
-      gcloud docker -- push ${REGISTRY}/${IMAGENAME}:${TAG}
-    fi
+    gcloud docker -- push ${REGISTRY}/${IMAGE}-${arch}:${TAG}
   done
 }
 

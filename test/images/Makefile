@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-REGISTRY ?= gcr.io/k8s-e2e-images
+REGISTRY ?= gcr.io/kubernetes-e2e-test-images
 GOARM=7
 QEMUVERSION=v2.7.0
 GOLANG_VERSION=1.8.3

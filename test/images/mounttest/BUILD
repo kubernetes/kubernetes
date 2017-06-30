@@ -8,12 +8,6 @@ load(
     "go_library",
 )
 
-go_binary(
-    name = "mount-tester",
-    library = ":go_default_library",
-    tags = ["automanaged"],
-)
-
 go_library(
     name = "go_default_library",
     srcs = ["mt.go"],
@@ -30,5 +24,11 @@ filegroup(
 filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
+    tags = ["automanaged"],
+)
+
+go_binary(
+    name = "mounttest",
+    library = ":go_default_library",
     tags = ["automanaged"],
 )

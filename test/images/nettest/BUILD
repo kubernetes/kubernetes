@@ -8,12 +8,6 @@ load(
     "go_library",
 )
 
-go_binary(
-    name = "network-tester",
-    library = ":go_default_library",
-    tags = ["automanaged"],
-)
-
 go_library(
     name = "go_default_library",
     srcs = ["nettest.go"],
@@ -36,5 +30,11 @@ filegroup(
 filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
+    tags = ["automanaged"],
+)
+
+go_binary(
+    name = "nettest",
+    library = ":go_default_library",
     tags = ["automanaged"],
 )
