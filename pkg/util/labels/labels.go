@@ -21,32 +21,30 @@ import (
 )
 
 // Clones the given map and returns a new map with the given key and value added.
-// Returns the given map, if labelKey is empty.
 func CloneAndAddLabel(labels map[string]string, labelKey, labelValue string) map[string]string {
-	if labelKey == "" {
-		// Don't need to add a label.
-		return labels
-	}
 	// Clone.
 	newLabels := map[string]string{}
 	for key, value := range labels {
 		newLabels[key] = value
+	}
+	if labelKey == "" {
+		// Don't need to add a label.
+		return newLabels
 	}
 	newLabels[labelKey] = labelValue
 	return newLabels
 }
 
 // CloneAndRemoveLabel clones the given map and returns a new map with the given key removed.
-// Returns the given map, if labelKey is empty.
 func CloneAndRemoveLabel(labels map[string]string, labelKey string) map[string]string {
-	if labelKey == "" {
-		// Don't need to add a label.
-		return labels
-	}
 	// Clone.
 	newLabels := map[string]string{}
 	for key, value := range labels {
 		newLabels[key] = value
+	}
+	if labelKey == "" {
+		// Don't need to remove a label.
+		return newLabels
 	}
 	delete(newLabels, labelKey)
 	return newLabels
