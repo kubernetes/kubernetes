@@ -148,7 +148,7 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 			clientBuilder = rootClientBuilder
 		}
 
-		err := StartControllers(s, kubeconfig, rootClientBuilder, clientBuilder, stop, recorder, cloud)
+		err = StartControllers(s, kubeconfig, rootClientBuilder, clientBuilder, stop, recorder, cloud)
 		glog.Fatalf("error running controllers: %v", err)
 		panic("unreachable")
 	}
