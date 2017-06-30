@@ -763,9 +763,13 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			}
 			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
 			monitorID = monitor.ID
+		} else if lbaas.opts.CreateMonitor == false {
+			glog.V(4).Infof("Do not create monitor for pool %s when create-monitor is false", pool.ID)
 		}
 
-		glog.V(4).Infof("Monitor for pool %s: %s", pool.ID, monitorID)
+		if monitorID != "" {
+			glog.V(4).Infof("Monitor for pool %s: %s", pool.ID, monitorID)
+		}
 	}
 
 	// All remaining listeners are obsolete, delete
@@ -1106,7 +1110,10 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 			return fmt.Errorf("Error getting pool for listener %s: %v", listener.ID, err)
 		}
 		poolIDs = append(poolIDs, pool.ID)
-		monitorIDs = append(monitorIDs, pool.MonitorID)
+		// If create-monitor of cloud-config is false, pool has not monitor.
+		if pool.MonitorID != "" {
+			monitorIDs = append(monitorIDs, pool.MonitorID)
+		}
 	}
 
 	// get all members associated with each poolIDs
