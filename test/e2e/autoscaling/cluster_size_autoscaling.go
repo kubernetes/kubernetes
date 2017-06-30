@@ -59,11 +59,14 @@ const (
 	nodesRecoverTimeout    = 5 * time.Minute
 	rcCreationRetryTimeout = 4 * time.Minute
 	rcCreationRetryDelay   = 20 * time.Second
+	makeSchedulableTimeout = 10 * time.Minute
+	makeSchedulableDelay   = 20 * time.Second
 
 	gkeEndpoint      = "https://test-container.sandbox.googleapis.com"
 	gkeUpdateTimeout = 15 * time.Minute
 
 	disabledTaint             = "DisabledForAutoscalingTest"
+	criticalAddonsOnlyTaint   = "CriticalAddonsOnly"
 	newNodesForScaledownTests = 2
 	unhealthyClusterThreshold = 4
 
@@ -126,9 +129,22 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(framework.WaitForClusterSize(c, expectedNodes, scaleDownTimeout))
 		nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
-		for _, n := range nodes.Items {
-			framework.ExpectNoError(makeNodeSchedulable(c, &n))
+
+		s := time.Now()
+	makeSchedulableLoop:
+		for start := time.Now(); time.Since(start) < makeSchedulableTimeout; time.Sleep(makeSchedulableDelay) {
+			for _, n := range nodes.Items {
+				err = makeNodeSchedulable(c, &n, true)
+				switch err.(type) {
+				case CriticalAddonsOnlyError:
+					continue makeSchedulableLoop
+				default:
+					framework.ExpectNoError(err)
+				}
+			}
+			break
 		}
+		glog.Infof("Made nodes schedulable again in %v", time.Now().Sub(s).String())
 	})
 
 	It("shouldn't increase cluster size if pending pod is too large [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -574,7 +590,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 			err = makeNodeUnschedulable(f.ClientSet, &node)
 
 			defer func(n v1.Node) {
-				makeNodeSchedulable(f.ClientSet, &n)
+				makeNodeSchedulable(f.ClientSet, &n, false)
 			}(node)
 			framework.ExpectNoError(err)
 		}
@@ -1012,7 +1028,13 @@ func makeNodeUnschedulable(c clientset.Interface, node *v1.Node) error {
 	return fmt.Errorf("Failed to taint node in allowed number of retries")
 }
 
-func makeNodeSchedulable(c clientset.Interface, node *v1.Node) error {
+type CriticalAddonsOnlyError struct{}
+
+func (_ CriticalAddonsOnlyError) Error() string {
+	return fmt.Sprintf("CriticalAddonsOnly taint found on node")
+}
+
+func makeNodeSchedulable(c clientset.Interface, node *v1.Node, failOnCriticalAddonsOnly bool) error {
 	By(fmt.Sprintf("Remove taint from node %s", node.Name))
 	for j := 0; j < 3; j++ {
 		freshNode, err := c.Core().Nodes().Get(node.Name, metav1.GetOptions{})
@@ -1021,6 +1043,9 @@ func makeNodeSchedulable(c clientset.Interface, node *v1.Node) error {
 		}
 		newTaints := make([]v1.Taint, 0)
 		for _, taint := range freshNode.Spec.Taints {
+			if failOnCriticalAddonsOnly && taint.Key == criticalAddonsOnlyTaint {
+				return CriticalAddonsOnlyError{}
+			}
 			if taint.Key != disabledTaint {
 				newTaints = append(newTaints, taint)
 			}
@@ -1143,7 +1168,7 @@ func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, namespa
 		err := makeNodeUnschedulable(f.ClientSet, &node)
 
 		defer func(n v1.Node) {
-			makeNodeSchedulable(f.ClientSet, &n)
+			makeNodeSchedulable(f.ClientSet, &n, false)
 		}(node)
 
 		if err != nil {
@@ -1169,7 +1194,7 @@ func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, namespa
 		return err
 	}
 	for i, node := range nodes {
-		err = makeNodeSchedulable(f.ClientSet, &node)
+		err = makeNodeSchedulable(f.ClientSet, &node, false)
 		if err != nil {
 			return err
 		}
