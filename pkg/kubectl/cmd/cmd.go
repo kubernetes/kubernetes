@@ -188,7 +188,7 @@ __custom_func() {
             __kubectl_get_resource_node
             return
             ;;
-        kubectl_config_use-context)
+        kubectl_config_use-context | kubectl_config_rename-context)
             __kubectl_config_get_contexts
             return
             ;;
