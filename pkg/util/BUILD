@@ -47,7 +47,6 @@ filegroup(
         "//pkg/util/bandwidth:all-srcs",
         "//pkg/util/config:all-srcs",
         "//pkg/util/configz:all-srcs",
-        "//pkg/util/crlf:all-srcs",
         "//pkg/util/dbus:all-srcs",
         "//pkg/util/ebtables:all-srcs",
         "//pkg/util/env:all-srcs",
