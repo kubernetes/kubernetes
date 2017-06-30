@@ -105,7 +105,7 @@ func createRoles(clientset *clientset.Clientset) error {
 				Namespace: metav1.NamespacePublic,
 			},
 			Rules: []rbac.PolicyRule{
-				rbac.NewRule("get").Groups("").Resources("configmaps").RuleOrDie(),
+				rbac.NewRule("get").Groups("").Resources("configmaps").Names("cluster-info").RuleOrDie(),
 			},
 		},
 	}
