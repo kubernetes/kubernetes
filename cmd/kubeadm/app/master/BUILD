@@ -22,7 +22,6 @@ go_library(
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/images:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
-        "//pkg/bootstrap/api:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubelet/types:go_default_library",
