@@ -482,8 +482,8 @@ func (u *Unstructured) SetInitializers(initializers *metav1.Initializers) {
 		setNestedField(u.Object, nil, "metadata", "initializers")
 		return
 	}
-	out := make(map[string]interface{})
-	if err := converter.ToUnstructured(initializers, &out); err != nil {
+	out, err := converter.ToUnstructured(initializers)
+	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
 	}
 	setNestedField(u.Object, out, "metadata", "initializers")

@@ -694,8 +694,8 @@ func patchResource(
 					return nil, err
 				}
 				// Capture the original object map and patch for possible retries.
-				originalMap := make(map[string]interface{})
-				if err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject, &originalMap); err != nil {
+				originalMap, err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject)
+				if err != nil {
 					return nil, err
 				}
 				if err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj); err != nil {
@@ -734,15 +734,14 @@ func patchResource(
 			// 3. ensure no conflicts between the two patches
 			// 4. apply the #1 patch to the currentJS object
 
-			currentObjMap := make(map[string]interface{})
-
 			// Since the patch is applied on versioned objects, we need to convert the
 			// current object to versioned representation first.
 			currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, kind.GroupVersion())
 			if err != nil {
 				return nil, err
 			}
-			if err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject, &currentObjMap); err != nil {
+			currentObjMap, err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject)
+			if err != nil {
 				return nil, err
 			}
 
