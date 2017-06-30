@@ -134,7 +134,9 @@ var _ volume.Provisioner = &azureFileProvisioner{}
 func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
 	var sku, location, account string
 
-	name := volume.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 75)
+	// File share name has a length limit of 63, and it cannot contain two consecutive '-'s.
+	name := volume.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 63)
+	name = strings.Replace(name, "--", "-", -1)
 	capacity := a.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
 	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
