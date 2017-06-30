@@ -624,7 +624,7 @@ func (l assignedPodNamespaceLister) Get(name string) (*v1.Pod, error) {
 	if len(pod.Spec.NodeName) > 0 {
 		return pod, nil
 	}
-	return nil, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
+	return nil, errors.NewNotFound(schema.GroupResource{Resource: string(v1.ResourcePods)}, name)
 }
 
 type podInformer struct {
@@ -642,7 +642,7 @@ func (i *podInformer) Lister() corelisters.PodLister {
 // NewPodInformer creates a shared index informer that returns only non-terminal pods.
 func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) coreinformers.PodInformer {
 	selector := fields.ParseSelectorOrDie("status.phase!=" + string(v1.PodSucceeded) + ",status.phase!=" + string(v1.PodFailed))
-	lw := cache.NewListWatchFromClient(client.Core().RESTClient(), "pods", metav1.NamespaceAll, selector)
+	lw := cache.NewListWatchFromClient(client.Core().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector)
 	return &podInformer{
 		informer: cache.NewSharedIndexInformer(lw, &v1.Pod{}, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
 	}
