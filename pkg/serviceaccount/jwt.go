@@ -290,6 +290,10 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 				glog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s: %v", namespace, secretName, namespace, serviceAccountName, err)
 				return nil, false, errors.New("Token has been invalidated")
 			}
+			if secret.DeletionTimestamp != nil {
+				glog.V(4).Infof("Token is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
+				return nil, false, errors.New("Token has been invalidated")
+			}
 			if bytes.Compare(secret.Data[v1.ServiceAccountTokenKey], []byte(token)) != 0 {
 				glog.V(4).Infof("Token contents no longer matches %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
 				return nil, false, errors.New("Token does not match server's copy")
@@ -300,6 +304,10 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 			if err != nil {
 				glog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, serviceAccountName, err)
 				return nil, false, err
+			}
+			if serviceAccount.DeletionTimestamp != nil {
+				glog.V(4).Infof("Service account has been deleted %s/%s", namespace, serviceAccountName)
+				return nil, false, fmt.Errorf("ServiceAccount %s/%s has been deleted", namespace, serviceAccountName)
 			}
 			if string(serviceAccount.UID) != serviceAccountUID {
 				glog.V(4).Infof("Service account UID no longer matches %s/%s: %q != %q", namespace, serviceAccountName, string(serviceAccount.UID), serviceAccountUID)
