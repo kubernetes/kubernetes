@@ -267,8 +267,7 @@ func (s *Server) InstallDefaultHandlers() {
 		healthz.PingHealthz,
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
 	)
-	var ws *restful.WebService
-	ws = new(restful.WebService)
+	ws := new(restful.WebService)
 	ws.
 		Path("/pods").
 		Produces(restful.MIME_JSON)
@@ -296,9 +295,8 @@ const pprofBasePath = "/debug/pprof/"
 // InstallDebuggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
 func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 	glog.Infof("Adding debug handlers to kubelet server.")
-	var ws *restful.WebService
 
-	ws = new(restful.WebService)
+	ws := new(restful.WebService)
 	ws.
 		Path("/run")
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
@@ -429,7 +427,7 @@ func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 	}
 	enterLoopTime := s.host.LatestLoopEntryTime()
 	if !enterLoopTime.IsZero() && time.Now().After(enterLoopTime.Add(duration)) {
-		return fmt.Errorf("Sync Loop took longer than expected.")
+		return fmt.Errorf("sync Loop took longer than expected")
 	}
 	return nil
 }
