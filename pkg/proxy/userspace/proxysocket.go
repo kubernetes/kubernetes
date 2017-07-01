@@ -97,8 +97,7 @@ func TryConnectEndpoints(service proxy.ServicePortName, srcAddr net.Addr, protoc
 			return nil, err
 		}
 		glog.V(3).Infof("Mapped service %q to endpoint %s", service, endpoint)
-		// TODO: This could spin up a new goroutine to make the outbound connection,
-		// and keep accepting inbound traffic.
+
 		outConn, err := net.DialTimeout(protocol, endpoint, dialTimeout)
 		if err != nil {
 			if isTooManyFDsError(err) {
@@ -137,14 +136,16 @@ func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *Serv
 			continue
 		}
 		glog.V(3).Infof("Accepted TCP connection from %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
-		outConn, err := TryConnectEndpoints(service, inConn.(*net.TCPConn).RemoteAddr(), "tcp", loadBalancer)
-		if err != nil {
-			glog.Errorf("Failed to connect to balancer: %v", err)
-			inConn.Close()
-			continue
-		}
-		// Spin up an async copy loop.
-		go ProxyTCP(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
+		go func(service proxy.ServicePortName, inConn net.Conn, loadBalancer LoadBalancer) {
+			outConn, err := TryConnectEndpoints(service, inConn.(*net.TCPConn).RemoteAddr(), "tcp", loadBalancer)
+			if err != nil {
+				glog.Errorf("Failed to connect to balancer: %v", err)
+				inConn.Close()
+				return
+			}
+			// Spin up an async copy loop.
+			go ProxyTCP(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
+		}(service, inConn, loadBalancer)
 	}
 }
 
