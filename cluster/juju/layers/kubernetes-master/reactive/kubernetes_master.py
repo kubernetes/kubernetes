@@ -920,9 +920,9 @@ def setup_tokens(token, username, user):
 def get_password(csv_fname, user):
     '''Get the password of user within the csv file provided.'''
     root_cdk = '/root/cdk'
-    if not os.path.isdir(root_cdk):
-        return None
     tokens_fname = os.path.join(root_cdk, csv_fname)
+    if not os.path.isfile(tokens_fname):
+        return None
     with open(tokens_fname, 'r') as stream:
         for line in stream:
             record = line.split(',')

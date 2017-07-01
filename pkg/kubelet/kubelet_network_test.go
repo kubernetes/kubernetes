@@ -26,7 +26,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/util/bandwidth"
 )
 
 func TestNodeIPParam(t *testing.T) {
@@ -181,85 +180,6 @@ func TestComposeDNSSearch(t *testing.T) {
 			event := fetchEvent(recorder)
 			assert.Equal(t, expected, event, "test [%d]", i)
 		}
-	}
-}
-
-func TestCleanupBandwidthLimits(t *testing.T) {
-	testPod := func(name, ingress string) *v1.Pod {
-		pod := podWithUidNameNs("", name, "")
-
-		if len(ingress) != 0 {
-			pod.Annotations["kubernetes.io/ingress-bandwidth"] = ingress
-		}
-
-		return pod
-	}
-
-	// TODO(random-liu): We removed the test case for pod status not cached here. We should add a higher
-	// layer status getter function and test that function instead.
-	tests := []struct {
-		status           *v1.PodStatus
-		pods             []*v1.Pod
-		inputCIDRs       []string
-		expectResetCIDRs []string
-		name             string
-	}{
-		{
-			status: &v1.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: v1.PodRunning,
-			},
-			pods: []*v1.Pod{
-				testPod("foo", "10M"),
-				testPod("bar", ""),
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"2.3.4.5/32", "5.6.7.8/32"},
-			name:             "pod running",
-		},
-		{
-			status: &v1.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: v1.PodFailed,
-			},
-			pods: []*v1.Pod{
-				testPod("foo", "10M"),
-				testPod("bar", ""),
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			name:             "pod not running",
-		},
-		{
-			status: &v1.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: v1.PodFailed,
-			},
-			pods: []*v1.Pod{
-				testPod("foo", ""),
-				testPod("bar", ""),
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			name:             "no bandwidth limits",
-		},
-	}
-	for _, test := range tests {
-		shaper := &bandwidth.FakeShaper{
-			CIDRs: test.inputCIDRs,
-		}
-
-		testKube := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKube.Cleanup()
-		testKube.kubelet.shaper = shaper
-
-		for _, pod := range test.pods {
-			testKube.kubelet.statusManager.SetPodStatus(pod, *test.status)
-		}
-
-		err := testKube.kubelet.cleanupBandwidthLimits(test.pods)
-		assert.NoError(t, err, "test [%s]", test.name)
-		assert.EqualValues(t, test.expectResetCIDRs, shaper.ResetCIDRs, "test[%s]", test.name)
 	}
 }
 

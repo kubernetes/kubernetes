@@ -808,7 +808,8 @@ var validDownwardAPIFieldPathExpressions = sets.NewString(
 	"metadata.name",
 	"metadata.namespace",
 	"metadata.labels",
-	"metadata.annotations")
+	"metadata.annotations",
+	"metadata.uid")
 
 func validateDownwardAPIVolumeFile(file *api.DownwardAPIVolumeFile, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1556,7 +1557,7 @@ func ValidateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP")
+var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP")
 var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "requests.cpu", "requests.memory")
 
 func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList {
@@ -2907,6 +2908,22 @@ func ValidateService(service *api.Service) field.ErrorList {
 			allErrs = append(allErrs, field.Duplicate(portPath.Child("nodePort"), port.NodePort))
 		}
 		nodePorts[key] = true
+	}
+
+	// Check for duplicate TargetPort
+	portsPath = specPath.Child("ports")
+	targetPorts := make(map[api.ServicePort]bool)
+	for i, port := range service.Spec.Ports {
+		if (port.TargetPort.Type == intstr.Int && port.TargetPort.IntVal == 0) || (port.TargetPort.Type == intstr.String && port.TargetPort.StrVal == "") {
+			continue
+		}
+		portPath := portsPath.Index(i)
+		key := api.ServicePort{Protocol: port.Protocol, TargetPort: port.TargetPort}
+		_, found := targetPorts[key]
+		if found {
+			allErrs = append(allErrs, field.Duplicate(portPath.Child("targetPort"), port.TargetPort))
+		}
+		targetPorts[key] = true
 	}
 
 	// Validate SourceRange field and annotation

@@ -96,6 +96,10 @@
 			"Rev": "f533f7a102197536779ea3a8cb881d639e21ec5a"
 		},
 		{
+			"ImportPath": "github.com/NYTimes/gziphandler",
+			"Rev": "56545f4a5d46df9a6648819d1664c3a03a13ffdb"
+		},
+		{
 			"ImportPath": "github.com/PuerkitoBio/purell",
 			"Comment": "v1.0.0",
 			"Rev": "8a290539e2e8629dbc4e6bad948158f790ec31f4"
@@ -2218,7 +2222,7 @@
 		},
 		{
 			"ImportPath": "github.com/quobyte/api",
-			"Rev": "bf713b5a4333f44504fa1ce63690de45cfed6413"
+			"Rev": "cb10db90715b14d4784465d2fa3b915dfacc0628"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud",

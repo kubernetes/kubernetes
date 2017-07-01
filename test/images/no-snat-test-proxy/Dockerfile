@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.5
+FROM BASEIMAGE
 
-ADD no-snat-test-proxy /usr/bin/no-snat-test-proxy
-RUN chmod +x /usr/bin/no-snat-test-proxy
+COPY no-snat-test-proxy /
 
-ENTRYPOINT ["/usr/bin/no-snat-test-proxy"]
+ENTRYPOINT ["/no-snat-test-proxy"]

@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.5
+FROM BASEIMAGE
 
-ADD no-snat-test /usr/bin/no-snat-test
-RUN chmod +x /usr/bin/no-snat-test
+COPY no-snat-test /
 
-ENTRYPOINT ["/usr/bin/no-snat-test"]
+ENTRYPOINT ["/no-snat-test"]

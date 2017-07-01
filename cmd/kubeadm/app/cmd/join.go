@@ -63,26 +63,26 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		Use:   "join <flags> [DiscoveryTokenAPIServers]",
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Long: dedent.Dedent(`
-		When joining a kubeadm initialized cluster, we need to establish 
-		bidirectional trust. This is split into discovery (having the Node 
-		trust the Kubernetes Master) and TLS bootstrap (having the Kubernetes 
+		When joining a kubeadm initialized cluster, we need to establish
+		bidirectional trust. This is split into discovery (having the Node
+		trust the Kubernetes Master) and TLS bootstrap (having the Kubernetes
 		Master trust the Node).
 
-		There are 2 main schemes for discovery. The first is to use a shared 
-		token along with the IP address of the API server. The second is to 
-		provide a file (a subset of the standard kubeconfig file). This file 
-		can be a local file or downloaded via an HTTPS URL. The forms are 
-		kubeadm join --discovery-token abcdef.1234567890abcdef 1.2.3.4:6443, 
+		There are 2 main schemes for discovery. The first is to use a shared
+		token along with the IP address of the API server. The second is to
+		provide a file (a subset of the standard kubeconfig file). This file
+		can be a local file or downloaded via an HTTPS URL. The forms are
+		kubeadm join --discovery-token abcdef.1234567890abcdef 1.2.3.4:6443,
 		kubeadm join --discovery-file path/to/file.conf, or kubeadm join
-		--discovery-file https://url/file.conf. Only one form can be used. If 
-		the discovery information is loaded from a URL, HTTPS must be used and 
+		--discovery-file https://url/file.conf. Only one form can be used. If
+		the discovery information is loaded from a URL, HTTPS must be used and
 		the host installed CA bundle is used to verify the connection.
 
-		The TLS bootstrap mechanism is also driven via a shared token. This is 
+		The TLS bootstrap mechanism is also driven via a shared token. This is
 		used to temporarily authenticate with the Kubernetes Master to submit a
-		certificate signing request (CSR) for a locally created key pair. By 
-		default kubeadm will set up the Kubernetes Master to automatically 
-		approve these signing requests. This token is passed in with the 
+		certificate signing request (CSR) for a locally created key pair. By
+		default kubeadm will set up the Kubernetes Master to automatically
+		approve these signing requests. This token is passed in with the
 		--tls-bootstrap-token abcdef.1234567890abcdef flag.
 
 		Often times the same token is used for both parts. In this case, the
@@ -97,7 +97,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 
 			j, err := NewJoin(cfgPath, args, internalcfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
-			kubeadmutil.CheckErr(j.Validate())
+			kubeadmutil.CheckErr(j.Validate(cmd))
 			kubeadmutil.CheckErr(j.Run(out))
 		},
 	}
@@ -161,7 +161,10 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 	return &Join{cfg: cfg}, nil
 }
 
-func (j *Join) Validate() error {
+func (j *Join) Validate(cmd *cobra.Command) error {
+	if err := validation.ValidateMixedArguments(cmd.PersistentFlags()); err != nil {
+		return err
+	}
 	return validation.ValidateNodeConfiguration(j.cfg).ToAggregate()
 }
 

@@ -23,13 +23,13 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/docker/docker/pkg/term"
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 
 	"k8s.io/client-go/tools/remotecommand"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/term"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
@@ -89,7 +89,7 @@ func (*NsenterExecHandler) ExecInContainer(client libdocker.Interface, container
 		defer stdout.Close()
 
 		kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
-			term.SetSize(p.Fd(), size)
+			term.SetWinsize(p.Fd(), &term.Winsize{Height: size.Height, Width: size.Width})
 		})
 
 		if stdin != nil {

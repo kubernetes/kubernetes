@@ -243,6 +243,7 @@ func ClusterRoles() []rbac.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:heapster"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("events", "pods", "nodes", "namespaces").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("deployments").RuleOrDie(),
 			},
 		},
 		{

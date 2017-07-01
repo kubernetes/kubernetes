@@ -133,6 +133,7 @@ type NodeTestContextType struct {
 }
 
 type CloudConfig struct {
+	ApiEndpoint       string
 	ProjectID         string
 	Zone              string
 	MultiZone         bool
@@ -140,6 +141,7 @@ type CloudConfig struct {
 	MasterName        string
 	NodeInstanceGroup string // comma-delimited list of groups' names
 	NumNodes          int
+	ClusterIPRange    string
 	ClusterTag        string
 	Network           string
 	ConfigFile        string // for azure and openstack
@@ -205,6 +207,7 @@ func RegisterClusterFlags() {
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	cloudConfig := &TestContext.CloudConfig
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
+	flag.StringVar(&cloudConfig.ApiEndpoint, "gce-api-endpoint", "", "The GCE ApiEndpoint being used, if applicable")
 	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
 	flag.BoolVar(&cloudConfig.MultiZone, "gce-multizone", false, "If true, start GCE cloud provider with multizone support.")
@@ -212,6 +215,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws. If there is more than one group: comma separated list of groups.")
 	flag.StringVar(&cloudConfig.Network, "network", "e2e", "The cloud provider network for this e2e cluster.")
 	flag.IntVar(&cloudConfig.NumNodes, "num-nodes", -1, "Number of nodes in the cluster")
+	flag.StringVar(&cloudConfig.ClusterIPRange, "cluster-ip-range", "10.100.0.0/14", "A CIDR notation IP range from which to assign IPs in the cluster.")
 	flag.StringVar(&cloudConfig.NodeTag, "node-tag", "", "Network tags used on node instances. Valid only for gce, gke")
 	flag.StringVar(&cloudConfig.MasterTag, "master-tag", "", "Network tags used on master instances. Valid only for gce, gke")
 

@@ -14,7 +14,6 @@ go_library(
         "env.go",
         "register.go",
         "types.go",
-        "well_known_labels.go",
     ],
     tags = ["automanaged"],
     deps = [

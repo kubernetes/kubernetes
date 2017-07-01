@@ -2589,6 +2589,24 @@ func TestValidateEnv(t *testing.T) {
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
 					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name: "abc",
+			ValueFrom: &api.EnvVarSource{
+				FieldRef: &api.ObjectFieldSelector{
+					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					FieldPath:  "metadata.uid",
+				},
+			},
+		},
+		{
+			Name: "abc",
+			ValueFrom: &api.EnvVarSource{
+				FieldRef: &api.ObjectFieldSelector{
+					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "spec.nodeName",
 				},
 			},
@@ -2644,7 +2662,7 @@ func TestValidateEnv(t *testing.T) {
 		},
 	}
 	if errs := ValidateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
+		t.Errorf("expected success, got: %v", errs)
 	}
 
 	errorCases := []struct {
@@ -2823,7 +2841,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: metadata.name, metadata.namespace, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
 		},
 		{
 			name: "invalid fieldPath annotations",
@@ -2836,7 +2854,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: metadata.name, metadata.namespace, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
 		},
 		{
 			name: "unsupported fieldPath",
@@ -2849,7 +2867,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: metadata.name, metadata.namespace, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
+			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
 		},
 	}
 	for _, tc := range errorCases {
@@ -6281,6 +6299,42 @@ func TestValidateService(t *testing.T) {
 				s.Spec.Type = api.ServiceTypeNodePort
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "UDP", NodePort: 1, TargetPort: intstr.FromInt(2)})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid duplicate targetports (number with same protocol)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid duplicate targetports (name with same protocol)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromString("http")})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "TCP", TargetPort: intstr.FromString("http")})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid duplicate targetports (number with different protocols)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "UDP", TargetPort: intstr.FromInt(8080)})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid duplicate targetports (name with different protocols)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromString("http")})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "UDP", TargetPort: intstr.FromString("http")})
 			},
 			numErrs: 0,
 		},

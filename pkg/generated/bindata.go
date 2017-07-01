@@ -3075,18 +3075,18 @@ msgstr "Describe one or many contexts"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_node.go#L77
 #: pkg/kubectl/cmd/top_node.go:78
-msgid "Display Resource (CPU/Memory/Storage) usage of nodes"
-msgstr "Display Resource (CPU/Memory/Storage) usage of nodes"
+msgid "Display Resource (CPU/Memory) usage of nodes"
+msgstr "Display Resource (CPU/Memory) usage of nodes"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_pod.go#L79
 #: pkg/kubectl/cmd/top_pod.go:80
-msgid "Display Resource (CPU/Memory/Storage) usage of pods"
-msgstr "Display Resource (CPU/Memory/Storage) usage of pods"
+msgid "Display Resource (CPU/Memory) usage of pods"
+msgstr "Display Resource (CPU/Memory) usage of pods"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top.go#L43
 #: pkg/kubectl/cmd/top.go:44
-msgid "Display Resource (CPU/Memory/Storage) usage."
-msgstr "Display Resource (CPU/Memory/Storage) usage."
+msgid "Display Resource (CPU/Memory) usage."
+msgstr "Display Resource (CPU/Memory) usage."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo.go#L49
 #: pkg/kubectl/cmd/clusterinfo.go:51
@@ -6551,18 +6551,18 @@ msgstr "Describe one or many contexts"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_node.go#L77
 #: pkg/kubectl/cmd/top_node.go:78
-msgid "Display Resource (CPU/Memory/Storage) usage of nodes"
-msgstr "Display Resource (CPU/Memory/Storage) usage of nodes"
+msgid "Display Resource (CPU/Memory) usage of nodes"
+msgstr "Display Resource (CPU/Memory) usage of nodes"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_pod.go#L79
 #: pkg/kubectl/cmd/top_pod.go:80
-msgid "Display Resource (CPU/Memory/Storage) usage of pods"
-msgstr "Display Resource (CPU/Memory/Storage) usage of pods"
+msgid "Display Resource (CPU/Memory) usage of pods"
+msgstr "Display Resource (CPU/Memory) usage of pods"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top.go#L43
 #: pkg/kubectl/cmd/top.go:44
-msgid "Display Resource (CPU/Memory/Storage) usage."
-msgstr "Display Resource (CPU/Memory/Storage) usage."
+msgid "Display Resource (CPU/Memory) usage."
+msgstr "Display Resource (CPU/Memory) usage."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo.go#L49
 #: pkg/kubectl/cmd/clusterinfo.go:51
@@ -9105,15 +9105,15 @@ msgid "Describe one or many contexts"
 msgstr ""
 
 #: pkg/kubectl/cmd/top_node.go:78
-msgid "Display Resource (CPU/Memory/Storage) usage of nodes"
+msgid "Display Resource (CPU/Memory) usage of nodes"
 msgstr ""
 
 #: pkg/kubectl/cmd/top_pod.go:80
-msgid "Display Resource (CPU/Memory/Storage) usage of pods"
+msgid "Display Resource (CPU/Memory) usage of pods"
 msgstr ""
 
 #: pkg/kubectl/cmd/top.go:44
-msgid "Display Resource (CPU/Memory/Storage) usage."
+msgid "Display Resource (CPU/Memory) usage."
 msgstr ""
 
 #: pkg/kubectl/cmd/clusterinfo.go:51

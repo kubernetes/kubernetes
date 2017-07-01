@@ -12,20 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: push
+SRCS = clusterapi-tester
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
+SRC_DIR = $(notdir $(shell pwd))
+export
 
-# 0.0 shouldn't clobber any released builds
-TAG = 1.0
-PREFIX = gcr.io/google_containers/clusterapi-tester
+bin:
+	../image-util.sh bin $(SRCS)
 
-main: main.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' -o main ./main.go
-
-container: main
-	docker build --pull -t $(PREFIX):$(TAG) .
-
-push: container
-	gcloud docker -- push $(PREFIX):$(TAG)
-
-clean:
-	rm -f main
+.PHONY: bin

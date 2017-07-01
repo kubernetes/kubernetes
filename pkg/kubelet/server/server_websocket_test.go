@@ -172,7 +172,7 @@ func TestServeWSPortForward(t *testing.T) {
 		}
 
 		if test.containerData != "" {
-			channel, data, err = wsRead(ws)
+			_, data, err = wsRead(ws)
 			if err != nil {
 				t.Fatalf("%d: unexpected error reading container data: %v", i, err)
 			}
