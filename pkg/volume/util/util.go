@@ -72,6 +72,15 @@ func SetReady(dir string) {
 // UnmountPath is a common unmount routine that unmounts the given path and
 // deletes the remaining directory if successful.
 func UnmountPath(mountPath string, mounter mount.Interface) error {
+	return UnmountMountPoint(mountPath, mounter, false /* extensiveMountPointCheck */)
+}
+
+// UnmountMountPoint is a common unmount routine that unmounts the given path and
+// deletes the remaining directory if successful.
+// if extensiveMountPointCheck is true
+// IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
+// IsNotMountPoint is more expensive but properly handles bind mounts.
+func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
 	if pathExists, pathErr := PathExists(mountPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
@@ -79,16 +88,26 @@ func UnmountPath(mountPath string, mounter mount.Interface) error {
 		return nil
 	}
 
-	notMnt, err := mounter.IsLikelyNotMountPoint(mountPath)
+	var notMnt bool
+	var err error
+
+	if extensiveMountPointCheck {
+		notMnt, err = mount.IsNotMountPoint(mounter, mountPath)
+	} else {
+		notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
+	}
+
 	if err != nil {
 		return err
 	}
+
 	if notMnt {
 		glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
 		return os.Remove(mountPath)
 	}
 
 	// Unmount the mount path
+	glog.V(4).Infof("%q is a mountpoint, unmounting", mountPath)
 	if err := mounter.Unmount(mountPath); err != nil {
 		return err
 	}
