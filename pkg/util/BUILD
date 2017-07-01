@@ -90,7 +90,6 @@ filegroup(
         "//pkg/util/system:all-srcs",
         "//pkg/util/tail:all-srcs",
         "//pkg/util/taints:all-srcs",
-        "//pkg/util/term:all-srcs",
         "//pkg/util/threading:all-srcs",
         "//pkg/util/tolerations:all-srcs",
         "//pkg/util/uuid:all-srcs",
