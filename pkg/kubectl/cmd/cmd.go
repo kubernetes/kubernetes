@@ -190,6 +190,10 @@ __custom_func() {
             __kubectl_config_get_contexts
             return
             ;;
+        kubectl_config_delete-cluster)
+            __kubectl_config_get_clusters
+            return
+            ;;
         *)
             ;;
     esac
