@@ -118,18 +118,8 @@ func WithImpersonation(handler http.Handler, requestContextMapper request.Reques
 
 		if !groupsSpecified && username != user.Anonymous {
 			// When impersonating a non-anonymous user, if no groups were specified
-			// if neither the system:authenticated nor system:unauthenticated groups are explicitly included,
 			// include the system:authenticated group in the impersonated user info
-			found := false
-			for _, group := range groups {
-				if group == user.AllAuthenticated || group == user.AllUnauthenticated {
-					found = true
-					break
-				}
-			}
-			if !found {
-				groups = append(groups, user.AllAuthenticated)
-			}
+			groups = append(groups, user.AllAuthenticated)
 		}
 
 		newUser := &user.DefaultInfo{

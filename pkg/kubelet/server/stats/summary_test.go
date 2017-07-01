@@ -376,13 +376,6 @@ func checkMemoryStats(t *testing.T, label string, seed int, info v2.ContainerInf
 	}
 }
 
-func checkFsStats(t *testing.T, capacity uint64, Available uint64, inodes uint64, inodesFree uint64, fs *kubestats.FsStats) {
-	assert.EqualValues(t, capacity, *fs.CapacityBytes)
-	assert.EqualValues(t, Available, *fs.AvailableBytes)
-	assert.EqualValues(t, inodesFree, *fs.InodesFree)
-	assert.EqualValues(t, inodes, *fs.Inodes)
-}
-
 func TestCustomMetrics(t *testing.T) {
 	spec := []v1.MetricSpec{
 		{

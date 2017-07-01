@@ -423,7 +423,7 @@ func handleResizeEvents(stream io.Reader, channel chan<- remotecommand.TerminalS
 	}
 }
 
-func v1WriteStatusFunc(stream io.WriteCloser) func(status *apierrors.StatusError) error {
+func v1WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) error {
 	return func(status *apierrors.StatusError) error {
 		if status.Status().Status == metav1.StatusSuccess {
 			return nil // send error messages
@@ -435,7 +435,7 @@ func v1WriteStatusFunc(stream io.WriteCloser) func(status *apierrors.StatusError
 
 // v4WriteStatusFunc returns a WriteStatusFunc that marshals a given api Status
 // as json in the error channel.
-func v4WriteStatusFunc(stream io.WriteCloser) func(status *apierrors.StatusError) error {
+func v4WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) error {
 	return func(status *apierrors.StatusError) error {
 		bs, err := json.Marshal(status.Status())
 		if err != nil {

@@ -26,6 +26,9 @@ import (
 // CopyStrings copies the contents of the specified string slice
 // into a new slice.
 func CopyStrings(s []string) []string {
+	if s == nil {
+		return nil
+	}
 	c := make([]string, len(s))
 	copy(c, s)
 	return c
@@ -41,6 +44,9 @@ func SortStrings(s []string) []string {
 // ShuffleStrings copies strings from the specified slice into a copy in random
 // order. It returns a new slice.
 func ShuffleStrings(s []string) []string {
+	if s == nil {
+		return nil
+	}
 	shuffled := make([]string, len(s))
 	perm := utilrand.Perm(len(s))
 	for i, j := range perm {
