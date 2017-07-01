@@ -1022,53 +1022,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	return dsc.updateDaemonSetStatus(ds, hash)
 }
 
-// nodeShouldRunDaemonPod checks a set of preconditions against a (node,daemonset) and returns a
-// summary. Returned booleans are:
-// * wantToRun:
-//     Returns true when a user would expect a pod to run on this node and ignores conditions
-//     such as OutOfDisk or insufficient resource that would cause a daemonset pod not to schedule.
-//     This is primarily used to populate daemonset status.
-// * shouldSchedule:
-//     Returns true when a daemonset should be scheduled to a node if a daemonset pod is not already
-//     running on that node.
-// * shouldContinueRunning:
-//     Returns true when a daemonset should continue running on a node if a daemonset pod is already
-//     running on that node.
-func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *extensions.DaemonSet) (wantToRun, shouldSchedule, shouldContinueRunning bool, err error) {
-	newPod := NewPod(ds, node.Name)
-	critical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && kubelettypes.IsCriticalPod(newPod)
-
-	// Because these bools require an && of all their required conditions, we start
-	// with all bools set to true and set a bool to false if a condition is not met.
-	// A bool should probably not be set to true after this line. We can
-	// return early if we are:
-	//
-	// 1. return false, false, false, err
-	// 2. return false, false, false, nil
-	//
-	// Otherwise if a condition is not met, we should set one of these
-	// bools to false.
-	wantToRun, shouldSchedule, shouldContinueRunning = true, true, true
-	// If the daemon set specifies a node name, check that it matches with node.Name.
-	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
-		return false, false, false, nil
-	}
-
-	// TODO: Move it to the predicates
-	for _, c := range node.Status.Conditions {
-		if critical {
-			break
-		}
-		// TODO: There are other node status that the DaemonSet should ideally respect too,
-		//       e.g. MemoryPressure, and DiskPressure
-		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
-			// the kubelet will evict this pod if it needs to. Let kubelet
-			// decide whether to continue running this pod so leave shouldContinueRunning
-			// set to true
-			shouldSchedule = false
-		}
-	}
-
+func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *extensions.DaemonSet) ([]algorithm.PredicateFailureReason, *schedulercache.NodeInfo, error) {
 	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
 	// Add infinite toleration for taint notReady:NoExecute here
 	// to survive taint-based eviction enforced by NodeController
@@ -1093,7 +1047,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 
 	podList, err := dsc.podLister.List(labels.Everything())
 	if err != nil {
-		return false, false, false, err
+		return nil, nil, err
 	}
 	for _, pod := range podList {
 		if pod.Spec.NodeName != node.Name {
@@ -1112,7 +1066,52 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
+
 	_, reasons, err := Predicates(newPod, nodeInfo)
+	return reasons, nodeInfo, err
+}
+
+// nodeShouldRunDaemonPod checks a set of preconditions against a (node,daemonset) and returns a
+// summary. Returned booleans are:
+// * wantToRun:
+//     Returns true when a user would expect a pod to run on this node and ignores conditions
+//     such as OutOfDisk or insufficient resource that would cause a daemonset pod not to schedule.
+//     This is primarily used to populate daemonset status.
+// * shouldSchedule:
+//     Returns true when a daemonset should be scheduled to a node if a daemonset pod is not already
+//     running on that node.
+// * shouldContinueRunning:
+//     Returns true when a daemonset should continue running on a node if a daemonset pod is already
+//     running on that node.
+func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *extensions.DaemonSet) (wantToRun, shouldSchedule, shouldContinueRunning bool, err error) {
+	newPod := NewPod(ds, node.Name)
+	critical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && kubelettypes.IsCriticalPod(newPod)
+
+	// Because these bools require an && of all their required conditions, we start
+	// with all bools set to true and set a bool to false if a condition is not met.
+	// A bool should probably not be set to true after this line.
+	wantToRun, shouldSchedule, shouldContinueRunning = true, true, true
+	// If the daemon set specifies a node name, check that it matches with node.Name.
+	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
+		return false, false, false, nil
+	}
+
+	// TODO: Move it to the predicates
+	for _, c := range node.Status.Conditions {
+		if critical {
+			break
+		}
+		// TODO: There are other node status that the DaemonSet should ideally respect too,
+		//       e.g. MemoryPressure, and DiskPressure
+		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
+			// the kubelet will evict this pod if it needs to. Let kubelet
+			// decide whether to continue running this pod so leave shouldContinueRunning
+			// set to true
+			shouldSchedule = false
+		}
+	}
+
+	reasons, nodeInfo, err := dsc.simulate(newPod, node, ds)
 	if err != nil {
 		glog.Warningf("DaemonSet Predicates failed on node %s for ds '%s/%s' due to unexpected error: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, err)
 		return false, false, false, err
