@@ -97,8 +97,7 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 		return
 	}
 
-	newUnstr := make(map[string]interface{})
-	err = unstructured.DefaultConverter.ToUnstructured(item, &newUnstr)
+	newUnstr, err := unstructured.DefaultConverter.ToUnstructured(item)
 	if err != nil {
 		t.Errorf("ToUnstructured failed: %v", err)
 		return
@@ -138,8 +137,8 @@ func BenchmarkToFromUnstructured(b *testing.B) {
 	size := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		unstr := map[string]interface{}{}
-		if err := unstructured.DefaultConverter.ToUnstructured(&items[i%size], &unstr); err != nil {
+		unstr, err := unstructured.DefaultConverter.ToUnstructured(&items[i%size])
+		if err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
 		obj := v1.Pod{}

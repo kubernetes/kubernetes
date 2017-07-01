@@ -98,6 +98,9 @@ ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
 START_MODE=${START_MODE:-"all"}
 
+# A list of controllers to enable
+KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
+
 # sanity check for OpenStack provider
 if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     if [ "${CLOUD_CONFIG}" == "" ]; then
@@ -587,6 +590,7 @@ function start_controller_manager {
       --cloud-config="${CLOUD_CONFIG}" \
       --kubeconfig "$CERT_DIR"/controller.kubeconfig \
       --use-service-account-credentials \
+      --controllers="${KUBE_CONTROLLERS}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }

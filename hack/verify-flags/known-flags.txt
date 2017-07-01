@@ -105,6 +105,7 @@ cluster-context
 cluster-dns
 cluster-domain
 cluster-ip
+cluster-ip-range
 cluster-monitor-period
 cluster-name
 cluster-signing-cert-file
@@ -297,6 +298,7 @@ gather-logs-sizes
 gather-metrics-at-teardown
 gather-resource-usage
 gather-suite-metrics-at-teardown
+gce-api-endpoint
 gce-multizone
 gce-project
 gce-service-account

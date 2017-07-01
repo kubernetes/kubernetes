@@ -19,6 +19,8 @@ package validation
 import (
 	"testing"
 
+	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
@@ -246,6 +248,45 @@ func TestValidateNodeConfiguration(t *testing.T) {
 				"failed ValidateNodeConfiguration:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(len(actual) == 0),
+			)
+		}
+	}
+}
+
+func TestValidateMixedArguments(t *testing.T) {
+	var tests = []struct {
+		args     []string
+		expected bool
+	}{
+		{[]string{"--foo=bar"}, true},
+		{[]string{"--config=hello"}, true},
+		{[]string{"--foo=bar", "--config=hello"}, false},
+	}
+
+	var cfgPath string
+	var skipPreFlight bool
+
+	for _, rt := range tests {
+		f := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		if f.Parsed() {
+			t.Error("f.Parse() = true before Parse")
+		}
+		f.String("foo", "", "string value")
+		f.StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
+		f.BoolVar(
+			&skipPreFlight, "skip-preflight-checks", skipPreFlight,
+			"Skip preflight checks normally run before modifying the system",
+		)
+		if err := f.Parse(rt.args); err != nil {
+			t.Fatal(err)
+		}
+
+		actual := ValidateMixedArguments(f)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed ValidateMixedArguments:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(actual == nil),
 			)
 		}
 	}

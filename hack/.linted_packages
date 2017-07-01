@@ -472,14 +472,14 @@ test/images/entrypoint-tester
 test/images/fakegitserver
 test/images/goproxy
 test/images/logs-generator
-test/images/mount-tester
+test/images/mounttest
 test/images/n-way-http
 test/images/net
 test/images/net/common
 test/images/port-forward-tester
 test/images/porter
 test/images/resource-consumer/consume-cpu
-test/images/serve_hostname
+test/images/serve-hostname
 test/integration/apiserver
 test/integration/client
 test/integration/configmap

@@ -478,35 +478,6 @@ func TestComponentPod(t *testing.T) {
 	}
 }
 
-func TestGetComponentBaseCommand(t *testing.T) {
-	var tests = []struct {
-		c        string
-		expected []string
-	}{
-		{
-			c:        "foo",
-			expected: []string{"kube-foo", "--v=2"},
-		},
-		{
-			c:        "bar",
-			expected: []string{"kube-bar", "--v=2"},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := getComponentBaseCommand(rt.c)
-		for i := range actual {
-			if actual[i] != rt.expected[i] {
-				t.Errorf(
-					"failed getComponentBaseCommand:\n\texpected: %s\n\t  actual: %s",
-					rt.expected[i],
-					actual[i],
-				)
-			}
-		}
-	}
-}
-
 func TestGetAPIServerCommand(t *testing.T) {
 	var tests = []struct {
 		cfg      *kubeadmapi.MasterConfiguration
@@ -567,9 +538,9 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--secure-port=123",
 				"--allow-privileged=true",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+				"--experimental-bootstrap-token-auth=true",
 				"--proxy-client-cert-file=/var/lib/certs/front-proxy-client.crt",
 				"--proxy-client-key-file=/var/lib/certs/front-proxy-client.key",
-				"--experimental-bootstrap-token-auth=true",
 				"--requestheader-username-headers=X-Remote-User",
 				"--requestheader-group-headers=X-Remote-Group",
 				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
@@ -724,25 +695,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
 				"--use-service-account-credentials=true",
 				"--controllers=*,bootstrapsigner,tokencleaner",
-			},
-		},
-		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.6.4",
-			},
-			expected: []string{
-				"kube-controller-manager",
-				"--address=127.0.0.1",
-				"--leader-elect=true",
-				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
-				"--root-ca-file=" + testCertsDir + "/ca.crt",
-				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
-				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
-				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
-				"--use-service-account-credentials=true",
-				"--controllers=*,bootstrapsigner,tokencleaner",
-				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:bootstrappers",
 			},
 		},
 		{
@@ -995,21 +947,6 @@ func TestGetExtraParameters(t *testing.T) {
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
 			t.Errorf("failed getExtraParameters:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
-		}
-	}
-}
-
-func TestVersionCompare(t *testing.T) {
-	versions := []string{
-		"v1.7.0-alpha.1",
-		"v1.7.0-beta.0",
-		"v1.7.0-rc.0",
-		"v1.7.0",
-		"v1.7.1",
-	}
-	for _, v := range versions {
-		if !version.MustParseSemantic(v).AtLeast(kubeadmconstants.MinimumAPIAggregationVersion) {
-			t.Errorf("err")
 		}
 	}
 }

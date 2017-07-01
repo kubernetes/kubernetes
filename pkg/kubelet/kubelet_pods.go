@@ -893,12 +893,6 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	// Remove any orphaned mirror pods.
 	kl.podManager.DeleteOrphanedMirrorPods()
 
-	// Clear out any old bandwidth rules
-	err = kl.cleanupBandwidthLimits(allPods)
-	if err != nil {
-		glog.Errorf("Failed cleaning up bandwidth limits: %v", err)
-	}
-
 	// Remove any cgroups in the hierarchy for pods that are no longer running.
 	if kl.cgroupsPerQOS {
 		kl.cleanupOrphanedPodCgroups(cgroupPods, activePods)

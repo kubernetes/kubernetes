@@ -84,7 +84,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 			i, err := NewInit(cfgPath, internalcfg, skipPreFlight, skipTokenPrint)
 			kubeadmutil.CheckErr(err)
-			kubeadmutil.CheckErr(i.Validate())
+			kubeadmutil.CheckErr(i.Validate(cmd))
 			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
@@ -186,7 +186,10 @@ type Init struct {
 }
 
 // Validate validates configuration passed to "kubeadm init"
-func (i *Init) Validate() error {
+func (i *Init) Validate(cmd *cobra.Command) error {
+	if err := validation.ValidateMixedArguments(cmd.PersistentFlags()); err != nil {
+		return err
+	}
 	return validation.ValidateMasterConfiguration(i.cfg).ToAggregate()
 }
 

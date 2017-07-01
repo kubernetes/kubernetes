@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful-swagger12"
-	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
+	"github.com/googleapis/gnostic/OpenAPIv2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -237,7 +237,7 @@ func (d *CachedDiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swa
 	return d.delegate.SwaggerSchema(version)
 }
 
-func (d *CachedDiscoveryClient) OpenAPISchema() (*spec.Swagger, error) {
+func (d *CachedDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	return d.delegate.OpenAPISchema()
 }
 

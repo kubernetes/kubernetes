@@ -38,7 +38,6 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -401,7 +400,8 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	deployment, err := reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
 		// set deployment's history and scale to 0
 		// TODO replace with patch when available: https://github.com/kubernetes/kubernetes/issues/20527
-		d.Spec.RevisionHistoryLimit = util.Int32Ptr(0)
+		rhl := int32(0)
+		d.Spec.RevisionHistoryLimit = &rhl
 		d.Spec.Replicas = 0
 		d.Spec.Paused = true
 	})

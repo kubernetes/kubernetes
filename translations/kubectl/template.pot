@@ -1688,15 +1688,15 @@ msgid "Describe one or many contexts"
 msgstr ""
 
 #: pkg/kubectl/cmd/top_node.go:78
-msgid "Display Resource (CPU/Memory/Storage) usage of nodes"
+msgid "Display Resource (CPU/Memory) usage of nodes"
 msgstr ""
 
 #: pkg/kubectl/cmd/top_pod.go:80
-msgid "Display Resource (CPU/Memory/Storage) usage of pods"
+msgid "Display Resource (CPU/Memory) usage of pods"
 msgstr ""
 
 #: pkg/kubectl/cmd/top.go:44
-msgid "Display Resource (CPU/Memory/Storage) usage."
+msgid "Display Resource (CPU/Memory) usage."
 msgstr ""
 
 #: pkg/kubectl/cmd/clusterinfo.go:51

@@ -304,7 +304,7 @@ func (plugin *kubenetNetworkPlugin) Name() string {
 }
 
 func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
-	return utilsets.NewInt(network.NET_PLUGIN_CAPABILITY_SHAPING)
+	return utilsets.NewInt()
 }
 
 // setup sets up networking through CNI using the given ns/name and sandbox ID.

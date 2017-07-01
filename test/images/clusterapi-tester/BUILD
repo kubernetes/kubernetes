@@ -16,7 +16,7 @@ go_binary(
 
 go_library(
     name = "go_default_library",
-    srcs = ["main.go"],
+    srcs = ["clusterapi-tester.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/client/clientset_generated/internalclientset:go_default_library",

@@ -107,11 +107,5 @@ var (
 	DefaultTokenUsages = []string{"signing", "authentication"}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.6.0")
-
-	// MinimumCSRSARApproverVersion specifies the minimum kubernetes version that can be used for enabling the new-in-v1.7 CSR approver based on a SubjectAccessReview
-	MinimumCSRSARApproverVersion = version.MustParseSemantic("v1.7.0-beta.0")
-
-	// MinimumAPIAggregationVersion specifies the minimum kubernetes version that can be used enabling the API aggregation in the apiserver and the front proxy flags
-	MinimumAPIAggregationVersion = version.MustParseSemantic("v1.7.0-alpha.1")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.7.0")
 )

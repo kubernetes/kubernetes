@@ -11,6 +11,10 @@
 			"Rev": "75cd24fc2f2c2a2088577d12123ddee5f54e0675"
 		},
 		{
+			"ImportPath": "github.com/NYTimes/gziphandler",
+			"Rev": "56545f4a5d46df9a6648819d1664c3a03a13ffdb"
+		},
+		{
 			"ImportPath": "github.com/PuerkitoBio/purell",
 			"Rev": "8a290539e2e8629dbc4e6bad948158f790ec31f4"
 		},
@@ -327,20 +331,12 @@
 			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 		},
 		{
-			"ImportPath": "github.com/go-openapi/analysis",
-			"Rev": "b44dc874b601d9e4e2f6e19140e794ba24bead3b"
-		},
-		{
 			"ImportPath": "github.com/go-openapi/jsonpointer",
 			"Rev": "46af16f9f7b149af66e5d1bd010e3574dc06de98"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/jsonreference",
 			"Rev": "13c6e3589ad90f49bd3e3bbe2c2cb3d7a4142272"
-		},
-		{
-			"ImportPath": "github.com/go-openapi/loads",
-			"Rev": "18441dfa706d924a39a030ee2c3b1d8d81917b38"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/spec",

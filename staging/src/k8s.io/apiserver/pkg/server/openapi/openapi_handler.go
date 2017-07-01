@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NYTimes/gziphandler"
 	"github.com/go-openapi/spec"
 	"github.com/golang/protobuf/proto"
 	"github.com/googleapis/gnostic/OpenAPIv2"
@@ -75,19 +76,22 @@ func RegisterOpenAPIService(openapiSpec *spec.Swagger, servePath string, mux *ge
 	for _, file := range files {
 		path := servePathBase + file.ext
 		getData := file.getData
-		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != path {
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte("Path not found!"))
-				return
-			}
-			o.update(r)
-			data := getData()
-			etag := computeEtag(data)
-			w.Header().Set("Etag", etag)
-			// ServeContent will take care of caching using eTag.
-			http.ServeContent(w, r, path, o.lastModified, bytes.NewReader(data))
-		})
+		mux.Handle(path, gziphandler.GzipHandler(http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != path {
+					w.WriteHeader(http.StatusNotFound)
+					w.Write([]byte("Path not found!"))
+					return
+				}
+				o.update(r)
+				data := getData()
+				etag := computeEtag(data)
+				w.Header().Set("Etag", etag)
+
+				// ServeContent will take care of caching using eTag.
+				http.ServeContent(w, r, path, o.lastModified, bytes.NewReader(data))
+			}),
+		))
 	}
 
 	return &o, nil
