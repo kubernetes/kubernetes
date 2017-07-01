@@ -137,6 +137,7 @@ type Config struct {
 		NodeTags           []string `gcfg:"node-tags"`
 		NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
 		Multizone          bool     `gcfg:"multizone"`
+		ApiEndpoint        string   `gcfg:"api-endpoint"`
 	}
 }
 
@@ -155,6 +156,7 @@ func (g *GCECloud) GetComputeService() *compute.Service {
 
 // newGCECloud creates a new instance of GCECloud.
 func newGCECloud(config io.Reader) (*GCECloud, error) {
+	apiEndpoint := ""
 	projectID, zone, err := getProjectAndZone()
 	if err != nil {
 		return nil, err
@@ -169,7 +171,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
-	networkURL := gceNetworkURL(projectID, networkName)
+	networkURL := gceNetworkURL(apiEndpoint, projectID, networkName)
 	subnetworkURL := ""
 
 	// By default, Kubernetes clusters only run against one zone
@@ -185,22 +187,23 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 			return nil, err
 		}
 		glog.Infof("Using GCE provider config %+v", cfg)
+		if cfg.Global.ApiEndpoint != "" {
+			apiEndpoint = cfg.Global.ApiEndpoint
+		}
 		if cfg.Global.ProjectID != "" {
 			projectID = cfg.Global.ProjectID
 		}
-		if cfg.Global.NetworkName != "" {
-			if strings.Contains(cfg.Global.NetworkName, "/") {
-				networkURL = cfg.Global.NetworkName
-			} else {
-				networkURL = gceNetworkURL(cfg.Global.ProjectID, cfg.Global.NetworkName)
-			}
+
+		if cfg.Global.NetworkName != "" && strings.Contains(cfg.Global.NetworkName, "/") {
+			networkURL = cfg.Global.NetworkName
+		} else {
+			networkURL = gceNetworkURL(apiEndpoint, projectID, networkName)
 		}
-		if cfg.Global.SubnetworkName != "" {
-			if strings.Contains(cfg.Global.SubnetworkName, "/") {
-				subnetworkURL = cfg.Global.SubnetworkName
-			} else {
-				subnetworkURL = gceSubnetworkURL(cfg.Global.ProjectID, region, cfg.Global.SubnetworkName)
-			}
+
+		if cfg.Global.SubnetworkName != "" && strings.Contains(cfg.Global.SubnetworkName, "/") {
+			subnetworkURL = cfg.Global.SubnetworkName
+		} else {
+			subnetworkURL = gceSubnetworkURL(apiEndpoint, cfg.Global.ProjectID, region, cfg.Global.SubnetworkName)
 		}
 		if cfg.Global.TokenURL != "" {
 			tokenSource = NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
@@ -212,7 +215,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 		}
 	}
 
-	return CreateGCECloud(projectID, region, zone, managedZones, networkURL, subnetworkURL,
+	return CreateGCECloud(apiEndpoint, projectID, region, zone, managedZones, networkURL, subnetworkURL,
 		nodeTags, nodeInstancePrefix, tokenSource, true /* useMetadataServer */)
 }
 
@@ -220,7 +223,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 // If no networkUrl is specified, loads networkName via rest call.
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
-func CreateGCECloud(projectID, region, zone string, managedZones []string, networkURL, subnetworkURL string, nodeTags []string,
+func CreateGCECloud(apiEndpoint, projectID, region, zone string, managedZones []string, networkURL, subnetworkURL string, nodeTags []string,
 	nodeInstancePrefix string, tokenSource oauth2.TokenSource, useMetadataServer bool) (*GCECloud, error) {
 
 	client, err := newOauthClient(tokenSource)
@@ -231,6 +234,10 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 	service, err := compute.New(client)
 	if err != nil {
 		return nil, err
+	}
+
+	if apiEndpoint != "" {
+		service.BasePath = fmt.Sprintf("%sprojects/", apiEndpoint)
 	}
 
 	client, err = newOauthClient(tokenSource)
@@ -249,7 +256,7 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		if err != nil {
 			return nil, err
 		}
-		networkURL = gceNetworkURL(projectID, networkName)
+		networkURL = gceNetworkURL(apiEndpoint, projectID, networkName)
 	}
 
 	networkProjectID, err := getProjectIDInURL(networkURL)
@@ -365,12 +372,18 @@ func (gce *GCECloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []
 // GCECloud implements cloudprovider.Interface.
 var _ cloudprovider.Interface = (*GCECloud)(nil)
 
-func gceNetworkURL(project, network string) string {
-	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", project, network)
+func gceNetworkURL(api_endpoint, project, network string) string {
+	if api_endpoint == "" {
+		api_endpoint = "https://www.googleapis.com/compute/v1/"
+	}
+	return fmt.Sprintf("%sprojects/%s/global/networks/%s", api_endpoint, project, network)
 }
 
-func gceSubnetworkURL(project, region, subnetwork string) string {
-	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/subnetworks/%s", project, region, subnetwork)
+func gceSubnetworkURL(api_endpoint, project, region, subnetwork string) string {
+	if api_endpoint == "" {
+		api_endpoint = "https://www.googleapis.com/compute/v1/"
+	}
+	return fmt.Sprintf("%sprojects/%s/regions/%s/subnetworks/%s", api_endpoint, project, region, subnetwork)
 }
 
 // getProjectIDInURL parses typical full resource URLS and shorter URLS

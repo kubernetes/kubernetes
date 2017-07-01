@@ -76,7 +76,8 @@ func setupProviderConfig() error {
 		if !framework.TestContext.CloudConfig.MultiZone {
 			managedZones = []string{zone}
 		}
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID,
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ApiEndpoint,
+			framework.TestContext.CloudConfig.ProjectID,
 			region, zone, managedZones, "" /* networkUrl */, "" /* subnetworkUrl */, nil, /* nodeTags */
 			"" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {

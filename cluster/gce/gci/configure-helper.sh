@@ -379,6 +379,11 @@ function create-master-auth {
   cat <<EOF >/etc/gce.conf
 [global]
 EOF
+  if [[ -n "${GCE_API_ENDPOINT:-}" ]]; then
+    cat <<EOF >>/etc/gce.conf
+api-endpoint = ${GCE_API_ENDPOINT}
+EOF
+  fi
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
@@ -1706,7 +1711,7 @@ function start-kube-addons {
     sed -i -e "s@__CALICO_TYPHA_CPU__@$(get-calico-typha-cpu)@g" "${typha_dep_file}"
     sed -i -e "s@__CALICO_TYPHA_REPLICAS__@$(get-calico-typha-replicas)@g" "${typha_dep_file}"
   else
-    # If not configured to use Calico, the set the typha replica count to 0, but only if the 
+    # If not configured to use Calico, the set the typha replica count to 0, but only if the
     # addon is present.
     local -r typha_dep_file="${dst_dir}/calico-policy-controller/typha-deployment.yaml"
     if [[ -e $typha_dep_file ]]; then
