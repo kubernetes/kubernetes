@@ -22,14 +22,14 @@ func main() {
         Name:              "MyVolume",
         RootUserID:        "root",
         RootGroupID:       "root",
-        ConfigurationName: "base",
+        ConfigurationName: "BASE",
     }
 
-    volume_uuid, err := client.CreateVolume(req)
+    volumeUUID, err := client.CreateVolume(req)
     if err != nil {
         log.Fatalf("Error:", err)
     }
 
-    log.Printf("%s", volume_uuid)
+    log.Printf("%s", volumeUUID)
 }
 ```
