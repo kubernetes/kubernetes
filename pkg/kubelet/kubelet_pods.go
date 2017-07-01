@@ -729,9 +729,8 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
 	return pullSecrets
 }
 
-// Returns true if pod is in the terminated state ("Failed" or "Succeeded").
+// podIsTerminated returns true if pod is in the terminated state ("Failed" or "Succeeded").
 func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
-	var status v1.PodStatus
 	// Check the cached pod status which was set after the last sync.
 	status, ok := kl.statusManager.GetPodStatus(pod.UID)
 	if !ok {

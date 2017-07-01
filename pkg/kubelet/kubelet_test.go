@@ -1249,10 +1249,21 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	pods := newTestPods(5)
+	now := metav1.NewTime(time.Now())
 	pods[0].Status.Phase = v1.PodFailed
 	pods[1].Status.Phase = v1.PodSucceeded
+	// The pod is terminating, should not filter out.
 	pods[2].Status.Phase = v1.PodRunning
+	pods[2].DeletionTimestamp = &now
+	pods[2].Status.ContainerStatuses = []v1.ContainerStatus{
+		{State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{
+				StartedAt: now,
+			},
+		}},
+	}
 	pods[3].Status.Phase = v1.PodPending
+	pods[4].Status.Phase = v1.PodRunning
 
 	expected := []*v1.Pod{pods[2], pods[3], pods[4]}
 	kubelet.podManager.SetPods(pods)
