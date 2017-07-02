@@ -43,6 +43,9 @@ CLUSTER_IP_RANGE=${CLUSTER_IP_RANGE:-10.244.0.0/16}
 
 SWIFT_SERVER_URL=${SWIFT_SERVER_URL:-}
 
+# The name of the object store container to use
+SWIFT_OBJECT_STORE=${SWIFT_OBJECT_STORE:-kubernetes}
+
 # Flag indicates if new image must be created. If 'false' then image with IMAGE_ID will be used.
 # If 'true' then new image will be created from file config-image.sh
 CREATE_IMAGE=${CREATE_IMAGE:-true} # use "true" for devstack
