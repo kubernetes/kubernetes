@@ -127,7 +127,7 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	saConfig.clientMapper = resource.ClientMapperFunc(f.ClientForMapping)
 	saConfig.categoryExpander = f.CategoryExpander()
 	saConfig._print = func(obj runtime.Object) error {
-		return f.PrintObject(cmd, saConfig.mapper, obj, saConfig.out)
+		return f.PrintObject(cmd, saConfig.local, saConfig.mapper, obj, saConfig.out)
 	}
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
