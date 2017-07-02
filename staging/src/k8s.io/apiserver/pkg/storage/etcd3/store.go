@@ -264,11 +264,13 @@ func (s *store) GuaranteedUpdate(
 	key = path.Join(s.pathPrefix, key)
 
 	var origState *objState
+	var mustCheckData bool
 	if len(suggestion) == 1 && suggestion[0] != nil {
 		origState, err = s.getStateFromObject(suggestion[0])
 		if err != nil {
 			return err
 		}
+		mustCheckData = true
 	} else {
 		getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
 		if err != nil {
@@ -297,6 +299,21 @@ func (s *store) GuaranteedUpdate(
 			return err
 		}
 		if !origState.stale && bytes.Equal(data, origState.data) {
+			// if we skipped the original Get in this loop, we must refresh from
+			// etcd in order to be sure the data in the store is equivalent to
+			// our desired serialization
+			if mustCheckData {
+				getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+				if err != nil {
+					return err
+				}
+				origState, err = s.getState(getResp, key, v, ignoreNotFound)
+				if err != nil {
+					return err
+				}
+				mustCheckData = false
+				continue
+			}
 			return decode(s.codec, s.versioner, origState.data, out, origState.rev)
 		}
 
@@ -330,6 +347,7 @@ func (s *store) GuaranteedUpdate(
 				return err
 			}
 			trace.Step("Retry value restored")
+			mustCheckData = false
 			continue
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()
