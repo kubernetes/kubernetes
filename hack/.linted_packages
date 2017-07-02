@@ -278,6 +278,7 @@ pkg/util/rand
 pkg/util/runtime
 pkg/util/sets
 pkg/util/sets/types
+pkg/util/slice
 pkg/util/tail
 pkg/util/validation
 pkg/util/validation/field

@@ -39,8 +39,8 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
-	sliceutil "k8s.io/kubernetes/pkg/util/slice"
 )
 
 const (
