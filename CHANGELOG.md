@@ -2000,37 +2000,41 @@ filename | sha256 hash
 * Support updating storageclasses in etcd to storage.k8s.io/v1. You must do this prior to upgrading to 1.8. ([#46116](https://github.com/kubernetes/kubernetes/pull/46116), [@ncdc](https://github.com/ncdc))
 * The namespace API object no longer supports the deletecollection operation. ([#46407](https://github.com/kubernetes/kubernetes/pull/46407), [@liggitt](https://github.com/liggitt))
 * NetworkPolicy has been moved from `extensions/v1beta1` to the new ([#39164](https://github.com/kubernetes/kubernetes/pull/39164), [@danwinship](https://github.com/danwinship))
-    * `networking.k8s.io/v1` API group. The structure remains unchanged from
-    * the beta1 API.
-    * The `net.beta.kubernetes.io/network-policy` annotation on Namespaces
-    * to opt in to isolation has been removed. Instead, isolation is now
-    * determined at a per-pod level, with pods being isolated if there is
-    * any NetworkPolicy whose spec.podSelector targets them. Pods that are
-    * targeted by NetworkPolicies accept traffic that is accepted by any of
-    * the NetworkPolicies (and nothing else), and pods that are not targeted
-    * by any NetworkPolicy accept all traffic by default.
-    * Action Required:
-    * When upgrading to Kubernetes 1.7 (and a network plugin that supports
-    * the new NetworkPolicy v1 semantics), to ensure full behavioral
-    * compatibility with v1beta1:
-    *     1. In Namespaces that previously had the "DefaultDeny" annotation,
-    *        you can create equivalent v1 semantics by creating a
-    *        NetworkPolicy that matches all pods but does not allow any
-    *        traffic:
-    *            kind: NetworkPolicy
-    *            apiVersion: networking.k8s.io/v1
-    *            metadata:
-    *              name: default-deny
-    *            spec:
-    *              podSelector:
-    *        This will ensure that pods that aren't matched by any other
-    *        NetworkPolicy will continue to be fully-isolated, as they were
-    *        before.
-    *     2. In Namespaces that previously did not have the "DefaultDeny"
-    *        annotation, you should delete any existing NetworkPolicy
-    *        objects. These would have had no effect before, but with v1
-    *        semantics they might cause some traffic to be blocked that you
-    *        didn't intend to be blocked.
+	`networking.k8s.io/v1` API group. The structure remains unchanged from
+	the beta1 API.
+	The `net.beta.kubernetes.io/network-policy` annotation on Namespaces
+	to opt in to isolation has been removed. Instead, isolation is now
+	determined at a per-pod level, with pods being isolated if there is
+	any NetworkPolicy whose spec.podSelector targets them. Pods that are
+	targeted by NetworkPolicies accept traffic that is accepted by any of
+	the NetworkPolicies (and nothing else), and pods that are not targeted
+	by any NetworkPolicy accept all traffic by default.
+	Action Required:
+	When upgrading to Kubernetes 1.7 (and a network plugin that supports
+	the new NetworkPolicy v1 semantics), to ensure full behavioral
+	compatibility with v1beta1:
+	1. In Namespaces that previously had the "DefaultDeny" annotation,
+	   you can create equivalent v1 semantics by creating a
+	   NetworkPolicy that matches all pods but does not allow any
+	   traffic:
+
+	   ```yaml
+           kind: NetworkPolicy
+           apiVersion: networking.k8s.io/v1
+           metadata:
+             name: default-deny
+           spec:
+             podSelector:
+	   ```
+
+	   This will ensure that pods that aren't matched by any other
+	   NetworkPolicy will continue to be fully-isolated, as they were
+	   before.
+	2. In Namespaces that previously did not have the "DefaultDeny"
+	   annotation, you should delete any existing NetworkPolicy
+	   objects. These would have had no effect before, but with v1
+	   semantics they might cause some traffic to be blocked that you
+	   didn't intend to be blocked.
 
 ### Other notable changes
 
@@ -2493,37 +2497,41 @@ filename | sha256 hash
 * Support updating storageclasses in etcd to storage.k8s.io/v1. You must do this prior to upgrading to 1.8. ([#46116](https://github.com/kubernetes/kubernetes/pull/46116), [@ncdc](https://github.com/ncdc))
 * The namespace API object no longer supports the deletecollection operation. ([#46407](https://github.com/kubernetes/kubernetes/pull/46407), [@liggitt](https://github.com/liggitt))
 * NetworkPolicy has been moved from `extensions/v1beta1` to the new ([#39164](https://github.com/kubernetes/kubernetes/pull/39164), [@danwinship](https://github.com/danwinship))
-    * `networking.k8s.io/v1` API group. The structure remains unchanged from
-    * the beta1 API.
-    * The `net.beta.kubernetes.io/network-policy` annotation on Namespaces
-    * to opt in to isolation has been removed. Instead, isolation is now
-    * determined at a per-pod level, with pods being isolated if there is
-    * any NetworkPolicy whose spec.podSelector targets them. Pods that are
-    * targeted by NetworkPolicies accept traffic that is accepted by any of
-    * the NetworkPolicies (and nothing else), and pods that are not targeted
-    * by any NetworkPolicy accept all traffic by default.
-    * Action Required:
-    * When upgrading to Kubernetes 1.7 (and a network plugin that supports
-    * the new NetworkPolicy v1 semantics), to ensure full behavioral
-    * compatibility with v1beta1:
-    *     1. In Namespaces that previously had the "DefaultDeny" annotation,
-    *        you can create equivalent v1 semantics by creating a
-    *        NetworkPolicy that matches all pods but does not allow any
-    *        traffic:
-    *            kind: NetworkPolicy
-    *            apiVersion: networking.k8s.io/v1
-    *            metadata:
-    *              name: default-deny
-    *            spec:
-    *              podSelector:
-    *        This will ensure that pods that aren't matched by any other
-    *        NetworkPolicy will continue to be fully-isolated, as they were
-    *        before.
-    *     2. In Namespaces that previously did not have the "DefaultDeny"
-    *        annotation, you should delete any existing NetworkPolicy
-    *        objects. These would have had no effect before, but with v1
-    *        semantics they might cause some traffic to be blocked that you
-    *        didn't intend to be blocked.
+	`networking.k8s.io/v1` API group. The structure remains unchanged from
+	the beta1 API.
+	The `net.beta.kubernetes.io/network-policy` annotation on Namespaces
+	to opt in to isolation has been removed. Instead, isolation is now
+	determined at a per-pod level, with pods being isolated if there is
+	any NetworkPolicy whose spec.podSelector targets them. Pods that are
+	targeted by NetworkPolicies accept traffic that is accepted by any of
+	the NetworkPolicies (and nothing else), and pods that are not targeted
+	by any NetworkPolicy accept all traffic by default.
+	Action Required:
+	When upgrading to Kubernetes 1.7 (and a network plugin that supports
+	the new NetworkPolicy v1 semantics), to ensure full behavioral
+	compatibility with v1beta1:
+	1. In Namespaces that previously had the "DefaultDeny" annotation,
+	   you can create equivalent v1 semantics by creating a
+	   NetworkPolicy that matches all pods but does not allow any
+	   traffic:
+
+	   ```yaml
+           kind: NetworkPolicy
+           apiVersion: networking.k8s.io/v1
+           metadata:
+             name: default-deny
+           spec:
+             podSelector:
+	   ```
+
+	   This will ensure that pods that aren't matched by any other
+	   NetworkPolicy will continue to be fully-isolated, as they were
+	   before.
+	2. In Namespaces that previously did not have the "DefaultDeny"
+	   annotation, you should delete any existing NetworkPolicy
+	   objects. These would have had no effect before, but with v1
+	   semantics they might cause some traffic to be blocked that you
+	   didn't intend to be blocked.
 
 ### Other notable changes
 
