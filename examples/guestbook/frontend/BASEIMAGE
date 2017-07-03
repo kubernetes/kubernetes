@@ -1,0 +1,4 @@
+amd64=php:5-apache
+arm=armhf/php:5.6-apache
+arm64=arm64v8/php:5-apache
+ppc64le=ppc64le/php:5-apache
