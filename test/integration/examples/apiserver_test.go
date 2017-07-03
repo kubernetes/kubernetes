@@ -448,9 +448,11 @@ func testAPIResourceList(t *testing.T, client rest.Interface) {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", "/apis/wardle.k8s.io/v1alpha1", err)
 	}
 	assert.Equal(t, groupVersion.String(), apiResourceList.GroupVersion)
-	assert.Equal(t, 1, len(apiResourceList.APIResources))
-	assert.Equal(t, "flunders", apiResourceList.APIResources[0].Name)
-	assert.True(t, apiResourceList.APIResources[0].Namespaced)
+	assert.Equal(t, 2, len(apiResourceList.APIResources))
+	assert.Equal(t, "fischers", apiResourceList.APIResources[0].Name)
+	assert.False(t, apiResourceList.APIResources[0].Namespaced)
+	assert.Equal(t, "flunders", apiResourceList.APIResources[1].Name)
+	assert.True(t, apiResourceList.APIResources[1].Namespaced)
 }
 
 const (

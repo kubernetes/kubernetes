@@ -30,7 +30,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  wardle.GroupName,
-			RootScopedKinds:            sets.NewString("APIService"),
+			RootScopedKinds:            sets.NewString("Fischer", "FischerList"),
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
 			ImportPrefix:               "k8s.io/sample-apiserver/pkg/apis/wardle",
 			AddInternalObjectsToScheme: wardle.AddToScheme,

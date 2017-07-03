@@ -41,3 +41,25 @@ type Flunder struct {
 	Spec   FlunderSpec   `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 	Status FlunderStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
+
+// +genclient=true
+// +nonNamespaced=true
+
+type Fischer struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// DisallowedFlunders holds a list of Flunder.Names that are disallowed.
+	DisallowedFlunders []string `json:"disallowedFlunders,omitempty" protobuf:"bytes,2,rep,name=disallowedFlunders"`
+}
+
+// +genclient=true
+// +nonNamespaced=true
+
+// FischerList is a list of Fischer objects.
+type FischerList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	Items []Fischer `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
