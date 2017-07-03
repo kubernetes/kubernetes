@@ -1831,7 +1831,7 @@ func validateHTTPGetAction(http *api.HTTPGetAction, fldPath *field.Path) field.E
 	if len(http.Path) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("path"), ""))
 	}
-	allErrors = append(allErrors, ValidatePortNumOrName(http.Port, fldPath.Child("port"))...)
+	allErrors = append(allErrors, ValidatePortNum(http.Port, fldPath.Child("port"))...)
 	if !supportedHTTPSchemes.Has(string(http.Scheme)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("scheme"), http.Scheme, supportedHTTPSchemes.List()))
 	}
@@ -1843,12 +1843,22 @@ func validateHTTPGetAction(http *api.HTTPGetAction, fldPath *field.Path) field.E
 	return allErrors
 }
 
+func ValidatePortNum(port intstr.IntOrString, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if port.Type != intstr.Int && port.Type != intstr.String {
+		allErrs = append(allErrs, field.InternalError(fldPath, fmt.Errorf("unknown type: %v", port.Type)))
+	}
+
+	for _, msg := range validation.IsValidPortNum(port.IntValue()) {
+		allErrs = append(allErrs, field.Invalid(fldPath, port.IntValue(), msg))
+	}
+	return allErrs
+}
+
 func ValidatePortNumOrName(port intstr.IntOrString, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if port.Type == intstr.Int {
-		for _, msg := range validation.IsValidPortNum(port.IntValue()) {
-			allErrs = append(allErrs, field.Invalid(fldPath, port.IntValue(), msg))
-		}
+		allErrs = append(allErrs, ValidatePortNum(port, fldPath)...)
 	} else if port.Type == intstr.String {
 		for _, msg := range validation.IsValidPortName(port.StrVal) {
 			allErrs = append(allErrs, field.Invalid(fldPath, port.StrVal, msg))
@@ -1860,7 +1870,7 @@ func ValidatePortNumOrName(port intstr.IntOrString, fldPath *field.Path) field.E
 }
 
 func validateTCPSocketAction(tcp *api.TCPSocketAction, fldPath *field.Path) field.ErrorList {
-	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
+	return ValidatePortNum(tcp.Port, fldPath.Child("port"))
 }
 
 func validateHandler(handler *api.Handler, fldPath *field.Path) field.ErrorList {
