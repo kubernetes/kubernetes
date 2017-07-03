@@ -100,8 +100,8 @@ type Event struct {
 	// +optional
 	ObjectRef *ObjectReference
 	// The response status, populated even when the ResponseObject is not a Status type.
-	// For successful responses, this will only include the Code and StatusSuccess.
-	// For non-status type error responses, this will be auto-populated with the error Message.
+	// For successful responses, this will only include the Code. For non-status type
+	// error responses, this will be auto-populated with the error Message.
 	// +optional
 	ResponseStatus *metav1.Status
 
