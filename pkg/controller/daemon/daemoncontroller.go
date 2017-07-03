@@ -1150,20 +1150,13 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		case *predicates.PredicateFailureError:
 			var emitEvent bool
 			switch reason {
-			// unintentional predicates reasons need to be fired out to event.
+			// unexpected
 			case
 				predicates.ErrDiskConflict,
 				predicates.ErrVolumeZoneConflict,
 				predicates.ErrMaxVolumeCountExceeded,
 				predicates.ErrNodeUnderMemoryPressure,
-				predicates.ErrNodeUnderDiskPressure:
-				// wantToRun and shouldContinueRunning are likely true here. They are
-				// absolutely true at the time of writing the comment. See first comment
-				// of this method.
-				shouldSchedule = false
-				emitEvent = true
-			// unexpected
-			case
+				predicates.ErrNodeUnderDiskPressure,
 				predicates.ErrPodAffinityNotMatch,
 				predicates.ErrServiceAffinityViolated:
 				glog.Warningf("unexpected predicate failure reason: %s", reason.GetReason())
