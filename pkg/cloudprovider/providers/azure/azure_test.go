@@ -592,6 +592,7 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"subnetName": "--subnet-name--",
 		"securityGroupName": "--security-group-name--",
 		"vnetName": "--vnet-name--",
+		"vnetResourceGroup": "--vnet-resource-group--",
 		"routeTableName": "--route-table-name--",
 		"primaryAvailabilitySetName": "--primary-availability-set-name--",
 		"cloudProviderBackoff": true,
@@ -639,6 +640,7 @@ location: --location--
 subnetName: --subnet-name--
 securityGroupName: --security-group-name--
 vnetName: --vnet-name--
+vnetResourceGroup: --vnet-resource-group--
 routeTableName: --route-table-name--
 primaryAvailabilitySetName: --primary-availability-set-name--
 cloudProviderBackoff: true
@@ -688,6 +690,9 @@ func validateConfig(t *testing.T, config string) {
 	}
 	if azureCloud.VnetName != "--vnet-name--" {
 		t.Errorf("got incorrect value for VnetName")
+	}
+	if azureCloud.VnetResourceGroup != "--vnet-resource-group--" {
+		t.Errorf("got incorrect value for VnetResourceGroup")
 	}
 	if azureCloud.RouteTableName != "--route-table-name--" {
 		t.Errorf("got incorrect value for RouteTableName")
