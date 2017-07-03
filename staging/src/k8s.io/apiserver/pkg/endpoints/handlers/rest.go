@@ -625,11 +625,12 @@ func patchResource(
 		getOriginalPatchMap     func() (map[string]interface{}, error)
 		lastConflictErr         error
 		originalResourceVersion string
+		resetOriginalData       bool
 	)
 
 	// applyPatch is called every time GuaranteedUpdate asks for the updated object,
 	// and is given the currently persisted object as input.
-	applyPatch := func(_ request.Context, _, currentObject runtime.Object) (runtime.Object, error) {
+	applyPatch := func(_ request.Context, _, currentObject runtime.Object, maybeStale bool) (runtime.Object, error) {
 		// Make sure we actually have a persisted currentObject
 		if hasUID, err := hasUID(currentObject); err != nil {
 			return nil, err
@@ -640,6 +641,17 @@ func patchResource(
 		currentResourceVersion := ""
 		if currentMetadata, err := meta.Accessor(currentObject); err == nil {
 			currentResourceVersion = currentMetadata.GetResourceVersion()
+		}
+
+		if resetOriginalData {
+			originalObjJS, originalPatchedObjJS = nil, nil
+			originalObjMap, originalPatchMap = nil, nil
+			resetOriginalData = false
+		}
+		if maybeStale {
+			// In case of potentially stale data, in case of retry we should reset original
+			// data, as it may conflict with currently passed data.
+			resetOriginalData = true
 		}
 
 		switch {
@@ -813,7 +825,7 @@ func patchResource(
 
 	// applyAdmission is called every time GuaranteedUpdate asks for the updated object,
 	// and is given the currently persisted object and the patched object as input.
-	applyAdmission := func(ctx request.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
+	applyAdmission := func(ctx request.Context, patchedObject runtime.Object, currentObject runtime.Object, maybeStale bool) (runtime.Object, error) {
 		return patchedObject, admit(patchedObject, currentObject)
 	}
 
@@ -885,7 +897,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 
 		var transformers []rest.TransformFunc
 		if admit != nil && admit.Handles(admission.Update) {
-			transformers = append(transformers, func(ctx request.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
+			transformers = append(transformers, func(ctx request.Context, newObj, oldObj runtime.Object, maybeStale bool) (runtime.Object, error) {
 				userInfo, _ := request.UserFrom(ctx)
 				return newObj, admit.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			})

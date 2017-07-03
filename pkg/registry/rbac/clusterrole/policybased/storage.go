@@ -57,7 +57,7 @@ func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.Up
 		return s.StandardStorage.Update(ctx, name, obj)
 	}
 
-	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
+	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object, maybeStale bool) (runtime.Object, error) {
 		clusterRole := obj.(*rbac.ClusterRole)
 
 		rules := clusterRole.Rules

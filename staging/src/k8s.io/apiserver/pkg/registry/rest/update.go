@@ -121,7 +121,7 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, ob
 }
 
 // TransformFunc is a function to transform and return newObj
-type TransformFunc func(ctx genericapirequest.Context, newObj runtime.Object, oldObj runtime.Object) (transformedNewObj runtime.Object, err error)
+type TransformFunc func(ctx genericapirequest.Context, newObj runtime.Object, oldObj runtime.Object, maybeStale bool) (transformedNewObj runtime.Object, err error)
 
 // defaultUpdatedObjectInfo implements UpdatedObjectInfo
 type defaultUpdatedObjectInfo struct {
@@ -163,7 +163,7 @@ func (i *defaultUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
 
 // UpdatedObject satisfies the UpdatedObjectInfo interface.
 // It returns a copy of the held obj, passed through any configured transformers.
-func (i *defaultUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, oldObj runtime.Object) (runtime.Object, error) {
+func (i *defaultUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, oldObj runtime.Object, maybeStale bool) (runtime.Object, error) {
 	var err error
 	// Start with the configured object
 	newObj := i.obj
@@ -180,7 +180,7 @@ func (i *defaultUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, 
 
 	// Allow any configured transformers to update the new object
 	for _, transformer := range i.transformers {
-		newObj, err = transformer(ctx, newObj, oldObj)
+		newObj, err = transformer(ctx, newObj, oldObj, maybeStale)
 		if err != nil {
 			return nil, err
 		}
@@ -213,15 +213,15 @@ func (i *wrappedUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
 
 // UpdatedObject satisfies the UpdatedObjectInfo interface.
 // It delegates to the wrapped objInfo and passes the result through any configured transformers.
-func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, oldObj runtime.Object) (runtime.Object, error) {
-	newObj, err := i.objInfo.UpdatedObject(ctx, oldObj)
+func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, oldObj runtime.Object, maybeStale bool) (runtime.Object, error) {
+	newObj, err := i.objInfo.UpdatedObject(ctx, oldObj, maybeStale)
 	if err != nil {
 		return newObj, err
 	}
 
 	// Allow any configured transformers to update the new object or error
 	for _, transformer := range i.transformers {
-		newObj, err = transformer(ctx, newObj, oldObj)
+		newObj, err = transformer(ctx, newObj, oldObj, maybeStale)
 		if err != nil {
 			return nil, err
 		}

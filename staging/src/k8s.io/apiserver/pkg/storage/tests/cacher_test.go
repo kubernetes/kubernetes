@@ -122,7 +122,7 @@ func makeTestPod(name string) *example.Pod {
 }
 
 func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *example.Pod {
-	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	updateFn := func(input runtime.Object, maybeStale bool, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		newObj, err := scheme.DeepCopy(obj)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

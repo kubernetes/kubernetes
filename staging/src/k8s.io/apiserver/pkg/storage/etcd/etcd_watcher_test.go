@@ -372,7 +372,7 @@ func TestWatchEtcdState(t *testing.T) {
 	}
 
 	// CAS the previous value
-	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	updateFn := func(input runtime.Object, maybeStale bool, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		newObj, err := scheme.DeepCopy(pod)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -426,7 +426,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	}
 
 	// check for concatenation on watch event with CAS
-	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	updateFn := func(input runtime.Object, maybeStale bool, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		pod := input.(*example.Pod)
 		pod.Name = "bar"
 		return pod, nil, nil
@@ -449,7 +449,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	}
 
 	pod.Name = "baz"
-	updateFn = func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	updateFn = func(input runtime.Object, maybeStale bool, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		pod := input.(*example.Pod)
 		pod.Name = "baz"
 		return pod, nil, nil

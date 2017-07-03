@@ -76,7 +76,7 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 	}
 	oldScale := scaleFromRC(rc)
 
-	obj, err := objInfo.UpdatedObject(ctx, oldScale)
+	obj, err := objInfo.UpdatedObject(ctx, oldScale, false)
 
 	if obj == nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
