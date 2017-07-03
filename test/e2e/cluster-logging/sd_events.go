@@ -40,26 +40,26 @@ const (
 	eventCreationInterval = 10 * time.Second
 )
 
-var _ = framework.KubeDescribe("Cluster level logging using GCL", func() {
-	f := framework.NewDefaultFramework("gcl-logging-events")
+var _ = framework.KubeDescribe("Cluster level logging implemented by Stackdriver", func() {
+	f := framework.NewDefaultFramework("sd-logging-events")
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	It("should ingest events", func() {
-		gclLogsProvider, err := newGclLogsProvider(f)
-		framework.ExpectNoError(err, "Failed to create GCL logs provider")
+		sdLogsProvider, err := newSdLogsProvider(f)
+		framework.ExpectNoError(err, "Failed to create Stackdriver logs provider")
 
-		err = gclLogsProvider.Init()
-		defer gclLogsProvider.Cleanup()
-		framework.ExpectNoError(err, "Failed to init GCL logs provider")
+		err = sdLogsProvider.Init()
+		defer sdLogsProvider.Cleanup()
+		framework.ExpectNoError(err, "Failed to init Stackdriver logs provider")
 
 		stopCh := make(chan struct{})
 		successCh := make(chan struct{})
 		go func() {
 			wait.Poll(eventPollingInterval, eventsIngestionTimeout, func() (bool, error) {
-				events := gclLogsProvider.ReadEvents()
+				events := sdLogsProvider.ReadEvents()
 				if len(events) > 0 {
 					framework.Logf("Some events are ingested, sample event: %v", events[0])
 					close(successCh)

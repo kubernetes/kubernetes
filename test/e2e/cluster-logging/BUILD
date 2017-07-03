@@ -14,7 +14,7 @@ go_library(
         "es_utils.go",
         "sd.go",
         "sd_events.go",
-        "sd_load.go",
+        "sd_soak.go",
         "sd_utils.go",
         "utils.go",
     ],
