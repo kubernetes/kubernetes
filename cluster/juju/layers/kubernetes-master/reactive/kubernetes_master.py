@@ -155,6 +155,7 @@ def install_snaps():
     hookenv.status_set('maintenance', 'Installing cdk-addons snap')
     snap.install('cdk-addons', channel=channel)
     set_state('kubernetes-master.snaps.installed')
+    remove_state('kubernetes-master.components.started')
 
 
 @when('config.changed.channel')
