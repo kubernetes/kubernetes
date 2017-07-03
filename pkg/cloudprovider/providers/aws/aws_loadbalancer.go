@@ -139,7 +139,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				glog.V(2).Info("Detaching load balancer from removed subnets")
 				_, err := c.elb.DetachLoadBalancerFromSubnets(request)
 				if err != nil {
-					return nil, fmt.Errorf("error detaching AWS loadbalancer from subnets: %v", err)
+					return nil, fmt.Errorf("error detaching AWS loadbalancer from subnets: %q", err)
 				}
 				dirty = true
 			}
@@ -151,7 +151,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				glog.V(2).Info("Attaching load balancer to added subnets")
 				_, err := c.elb.AttachLoadBalancerToSubnets(request)
 				if err != nil {
-					return nil, fmt.Errorf("error attaching AWS loadbalancer to subnets: %v", err)
+					return nil, fmt.Errorf("error attaching AWS loadbalancer to subnets: %q", err)
 				}
 				dirty = true
 			}
@@ -170,7 +170,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				glog.V(2).Info("Applying updated security groups to load balancer")
 				_, err := c.elb.ApplySecurityGroupsToLoadBalancer(request)
 				if err != nil {
-					return nil, fmt.Errorf("error applying AWS loadbalancer security groups: %v", err)
+					return nil, fmt.Errorf("error applying AWS loadbalancer security groups: %q", err)
 				}
 				dirty = true
 			}
@@ -230,7 +230,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				glog.V(2).Info("Deleting removed load balancer listeners")
 				_, err := c.elb.DeleteLoadBalancerListeners(request)
 				if err != nil {
-					return nil, fmt.Errorf("error deleting AWS loadbalancer listeners: %v", err)
+					return nil, fmt.Errorf("error deleting AWS loadbalancer listeners: %q", err)
 				}
 				dirty = true
 			}
@@ -242,7 +242,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				glog.V(2).Info("Creating added load balancer listeners")
 				_, err := c.elb.CreateLoadBalancerListeners(request)
 				if err != nil {
-					return nil, fmt.Errorf("error creating AWS loadbalancer listeners: %v", err)
+					return nil, fmt.Errorf("error creating AWS loadbalancer listeners: %q", err)
 				}
 				dirty = true
 			}
@@ -339,7 +339,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 			modifyAttributesRequest.LoadBalancerAttributes = loadBalancerAttributes
 			_, err = c.elb.ModifyLoadBalancerAttributes(modifyAttributesRequest)
 			if err != nil {
-				return nil, fmt.Errorf("Unable to update load balancer attributes during attribute sync: %v", err)
+				return nil, fmt.Errorf("Unable to update load balancer attributes during attribute sync: %q", err)
 			}
 			dirty = true
 		}
@@ -411,7 +411,7 @@ func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDesc
 
 	_, err := c.elb.ConfigureHealthCheck(request)
 	if err != nil {
-		return fmt.Errorf("error configuring load-balancer health-check for %q: %v", name, err)
+		return fmt.Errorf("error configuring load-balancer health-check for %q: %q", name, err)
 	}
 
 	return nil
@@ -486,7 +486,7 @@ func (c *Cloud) createProxyProtocolPolicy(loadBalancerName string) error {
 	glog.V(2).Info("Creating proxy protocol policy on load balancer")
 	_, err := c.elb.CreateLoadBalancerPolicy(request)
 	if err != nil {
-		return fmt.Errorf("error creating proxy protocol policy on load balancer: %v", err)
+		return fmt.Errorf("error creating proxy protocol policy on load balancer: %q", err)
 	}
 
 	return nil
@@ -505,7 +505,7 @@ func (c *Cloud) setBackendPolicies(loadBalancerName string, instancePort int64, 
 	}
 	_, err := c.elb.SetLoadBalancerPoliciesForBackendServer(request)
 	if err != nil {
-		return fmt.Errorf("error adjusting AWS loadbalancer backend policies: %v", err)
+		return fmt.Errorf("error adjusting AWS loadbalancer backend policies: %q", err)
 	}
 
 	return nil
