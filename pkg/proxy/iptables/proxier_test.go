@@ -2425,7 +2425,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				fp.OnEndpointsAdd(tc.previousEndpoints[i])
 			}
 		}
-		updateEndpointsMap(fp.endpointsMap, &fp.endpointsChanges, fp.hostname)
+		updateEndpointsMap(fp.endpointsMap, &fp.endpointsChanges)
 		compareEndpointsMaps(t, tci, fp.endpointsMap, tc.oldEndpoints)
 
 		// Now let's call appropriate handlers to get to state we want to be.
@@ -2445,7 +2445,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				fp.OnEndpointsUpdate(prev, curr)
 			}
 		}
-		result := updateEndpointsMap(fp.endpointsMap, &fp.endpointsChanges, fp.hostname)
+		result := updateEndpointsMap(fp.endpointsMap, &fp.endpointsChanges)
 		newMap := fp.endpointsMap
 		compareEndpointsMaps(t, tci, newMap, tc.expectedResult)
 		if len(result.staleEndpoints) != len(tc.expectedStaleEndpoints) {
