@@ -296,7 +296,7 @@ func (s *store) GuaranteedUpdate(
 		if err != nil {
 			return err
 		}
-		if !origState.stale && bytes.Equal(data, origState.data) {
+		if !origState.stale && bytes.Equal(data, origState.data) && ttl == 0 {
 			return decode(s.codec, s.versioner, origState.data, out, origState.rev)
 		}
 

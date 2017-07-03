@@ -563,7 +563,7 @@ func (h *etcdHelper) GuaranteedUpdate(
 		// If we don't send an update, we simply return the currently existing
 		// version of the object. However, the value transformer may indicate that
 		// the on disk representation has changed and that we must commit an update.
-		if newBody == origBody && !stale {
+		if newBody == origBody && !stale && ttl == 0 {
 			_, _, _, err := h.extractObj(res, nil, ptrToType, ignoreNotFound, false)
 			return err
 		}
