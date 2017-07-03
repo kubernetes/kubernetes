@@ -574,7 +574,7 @@ func validateIngressBackend(backend *extensions.IngressBackend, fldPath *field.P
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceName"), backend.ServiceName, msg))
 		}
 	}
-	allErrs = append(allErrs, apivalidation.ValidatePortNumOrName(backend.ServicePort, fldPath.Child("servicePort"))...)
+	allErrs = append(allErrs, apivalidation.ValidatePortNum(backend.ServicePort, fldPath.Child("servicePort"))...)
 	return allErrs
 }
 
