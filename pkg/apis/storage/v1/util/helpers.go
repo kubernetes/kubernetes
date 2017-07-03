@@ -16,7 +16,11 @@ limitations under the License.
 
 package util
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"strconv"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // IsDefaultStorageClassAnnotation represents a StorageClass annotation that
 // marks a class as the default StorageClass
@@ -28,10 +32,10 @@ const BetaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-
 // the annotation is set
 // TODO: remove Beta when no longer needed
 func IsDefaultAnnotationText(obj metav1.ObjectMeta) string {
-	if obj.Annotations[IsDefaultStorageClassAnnotation] == "true" {
+	if ret, _ := strconv.ParseBool(obj.Annotations[IsDefaultStorageClassAnnotation]); ret == true {
 		return "Yes"
 	}
-	if obj.Annotations[BetaIsDefaultStorageClassAnnotation] == "true" {
+	if ret, _ := strconv.ParseBool(obj.Annotations[BetaIsDefaultStorageClassAnnotation]); ret == true {
 		return "Yes"
 	}
 
@@ -42,10 +46,10 @@ func IsDefaultAnnotationText(obj metav1.ObjectMeta) string {
 // the annotation is set
 // TODO: remove Beta when no longer needed
 func IsDefaultAnnotation(obj metav1.ObjectMeta) bool {
-	if obj.Annotations[IsDefaultStorageClassAnnotation] == "true" {
+	if ret, _ := strconv.ParseBool(obj.Annotations[IsDefaultStorageClassAnnotation]); ret == true {
 		return true
 	}
-	if obj.Annotations[BetaIsDefaultStorageClassAnnotation] == "true" {
+	if ret, _ := strconv.ParseBool(obj.Annotations[BetaIsDefaultStorageClassAnnotation]); ret == true {
 		return true
 	}
 
