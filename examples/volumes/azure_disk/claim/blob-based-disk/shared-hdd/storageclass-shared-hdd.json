@@ -1,0 +1,12 @@
+{
+    "kind": "StorageClass",
+    "apiVersion": "storage.k8s.io/v1beta1",
+    "metadata": {
+        "name": "sharedhdd"
+    },
+    "provisioner": "kubernetes.io/azure-disk",
+    "parameters": {
+        "skuname": "standard_lrs",
+		"kind": "Shared"
+    }
+}

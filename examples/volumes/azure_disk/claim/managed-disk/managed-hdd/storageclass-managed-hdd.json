@@ -1,0 +1,12 @@
+{
+    "kind": "StorageClass",
+    "apiVersion": "storage.k8s.io/v1beta1",
+    "metadata": {
+        "name": "managedhdd"
+    },
+    "provisioner": "kubernetes.io/azure-disk",
+    "parameters": {
+        "storageaccounttype": "standard_lrs",
+        "kind" :"Managed"
+    }
+}
