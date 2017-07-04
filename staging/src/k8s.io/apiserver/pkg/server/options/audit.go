@@ -81,6 +81,33 @@ func NewAuditOptions() *AuditOptions {
 	}
 }
 
+// Validate checks invalid config combination
+func (o *AuditOptions) Validate() []error {
+	allErrors := []error{}
+
+	if !advancedAuditingEnabled() {
+		if len(o.PolicyFile) > 0 {
+			allErrors = append(allErrors, fmt.Errorf("feature '%s' must be enabled to set option --audit-policy-file", features.AdvancedAuditing))
+		}
+		if len(o.WebhookOptions.ConfigFile) > 0 {
+			allErrors = append(allErrors, fmt.Errorf("feature '%s' must be enabled to set option --audit-webhook-config-file", features.AdvancedAuditing))
+		}
+	} else {
+		// check webhook mode
+		validMode := false
+		for _, m := range pluginwebhook.AllowedModes {
+			if m == o.WebhookOptions.Mode {
+				validMode = true
+				break
+			}
+		}
+		if !validMode {
+			allErrors = append(allErrors, fmt.Errorf("invalid audit webhook mode %s, allowed modes are %q", o.WebhookOptions.Mode, strings.Join(pluginwebhook.AllowedModes, ",")))
+		}
+	}
+	return allErrors
+}
+
 func (o *AuditOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.PolicyFile, "audit-policy-file", o.PolicyFile,
 		"Path to the file that defines the audit policy configuration. Requires the 'AdvancedAuditing' feature gate."+
@@ -91,13 +118,19 @@ func (o *AuditOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *AuditOptions) ApplyTo(c *server.Config) error {
-	// Apply generic options.
+	// Apply legacy audit options if advanced audit is not enabled.
+	if !advancedAuditingEnabled() {
+		return o.LogOptions.legacyApplyTo(c)
+	}
+
+	// Apply advanced options if advanced audit is enabled.
+	// 1. Apply generic options.
 	if err := o.applyTo(c); err != nil {
 		return err
 	}
 
-	// Apply plugin options.
-	if err := o.LogOptions.applyTo(c); err != nil {
+	// 2. Apply plugin options.
+	if err := o.LogOptions.advancedApplyTo(c); err != nil {
 		return err
 	}
 	if err := o.WebhookOptions.applyTo(c); err != nil {
@@ -111,9 +144,6 @@ func (o *AuditOptions) applyTo(c *server.Config) error {
 		return nil
 	}
 
-	if !advancedAuditingEnabled() {
-		return fmt.Errorf("feature '%s' must be enabled to set an audit policy", features.AdvancedAuditing)
-	}
 	p, err := policy.LoadPolicyFromFile(o.PolicyFile)
 	if err != nil {
 		return fmt.Errorf("loading audit policy file: %v", err)
@@ -133,7 +163,7 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 		"The maximum size in megabytes of the audit log file before it gets rotated.")
 }
 
-func (o *AuditLogOptions) applyTo(c *server.Config) error {
+func (o *AuditLogOptions) getWriter() io.Writer {
 	if o.Path == "" {
 		return nil
 	}
@@ -147,11 +177,18 @@ func (o *AuditLogOptions) applyTo(c *server.Config) error {
 			MaxSize:    o.MaxSize,
 		}
 	}
-	c.LegacyAuditWriter = w
+	return w
+}
 
-	if advancedAuditingEnabled() {
+func (o *AuditLogOptions) advancedApplyTo(c *server.Config) error {
+	if w := o.getWriter(); w != nil {
 		c.AuditBackend = appendBackend(c.AuditBackend, pluginlog.NewBackend(w))
 	}
+	return nil
+}
+
+func (o *AuditLogOptions) legacyApplyTo(c *server.Config) error {
+	c.LegacyAuditWriter = o.getWriter()
 	return nil
 }
 
@@ -170,9 +207,6 @@ func (o *AuditWebhookOptions) applyTo(c *server.Config) error {
 		return nil
 	}
 
-	if !advancedAuditingEnabled() {
-		return fmt.Errorf("feature '%s' must be enabled to set an audit webhook", features.AdvancedAuditing)
-	}
 	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, o.Mode)
 	if err != nil {
 		return fmt.Errorf("initializing audit webhook: %v", err)

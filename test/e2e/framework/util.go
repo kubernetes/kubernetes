@@ -2421,20 +2421,40 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 	})
 }
 
-func GetTTLAnnotationFromNode(node *v1.Node) (time.Duration, bool) {
+func GetPodSecretUpdateTimeout(c clientset.Interface) time.Duration {
+	// With SecretManager(ConfigMapManager), we may have to wait up to full sync period +
+	// TTL of secret(configmap) to elapse before the Kubelet projects the update into the
+	// volume and the container picks it up.
+	// So this timeout is based on default Kubelet sync period (1 minute) + maximum TTL for
+	// secret(configmap) that's based on cluster size + additional time as a fudge factor.
+	secretTTL, err := GetNodeTTLAnnotationValue(c)
+	if err != nil {
+		Logf("Couldn't get node TTL annotation (using default value of 0): %v", err)
+	}
+	podLogTimeout := 240*time.Second + secretTTL
+	return podLogTimeout
+}
+
+func GetNodeTTLAnnotationValue(c clientset.Interface) (time.Duration, error) {
+	nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
+	if err != nil || len(nodes.Items) == 0 {
+		return time.Duration(0), fmt.Errorf("Couldn't list any nodes to get TTL annotation: %v", err)
+	}
+	// Since TTL the kubelet is using is stored in node object, for the timeout
+	// purpose we take it from the first node (all of them should be the same).
+	node := &nodes.Items[0]
 	if node.Annotations == nil {
-		return time.Duration(0), false
+		return time.Duration(0), fmt.Errorf("No annotations found on the node")
 	}
 	value, ok := node.Annotations[v1.ObjectTTLAnnotationKey]
 	if !ok {
-		return time.Duration(0), false
+		return time.Duration(0), fmt.Errorf("No TTL annotation found on the node")
 	}
 	intValue, err := strconv.Atoi(value)
 	if err != nil {
-		Logf("Cannot convert TTL annotation from %#v to int", *node)
-		return time.Duration(0), false
+		return time.Duration(0), fmt.Errorf("Cannot convert TTL annotation from %#v to int", *node)
 	}
-	return time.Duration(intValue) * time.Second, true
+	return time.Duration(intValue) * time.Second, nil
 }
 
 func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, labelValue string) {

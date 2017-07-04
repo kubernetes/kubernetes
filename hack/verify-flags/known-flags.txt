@@ -46,6 +46,7 @@ audit-log-maxage
 audit-log-maxbackup
 audit-log-maxsize
 audit-log-path
+audit-policy-file
 audit-webhook-config-file
 audit-webhook-mode
 authentication-kubeconfig

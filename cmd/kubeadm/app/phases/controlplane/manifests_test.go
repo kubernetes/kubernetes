@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package controlplane
 
 import (
 	"fmt"
@@ -25,7 +25,7 @@ import (
 	"sort"
 	"testing"
 
-	api "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -93,7 +93,7 @@ func TestWriteStaticPodManifests(t *testing.T) {
 			}
 			defer manifest.Close()
 
-			var pod api.Pod
+			var pod v1.Pod
 			d := yaml.NewYAMLOrJSONDecoder(manifest, 4096)
 			if err := d.Decode(&pod); err != nil {
 				t.Error("WriteStaticPodManifests: error decoding manifests/kube-apiserver.yaml into Pod")
@@ -131,15 +131,15 @@ func TestNewVolume(t *testing.T) {
 	var tests = []struct {
 		name     string
 		path     string
-		expected api.Volume
+		expected v1.Volume
 	}{
 		{
 			name: "foo",
 			path: "/etc/foo",
-			expected: api.Volume{
+			expected: v1.Volume{
 				Name: "foo",
-				VolumeSource: api.VolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/etc/foo"},
+				VolumeSource: v1.VolumeSource{
+					HostPath: &v1.HostPathVolumeSource{Path: "/etc/foo"},
 				}},
 		},
 	}
@@ -167,12 +167,12 @@ func TestNewVolumeMount(t *testing.T) {
 	var tests = []struct {
 		name     string
 		path     string
-		expected api.VolumeMount
+		expected v1.VolumeMount
 	}{
 		{
 			name: "foo",
 			path: "/etc/foo",
-			expected: api.VolumeMount{
+			expected: v1.VolumeMount{
 				Name:      "foo",
 				MountPath: "/etc/foo",
 			},
@@ -201,16 +201,16 @@ func TestNewVolumeMount(t *testing.T) {
 func TestEtcdVolume(t *testing.T) {
 	var tests = []struct {
 		cfg      *kubeadmapi.MasterConfiguration
-		expected api.Volume
+		expected v1.Volume
 	}{
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
 				Etcd: kubeadmapi.Etcd{DataDir: etcdDataDir},
 			},
-			expected: api.Volume{
+			expected: v1.Volume{
 				Name: "etcd",
-				VolumeSource: api.VolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: etcdDataDir},
+				VolumeSource: v1.VolumeSource{
+					HostPath: &v1.HostPathVolumeSource{Path: etcdDataDir},
 				}},
 		},
 	}
@@ -236,10 +236,10 @@ func TestEtcdVolume(t *testing.T) {
 
 func TestEtcdVolumeMount(t *testing.T) {
 	var tests = []struct {
-		expected api.VolumeMount
+		expected v1.VolumeMount
 	}{
 		{
-			expected: api.VolumeMount{
+			expected: v1.VolumeMount{
 				Name:      "etcd",
 				MountPath: etcdDataDir,
 			},
@@ -268,14 +268,14 @@ func TestEtcdVolumeMount(t *testing.T) {
 func TestCertsVolume(t *testing.T) {
 	var tests = []struct {
 		cfg      *kubeadmapi.MasterConfiguration
-		expected api.Volume
+		expected v1.Volume
 	}{
 		{
 			cfg: &kubeadmapi.MasterConfiguration{},
-			expected: api.Volume{
+			expected: v1.Volume{
 				Name: "certs",
-				VolumeSource: api.VolumeSource{
-					HostPath: &api.HostPathVolumeSource{
+				VolumeSource: v1.VolumeSource{
+					HostPath: &v1.HostPathVolumeSource{
 						Path: "/etc/ssl/certs"},
 				}},
 		},
@@ -302,10 +302,10 @@ func TestCertsVolume(t *testing.T) {
 
 func TestCertsVolumeMount(t *testing.T) {
 	var tests = []struct {
-		expected api.VolumeMount
+		expected v1.VolumeMount
 	}{
 		{
-			expected: api.VolumeMount{
+			expected: v1.VolumeMount{
 				Name:      "certs",
 				MountPath: "/etc/ssl/certs",
 			},
@@ -333,13 +333,13 @@ func TestCertsVolumeMount(t *testing.T) {
 
 func TestK8sVolume(t *testing.T) {
 	var tests = []struct {
-		expected api.Volume
+		expected v1.Volume
 	}{
 		{
-			expected: api.Volume{
+			expected: v1.Volume{
 				Name: "k8s",
-				VolumeSource: api.VolumeSource{
-					HostPath: &api.HostPathVolumeSource{
+				VolumeSource: v1.VolumeSource{
+					HostPath: &v1.HostPathVolumeSource{
 						Path: kubeadmapi.GlobalEnvParams.KubernetesDir},
 				}},
 		},
@@ -366,10 +366,10 @@ func TestK8sVolume(t *testing.T) {
 
 func TestK8sVolumeMount(t *testing.T) {
 	var tests = []struct {
-		expected api.VolumeMount
+		expected v1.VolumeMount
 	}{
 		{
-			expected: api.VolumeMount{
+			expected: v1.VolumeMount{
 				Name:      "k8s",
 				MountPath: kubeadmapi.GlobalEnvParams.KubernetesDir,
 				ReadOnly:  true,
@@ -416,17 +416,17 @@ func TestComponentProbe(t *testing.T) {
 	var tests = []struct {
 		port   int
 		path   string
-		scheme api.URIScheme
+		scheme v1.URIScheme
 	}{
 		{
 			port:   1,
 			path:   "foo",
-			scheme: api.URISchemeHTTP,
+			scheme: v1.URISchemeHTTP,
 		},
 		{
 			port:   2,
 			path:   "bar",
-			scheme: api.URISchemeHTTPS,
+			scheme: v1.URISchemeHTTPS,
 		},
 	}
 	for _, rt := range tests {
@@ -465,8 +465,8 @@ func TestComponentPod(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		c := api.Container{Name: rt.n}
-		v := api.Volume{}
+		c := v1.Container{Name: rt.n}
+		v := v1.Volume{}
 		actual := componentPod(c, v)
 		if actual.ObjectMeta.Name != rt.n {
 			t.Errorf(

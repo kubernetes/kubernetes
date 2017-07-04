@@ -45,6 +45,7 @@ from charms.kubernetes.flagmanager import FlagManager
 from charmhelpers.core import hookenv
 from charmhelpers.core import host
 from charmhelpers.core import unitdata
+from charmhelpers.core.host import service_stop
 from charmhelpers.core.templating import render
 from charmhelpers.fetch import apt_install
 from charmhelpers.contrib.charmsupport import nrpe
@@ -693,6 +694,16 @@ def disable_gpu_mode():
 
     """
     remove_state('kubernetes-master.gpu.enabled')
+
+
+@hook('stop')
+def shutdown():
+    """ Stop the kubernetes master services
+
+    """
+    service_stop('snap.kube-apiserver.daemon')
+    service_stop('snap.kube-controller-manager.daemon')
+    service_stop('snap.kube-scheduler.daemon')
 
 
 def arch():
