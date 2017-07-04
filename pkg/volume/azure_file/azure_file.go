@@ -28,6 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -207,7 +209,12 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 	os.MkdirAll(dir, 0750)
-	source := fmt.Sprintf("//%s.file.core.windows.net/%s", accountName, b.shareName)
+
+	azure, err := getAzureCloud(b.plugin.host.GetCloudProvider())
+	if err != nil {
+		return err
+	}
+	source := fmt.Sprintf("//%s.file.%s/%s", accountName, azure.Environment.StorageEndpointSuffix, b.shareName)
 	// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
 	options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=0777,file_mode=0777", accountName, accountKey)}
 	if b.readOnly {
@@ -267,4 +274,13 @@ func getVolumeSource(
 	}
 
 	return nil, false, fmt.Errorf("Spec does not reference an AzureFile volume type")
+}
+
+func getAzureCloud(cloudProvider cloudprovider.Interface) (*azure.Cloud, error) {
+	azure, ok := cloudProvider.(*azure.Cloud)
+	if !ok || azure == nil {
+		return nil, fmt.Errorf("Failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
+	}
+
+	return azure, nil
 }
