@@ -879,11 +879,17 @@ func PodFitsHostPorts(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 
 // search two arrays and return true if they have at least one common element; return false otherwise
 func haveSame(a1, a2 []string) bool {
-	for _, val1 := range a1 {
-		for _, val2 := range a2 {
-			if val1 == val2 {
-				return true
-			}
+	m := map[string]int{}
+
+	for _, val := range a1 {
+		m[val] = 1
+	}
+	for _, val := range a2 {
+		m[val] = m[val] + 1
+	}
+	for _, val := range m {
+		if val > 1 {
+			return true
 		}
 	}
 	return false
