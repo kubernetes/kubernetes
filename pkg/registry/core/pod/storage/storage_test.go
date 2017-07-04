@@ -413,10 +413,21 @@ func TestConvertToTableList(t *testing.T) {
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "IP", Type: "string", Priority: 1, Description: v1.PodStatus{}.SwaggerDoc()["podIP"]},
 		{Name: "Node", Type: "string", Priority: 1, Description: v1.PodSpec{}.SwaggerDoc()["nodeName"]},
+		{Name: "REFERENCE", Type: "string", Priority: 1, Description: "Pods reference by replicationcontrollers, replicasets, deployments, daemonsets."},
 	}
 
 	pod1 := &api.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo", CreationTimestamp: metav1.NewTime(time.Now().Add(-370 * 24 * time.Hour))},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         "test",
+			Name:              "foo",
+			CreationTimestamp: metav1.NewTime(time.Now().Add(-370 * 24 * time.Hour)),
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Name: "my-rc",
+					Kind: "ReplicationController",
+				},
+			},
+		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{Name: "ctr1"},
@@ -448,7 +459,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1alpha1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1alpha1.TableRow{
-					{Cells: []interface{}{"", "0/0", "", 0, "<unknown>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
+					{Cells: []interface{}{"", "0/0", "", 0, "<unknown>", "<none>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
 				},
 			},
 		},
@@ -457,7 +468,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1alpha1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1alpha1.TableRow{
-					{Cells: []interface{}{"foo", "1/2", "Pending", 10, "1y", "10.1.2.3", "test-node"}, Object: runtime.RawExtension{Object: pod1}},
+					{Cells: []interface{}{"foo", "1/2", "Pending", 10, "1y", "10.1.2.3", "test-node", "ReplicationController/my-rc"}, Object: runtime.RawExtension{Object: pod1}},
 				},
 			},
 		},

@@ -112,6 +112,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "IP", Type: "string", Priority: 1, Description: apiv1.PodStatus{}.SwaggerDoc()["podIP"]},
 		{Name: "Node", Type: "string", Priority: 1, Description: apiv1.PodSpec{}.SwaggerDoc()["nodeName"]},
+		{Name: "REFERENCE", Type: "string", Priority: 1, Description: "Pods reference by replicationcontrollers, replicasets, deployments, daemonsets."},
 	}
 	h.TableHandler(podColumnDefinitions, printPodList)
 	h.TableHandler(podColumnDefinitions, printPod)
@@ -411,13 +412,25 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1alpha1.Table
 	if options.Wide {
 		nodeName := pod.Spec.NodeName
 		podIP := pod.Status.PodIP
+		references := []string{}
+		for _, ownerReference := range pod.OwnerReferences {
+			reference := fmt.Sprintf("%s/%s",
+				ownerReference.Kind,
+				ownerReference.Name,
+			)
+			references = append(references, reference)
+		}
+		reference := strings.Join(references, ", ")
+		if reference == "" {
+			reference = "<none>"
+		}
 		if podIP == "" {
 			podIP = "<none>"
 		}
 		if nodeName == "" {
 			nodeName = "<none>"
 		}
-		row.Cells = append(row.Cells, podIP, nodeName)
+		row.Cells = append(row.Cells, podIP, nodeName, reference)
 	}
 
 	return []metav1alpha1.TableRow{row}, nil

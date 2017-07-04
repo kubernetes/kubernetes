@@ -334,6 +334,12 @@ func Example_printPodWithWideFormat() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test1",
 			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Name: "my-rc",
+					Kind: "ReplicationController",
+				},
+			},
 		},
 		Spec: api.PodSpec{
 			Containers: make([]api.Container, 2),
@@ -354,8 +360,8 @@ func Example_printPodWithWideFormat() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAME      READY     STATUS     RESTARTS   AGE       IP         NODE
-	// test1     1/2       podPhase   6          10y       10.1.1.3   kubernetes-node-abcd
+	// NAME      READY     STATUS     RESTARTS   AGE       IP         NODE                   REFERENCE
+	// test1     1/2       podPhase   6          10y       10.1.1.3   kubernetes-node-abcd   ReplicationController/my-rc
 }
 
 func Example_printPodWithShowLabels() {
