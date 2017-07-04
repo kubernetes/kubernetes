@@ -856,7 +856,7 @@ func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, 
 
 // addChaosToClientConfig injects random errors into client connections if configured.
 func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config) {
-	if s.ChaosChance != 0.0 {
+	if s.ChaosChance > 0.0 {
 		config.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
 			seed := chaosclient.NewSeed(1)
 			// TODO: introduce a standard chaos package with more tunables - this is just a proof of concept
