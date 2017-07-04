@@ -380,7 +380,7 @@ func TestAudit(t *testing.T) {
 		},
 	} {
 		var buf bytes.Buffer
-		backend := pluginlog.NewBackend(&buf)
+		backend := pluginlog.NewBackend(&buf, "", 0, 0, 0, false)
 		policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse)
 		handler := WithAudit(http.HandlerFunc(test.handler), &fakeRequestContextMapper{
 			user: &user.DefaultInfo{Name: "admin"},

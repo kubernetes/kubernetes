@@ -59,10 +59,11 @@ type AuditOptions struct {
 // AuditLogOptions holds the legacy audit log writer. If the AdvancedAuditing feature
 // is enabled, these options determine the output of the structured audit log.
 type AuditLogOptions struct {
-	Path       string
-	MaxAge     int
-	MaxBackups int
-	MaxSize    int
+	Path          string
+	MaxAge        int
+	MaxBackups    int
+	MaxSize       int
+	GroupedByUser bool
 }
 
 // AuditWebhookOptions control the webhook configuration for audit events.
@@ -131,6 +132,9 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 		"The maximum number of old audit log files to retain.")
 	fs.IntVar(&o.MaxSize, "audit-log-maxsize", o.MaxSize,
 		"The maximum size in megabytes of the audit log file before it gets rotated.")
+	fs.BoolVar(&o.GroupedByUser, "audit-grouped-by-user", o.GroupedByUser,
+		"Whether to split audit into multi log files by user. It will not work if audit-log-path is set to standard"+
+			" out. This only works for 'AdvancedAuditing'.")
 }
 
 func (o *AuditLogOptions) applyTo(c *server.Config) error {
@@ -150,8 +154,10 @@ func (o *AuditLogOptions) applyTo(c *server.Config) error {
 	c.LegacyAuditWriter = w
 
 	if advancedAuditingEnabled() {
-		c.AuditBackend = appendBackend(c.AuditBackend, pluginlog.NewBackend(w))
+		c.AuditBackend = appendBackend(c.AuditBackend, pluginlog.NewBackend(w, o.Path, o.MaxAge, o.MaxBackups, o.MaxSize,
+			o.GroupedByUser))
 	}
+
 	return nil
 }
 
