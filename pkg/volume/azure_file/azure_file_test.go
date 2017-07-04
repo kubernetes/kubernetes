@@ -20,12 +20,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -82,6 +85,23 @@ func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAcc
 	return false
 }
 
+func getTestCloud(t *testing.T) *azure.Cloud {
+	config := `{
+                "aadClientId": "--aad-client-id--",
+                "aadClientSecret": "--aad-client-secret--"
+        }`
+	configReader := strings.NewReader(config)
+	cloud, err := azure.NewCloud(configReader)
+	if err != nil {
+		t.Error(err)
+	}
+	azureCloud, ok := cloud.(*azure.Cloud)
+	if !ok {
+		t.Error("NewCloud returned incorrect type")
+	}
+	return azureCloud
+}
+
 func TestPlugin(t *testing.T) {
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "azurefileTest")
 	if err != nil {
@@ -89,7 +109,7 @@ func TestPlugin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, getTestCloud(t)))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/azure-file")
 	if err != nil {
