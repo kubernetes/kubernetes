@@ -63,6 +63,9 @@ func (options *ServerRunOptions) Validate() []error {
 	if errs := options.Authentication.Validate(); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
+	if errs := options.Audit.Validate(); len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
 	if errs := options.InsecureServing.Validate("insecure-port"); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
