@@ -110,6 +110,12 @@ type Config struct {
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
 	Timeout time.Duration
 
+	// EnableCompression, if true the Transport will
+	// request compression with an "Accept-Encoding: gzip"
+	// request header when the Request contains no existing
+	// Accept-Encoding value.
+	EnableCompression bool
+
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
@@ -406,12 +412,13 @@ func AnonymousClientConfig(config *Config) *Config {
 			CAFile:     config.TLSClientConfig.CAFile,
 			CAData:     config.TLSClientConfig.CAData,
 		},
-		RateLimiter:   config.RateLimiter,
-		UserAgent:     config.UserAgent,
-		Transport:     config.Transport,
-		WrapTransport: config.WrapTransport,
-		QPS:           config.QPS,
-		Burst:         config.Burst,
-		Timeout:       config.Timeout,
+		RateLimiter:       config.RateLimiter,
+		UserAgent:         config.UserAgent,
+		Transport:         config.Transport,
+		WrapTransport:     config.WrapTransport,
+		QPS:               config.QPS,
+		Burst:             config.Burst,
+		Timeout:           config.Timeout,
+		EnableCompression: config.EnableCompression,
 	}
 }
