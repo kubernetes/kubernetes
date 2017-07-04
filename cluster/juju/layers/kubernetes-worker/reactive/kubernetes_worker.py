@@ -158,15 +158,12 @@ def install_snaps():
 def shutdown():
     ''' When this unit is destroyed:
         - delete the current node
-        - stop the kubelet service
-        - stop the kube-proxy service
-        - remove the 'kubernetes-worker.cni-plugins.installed' state
+        - stop the worker services
     '''
     if os.path.isfile(kubeconfig_path):
         kubectl('delete', 'node', gethostname())
-    service_stop('kubelet')
-    service_stop('kube-proxy')
-    remove_state('kubernetes-worker.cni-plugins.installed')
+    service_stop('snap.kubelet.daemon')
+    service_stop('snap.kube-proxy.daemon')
 
 
 @when('docker.available')
