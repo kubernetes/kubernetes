@@ -31,6 +31,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -115,7 +116,7 @@ func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 		return fmt.Errorf("unable to delete temporary API server manifest [%v]", err)
 	}
 
-	WaitForAPI(client)
+	kubeadmutil.WaitForAPI(client)
 
 	fmt.Printf("[self-hosted] self-hosted kube-apiserver ready after %f seconds\n", time.Since(start).Seconds())
 	return nil

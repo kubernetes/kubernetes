@@ -72,7 +72,7 @@ package_group(
     packages = [
         "//cmd/kubeadm/app",
         "//cmd/kubeadm/app/cmd",
-        "//cmd/kubeadm/app/master",
+        "//cmd/kubeadm/app/phases/controlplane",
     ],
 )
 
