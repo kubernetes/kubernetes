@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tests
+package test
 
 import (
 	"encoding/json"
@@ -23,11 +23,10 @@ import (
 
 	// TODO: Ideally we should create the necessary package structure in e.g.,
 	// pkg/conversion/test/... instead of importing pkg/api here.
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestV1EncodeDecodeStatus(t *testing.T) {
@@ -38,9 +37,10 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 		Message: "",
 	}
 
-	v1Codec := testapi.Default.Codec()
+	_, codecs := TestScheme()
+	codec := apitesting.TestCodec(codecs, schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal})
 
-	encoded, err := runtime.Encode(v1Codec, status)
+	encoded, err := runtime.Encode(codec, status)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 	if typeMeta.APIVersion != "v1" {
 		t.Errorf("APIVersion is not set to \"v1\". Got %v", string(encoded))
 	}
-	decoded, err := runtime.Decode(v1Codec, encoded)
+	decoded, err := runtime.Decode(codec, encoded)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -72,7 +72,9 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	}
 	// TODO: caesarxuchao: use the testapi.Extensions.Codec() once the PR that
 	// moves experimental from v1 to v1beta1 got merged.
-	expCodec := api.Codecs.LegacyCodec(extensions.SchemeGroupVersion)
+	_, codecs := TestScheme()
+	expCodec := apitesting.TestCodec(codecs, schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal})
+
 	encoded, err := runtime.Encode(expCodec, status)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
