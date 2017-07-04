@@ -22,6 +22,7 @@ options:
       - 'ceph-common'
       - 'nfs-common'
       - 'socat'
+      - 'virt-what'
   tls-client:
     ca_certificate_path: '/root/cdk/ca.crt'
     server_certificate_path: '/root/cdk/server.crt'
