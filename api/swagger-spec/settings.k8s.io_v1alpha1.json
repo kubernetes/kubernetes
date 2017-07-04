@@ -1561,6 +1561,10 @@
      "storageos": {
       "$ref": "v1.StorageOSVolumeSource",
       "description": "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes."
+     },
+     "nutanixVolume": {
+      "$ref": "v1.NutanixVolumeSource",
+      "description": "NutanixVolume represents a Nutanix persistent volume attached and mounted on Kubernetes nodes."
      }
     }
    },
@@ -2409,6 +2413,63 @@
      "secretRef": {
       "$ref": "v1.LocalObjectReference",
       "description": "SecretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted."
+     }
+    }
+   },
+   "v1.NutanixVolumeSource": {
+    "id": "v1.NutanixVolumeSource",
+    "description": "Represents Nutanix volume. NutanixVolume can be mounted as read/write once or read only.",
+    "required": [
+     "prismEndPoint",
+     "dataServiceEndPoint",
+     "volumeName",
+     "volumeUUID",
+     "iscsiTarget"
+    ],
+    "properties": {
+     "user": {
+      "type": "string",
+      "description": "Prism user id for accessing nutanix cluster via rest API. Either User/Password OR SecretName/SecretNamespace should be provided."
+     },
+     "password": {
+      "type": "string",
+      "description": "Prism password for accessing nutanix cluster via rest API."
+     },
+     "secretNamespace": {
+      "type": "string",
+      "description": "Secret namespace and Secret Name to retrieve credential for accessing nutanix cluster via rest. if SecretNamespace is not specified then default namespace is used."
+     },
+     "secretName": {
+      "type": "string",
+      "description": "Secret name for accessing nutanix cluster via rest."
+     },
+     "prismEndPoint": {
+      "type": "string",
+      "description": "Prism service \u003cIP:port\u003e  for nutanix cluster."
+     },
+     "dataServiceEndPoint": {
+      "type": "string",
+      "description": "Data service \u003cIP:port\u003e as configured in nutanix cluster."
+     },
+     "volumeName": {
+      "type": "string",
+      "description": "Volume Name."
+     },
+     "volumeUUID": {
+      "type": "string",
+      "description": "Volume UUID."
+     },
+     "iscsiTarget": {
+      "type": "string",
+      "description": "ISCSI target for the nutanix volume group."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false."
      }
     }
    },
