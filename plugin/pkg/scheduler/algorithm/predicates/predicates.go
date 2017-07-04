@@ -44,7 +44,7 @@ import (
 	"k8s.io/metrics/pkg/client/clientset_generated/clientset"
 )
 
-// predicatePrecomputations: Helper types/variables...
+// PredicateMetadataModifier: Helper types/variables...
 type PredicateMetadataModifier func(pm *predicateMetadata)
 
 var predicatePrecomputeRegisterLock sync.Mutex
@@ -56,7 +56,7 @@ func RegisterPredicatePrecomputation(predicateName string, precomp PredicateMeta
 	predicatePrecomputations[predicateName] = precomp
 }
 
-// Other types for predicate functions...
+// NodeInfo: Other types for predicate functions...
 type NodeInfo interface {
 	GetNodeInfo(nodeID string) (*v1.Node, error)
 }
@@ -377,7 +377,7 @@ type VolumeZoneChecker struct {
 	pvcInfo PersistentVolumeClaimInfo
 }
 
-// VolumeZonePredicate evaluates if a pod can fit due to the volumes it requests, given
+// NewVolumeZonePredicate evaluates if a pod can fit due to the volumes it requests, given
 // that some volumes may have zone scheduling constraints.  The requirement is that any
 // volume zone-labels must match the equivalent zone-labels on the node.  It is OK for
 // the node to have more zone-label constraints (for example, a hypothetical replicated
@@ -474,10 +474,10 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 	return true, nil, nil
 }
 
-// Returns a *schedulercache.Resource that covers the largest width in each
-// resource dimension. Because init-containers run sequentially, we collect the
-// max in each dimension iteratively. In contrast, we sum the resource vectors
-// for regular containers since they run simultaneously.
+// GetResourceRequest returns a *schedulercache.Resource that covers the largest
+// width in each resource dimension. Because init-containers run sequentially, we collect
+// the max in each dimension iteratively. In contrast, we sum the resource vectors for
+// regular containers since they run simultaneously.
 //
 // Example:
 //
@@ -1307,7 +1307,7 @@ type VolumeNodeChecker struct {
 	client  clientset.Interface
 }
 
-// VolumeNodeChecker evaluates if a pod can fit due to the volumes it requests, given
+// NewVolumeNodePredicate evaluates if a pod can fit due to the volumes it requests, given
 // that some volumes have node topology constraints, particularly when using Local PVs.
 // The requirement is that any pod that uses a PVC that is bound to a PV with topology constraints
 // must be scheduled to a node that satisfies the PV's topology labels.
