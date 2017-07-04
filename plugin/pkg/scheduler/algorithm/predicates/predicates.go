@@ -499,30 +499,15 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 //
 // Result: CPU: 3, Memory: 3G
 func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
-	result := schedulercache.Resource{}
+	result := &schedulercache.Resource{}
 	for _, container := range pod.Spec.Containers {
-		for rName, rQuantity := range container.Resources.Requests {
-			switch rName {
-			case v1.ResourceMemory:
-				result.Memory += rQuantity.Value()
-			case v1.ResourceCPU:
-				result.MilliCPU += rQuantity.MilliValue()
-			case v1.ResourceNvidiaGPU:
-				result.NvidiaGPU += rQuantity.Value()
-			case v1.ResourceStorageOverlay:
-				result.StorageOverlay += rQuantity.Value()
-			default:
-				if v1helper.IsOpaqueIntResourceName(rName) {
-					result.AddOpaque(rName, rQuantity.Value())
-				}
-			}
-		}
+		result.Add(container.Resources.Requests)
 	}
+
 	// Account for storage requested by emptydir volumes
 	// If the storage medium is memory, should exclude the size
 	for _, vol := range pod.Spec.Volumes {
 		if vol.EmptyDir != nil && vol.EmptyDir.Medium != v1.StorageMediumMemory {
-
 			result.StorageScratch += vol.EmptyDir.SizeLimit.Value()
 		}
 	}
@@ -557,7 +542,8 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 			}
 		}
 	}
-	return &result
+
+	return result
 }
 
 func podName(pod *v1.Pod) string {

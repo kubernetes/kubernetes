@@ -35,7 +35,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1/helper:go_default_library",
         "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//plugin/pkg/scheduler/util:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
