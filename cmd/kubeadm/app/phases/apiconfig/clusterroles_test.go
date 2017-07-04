@@ -67,7 +67,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 			t.Errorf("CreateServiceAccounts(%s) returned unexpected err: %v", tc.name, err)
 		}
 
-		wantResourcesCreated := 2
+		wantResourcesCreated := 1
 		if len(client.Actions()) != wantResourcesCreated {
 			t.Errorf("CreateServiceAccounts(%s) should have made %d actions, but made %d", tc.name, wantResourcesCreated, len(client.Actions()))
 		}

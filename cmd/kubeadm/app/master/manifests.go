@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -47,10 +48,41 @@ const (
 	defaultv17AdmissionControl = "Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota"
 
 	etcd                  = "etcd"
+	bootEtcd              = "boot-etcd"
+	apiServer             = "apiserver"
+	controllerManager     = "controller-manager"
+	scheduler             = "scheduler"
+	proxy                 = "proxy"
 	kubeAPIServer         = "kube-apiserver"
 	kubeControllerManager = "kube-controller-manager"
 	kubeScheduler         = "kube-scheduler"
+	kubeProxy             = "kube-proxy"
+	etcdOperator          = "etcd-operator"
+	etcdCluster           = "kube-etcd"
+	etcdService           = "etcd-service"
+	podCheckpointer       = "pod-checkpointer"
+	networkCheckpointer   = "kube-etcd-network-checkpointer"
 )
+
+func TeardownBootstrapControlPlane(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
+	fmt.Println("[self-hosted] Tearing down temporary bootstrap control plane...")
+
+	if err := client.CoreV1().Services(metav1.NamespaceSystem).Delete(bootEtcdSvc, &metav1.DeleteOptions{}); err != nil {
+		fmt.Printf("[self-hosted] Could not delete %s service\n", bootEtcdSvc)
+	}
+	fmt.Printf("[self-hosted] Deleted %s service\n", bootEtcdSvc)
+
+	path := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
+	for _, comp := range []string{kubeAPIServer, kubeControllerManager, kubeScheduler, "etcd"} {
+		if err := os.Remove(filepath.Join(path, comp+".yaml")); err != nil {
+			return fmt.Errorf("[self-hosted] Unable to delete bootstrap %s pod [%v]\n", comp, err)
+		}
+		fmt.Printf("[self-hosted] Deleted bootstrap %s pod\n", comp)
+	}
+
+	WaitForAPI(client)
+	return nil
+}
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
 // where kubelet will pick and schedule them.
@@ -81,13 +113,12 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	// Prepare static pod specs
 	staticPodSpecs := map[string]api.Pod{
 		kubeAPIServer: componentPod(api.Container{
-			Name:          kubeAPIServer,
-			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-			Command:       getAPIServerCommand(cfg, false, k8sVersion),
-			VolumeMounts:  volumeMounts,
-			LivenessProbe: componentProbe(int(cfg.API.BindPort), "/healthz", api.URISchemeHTTPS),
-			Resources:     componentResources("250m"),
-			Env:           getProxyEnvVars(),
+			Name:         kubeAPIServer,
+			Image:        images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+			Command:      getAPIServerCommand(cfg, false, k8sVersion),
+			VolumeMounts: volumeMounts,
+			Resources:    componentResources("250m"),
+			Env:          getProxyEnvVars(),
 		}, volumes...),
 		kubeControllerManager: componentPod(api.Container{
 			Name:          kubeControllerManager,
@@ -112,12 +143,11 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	// Add etcd static pod spec only if external etcd is not configured
 	if len(cfg.Etcd.Endpoints) == 0 {
 		etcdPod := componentPod(api.Container{
-			Name:          etcd,
-			Command:       getEtcdCommand(cfg),
-			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(cfg.Etcd.DataDir), k8sVolumeMount()},
-			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
-			LivenessProbe: componentProbe(2379, "/health", api.URISchemeHTTP),
-		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume())
+			Name:         bootEtcd,
+			Command:      getEtcdCommand(cfg),
+			VolumeMounts: volumeMounts,
+			Image:        images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
+		}, volumes...)
 
 		etcdPod.Spec.SecurityContext = &api.PodSecurityContext{
 			SELinuxOptions: &api.SELinuxOptions{
@@ -133,6 +163,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
 		return fmt.Errorf("failed to create directory %q [%v]", manifestsPath, err)
 	}
+
 	for name, spec := range staticPodSpecs {
 		filename := filepath.Join(manifestsPath, name+".yaml")
 		serialized, err := yaml.Marshal(spec)
@@ -143,6 +174,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			return fmt.Errorf("failed to create static pod manifest file for %q (%q) [%v]", name, filename, err)
 		}
 	}
+
 	return nil
 }
 
@@ -275,7 +307,7 @@ func componentProbe(port int, path string, scheme api.URIScheme) *api.Probe {
 	return &api.Probe{
 		Handler: api.Handler{
 			HTTPGet: &api.HTTPGetAction{
-				Host:   "127.0.0.1",
+				Host:   "",
 				Path:   path,
 				Port:   intstr.FromInt(port),
 				Scheme: scheme,
@@ -297,7 +329,11 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 			Name:        container.Name,
 			Namespace:   "kube-system",
 			Annotations: map[string]string{kubetypes.CriticalPodAnnotationKey: ""},
-			Labels:      map[string]string{"component": container.Name, "tier": "control-plane"},
+			Labels: map[string]string{
+				"k8s-app":   container.Name,
+				"component": container.Name,
+				"tier":      "control-plane",
+			},
 		},
 		Spec: api.PodSpec{
 			Containers:  []api.Container{container},
@@ -337,27 +373,43 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 	command = append(command, getExtraParameters(cfg.APIServerExtraArgs, defaultArguments)...)
 	command = append(command, getAuthzParameters(cfg.AuthorizationModes)...)
 
+	// Advertise address
 	if selfHosted {
 		command = append(command, "--advertise-address=$(POD_IP)")
 	} else {
 		command = append(command, fmt.Sprintf("--advertise-address=%s", cfg.API.AdvertiseAddress))
 	}
 
-	// Check if the user decided to use an external etcd cluster
-	if len(cfg.Etcd.Endpoints) > 0 {
-		command = append(command, fmt.Sprintf("--etcd-servers=%s", strings.Join(cfg.Etcd.Endpoints, ",")))
+	// Etcd endpoints
+	var etcdURLs string
+	if selfHosted {
+		// self-hosted pod
+		etcdURLs = fmt.Sprintf("https://%s:2379", cfg.Etcd.SelfHosted.ServiceIP)
+	} else if len(cfg.Etcd.Endpoints) > 0 {
+		// external etcd
+		etcdURLs = strings.Join(cfg.Etcd.Endpoints, ",")
 	} else {
-		command = append(command, "--etcd-servers=http://127.0.0.1:2379")
+		// bootstrap etcd
+		etcdURLs = fmt.Sprintf("https://127.0.0.1:12379,https://%s:12379", cfg.Etcd.BootstrapServiceIP)
 	}
+	command = append(command, fmt.Sprintf("--etcd-servers=%s", etcdURLs))
 
-	// Is etcd secured?
-	if cfg.Etcd.CAFile != "" {
-		command = append(command, fmt.Sprintf("--etcd-cafile=%s", cfg.Etcd.CAFile))
-	}
-	if cfg.Etcd.CertFile != "" && cfg.Etcd.KeyFile != "" {
-		etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", cfg.Etcd.CertFile)
-		etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", cfg.Etcd.KeyFile)
-		command = append(command, etcdClientFileArg, etcdKeyFileArg)
+	// Etcd TLS
+	if len(cfg.Etcd.Endpoints) > 0 {
+		if cfg.Etcd.CAFile != "" {
+			command = append(command, fmt.Sprintf("--etcd-cafile=%s", cfg.Etcd.CAFile))
+		}
+		if cfg.Etcd.CertFile != "" && cfg.Etcd.KeyFile != "" {
+			etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", cfg.Etcd.CertFile)
+			etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", cfg.Etcd.KeyFile)
+			command = append(command, etcdClientFileArg, etcdKeyFileArg)
+		}
+	} else {
+		command = append(command, []string{
+			fmt.Sprintf("--etcd-cafile=%s", filepath.Join(cfg.CertificatesDir, "etcd-ca.crt")),
+			fmt.Sprintf("--etcd-certfile=%s", filepath.Join(cfg.CertificatesDir, "etcd-client.crt")),
+			fmt.Sprintf("--etcd-keyfile=%s", filepath.Join(cfg.CertificatesDir, "etcd-client.key")),
+		}...)
 	}
 
 	if cfg.CloudProvider != "" {
@@ -374,9 +426,23 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k
 
 func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	defaultArguments := map[string]string{
-		"listen-client-urls":    "http://127.0.0.1:2379",
-		"advertise-client-urls": "http://127.0.0.1:2379",
-		"data-dir":              cfg.Etcd.DataDir,
+		"name":                        bootEtcd,
+		"listen-client-urls":          "https://0.0.0.0:12379",
+		"listen-peer-urls":            "https://0.0.0.0:12380",
+		"advertise-client-urls":       fmt.Sprintf("https://%s:12379", cfg.Etcd.BootstrapServiceIP),
+		"initial-advertise-peer-urls": fmt.Sprintf("https://%s:12380", cfg.Etcd.BootstrapServiceIP),
+		"initial-cluster":             fmt.Sprintf("%s=https://%s:12380", bootEtcd, cfg.Etcd.BootstrapServiceIP),
+		"initial-cluster-token":       "bootkube",
+		"initial-cluster-state":       "new",
+		"data-dir":                    cfg.Etcd.DataDir,
+		"peer-client-cert-auth":       "true",
+		"peer-trusted-ca-file":        filepath.Join(cfg.CertificatesDir, "etcd-ca.crt"),
+		"peer-cert-file":              filepath.Join(cfg.CertificatesDir, "etcd-peer.crt"),
+		"peer-key-file":               filepath.Join(cfg.CertificatesDir, "etcd-peer.key"),
+		"client-cert-auth":            "true",
+		"trusted-ca-file":             filepath.Join(cfg.CertificatesDir, "etcd-ca.crt"),
+		"cert-file":                   filepath.Join(cfg.CertificatesDir, "etcd-member-client.crt"),
+		"key-file":                    filepath.Join(cfg.CertificatesDir, "etcd-member-client.key"),
 	}
 
 	command := []string{"etcd"}
@@ -386,7 +452,6 @@ func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 
 func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool, k8sVersion *version.Version) []string {
 	defaultArguments := map[string]string{
-		"address":                          "127.0.0.1",
 		"leader-elect":                     "true",
 		"kubeconfig":                       filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
 		"root-ca-file":                     filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
@@ -419,7 +484,6 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 
 func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
 	defaultArguments := map[string]string{
-		"address":      "127.0.0.1",
 		"leader-elect": "true",
 		"kubeconfig":   filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
 	}

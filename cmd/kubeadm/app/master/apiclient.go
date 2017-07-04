@@ -34,9 +34,22 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 	}
 
 	fmt.Println("[apiclient] Created API client, waiting for the control plane to become ready")
-	WaitForAPI(client)
+	WaitForControlPanel(client)
 
 	return client, nil
+}
+
+func WaitForControlPanel(client *clientset.Clientset) {
+	WaitForAPI(client)
+
+	fmt.Println("[apiclient] Wait for control panel api-server")
+	WaitForPodsWithLabel(client, kubeAPIServer, true)
+
+	fmt.Println("[apiclient] Wait for control panel scheduler")
+	WaitForPodsWithLabel(client, kubeScheduler, true)
+
+	fmt.Println("[apiclient] Wait for control panel controller-manager")
+	WaitForPodsWithLabel(client, kubeControllerManager, true)
 }
 
 func WaitForAPI(client *clientset.Clientset) {

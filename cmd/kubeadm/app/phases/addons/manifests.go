@@ -17,86 +17,6 @@ limitations under the License.
 package addons
 
 const (
-	KubeProxyConfigMap = `
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: kube-proxy
-  namespace: kube-system
-  labels:
-    app: kube-proxy
-data:
-  kubeconfig.conf: |
-    apiVersion: v1
-    kind: Config
-    clusters:
-    - cluster:
-        certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        server: {{ .MasterEndpoint }}
-      name: default
-    contexts:
-    - context:
-        cluster: default
-        namespace: default
-        user: default
-      name: default
-    current-context: default
-    users:
-    - name: default
-      user:
-        tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-`
-
-	KubeProxyDaemonSet = `
-apiVersion: extensions/v1beta1
-kind: DaemonSet
-metadata:
-  labels:
-    k8s-app: kube-proxy
-  name: kube-proxy
-  namespace: kube-system
-spec:
-  selector:
-    matchLabels:
-      k8s-app: kube-proxy
-  updateStrategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        k8s-app: kube-proxy
-    spec:
-      containers:
-      - name: kube-proxy
-        image: {{ .Image }}
-        imagePullPolicy: IfNotPresent
-        command:
-        - /usr/local/bin/kube-proxy
-        - --kubeconfig=/var/lib/kube-proxy/kubeconfig.conf
-        {{ .ClusterCIDR }}
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - mountPath: /var/lib/kube-proxy
-          name: kube-proxy
-        # TODO: Make this a file hostpath mount
-        - mountPath: /run/xtables.lock
-          name: xtables-lock
-          readOnly: false
-      hostNetwork: true
-      serviceAccountName: kube-proxy
-      tolerations:
-      - key: {{ .MasterTaintKey }}
-        effect: NoSchedule
-      volumes:
-      - name: kube-proxy
-        configMap:
-          name: kube-proxy
-      - name: xtables-lock
-        hostPath:
-          path: /run/xtables.lock
-`
-
 	KubeDNSVersion = "1.14.4"
 
 	KubeDNSDeployment = `
@@ -129,6 +49,9 @@ spec:
         configMap:
           name: kube-dns
           optional: true
+      - name: kubeconfig
+        hostPath:
+          path: /etc/kubernetes/admin.conf
       containers:
       - name: kubedns
         image: {{ .ImageRepository }}/k8s-dns-kube-dns-{{ .Arch }}:{{ .Version }}
@@ -166,6 +89,7 @@ spec:
         - --dns-port=10053
         - --config-dir=/kube-dns-config
         - --v=2
+        - --kubecfg-file=/conf/kubeconfig.conf
         env:
         - name: PROMETHEUS_PORT
           value: "10055"
@@ -182,6 +106,8 @@ spec:
         volumeMounts:
         - name: kube-dns-config
           mountPath: /kube-dns-config
+        - name: kubeconfig
+          mountPath: /conf/kubeconfig.conf
       - name: dnsmasq
         image: {{ .ImageRepository }}/k8s-dns-dnsmasq-nanny-{{ .Arch }}:{{ .Version }}
         imagePullPolicy: IfNotPresent

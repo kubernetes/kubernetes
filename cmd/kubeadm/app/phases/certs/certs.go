@@ -88,6 +88,10 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 		fmt.Println("[certificates] Generated CA certificate and key.")
 	}
 
+	if err := createBootstrapEtcdAssets(cfg); err != nil {
+		return err
+	}
+
 	// If at least one of them exists, we should try to load them
 	// In the case that only one exists, there will most likely be an error anyway
 	if pkiutil.CertOrKeyExist(pkiDir, kubeadmconstants.APIServerCertAndKeyBaseName) {
@@ -241,6 +245,69 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 	fmt.Printf("[certificates] Valid certificates and keys now exist in %q\n", pkiDir)
 
 	return nil
+}
+
+func createBootstrapEtcdAssets(cfg *kubeadmapi.MasterConfiguration) error {
+	caCert, caKey, err := pkiutil.NewCertificateAuthority()
+	if err != nil {
+		return err
+	}
+	pkiutil.WriteCert(cfg.CertificatesDir, "etcd-ca", caCert)
+
+	// create operator and apiserver certs
+	cert, key, err := createCertKey(caCert, caKey, "etcd-client", nil)
+	if err != nil {
+		return err
+	}
+	pkiutil.WriteCertAndKey(cfg.CertificatesDir, "etcd-client", cert, key)
+
+	// create peer certs
+	peerAddrs := []string{
+		cfg.Etcd.BootstrapServiceIP,
+		"*.kube-etcd.kube-system.svc.cluster.local",
+		"kube-etcd-client.kube-system.svc.cluster.local",
+	}
+	peerCert, peerKey, err := createCertKey(caCert, caKey, "etcd-peer", peerAddrs)
+	if err != nil {
+		return err
+	}
+	pkiutil.WriteCertAndKey(cfg.CertificatesDir, "etcd-peer", peerCert, peerKey)
+
+	// create etcd client certs
+	clientAddrs := []string{
+		cfg.Etcd.SelfHosted.ServiceIP,
+		cfg.Etcd.BootstrapServiceIP,
+		"127.0.0.1",
+		"localhost",
+		"*.kube-etcd.kube-system.svc.cluster.local",
+		"kube-etcd-client.kube-system.svc.cluster.local",
+	}
+	clientCert, clientKey, err := createCertKey(caCert, caKey, "etcd-member-client", clientAddrs)
+	if err != nil {
+		return err
+	}
+	pkiutil.WriteCertAndKey(cfg.CertificatesDir, "etcd-member-client", clientCert, clientKey)
+
+	return nil
+}
+
+func createCertKey(caCert *x509.Certificate, caKey *rsa.PrivateKey, name string, addrs []string) (*x509.Certificate, *rsa.PrivateKey, error) {
+	config := certutil.Config{
+		CommonName:   name,
+		Organization: []string{"etcd"},
+		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		AltNames:     certutil.AltNames{},
+	}
+
+	for _, altname := range addrs {
+		if ip := net.ParseIP(altname); ip != nil {
+			config.AltNames.IPs = append(config.AltNames.IPs, ip)
+		} else {
+			config.AltNames.DNSNames = append(config.AltNames.DNSNames, altname)
+		}
+	}
+
+	return pkiutil.NewCertAndKey(caCert, caKey, config)
 }
 
 // checkAltNamesExist verifies that the cert is valid for all IPs and DNS names it should be valid for

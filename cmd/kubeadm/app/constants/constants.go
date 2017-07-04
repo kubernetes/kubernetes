@@ -90,6 +90,12 @@ const (
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.0.14"
+
+	// DefaultEtcdIPSuffix specifies the offset value for the service CIDR that will make the etcd service IPv4
+	DefaultEtcdIPSuffix = 15
+
+	// DefaultBootstrapIPSuffix specifies the offset value for the service CIDR for the bootstrap etcd pod
+	DefaultBootstrapIPSuffix = 20
 )
 
 var (

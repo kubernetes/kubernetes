@@ -489,6 +489,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Networking:        kubeadm.Networking{ServiceSubnet: "bar"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.0",
+				Etcd:              kubeadm.Etcd{BootstrapServiceIP: "10.96.0.20"},
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -514,7 +515,10 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=Node,RBAC",
 				"--advertise-address=1.2.3.4",
-				"--etcd-servers=http://127.0.0.1:2379",
+				"--etcd-servers=https://127.0.0.1:12379,https://10.96.0.20:12379",
+				"--etcd-cafile=/var/lib/certs/etcd-ca.crt",
+				"--etcd-certfile=/var/lib/certs/etcd-client.crt",
+				"--etcd-keyfile=/var/lib/certs/etcd-client.key",
 			},
 		},
 		{
@@ -523,6 +527,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Networking:        kubeadm.Networking{ServiceSubnet: "bar"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.1",
+				Etcd:              kubeadm.Etcd{BootstrapServiceIP: "10.96.0.20"},
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -548,14 +553,21 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=Node,RBAC",
 				"--advertise-address=4.3.2.1",
-				"--etcd-servers=http://127.0.0.1:2379",
+				"--etcd-servers=https://127.0.0.1:12379,https://10.96.0.20:12379",
+				"--etcd-cafile=/var/lib/certs/etcd-ca.crt",
+				"--etcd-certfile=/var/lib/certs/etcd-client.crt",
+				"--etcd-keyfile=/var/lib/certs/etcd-client.key",
 			},
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:               kubeadm.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
-				Networking:        kubeadm.Networking{ServiceSubnet: "bar"},
-				Etcd:              kubeadm.Etcd{CertFile: "fiz", KeyFile: "faz"},
+				API:        kubeadm.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
+				Networking: kubeadm.Networking{ServiceSubnet: "bar"},
+				Etcd: kubeadm.Etcd{
+					CertFile:  "fiz",
+					KeyFile:   "faz",
+					Endpoints: []string{"https://bar.com:2379"},
+				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.2",
 			},
@@ -583,16 +595,20 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=Node,RBAC",
 				"--advertise-address=4.3.2.1",
-				"--etcd-servers=http://127.0.0.1:2379",
+				"--etcd-servers=https://bar.com:2379",
 				"--etcd-certfile=fiz",
 				"--etcd-keyfile=faz",
 			},
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:               kubeadm.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
-				Networking:        kubeadm.Networking{ServiceSubnet: "bar"},
-				Etcd:              kubeadm.Etcd{CertFile: "fiz", KeyFile: "faz"},
+				API:        kubeadm.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
+				Networking: kubeadm.Networking{ServiceSubnet: "bar"},
+				Etcd: kubeadm.Etcd{
+					CertFile:  "fiz",
+					KeyFile:   "faz",
+					Endpoints: []string{"https://bar.com:2379"},
+				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.3",
 			},
@@ -620,16 +636,20 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=Node,RBAC",
 				"--advertise-address=4.3.2.1",
-				"--etcd-servers=http://127.0.0.1:2379",
+				"--etcd-servers=https://bar.com:2379",
 				"--etcd-certfile=fiz",
 				"--etcd-keyfile=faz",
 			},
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:               kubeadm.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
-				Networking:        kubeadm.Networking{ServiceSubnet: "bar"},
-				Etcd:              kubeadm.Etcd{CertFile: "fiz", KeyFile: "faz"},
+				API:        kubeadm.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
+				Networking: kubeadm.Networking{ServiceSubnet: "bar"},
+				Etcd: kubeadm.Etcd{
+					CertFile:  "fiz",
+					KeyFile:   "faz",
+					Endpoints: []string{"https://bar.com:2379"},
+				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.0",
 			},
@@ -657,7 +677,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-allowed-names=front-proxy-client",
 				"--authorization-mode=Node,RBAC",
 				"--advertise-address=2001:db8::1",
-				"--etcd-servers=http://127.0.0.1:2379",
+				"--etcd-servers=https://bar.com:2379",
 				"--etcd-certfile=fiz",
 				"--etcd-keyfile=faz",
 			},
@@ -686,7 +706,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
 				"--root-ca-file=" + testCertsDir + "/ca.crt",
@@ -705,7 +724,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
 				"--root-ca-file=" + testCertsDir + "/ca.crt",
@@ -725,7 +743,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 			expected: []string{
 				"kube-controller-manager",
-				"--address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
 				"--root-ca-file=" + testCertsDir + "/ca.crt",
@@ -756,20 +773,42 @@ func TestGetEtcdCommand(t *testing.T) {
 		expected []string
 	}{
 		{
+			// custom data dir
 			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{DataDir: "/var/lib/etcd"},
+				CertificatesDir: "/etc/kubernetes/pki",
+				Etcd: kubeadmapi.Etcd{
+					BootstrapServiceIP: "10.96.0.20",
+					DataDir:            "/var/foo/etcd",
+				},
 			},
 			expected: []string{
 				"etcd",
-				"--listen-client-urls=http://127.0.0.1:2379",
-				"--advertise-client-urls=http://127.0.0.1:2379",
-				"--data-dir=/var/lib/etcd",
+				"--name=boot-etcd",
+				"--listen-client-urls=https://0.0.0.0:12379",
+				"--listen-peer-urls=https://0.0.0.0:12380",
+				"--advertise-client-urls=https://10.96.0.20:12379",
+				"--initial-advertise-peer-urls=https://10.96.0.20:12380",
+				"--initial-cluster=boot-etcd=https://10.96.0.20:12380",
+				"--initial-cluster-token=bootkube",
+				"--initial-cluster-state=new",
+				"--data-dir=/var/foo/etcd",
+				"--peer-client-cert-auth=true",
+				"--peer-trusted-ca-file=/etc/kubernetes/pki/etcd-ca.crt",
+				"--peer-cert-file=/etc/kubernetes/pki/etcd-peer.crt",
+				"--peer-key-file=/etc/kubernetes/pki/etcd-peer.key",
+				"--client-cert-auth=true",
+				"--trusted-ca-file=/etc/kubernetes/pki/etcd-ca.crt",
+				"--cert-file=/etc/kubernetes/pki/etcd-member-client.crt",
+				"--key-file=/etc/kubernetes/pki/etcd-member-client.key",
 			},
 		},
 		{
+			// custom extra args
 			cfg: &kubeadmapi.MasterConfiguration{
+				CertificatesDir: "/etc/kubernetes/pki",
 				Etcd: kubeadmapi.Etcd{
-					DataDir: "/var/lib/etcd",
+					BootstrapServiceIP: "10.96.0.20",
+					DataDir:            "/var/foo/etcd",
 					ExtraArgs: map[string]string{
 						"listen-client-urls":    "http://10.0.1.10:2379",
 						"advertise-client-urls": "http://10.0.1.10:2379",
@@ -778,20 +817,23 @@ func TestGetEtcdCommand(t *testing.T) {
 			},
 			expected: []string{
 				"etcd",
+				"--name=boot-etcd",
 				"--listen-client-urls=http://10.0.1.10:2379",
+				"--listen-peer-urls=https://0.0.0.0:12380",
 				"--advertise-client-urls=http://10.0.1.10:2379",
-				"--data-dir=/var/lib/etcd",
-			},
-		},
-		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{DataDir: "/etc/foo"},
-			},
-			expected: []string{
-				"etcd",
-				"--listen-client-urls=http://127.0.0.1:2379",
-				"--advertise-client-urls=http://127.0.0.1:2379",
-				"--data-dir=/etc/foo",
+				"--initial-advertise-peer-urls=https://10.96.0.20:12380",
+				"--initial-cluster=boot-etcd=https://10.96.0.20:12380",
+				"--initial-cluster-token=bootkube",
+				"--initial-cluster-state=new",
+				"--data-dir=/var/foo/etcd",
+				"--peer-client-cert-auth=true",
+				"--peer-trusted-ca-file=/etc/kubernetes/pki/etcd-ca.crt",
+				"--peer-cert-file=/etc/kubernetes/pki/etcd-peer.crt",
+				"--peer-key-file=/etc/kubernetes/pki/etcd-peer.key",
+				"--client-cert-auth=true",
+				"--trusted-ca-file=/etc/kubernetes/pki/etcd-ca.crt",
+				"--cert-file=/etc/kubernetes/pki/etcd-member-client.crt",
+				"--key-file=/etc/kubernetes/pki/etcd-member-client.key",
 			},
 		},
 	}
@@ -815,7 +857,6 @@ func TestGetSchedulerCommand(t *testing.T) {
 			cfg: &kubeadmapi.MasterConfiguration{},
 			expected: []string{
 				"kube-scheduler",
-				"--address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/scheduler.conf",
 			},

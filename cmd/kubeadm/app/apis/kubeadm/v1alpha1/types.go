@@ -70,12 +70,21 @@ type Networking struct {
 }
 
 type Etcd struct {
-	Endpoints []string          `json:"endpoints"`
-	CAFile    string            `json:"caFile"`
-	CertFile  string            `json:"certFile"`
-	KeyFile   string            `json:"keyFile"`
-	DataDir   string            `json:"dataDir"`
-	ExtraArgs map[string]string `json:"extraArgs"`
+	Endpoints          []string          `json:"endpoints"`
+	CAFile             string            `json:"caFile"`
+	CertFile           string            `json:"certFile"`
+	KeyFile            string            `json:"keyFile"`
+	DataDir            string            `json:"dataDir"`
+	ExtraArgs          map[string]string `json:"extraArgs"`
+	SelfHosted         SelfHostedEtcd    `json:"selfHosted"`
+	BootstrapServiceIP string            `json:"bootstrapServiceIP"`
+}
+
+type SelfHostedEtcd struct {
+	OperatorCount int    `json:"operatorCount"`
+	ServiceIP     string `json:"serviceIP"`
+	ClusterSize   int    `json:"size"`
+	Version       string `json:"version"`
 }
 
 type NodeConfiguration struct {
