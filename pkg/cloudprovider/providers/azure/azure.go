@@ -159,7 +159,7 @@ func newServicePrincipalToken(az *Cloud) (*azure.ServicePrincipalToken, error) {
 		if err != nil {
 			return nil, fmt.Errorf("reading the client certificate from file %s: %v", az.AADClientCertPath, err)
 		}
-		certificate, privateKey, err := decodePkcs12(certData, az.AADClientSecret)
+		certificate, privateKey, err := decodePkcs12(certData, az.AADClientCertPassword)
 		if err != nil {
 			return nil, fmt.Errorf("decoding the client certificate: %v", err)
 		}
