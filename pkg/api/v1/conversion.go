@@ -164,6 +164,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"metadata.uid",
 				"spec.nodeName",
 				"spec.restartPolicy",
+				"spec.schedulerName",
 				"spec.serviceAccountName",
 				"spec.schedulerName",
 				"status.phase",
