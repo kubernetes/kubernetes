@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package controlplane
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	ext "k8s.io/api/extensions/v1beta1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -31,6 +31,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -115,7 +116,7 @@ func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 		return fmt.Errorf("unable to delete temporary API server manifest [%v]", err)
 	}
 
-	WaitForAPI(client)
+	kubeadmutil.WaitForAPI(client)
 
 	fmt.Printf("[self-hosted] self-hosted kube-apiserver ready after %f seconds\n", time.Since(start).Seconds())
 	return nil
@@ -193,8 +194,8 @@ func waitForPodsWithLabel(client *clientset.Clientset, appLabel string, mustBeRu
 }
 
 // Sources from bootkube templates.go
-func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount, kubeVersion *version.Version) ext.DaemonSet {
-	ds := ext.DaemonSet{
+func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount, kubeVersion *version.Version) extensions.DaemonSet {
+	ds := extensions.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
 			Kind:       "DaemonSet",
@@ -204,7 +205,7 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 			Namespace: "kube-system",
 			Labels:    map[string]string{"k8s-app": "self-hosted-" + kubeAPIServer},
 		},
-		Spec: ext.DaemonSetSpec{
+		Spec: extensions.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -237,8 +238,8 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 	return ds
 }
 
-func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount, kubeVersion *version.Version) ext.Deployment {
-	d := ext.Deployment{
+func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount, kubeVersion *version.Version) extensions.Deployment {
+	d := extensions.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
 			Kind:       "Deployment",
@@ -248,11 +249,11 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 			Namespace: "kube-system",
 			Labels:    map[string]string{"k8s-app": "self-hosted-" + kubeControllerManager},
 		},
-		Spec: ext.DeploymentSpec{
+		Spec: extensions.DeploymentSpec{
 			// TODO bootkube uses 2 replicas
-			Strategy: ext.DeploymentStrategy{
-				Type: ext.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &ext.RollingUpdateDeployment{
+			Strategy: extensions.DeploymentStrategy{
+				Type: extensions.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &extensions.RollingUpdateDeployment{
 					MaxUnavailable: &maxUnavailable,
 					MaxSurge:       &maxSurge,
 				},
@@ -289,8 +290,8 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 	return d
 }
 
-func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount) ext.Deployment {
-	d := ext.Deployment{
+func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount) extensions.Deployment {
+	d := extensions.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
 			Kind:       "Deployment",
@@ -300,11 +301,11 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Vo
 			Namespace: "kube-system",
 			Labels:    map[string]string{"k8s-app": "self-hosted-" + kubeScheduler},
 		},
-		Spec: ext.DeploymentSpec{
+		Spec: extensions.DeploymentSpec{
 			// TODO bootkube uses 2 replicas
-			Strategy: ext.DeploymentStrategy{
-				Type: ext.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &ext.RollingUpdateDeployment{
+			Strategy: extensions.DeploymentStrategy{
+				Type: extensions.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &extensions.RollingUpdateDeployment{
 					MaxUnavailable: &maxUnavailable,
 					MaxSurge:       &maxSurge,
 				},

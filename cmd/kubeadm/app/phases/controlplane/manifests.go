@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package controlplane
 
 import (
 	"bytes"
@@ -25,7 +25,7 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	api "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -55,8 +55,8 @@ const (
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
 // where kubelet will pick and schedule them.
 func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
-	volumes := []api.Volume{k8sVolume()}
-	volumeMounts := []api.VolumeMount{k8sVolumeMount()}
+	volumes := []v1.Volume{k8sVolume()}
+	volumeMounts := []v1.VolumeMount{k8sVolumeMount()}
 
 	if isCertsVolumeMountNeeded() {
 		volumes = append(volumes, certsVolume(cfg))
@@ -79,31 +79,31 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 
 	// Prepare static pod specs
-	staticPodSpecs := map[string]api.Pod{
-		kubeAPIServer: componentPod(api.Container{
+	staticPodSpecs := map[string]v1.Pod{
+		kubeAPIServer: componentPod(v1.Container{
 			Name:          kubeAPIServer,
 			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getAPIServerCommand(cfg, false, k8sVersion),
 			VolumeMounts:  volumeMounts,
-			LivenessProbe: componentProbe(int(cfg.API.BindPort), "/healthz", api.URISchemeHTTPS),
+			LivenessProbe: componentProbe(int(cfg.API.BindPort), "/healthz", v1.URISchemeHTTPS),
 			Resources:     componentResources("250m"),
 			Env:           getProxyEnvVars(),
 		}, volumes...),
-		kubeControllerManager: componentPod(api.Container{
+		kubeControllerManager: componentPod(v1.Container{
 			Name:          kubeControllerManager,
 			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getControllerManagerCommand(cfg, false, k8sVersion),
 			VolumeMounts:  volumeMounts,
-			LivenessProbe: componentProbe(10252, "/healthz", api.URISchemeHTTP),
+			LivenessProbe: componentProbe(10252, "/healthz", v1.URISchemeHTTP),
 			Resources:     componentResources("200m"),
 			Env:           getProxyEnvVars(),
 		}, volumes...),
-		kubeScheduler: componentPod(api.Container{
+		kubeScheduler: componentPod(v1.Container{
 			Name:          kubeScheduler,
 			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getSchedulerCommand(cfg, false),
-			VolumeMounts:  []api.VolumeMount{k8sVolumeMount()},
-			LivenessProbe: componentProbe(10251, "/healthz", api.URISchemeHTTP),
+			VolumeMounts:  []v1.VolumeMount{k8sVolumeMount()},
+			LivenessProbe: componentProbe(10251, "/healthz", v1.URISchemeHTTP),
 			Resources:     componentResources("100m"),
 			Env:           getProxyEnvVars(),
 		}, k8sVolume()),
@@ -111,16 +111,16 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// Add etcd static pod spec only if external etcd is not configured
 	if len(cfg.Etcd.Endpoints) == 0 {
-		etcdPod := componentPod(api.Container{
+		etcdPod := componentPod(v1.Container{
 			Name:          etcd,
 			Command:       getEtcdCommand(cfg),
-			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(cfg.Etcd.DataDir), k8sVolumeMount()},
+			VolumeMounts:  []v1.VolumeMount{certsVolumeMount(), etcdVolumeMount(cfg.Etcd.DataDir), k8sVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
-			LivenessProbe: componentProbe(2379, "/health", api.URISchemeHTTP),
+			LivenessProbe: componentProbe(2379, "/health", v1.URISchemeHTTP),
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume())
 
-		etcdPod.Spec.SecurityContext = &api.PodSecurityContext{
-			SELinuxOptions: &api.SELinuxOptions{
+		etcdPod.Spec.SecurityContext = &v1.PodSecurityContext{
+			SELinuxOptions: &v1.SELinuxOptions{
 				// Unconfine the etcd container so it can write to the data dir with SELinux enforcing:
 				Type: "spc_t",
 			},
@@ -146,34 +146,34 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	return nil
 }
 
-func newVolume(name, path string) api.Volume {
-	return api.Volume{
+func newVolume(name, path string) v1.Volume {
+	return v1.Volume{
 		Name: name,
-		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{Path: path},
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{Path: path},
 		},
 	}
 }
 
-func newVolumeMount(name, path string) api.VolumeMount {
-	return api.VolumeMount{
+func newVolumeMount(name, path string) v1.VolumeMount {
+	return v1.VolumeMount{
 		Name:      name,
 		MountPath: path,
 	}
 }
 
 // etcdVolume exposes a path on the host in order to guarantee data survival during reboot.
-func etcdVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
-	return api.Volume{
+func etcdVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
+	return v1.Volume{
 		Name: "etcd",
-		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{Path: cfg.Etcd.DataDir},
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{Path: cfg.Etcd.DataDir},
 		},
 	}
 }
 
-func etcdVolumeMount(dataDir string) api.VolumeMount {
-	return api.VolumeMount{
+func etcdVolumeMount(dataDir string) v1.VolumeMount {
+	return v1.VolumeMount{
 		Name:      "etcd",
 		MountPath: dataDir,
 	}
@@ -186,18 +186,18 @@ func isCertsVolumeMountNeeded() bool {
 }
 
 // certsVolume exposes host SSL certificates to pod containers.
-func certsVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
-	return api.Volume{
+func certsVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
+	return v1.Volume{
 		Name: "certs",
-		VolumeSource: api.VolumeSource{
+		VolumeSource: v1.VolumeSource{
 			// TODO(phase1+) make path configurable
-			HostPath: &api.HostPathVolumeSource{Path: "/etc/ssl/certs"},
+			HostPath: &v1.HostPathVolumeSource{Path: "/etc/ssl/certs"},
 		},
 	}
 }
 
-func certsVolumeMount() api.VolumeMount {
-	return api.VolumeMount{
+func certsVolumeMount() v1.VolumeMount {
+	return v1.VolumeMount{
 		Name:      "certs",
 		MountPath: "/etc/ssl/certs",
 	}
@@ -212,69 +212,69 @@ func isPkiVolumeMountNeeded() bool {
 	return false
 }
 
-func pkiVolume() api.Volume {
-	return api.Volume{
+func pkiVolume() v1.Volume {
+	return v1.Volume{
 		Name: "pki",
-		VolumeSource: api.VolumeSource{
+		VolumeSource: v1.VolumeSource{
 			// TODO(phase1+) make path configurable
-			HostPath: &api.HostPathVolumeSource{Path: "/etc/pki"},
+			HostPath: &v1.HostPathVolumeSource{Path: "/etc/pki"},
 		},
 	}
 }
 
-func pkiVolumeMount() api.VolumeMount {
-	return api.VolumeMount{
+func pkiVolumeMount() v1.VolumeMount {
+	return v1.VolumeMount{
 		Name:      "pki",
 		MountPath: "/etc/pki",
 	}
 }
 
-func flockVolume() api.Volume {
-	return api.Volume{
+func flockVolume() v1.Volume {
+	return v1.Volume{
 		Name: "var-lock",
-		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{Path: "/var/lock"},
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{Path: "/var/lock"},
 		},
 	}
 }
 
-func flockVolumeMount() api.VolumeMount {
-	return api.VolumeMount{
+func flockVolumeMount() v1.VolumeMount {
+	return v1.VolumeMount{
 		Name:      "var-lock",
 		MountPath: "/var/lock",
 		ReadOnly:  false,
 	}
 }
 
-func k8sVolume() api.Volume {
-	return api.Volume{
+func k8sVolume() v1.Volume {
+	return v1.Volume{
 		Name: "k8s",
-		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{Path: kubeadmapi.GlobalEnvParams.KubernetesDir},
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{Path: kubeadmapi.GlobalEnvParams.KubernetesDir},
 		},
 	}
 }
 
-func k8sVolumeMount() api.VolumeMount {
-	return api.VolumeMount{
+func k8sVolumeMount() v1.VolumeMount {
+	return v1.VolumeMount{
 		Name:      "k8s",
 		MountPath: kubeadmapi.GlobalEnvParams.KubernetesDir,
 		ReadOnly:  true,
 	}
 }
 
-func componentResources(cpu string) api.ResourceRequirements {
-	return api.ResourceRequirements{
-		Requests: api.ResourceList{
-			api.ResourceName(api.ResourceCPU): resource.MustParse(cpu),
+func componentResources(cpu string) v1.ResourceRequirements {
+	return v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceName(v1.ResourceCPU): resource.MustParse(cpu),
 		},
 	}
 }
 
-func componentProbe(port int, path string, scheme api.URIScheme) *api.Probe {
-	return &api.Probe{
-		Handler: api.Handler{
-			HTTPGet: &api.HTTPGetAction{
+func componentProbe(port int, path string, scheme v1.URIScheme) *v1.Probe {
+	return &v1.Probe{
+		Handler: v1.Handler{
+			HTTPGet: &v1.HTTPGetAction{
 				Host:   "127.0.0.1",
 				Path:   path,
 				Port:   intstr.FromInt(port),
@@ -287,8 +287,8 @@ func componentProbe(port int, path string, scheme api.URIScheme) *api.Probe {
 	}
 }
 
-func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
-	return api.Pod{
+func componentPod(container v1.Container, volumes ...v1.Volume) v1.Pod {
+	return v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Pod",
@@ -299,8 +299,8 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 			Annotations: map[string]string{kubetypes.CriticalPodAnnotationKey: ""},
 			Labels:      map[string]string{"component": container.Name, "tier": "control-plane"},
 		},
-		Spec: api.PodSpec{
-			Containers:  []api.Container{container},
+		Spec: v1.PodSpec{
+			Containers:  []v1.Container{container},
 			HostNetwork: true,
 			Volumes:     volumes,
 		},
@@ -429,8 +429,8 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 	return command
 }
 
-func getProxyEnvVars() []api.EnvVar {
-	envs := []api.EnvVar{}
+func getProxyEnvVars() []v1.EnvVar {
+	envs := []v1.EnvVar{}
 	for _, env := range os.Environ() {
 		pos := strings.Index(env, "=")
 		if pos == -1 {
@@ -440,18 +440,18 @@ func getProxyEnvVars() []api.EnvVar {
 		name := env[:pos]
 		value := env[pos+1:]
 		if strings.HasSuffix(strings.ToLower(name), "_proxy") && value != "" {
-			envVar := api.EnvVar{Name: name, Value: value}
+			envVar := v1.EnvVar{Name: name, Value: value}
 			envs = append(envs, envVar)
 		}
 	}
 	return envs
 }
 
-func getSelfHostedAPIServerEnv() []api.EnvVar {
-	podIPEnvVar := api.EnvVar{
+func getSelfHostedAPIServerEnv() []v1.EnvVar {
+	podIPEnvVar := v1.EnvVar{
 		Name: "POD_IP",
-		ValueFrom: &api.EnvVarSource{
-			FieldRef: &api.ObjectFieldSelector{
+		ValueFrom: &v1.EnvVarSource{
+			FieldRef: &v1.ObjectFieldSelector{
 				FieldPath: "status.podIP",
 			},
 		},
