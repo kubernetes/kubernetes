@@ -98,7 +98,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager())
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
 
 	node, pod, pv, claim := createObjects()
 	claim.Status = v1.PersistentVolumeClaimStatus{
@@ -107,10 +107,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 
 	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
 
-	manager, err := newTestVolumeManager(tmpDir, podManager, kubeClient)
-	if err != nil {
-		t.Fatalf("Failed to initialize volume manager: %v", err)
-	}
+	manager := newTestVolumeManager(tmpDir, podManager, kubeClient)
 
 	stopCh := runVolumeManager(manager)
 	defer close(stopCh)
