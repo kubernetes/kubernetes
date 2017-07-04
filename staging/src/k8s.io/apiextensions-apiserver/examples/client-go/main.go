@@ -110,7 +110,7 @@ func main() {
 	}
 	fmt.Print("PROCESSED\n")
 
-	// Fetch a list of our TPRs
+	// Fetch a list of our CRs
 	exampleList := crv1.ExampleList{}
 	err = exampleClient.Get().Resource(crv1.ExampleResourcePlural).Do().Into(&exampleList)
 	if err != nil {

@@ -155,6 +155,7 @@ def install_snaps():
     hookenv.status_set('maintenance', 'Installing cdk-addons snap')
     snap.install('cdk-addons', channel=channel)
     set_state('kubernetes-master.snaps.installed')
+    remove_state('kubernetes-master.components.started')
 
 
 @when('config.changed.channel')
@@ -247,7 +248,9 @@ def setup_non_leader_authentication():
     known_tokens = '/root/cdk/known_tokens.csv'
 
     keys = [service_key, basic_auth, known_tokens]
-    if not get_keys_from_leader(keys):
+    # The source of truth for non-leaders is the leader.
+    # Therefore we overwrite_local with whatever the leader has.
+    if not get_keys_from_leader(keys, overwrite_local=True):
         # the keys were not retrieved. Non-leaders have to retry.
         return
 
@@ -268,7 +271,7 @@ def setup_non_leader_authentication():
     set_state('authentication.setup')
 
 
-def get_keys_from_leader(keys):
+def get_keys_from_leader(keys, overwrite_local=False):
     """
     Gets the broadcasted keys from the leader and stores them in
     the corresponding files.
@@ -285,7 +288,7 @@ def get_keys_from_leader(keys):
 
     for k in keys:
         # If the path does not exist, assume we need it
-        if not os.path.exists(k):
+        if not os.path.exists(k) or overwrite_local:
             # Fetch data from leadership broadcast
             contents = charms.leadership.leader_get(k)
             # Default to logging the warning and wait for leader data to be set

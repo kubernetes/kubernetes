@@ -44,3 +44,9 @@ type User struct {
 	Password string `json:"password"`
 }
 ```
+
+## Cleanup
+
+Successfully running this program will clean the created artifacts. If you terminate the program without completing, you can clean up the created CustomResourceDefinition with:
+
+    kubectl delete crd examples.cr.client-go.k8s.io

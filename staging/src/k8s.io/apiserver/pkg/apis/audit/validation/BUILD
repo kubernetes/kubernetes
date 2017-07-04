@@ -21,6 +21,7 @@ go_library(
     srcs = ["validation.go"],
     tags = ["automanaged"],
     deps = [
+        "//vendor/k8s.io/apimachinery/pkg/api/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/audit:go_default_library",
     ],

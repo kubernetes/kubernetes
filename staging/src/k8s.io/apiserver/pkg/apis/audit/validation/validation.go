@@ -17,6 +17,9 @@ limitations under the License.
 package validation
 
 import (
+	"strings"
+
+	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/apis/audit"
 )
@@ -33,6 +36,8 @@ func ValidatePolicy(policy *audit.Policy) field.ErrorList {
 func validatePolicyRule(rule audit.PolicyRule, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateLevel(rule.Level, fldPath.Child("level"))...)
+	allErrs = append(allErrs, validateNonResourceURLs(rule.NonResourceURLs, fldPath.Child("nonResourceURLs"))...)
+	allErrs = append(allErrs, validateResources(rule.Resources, fldPath.Child("resources"))...)
 
 	if len(rule.NonResourceURLs) > 0 {
 		if len(rule.Resources) > 0 || len(rule.Namespaces) > 0 {
@@ -59,4 +64,41 @@ func validateLevel(level audit.Level, fldPath *field.Path) field.ErrorList {
 	default:
 		return field.ErrorList{field.NotSupported(fldPath, level, validLevels)}
 	}
+}
+
+func validateNonResourceURLs(urls []string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for i, url := range urls {
+		if url == "*" {
+			continue
+		}
+
+		if !strings.HasPrefix(url, "/") {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), url, "non-resource URL rules must begin with a '/' character"))
+		}
+
+		if url != "" && strings.ContainsRune(url[:len(url)-1], '*') {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), url, "non-resource URL wildcards '*' must be the final character of the rule"))
+		}
+	}
+	return allErrs
+}
+
+func validateResources(groupResources []audit.GroupResources, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, groupResource := range groupResources {
+		// The empty string represents the core API group.
+		if len(groupResource.Group) == 0 {
+			continue
+		}
+
+		// Group names must be lower case and be valid DNS subdomains.
+		// reference: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md
+		// an error is returned for group name like rbac.authorization.k8s.io/v1beta1
+		// rbac.authorization.k8s.io is the valid one
+		if msgs := validation.NameIsDNSSubdomain(groupResource.Group, false); len(msgs) != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), groupResource.Group, strings.Join(msgs, ",")))
+		}
+	}
+	return allErrs
 }

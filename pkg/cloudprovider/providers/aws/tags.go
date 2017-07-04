@@ -179,7 +179,7 @@ func (c *awsTagging) readRepairClusterTags(client EC2, resourceID string, lifecy
 	}
 
 	if err := c.createTags(client, resourceID, lifecycle, addTags); err != nil {
-		return fmt.Errorf("error adding missing tags to resource %q: %v", resourceID, err)
+		return fmt.Errorf("error adding missing tags to resource %q: %q", resourceID, err)
 	}
 
 	return nil
@@ -222,7 +222,7 @@ func (t *awsTagging) createTags(client EC2, resourceID string, lifecycle Resourc
 
 		// We could check that the error is retryable, but the error code changes based on what we are tagging
 		// SecurityGroup: InvalidGroup.NotFound
-		glog.V(2).Infof("Failed to create tags; will retry.  Error was %v", err)
+		glog.V(2).Infof("Failed to create tags; will retry.  Error was %q", err)
 		lastErr = err
 		return false, nil
 	})
