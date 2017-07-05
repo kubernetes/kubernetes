@@ -65,7 +65,7 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 		key := deployment.Fields["kind"].(*openapi.Primitive)
 		Expect(key).ToNot(BeNil())
 		Expect(key.Type).To(Equal("string"))
-		Expect(key.GetPath().Get()).To(Equal([]string{"io.k8s.api.apps.v1beta1.Deployment", "kind"}))
+		Expect(key.GetPath().Get()).To(Equal([]string{"io.k8s.api.apps.v1beta1.Deployment", ".kind"}))
 	})
 
 	It("should have a apiVersion key of type string", func() {
@@ -73,7 +73,7 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 		key := deployment.Fields["apiVersion"].(*openapi.Primitive)
 		Expect(key).ToNot(BeNil())
 		Expect(key.Type).To(Equal("string"))
-		Expect(key.GetPath().Get()).To(Equal([]string{"io.k8s.api.apps.v1beta1.Deployment", "apiVersion"}))
+		Expect(key.GetPath().Get()).To(Equal([]string{"io.k8s.api.apps.v1beta1.Deployment", ".apiVersion"}))
 	})
 
 	It("should have a metadata key of type Reference", func() {
@@ -176,15 +176,43 @@ var _ = Describe("Reading authorization.k8s.io/v1/SubjectAccessReview from openA
 		extra := sarspec.Fields["extra"].(*openapi.Map)
 		Expect(extra).ToNot(BeNil())
 		Expect(extra.GetName()).To(Equal("Map of Array of string"))
-		Expect(extra.GetPath().Get()).To(Equal([]string{"io.k8s.api.authorization.v1.SubjectAccessReviewSpec", "extra"}))
+		Expect(extra.GetPath().Get()).To(Equal([]string{"io.k8s.api.authorization.v1.SubjectAccessReviewSpec", ".extra"}))
 		array := extra.SubType.(*openapi.Array)
 		Expect(array).ToNot(BeNil())
 		Expect(array.GetName()).To(Equal("Array of string"))
-		Expect(array.GetPath().Get()).To(Equal([]string{"io.k8s.api.authorization.v1.SubjectAccessReviewSpec", "extra"}))
+		Expect(array.GetPath().Get()).To(Equal([]string{"io.k8s.api.authorization.v1.SubjectAccessReviewSpec", ".extra"}))
 		str := array.SubType.(*openapi.Primitive)
 		Expect(str).ToNot(BeNil())
 		Expect(str.Type).To(Equal("string"))
 		Expect(str.GetName()).To(Equal("string"))
-		Expect(str.GetPath().Get()).To(Equal([]string{"io.k8s.api.authorization.v1.SubjectAccessReviewSpec", "extra"}))
+		Expect(str.GetPath().Get()).To(Equal([]string{"io.k8s.api.authorization.v1.SubjectAccessReviewSpec", ".extra"}))
+	})
+})
+
+var _ = Describe("Path", func() {
+	It("can be created by NewPath", func() {
+		path := openapi.NewPath("key")
+		Expect(path.String()).To(Equal("key"))
+	})
+	It("can create and print complex paths", func() {
+		key := openapi.NewPath("key")
+		array := key.ArrayPath(12)
+		field := array.FieldPath("subKey")
+
+		Expect(field.String()).To(Equal("key[12].subKey"))
+	})
+	It("has a length", func() {
+		key := openapi.NewPath("key")
+		array := key.ArrayPath(12)
+		field := array.FieldPath("subKey")
+
+		Expect(field.Len()).To(Equal(3))
+	})
+	It("can look like an array", func() {
+		key := openapi.NewPath("key")
+		array := key.ArrayPath(12)
+		field := array.FieldPath("subKey")
+
+		Expect(field.Get()).To(Equal([]string{"key", "[12]", ".subKey"}))
 	})
 })

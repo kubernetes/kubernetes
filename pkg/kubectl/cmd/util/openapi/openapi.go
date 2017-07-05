@@ -77,6 +77,10 @@ type Path struct {
 	key    string
 }
 
+func NewPath(key string) Path {
+	return Path{key: key}
+}
+
 func (p *Path) Get() []string {
 	if p == nil {
 		return []string{}
@@ -92,7 +96,23 @@ func (p *Path) Len() int {
 }
 
 func (p *Path) String() string {
-	return strings.Join(p.Get(), ".")
+	return strings.Join(p.Get(), "")
+}
+
+// ArrayPath appends an array index and creates a new path
+func (p *Path) ArrayPath(i int) Path {
+	return Path{
+		parent: p,
+		key:    fmt.Sprintf("[%d]", i),
+	}
+}
+
+// FieldPath appends a field name and creates a new path
+func (p *Path) FieldPath(field string) Path {
+	return Path{
+		parent: p,
+		key:    fmt.Sprintf(".%s", field),
+	}
 }
 
 // BaseSchema holds data used by each types of schema.

@@ -64,6 +64,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubectl/cmd/util/openapi/testing:all-srcs",
+        "//pkg/kubectl/cmd/util/openapi/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )
