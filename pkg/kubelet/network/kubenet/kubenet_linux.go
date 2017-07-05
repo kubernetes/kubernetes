@@ -118,8 +118,8 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 		iptables:          iptInterface,
 		sysctl:            sysctl,
 		vendorDir:         networkPluginDir,
-		hostportSyncer:    hostport.NewHostportSyncer(),
-		hostportManager:   hostport.NewHostportManager(),
+		hostportSyncer:    hostport.NewHostportSyncer(iptInterface),
+		hostportManager:   hostport.NewHostportManager(iptInterface),
 		nonMasqueradeCIDR: "10.0.0.0/8",
 	}
 }
