@@ -242,10 +242,14 @@ type Unstructured interface {
 	// IsUnstructuredObject is a marker interface to allow objects that can be serialized but not introspected
 	// to bypass conversion.
 	IsUnstructuredObject()
-	// IsList returns true if this type is a list or matches the list convention - has an array called "items".
-	IsList() bool
 	// UnstructuredContent returns a non-nil, mutable map of the contents of this object. Values may be
 	// []interface{}, map[string]interface{}, or any primitive type. Contents are typically serialized to
 	// and from JSON.
 	UnstructuredContent() map[string]interface{}
+	// IsList returns true if this type is a list or matches the list convention - has an array called "items".
+	IsList() bool
+	// EachListItem should pass a single item out of the list as an Object to the provided function. Any
+	// error should terminate the iteration. If IsList() returns false, this method should return an error
+	// instead of calling the provided function.
+	EachListItem(func(Object) error) error
 }
