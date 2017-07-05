@@ -34,7 +34,6 @@ import (
 )
 
 type RESTStorageProvider struct {
-	ResourceInterface ResourceInterface
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {

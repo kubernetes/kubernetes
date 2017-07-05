@@ -238,8 +238,6 @@ pkg/registry/core/service/ipallocator/controller
 pkg/registry/core/service/ipallocator/storage
 pkg/registry/core/serviceaccount
 pkg/registry/extensions/podsecuritypolicy/storage
-pkg/registry/extensions/thirdpartyresource
-pkg/registry/extensions/thirdpartyresource/storage
 pkg/registry/rbac/clusterrole/storage
 pkg/registry/rbac/clusterrolebinding/storage
 pkg/registry/rbac/role/storage

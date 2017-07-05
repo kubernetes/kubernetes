@@ -54,7 +54,6 @@ import (
 	corev1client "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master/thirdparty"
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/routes"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -259,7 +258,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget,
 		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{},
 		// TODO(enisoc): Remove crdRESTOptionsGetter input argument when TPR code is removed.
-		extensionsrest.RESTStorageProvider{ResourceInterface: thirdparty.NewThirdPartyResourceServer(s, s.DiscoveryGroupManager, c.StorageFactory, crdRESTOptionsGetter)},
+		extensionsrest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
