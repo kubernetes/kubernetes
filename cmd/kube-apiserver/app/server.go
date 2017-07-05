@@ -161,7 +161,7 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	}
 	aggregatorConfig.ProxyTransport = proxyTransport
 	aggregatorConfig.ServiceResolver = serviceResolver
-	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, sharedInformers, apiExtensionsServer.Informers)
+	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return err
