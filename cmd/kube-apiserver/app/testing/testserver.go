@@ -79,6 +79,7 @@ func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller
 	s.Etcd.StorageConfig = *storageConfig
 	s.Etcd.DefaultStorageMediaType = "application/json"
 	s.Admission.PluginNames = strings.Split("Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds", ",")
+	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
 	t.Logf("Starting kube-apiserver...")
 	runErrCh := make(chan error, 1)
