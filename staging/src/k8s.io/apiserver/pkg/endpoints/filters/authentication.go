@@ -17,13 +17,19 @@ limitations under the License.
 package filters
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
@@ -76,22 +82,25 @@ func WithAuthentication(handler http.Handler, mapper genericapirequest.RequestCo
 	)
 }
 
-func Unauthorized(supportsBasicAuth bool) http.HandlerFunc {
-	if supportsBasicAuth {
-		return unauthorizedBasicAuth
-	}
-	return unauthorized
-}
+func Unauthorized(requestContextMapper request.RequestContextMapper, s runtime.NegotiatedSerializer, supportsBasicAuth bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if supportsBasicAuth {
+			w.Header().Set("WWW-Authenticate", `Basic realm="kubernetes-master"`)
+		}
+		ctx, ok := requestContextMapper.Get(req)
+		if !ok {
+			responsewriters.InternalError(w, req, errors.New("no context found for request"))
+			return
+		}
+		requestInfo, found := request.RequestInfoFrom(ctx)
+		if !found {
+			responsewriters.InternalError(w, req, errors.New("no RequestInfo found in the context"))
+			return
+		}
 
-// unauthorizedBasicAuth serves an unauthorized message to clients.
-func unauthorizedBasicAuth(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("WWW-Authenticate", `Basic realm="kubernetes-master"`)
-	http.Error(w, "Unauthorized", http.StatusUnauthorized)
-}
-
-// unauthorized serves an unauthorized message to clients.
-func unauthorized(w http.ResponseWriter, req *http.Request) {
-	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		gv := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+		responsewriters.ErrorNegotiated(ctx, apierrors.NewUnauthorized("Unauthorized"), s, gv, w, req)
+	})
 }
 
 // compressUsername maps all possible usernames onto a small set of categories

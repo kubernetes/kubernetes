@@ -82,6 +82,7 @@ go_test(
         "//vendor/github.com/appc/spec/schema:go_default_library",
         "//vendor/github.com/appc/spec/schema/types:go_default_library",
         "//vendor/github.com/coreos/go-systemd/dbus:go_default_library",
+        "//vendor/github.com/coreos/go-systemd/unit:go_default_library",
         "//vendor/github.com/coreos/rkt/api/v1alpha:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

@@ -14,30 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package wardle
+package fischer
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
+	"k8s.io/sample-apiserver/pkg/registry"
 )
 
-// rest implements a RESTStorage for API services against etcd
-type REST struct {
-	*genericregistry.Store
-}
-
-// NewREST returns a RESTStorage object that will work against API services.
-func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST {
+// RESTInPeace returns a RESTStorage object that will work against API services.
+func RESTInPeace(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *registry.REST {
 	strategy := NewStrategy(scheme)
 
 	store := &genericregistry.Store{
 		Copier:            scheme,
-		NewFunc:           func() runtime.Object { return &wardle.Flunder{} },
-		NewListFunc:       func() runtime.Object { return &wardle.FlunderList{} },
-		PredicateFunc:     MatchFlunder,
-		QualifiedResource: wardle.Resource("flunders"),
+		NewFunc:           func() runtime.Object { return &wardle.Fischer{} },
+		NewListFunc:       func() runtime.Object { return &wardle.FischerList{} },
+		PredicateFunc:     MatchFischer,
+		QualifiedResource: wardle.Resource("fischers"),
 
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,
@@ -45,7 +43,8 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		err = fmt.Errorf("Unable to create REST storage for fischer resource due to %v. Committing suicide.", err)
+		panic(err)
 	}
-	return &REST{store}
+	return &registry.REST{store}
 }

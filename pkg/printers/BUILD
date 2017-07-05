@@ -25,8 +25,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/slice:go_default_library",
-        "//vendor/github.com/fatih/camelcase:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -68,12 +66,4 @@ filegroup(
         "//pkg/printers/storage:all-srcs",
     ],
     tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["humanreadable_test.go"],
-    library = ":go_default_library",
-    tags = ["automanaged"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library"],
 )

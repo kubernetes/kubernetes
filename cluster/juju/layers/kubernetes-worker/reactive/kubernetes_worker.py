@@ -160,8 +160,11 @@ def shutdown():
         - delete the current node
         - stop the worker services
     '''
-    if os.path.isfile(kubeconfig_path):
-        kubectl('delete', 'node', gethostname())
+    try:
+        if os.path.isfile(kubeconfig_path):
+            kubectl('delete', 'node', gethostname())
+    except CalledProcessError:
+        hookenv.log('Failed to unregister node.')
     service_stop('snap.kubelet.daemon')
     service_stop('snap.kube-proxy.daemon')
 
@@ -481,6 +484,9 @@ def configure_worker_services(api_servers, dns, cluster_cidr):
     kube_proxy_opts.add('logtostderr', 'true')
     kube_proxy_opts.add('v', '0')
     kube_proxy_opts.add('master', random.choice(api_servers), strict=True)
+
+    if b'lxc' in check_output('virt-what', shell=True):
+        kube_proxy_opts.add('conntrack-max-per-core', '0')
 
     cmd = ['snap', 'set', 'kubelet'] + kubelet_opts.to_s().split(' ')
     check_call(cmd)

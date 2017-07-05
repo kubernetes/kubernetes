@@ -30,6 +30,7 @@ import (
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -47,7 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/controller"
@@ -68,8 +68,6 @@ var (
 	nodeColumns                   = []string{"NAME", "STATUS", "AGE", "VERSION"}
 	nodeWideColumns               = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION", "CONTAINER-RUNTIME"}
 	eventColumns                  = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
-	limitRangeColumns             = []string{"NAME", "AGE"}
-	resourceQuotaColumns          = []string{"NAME", "AGE"}
 	namespaceColumns              = []string{"NAME", "STATUS", "AGE"}
 	secretColumns                 = []string{"NAME", "TYPE", "DATA", "AGE"}
 	serviceAccountColumns         = []string{"NAME", "SECRETS", "AGE"}
@@ -77,10 +75,8 @@ var (
 	persistentVolumeClaimColumns  = []string{"NAME", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "STORAGECLASS", "AGE"}
 	componentStatusColumns        = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 	thirdPartyResourceColumns     = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
-	roleColumns                   = []string{"NAME", "AGE"}
 	roleBindingColumns            = []string{"NAME", "AGE"}
 	roleBindingWideColumns        = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
-	clusterRoleColumns            = []string{"NAME", "AGE"}
 	clusterRoleBindingColumns     = []string{"NAME", "AGE"}
 	clusterRoleBindingWideColumns = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
 	storageClassColumns           = []string{"NAME", "PROVISIONER"}
@@ -214,10 +210,6 @@ func AddHandlers(h printers.PrintHandler) {
 	h.Handler(nodeColumns, nodeWideColumns, printNodeList)
 	h.Handler(eventColumns, nil, printEvent)
 	h.Handler(eventColumns, nil, printEventList)
-	h.Handler(limitRangeColumns, nil, printLimitRange)
-	h.Handler(limitRangeColumns, nil, printLimitRangeList)
-	h.Handler(resourceQuotaColumns, nil, printResourceQuota)
-	h.Handler(resourceQuotaColumns, nil, printResourceQuotaList)
 	h.Handler(namespaceColumns, nil, printNamespace)
 	h.Handler(namespaceColumns, nil, printNamespaceList)
 	h.Handler(secretColumns, nil, printSecret)
@@ -248,23 +240,59 @@ func AddHandlers(h printers.PrintHandler) {
 	h.Handler(networkPolicyColumns, nil, printExtensionsNetworkPolicyList)
 	h.Handler(networkPolicyColumns, nil, printNetworkPolicy)
 	h.Handler(networkPolicyColumns, nil, printNetworkPolicyList)
-	h.Handler(roleColumns, nil, printRole)
-	h.Handler(roleColumns, nil, printRoleList)
 	h.Handler(roleBindingColumns, roleBindingWideColumns, printRoleBinding)
 	h.Handler(roleBindingColumns, roleBindingWideColumns, printRoleBindingList)
-	h.Handler(clusterRoleColumns, nil, printClusterRole)
-	h.Handler(clusterRoleColumns, nil, printClusterRoleList)
 	h.Handler(clusterRoleBindingColumns, clusterRoleBindingWideColumns, printClusterRoleBinding)
 	h.Handler(clusterRoleBindingColumns, clusterRoleBindingWideColumns, printClusterRoleBindingList)
 	h.Handler(certificateSigningRequestColumns, nil, printCertificateSigningRequest)
 	h.Handler(certificateSigningRequestColumns, nil, printCertificateSigningRequestList)
 	h.Handler(storageClassColumns, nil, printStorageClass)
 	h.Handler(storageClassColumns, nil, printStorageClassList)
-	h.Handler(podPresetColumns, nil, printPodPreset)
-	h.Handler(podPresetColumns, nil, printPodPresetList)
 	h.Handler(statusColumns, nil, printStatus)
 	h.Handler(controllerRevisionColumns, nil, printControllerRevision)
 	h.Handler(controllerRevisionColumns, nil, printControllerRevisionList)
+
+	AddDefaultHandlers(h)
+}
+
+// AddDefaultHandlers adds handlers that can work with most Kubernetes objects.
+func AddDefaultHandlers(h printers.PrintHandler) {
+	// types without defined columns
+	objectMetaColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.DefaultTableHandler(objectMetaColumnDefinitions, printObjectMeta)
+}
+
+func printObjectMeta(obj runtime.Object, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	if meta.IsListType(obj) {
+		rows := make([]metav1alpha1.TableRow, 0, 16)
+		err := meta.EachListItem(obj, func(obj runtime.Object) error {
+			nestedRows, err := printObjectMeta(obj, options)
+			if err != nil {
+				return err
+			}
+			rows = append(rows, nestedRows...)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return rows, nil
+	}
+
+	rows := make([]metav1alpha1.TableRow, 0, 1)
+	m, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, m.GetName(), translateTimestamp(m.GetCreationTimestamp()))
+	rows = append(rows, row)
+	return rows, nil
 }
 
 // Pass ports=nil for all ports.
@@ -666,8 +694,12 @@ func getServiceExternalIP(svc *api.Service, wide bool) string {
 	case api.ServiceTypeLoadBalancer:
 		lbIps := loadBalancerStatusStringer(svc.Status.LoadBalancer, wide)
 		if len(svc.Spec.ExternalIPs) > 0 {
-			result := append(strings.Split(lbIps, ","), svc.Spec.ExternalIPs...)
-			return strings.Join(result, ",")
+			results := []string{}
+			if len(lbIps) > 0 {
+				results = append(results, strings.Split(lbIps, ",")...)
+			}
+			results = append(results, svc.Spec.ExternalIPs...)
+			return strings.Join(results, ",")
 		}
 		if len(lbIps) > 0 {
 			return lbIps
@@ -696,7 +728,14 @@ func printService(svc *api.Service, w io.Writer, options printers.PrintOptions) 
 	namespace := svc.Namespace
 	svcType := svc.Spec.Type
 	internalIP := svc.Spec.ClusterIP
+	if len(internalIP) == 0 {
+		internalIP = "<none>"
+	}
 	externalIP := getServiceExternalIP(svc, options.Wide)
+	svcPorts := makePortString(svc.Spec.Ports)
+	if len(svcPorts) == 0 {
+		svcPorts = "<none>"
+	}
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -708,7 +747,7 @@ func printService(svc *api.Service, w io.Writer, options printers.PrintOptions) 
 		string(svcType),
 		internalIP,
 		externalIP,
-		makePortString(svc.Spec.Ports),
+		svcPorts,
 		translateTimestamp(svc.CreationTimestamp),
 	); err != nil {
 		return err
@@ -1220,72 +1259,6 @@ func printEventList(list *api.EventList, w io.Writer, options printers.PrintOpti
 	return nil
 }
 
-func printLimitRange(limitRange *api.LimitRange, w io.Writer, options printers.PrintOptions) error {
-	return printObjectMeta(limitRange.ObjectMeta, w, options, true)
-}
-
-// Prints the LimitRangeList in a human-friendly format.
-func printLimitRangeList(list *api.LimitRangeList, w io.Writer, options printers.PrintOptions) error {
-	for i := range list.Items {
-		if err := printLimitRange(&list.Items[i], w, options); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// printObjectMeta prints the object metadata of a given resource.
-func printObjectMeta(meta metav1.ObjectMeta, w io.Writer, options printers.PrintOptions, namespaced bool) error {
-	name := printers.FormatResourceName(options.Kind, meta.Name, options.WithKind)
-
-	if namespaced && options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", meta.Namespace); err != nil {
-			return err
-		}
-	}
-
-	if _, err := fmt.Fprintf(
-		w, "%s\t%s",
-		name,
-		translateTimestamp(meta.CreationTimestamp),
-	); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(meta.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, meta.Labels))
-	return err
-}
-
-func printResourceQuota(resourceQuota *api.ResourceQuota, w io.Writer, options printers.PrintOptions) error {
-	return printObjectMeta(resourceQuota.ObjectMeta, w, options, true)
-}
-
-// Prints the ResourceQuotaList in a human-friendly format.
-func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer, options printers.PrintOptions) error {
-	for i := range list.Items {
-		if err := printResourceQuota(&list.Items[i], w, options); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func printRole(role *rbac.Role, w io.Writer, options printers.PrintOptions) error {
-	return printObjectMeta(role.ObjectMeta, w, options, true)
-}
-
-// Prints the Role in a human-friendly format.
-func printRoleList(list *rbac.RoleList, w io.Writer, options printers.PrintOptions) error {
-	for i := range list.Items {
-		if err := printRole(&list.Items[i], w, options); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func printRoleBinding(roleBinding *rbac.RoleBinding, w io.Writer, options printers.PrintOptions) error {
 	meta := roleBinding.ObjectMeta
 	name := printers.FormatResourceName(options.Kind, meta.Name, options.WithKind)
@@ -1328,23 +1301,6 @@ func printRoleBinding(roleBinding *rbac.RoleBinding, w io.Writer, options printe
 func printRoleBindingList(list *rbac.RoleBindingList, w io.Writer, options printers.PrintOptions) error {
 	for i := range list.Items {
 		if err := printRoleBinding(&list.Items[i], w, options); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func printClusterRole(clusterRole *rbac.ClusterRole, w io.Writer, options printers.PrintOptions) error {
-	if options.WithNamespace {
-		return fmt.Errorf("clusterRole is not namespaced")
-	}
-	return printObjectMeta(clusterRole.ObjectMeta, w, options, false)
-}
-
-// Prints the ClusterRole in a human-friendly format.
-func printClusterRoleList(list *rbac.ClusterRoleList, w io.Writer, options printers.PrintOptions) error {
-	for i := range list.Items {
-		if err := printClusterRole(&list.Items[i], w, options); err != nil {
 			return err
 		}
 	}
@@ -1847,19 +1803,6 @@ func printStorageClass(sc *storage.StorageClass, w io.Writer, options printers.P
 func printStorageClassList(scList *storage.StorageClassList, w io.Writer, options printers.PrintOptions) error {
 	for _, sc := range scList.Items {
 		if err := printStorageClass(&sc, w, options); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func printPodPreset(podPreset *settings.PodPreset, w io.Writer, options printers.PrintOptions) error {
-	return printObjectMeta(podPreset.ObjectMeta, w, options, false)
-}
-
-func printPodPresetList(list *settings.PodPresetList, w io.Writer, options printers.PrintOptions) error {
-	for i := range list.Items {
-		if err := printPodPreset(&list.Items[i], w, options); err != nil {
 			return err
 		}
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,22 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package thirdpartyresourcedata
+package registry
 
-import (
-	"testing"
+import genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 
-	_ "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-)
-
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Extensions.GroupVersion().String(),
-		"ThirdPartyResourceData",
-		SelectableFields(&extensions.ThirdPartyResourceData{}),
-		nil,
-	)
+// rest implements a RESTStorage for API services against etcd
+type REST struct {
+	*genericregistry.Store
 }

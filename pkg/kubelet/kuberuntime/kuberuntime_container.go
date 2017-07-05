@@ -155,7 +155,10 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		msg, handlerErr := m.runner.Run(kubeContainerID, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
 			m.recordContainerEvent(pod, container, kubeContainerID.ID, v1.EventTypeWarning, events.FailedPostStartHook, msg)
-			m.killContainer(pod, kubeContainerID, container.Name, "FailedPostStartHook", nil)
+			if err := m.killContainer(pod, kubeContainerID, container.Name, "FailedPostStartHook", nil); err != nil {
+				glog.Errorf("Failed to kill container %q(id=%q) in pod %q: %v, %v",
+					container.Name, kubeContainerID.String(), format.Pod(pod), ErrPostStartHook, err)
+			}
 			return msg, ErrPostStartHook
 		}
 	}
@@ -547,7 +550,10 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID 
 func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubecontainer.ContainerID, containerName string, reason string, gracePeriodOverride *int64) error {
 	var containerSpec *v1.Container
 	if pod != nil {
-		containerSpec = kubecontainer.GetContainerSpec(pod, containerName)
+		if containerSpec = kubecontainer.GetContainerSpec(pod, containerName); containerSpec == nil {
+			return fmt.Errorf("failed to get containerSpec %q(id=%q) in pod %q when killing container for reason %q",
+				containerName, containerID.String(), format.Pod(pod), reason)
+		}
 	} else {
 		// Restore necessary information if one of the specs is nil.
 		restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(containerID)
@@ -556,6 +562,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		}
 		pod, containerSpec = restoredPod, restoredContainer
 	}
+
 	// From this point , pod and container must be non-nil.
 	gracePeriod := int64(minimumGracePeriodInSeconds)
 	switch {

@@ -104,7 +104,6 @@ go_library(
         "serviceloadbalancers.go",
         "ssh.go",
         "stackdriver_monitoring.go",
-        "third-party.go",
         "ubernetes_lite.go",
         "util_iperf.go",
     ],

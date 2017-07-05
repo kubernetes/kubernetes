@@ -25,5 +25,6 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
+        "//vendor/k8s.io/sample-apiserver/pkg/registry:go_default_library",
     ],
 )
