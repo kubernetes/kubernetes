@@ -160,8 +160,11 @@ def shutdown():
         - delete the current node
         - stop the worker services
     '''
-    if os.path.isfile(kubeconfig_path):
-        kubectl('delete', 'node', gethostname())
+    try:
+        if os.path.isfile(kubeconfig_path):
+            kubectl('delete', 'node', gethostname())
+    except CalledProcessError:
+        hookenv.log('Failed to unregister node.')
     service_stop('snap.kubelet.daemon')
     service_stop('snap.kube-proxy.daemon')
 
