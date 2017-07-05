@@ -85,7 +85,7 @@ type LogsOptions struct {
 	Out io.Writer
 }
 
-// NewCmdLog creates a new pod logs command
+// NewCmdLogs creates a new pod logs command
 func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &LogsOptions{}
 	cmd := &cobra.Command{
