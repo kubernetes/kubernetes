@@ -130,6 +130,29 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 
 		glog.V(4).Infof("PodPreset %s matches pod %s labels", pip.GetName(), pod.GetName())
 
+		//merge in policy for Containers
+		if pip.Spec.Containers != nil {
+			r, err := mergeContainers(pip.GetName(), pip.Spec.Containers, pod.Spec.Containers)
+			if err != nil {
+				// add event to pod
+				c.addEvent(pod, pip, err.Error())
+
+				return nil
+			}
+			pod.Spec.Containers = r
+		}
+
+		if pip.Spec.InitContainers != nil {
+			r, err := mergeContainers(pip.GetName(), pip.Spec.InitContainers, pod.Spec.InitContainers)
+			if err != nil {
+				// add event to pod
+				c.addEvent(pod, pip, err.Error())
+
+				return nil
+			}
+			pod.Spec.InitContainers = r
+		}
+
 		// merge in policy for Env
 		if pip.Spec.Env != nil {
 			for i, ctr := range pod.Spec.Containers {
@@ -307,6 +330,30 @@ func mergeVolumes(pip *settings.PodPreset, original []api.Volume) ([]api.Volume,
 
 		if !reflect.DeepEqual(found, v) {
 			return nil, fmt.Errorf("merging volumes for %s has a conflict on %s: \n%#v\ndoes not match\n%#v\nin pod spec", pip.GetName(), v.Name, v, found)
+		}
+	}
+
+	return original, nil
+}
+
+func mergeContainers(name string, additional, original []api.Container) ([]api.Container, error) {
+
+	orig := map[string]api.Container{}
+	for _, c := range original {
+		orig[c.Name] = c
+	}
+
+	// check for conflicts.
+	for _, c := range additional {
+		found, ok := orig[c.Name]
+		if !ok {
+			//pod doesn't have container, we append it and continue
+			original = append(original, c)
+			continue
+		}
+
+		if !reflect.DeepEqual(found, c) {
+			return nil, fmt.Errorf("merging containers for %s has a conflict on %s: \n%#v\ndoes not match\n%#v\nin pod spec", name, c.Name, c, found)
 		}
 	}
 
