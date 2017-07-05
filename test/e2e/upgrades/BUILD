@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "apparmor.go",
+        "cassandra.go",
         "configmaps.go",
         "etcd.go",
         "horizontal_pod_autoscalers.go",
