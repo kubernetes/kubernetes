@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -35,8 +36,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
-
-	"fmt"
 
 	"github.com/golang/glog"
 )
