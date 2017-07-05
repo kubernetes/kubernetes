@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
    "title": "Generic API Server",
-   "version": "v1.6.7"
+   "version": "v1.6.8"
   },
   "paths": {
    "/api/": {
