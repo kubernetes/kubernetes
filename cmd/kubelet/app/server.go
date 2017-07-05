@@ -417,13 +417,15 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps == nil {
-		var kubeClient clientset.Interface
-		var eventClient v1core.EventsGetter
-		var externalKubeClient clientgoclientset.Interface
-		var cloud cloudprovider.Interface
+		kubeDeps, err = UnsecuredKubeletDeps(s)
+		if err != nil {
+			return err
+		}
+	}
 
+	if kubeDeps.Cloud == nil {
 		if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != componentconfigv1alpha1.AutoDetectCloudProvider {
-			cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 			if err != nil {
 				return err
 			}
@@ -432,28 +434,32 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			} else {
 				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
 			}
+			kubeDeps.Cloud = cloud
 		}
+	}
 
-		nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
-		if err != nil {
+	nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+	if err != nil {
+		return err
+	}
+
+	if s.BootstrapKubeconfig != "" {
+		if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
 			return err
 		}
+	}
 
-		if s.BootstrapKubeconfig != "" {
-			if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
-				return err
-			}
-		}
+	// initialize clients if any of the clients are not provided
+	if kubeDeps.KubeClient == nil || kubeDeps.ExternalKubeClient == nil || kubeDeps.EventClient == nil {
+		var kubeClient clientset.Interface
+		var eventClient v1core.EventsGetter
+		var externalKubeClient clientgoclientset.Interface
 
 		clientConfig, err := CreateAPIServerClientConfig(s)
 
 		var clientCertificateManager certificate.Manager
 		if err == nil {
 			if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
-				nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
-				if err != nil {
-					return err
-				}
 				clientCertificateManager, err = certificate.NewKubeletClientCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData, clientConfig.CertFile, clientConfig.KeyFile)
 				if err != nil {
 					return err
@@ -484,30 +490,19 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				glog.Warningf("Failed to create API Server client: %v", err)
 			}
 		} else {
-			if s.RequireKubeConfig {
+			switch {
+			case s.RequireKubeConfig:
 				return fmt.Errorf("invalid kubeconfig: %v", err)
-			} else if s.KubeConfig.Provided() && !standaloneMode {
+			case standaloneMode:
+				glog.Warningf("No API client: %v", err)
+			case s.KubeConfig.Provided():
 				glog.Warningf("Invalid kubeconfig: %v", err)
 			}
-			if standaloneMode {
-				glog.Warningf("No API client: %v", err)
-			}
 		}
 
-		kubeDeps, err = UnsecuredKubeletDeps(s)
-		if err != nil {
-			return err
-		}
-
-		kubeDeps.Cloud = cloud
 		kubeDeps.KubeClient = kubeClient
 		kubeDeps.ExternalKubeClient = externalKubeClient
 		kubeDeps.EventClient = eventClient
-	}
-
-	nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
-	if err != nil {
-		return err
 	}
 
 	if kubeDeps.Auth == nil {
