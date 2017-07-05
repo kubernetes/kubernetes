@@ -218,7 +218,7 @@ func (m *manager) reconcileState() {
 
 			cset := m.state.GetCPUSetOrDefault(containerID)
 			if cset.IsEmpty() {
-				glog.Info("[cpumanager] reconcileState: skipping container; assigned cpuset is empty (pod: %s, container: %s)", pod.Name, container.Name)
+				glog.Infof("[cpumanager] reconcileState: skipping container; assigned cpuset is empty (pod: %s, container: %s)", pod.Name, container.Name)
 				continue
 			}
 
