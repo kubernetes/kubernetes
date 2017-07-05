@@ -43,7 +43,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/kubelet/client:go_default_library",
-        "//pkg/master/thirdparty:go_default_library",
         "//pkg/master/tunneler:go_default_library",
         "//pkg/registry/admissionregistration/rest:go_default_library",
         "//pkg/registry/apps/rest:go_default_library",
