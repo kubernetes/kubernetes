@@ -14,22 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cpumanager
+package topology
 
 import (
 	"reflect"
 	"testing"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topo"
 )
 
-func Test_discoverTopology(t *testing.T) {
+func Test_Discover(t *testing.T) {
 
 	tests := []struct {
 		name    string
 		args    *cadvisorapi.MachineInfo
-		want    *topo.CPUTopology
+		want    *CPUTopology
 		wantErr bool
 	}{
 		{
@@ -37,7 +36,7 @@ func Test_discoverTopology(t *testing.T) {
 			args: &cadvisorapi.MachineInfo{
 				NumCores: 0,
 			},
-			want:    &topo.CPUTopology{},
+			want:    &CPUTopology{},
 			wantErr: true,
 		},
 		{
@@ -55,12 +54,12 @@ func Test_discoverTopology(t *testing.T) {
 					},
 				},
 			},
-			want: &topo.CPUTopology{
+			want: &CPUTopology{
 				NumCPUs:        8,
 				NumSockets:     1,
 				NumCores:       4,
 				HyperThreading: true,
-				CPUtopoDetails: map[int]topo.CPUInfo{
+				CPUtopoDetails: map[int]CPUInfo{
 					0: {CoreId: 0, SocketId: 0},
 					1: {CoreId: 1, SocketId: 0},
 					2: {CoreId: 2, SocketId: 0},
@@ -92,12 +91,12 @@ func Test_discoverTopology(t *testing.T) {
 					},
 				},
 			},
-			want: &topo.CPUTopology{
+			want: &CPUTopology{
 				NumCPUs:        4,
 				NumSockets:     2,
 				NumCores:       4,
 				HyperThreading: false,
-				CPUtopoDetails: map[int]topo.CPUInfo{
+				CPUtopoDetails: map[int]CPUInfo{
 					0: {CoreId: 0, SocketId: 0},
 					1: {CoreId: 1, SocketId: 1},
 					2: {CoreId: 2, SocketId: 0},
@@ -109,17 +108,17 @@ func Test_discoverTopology(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := discoverTopology(tt.args)
+			got, err := Discover(tt.args)
 			if err != nil {
 				if tt.wantErr {
-					t.Logf("discoverTopology() expected error = %v", err)
+					t.Logf("Discover() expected error = %v", err)
 				} else {
-					t.Errorf("discoverTopology() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("Discover() error = %v, wantErr %v", err, tt.wantErr)
 				}
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("discoverTopology() = %v, want %v", got, tt.want)
+				t.Errorf("Discover() = %v, want %v", got, tt.want)
 			}
 		})
 	}

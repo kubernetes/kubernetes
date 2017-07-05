@@ -23,20 +23,20 @@ import (
 	"k8s.io/api/core/v1"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/state"
-	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topo"
+	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
 const PolicyStatic PolicyName = "static"
 
 type staticPolicy struct {
-	topology      *topo.CPUTopology
+	topology *topology.CPUTopology
 }
 
 // NewStaticPolicy returns a cupset manager policy that does not change
 // CPU assignments for exclusively pinned guaranteed containers after
 // the main container process starts.
-func NewStaticPolicy(topology *topo.CPUTopology) Policy {
+func NewStaticPolicy(topology *topology.CPUTopology) Policy {
 	return &staticPolicy{
 		topology: topology,
 	}
@@ -64,7 +64,7 @@ func (p *staticPolicy) RegisterContainer(s state.State, pod *v1.Pod, container *
 		// container belongs in an exclusively allocated pool
 		cpuset, err := p.allocateCPUs(s, numCPUs)
 		if err != nil {
-			glog.Errorf("[cpumanager] unable to allocate %d CPUs (container: (%v)", numCPUs, containerID, err)
+			glog.Errorf("[cpumanager] unable to allocate %d CPUs (container id: %s, error: %v)", numCPUs, containerID, err)
 			return err
 		}
 		s.SetCPUSet(containerID, cpuset)

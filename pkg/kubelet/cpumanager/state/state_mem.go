@@ -34,7 +34,6 @@ func NewMemoryState() State {
 	}
 }
 
-
 func (s *stateMemory) GetCPUSet(containerID string) (cpuset.CPUSet, bool) {
 	res, ok := s.assignments[containerID]
 	return res.Clone(), ok
