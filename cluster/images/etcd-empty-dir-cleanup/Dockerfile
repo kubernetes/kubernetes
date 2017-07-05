@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gliderlabs/alpine
+FROM alpine
 MAINTAINER Mehdy Bohlool <mehdy@google.com>
 
-RUN apk-install bash
+RUN apk add --update bash && rm -rf /var/cache/apk/*
 ADD etcd-empty-dir-cleanup.sh etcd-empty-dir-cleanup.sh
 ADD etcdctl etcdctl
 ENV ETCDCTL /etcdctl
