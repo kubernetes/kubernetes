@@ -26,7 +26,7 @@ import (
 
 var (
 	kubeReleaseBucketURL  = "https://storage.googleapis.com/kubernetes-release/release"
-	kubeReleaseRegex      = regexp.MustCompile(`^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$`)
+	kubeReleaseRegex      = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$`)
 	kubeReleaseLabelRegex = regexp.MustCompile(`^[[:lower:]]+(-[-\w_\.]+)?$`)
 )
 
@@ -49,7 +49,10 @@ var (
 //  latest-1.0  (and similarly 1.1, 1.2, 1.3, ...)
 func KubernetesReleaseVersion(version string) (string, error) {
 	if kubeReleaseRegex.MatchString(version) {
-		return version, nil
+		if strings.HasPrefix(version, "v") {
+			return version, nil
+		}
+		return "v" + version, nil
 	} else if kubeReleaseLabelRegex.MatchString(version) {
 		url := fmt.Sprintf("%s/%s.txt", kubeReleaseBucketURL, version)
 		resp, err := http.Get(url)
