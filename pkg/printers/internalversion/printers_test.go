@@ -2322,6 +2322,8 @@ func TestPrintPodShowLabels(t *testing.T) {
 }
 
 func TestPrintService(t *testing.T) {
+	single_ExternalIP := []string{"80.11.12.10"}
+	mul_ExternalIP := []string{"80.11.12.10", "80.11.12.11"}
 	tests := []struct {
 		service api.Service
 		expect  string
@@ -2333,8 +2335,10 @@ func TestPrintService(t *testing.T) {
 				Spec: api.ServiceSpec{
 					Type: api.ServiceTypeClusterIP,
 					Ports: []api.ServicePort{
-						{Protocol: "tcp",
-							Port: 2233},
+						{
+							Protocol: "tcp",
+							Port:     2233,
+						},
 					},
 					ClusterIP: "10.9.8.7",
 				},
@@ -2342,13 +2346,14 @@ func TestPrintService(t *testing.T) {
 			"test1\tClusterIP\t10.9.8.7\t<none>\t2233/tcp\t<unknown>\n",
 		},
 		{
-			// Test name, cluster ip, port:nodePort with protocol
+			// Test NodePort service
 			api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "test2"},
 				Spec: api.ServiceSpec{
 					Type: api.ServiceTypeNodePort,
 					Ports: []api.ServicePort{
-						{Protocol: "tcp",
+						{
+							Protocol: "tcp",
 							Port:     8888,
 							NodePort: 9999,
 						},
@@ -2357,6 +2362,112 @@ func TestPrintService(t *testing.T) {
 				},
 			},
 			"test2\tNodePort\t10.9.8.7\t<none>\t8888:9999/tcp\t<unknown>\n",
+		},
+		{
+			// Test LoadBalancer service
+			api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "test3"},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Protocol: "tcp",
+							Port:     8888,
+						},
+					},
+					ClusterIP: "10.9.8.7",
+				},
+			},
+			"test3\tLoadBalancer\t10.9.8.7\t<pending>\t8888/tcp\t<unknown>\n",
+		},
+		{
+			// Test LoadBalancer service with single ExternalIP and no LoadBalancerStatus
+			api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "test4"},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Protocol: "tcp",
+							Port:     8888,
+						},
+					},
+					ClusterIP:   "10.9.8.7",
+					ExternalIPs: single_ExternalIP,
+				},
+			},
+			"test4\tLoadBalancer\t10.9.8.7\t80.11.12.10\t8888/tcp\t<unknown>\n",
+		},
+		{
+			// Test LoadBalancer service with single ExternalIP
+			api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "test5"},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Protocol: "tcp",
+							Port:     8888,
+						},
+					},
+					ClusterIP:   "10.9.8.7",
+					ExternalIPs: single_ExternalIP,
+				},
+				Status: api.ServiceStatus{
+					LoadBalancer: api.LoadBalancerStatus{
+						Ingress: []api.LoadBalancerIngress{
+							{
+								IP:       "3.4.5.6",
+								Hostname: "test.cluster.com",
+							},
+						},
+					},
+				},
+			},
+			"test5\tLoadBalancer\t10.9.8.7\t3.4.5.6,80.11.12.10\t8888/tcp\t<unknown>\n",
+		},
+		{
+			// Test LoadBalancer service with mul ExternalIPs
+			api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "test6"},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Protocol: "tcp",
+							Port:     8888,
+						},
+					},
+					ClusterIP:   "10.9.8.7",
+					ExternalIPs: mul_ExternalIP,
+				},
+				Status: api.ServiceStatus{
+					LoadBalancer: api.LoadBalancerStatus{
+						Ingress: []api.LoadBalancerIngress{
+							{
+								IP:       "2.3.4.5",
+								Hostname: "test.cluster.local",
+							},
+							{
+								IP:       "3.4.5.6",
+								Hostname: "test.cluster.com",
+							},
+						},
+					},
+				},
+			},
+			"test6\tLoadBalancer\t10.9.8.7\t2.3.4.5,3.4.5.6,80.11.12.10,80.11.12.11\t8888/tcp\t<unknown>\n",
+		},
+		{
+			// Test ExternalName service
+			api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "test7"},
+				Spec: api.ServiceSpec{
+					Type:         api.ServiceTypeExternalName,
+					ExternalName: "my.database.example.com",
+				},
+			},
+			"test7\tExternalName\t<none>\tmy.database.example.com\t<none>\t<unknown>\n",
 		},
 	}
 
