@@ -68,17 +68,11 @@ func (attacher *cinderDiskAttacher) Attach(spec *volume.Spec, nodeName types.Nod
 
 	volumeID := volumeSource.VolumeID
 
-	instances, res := attacher.cinderProvider.Instances()
-	if !res {
-		return "", fmt.Errorf("failed to list openstack instances")
-	}
-	instanceid, err := instances.InstanceID(nodeName)
+	instanceid, err := attacher.nodeInstanceID(nodeName)
 	if err != nil {
 		return "", err
 	}
-	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
-		instanceid = instanceid[(ind + 1):]
-	}
+
 	attached, err := attacher.cinderProvider.DiskIsAttached(volumeID, instanceid)
 	if err != nil {
 		// Log error and continue with attach
@@ -124,7 +118,13 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 		volumesAttachedCheck[spec] = true
 		volumeSpecMap[volumeSource.VolumeID] = spec
 	}
-	attachedResult, err := attacher.cinderProvider.DisksAreAttached(volumeIDList, string(nodeName))
+
+	instanceid, err := attacher.nodeInstanceID(nodeName)
+	if err != nil {
+		return volumesAttachedCheck, err
+	}
+
+	attachedResult, err := attacher.cinderProvider.DisksAreAttached(volumeIDList, instanceid)
 	if err != nil {
 		// Log error and continue with attach
 		glog.Errorf(
@@ -283,4 +283,19 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName type
 
 func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) error {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+}
+
+func (attacher *cinderDiskAttacher) nodeInstanceID(nodeName types.NodeName) (string, error) {
+	instances, res := attacher.cinderProvider.Instances()
+	if !res {
+		return "", fmt.Errorf("failed to list openstack instances")
+	}
+	instanceid, err := instances.InstanceID(nodeName)
+	if err != nil {
+		return "", err
+	}
+	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
+		instanceid = instanceid[(ind + 1):]
+	}
+	return instanceid, nil
 }
