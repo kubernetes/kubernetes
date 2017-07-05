@@ -98,6 +98,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	}
 	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices(), apiRegistrationClient)
 	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
+	aggregatorServer.SetInternalAPIServices(apiServices)
 	tprRegistrationController := thirdparty.NewAutoRegistrationController(
 		kubeInformers.Extensions().InternalVersion().ThirdPartyResources(),
 		apiExtensionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),

@@ -150,6 +150,9 @@ type APIAggregator struct {
 
 	// Information needed to determine routing for the aggregator
 	serviceResolver ServiceResolver
+
+	// apiDiscoveryHandler handles call to API discovery on "/apis"
+	apiDiscoveryHandler *apisHandler
 }
 
 type completedConfig struct {
@@ -226,6 +229,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
+	s.apiDiscoveryHandler = apisHandler
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), c.CoreKubeInformers.Core().V1().Services(), s)
 	availableController := statuscontrollers.NewAvailableConditionController(
@@ -264,6 +268,15 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	}
 
 	return s, nil
+}
+
+// Set list of internal API servers that delegated server supports. It may take
+// some time for these services to get registered with aggregator but
+// we will return them as part of API discovery as they are served
+// regardless of their registration state (all unknown API calls will be
+// sent to delegated server anyway).
+func (s *APIAggregator) SetInternalAPIServices(apiServices []*apiregistration.APIService) {
+	s.apiDiscoveryHandler.internalServices = append([]*apiregistration.APIService{}, apiServices...)
 }
 
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.
