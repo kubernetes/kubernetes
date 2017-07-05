@@ -976,13 +976,13 @@ func (j *IngressTestJig) GetIngressNodePorts() []string {
 }
 
 // ConstructFirewallForIngress returns the expected GCE firewall rule for the ingress resource
-func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressController, nodeTag string) *compute.Firewall {
+func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressController, nodeTags []string) *compute.Firewall {
 	nodePorts := j.GetIngressNodePorts()
 
 	fw := compute.Firewall{}
 	fw.Name = gceController.GetFirewallRuleName()
 	fw.SourceRanges = gcecloud.LoadBalancerSrcRanges()
-	fw.TargetTags = []string{nodeTag}
+	fw.TargetTags = nodeTags
 	fw.Allowed = []*compute.FirewallAllowed{
 		{
 			IPProtocol: "tcp",
