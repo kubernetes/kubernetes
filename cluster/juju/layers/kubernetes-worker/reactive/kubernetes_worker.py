@@ -482,6 +482,9 @@ def configure_worker_services(api_servers, dns, cluster_cidr):
     kube_proxy_opts.add('v', '0')
     kube_proxy_opts.add('master', random.choice(api_servers), strict=True)
 
+    if b'lxc' in check_output('virt-what', shell=True):
+        kube_proxy_opts.add('conntrack-max-per-core', '0')
+
     cmd = ['snap', 'set', 'kubelet'] + kubelet_opts.to_s().split(' ')
     check_call(cmd)
     cmd = ['snap', 'set', 'kube-proxy'] + kube_proxy_opts.to_s().split(' ')
