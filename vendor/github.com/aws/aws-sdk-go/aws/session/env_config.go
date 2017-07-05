@@ -2,7 +2,6 @@ package session
 
 import (
 	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -75,6 +74,24 @@ type envConfig struct {
 	//
 	//	AWS_CONFIG_FILE=$HOME/my_shared_config
 	SharedConfigFile string
+
+	// Sets the path to a custom Credentials Authroity (CA) Bundle PEM file
+	// that the SDK will use instead of the the system's root CA bundle.
+	// Only use this if you want to configure the SDK to use a custom set
+	// of CAs.
+	//
+	// Enabling this option will attempt to merge the Transport
+	// into the SDK's HTTP client. If the client's Transport is
+	// not a http.Transport an error will be returned. If the
+	// Transport's TLS config is set this option will cause the
+	// SDK to overwrite the Transport's TLS config's  RootCAs value.
+	//
+	// Setting a custom HTTPClient in the aws.Config options will override this setting.
+	// To use this option and custom HTTP client, the HTTP client needs to be provided
+	// when creating the session. Not the service client.
+	//
+	//  AWS_CA_BUNDLE=$HOME/my_custom_ca_bundle
+	CustomCABundle string
 }
 
 var (
@@ -97,6 +114,12 @@ var (
 	profileEnvKeys = []string{
 		"AWS_PROFILE",
 		"AWS_DEFAULT_PROFILE", // Only read if AWS_SDK_LOAD_CONFIG is also set
+	}
+	sharedCredsFileEnvKey = []string{
+		"AWS_SHARED_CREDENTIALS_FILE",
+	}
+	sharedConfigFileEnvKey = []string{
+		"AWS_CONFIG_FILE",
 	}
 )
 
@@ -147,8 +170,10 @@ func envConfigLoad(enableSharedConfig bool) envConfig {
 	setFromEnvVal(&cfg.Region, regionKeys)
 	setFromEnvVal(&cfg.Profile, profileKeys)
 
-	cfg.SharedCredentialsFile = sharedCredentialsFilename()
-	cfg.SharedConfigFile = sharedConfigFilename()
+	setFromEnvVal(&cfg.SharedCredentialsFile, sharedCredsFileEnvKey)
+	setFromEnvVal(&cfg.SharedConfigFile, sharedConfigFileEnvKey)
+
+	cfg.CustomCABundle = os.Getenv("AWS_CA_BUNDLE")
 
 	return cfg
 }
@@ -160,29 +185,4 @@ func setFromEnvVal(dst *string, keys []string) {
 			break
 		}
 	}
-}
-
-func sharedCredentialsFilename() string {
-	if name := os.Getenv("AWS_SHARED_CREDENTIALS_FILE"); len(name) > 0 {
-		return name
-	}
-
-	return filepath.Join(userHomeDir(), ".aws", "credentials")
-}
-
-func sharedConfigFilename() string {
-	if name := os.Getenv("AWS_CONFIG_FILE"); len(name) > 0 {
-		return name
-	}
-
-	return filepath.Join(userHomeDir(), ".aws", "config")
-}
-
-func userHomeDir() string {
-	homeDir := os.Getenv("HOME") // *nix
-	if len(homeDir) == 0 {       // windows
-		homeDir = os.Getenv("USERPROFILE")
-	}
-
-	return homeDir
 }

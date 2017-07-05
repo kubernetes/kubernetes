@@ -54,6 +54,12 @@ func (d DefaultRetryer) RetryRules(r *request.Request) time.Duration {
 
 // ShouldRetry returns true if the request should be retried.
 func (d DefaultRetryer) ShouldRetry(r *request.Request) bool {
+	// If one of the other handlers already set the retry state
+	// we don't want to override it based on the service's state
+	if r.Retryable != nil {
+		return *r.Retryable
+	}
+
 	if r.HTTPResponse.StatusCode >= 500 {
 		return true
 	}

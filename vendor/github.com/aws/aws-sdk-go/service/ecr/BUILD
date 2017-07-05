@@ -11,6 +11,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "api.go",
+        "doc.go",
+        "errors.go",
         "service.go",
     ],
     tags = ["automanaged"],

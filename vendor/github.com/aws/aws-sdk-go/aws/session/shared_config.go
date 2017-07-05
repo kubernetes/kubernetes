@@ -113,7 +113,7 @@ func loadSharedConfigIniFiles(filenames []string) ([]sharedConfigFile, error) {
 
 		f, err := ini.Load(b)
 		if err != nil {
-			return nil, SharedConfigLoadError{Filename: filename}
+			return nil, SharedConfigLoadError{Filename: filename, Err: err}
 		}
 
 		files = append(files, sharedConfigFile{
