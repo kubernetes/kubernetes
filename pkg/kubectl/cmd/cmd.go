@@ -214,8 +214,10 @@ __custom_func() {
     * deployments (aka 'deploy')
     * endpoints (aka 'ep')
     * events (aka 'ev')
+    * externaladmissionhookconfigurations
     * horizontalpodautoscalers (aka 'hpa')
     * ingresses (aka 'ing')
+    * initializerconfigurations
     * jobs
     * limitranges (aka 'limits')
     * namespaces (aka 'ns')
