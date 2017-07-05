@@ -77,7 +77,7 @@ func TestClient(t *testing.T) {
 		},
 	}
 
-	c := NewClient(fake)
+	c := NewMemCacheClient(fake)
 	g, err := c.ServerGroups()
 	if err == nil {
 		t.Errorf("Unexpected non-error.")

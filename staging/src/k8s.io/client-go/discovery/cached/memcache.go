@@ -32,11 +32,12 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
-// Client can Invalidate() to stay up-to-date with discovery information.
+// memCacheClient can Invalidate() to stay up-to-date with discovery
+// information.
 //
 // TODO: Switch to a watch interface. Right now it will poll anytime
 // Invalidate() is called.
-type Client struct {
+type memCacheClient struct {
 	delegate discovery.DiscoveryInterface
 
 	lock                   sync.RWMutex
@@ -50,10 +51,10 @@ var (
 	ErrCacheNotFound = errors.New("not found")
 )
 
-var _ discovery.CachedDiscoveryInterface = &Client{}
+var _ discovery.CachedDiscoveryInterface = &memCacheClient{}
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
-func (d *Client) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+func (d *memCacheClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	if !d.cacheValid {
@@ -67,7 +68,7 @@ func (d *Client) ServerResourcesForGroupVersion(groupVersion string) (*metav1.AP
 }
 
 // ServerResources returns the supported resources for all groups and versions.
-func (d *Client) ServerResources() ([]*metav1.APIResourceList, error) {
+func (d *memCacheClient) ServerResources() ([]*metav1.APIResourceList, error) {
 	apiGroups, err := d.ServerGroups()
 	if err != nil {
 		return nil, err
@@ -84,7 +85,7 @@ func (d *Client) ServerResources() ([]*metav1.APIResourceList, error) {
 	return result, nil
 }
 
-func (d *Client) ServerGroups() (*metav1.APIGroupList, error) {
+func (d *memCacheClient) ServerGroups() (*metav1.APIGroupList, error) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	if d.groupList == nil {
@@ -93,37 +94,37 @@ func (d *Client) ServerGroups() (*metav1.APIGroupList, error) {
 	return d.groupList, nil
 }
 
-func (d *Client) RESTClient() restclient.Interface {
+func (d *memCacheClient) RESTClient() restclient.Interface {
 	return d.delegate.RESTClient()
 }
 
 // TODO: Should this also be cached? The results seem more likely to be
 // inconsistent with ServerGroups and ServerResources given the requirement to
 // actively Invalidate.
-func (d *Client) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+func (d *memCacheClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return d.delegate.ServerPreferredResources()
 }
 
 // TODO: Should this also be cached? The results seem more likely to be
 // inconsistent with ServerGroups and ServerResources given the requirement to
 // actively Invalidate.
-func (d *Client) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+func (d *memCacheClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return d.delegate.ServerPreferredNamespacedResources()
 }
 
-func (d *Client) ServerVersion() (*version.Info, error) {
+func (d *memCacheClient) ServerVersion() (*version.Info, error) {
 	return d.delegate.ServerVersion()
 }
 
-func (d *Client) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
+func (d *memCacheClient) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
 	return d.delegate.SwaggerSchema(version)
 }
 
-func (d *Client) OpenAPISchema() (*spec.Swagger, error) {
+func (d *memCacheClient) OpenAPISchema() (*spec.Swagger, error) {
 	return d.delegate.OpenAPISchema()
 }
 
-func (d *Client) Fresh() bool {
+func (d *memCacheClient) Fresh() bool {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	// Fresh is supposed to tell the caller whether or not to retry if the cache
@@ -137,7 +138,7 @@ func (d *Client) Fresh() bool {
 // Invalidate refreshes the cache, blocking calls until the cache has been
 // refreshed. It would be trivial to make a version that does this in the
 // background while continuing to respond to requests if needed.
-func (d *Client) Invalidate() {
+func (d *memCacheClient) Invalidate() {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -171,10 +172,13 @@ func (d *Client) Invalidate() {
 	d.cacheValid = true
 }
 
-// NewClient creates a new Client which caches discovery information in memory
-// and will stay up-to-date if Invalidate is called with regularity.
-func NewClient(delegate discovery.DiscoveryInterface) *Client {
-	return &Client{
+// NewMemCacheClient creates a new CachedDiscoveryInterface which caches
+// discovery information in memory and will stay up-to-date if Invalidate is
+// called with regularity.
+//
+// NOTE: The client will NOT resort to live lookups on cache misses.
+func NewMemCacheClient(delegate discovery.DiscoveryInterface) discovery.CachedDiscoveryInterface {
+	return &memCacheClient{
 		delegate:               delegate,
 		groupToServerResources: map[string]*metav1.APIResourceList{},
 	}
