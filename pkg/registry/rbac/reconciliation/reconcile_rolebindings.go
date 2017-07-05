@@ -21,8 +21,10 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
@@ -34,6 +36,7 @@ type RoleBindingModifier interface {
 }
 
 type RoleBinding interface {
+	GetObject() runtime.Object
 	GetNamespace() string
 	GetName() string
 	GetUID() types.UID
@@ -149,7 +152,12 @@ func (o *ReconcileRoleBindingOptions) run(attempts int) (*ReconcileClusterRoleBi
 		result.RoleBinding = created
 
 	case ReconcileUpdate:
-		updated, err := o.Client.Update(result.RoleBinding)
+		rolebinding, err := updateRoleBindingLastAppliedAnnotation(existingBinding, result.RoleBinding)
+		if err != nil {
+			return nil, err
+		}
+
+		updated, err := o.Client.Update(rolebinding)
 		// If deleted since we started this reconcile, re-run
 		if errors.IsNotFound(err) {
 			return o.run(attempts + 1)
@@ -247,4 +255,28 @@ func diffSubjectLists(list1 []rbac.Subject, list2 []rbac.Subject) (list1Only []r
 		}
 	}
 	return
+}
+
+func updateRoleBindingLastAppliedAnnotation(existing, computed RoleBinding) (RoleBinding, error) {
+	existingAnnots := existing.GetAnnotations()
+	if existingAnnots != nil {
+		if _, ok := existingAnnots[api.LastAppliedConfigAnnotation]; ok {
+			delete(existingAnnots, api.LastAppliedConfigAnnotation)
+			existing.SetAnnotations(existingAnnots)
+		}
+	}
+
+	jsonData, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion, rbac.SchemeGroupVersion), existing.GetObject())
+	if err != nil {
+		return computed, err
+	}
+
+	computedAnnots := computed.GetAnnotations()
+	if computedAnnots == nil {
+		computedAnnots = map[string]string{}
+	}
+	computedAnnots[api.LastAppliedConfigAnnotation] = string(jsonData)
+	computed.SetAnnotations(computedAnnots)
+
+	return computed, nil
 }

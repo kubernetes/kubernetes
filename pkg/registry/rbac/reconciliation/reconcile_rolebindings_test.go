@@ -19,12 +19,17 @@ package reconciliation
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 func binding(roleRef rbac.RoleRef, subjects []rbac.Subject) *rbac.ClusterRoleBinding {
 	return &rbac.ClusterRoleBinding{RoleRef: roleRef, Subjects: subjects}
+}
+
+func bindingWithAnnotation(roleRef rbac.RoleRef, subjects []rbac.Subject, annotations map[string]string) *rbac.ClusterRoleBinding {
+	return &rbac.ClusterRoleBinding{RoleRef: roleRef, Subjects: subjects, ObjectMeta: metav1.ObjectMeta{Annotations: annotations}}
 }
 
 func ref(name string) rbac.RoleRef {
@@ -176,6 +181,53 @@ func TestComputeUpdate(t *testing.T) {
 		}
 		if updateNeeded && !helper.Semantic.DeepEqual(updatedBinding, tc.ExpectedUpdatedBinding) {
 			t.Errorf("%s: Expected\n\t%v %v\ngot\n\t%v %v", k, tc.ExpectedUpdatedBinding.RoleRef, tc.ExpectedUpdatedBinding.Subjects, updatedBinding.RoleRef, updatedBinding.Subjects)
+		}
+	}
+}
+
+func TestUpdateRoleBindingLastAppliedAnnotation(t *testing.T) {
+	tests := map[string]struct {
+		expectedBinding        *rbac.ClusterRoleBinding
+		computedBinding        *rbac.ClusterRoleBinding
+		expectedUpdatedBinding *rbac.ClusterRoleBinding
+	}{
+		"different subjects": {
+			expectedBinding: binding(ref("role"), subjects("a")),
+			computedBinding: binding(ref("role"), subjects("b")),
+
+			expectedUpdatedBinding: bindingWithAnnotation(
+				ref("role"),
+				subjects("b"),
+				ss{"kubectl.kubernetes.io/last-applied-configuration": "{\"creationTimestamp\":null,\"Subjects\":[{\"Kind\":\"\",\"APIGroup\":\"\",\"Name\":\"a\",\"Namespace\":\"\"}],\"RoleRef\":{\"APIGroup\":\"\",\"Kind\":\"\",\"Name\":\"role\"}}\n"},
+			),
+		},
+		"complex annotations and subjects": {
+			expectedBinding: bindingWithAnnotation(ref("role"), subjects("a"), ss{"description": "fancy", "system": "true"}),
+			computedBinding: bindingWithAnnotation(ref("role"), subjects("b"), ss{"system": "false", "owner": "admin", "vip": "yes"}),
+
+			expectedUpdatedBinding: bindingWithAnnotation(
+				ref("role"),
+				subjects("b"),
+				ss{
+					"system": "false",
+					"owner":  "admin",
+					"vip":    "yes",
+					"kubectl.kubernetes.io/last-applied-configuration": "{\"creationTimestamp\":null,\"annotations\":{\"description\":\"fancy\",\"system\":\"true\"},\"Subjects\":[{\"Kind\":\"\",\"APIGroup\":\"\",\"Name\":\"a\",\"Namespace\":\"\"}],\"RoleRef\":{\"APIGroup\":\"\",\"Kind\":\"\",\"Name\":\"role\"}}\n",
+				}),
+		},
+	}
+
+	for k, tc := range tests {
+		expectedRoleBinding := ClusterRoleBindingAdapter{ClusterRoleBinding: tc.expectedBinding}
+		computedRoleBinding := ClusterRoleBindingAdapter{ClusterRoleBinding: tc.computedBinding}
+		result, err := updateRoleBindingLastAppliedAnnotation(expectedRoleBinding, computedRoleBinding)
+		if err != nil {
+			t.Errorf("%s: %v", k, err)
+			continue
+		}
+		got := result.(ClusterRoleBindingAdapter).ClusterRoleBinding
+		if !helper.Semantic.DeepEqual(got, tc.expectedUpdatedBinding) {
+			t.Errorf("%s: Expected\n\t%#v\ngot\n\t%#v", k, tc.expectedUpdatedBinding, got)
 		}
 	}
 }

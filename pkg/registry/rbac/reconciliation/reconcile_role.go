@@ -21,7 +21,9 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
@@ -42,6 +44,7 @@ type RuleOwnerModifier interface {
 }
 
 type RuleOwner interface {
+	GetObject() runtime.Object
 	GetNamespace() string
 	GetName() string
 	GetLabels() map[string]string
@@ -137,7 +140,12 @@ func (o *ReconcileRoleOptions) run(attempts int) (*ReconcileClusterRoleResult, e
 		result.Role = created
 
 	case ReconcileUpdate:
-		updated, err := o.Client.Update(result.Role)
+		role, err := updateRoleLastAppliedAnnotation(existing, result.Role)
+		if err != nil {
+			return nil, err
+		}
+
+		updated, err := o.Client.Update(role)
 		// If deleted since we started this reconcile, re-run
 		if errors.IsNotFound(err) {
 			return o.run(attempts + 1)
@@ -212,4 +220,28 @@ func merge(maps ...map[string]string) map[string]string {
 		}
 	}
 	return output
+}
+
+func updateRoleLastAppliedAnnotation(existing, computed RuleOwner) (RuleOwner, error) {
+	existingAnnots := existing.GetAnnotations()
+	if existingAnnots != nil {
+		if _, ok := existingAnnots[api.LastAppliedConfigAnnotation]; ok {
+			delete(existingAnnots, api.LastAppliedConfigAnnotation)
+			existing.SetAnnotations(existingAnnots)
+		}
+	}
+
+	jsonData, err := runtime.Encode(api.Codecs.LegacyCodec(v1.SchemeGroupVersion, rbac.SchemeGroupVersion), existing.GetObject())
+	if err != nil {
+		return computed, err
+	}
+
+	computedAnnots := computed.GetAnnotations()
+	if computedAnnots == nil {
+		computedAnnots = map[string]string{}
+	}
+	computedAnnots[api.LastAppliedConfigAnnotation] = string(jsonData)
+	computed.SetAnnotations(computedAnnots)
+
+	return computed, nil
 }
