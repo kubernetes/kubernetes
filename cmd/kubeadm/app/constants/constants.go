@@ -109,3 +109,8 @@ var (
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
 	MinimumControlPlaneVersion = version.MustParseSemantic("v1.7.0")
 )
+
+// BuildStaticManifestFilepath returns the location on the disk where the Static Pod should be present
+func BuildStaticManifestFilepath(componentName string) string {
+	return filepath.Join(KubernetesDir, ManifestsSubDirName, componentName+".yaml")
+}
