@@ -60,6 +60,7 @@ type openAPI struct {
 	swaggerPbGz  []byte
 	lastModified time.Time
 	protocolList []string
+	servePath    string
 	definitions  map[string]openapi.OpenAPIDefinition
 }
 
@@ -78,6 +79,7 @@ func RegisterOpenAPIService(servePath string, webServices []*restful.WebService,
 
 	o := openAPI{
 		config:    config,
+		servePath: servePath,
 		swagger: &spec.Swagger{
 			SwaggerProps: spec.SwaggerProps{
 				Swagger:     OpenAPIVersion,
@@ -130,17 +132,17 @@ func RegisterOpenAPIService(servePath string, webServices []*restful.WebService,
 
 func (o *openAPI) init(webServices []*restful.WebService) error {
 	if o.config.GetOperationIDAndTags == nil {
-		o.config.GetOperationIDAndTags = func(r *restful.Route) (string, []string, error) {
+		o.config.GetOperationIDAndTags = func(_ string, r *restful.Route) (string, []string, error) {
 			return r.Operation, nil, nil
 		}
 	}
 	if o.config.GetDefinitionName == nil {
-		o.config.GetDefinitionName = func(name string) (string, spec.Extensions) {
+		o.config.GetDefinitionName = func(_, name string) (string, spec.Extensions) {
 			return name[strings.LastIndex(name, "/")+1:], nil
 		}
 	}
 	o.definitions = o.config.GetDefinitions(func(name string) spec.Ref {
-		defName, _ := o.config.GetDefinitionName(name)
+		defName, _ := o.config.GetDefinitionName(o.servePath, name)
 		return spec.MustCreateRef("#/definitions/" + openapi.EscapeJsonPointer(defName))
 	})
 	if o.config.CommonResponses == nil {
@@ -208,7 +210,7 @@ func getCanonicalizeTypeName(t reflect.Type) string {
 }
 
 func (o *openAPI) buildDefinitionRecursively(name string) error {
-	uniqueName, extensions := o.config.GetDefinitionName(name)
+	uniqueName, extensions := o.config.GetDefinitionName(o.servePath, name)
 	if _, ok := o.swagger.Definitions[uniqueName]; ok {
 		return nil
 	}
@@ -250,7 +252,7 @@ func (o *openAPI) buildDefinitionForType(sample interface{}) (string, error) {
 	if err := o.buildDefinitionRecursively(name); err != nil {
 		return "", err
 	}
-	defName, _ := o.config.GetDefinitionName(name)
+	defName, _ := o.config.GetDefinitionName(o.servePath, name)
 	return "#/definitions/" + openapi.EscapeJsonPointer(defName), nil
 }
 
@@ -354,7 +356,7 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 			ret.Extensions.Add(k, v)
 		}
 	}
-	if ret.ID, ret.Tags, err = o.config.GetOperationIDAndTags(&route); err != nil {
+	if ret.ID, ret.Tags, err = o.config.GetOperationIDAndTags(o.servePath, &route); err != nil {
 		return ret, err
 	}
 
