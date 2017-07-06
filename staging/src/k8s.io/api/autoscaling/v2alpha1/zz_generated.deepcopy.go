@@ -28,292 +28,463 @@ import (
 	reflect "reflect"
 )
 
+// Deprecated: register deep-copy functions.
 func init() {
 	SchemeBuilder.Register(RegisterDeepCopies)
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
+// Deprecated: RegisterDeepCopies adds deep-copy functions to the given scheme. Public
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_CrossVersionObjectReference, InType: reflect.TypeOf(&CrossVersionObjectReference{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_HorizontalPodAutoscaler, InType: reflect.TypeOf(&HorizontalPodAutoscaler{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_HorizontalPodAutoscalerCondition, InType: reflect.TypeOf(&HorizontalPodAutoscalerCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_HorizontalPodAutoscalerList, InType: reflect.TypeOf(&HorizontalPodAutoscalerList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_HorizontalPodAutoscalerSpec, InType: reflect.TypeOf(&HorizontalPodAutoscalerSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_HorizontalPodAutoscalerStatus, InType: reflect.TypeOf(&HorizontalPodAutoscalerStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_MetricSpec, InType: reflect.TypeOf(&MetricSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_MetricStatus, InType: reflect.TypeOf(&MetricStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ObjectMetricSource, InType: reflect.TypeOf(&ObjectMetricSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ObjectMetricStatus, InType: reflect.TypeOf(&ObjectMetricStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_PodsMetricSource, InType: reflect.TypeOf(&PodsMetricSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_PodsMetricStatus, InType: reflect.TypeOf(&PodsMetricStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ResourceMetricSource, InType: reflect.TypeOf(&ResourceMetricSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ResourceMetricStatus, InType: reflect.TypeOf(&ResourceMetricStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*CrossVersionObjectReference).DeepCopyInto(out.(*CrossVersionObjectReference))
+			return nil
+		}, InType: reflect.TypeOf(&CrossVersionObjectReference{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*HorizontalPodAutoscaler).DeepCopyInto(out.(*HorizontalPodAutoscaler))
+			return nil
+		}, InType: reflect.TypeOf(&HorizontalPodAutoscaler{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*HorizontalPodAutoscalerCondition).DeepCopyInto(out.(*HorizontalPodAutoscalerCondition))
+			return nil
+		}, InType: reflect.TypeOf(&HorizontalPodAutoscalerCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*HorizontalPodAutoscalerList).DeepCopyInto(out.(*HorizontalPodAutoscalerList))
+			return nil
+		}, InType: reflect.TypeOf(&HorizontalPodAutoscalerList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*HorizontalPodAutoscalerSpec).DeepCopyInto(out.(*HorizontalPodAutoscalerSpec))
+			return nil
+		}, InType: reflect.TypeOf(&HorizontalPodAutoscalerSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*HorizontalPodAutoscalerStatus).DeepCopyInto(out.(*HorizontalPodAutoscalerStatus))
+			return nil
+		}, InType: reflect.TypeOf(&HorizontalPodAutoscalerStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*MetricSpec).DeepCopyInto(out.(*MetricSpec))
+			return nil
+		}, InType: reflect.TypeOf(&MetricSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*MetricStatus).DeepCopyInto(out.(*MetricStatus))
+			return nil
+		}, InType: reflect.TypeOf(&MetricStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ObjectMetricSource).DeepCopyInto(out.(*ObjectMetricSource))
+			return nil
+		}, InType: reflect.TypeOf(&ObjectMetricSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ObjectMetricStatus).DeepCopyInto(out.(*ObjectMetricStatus))
+			return nil
+		}, InType: reflect.TypeOf(&ObjectMetricStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*PodsMetricSource).DeepCopyInto(out.(*PodsMetricSource))
+			return nil
+		}, InType: reflect.TypeOf(&PodsMetricSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*PodsMetricStatus).DeepCopyInto(out.(*PodsMetricStatus))
+			return nil
+		}, InType: reflect.TypeOf(&PodsMetricStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ResourceMetricSource).DeepCopyInto(out.(*ResourceMetricSource))
+			return nil
+		}, InType: reflect.TypeOf(&ResourceMetricSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ResourceMetricStatus).DeepCopyInto(out.(*ResourceMetricStatus))
+			return nil
+		}, InType: reflect.TypeOf(&ResourceMetricStatus{})},
 	)
 }
 
-// DeepCopy_v2alpha1_CrossVersionObjectReference is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_CrossVersionObjectReference(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*CrossVersionObjectReference)
-		out := out.(*CrossVersionObjectReference)
-		*out = *in
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *CrossVersionObjectReference) DeepCopyInto(out *CrossVersionObjectReference) {
+	*out = *in
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new CrossVersionObjectReference.
+func (x *CrossVersionObjectReference) DeepCopy() *CrossVersionObjectReference {
+	if x == nil {
+		return nil
+	}
+	out := new(CrossVersionObjectReference)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *HorizontalPodAutoscaler) DeepCopyInto(out *HorizontalPodAutoscaler) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new HorizontalPodAutoscaler.
+func (x *HorizontalPodAutoscaler) DeepCopy() *HorizontalPodAutoscaler {
+	if x == nil {
+		return nil
+	}
+	out := new(HorizontalPodAutoscaler)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *HorizontalPodAutoscaler) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v2alpha1_HorizontalPodAutoscaler is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_HorizontalPodAutoscaler(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*HorizontalPodAutoscaler)
-		out := out.(*HorizontalPodAutoscaler)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *HorizontalPodAutoscalerCondition) DeepCopyInto(out *HorizontalPodAutoscalerCondition) {
+	*out = *in
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new HorizontalPodAutoscalerCondition.
+func (x *HorizontalPodAutoscalerCondition) DeepCopy() *HorizontalPodAutoscalerCondition {
+	if x == nil {
+		return nil
+	}
+	out := new(HorizontalPodAutoscalerCondition)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *HorizontalPodAutoscalerList) DeepCopyInto(out *HorizontalPodAutoscalerList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]HorizontalPodAutoscaler, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new HorizontalPodAutoscalerList.
+func (x *HorizontalPodAutoscalerList) DeepCopy() *HorizontalPodAutoscalerList {
+	if x == nil {
+		return nil
+	}
+	out := new(HorizontalPodAutoscalerList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *HorizontalPodAutoscalerList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *HorizontalPodAutoscalerSpec) DeepCopyInto(out *HorizontalPodAutoscalerSpec) {
+	*out = *in
+	out.ScaleTargetRef = in.ScaleTargetRef
+	if in.MinReplicas != nil {
+		in, out := &in.MinReplicas, &out.MinReplicas
+		if *in == nil {
+			*out = nil
 		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_v2alpha1_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v2alpha1_HorizontalPodAutoscalerStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v2alpha1_HorizontalPodAutoscalerCondition is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_HorizontalPodAutoscalerCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*HorizontalPodAutoscalerCondition)
-		out := out.(*HorizontalPodAutoscalerCondition)
-		*out = *in
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-		return nil
-	}
-}
-
-// DeepCopy_v2alpha1_HorizontalPodAutoscalerList is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_HorizontalPodAutoscalerList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*HorizontalPodAutoscalerList)
-		out := out.(*HorizontalPodAutoscalerList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]HorizontalPodAutoscaler, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v2alpha1_HorizontalPodAutoscaler(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v2alpha1_HorizontalPodAutoscalerSpec is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_HorizontalPodAutoscalerSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*HorizontalPodAutoscalerSpec)
-		out := out.(*HorizontalPodAutoscalerSpec)
-		*out = *in
-		if in.MinReplicas != nil {
-			in, out := &in.MinReplicas, &out.MinReplicas
 			*out = new(int32)
 			**out = **in
 		}
-		if in.Metrics != nil {
-			in, out := &in.Metrics, &out.Metrics
-			*out = make([]MetricSpec, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v2alpha1_MetricSpec(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
 	}
+	if in.Metrics != nil {
+		in, out := &in.Metrics, &out.Metrics
+		*out = make([]MetricSpec, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
 }
 
-// DeepCopy_v2alpha1_HorizontalPodAutoscalerStatus is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_HorizontalPodAutoscalerStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*HorizontalPodAutoscalerStatus)
-		out := out.(*HorizontalPodAutoscalerStatus)
-		*out = *in
-		if in.ObservedGeneration != nil {
-			in, out := &in.ObservedGeneration, &out.ObservedGeneration
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new HorizontalPodAutoscalerSpec.
+func (x *HorizontalPodAutoscalerSpec) DeepCopy() *HorizontalPodAutoscalerSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(HorizontalPodAutoscalerSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *HorizontalPodAutoscalerStatus) DeepCopyInto(out *HorizontalPodAutoscalerStatus) {
+	*out = *in
+	if in.ObservedGeneration != nil {
+		in, out := &in.ObservedGeneration, &out.ObservedGeneration
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int64)
 			**out = **in
 		}
-		if in.LastScaleTime != nil {
-			in, out := &in.LastScaleTime, &out.LastScaleTime
+	}
+	if in.LastScaleTime != nil {
+		in, out := &in.LastScaleTime, &out.LastScaleTime
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(v1.Time)
-			**out = (*in).DeepCopy()
+			(*in).DeepCopyInto(*out)
 		}
-		if in.CurrentMetrics != nil {
-			in, out := &in.CurrentMetrics, &out.CurrentMetrics
-			*out = make([]MetricStatus, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v2alpha1_MetricStatus(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]HorizontalPodAutoscalerCondition, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v2alpha1_HorizontalPodAutoscalerCondition(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
 	}
+	if in.CurrentMetrics != nil {
+		in, out := &in.CurrentMetrics, &out.CurrentMetrics
+		*out = make([]MetricStatus, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]HorizontalPodAutoscalerCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
 }
 
-// DeepCopy_v2alpha1_MetricSpec is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_MetricSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*MetricSpec)
-		out := out.(*MetricSpec)
-		*out = *in
-		if in.Object != nil {
-			in, out := &in.Object, &out.Object
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new HorizontalPodAutoscalerStatus.
+func (x *HorizontalPodAutoscalerStatus) DeepCopy() *HorizontalPodAutoscalerStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(HorizontalPodAutoscalerStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *MetricSpec) DeepCopyInto(out *MetricSpec) {
+	*out = *in
+	if in.Object != nil {
+		in, out := &in.Object, &out.Object
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(ObjectMetricSource)
-			if err := DeepCopy_v2alpha1_ObjectMetricSource(*in, *out, c); err != nil {
-				return err
-			}
+			(*in).DeepCopyInto(*out)
 		}
-		if in.Pods != nil {
-			in, out := &in.Pods, &out.Pods
+	}
+	if in.Pods != nil {
+		in, out := &in.Pods, &out.Pods
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(PodsMetricSource)
-			if err := DeepCopy_v2alpha1_PodsMetricSource(*in, *out, c); err != nil {
-				return err
-			}
+			(*in).DeepCopyInto(*out)
 		}
-		if in.Resource != nil {
-			in, out := &in.Resource, &out.Resource
+	}
+	if in.Resource != nil {
+		in, out := &in.Resource, &out.Resource
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(ResourceMetricSource)
-			if err := DeepCopy_v2alpha1_ResourceMetricSource(*in, *out, c); err != nil {
-				return err
-			}
+			(*in).DeepCopyInto(*out)
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_v2alpha1_MetricStatus is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_MetricStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*MetricStatus)
-		out := out.(*MetricStatus)
-		*out = *in
-		if in.Object != nil {
-			in, out := &in.Object, &out.Object
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new MetricSpec.
+func (x *MetricSpec) DeepCopy() *MetricSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(MetricSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *MetricStatus) DeepCopyInto(out *MetricStatus) {
+	*out = *in
+	if in.Object != nil {
+		in, out := &in.Object, &out.Object
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(ObjectMetricStatus)
-			if err := DeepCopy_v2alpha1_ObjectMetricStatus(*in, *out, c); err != nil {
-				return err
-			}
+			(*in).DeepCopyInto(*out)
 		}
-		if in.Pods != nil {
-			in, out := &in.Pods, &out.Pods
+	}
+	if in.Pods != nil {
+		in, out := &in.Pods, &out.Pods
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(PodsMetricStatus)
-			if err := DeepCopy_v2alpha1_PodsMetricStatus(*in, *out, c); err != nil {
-				return err
-			}
+			(*in).DeepCopyInto(*out)
 		}
-		if in.Resource != nil {
-			in, out := &in.Resource, &out.Resource
+	}
+	if in.Resource != nil {
+		in, out := &in.Resource, &out.Resource
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(ResourceMetricStatus)
-			if err := DeepCopy_v2alpha1_ResourceMetricStatus(*in, *out, c); err != nil {
-				return err
-			}
+			(*in).DeepCopyInto(*out)
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_v2alpha1_ObjectMetricSource is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_ObjectMetricSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ObjectMetricSource)
-		out := out.(*ObjectMetricSource)
-		*out = *in
-		out.TargetValue = in.TargetValue.DeepCopy()
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new MetricStatus.
+func (x *MetricStatus) DeepCopy() *MetricStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(MetricStatus)
+	x.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_v2alpha1_ObjectMetricStatus is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_ObjectMetricStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ObjectMetricStatus)
-		out := out.(*ObjectMetricStatus)
-		*out = *in
-		out.CurrentValue = in.CurrentValue.DeepCopy()
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ObjectMetricSource) DeepCopyInto(out *ObjectMetricSource) {
+	*out = *in
+	out.Target = in.Target
+	out.TargetValue = in.TargetValue.DeepCopy()
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ObjectMetricSource.
+func (x *ObjectMetricSource) DeepCopy() *ObjectMetricSource {
+	if x == nil {
 		return nil
 	}
+	out := new(ObjectMetricSource)
+	x.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_v2alpha1_PodsMetricSource is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_PodsMetricSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodsMetricSource)
-		out := out.(*PodsMetricSource)
-		*out = *in
-		out.TargetAverageValue = in.TargetAverageValue.DeepCopy()
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ObjectMetricStatus) DeepCopyInto(out *ObjectMetricStatus) {
+	*out = *in
+	out.Target = in.Target
+	out.CurrentValue = in.CurrentValue.DeepCopy()
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ObjectMetricStatus.
+func (x *ObjectMetricStatus) DeepCopy() *ObjectMetricStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(ObjectMetricStatus)
+	x.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_v2alpha1_PodsMetricStatus is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_PodsMetricStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodsMetricStatus)
-		out := out.(*PodsMetricStatus)
-		*out = *in
-		out.CurrentAverageValue = in.CurrentAverageValue.DeepCopy()
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PodsMetricSource) DeepCopyInto(out *PodsMetricSource) {
+	*out = *in
+	out.TargetAverageValue = in.TargetAverageValue.DeepCopy()
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new PodsMetricSource.
+func (x *PodsMetricSource) DeepCopy() *PodsMetricSource {
+	if x == nil {
 		return nil
 	}
+	out := new(PodsMetricSource)
+	x.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_v2alpha1_ResourceMetricSource is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_ResourceMetricSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ResourceMetricSource)
-		out := out.(*ResourceMetricSource)
-		*out = *in
-		if in.TargetAverageUtilization != nil {
-			in, out := &in.TargetAverageUtilization, &out.TargetAverageUtilization
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PodsMetricStatus) DeepCopyInto(out *PodsMetricStatus) {
+	*out = *in
+	out.CurrentAverageValue = in.CurrentAverageValue.DeepCopy()
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new PodsMetricStatus.
+func (x *PodsMetricStatus) DeepCopy() *PodsMetricStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(PodsMetricStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ResourceMetricSource) DeepCopyInto(out *ResourceMetricSource) {
+	*out = *in
+	if in.TargetAverageUtilization != nil {
+		in, out := &in.TargetAverageUtilization, &out.TargetAverageUtilization
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int32)
 			**out = **in
 		}
-		if in.TargetAverageValue != nil {
-			in, out := &in.TargetAverageValue, &out.TargetAverageValue
+	}
+	if in.TargetAverageValue != nil {
+		in, out := &in.TargetAverageValue, &out.TargetAverageValue
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(resource.Quantity)
 			**out = (*in).DeepCopy()
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_v2alpha1_ResourceMetricStatus is an autogenerated deepcopy function.
-func DeepCopy_v2alpha1_ResourceMetricStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ResourceMetricStatus)
-		out := out.(*ResourceMetricStatus)
-		*out = *in
-		if in.CurrentAverageUtilization != nil {
-			in, out := &in.CurrentAverageUtilization, &out.CurrentAverageUtilization
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ResourceMetricSource.
+func (x *ResourceMetricSource) DeepCopy() *ResourceMetricSource {
+	if x == nil {
+		return nil
+	}
+	out := new(ResourceMetricSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ResourceMetricStatus) DeepCopyInto(out *ResourceMetricStatus) {
+	*out = *in
+	if in.CurrentAverageUtilization != nil {
+		in, out := &in.CurrentAverageUtilization, &out.CurrentAverageUtilization
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int32)
 			**out = **in
 		}
-		out.CurrentAverageValue = in.CurrentAverageValue.DeepCopy()
+	}
+	out.CurrentAverageValue = in.CurrentAverageValue.DeepCopy()
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ResourceMetricStatus.
+func (x *ResourceMetricStatus) DeepCopy() *ResourceMetricStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(ResourceMetricStatus)
+	x.DeepCopyInto(out)
+	return out
 }

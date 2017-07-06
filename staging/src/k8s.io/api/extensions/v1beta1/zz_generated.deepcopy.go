@@ -29,1135 +29,1813 @@ import (
 	reflect "reflect"
 )
 
+// Deprecated: register deep-copy functions.
 func init() {
 	SchemeBuilder.Register(RegisterDeepCopies)
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
+// Deprecated: RegisterDeepCopies adds deep-copy functions to the given scheme. Public
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_APIVersion, InType: reflect.TypeOf(&APIVersion{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_CustomMetricCurrentStatus, InType: reflect.TypeOf(&CustomMetricCurrentStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_CustomMetricCurrentStatusList, InType: reflect.TypeOf(&CustomMetricCurrentStatusList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_CustomMetricTarget, InType: reflect.TypeOf(&CustomMetricTarget{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_CustomMetricTargetList, InType: reflect.TypeOf(&CustomMetricTargetList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DaemonSet, InType: reflect.TypeOf(&DaemonSet{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DaemonSetList, InType: reflect.TypeOf(&DaemonSetList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DaemonSetSpec, InType: reflect.TypeOf(&DaemonSetSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DaemonSetStatus, InType: reflect.TypeOf(&DaemonSetStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DaemonSetUpdateStrategy, InType: reflect.TypeOf(&DaemonSetUpdateStrategy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Deployment, InType: reflect.TypeOf(&Deployment{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentCondition, InType: reflect.TypeOf(&DeploymentCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentList, InType: reflect.TypeOf(&DeploymentList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentRollback, InType: reflect.TypeOf(&DeploymentRollback{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentSpec, InType: reflect.TypeOf(&DeploymentSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentStatus, InType: reflect.TypeOf(&DeploymentStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentStrategy, InType: reflect.TypeOf(&DeploymentStrategy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_FSGroupStrategyOptions, InType: reflect.TypeOf(&FSGroupStrategyOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_HTTPIngressPath, InType: reflect.TypeOf(&HTTPIngressPath{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_HTTPIngressRuleValue, InType: reflect.TypeOf(&HTTPIngressRuleValue{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_HostPortRange, InType: reflect.TypeOf(&HostPortRange{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_IDRange, InType: reflect.TypeOf(&IDRange{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Ingress, InType: reflect.TypeOf(&Ingress{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_IngressBackend, InType: reflect.TypeOf(&IngressBackend{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_IngressList, InType: reflect.TypeOf(&IngressList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_IngressRule, InType: reflect.TypeOf(&IngressRule{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_IngressRuleValue, InType: reflect.TypeOf(&IngressRuleValue{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_IngressSpec, InType: reflect.TypeOf(&IngressSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_IngressStatus, InType: reflect.TypeOf(&IngressStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_IngressTLS, InType: reflect.TypeOf(&IngressTLS{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NetworkPolicy, InType: reflect.TypeOf(&NetworkPolicy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NetworkPolicyIngressRule, InType: reflect.TypeOf(&NetworkPolicyIngressRule{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NetworkPolicyList, InType: reflect.TypeOf(&NetworkPolicyList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NetworkPolicyPeer, InType: reflect.TypeOf(&NetworkPolicyPeer{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NetworkPolicyPort, InType: reflect.TypeOf(&NetworkPolicyPort{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NetworkPolicySpec, InType: reflect.TypeOf(&NetworkPolicySpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_PodSecurityPolicy, InType: reflect.TypeOf(&PodSecurityPolicy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_PodSecurityPolicyList, InType: reflect.TypeOf(&PodSecurityPolicyList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_PodSecurityPolicySpec, InType: reflect.TypeOf(&PodSecurityPolicySpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ReplicaSet, InType: reflect.TypeOf(&ReplicaSet{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ReplicaSetCondition, InType: reflect.TypeOf(&ReplicaSetCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ReplicaSetList, InType: reflect.TypeOf(&ReplicaSetList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ReplicaSetSpec, InType: reflect.TypeOf(&ReplicaSetSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ReplicaSetStatus, InType: reflect.TypeOf(&ReplicaSetStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ReplicationControllerDummy, InType: reflect.TypeOf(&ReplicationControllerDummy{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_RollbackConfig, InType: reflect.TypeOf(&RollbackConfig{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_RollingUpdateDaemonSet, InType: reflect.TypeOf(&RollingUpdateDaemonSet{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_RollingUpdateDeployment, InType: reflect.TypeOf(&RollingUpdateDeployment{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_RunAsUserStrategyOptions, InType: reflect.TypeOf(&RunAsUserStrategyOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SELinuxStrategyOptions, InType: reflect.TypeOf(&SELinuxStrategyOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Scale, InType: reflect.TypeOf(&Scale{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ScaleSpec, InType: reflect.TypeOf(&ScaleSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ScaleStatus, InType: reflect.TypeOf(&ScaleStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SupplementalGroupsStrategyOptions, InType: reflect.TypeOf(&SupplementalGroupsStrategyOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ThirdPartyResource, InType: reflect.TypeOf(&ThirdPartyResource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ThirdPartyResourceData, InType: reflect.TypeOf(&ThirdPartyResourceData{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ThirdPartyResourceDataList, InType: reflect.TypeOf(&ThirdPartyResourceDataList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ThirdPartyResourceList, InType: reflect.TypeOf(&ThirdPartyResourceList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*APIVersion).DeepCopyInto(out.(*APIVersion))
+			return nil
+		}, InType: reflect.TypeOf(&APIVersion{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*CustomMetricCurrentStatus).DeepCopyInto(out.(*CustomMetricCurrentStatus))
+			return nil
+		}, InType: reflect.TypeOf(&CustomMetricCurrentStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*CustomMetricCurrentStatusList).DeepCopyInto(out.(*CustomMetricCurrentStatusList))
+			return nil
+		}, InType: reflect.TypeOf(&CustomMetricCurrentStatusList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*CustomMetricTarget).DeepCopyInto(out.(*CustomMetricTarget))
+			return nil
+		}, InType: reflect.TypeOf(&CustomMetricTarget{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*CustomMetricTargetList).DeepCopyInto(out.(*CustomMetricTargetList))
+			return nil
+		}, InType: reflect.TypeOf(&CustomMetricTargetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*DaemonSet).DeepCopyInto(out.(*DaemonSet))
+			return nil
+		}, InType: reflect.TypeOf(&DaemonSet{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*DaemonSetList).DeepCopyInto(out.(*DaemonSetList))
+			return nil
+		}, InType: reflect.TypeOf(&DaemonSetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*DaemonSetSpec).DeepCopyInto(out.(*DaemonSetSpec))
+			return nil
+		}, InType: reflect.TypeOf(&DaemonSetSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*DaemonSetStatus).DeepCopyInto(out.(*DaemonSetStatus))
+			return nil
+		}, InType: reflect.TypeOf(&DaemonSetStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*DaemonSetUpdateStrategy).DeepCopyInto(out.(*DaemonSetUpdateStrategy))
+			return nil
+		}, InType: reflect.TypeOf(&DaemonSetUpdateStrategy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*Deployment).DeepCopyInto(out.(*Deployment))
+			return nil
+		}, InType: reflect.TypeOf(&Deployment{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*DeploymentCondition).DeepCopyInto(out.(*DeploymentCondition))
+			return nil
+		}, InType: reflect.TypeOf(&DeploymentCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*DeploymentList).DeepCopyInto(out.(*DeploymentList))
+			return nil
+		}, InType: reflect.TypeOf(&DeploymentList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*DeploymentRollback).DeepCopyInto(out.(*DeploymentRollback))
+			return nil
+		}, InType: reflect.TypeOf(&DeploymentRollback{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*DeploymentSpec).DeepCopyInto(out.(*DeploymentSpec))
+			return nil
+		}, InType: reflect.TypeOf(&DeploymentSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*DeploymentStatus).DeepCopyInto(out.(*DeploymentStatus))
+			return nil
+		}, InType: reflect.TypeOf(&DeploymentStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*DeploymentStrategy).DeepCopyInto(out.(*DeploymentStrategy))
+			return nil
+		}, InType: reflect.TypeOf(&DeploymentStrategy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*FSGroupStrategyOptions).DeepCopyInto(out.(*FSGroupStrategyOptions))
+			return nil
+		}, InType: reflect.TypeOf(&FSGroupStrategyOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*HTTPIngressPath).DeepCopyInto(out.(*HTTPIngressPath))
+			return nil
+		}, InType: reflect.TypeOf(&HTTPIngressPath{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*HTTPIngressRuleValue).DeepCopyInto(out.(*HTTPIngressRuleValue))
+			return nil
+		}, InType: reflect.TypeOf(&HTTPIngressRuleValue{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*HostPortRange).DeepCopyInto(out.(*HostPortRange))
+			return nil
+		}, InType: reflect.TypeOf(&HostPortRange{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*IDRange).DeepCopyInto(out.(*IDRange))
+			return nil
+		}, InType: reflect.TypeOf(&IDRange{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*Ingress).DeepCopyInto(out.(*Ingress))
+			return nil
+		}, InType: reflect.TypeOf(&Ingress{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*IngressBackend).DeepCopyInto(out.(*IngressBackend))
+			return nil
+		}, InType: reflect.TypeOf(&IngressBackend{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*IngressList).DeepCopyInto(out.(*IngressList))
+			return nil
+		}, InType: reflect.TypeOf(&IngressList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*IngressRule).DeepCopyInto(out.(*IngressRule))
+			return nil
+		}, InType: reflect.TypeOf(&IngressRule{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*IngressRuleValue).DeepCopyInto(out.(*IngressRuleValue))
+			return nil
+		}, InType: reflect.TypeOf(&IngressRuleValue{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*IngressSpec).DeepCopyInto(out.(*IngressSpec))
+			return nil
+		}, InType: reflect.TypeOf(&IngressSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*IngressStatus).DeepCopyInto(out.(*IngressStatus))
+			return nil
+		}, InType: reflect.TypeOf(&IngressStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*IngressTLS).DeepCopyInto(out.(*IngressTLS))
+			return nil
+		}, InType: reflect.TypeOf(&IngressTLS{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*NetworkPolicy).DeepCopyInto(out.(*NetworkPolicy))
+			return nil
+		}, InType: reflect.TypeOf(&NetworkPolicy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*NetworkPolicyIngressRule).DeepCopyInto(out.(*NetworkPolicyIngressRule))
+			return nil
+		}, InType: reflect.TypeOf(&NetworkPolicyIngressRule{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*NetworkPolicyList).DeepCopyInto(out.(*NetworkPolicyList))
+			return nil
+		}, InType: reflect.TypeOf(&NetworkPolicyList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*NetworkPolicyPeer).DeepCopyInto(out.(*NetworkPolicyPeer))
+			return nil
+		}, InType: reflect.TypeOf(&NetworkPolicyPeer{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*NetworkPolicyPort).DeepCopyInto(out.(*NetworkPolicyPort))
+			return nil
+		}, InType: reflect.TypeOf(&NetworkPolicyPort{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*NetworkPolicySpec).DeepCopyInto(out.(*NetworkPolicySpec))
+			return nil
+		}, InType: reflect.TypeOf(&NetworkPolicySpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*PodSecurityPolicy).DeepCopyInto(out.(*PodSecurityPolicy))
+			return nil
+		}, InType: reflect.TypeOf(&PodSecurityPolicy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*PodSecurityPolicyList).DeepCopyInto(out.(*PodSecurityPolicyList))
+			return nil
+		}, InType: reflect.TypeOf(&PodSecurityPolicyList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*PodSecurityPolicySpec).DeepCopyInto(out.(*PodSecurityPolicySpec))
+			return nil
+		}, InType: reflect.TypeOf(&PodSecurityPolicySpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ReplicaSet).DeepCopyInto(out.(*ReplicaSet))
+			return nil
+		}, InType: reflect.TypeOf(&ReplicaSet{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ReplicaSetCondition).DeepCopyInto(out.(*ReplicaSetCondition))
+			return nil
+		}, InType: reflect.TypeOf(&ReplicaSetCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ReplicaSetList).DeepCopyInto(out.(*ReplicaSetList))
+			return nil
+		}, InType: reflect.TypeOf(&ReplicaSetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ReplicaSetSpec).DeepCopyInto(out.(*ReplicaSetSpec))
+			return nil
+		}, InType: reflect.TypeOf(&ReplicaSetSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ReplicaSetStatus).DeepCopyInto(out.(*ReplicaSetStatus))
+			return nil
+		}, InType: reflect.TypeOf(&ReplicaSetStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ReplicationControllerDummy).DeepCopyInto(out.(*ReplicationControllerDummy))
+			return nil
+		}, InType: reflect.TypeOf(&ReplicationControllerDummy{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*RollbackConfig).DeepCopyInto(out.(*RollbackConfig))
+			return nil
+		}, InType: reflect.TypeOf(&RollbackConfig{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*RollingUpdateDaemonSet).DeepCopyInto(out.(*RollingUpdateDaemonSet))
+			return nil
+		}, InType: reflect.TypeOf(&RollingUpdateDaemonSet{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*RollingUpdateDeployment).DeepCopyInto(out.(*RollingUpdateDeployment))
+			return nil
+		}, InType: reflect.TypeOf(&RollingUpdateDeployment{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*RunAsUserStrategyOptions).DeepCopyInto(out.(*RunAsUserStrategyOptions))
+			return nil
+		}, InType: reflect.TypeOf(&RunAsUserStrategyOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*SELinuxStrategyOptions).DeepCopyInto(out.(*SELinuxStrategyOptions))
+			return nil
+		}, InType: reflect.TypeOf(&SELinuxStrategyOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*Scale).DeepCopyInto(out.(*Scale))
+			return nil
+		}, InType: reflect.TypeOf(&Scale{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ScaleSpec).DeepCopyInto(out.(*ScaleSpec))
+			return nil
+		}, InType: reflect.TypeOf(&ScaleSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ScaleStatus).DeepCopyInto(out.(*ScaleStatus))
+			return nil
+		}, InType: reflect.TypeOf(&ScaleStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*SupplementalGroupsStrategyOptions).DeepCopyInto(out.(*SupplementalGroupsStrategyOptions))
+			return nil
+		}, InType: reflect.TypeOf(&SupplementalGroupsStrategyOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ThirdPartyResource).DeepCopyInto(out.(*ThirdPartyResource))
+			return nil
+		}, InType: reflect.TypeOf(&ThirdPartyResource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ThirdPartyResourceData).DeepCopyInto(out.(*ThirdPartyResourceData))
+			return nil
+		}, InType: reflect.TypeOf(&ThirdPartyResourceData{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ThirdPartyResourceDataList).DeepCopyInto(out.(*ThirdPartyResourceDataList))
+			return nil
+		}, InType: reflect.TypeOf(&ThirdPartyResourceDataList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ThirdPartyResourceList).DeepCopyInto(out.(*ThirdPartyResourceList))
+			return nil
+		}, InType: reflect.TypeOf(&ThirdPartyResourceList{})},
 	)
 }
 
-// DeepCopy_v1beta1_APIVersion is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_APIVersion(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*APIVersion)
-		out := out.(*APIVersion)
-		*out = *in
-		return nil
-	}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *APIVersion) DeepCopyInto(out *APIVersion) {
+	*out = *in
+	return
 }
 
-// DeepCopy_v1beta1_CustomMetricCurrentStatus is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_CustomMetricCurrentStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*CustomMetricCurrentStatus)
-		out := out.(*CustomMetricCurrentStatus)
-		*out = *in
-		out.CurrentValue = in.CurrentValue.DeepCopy()
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new APIVersion.
+func (x *APIVersion) DeepCopy() *APIVersion {
+	if x == nil {
 		return nil
 	}
+	out := new(APIVersion)
+	x.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_v1beta1_CustomMetricCurrentStatusList is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_CustomMetricCurrentStatusList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*CustomMetricCurrentStatusList)
-		out := out.(*CustomMetricCurrentStatusList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]CustomMetricCurrentStatus, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_CustomMetricCurrentStatus(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *CustomMetricCurrentStatus) DeepCopyInto(out *CustomMetricCurrentStatus) {
+	*out = *in
+	out.CurrentValue = in.CurrentValue.DeepCopy()
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new CustomMetricCurrentStatus.
+func (x *CustomMetricCurrentStatus) DeepCopy() *CustomMetricCurrentStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(CustomMetricCurrentStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *CustomMetricCurrentStatusList) DeepCopyInto(out *CustomMetricCurrentStatusList) {
+	*out = *in
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]CustomMetricCurrentStatus, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_v1beta1_CustomMetricTarget is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_CustomMetricTarget(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*CustomMetricTarget)
-		out := out.(*CustomMetricTarget)
-		*out = *in
-		out.TargetValue = in.TargetValue.DeepCopy()
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new CustomMetricCurrentStatusList.
+func (x *CustomMetricCurrentStatusList) DeepCopy() *CustomMetricCurrentStatusList {
+	if x == nil {
 		return nil
 	}
+	out := new(CustomMetricCurrentStatusList)
+	x.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_v1beta1_CustomMetricTargetList is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_CustomMetricTargetList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*CustomMetricTargetList)
-		out := out.(*CustomMetricTargetList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]CustomMetricTarget, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_CustomMetricTarget(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *CustomMetricTarget) DeepCopyInto(out *CustomMetricTarget) {
+	*out = *in
+	out.TargetValue = in.TargetValue.DeepCopy()
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new CustomMetricTarget.
+func (x *CustomMetricTarget) DeepCopy() *CustomMetricTarget {
+	if x == nil {
+		return nil
+	}
+	out := new(CustomMetricTarget)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *CustomMetricTargetList) DeepCopyInto(out *CustomMetricTargetList) {
+	*out = *in
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]CustomMetricTarget, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new CustomMetricTargetList.
+func (x *CustomMetricTargetList) DeepCopy() *CustomMetricTargetList {
+	if x == nil {
+		return nil
+	}
+	out := new(CustomMetricTargetList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DaemonSet) DeepCopyInto(out *DaemonSet) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new DaemonSet.
+func (x *DaemonSet) DeepCopy() *DaemonSet {
+	if x == nil {
+		return nil
+	}
+	out := new(DaemonSet)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *DaemonSet) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_DaemonSet is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_DaemonSet(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DaemonSet)
-		out := out.(*DaemonSet)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DaemonSetList) DeepCopyInto(out *DaemonSetList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]DaemonSet, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new DaemonSetList.
+func (x *DaemonSetList) DeepCopy() *DaemonSetList {
+	if x == nil {
+		return nil
+	}
+	out := new(DaemonSetList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *DaemonSetList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DaemonSetSpec) DeepCopyInto(out *DaemonSetSpec) {
+	*out = *in
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		if *in == nil {
+			*out = nil
 		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
 		}
-		if err := DeepCopy_v1beta1_DaemonSetSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_DaemonSetStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
 	}
-}
-
-// DeepCopy_v1beta1_DaemonSetList is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_DaemonSetList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DaemonSetList)
-		out := out.(*DaemonSetList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]DaemonSet, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_DaemonSet(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_DaemonSetSpec is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_DaemonSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DaemonSetSpec)
-		out := out.(*DaemonSetSpec)
-		*out = *in
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
-				*out = newVal.(*v1.LabelSelector)
-			}
-		}
-		if err := core_v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, c); err != nil {
-			return err
-		}
-		if in.RevisionHistoryLimit != nil {
-			in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
+	in.Template.DeepCopyInto(&out.Template)
+	in.UpdateStrategy.DeepCopyInto(&out.UpdateStrategy)
+	if in.RevisionHistoryLimit != nil {
+		in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int32)
 			**out = **in
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_v1beta1_DaemonSetStatus is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_DaemonSetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DaemonSetStatus)
-		out := out.(*DaemonSetStatus)
-		*out = *in
-		if in.CollisionCount != nil {
-			in, out := &in.CollisionCount, &out.CollisionCount
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new DaemonSetSpec.
+func (x *DaemonSetSpec) DeepCopy() *DaemonSetSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(DaemonSetSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DaemonSetStatus) DeepCopyInto(out *DaemonSetStatus) {
+	*out = *in
+	if in.CollisionCount != nil {
+		in, out := &in.CollisionCount, &out.CollisionCount
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int64)
 			**out = **in
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_v1beta1_DaemonSetUpdateStrategy is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_DaemonSetUpdateStrategy(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DaemonSetUpdateStrategy)
-		out := out.(*DaemonSetUpdateStrategy)
-		*out = *in
-		if in.RollingUpdate != nil {
-			in, out := &in.RollingUpdate, &out.RollingUpdate
-			*out = new(RollingUpdateDaemonSet)
-			if err := DeepCopy_v1beta1_RollingUpdateDaemonSet(*in, *out, c); err != nil {
-				return err
-			}
-		}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new DaemonSetStatus.
+func (x *DaemonSetStatus) DeepCopy() *DaemonSetStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(DaemonSetStatus)
+	x.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_v1beta1_Deployment is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_Deployment(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Deployment)
-		out := out.(*Deployment)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DaemonSetUpdateStrategy) DeepCopyInto(out *DaemonSetUpdateStrategy) {
+	*out = *in
+	if in.RollingUpdate != nil {
+		in, out := &in.RollingUpdate, &out.RollingUpdate
+		if *in == nil {
+			*out = nil
 		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+			*out = new(RollingUpdateDaemonSet)
+			(*in).DeepCopyInto(*out)
 		}
-		if err := DeepCopy_v1beta1_DeploymentSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_DeploymentStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new DaemonSetUpdateStrategy.
+func (x *DaemonSetUpdateStrategy) DeepCopy() *DaemonSetUpdateStrategy {
+	if x == nil {
+		return nil
+	}
+	out := new(DaemonSetUpdateStrategy)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *Deployment) DeepCopyInto(out *Deployment) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new Deployment.
+func (x *Deployment) DeepCopy() *Deployment {
+	if x == nil {
+		return nil
+	}
+	out := new(Deployment)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *Deployment) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_DeploymentCondition is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_DeploymentCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeploymentCondition)
-		out := out.(*DeploymentCondition)
-		*out = *in
-		out.LastUpdateTime = in.LastUpdateTime.DeepCopy()
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-		return nil
-	}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DeploymentCondition) DeepCopyInto(out *DeploymentCondition) {
+	*out = *in
+	in.LastUpdateTime.DeepCopyInto(&out.LastUpdateTime)
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
+	return
 }
 
-// DeepCopy_v1beta1_DeploymentList is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_DeploymentList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeploymentList)
-		out := out.(*DeploymentList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Deployment, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_Deployment(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new DeploymentCondition.
+func (x *DeploymentCondition) DeepCopy() *DeploymentCondition {
+	if x == nil {
+		return nil
+	}
+	out := new(DeploymentCondition)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DeploymentList) DeepCopyInto(out *DeploymentList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Deployment, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new DeploymentList.
+func (x *DeploymentList) DeepCopy() *DeploymentList {
+	if x == nil {
+		return nil
+	}
+	out := new(DeploymentList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *DeploymentList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_DeploymentRollback is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_DeploymentRollback(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeploymentRollback)
-		out := out.(*DeploymentRollback)
-		*out = *in
-		if in.UpdatedAnnotations != nil {
-			in, out := &in.UpdatedAnnotations, &out.UpdatedAnnotations
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DeploymentRollback) DeepCopyInto(out *DeploymentRollback) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	if in.UpdatedAnnotations != nil {
+		in, out := &in.UpdatedAnnotations, &out.UpdatedAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
 		}
+	}
+	out.RollbackTo = in.RollbackTo
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new DeploymentRollback.
+func (x *DeploymentRollback) DeepCopy() *DeploymentRollback {
+	if x == nil {
+		return nil
+	}
+	out := new(DeploymentRollback)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *DeploymentRollback) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_DeploymentSpec is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_DeploymentSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeploymentSpec)
-		out := out.(*DeploymentSpec)
-		*out = *in
-		if in.Replicas != nil {
-			in, out := &in.Replicas, &out.Replicas
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DeploymentSpec) DeepCopyInto(out *DeploymentSpec) {
+	*out = *in
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int32)
 			**out = **in
 		}
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
-				*out = newVal.(*v1.LabelSelector)
-			}
+	}
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
 		}
-		if err := core_v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, c); err != nil {
-			return err
-		}
-		if in.RevisionHistoryLimit != nil {
-			in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
+	}
+	in.Template.DeepCopyInto(&out.Template)
+	in.Strategy.DeepCopyInto(&out.Strategy)
+	if in.RevisionHistoryLimit != nil {
+		in, out := &in.RevisionHistoryLimit, &out.RevisionHistoryLimit
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int32)
 			**out = **in
 		}
-		if in.RollbackTo != nil {
-			in, out := &in.RollbackTo, &out.RollbackTo
+	}
+	if in.RollbackTo != nil {
+		in, out := &in.RollbackTo, &out.RollbackTo
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(RollbackConfig)
 			**out = **in
 		}
-		if in.ProgressDeadlineSeconds != nil {
-			in, out := &in.ProgressDeadlineSeconds, &out.ProgressDeadlineSeconds
+	}
+	if in.ProgressDeadlineSeconds != nil {
+		in, out := &in.ProgressDeadlineSeconds, &out.ProgressDeadlineSeconds
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int32)
 			**out = **in
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_v1beta1_DeploymentStatus is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_DeploymentStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeploymentStatus)
-		out := out.(*DeploymentStatus)
-		*out = *in
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]DeploymentCondition, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_DeploymentCondition(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new DeploymentSpec.
+func (x *DeploymentSpec) DeepCopy() *DeploymentSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(DeploymentSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DeploymentStatus) DeepCopyInto(out *DeploymentStatus) {
+	*out = *in
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]DeploymentCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if in.CollisionCount != nil {
-			in, out := &in.CollisionCount, &out.CollisionCount
+	}
+	if in.CollisionCount != nil {
+		in, out := &in.CollisionCount, &out.CollisionCount
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int64)
 			**out = **in
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_v1beta1_DeploymentStrategy is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_DeploymentStrategy(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeploymentStrategy)
-		out := out.(*DeploymentStrategy)
-		*out = *in
-		if in.RollingUpdate != nil {
-			in, out := &in.RollingUpdate, &out.RollingUpdate
-			*out = new(RollingUpdateDeployment)
-			if err := DeepCopy_v1beta1_RollingUpdateDeployment(*in, *out, c); err != nil {
-				return err
-			}
-		}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new DeploymentStatus.
+func (x *DeploymentStatus) DeepCopy() *DeploymentStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(DeploymentStatus)
+	x.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_v1beta1_FSGroupStrategyOptions is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_FSGroupStrategyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*FSGroupStrategyOptions)
-		out := out.(*FSGroupStrategyOptions)
-		*out = *in
-		if in.Ranges != nil {
-			in, out := &in.Ranges, &out.Ranges
-			*out = make([]IDRange, len(*in))
-			copy(*out, *in)
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_HTTPIngressPath is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_HTTPIngressPath(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*HTTPIngressPath)
-		out := out.(*HTTPIngressPath)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_HTTPIngressRuleValue is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_HTTPIngressRuleValue(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*HTTPIngressRuleValue)
-		out := out.(*HTTPIngressRuleValue)
-		*out = *in
-		if in.Paths != nil {
-			in, out := &in.Paths, &out.Paths
-			*out = make([]HTTPIngressPath, len(*in))
-			copy(*out, *in)
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_HostPortRange is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_HostPortRange(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*HostPortRange)
-		out := out.(*HostPortRange)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_IDRange is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_IDRange(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*IDRange)
-		out := out.(*IDRange)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_Ingress is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_Ingress(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Ingress)
-		out := out.(*Ingress)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *DeploymentStrategy) DeepCopyInto(out *DeploymentStrategy) {
+	*out = *in
+	if in.RollingUpdate != nil {
+		in, out := &in.RollingUpdate, &out.RollingUpdate
+		if *in == nil {
+			*out = nil
 		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+			*out = new(RollingUpdateDeployment)
+			(*in).DeepCopyInto(*out)
 		}
-		if err := DeepCopy_v1beta1_IngressSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_IngressStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new DeploymentStrategy.
+func (x *DeploymentStrategy) DeepCopy() *DeploymentStrategy {
+	if x == nil {
+		return nil
+	}
+	out := new(DeploymentStrategy)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *FSGroupStrategyOptions) DeepCopyInto(out *FSGroupStrategyOptions) {
+	*out = *in
+	if in.Ranges != nil {
+		in, out := &in.Ranges, &out.Ranges
+		*out = make([]IDRange, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new FSGroupStrategyOptions.
+func (x *FSGroupStrategyOptions) DeepCopy() *FSGroupStrategyOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(FSGroupStrategyOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *HTTPIngressPath) DeepCopyInto(out *HTTPIngressPath) {
+	*out = *in
+	out.Backend = in.Backend
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new HTTPIngressPath.
+func (x *HTTPIngressPath) DeepCopy() *HTTPIngressPath {
+	if x == nil {
+		return nil
+	}
+	out := new(HTTPIngressPath)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *HTTPIngressRuleValue) DeepCopyInto(out *HTTPIngressRuleValue) {
+	*out = *in
+	if in.Paths != nil {
+		in, out := &in.Paths, &out.Paths
+		*out = make([]HTTPIngressPath, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new HTTPIngressRuleValue.
+func (x *HTTPIngressRuleValue) DeepCopy() *HTTPIngressRuleValue {
+	if x == nil {
+		return nil
+	}
+	out := new(HTTPIngressRuleValue)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *HostPortRange) DeepCopyInto(out *HostPortRange) {
+	*out = *in
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new HostPortRange.
+func (x *HostPortRange) DeepCopy() *HostPortRange {
+	if x == nil {
+		return nil
+	}
+	out := new(HostPortRange)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *IDRange) DeepCopyInto(out *IDRange) {
+	*out = *in
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new IDRange.
+func (x *IDRange) DeepCopy() *IDRange {
+	if x == nil {
+		return nil
+	}
+	out := new(IDRange)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *Ingress) DeepCopyInto(out *Ingress) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new Ingress.
+func (x *Ingress) DeepCopy() *Ingress {
+	if x == nil {
+		return nil
+	}
+	out := new(Ingress)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *Ingress) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_IngressBackend is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_IngressBackend(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*IngressBackend)
-		out := out.(*IngressBackend)
-		*out = *in
-		return nil
-	}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *IngressBackend) DeepCopyInto(out *IngressBackend) {
+	*out = *in
+	out.ServicePort = in.ServicePort
+	return
 }
 
-// DeepCopy_v1beta1_IngressList is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_IngressList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*IngressList)
-		out := out.(*IngressList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Ingress, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_Ingress(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new IngressBackend.
+func (x *IngressBackend) DeepCopy() *IngressBackend {
+	if x == nil {
+		return nil
+	}
+	out := new(IngressBackend)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *IngressList) DeepCopyInto(out *IngressList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Ingress, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new IngressList.
+func (x *IngressList) DeepCopy() *IngressList {
+	if x == nil {
+		return nil
+	}
+	out := new(IngressList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *IngressList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_IngressRule is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_IngressRule(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*IngressRule)
-		out := out.(*IngressRule)
-		*out = *in
-		if err := DeepCopy_v1beta1_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, c); err != nil {
-			return err
-		}
-		return nil
-	}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *IngressRule) DeepCopyInto(out *IngressRule) {
+	*out = *in
+	in.IngressRuleValue.DeepCopyInto(&out.IngressRuleValue)
+	return
 }
 
-// DeepCopy_v1beta1_IngressRuleValue is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_IngressRuleValue(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*IngressRuleValue)
-		out := out.(*IngressRuleValue)
-		*out = *in
-		if in.HTTP != nil {
-			in, out := &in.HTTP, &out.HTTP
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new IngressRule.
+func (x *IngressRule) DeepCopy() *IngressRule {
+	if x == nil {
+		return nil
+	}
+	out := new(IngressRule)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *IngressRuleValue) DeepCopyInto(out *IngressRuleValue) {
+	*out = *in
+	if in.HTTP != nil {
+		in, out := &in.HTTP, &out.HTTP
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(HTTPIngressRuleValue)
-			if err := DeepCopy_v1beta1_HTTPIngressRuleValue(*in, *out, c); err != nil {
-				return err
-			}
+			(*in).DeepCopyInto(*out)
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_v1beta1_IngressSpec is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_IngressSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*IngressSpec)
-		out := out.(*IngressSpec)
-		*out = *in
-		if in.Backend != nil {
-			in, out := &in.Backend, &out.Backend
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new IngressRuleValue.
+func (x *IngressRuleValue) DeepCopy() *IngressRuleValue {
+	if x == nil {
+		return nil
+	}
+	out := new(IngressRuleValue)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *IngressSpec) DeepCopyInto(out *IngressSpec) {
+	*out = *in
+	if in.Backend != nil {
+		in, out := &in.Backend, &out.Backend
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(IngressBackend)
 			**out = **in
 		}
-		if in.TLS != nil {
-			in, out := &in.TLS, &out.TLS
-			*out = make([]IngressTLS, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_IngressTLS(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+	}
+	if in.TLS != nil {
+		in, out := &in.TLS, &out.TLS
+		*out = make([]IngressTLS, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if in.Rules != nil {
-			in, out := &in.Rules, &out.Rules
-			*out = make([]IngressRule, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_IngressRule(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
+	}
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]IngressRule, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new IngressSpec.
+func (x *IngressSpec) DeepCopy() *IngressSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(IngressSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *IngressStatus) DeepCopyInto(out *IngressStatus) {
+	*out = *in
+	in.LoadBalancer.DeepCopyInto(&out.LoadBalancer)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new IngressStatus.
+func (x *IngressStatus) DeepCopy() *IngressStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(IngressStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *IngressTLS) DeepCopyInto(out *IngressTLS) {
+	*out = *in
+	if in.Hosts != nil {
+		in, out := &in.Hosts, &out.Hosts
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new IngressTLS.
+func (x *IngressTLS) DeepCopy() *IngressTLS {
+	if x == nil {
+		return nil
+	}
+	out := new(IngressTLS)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *NetworkPolicy) DeepCopyInto(out *NetworkPolicy) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new NetworkPolicy.
+func (x *NetworkPolicy) DeepCopy() *NetworkPolicy {
+	if x == nil {
+		return nil
+	}
+	out := new(NetworkPolicy)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *NetworkPolicy) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_IngressStatus is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_IngressStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*IngressStatus)
-		out := out.(*IngressStatus)
-		*out = *in
-		if err := core_v1.DeepCopy_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, c); err != nil {
-			return err
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *NetworkPolicyIngressRule) DeepCopyInto(out *NetworkPolicyIngressRule) {
+	*out = *in
+	if in.Ports != nil {
+		in, out := &in.Ports, &out.Ports
+		*out = make([]NetworkPolicyPort, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.From != nil {
+		in, out := &in.From, &out.From
+		*out = make([]NetworkPolicyPeer, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new NetworkPolicyIngressRule.
+func (x *NetworkPolicyIngressRule) DeepCopy() *NetworkPolicyIngressRule {
+	if x == nil {
+		return nil
+	}
+	out := new(NetworkPolicyIngressRule)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *NetworkPolicyList) DeepCopyInto(out *NetworkPolicyList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]NetworkPolicy, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new NetworkPolicyList.
+func (x *NetworkPolicyList) DeepCopy() *NetworkPolicyList {
+	if x == nil {
+		return nil
+	}
+	out := new(NetworkPolicyList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *NetworkPolicyList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_IngressTLS is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_IngressTLS(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*IngressTLS)
-		out := out.(*IngressTLS)
-		*out = *in
-		if in.Hosts != nil {
-			in, out := &in.Hosts, &out.Hosts
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_NetworkPolicy is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_NetworkPolicy(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NetworkPolicy)
-		out := out.(*NetworkPolicy)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *NetworkPolicyPeer) DeepCopyInto(out *NetworkPolicyPeer) {
+	*out = *in
+	if in.PodSelector != nil {
+		in, out := &in.PodSelector, &out.PodSelector
+		if *in == nil {
+			*out = nil
 		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
 		}
-		if err := DeepCopy_v1beta1_NetworkPolicySpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		return nil
 	}
+	if in.NamespaceSelector != nil {
+		in, out := &in.NamespaceSelector, &out.NamespaceSelector
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
+		}
+	}
+	return
 }
 
-// DeepCopy_v1beta1_NetworkPolicyIngressRule is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_NetworkPolicyIngressRule(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NetworkPolicyIngressRule)
-		out := out.(*NetworkPolicyIngressRule)
-		*out = *in
-		if in.Ports != nil {
-			in, out := &in.Ports, &out.Ports
-			*out = make([]NetworkPolicyPort, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_NetworkPolicyPort(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		if in.From != nil {
-			in, out := &in.From, &out.From
-			*out = make([]NetworkPolicyPeer, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_NetworkPolicyPeer(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new NetworkPolicyPeer.
+func (x *NetworkPolicyPeer) DeepCopy() *NetworkPolicyPeer {
+	if x == nil {
 		return nil
 	}
+	out := new(NetworkPolicyPeer)
+	x.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_v1beta1_NetworkPolicyList is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_NetworkPolicyList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NetworkPolicyList)
-		out := out.(*NetworkPolicyList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]NetworkPolicy, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_NetworkPolicy(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_NetworkPolicyPeer is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_NetworkPolicyPeer(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NetworkPolicyPeer)
-		out := out.(*NetworkPolicyPeer)
-		*out = *in
-		if in.PodSelector != nil {
-			in, out := &in.PodSelector, &out.PodSelector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
-				*out = newVal.(*v1.LabelSelector)
-			}
-		}
-		if in.NamespaceSelector != nil {
-			in, out := &in.NamespaceSelector, &out.NamespaceSelector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
-				*out = newVal.(*v1.LabelSelector)
-			}
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_NetworkPolicyPort is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_NetworkPolicyPort(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NetworkPolicyPort)
-		out := out.(*NetworkPolicyPort)
-		*out = *in
-		if in.Protocol != nil {
-			in, out := &in.Protocol, &out.Protocol
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *NetworkPolicyPort) DeepCopyInto(out *NetworkPolicyPort) {
+	*out = *in
+	if in.Protocol != nil {
+		in, out := &in.Protocol, &out.Protocol
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(core_v1.Protocol)
 			**out = **in
 		}
-		if in.Port != nil {
-			in, out := &in.Port, &out.Port
+	}
+	if in.Port != nil {
+		in, out := &in.Port, &out.Port
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(intstr.IntOrString)
 			**out = **in
 		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new NetworkPolicyPort.
+func (x *NetworkPolicyPort) DeepCopy() *NetworkPolicyPort {
+	if x == nil {
+		return nil
+	}
+	out := new(NetworkPolicyPort)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *NetworkPolicySpec) DeepCopyInto(out *NetworkPolicySpec) {
+	*out = *in
+	in.PodSelector.DeepCopyInto(&out.PodSelector)
+	if in.Ingress != nil {
+		in, out := &in.Ingress, &out.Ingress
+		*out = make([]NetworkPolicyIngressRule, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new NetworkPolicySpec.
+func (x *NetworkPolicySpec) DeepCopy() *NetworkPolicySpec {
+	if x == nil {
+		return nil
+	}
+	out := new(NetworkPolicySpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PodSecurityPolicy) DeepCopyInto(out *PodSecurityPolicy) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new PodSecurityPolicy.
+func (x *PodSecurityPolicy) DeepCopy() *PodSecurityPolicy {
+	if x == nil {
+		return nil
+	}
+	out := new(PodSecurityPolicy)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *PodSecurityPolicy) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_NetworkPolicySpec is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_NetworkPolicySpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NetworkPolicySpec)
-		out := out.(*NetworkPolicySpec)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.PodSelector); err != nil {
-			return err
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PodSecurityPolicyList) DeepCopyInto(out *PodSecurityPolicyList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]PodSecurityPolicy, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new PodSecurityPolicyList.
+func (x *PodSecurityPolicyList) DeepCopy() *PodSecurityPolicyList {
+	if x == nil {
+		return nil
+	}
+	out := new(PodSecurityPolicyList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *PodSecurityPolicyList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
+	*out = *in
+	if in.DefaultAddCapabilities != nil {
+		in, out := &in.DefaultAddCapabilities, &out.DefaultAddCapabilities
+		*out = make([]core_v1.Capability, len(*in))
+		copy(*out, *in)
+	}
+	if in.RequiredDropCapabilities != nil {
+		in, out := &in.RequiredDropCapabilities, &out.RequiredDropCapabilities
+		*out = make([]core_v1.Capability, len(*in))
+		copy(*out, *in)
+	}
+	if in.AllowedCapabilities != nil {
+		in, out := &in.AllowedCapabilities, &out.AllowedCapabilities
+		*out = make([]core_v1.Capability, len(*in))
+		copy(*out, *in)
+	}
+	if in.Volumes != nil {
+		in, out := &in.Volumes, &out.Volumes
+		*out = make([]FSType, len(*in))
+		copy(*out, *in)
+	}
+	if in.HostPorts != nil {
+		in, out := &in.HostPorts, &out.HostPorts
+		*out = make([]HostPortRange, len(*in))
+		copy(*out, *in)
+	}
+	in.SELinux.DeepCopyInto(&out.SELinux)
+	in.RunAsUser.DeepCopyInto(&out.RunAsUser)
+	in.SupplementalGroups.DeepCopyInto(&out.SupplementalGroups)
+	in.FSGroup.DeepCopyInto(&out.FSGroup)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new PodSecurityPolicySpec.
+func (x *PodSecurityPolicySpec) DeepCopy() *PodSecurityPolicySpec {
+	if x == nil {
+		return nil
+	}
+	out := new(PodSecurityPolicySpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ReplicaSet) DeepCopyInto(out *ReplicaSet) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ReplicaSet.
+func (x *ReplicaSet) DeepCopy() *ReplicaSet {
+	if x == nil {
+		return nil
+	}
+	out := new(ReplicaSet)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ReplicaSet) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ReplicaSetCondition) DeepCopyInto(out *ReplicaSetCondition) {
+	*out = *in
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ReplicaSetCondition.
+func (x *ReplicaSetCondition) DeepCopy() *ReplicaSetCondition {
+	if x == nil {
+		return nil
+	}
+	out := new(ReplicaSetCondition)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ReplicaSetList) DeepCopyInto(out *ReplicaSetList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ReplicaSet, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ReplicaSetList.
+func (x *ReplicaSetList) DeepCopy() *ReplicaSetList {
+	if x == nil {
+		return nil
+	}
+	out := new(ReplicaSetList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ReplicaSetList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ReplicaSetSpec) DeepCopyInto(out *ReplicaSetSpec) {
+	*out = *in
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		if *in == nil {
+			*out = nil
 		} else {
-			out.PodSelector = *newVal.(*v1.LabelSelector)
-		}
-		if in.Ingress != nil {
-			in, out := &in.Ingress, &out.Ingress
-			*out = make([]NetworkPolicyIngressRule, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_NetworkPolicyIngressRule(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_PodSecurityPolicy is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_PodSecurityPolicy(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodSecurityPolicy)
-		out := out.(*PodSecurityPolicy)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_v1beta1_PodSecurityPolicySpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_PodSecurityPolicyList is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_PodSecurityPolicyList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodSecurityPolicyList)
-		out := out.(*PodSecurityPolicyList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]PodSecurityPolicy, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_PodSecurityPolicy(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_PodSecurityPolicySpec is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_PodSecurityPolicySpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodSecurityPolicySpec)
-		out := out.(*PodSecurityPolicySpec)
-		*out = *in
-		if in.DefaultAddCapabilities != nil {
-			in, out := &in.DefaultAddCapabilities, &out.DefaultAddCapabilities
-			*out = make([]core_v1.Capability, len(*in))
-			copy(*out, *in)
-		}
-		if in.RequiredDropCapabilities != nil {
-			in, out := &in.RequiredDropCapabilities, &out.RequiredDropCapabilities
-			*out = make([]core_v1.Capability, len(*in))
-			copy(*out, *in)
-		}
-		if in.AllowedCapabilities != nil {
-			in, out := &in.AllowedCapabilities, &out.AllowedCapabilities
-			*out = make([]core_v1.Capability, len(*in))
-			copy(*out, *in)
-		}
-		if in.Volumes != nil {
-			in, out := &in.Volumes, &out.Volumes
-			*out = make([]FSType, len(*in))
-			copy(*out, *in)
-		}
-		if in.HostPorts != nil {
-			in, out := &in.HostPorts, &out.HostPorts
-			*out = make([]HostPortRange, len(*in))
-			copy(*out, *in)
-		}
-		if err := DeepCopy_v1beta1_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_RunAsUserStrategyOptions(&in.RunAsUser, &out.RunAsUser, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_SupplementalGroupsStrategyOptions(&in.SupplementalGroups, &out.SupplementalGroups, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_FSGroupStrategyOptions(&in.FSGroup, &out.FSGroup, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_ReplicaSet is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_ReplicaSet(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ReplicaSet)
-		out := out.(*ReplicaSet)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if err := DeepCopy_v1beta1_ReplicaSetSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1beta1_ReplicaSetStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_ReplicaSetCondition is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_ReplicaSetCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ReplicaSetCondition)
-		out := out.(*ReplicaSetCondition)
-		*out = *in
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_ReplicaSetList is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_ReplicaSetList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ReplicaSetList)
-		out := out.(*ReplicaSetList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]ReplicaSet, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_ReplicaSet(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_ReplicaSetSpec is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_ReplicaSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ReplicaSetSpec)
-		out := out.(*ReplicaSetSpec)
-		*out = *in
-		if in.Replicas != nil {
-			in, out := &in.Replicas, &out.Replicas
 			*out = new(int32)
 			**out = **in
 		}
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			if newVal, err := c.DeepCopy(*in); err != nil {
-				return err
-			} else {
-				*out = newVal.(*v1.LabelSelector)
-			}
+	}
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
 		}
-		if err := core_v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
-			return err
+	}
+	in.Template.DeepCopyInto(&out.Template)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ReplicaSetSpec.
+func (x *ReplicaSetSpec) DeepCopy() *ReplicaSetSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(ReplicaSetSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ReplicaSetStatus) DeepCopyInto(out *ReplicaSetStatus) {
+	*out = *in
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]ReplicaSetCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ReplicaSetStatus.
+func (x *ReplicaSetStatus) DeepCopy() *ReplicaSetStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(ReplicaSetStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ReplicationControllerDummy) DeepCopyInto(out *ReplicationControllerDummy) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ReplicationControllerDummy.
+func (x *ReplicationControllerDummy) DeepCopy() *ReplicationControllerDummy {
+	if x == nil {
+		return nil
+	}
+	out := new(ReplicationControllerDummy)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ReplicationControllerDummy) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_ReplicaSetStatus is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_ReplicaSetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ReplicaSetStatus)
-		out := out.(*ReplicaSetStatus)
-		*out = *in
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]ReplicaSetCondition, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_ReplicaSetCondition(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *RollbackConfig) DeepCopyInto(out *RollbackConfig) {
+	*out = *in
+	return
 }
 
-// DeepCopy_v1beta1_ReplicationControllerDummy is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_ReplicationControllerDummy(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ReplicationControllerDummy)
-		out := out.(*ReplicationControllerDummy)
-		*out = *in
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new RollbackConfig.
+func (x *RollbackConfig) DeepCopy() *RollbackConfig {
+	if x == nil {
 		return nil
 	}
+	out := new(RollbackConfig)
+	x.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_v1beta1_RollbackConfig is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_RollbackConfig(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RollbackConfig)
-		out := out.(*RollbackConfig)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_RollingUpdateDaemonSet is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_RollingUpdateDaemonSet(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RollingUpdateDaemonSet)
-		out := out.(*RollingUpdateDaemonSet)
-		*out = *in
-		if in.MaxUnavailable != nil {
-			in, out := &in.MaxUnavailable, &out.MaxUnavailable
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *RollingUpdateDaemonSet) DeepCopyInto(out *RollingUpdateDaemonSet) {
+	*out = *in
+	if in.MaxUnavailable != nil {
+		in, out := &in.MaxUnavailable, &out.MaxUnavailable
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(intstr.IntOrString)
 			**out = **in
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_v1beta1_RollingUpdateDeployment is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_RollingUpdateDeployment(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RollingUpdateDeployment)
-		out := out.(*RollingUpdateDeployment)
-		*out = *in
-		if in.MaxUnavailable != nil {
-			in, out := &in.MaxUnavailable, &out.MaxUnavailable
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new RollingUpdateDaemonSet.
+func (x *RollingUpdateDaemonSet) DeepCopy() *RollingUpdateDaemonSet {
+	if x == nil {
+		return nil
+	}
+	out := new(RollingUpdateDaemonSet)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *RollingUpdateDeployment) DeepCopyInto(out *RollingUpdateDeployment) {
+	*out = *in
+	if in.MaxUnavailable != nil {
+		in, out := &in.MaxUnavailable, &out.MaxUnavailable
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(intstr.IntOrString)
 			**out = **in
 		}
-		if in.MaxSurge != nil {
-			in, out := &in.MaxSurge, &out.MaxSurge
+	}
+	if in.MaxSurge != nil {
+		in, out := &in.MaxSurge, &out.MaxSurge
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(intstr.IntOrString)
 			**out = **in
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_v1beta1_RunAsUserStrategyOptions is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_RunAsUserStrategyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RunAsUserStrategyOptions)
-		out := out.(*RunAsUserStrategyOptions)
-		*out = *in
-		if in.Ranges != nil {
-			in, out := &in.Ranges, &out.Ranges
-			*out = make([]IDRange, len(*in))
-			copy(*out, *in)
-		}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new RollingUpdateDeployment.
+func (x *RollingUpdateDeployment) DeepCopy() *RollingUpdateDeployment {
+	if x == nil {
 		return nil
 	}
+	out := new(RollingUpdateDeployment)
+	x.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_v1beta1_SELinuxStrategyOptions is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_SELinuxStrategyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SELinuxStrategyOptions)
-		out := out.(*SELinuxStrategyOptions)
-		*out = *in
-		if in.SELinuxOptions != nil {
-			in, out := &in.SELinuxOptions, &out.SELinuxOptions
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *RunAsUserStrategyOptions) DeepCopyInto(out *RunAsUserStrategyOptions) {
+	*out = *in
+	if in.Ranges != nil {
+		in, out := &in.Ranges, &out.Ranges
+		*out = make([]IDRange, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new RunAsUserStrategyOptions.
+func (x *RunAsUserStrategyOptions) DeepCopy() *RunAsUserStrategyOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(RunAsUserStrategyOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *SELinuxStrategyOptions) DeepCopyInto(out *SELinuxStrategyOptions) {
+	*out = *in
+	if in.SELinuxOptions != nil {
+		in, out := &in.SELinuxOptions, &out.SELinuxOptions
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(core_v1.SELinuxOptions)
 			**out = **in
 		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new SELinuxStrategyOptions.
+func (x *SELinuxStrategyOptions) DeepCopy() *SELinuxStrategyOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(SELinuxStrategyOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *Scale) DeepCopyInto(out *Scale) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Spec = in.Spec
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new Scale.
+func (x *Scale) DeepCopy() *Scale {
+	if x == nil {
+		return nil
+	}
+	out := new(Scale)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *Scale) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_Scale is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_Scale(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Scale)
-		out := out.(*Scale)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ScaleSpec) DeepCopyInto(out *ScaleSpec) {
+	*out = *in
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ScaleSpec.
+func (x *ScaleSpec) DeepCopy() *ScaleSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(ScaleSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ScaleStatus) DeepCopyInto(out *ScaleStatus) {
+	*out = *in
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
 		}
-		if err := DeepCopy_v1beta1_ScaleStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ScaleStatus.
+func (x *ScaleStatus) DeepCopy() *ScaleStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(ScaleStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *SupplementalGroupsStrategyOptions) DeepCopyInto(out *SupplementalGroupsStrategyOptions) {
+	*out = *in
+	if in.Ranges != nil {
+		in, out := &in.Ranges, &out.Ranges
+		*out = make([]IDRange, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new SupplementalGroupsStrategyOptions.
+func (x *SupplementalGroupsStrategyOptions) DeepCopy() *SupplementalGroupsStrategyOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(SupplementalGroupsStrategyOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ThirdPartyResource) DeepCopyInto(out *ThirdPartyResource) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Versions != nil {
+		in, out := &in.Versions, &out.Versions
+		*out = make([]APIVersion, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ThirdPartyResource.
+func (x *ThirdPartyResource) DeepCopy() *ThirdPartyResource {
+	if x == nil {
+		return nil
+	}
+	out := new(ThirdPartyResource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ThirdPartyResource) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_ScaleSpec is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_ScaleSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ScaleSpec)
-		out := out.(*ScaleSpec)
-		*out = *in
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ThirdPartyResourceData) DeepCopyInto(out *ThirdPartyResourceData) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Data != nil {
+		in, out := &in.Data, &out.Data
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ThirdPartyResourceData.
+func (x *ThirdPartyResourceData) DeepCopy() *ThirdPartyResourceData {
+	if x == nil {
+		return nil
+	}
+	out := new(ThirdPartyResourceData)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ThirdPartyResourceData) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_ScaleStatus is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_ScaleStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ScaleStatus)
-		out := out.(*ScaleStatus)
-		*out = *in
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ThirdPartyResourceDataList) DeepCopyInto(out *ThirdPartyResourceDataList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ThirdPartyResourceData, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ThirdPartyResourceDataList.
+func (x *ThirdPartyResourceDataList) DeepCopy() *ThirdPartyResourceDataList {
+	if x == nil {
+		return nil
+	}
+	out := new(ThirdPartyResourceDataList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ThirdPartyResourceDataList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_v1beta1_SupplementalGroupsStrategyOptions is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_SupplementalGroupsStrategyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SupplementalGroupsStrategyOptions)
-		out := out.(*SupplementalGroupsStrategyOptions)
-		*out = *in
-		if in.Ranges != nil {
-			in, out := &in.Ranges, &out.Ranges
-			*out = make([]IDRange, len(*in))
-			copy(*out, *in)
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ThirdPartyResourceList) DeepCopyInto(out *ThirdPartyResourceList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ThirdPartyResource, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_v1beta1_ThirdPartyResource is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_ThirdPartyResource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ThirdPartyResource)
-		out := out.(*ThirdPartyResource)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if in.Versions != nil {
-			in, out := &in.Versions, &out.Versions
-			*out = make([]APIVersion, len(*in))
-			copy(*out, *in)
-		}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ThirdPartyResourceList.
+func (x *ThirdPartyResourceList) DeepCopy() *ThirdPartyResourceList {
+	if x == nil {
 		return nil
 	}
+	out := new(ThirdPartyResourceList)
+	x.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_v1beta1_ThirdPartyResourceData is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_ThirdPartyResourceData(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ThirdPartyResourceData)
-		out := out.(*ThirdPartyResourceData)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
-			return err
-		} else {
-			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
-		}
-		if in.Data != nil {
-			in, out := &in.Data, &out.Data
-			*out = make([]byte, len(*in))
-			copy(*out, *in)
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_ThirdPartyResourceDataList is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_ThirdPartyResourceDataList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ThirdPartyResourceDataList)
-		out := out.(*ThirdPartyResourceDataList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]ThirdPartyResourceData, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_ThirdPartyResourceData(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-}
-
-// DeepCopy_v1beta1_ThirdPartyResourceList is an autogenerated deepcopy function.
-func DeepCopy_v1beta1_ThirdPartyResourceList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ThirdPartyResourceList)
-		out := out.(*ThirdPartyResourceList)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]ThirdPartyResource, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_ThirdPartyResource(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ThirdPartyResourceList) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }

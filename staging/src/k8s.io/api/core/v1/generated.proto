@@ -1958,6 +1958,7 @@ message ObjectMeta {
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 message ObjectReference {
   // Kind of the referent.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
