@@ -83,17 +83,19 @@ type GCECloud struct {
 	// for the cloudprovider to start watching the configmap.
 	ClusterID ClusterID
 
-	service                  *compute.Service
-	serviceBeta              *computebeta.Service
-	containerService         *container.Service
-	cloudkmsService          *cloudkms.Service
-	clientBuilder            controller.ControllerClientBuilder
-	projectID                string
-	region                   string
-	localZone                string   // The zone in which we are running
-	managedZones             []string // List of zones we are spanning (for multi-AZ clusters, primarily when running on master)
-	networkURL               string
-	subnetworkURL            string
+	service          *compute.Service
+	serviceBeta      *computebeta.Service
+	containerService *container.Service
+	cloudkmsService  *cloudkms.Service
+	clientBuilder    controller.ControllerClientBuilder
+	projectID        string
+	region           string
+	localZone        string   // The zone in which we are running
+	managedZones     []string // List of zones we are spanning (for multi-AZ clusters, primarily when running on master)
+	networkURL       string
+	subnetworkURL    string
+	// Project which contains the cluster's network.
+	// Used for specific network resources: firewalls, routes, and listing of zones in a region.
 	networkProjectID         string
 	onXPN                    bool
 	nodeTags                 []string    // List of tags to use on firewall rules for load balancers
@@ -131,9 +133,12 @@ type GCEServiceManager struct {
 
 type Config struct {
 	Global struct {
-		TokenURL           string   `gcfg:"token-url"`
-		TokenBody          string   `gcfg:"token-body"`
+		TokenURL  string `gcfg:"token-url"`
+		TokenBody string `gcfg:"token-body"`
+		// ProjectID and NetworkProjectID can either be the numeric or string-based unique identifier that starts with [a-z]
+		// However, both IDs need to be the same type for controllers to recognize this cluster as an XPN cluster.
 		ProjectID          string   `gcfg:"project-id"`
+		NetworkProjectID   string   `gcfg:"network-project-id"` // Project which contains the cluster's network. See networkProjectID in GCECloud
 		NetworkName        string   `gcfg:"network-name"`
 		SubnetworkName     string   `gcfg:"subnetwork-name"`
 		NodeTags           []string `gcfg:"node-tags"`
@@ -161,29 +166,32 @@ func (g *GCECloud) GetKMSService() *cloudkms.Service {
 	return g.cloudkmsService
 }
 
-// Returns the ProjectID corresponding to the project this cloud is in.
-func (g *GCECloud) GetProjectID() string {
-	return g.projectID
-}
-
 // newGCECloud creates a new instance of GCECloud.
 func newGCECloud(config io.Reader) (*GCECloud, error) {
 	apiEndpoint := ""
-	projectID, zone, err := getProjectAndZone()
+
+	// projectNumber is the numeric identifier. Note: there is also a unique string-based project identifier as well (see https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects)
+	projectNumber, zone, err := getProjectAndZone()
 	if err != nil {
 		return nil, err
 	}
+	// Default projectID to known project number
+	projectID := projectNumber
 
 	region, err := GetGCERegion(zone)
 	if err != nil {
 		return nil, err
 	}
 
-	networkName, err := getNetworkNameViaMetadata()
+	// networkProjectNumber is a numeric identifier similar to the projectNumber above.
+	networkProjectNumber, networkName, err := getNetworkProjectAndNameViaMetadata()
 	if err != nil {
 		return nil, err
 	}
-	networkURL := gceNetworkURL(apiEndpoint, projectID, networkName)
+	// Default networkProjectID to known network project number
+	networkProjectID := networkProjectNumber
+
+	networkURL := gceNetworkURL(apiEndpoint, networkProjectNumber, networkName)
 	subnetworkURL := ""
 
 	// By default, Kubernetes clusters only run against one zone
@@ -205,18 +213,31 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 		if cfg.Global.ProjectID != "" {
 			projectID = cfg.Global.ProjectID
 		}
-
-		if cfg.Global.NetworkName != "" && strings.Contains(cfg.Global.NetworkName, "/") {
-			networkURL = cfg.Global.NetworkName
-		} else {
-			networkURL = gceNetworkURL(apiEndpoint, projectID, networkName)
+		if cfg.Global.NetworkProjectID != "" {
+			networkProjectID = cfg.Global.NetworkProjectID
 		}
 
-		if cfg.Global.SubnetworkName != "" && strings.Contains(cfg.Global.SubnetworkName, "/") {
-			subnetworkURL = cfg.Global.SubnetworkName
-		} else {
-			subnetworkURL = gceSubnetworkURL(apiEndpoint, cfg.Global.ProjectID, region, cfg.Global.SubnetworkName)
+		if cfg.Global.NetworkName != "" {
+			if strings.Contains(cfg.Global.NetworkName, "/") {
+				otherNetworkProjectID, _ := getProjectIDInURL(cfg.Global.NetworkName)
+				if networkProjectID != otherNetworkProjectID {
+					glog.Warningf("Different network projects (may be id vs number). %q and %q", networkProjectID, otherNetworkProjectID)
+				}
+
+				networkURL = cfg.Global.NetworkName
+			} else {
+				networkURL = gceNetworkURL(apiEndpoint, networkProjectID, cfg.Global.NetworkName)
+			}
 		}
+
+		if cfg.Global.SubnetworkName != "" {
+			if strings.Contains(cfg.Global.SubnetworkName, "/") {
+				subnetworkURL = cfg.Global.SubnetworkName
+			} else {
+				subnetworkURL = gceSubnetworkURL(apiEndpoint, networkProjectID, region, cfg.Global.SubnetworkName)
+			}
+		}
+
 		if cfg.Global.TokenURL != "" {
 			tokenSource = NewAltTokenSource(cfg.Global.TokenURL, cfg.Global.TokenBody)
 		}
@@ -227,7 +248,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 		}
 	}
 
-	return CreateGCECloud(apiEndpoint, projectID, region, zone, managedZones, networkURL, subnetworkURL,
+	return CreateGCECloud(apiEndpoint, projectID, networkProjectID, region, zone, managedZones, networkURL, subnetworkURL,
 		nodeTags, nodeInstancePrefix, tokenSource, true /* useMetadataServer */)
 }
 
@@ -235,8 +256,12 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 // If no networkUrl is specified, loads networkName via rest call.
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
-func CreateGCECloud(apiEndpoint, projectID, region, zone string, managedZones []string, networkURL, subnetworkURL string, nodeTags []string,
+func CreateGCECloud(apiEndpoint, projectID, networkProjectID, region, zone string, managedZones []string, networkURL, subnetworkURL string, nodeTags []string,
 	nodeInstancePrefix string, tokenSource oauth2.TokenSource, useMetadataServer bool) (*GCECloud, error) {
+
+	// Determine if cluster is on shared VPC network
+	// Must assert that the IDs are the same type (ID or number) before checking inequality
+	onXPN := isProjectNumber(projectID) == isProjectNumber(networkProjectID) && projectID != networkProjectID
 
 	client, err := newOauthClient(tokenSource)
 	if err != nil {
@@ -267,20 +292,6 @@ func CreateGCECloud(apiEndpoint, projectID, region, zone string, managedZones []
 	if err != nil {
 		return nil, err
 	}
-
-	if networkURL == "" {
-		networkName, err := getNetworkNameViaAPICall(service, projectID)
-		if err != nil {
-			return nil, err
-		}
-		networkURL = gceNetworkURL(apiEndpoint, projectID, networkName)
-	}
-
-	networkProjectID, err := getProjectIDInURL(networkURL)
-	if err != nil {
-		return nil, err
-	}
-	onXPN := networkProjectID != projectID
 
 	if len(managedZones) == 0 {
 		managedZones, err = getZonesForRegion(service, projectID, region)
@@ -358,7 +369,17 @@ func (gce *GCECloud) Region() string {
 	return gce.region
 }
 
-// OnXPN returns true if the cluster is running on a cross project network (XPN)
+// ProjectID returns the project ID which owns the instances
+func (gce *GCECloud) ProjectID() string {
+	return gce.projectID
+}
+
+// NetworkProjectID returns the project ID which owns the network
+func (gce *GCECloud) NetworkProjectID() string {
+	return gce.networkProjectID
+}
+
+// OnXPN returns true if the cluster is running on a shared VPC network
 func (gce *GCECloud) OnXPN() bool {
 	return gce.onXPN
 }
@@ -390,18 +411,28 @@ func (gce *GCECloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []
 // GCECloud implements cloudprovider.Interface.
 var _ cloudprovider.Interface = (*GCECloud)(nil)
 
-func gceNetworkURL(api_endpoint, project, network string) string {
-	if api_endpoint == "" {
-		api_endpoint = "https://www.googleapis.com/compute/v1/"
+func gceNetworkURL(apiEndpoint, project, network string) string {
+	if apiEndpoint == "" {
+		apiEndpoint = "https://www.googleapis.com/compute/v1/"
 	}
-	return fmt.Sprintf("%sprojects/%s/global/networks/%s", api_endpoint, project, network)
+	return fmt.Sprintf("%vprojects/%s/global/networks/%s", apiEndpoint, project, network)
 }
 
-func gceSubnetworkURL(api_endpoint, project, region, subnetwork string) string {
-	if api_endpoint == "" {
-		api_endpoint = "https://www.googleapis.com/compute/v1/"
+func gceSubnetworkURL(apiEndpoint, project, region, subnetwork string) string {
+	if apiEndpoint == "" {
+		apiEndpoint = "https://www.googleapis.com/compute/v1/"
 	}
-	return fmt.Sprintf("%sprojects/%s/regions/%s/subnetworks/%s", api_endpoint, project, region, subnetwork)
+	return fmt.Sprintf("%vprojects/%s/regions/%s/subnetworks/%s", apiEndpoint, project, region, subnetwork)
+}
+
+// Project IDs cannot have a digit for the first characeter. If the id contains a digit,
+// then it must be a project number.
+func isProjectNumber(idOrNumber string) bool {
+	if len(idOrNumber) == 0 {
+		return false
+	}
+
+	return idOrNumber[0] >= '0' && idOrNumber[0] <= '9'
 }
 
 // getProjectIDInURL parses typical full resource URLS and shorter URLS
@@ -418,30 +449,16 @@ func getProjectIDInURL(urlStr string) (string, error) {
 	return "", fmt.Errorf("could not find project field in url: %v", urlStr)
 }
 
-func getNetworkNameViaMetadata() (string, error) {
+func getNetworkProjectAndNameViaMetadata() (string, string, error) {
 	result, err := metadata.Get("instance/network-interfaces/0/network")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	parts := strings.Split(result, "/")
 	if len(parts) != 4 {
-		return "", fmt.Errorf("unexpected response: %s", result)
+		return "", "", fmt.Errorf("unexpected response: %s", result)
 	}
-	return parts[3], nil
-}
-
-func getNetworkNameViaAPICall(svc *compute.Service, projectID string) (string, error) {
-	// TODO: use PageToken to list all not just the first 500
-	networkList, err := svc.Networks.List(projectID).Do()
-	if err != nil {
-		return "", err
-	}
-
-	if networkList == nil || len(networkList.Items) <= 0 {
-		return "", fmt.Errorf("GCE Network List call returned no networks for project %q", projectID)
-	}
-
-	return networkList.Items[0].Name, nil
+	return parts[1], parts[3], nil
 }
 
 func getZonesForRegion(svc *compute.Service, projectID, region string) ([]string, error) {

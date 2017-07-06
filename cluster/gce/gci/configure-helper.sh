@@ -390,6 +390,7 @@ EOF
 token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
+network-project-id = ${NETWORK_PROJECT_ID}
 network-name = ${NODE_NETWORK}
 EOF
     if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
@@ -946,7 +947,7 @@ function start-kubelet {
   fi
   if [[ -n "${NODE_TAINTS:-}" ]]; then
     flags+=" --register-with-taints=${NODE_TAINTS}"
-  fi  
+  fi
   if [[ -n "${EVICTION_HARD:-}" ]]; then
     flags+=" --eviction-hard=${EVICTION_HARD}"
   fi

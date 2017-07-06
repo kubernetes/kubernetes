@@ -230,6 +230,7 @@ EOF
 token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
+network-project-id = ${NETWORK_PROJECT_ID}
 network-name = ${NODE_NETWORK}
 EOF
     if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
@@ -1269,7 +1270,7 @@ function start-kube-addons {
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
 
-    # Configure Calico based on cluster size and image type. 
+    # Configure Calico based on cluster size and image type.
     local -r ds_file="${dst_dir}/calico-policy-controller/calico-node-daemonset.yaml"
     local -r typha_dep_file="${dst_dir}/calico-policy-controller/typha-deployment.yaml"
     sed -i -e "s@__CALICO_CNI_DIR__@/opt/cni/bin@g" "${ds_file}"
@@ -1277,7 +1278,7 @@ function start-kube-addons {
     sed -i -e "s@__CALICO_TYPHA_CPU__@$(get-calico-typha-cpu)@g" "${typha_dep_file}"
     sed -i -e "s@__CALICO_TYPHA_REPLICAS__@$(get-calico-typha-replicas)@g" "${typha_dep_file}"
   else
-    # If not configured to use Calico, the set the typha replica count to 0, but only if the 
+    # If not configured to use Calico, the set the typha replica count to 0, but only if the
     # addon is present.
     local -r typha_dep_file="${dst_dir}/calico-policy-controller/typha-deployment.yaml"
     if [[ -e $typha_dep_file ]]; then
