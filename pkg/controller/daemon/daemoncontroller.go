@@ -1022,30 +1022,6 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	return dsc.updateDaemonSetStatus(ds, hash)
 }
 
-// hasIntentionalPredicatesReasons checks if any of the given predicate failure reasons
-// is intentional.
-func hasIntentionalPredicatesReasons(reasons []algorithm.PredicateFailureReason) bool {
-	for _, r := range reasons {
-		switch reason := r.(type) {
-		case *predicates.PredicateFailureError:
-			switch reason {
-			// intentional
-			case
-				predicates.ErrNodeSelectorNotMatch,
-				predicates.ErrPodNotMatchHostName,
-				predicates.ErrNodeLabelPresenceViolated,
-				// this one is probably intentional since it's a workaround for not having
-				// pod hard anti affinity.
-				predicates.ErrPodNotFitsHostPorts,
-				// DaemonSet is expected to respect taints and tolerations
-				predicates.ErrTaintsTolerationsNotMatch:
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // nodeShouldRunDaemonPod checks a set of preconditions against a (node,daemonset) and returns a
 // summary. Returned booleans are:
 // * wantToRun:
@@ -1064,7 +1040,14 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 
 	// Because these bools require an && of all their required conditions, we start
 	// with all bools set to true and set a bool to false if a condition is not met.
-	// A bool should probably not be set to true after this line.
+	// A bool should probably not be set to true after this line. We can
+	// return early if we are:
+	//
+	// 1. return false, false, false, err
+	// 2. return false, false, false, nil
+	//
+	// Otherwise if a condition is not met, we should set one of these
+	// bools to false.
 	wantToRun, shouldSchedule, shouldContinueRunning = true, true, true
 	// If the daemon set specifies a node name, check that it matches with node.Name.
 	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
@@ -1135,22 +1118,37 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		return false, false, false, err
 	}
 
-	// Return directly if there is any intentional predicate failure reason, so that daemonset controller skips
-	// checking other predicate failures, such as InsufficientResourceError and unintentional errors.
-	if hasIntentionalPredicatesReasons(reasons) {
-		return false, false, false, nil
-	}
+	var insufficientResourceErr error
 
 	for _, r := range reasons {
 		glog.V(4).Infof("DaemonSet Predicates failed on node %s for ds '%s/%s' for reason: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
 		switch reason := r.(type) {
 		case *predicates.InsufficientResourceError:
-			dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.Error())
-			shouldSchedule = false
+			insufficientResourceErr = reason
 		case *predicates.PredicateFailureError:
 			var emitEvent bool
+			// we try to partition predicates into two partitions here: intentional on the part of the operator and not.
 			switch reason {
-			// unintentional predicates reasons need to be fired out to event.
+			// intentional
+			case
+				predicates.ErrNodeSelectorNotMatch,
+				predicates.ErrPodNotMatchHostName,
+				predicates.ErrNodeLabelPresenceViolated,
+				// this one is probably intentional since it's a workaround for not having
+				// pod hard anti affinity.
+				predicates.ErrPodNotFitsHostPorts:
+				return false, false, false, nil
+			case predicates.ErrTaintsTolerationsNotMatch:
+				// DaemonSet is expected to respect taints and tolerations
+				fitsNoExecute, _, err := predicates.PodToleratesNodeNoExecuteTaints(newPod, nil, nodeInfo)
+				if err != nil {
+					return false, false, false, err
+				}
+				if !fitsNoExecute {
+					return false, false, false, nil
+				}
+				wantToRun, shouldSchedule = false, false
+			// unintentional
 			case
 				predicates.ErrDiskConflict,
 				predicates.ErrVolumeZoneConflict,
@@ -1177,6 +1175,12 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.GetReason())
 			}
 		}
+	}
+	// only emit this event if insufficient resource is the only thing
+	// preventing the daemon pod from scheduling
+	if shouldSchedule && insufficientResourceErr != nil {
+		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, insufficientResourceErr.Error())
+		shouldSchedule = false
 	}
 	return
 }
