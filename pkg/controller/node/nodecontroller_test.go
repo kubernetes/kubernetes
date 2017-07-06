@@ -36,13 +36,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/node/testutil"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
+	taintutils "k8s.io/kubernetes/pkg/util/taints"
 )
 
 const (
@@ -1326,7 +1326,6 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				break
 			}
 		}
-
 		if item.expectedEvictPods != podEvicted {
 			t.Errorf("%v: expected pod eviction: %+v, got %+v", item.description, item.expectedEvictPods, podEvicted)
 		}
@@ -2019,7 +2018,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 		return
 	}
 
-	if originalTaint != nil && !v1helper.TaintExists(node0.Spec.Taints, originalTaint) {
+	if originalTaint != nil && !taintutils.TaintExists(node0.Spec.Taints, originalTaint) {
 		t.Errorf("Can't find taint %v in %v", originalTaint, node0.Spec.Taints)
 	}
 
@@ -2052,7 +2051,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 		return
 	}
 	if updatedTaint != nil {
-		if !v1helper.TaintExists(node0.Spec.Taints, updatedTaint) {
+		if !taintutils.TaintExists(node0.Spec.Taints, updatedTaint) {
 			t.Errorf("Can't find taint %v in %v", updatedTaint, node0.Spec.Taints)
 		}
 	}

@@ -28,23 +28,14 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/util/i18n"
-	utiltaints "k8s.io/kubernetes/pkg/util/taints"
-)
-
-const (
-	MODIFIED  = "modified"
-	TAINTED   = "tainted"
-	UNTAINTED = "untainted"
+	taintutils "k8s.io/kubernetes/pkg/util/taints"
 )
 
 // TaintOptions have the data required to perform the taint operation
@@ -121,95 +112,6 @@ func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// reorganizeTaints returns the updated set of taints, taking into account old taints that were not updated,
-// old taints that were updated, old taints that were deleted, and new taints.
-func reorganizeTaints(node *v1.Node, overwrite bool, taintsToAdd []v1.Taint, taintsToRemove []v1.Taint) (string, []v1.Taint, error) {
-	newTaints := append([]v1.Taint{}, taintsToAdd...)
-	oldTaints := node.Spec.Taints
-	// add taints that already existing but not updated to newTaints
-	added := addTaints(oldTaints, &newTaints)
-	allErrs, deleted := deleteTaints(taintsToRemove, &newTaints)
-	if (added && deleted) || overwrite {
-		return MODIFIED, newTaints, utilerrors.NewAggregate(allErrs)
-	} else if added {
-		return TAINTED, newTaints, utilerrors.NewAggregate(allErrs)
-	}
-	return UNTAINTED, newTaints, utilerrors.NewAggregate(allErrs)
-}
-
-// deleteTaints deletes the given taints from the node's taintlist.
-func deleteTaints(taintsToRemove []v1.Taint, newTaints *[]v1.Taint) ([]error, bool) {
-	allErrs := []error{}
-	var removed bool
-	for _, taintToRemove := range taintsToRemove {
-		removed = false
-		if len(taintToRemove.Effect) > 0 {
-			*newTaints, removed = v1helper.DeleteTaint(*newTaints, &taintToRemove)
-		} else {
-			*newTaints, removed = v1helper.DeleteTaintsByKey(*newTaints, taintToRemove.Key)
-		}
-		if !removed {
-			allErrs = append(allErrs, fmt.Errorf("taint %q not found", taintToRemove.ToString()))
-		}
-	}
-	return allErrs, removed
-}
-
-// addTaints adds the newTaints list to existing ones and updates the newTaints List.
-// TODO: This needs a rewrite to take only the new values instead of appended newTaints list to be consistent.
-func addTaints(oldTaints []v1.Taint, newTaints *[]v1.Taint) bool {
-	for _, oldTaint := range oldTaints {
-		existsInNew := false
-		for _, taint := range *newTaints {
-			if taint.MatchTaint(&oldTaint) {
-				existsInNew = true
-				break
-			}
-		}
-		if !existsInNew {
-			*newTaints = append(*newTaints, oldTaint)
-		}
-	}
-	return len(oldTaints) != len(*newTaints)
-}
-
-func parseTaints(spec []string) ([]v1.Taint, []v1.Taint, error) {
-	var taints, taintsToRemove []v1.Taint
-	uniqueTaints := map[v1.TaintEffect]sets.String{}
-
-	for _, taintSpec := range spec {
-		if strings.Contains(taintSpec, "=") && strings.Contains(taintSpec, ":") {
-			newTaint, err := utiltaints.ParseTaint(taintSpec)
-			if err != nil {
-				return nil, nil, err
-			}
-			// validate if taint is unique by <key, effect>
-			if len(uniqueTaints[newTaint.Effect]) > 0 && uniqueTaints[newTaint.Effect].Has(newTaint.Key) {
-				return nil, nil, fmt.Errorf("duplicated taints with the same key and effect: %v", newTaint)
-			}
-			// add taint to existingTaints for uniqueness check
-			if len(uniqueTaints[newTaint.Effect]) == 0 {
-				uniqueTaints[newTaint.Effect] = sets.String{}
-			}
-			uniqueTaints[newTaint.Effect].Insert(newTaint.Key)
-
-			taints = append(taints, newTaint)
-		} else if strings.HasSuffix(taintSpec, "-") {
-			taintKey := taintSpec[:len(taintSpec)-1]
-			var effect v1.TaintEffect
-			if strings.Contains(taintKey, ":") {
-				parts := strings.Split(taintKey, ":")
-				taintKey = parts[0]
-				effect = v1.TaintEffect(parts[1])
-			}
-			taintsToRemove = append(taintsToRemove, v1.Taint{Key: taintKey, Effect: effect})
-		} else {
-			return nil, nil, fmt.Errorf("unknown taint spec: %v", taintSpec)
-		}
-	}
-	return taints, taintsToRemove, nil
-}
-
 // Complete adapts from the command line args and factory to the data required.
 func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
 	namespace, _, err := f.DefaultNamespace()
@@ -243,7 +145,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 		return fmt.Errorf("at least one taint update is required")
 	}
 
-	if o.taintsToAdd, o.taintsToRemove, err = parseTaints(taintArgs); err != nil {
+	if o.taintsToAdd, o.taintsToRemove, err = taintutils.ParseTaints(taintArgs); err != nil {
 		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 	o.builder = f.NewBuilder(true).
@@ -380,21 +282,6 @@ func (o TaintOptions) RunTaint() error {
 	})
 }
 
-// validateNoTaintOverwrites validates that when overwrite is false, to-be-updated taints don't exist in the node taint list (yet)
-func validateNoTaintOverwrites(node *v1.Node, taints []v1.Taint) error {
-	allErrs := []error{}
-	oldTaints := node.Spec.Taints
-	for _, taint := range taints {
-		for _, oldTaint := range oldTaints {
-			if taint.Key == oldTaint.Key && taint.Effect == oldTaint.Effect {
-				allErrs = append(allErrs, fmt.Errorf("Node '%s' already has a taint with key (%s) and effect (%v), and --overwrite is false", node.Name, taint.Key, taint.Effect))
-				break
-			}
-		}
-	}
-	return utilerrors.NewAggregate(allErrs)
-}
-
 // updateTaints applies a taint option(o) to a node in cluster after computing the net effect of operation(i.e. does it result in an overwrite?), it reports back the end result in a way that user can easily interpret.
 func (o TaintOptions) updateTaints(obj runtime.Object) (string, error) {
 	node, ok := obj.(*v1.Node)
@@ -402,11 +289,11 @@ func (o TaintOptions) updateTaints(obj runtime.Object) (string, error) {
 		return "", fmt.Errorf("unexpected type %T, expected Node", obj)
 	}
 	if !o.overwrite {
-		if err := validateNoTaintOverwrites(node, o.taintsToAdd); err != nil {
-			return "", err
+		if exists := taintutils.CheckIfTaintsAlreadyExists(node.Spec.Taints, o.taintsToAdd); len(exists) != 0 {
+			return "", fmt.Errorf("Node %s already has %v taint(s) with same effect(s) and --overwrite is false", node.Name, exists)
 		}
 	}
-	operation, newTaints, err := reorganizeTaints(node, o.overwrite, o.taintsToAdd, o.taintsToRemove)
+	operation, newTaints, err := taintutils.ReorganizeTaints(node, o.overwrite, o.taintsToAdd, o.taintsToRemove)
 	if err != nil {
 		return "", err
 	}
