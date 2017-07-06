@@ -409,7 +409,7 @@ func (s *ServiceController) reconcileService(key string) reconciliationStatus {
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		runtime.HandleError(fmt.Errorf("Invalid key %q recieved, unable to split key to namespace and name, err: %v", key, err))
+		runtime.HandleError(fmt.Errorf("Invalid key %q received, unable to split key to namespace and name, err: %v", key, err))
 		return statusNonRecoverableError
 	}
 
@@ -432,7 +432,7 @@ func (s *ServiceController) reconcileService(key string) reconciliationStatus {
 	}
 	fedService, ok := fedServiceObj.(*v1.Service)
 	if err != nil || !ok {
-		runtime.HandleError(fmt.Errorf("Unknown obj recieved from store: %#v, %v", fedServiceObj, err))
+		runtime.HandleError(fmt.Errorf("Unknown obj received from store: %#v, %v", fedServiceObj, err))
 		return statusNonRecoverableError
 	}
 
