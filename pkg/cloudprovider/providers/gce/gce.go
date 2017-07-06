@@ -25,9 +25,9 @@ import (
 	"sync"
 	"time"
 
-	"cloud.google.com/go/compute/metadata"
+	gcfg "gopkg.in/gcfg.v1"
 
-	"gopkg.in/gcfg.v1"
+	"cloud.google.com/go/compute/metadata"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -38,6 +38,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	cloudkms "google.golang.org/api/cloudkms/v1"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
@@ -85,6 +86,7 @@ type GCECloud struct {
 	service                  *compute.Service
 	serviceBeta              *computebeta.Service
 	containerService         *container.Service
+	cloudkmsService          *cloudkms.Service
 	clientBuilder            controller.ControllerClientBuilder
 	projectID                string
 	region                   string
@@ -152,6 +154,16 @@ func init() {
 // Raw access to the underlying GCE service, probably should only be used for e2e tests
 func (g *GCECloud) GetComputeService() *compute.Service {
 	return g.service
+}
+
+// Raw access to the cloudkmsService of GCE cloud. Required for encryption of etcd using Google KMS.
+func (g *GCECloud) GetKMSService() *cloudkms.Service {
+	return g.cloudkmsService
+}
+
+// Returns the ProjectID corresponding to the project this cloud is in.
+func (g *GCECloud) GetProjectID() string {
+	return g.projectID
 }
 
 // newGCECloud creates a new instance of GCECloud.
@@ -251,6 +263,11 @@ func CreateGCECloud(apiEndpoint, projectID, region, zone string, managedZones []
 		return nil, err
 	}
 
+	cloudkmsService, err := cloudkms.New(client)
+	if err != nil {
+		return nil, err
+	}
+
 	if networkURL == "" {
 		networkName, err := getNetworkNameViaAPICall(service, projectID)
 		if err != nil {
@@ -281,6 +298,7 @@ func CreateGCECloud(apiEndpoint, projectID, region, zone string, managedZones []
 		service:                  service,
 		serviceBeta:              serviceBeta,
 		containerService:         containerService,
+		cloudkmsService:          cloudkmsService,
 		projectID:                projectID,
 		networkProjectID:         networkProjectID,
 		onXPN:                    onXPN,
