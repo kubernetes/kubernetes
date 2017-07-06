@@ -15,9 +15,9 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/apis/example
+// +k8s:conversion-gen=k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/testapigroup
 // +k8s:openapi-gen=false
 // +k8s:defaulter-gen=TypeMeta
 
-// +groupName=example.apiserver.k8s.io
-package v1 // import "k8s.io/apiserver/pkg/apis/example/v1"
+// +groupName=testapigroup.apimachinery.k8s.io
+package v1 // import "k8s.io/apimachinery/pkg/apis/testapigroup/v1"

@@ -19,7 +19,7 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.apiserver.pkg.apis.example.v1;
+package k8s.io.apimachinery.pkg.apis.testapigroup.v1;
 
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
@@ -36,12 +36,12 @@ message Carp {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Specification of the desired behavior of the pod.
+  // Specification of the desired behavior of the carp.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional CarpSpec spec = 2;
 
-  // Most recently observed status of the pod.
+  // Most recently observed status of the carp.
   // This data may not be up to date.
   // Populated by the system.
   // Read-only.
@@ -53,12 +53,12 @@ message Carp {
 message CarpCondition {
   // Type is the type of the condition.
   // Currently only Ready.
-  // More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
+  // More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions
   optional string type = 1;
 
   // Status is the status of the condition.
   // Can be True, False, Unknown.
-  // More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
+  // More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions
   optional string status = 2;
 
   // Last time we probed the condition.
@@ -85,43 +85,43 @@ message CarpList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // List of pods.
-  // More info: http://kubernetes.io/docs/user-guide/pods
+  // List of carps.
+  // More info: http://kubernetes.io/docs/user-guide/carps
   repeated Carp items = 2;
 }
 
-// CarpSpec is a description of a pod
+// CarpSpec is a description of a carp
 message CarpSpec {
-  // Restart policy for all containers within the pod.
+  // Restart policy for all containers within the carp.
   // One of Always, OnFailure, Never.
   // Default to Always.
-  // More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy
+  // More info: http://kubernetes.io/docs/user-guide/carp-states#restartpolicy
   // +optional
   optional string restartPolicy = 3;
 
-  // Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
+  // Optional duration in seconds the carp needs to terminate gracefully. May be decreased in delete request.
   // Value must be non-negative integer. The value zero indicates delete immediately.
   // If this value is nil, the default grace period will be used instead.
-  // The grace period is the duration in seconds after the processes running in the pod are sent
+  // The grace period is the duration in seconds after the processes running in the carp are sent
   // a termination signal and the time when the processes are forcibly halted with a kill signal.
   // Set this value longer than the expected cleanup time for your process.
   // Defaults to 30 seconds.
   // +optional
   optional int64 terminationGracePeriodSeconds = 4;
 
-  // Optional duration in seconds the pod may be active on the node relative to
+  // Optional duration in seconds the carp may be active on the node relative to
   // StartTime before the system will actively try to mark it failed and kill associated containers.
   // Value must be a positive integer.
   // +optional
   optional int64 activeDeadlineSeconds = 5;
 
-  // NodeSelector is a selector which must be true for the pod to fit on a node.
-  // Selector which must match a node's labels for the pod to be scheduled on that node.
+  // NodeSelector is a selector which must be true for the carp to fit on a node.
+  // Selector which must match a node's labels for the carp to be scheduled on that node.
   // More info: http://kubernetes.io/docs/user-guide/node-selection/README
   // +optional
   map<string, string> nodeSelector = 7;
 
-  // ServiceAccountName is the name of the ServiceAccount to use to run this pod.
+  // ServiceAccountName is the name of the ServiceAccount to use to run this carp.
   // More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md
   // +optional
   optional string serviceAccountName = 8;
@@ -132,13 +132,13 @@ message CarpSpec {
   // +optional
   optional string serviceAccount = 9;
 
-  // NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
-  // the scheduler simply schedules this pod onto that node, assuming that it fits resource
+  // NodeName is a request to schedule this carp onto a specific node. If it is non-empty,
+  // the scheduler simply schedules this carp onto that node, assuming that it fits resource
   // requirements.
   // +optional
   optional string nodeName = 10;
 
-  // Host networking requested for this pod. Use the host's network namespace.
+  // Host networking requested for this carp. Use the host's network namespace.
   // If this option is set, the ports that will be used must be specified.
   // Default to false.
   // +k8s:conversion-gen=false
@@ -158,54 +158,54 @@ message CarpSpec {
   optional bool hostIPC = 13;
 
   // Specifies the hostname of the Carp
-  // If not specified, the pod's hostname will be set to a system-defined value.
+  // If not specified, the carp's hostname will be set to a system-defined value.
   // +optional
   optional string hostname = 16;
 
-  // If specified, the fully qualified Carp hostname will be "<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>".
-  // If not specified, the pod will not have a domainname at all.
+  // If specified, the fully qualified Carp hostname will be "<hostname>.<subdomain>.<carp namespace>.svc.<cluster domain>".
+  // If not specified, the carp will not have a domainname at all.
   // +optional
   optional string subdomain = 17;
 
-  // If specified, the pod will be dispatched by specified scheduler.
-  // If not specified, the pod will be dispatched by default scheduler.
+  // If specified, the carp will be dispatched by specified scheduler.
+  // If not specified, the carp will be dispatched by default scheduler.
   // +optional
   optional string schedulername = 19;
 }
 
-// CarpStatus represents information about the status of a pod. Status may trail the actual
+// CarpStatus represents information about the status of a carp. Status may trail the actual
 // state of a system.
 message CarpStatus {
-  // Current condition of the pod.
-  // More info: http://kubernetes.io/docs/user-guide/pod-states#pod-phase
+  // Current condition of the carp.
+  // More info: http://kubernetes.io/docs/user-guide/carp-states#carp-phase
   // +optional
   optional string phase = 1;
 
-  // Current service state of pod.
-  // More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
+  // Current service state of carp.
+  // More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions
   // +optional
   repeated CarpCondition conditions = 2;
 
-  // A human readable message indicating details about why the pod is in this condition.
+  // A human readable message indicating details about why the carp is in this condition.
   // +optional
   optional string message = 3;
 
-  // A brief CamelCase message indicating details about why the pod is in this state.
+  // A brief CamelCase message indicating details about why the carp is in this state.
   // e.g. 'OutOfDisk'
   // +optional
   optional string reason = 4;
 
-  // IP address of the host to which the pod is assigned. Empty if not yet scheduled.
+  // IP address of the host to which the carp is assigned. Empty if not yet scheduled.
   // +optional
   optional string hostIP = 5;
 
-  // IP address allocated to the pod. Routable at least within the cluster.
+  // IP address allocated to the carp. Routable at least within the cluster.
   // Empty if not yet allocated.
   // +optional
-  optional string podIP = 6;
+  optional string carpIP = 6;
 
   // RFC 3339 date and time at which the object was acknowledged by the Kubelet.
-  // This is before the Kubelet pulled the container image(s) for the pod.
+  // This is before the Kubelet pulled the container image(s) for the carp.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time startTime = 7;
 }

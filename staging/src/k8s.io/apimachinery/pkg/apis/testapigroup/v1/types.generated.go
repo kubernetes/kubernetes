@@ -739,7 +739,7 @@ func (x *CarpStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq2[5] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("podIP"))
+					r.EncodeString(codecSelferC_UTF81234, string("carpIP"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					yym20 := z.EncBinary()
 					_ = yym20
@@ -908,7 +908,7 @@ func (x *CarpStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 					*((*string)(yyv11)) = r.DecodeString()
 				}
 			}
-		case "podIP":
+		case "carpIP":
 			if r.TryDecodeAsNil() {
 				x.CarpIP = ""
 			} else {

@@ -20,13 +20,13 @@ import (
 	"github.com/google/gofuzz"
 
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
-	example "k8s.io/apimachinery/pkg/apis/testapigroup"
-	examplev1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
+	"k8s.io/apimachinery/pkg/apis/testapigroup"
+	"k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
-// overrideGenericFuncs override some generic fuzzer funcs from k8s.io/apiserver in order to have more realistic
+// overrideGenericFuncs override some generic fuzzer funcs from k8s.io/apimachinery in order to have more realistic
 // values in a Kubernetes context.
 func overrideGenericFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
@@ -39,7 +39,7 @@ func overrideGenericFuncs(t apitesting.TestingCommon, codecs runtimeserializer.C
 					ContentType: runtime.ContentTypeJSON,
 				}
 			} else {
-				types := []runtime.Object{&example.Carp{}}
+				types := []runtime.Object{&testapigroup.Carp{}}
 				t := types[c.Rand.Intn(len(types))]
 				c.Fuzz(t)
 				*j = t
@@ -47,12 +47,12 @@ func overrideGenericFuncs(t apitesting.TestingCommon, codecs runtimeserializer.C
 		},
 		func(r *runtime.RawExtension, c fuzz.Continue) {
 			// Pick an arbitrary type and fuzz it
-			types := []runtime.Object{&example.Carp{}}
+			types := []runtime.Object{&testapigroup.Carp{}}
 			obj := types[c.Rand.Intn(len(types))]
 			c.Fuzz(obj)
 
 			// Convert the object to raw bytes
-			bytes, err := runtime.Encode(apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), obj)
+			bytes, err := runtime.Encode(apitesting.TestCodec(codecs, v1.SchemeGroupVersion), obj)
 			if err != nil {
 				t.Errorf("Failed to encode object: %v", err)
 				return
@@ -64,9 +64,9 @@ func overrideGenericFuncs(t apitesting.TestingCommon, codecs runtimeserializer.C
 	}
 }
 
-func exampleFuncs(t apitesting.TestingCommon) []interface{} {
+func testapigroupFuncs(t apitesting.TestingCommon) []interface{} {
 	return []interface{}{
-		func(s *example.CarpSpec, c fuzz.Continue) {
+		func(s *testapigroup.CarpSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
 			// has a default value
 			ttl := int64(30)
@@ -79,12 +79,12 @@ func exampleFuncs(t apitesting.TestingCommon) []interface{} {
 				s.SchedulerName = "default-scheduler"
 			}
 		},
-		func(j *example.CarpPhase, c fuzz.Continue) {
-			statuses := []example.CarpPhase{"Pending", "Running", "Succeeded", "Failed", "Unknown"}
+		func(j *testapigroup.CarpPhase, c fuzz.Continue) {
+			statuses := []testapigroup.CarpPhase{"Pending", "Running", "Succeeded", "Failed", "Unknown"}
 			*j = statuses[c.Rand.Intn(len(statuses))]
 		},
-		func(rp *example.RestartPolicy, c fuzz.Continue) {
-			policies := []example.RestartPolicy{"Always", "Never", "OnFailure"}
+		func(rp *testapigroup.RestartPolicy, c fuzz.Continue) {
+			policies := []testapigroup.RestartPolicy{"Always", "Never", "OnFailure"}
 			*rp = policies[c.Rand.Intn(len(policies))]
 		},
 	}
@@ -94,6 +94,6 @@ func Funcs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFactory) []
 	return apitesting.MergeFuzzerFuncs(t,
 		apitesting.GenericFuzzerFuncs(t, codecs),
 		overrideGenericFuncs(t, codecs),
-		exampleFuncs(t),
+		testapigroupFuncs(t),
 	)
 }

@@ -18,8 +18,8 @@ package test
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	example "k8s.io/apimachinery/pkg/apis/testapigroup"
-	examplev1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
+	"k8s.io/apimachinery/pkg/apis/testapigroup"
+	"k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -40,17 +40,17 @@ func TestScheme() (*runtime.Scheme, apiserializer.CodecFactory) {
 	scheme := runtime.NewScheme()
 
 	scheme.AddKnownTypes(internalGV,
-		&example.Carp{},
-		&example.CarpList{},
+		&testapigroup.Carp{},
+		&testapigroup.CarpList{},
 		&List{},
 	)
 	scheme.AddKnownTypes(externalGV,
-		&examplev1.Carp{},
-		&examplev1.CarpList{},
+		&v1.Carp{},
+		&v1.CarpList{},
 		&List{},
 	)
-	example.AddToScheme(scheme)
-	examplev1.AddToScheme(scheme)
+	testapigroup.AddToScheme(scheme)
+	v1.AddToScheme(scheme)
 
 	codecs := apiserializer.NewCodecFactory(scheme)
 	return scheme, codecs

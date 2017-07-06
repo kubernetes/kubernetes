@@ -24,14 +24,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	example "k8s.io/apimachinery/pkg/apis/testapigroup"
+	"k8s.io/apimachinery/pkg/apis/testapigroup"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestAPIObjectMeta(t *testing.T) {
-	j := &example.Carp{
+	j := &testapigroup.Carp{
 		TypeMeta: metav1.TypeMeta{APIVersion: "/a", Kind: "b"},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       "bar",
@@ -394,7 +394,7 @@ func TestAccessOwnerReferences(t *testing.T) {
 
 // BenchmarkAccessorSetFastPath shows the interface fast path
 func BenchmarkAccessorSetFastPath(b *testing.B) {
-	obj := &example.Carp{
+	obj := &testapigroup.Carp{
 		TypeMeta: metav1.TypeMeta{APIVersion: "/a", Kind: "b"},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       "bar",

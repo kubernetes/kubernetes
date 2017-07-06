@@ -21,14 +21,14 @@ import (
 
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	example "k8s.io/apimachinery/pkg/apis/testapigroup"
+	"k8s.io/apimachinery/pkg/apis/testapigroup"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestDecodeList(t *testing.T) {
 	pl := List{
 		Items: []runtime.Object{
-			&example.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+			&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 			&runtime.Unknown{
 				TypeMeta:    runtime.TypeMeta{Kind: "Carp", APIVersion: "v1"},
 				Raw:         []byte(`{"kind":"Carp","apiVersion":"` + "v1" + `","metadata":{"name":"test"}}`),
@@ -38,12 +38,12 @@ func TestDecodeList(t *testing.T) {
 	}
 
 	_, codecs := TestScheme()
-	Codec := apitesting.TestCodec(codecs, example.SchemeGroupVersion)
+	Codec := apitesting.TestCodec(codecs, testapigroup.SchemeGroupVersion)
 
 	if errs := runtime.DecodeList(pl.Items, Codec); len(errs) != 0 {
 		t.Fatalf("unexpected error %v", errs)
 	}
-	if pod, ok := pl.Items[1].(*example.Carp); !ok || pod.Name != "test" {
+	if pod, ok := pl.Items[1].(*testapigroup.Carp); !ok || pod.Name != "test" {
 		t.Errorf("object not converted: %#v", pl.Items[1])
 	}
 }

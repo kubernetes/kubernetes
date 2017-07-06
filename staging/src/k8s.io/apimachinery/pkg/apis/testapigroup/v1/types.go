@@ -35,12 +35,12 @@ type Carp struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Specification of the desired behavior of the pod.
+	// Specification of the desired behavior of the carp.
 	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
 	// +optional
 	Spec CarpSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// Most recently observed status of the pod.
+	// Most recently observed status of the carp.
 	// This data may not be up to date.
 	// Populated by the system.
 	// Read-only.
@@ -49,35 +49,35 @@ type Carp struct {
 	Status CarpStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
-// CarpStatus represents information about the status of a pod. Status may trail the actual
+// CarpStatus represents information about the status of a carp. Status may trail the actual
 // state of a system.
 type CarpStatus struct {
-	// Current condition of the pod.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#pod-phase
+	// Current condition of the carp.
+	// More info: http://kubernetes.io/docs/user-guide/carp-states#carp-phase
 	// +optional
 	Phase CarpPhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=CarpPhase"`
-	// Current service state of pod.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
+	// Current service state of carp.
+	// More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions
 	// +optional
 	Conditions []CarpCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
-	// A human readable message indicating details about why the pod is in this condition.
+	// A human readable message indicating details about why the carp is in this condition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
-	// A brief CamelCase message indicating details about why the pod is in this state.
+	// A brief CamelCase message indicating details about why the carp is in this state.
 	// e.g. 'OutOfDisk'
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
 
-	// IP address of the host to which the pod is assigned. Empty if not yet scheduled.
+	// IP address of the host to which the carp is assigned. Empty if not yet scheduled.
 	// +optional
 	HostIP string `json:"hostIP,omitempty" protobuf:"bytes,5,opt,name=hostIP"`
-	// IP address allocated to the pod. Routable at least within the cluster.
+	// IP address allocated to the carp. Routable at least within the cluster.
 	// Empty if not yet allocated.
 	// +optional
-	CarpIP string `json:"podIP,omitempty" protobuf:"bytes,6,opt,name=podIP"`
+	CarpIP string `json:"carpIP,omitempty" protobuf:"bytes,6,opt,name=carpIP"`
 
 	// RFC 3339 date and time at which the object was acknowledged by the Kubelet.
-	// This is before the Kubelet pulled the container image(s) for the pod.
+	// This is before the Kubelet pulled the container image(s) for the carp.
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty" protobuf:"bytes,7,opt,name=startTime"`
 }
@@ -85,11 +85,11 @@ type CarpStatus struct {
 type CarpCondition struct {
 	// Type is the type of the condition.
 	// Currently only Ready.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
+	// More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions
 	Type CarpConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=CarpConditionType"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#pod-conditions
+	// More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions
 	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
 	// Last time we probed the condition.
 	// +optional
@@ -105,35 +105,35 @@ type CarpCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
-// CarpSpec is a description of a pod
+// CarpSpec is a description of a carp
 type CarpSpec struct {
-	// Restart policy for all containers within the pod.
+	// Restart policy for all containers within the carp.
 	// One of Always, OnFailure, Never.
 	// Default to Always.
-	// More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy
+	// More info: http://kubernetes.io/docs/user-guide/carp-states#restartpolicy
 	// +optional
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,3,opt,name=restartPolicy,casttype=RestartPolicy"`
-	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
+	// Optional duration in seconds the carp needs to terminate gracefully. May be decreased in delete request.
 	// Value must be non-negative integer. The value zero indicates delete immediately.
 	// If this value is nil, the default grace period will be used instead.
-	// The grace period is the duration in seconds after the processes running in the pod are sent
+	// The grace period is the duration in seconds after the processes running in the carp are sent
 	// a termination signal and the time when the processes are forcibly halted with a kill signal.
 	// Set this value longer than the expected cleanup time for your process.
 	// Defaults to 30 seconds.
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,4,opt,name=terminationGracePeriodSeconds"`
-	// Optional duration in seconds the pod may be active on the node relative to
+	// Optional duration in seconds the carp may be active on the node relative to
 	// StartTime before the system will actively try to mark it failed and kill associated containers.
 	// Value must be a positive integer.
 	// +optional
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,5,opt,name=activeDeadlineSeconds"`
-	// NodeSelector is a selector which must be true for the pod to fit on a node.
-	// Selector which must match a node's labels for the pod to be scheduled on that node.
+	// NodeSelector is a selector which must be true for the carp to fit on a node.
+	// Selector which must match a node's labels for the carp to be scheduled on that node.
 	// More info: http://kubernetes.io/docs/user-guide/node-selection/README
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 
-	// ServiceAccountName is the name of the ServiceAccount to use to run this pod.
+	// ServiceAccountName is the name of the ServiceAccount to use to run this carp.
 	// More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty" protobuf:"bytes,8,opt,name=serviceAccountName"`
@@ -143,12 +143,12 @@ type CarpSpec struct {
 	// +optional
 	DeprecatedServiceAccount string `json:"serviceAccount,omitempty" protobuf:"bytes,9,opt,name=serviceAccount"`
 
-	// NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
-	// the scheduler simply schedules this pod onto that node, assuming that it fits resource
+	// NodeName is a request to schedule this carp onto a specific node. If it is non-empty,
+	// the scheduler simply schedules this carp onto that node, assuming that it fits resource
 	// requirements.
 	// +optional
 	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,10,opt,name=nodeName"`
-	// Host networking requested for this pod. Use the host's network namespace.
+	// Host networking requested for this carp. Use the host's network namespace.
 	// If this option is set, the ports that will be used must be specified.
 	// Default to false.
 	// +k8s:conversion-gen=false
@@ -165,15 +165,15 @@ type CarpSpec struct {
 	// +optional
 	HostIPC bool `json:"hostIPC,omitempty" protobuf:"varint,13,opt,name=hostIPC"`
 	// Specifies the hostname of the Carp
-	// If not specified, the pod's hostname will be set to a system-defined value.
+	// If not specified, the carp's hostname will be set to a system-defined value.
 	// +optional
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,16,opt,name=hostname"`
-	// If specified, the fully qualified Carp hostname will be "<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>".
-	// If not specified, the pod will not have a domainname at all.
+	// If specified, the fully qualified Carp hostname will be "<hostname>.<subdomain>.<carp namespace>.svc.<cluster domain>".
+	// If not specified, the carp will not have a domainname at all.
 	// +optional
 	Subdomain string `json:"subdomain,omitempty" protobuf:"bytes,17,opt,name=subdomain"`
-	// If specified, the pod will be dispatched by specified scheduler.
-	// If not specified, the pod will be dispatched by default scheduler.
+	// If specified, the carp will be dispatched by specified scheduler.
+	// If not specified, the carp will be dispatched by default scheduler.
 	// +optional
 	SchedulerName string `json:"schedulername,omitempty" protobuf:"bytes,19,opt,name=schedulername"`
 }
@@ -186,7 +186,7 @@ type CarpList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// List of pods.
-	// More info: http://kubernetes.io/docs/user-guide/pods
+	// List of carps.
+	// More info: http://kubernetes.io/docs/user-guide/carps
 	Items []Carp `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

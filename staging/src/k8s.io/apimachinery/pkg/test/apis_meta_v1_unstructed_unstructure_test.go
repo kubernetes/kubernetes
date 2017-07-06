@@ -27,7 +27,7 @@ import (
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	example "k8s.io/apimachinery/pkg/apis/testapigroup"
+	"k8s.io/apimachinery/pkg/apis/testapigroup"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,7 +38,7 @@ func TestDecodeUnstructured(t *testing.T) {
 	rawJson := fmt.Sprintf(`{"kind":"Pod","apiVersion":"%s","metadata":{"name":"test"}}`, groupVersionString)
 	pl := &List{
 		Items: []runtime.Object{
-			&example.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+			&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 			&runtime.Unknown{
 				TypeMeta:    runtime.TypeMeta{Kind: "Pod", APIVersion: groupVersionString},
 				Raw:         []byte(rawJson),
@@ -458,7 +458,7 @@ func TestDecodeNumbers(t *testing.T) {
 		}
 	}`)
 
-	pod := &example.Carp{}
+	pod := &testapigroup.Carp{}
 
 	_, codecs := TestScheme()
 	codec := apitesting.TestCodec(codecs, schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal})
@@ -489,7 +489,7 @@ func TestDecodeNumbers(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// ensure pod is still valid
-	pod2, ok := obj2.(*example.Carp)
+	pod2, ok := obj2.(*testapigroup.Carp)
 	if !ok {
 		t.Fatalf("expected an *api.Pod, got %#v", obj2)
 	}

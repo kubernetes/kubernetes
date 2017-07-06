@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	example "k8s.io/apimachinery/pkg/apis/testapigroup"
+	"k8s.io/apimachinery/pkg/apis/testapigroup"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -37,8 +37,8 @@ func TestIsList(t *testing.T) {
 		obj    runtime.Object
 		isList bool
 	}{
-		{&example.CarpList{}, true},
-		{&example.Carp{}, false},
+		{&testapigroup.CarpList{}, true},
+		{&testapigroup.Carp{}, false},
 	}
 	for _, item := range tests {
 		if e, a := item.isList, meta.IsListType(item.obj); e != a {
@@ -49,8 +49,8 @@ func TestIsList(t *testing.T) {
 
 func TestExtractList(t *testing.T) {
 	list1 := []runtime.Object{
-		&example.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
-		&example.Carp{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 	}
 	list2 := &v1.List{
 		Items: []runtime.RawExtension{
@@ -60,13 +60,13 @@ func TestExtractList(t *testing.T) {
 		},
 	}
 	list3 := &fakePtrValueList{
-		Items: []*example.Carp{
+		Items: []*testapigroup.Carp{
 			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 		},
 	}
-	list4 := &example.CarpList{
-		Items: []example.Carp{
+	list4 := &testapigroup.CarpList{
+		Items: []testapigroup.Carp{
 			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
@@ -142,8 +142,8 @@ func TestExtractList(t *testing.T) {
 
 func TestEachListItem(t *testing.T) {
 	list1 := []runtime.Object{
-		&example.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
-		&example.Carp{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 	}
 	list2 := &v1.List{
 		Items: []runtime.RawExtension{
@@ -153,13 +153,13 @@ func TestEachListItem(t *testing.T) {
 		},
 	}
 	list3 := &fakePtrValueList{
-		Items: []*example.Carp{
+		Items: []*testapigroup.Carp{
 			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 		},
 	}
-	list4 := &example.CarpList{
-		Items: []example.Carp{
+	list4 := &testapigroup.CarpList{
+		Items: []testapigroup.Carp{
 			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
@@ -252,7 +252,7 @@ func TestExtractListOfInterfacePtrs(t *testing.T) {
 }
 
 type fakePtrValueList struct {
-	Items []*example.Carp
+	Items []*testapigroup.Carp
 }
 
 func (obj fakePtrValueList) GetObjectKind() schema.ObjectKind {
@@ -260,11 +260,11 @@ func (obj fakePtrValueList) GetObjectKind() schema.ObjectKind {
 }
 
 func TestSetList(t *testing.T) {
-	pl := &example.CarpList{}
+	pl := &testapigroup.CarpList{}
 	list := []runtime.Object{
-		&example.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
-		&example.Carp{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
-		&example.Carp{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
+		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
 	}
 	err := meta.SetList(pl, list)
 	if err != nil {
@@ -274,7 +274,7 @@ func TestSetList(t *testing.T) {
 		t.Fatalf("Expected %v, got %v", e, a)
 	}
 	for i := range list {
-		if e, a := list[i].(*example.Carp).Name, pl.Items[i].Name; e != a {
+		if e, a := list[i].(*testapigroup.Carp).Name, pl.Items[i].Name; e != a {
 			t.Fatalf("Expected %v, got %v", e, a)
 		}
 	}
@@ -283,9 +283,9 @@ func TestSetList(t *testing.T) {
 func TestSetListToRuntimeObjectArray(t *testing.T) {
 	pl := &List{}
 	list := []runtime.Object{
-		&example.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
-		&example.Carp{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
-		&example.Carp{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
+		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
 	}
 	err := meta.SetList(pl, list)
 	if err != nil {
@@ -325,7 +325,7 @@ func TestSetListToMatchingType(t *testing.T) {
 func TestSetExtractListRoundTrip(t *testing.T) {
 	fuzzer := fuzz.New().NilChance(0).NumElements(1, 5)
 	for i := 0; i < 5; i++ {
-		start := &example.CarpList{}
+		start := &testapigroup.CarpList{}
 		fuzzer.Fuzz(&start.Items)
 
 		list, err := meta.ExtractList(start)
@@ -333,7 +333,7 @@ func TestSetExtractListRoundTrip(t *testing.T) {
 			t.Errorf("Unexpected error %v", err)
 			continue
 		}
-		got := &example.CarpList{}
+		got := &testapigroup.CarpList{}
 		err = meta.SetList(got, list)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)

@@ -33,27 +33,27 @@ type Carp struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Spec defines the behavior of a pod.
+	// Spec defines the behavior of a carp.
 	// +optional
 	Spec CarpSpec
 
-	// Status represents the current information about a pod. This data may not be up
+	// Status represents the current information about a carp. This data may not be up
 	// to date.
 	// +optional
 	Status CarpStatus
 }
 
-// CarpStatus represents information about the status of a pod. Status may trail the actual
+// CarpStatus represents information about the status of a carp. Status may trail the actual
 // state of a system.
 type CarpStatus struct {
 	// +optional
 	Phase CarpPhase
 	// +optional
 	Conditions []CarpCondition
-	// A human readable message indicating details about why the pod is in this state.
+	// A human readable message indicating details about why the carp is in this state.
 	// +optional
 	Message string
-	// A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'
+	// A brief CamelCase message indicating details about why the carp is in this state. e.g. 'OutOfDisk'
 	// +optional
 	Reason string
 
@@ -63,7 +63,7 @@ type CarpStatus struct {
 	CarpIP string
 
 	// Date and time at which the object was acknowledged by the Kubelet.
-	// This is before the Kubelet pulled the container image(s) for the pod.
+	// This is before the Kubelet pulled the container image(s) for the carp.
 	// +optional
 	StartTime *metav1.Time
 }
@@ -81,45 +81,45 @@ type CarpCondition struct {
 	Message string
 }
 
-// CarpSpec is a description of a pod
+// CarpSpec is a description of a carp
 type CarpSpec struct {
 	// +optional
 	RestartPolicy RestartPolicy
-	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
+	// Optional duration in seconds the carp needs to terminate gracefully. May be decreased in delete request.
 	// Value must be non-negative integer. The value zero indicates delete immediately.
 	// If this value is nil, the default grace period will be used instead.
-	// The grace period is the duration in seconds after the processes running in the pod are sent
+	// The grace period is the duration in seconds after the processes running in the carp are sent
 	// a termination signal and the time when the processes are forcibly halted with a kill signal.
 	// Set this value longer than the expected cleanup time for your process.
 	// +optional
 	TerminationGracePeriodSeconds *int64
-	// Optional duration in seconds relative to the StartTime that the pod may be active on a node
-	// before the system actively tries to terminate the pod; value must be positive integer
+	// Optional duration in seconds relative to the StartTime that the carp may be active on a node
+	// before the system actively tries to terminate the carp; value must be positive integer
 	// +optional
 	ActiveDeadlineSeconds *int64
-	// NodeSelector is a selector which must be true for the pod to fit on a node
+	// NodeSelector is a selector which must be true for the carp to fit on a node
 	// +optional
 	NodeSelector map[string]string
 
-	// ServiceAccountName is the name of the ServiceAccount to use to run this pod
-	// The pod will be allowed to use secrets referenced by the ServiceAccount
+	// ServiceAccountName is the name of the ServiceAccount to use to run this carp
+	// The carp will be allowed to use secrets referenced by the ServiceAccount
 	ServiceAccountName string
 
-	// NodeName is a request to schedule this pod onto a specific node.  If it is non-empty,
-	// the scheduler simply schedules this pod onto that node, assuming that it fits resource
+	// NodeName is a request to schedule this carp onto a specific node.  If it is non-empty,
+	// the scheduler simply schedules this carp onto that node, assuming that it fits resource
 	// requirements.
 	// +optional
 	NodeName string
 	// Specifies the hostname of the Carp.
-	// If not specified, the pod's hostname will be set to a system-defined value.
+	// If not specified, the carp's hostname will be set to a system-defined value.
 	// +optional
 	Hostname string
-	// If specified, the fully qualified Carp hostname will be "<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>".
-	// If not specified, the pod will not have a domainname at all.
+	// If specified, the fully qualified Carp hostname will be "<hostname>.<subdomain>.<carp namespace>.svc.<cluster domain>".
+	// If not specified, the carp will not have a domainname at all.
 	// +optional
 	Subdomain string
-	// If specified, the pod will be dispatched by specified scheduler.
-	// If not specified, the pod will be dispatched by default scheduler.
+	// If specified, the carp will be dispatched by specified scheduler.
+	// If not specified, the carp will be dispatched by default scheduler.
 	// +optional
 	SchedulerName string
 }

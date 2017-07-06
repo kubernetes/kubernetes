@@ -21,8 +21,8 @@ package install
 import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
-	example "k8s.io/apimachinery/pkg/apis/testapigroup"
-	examplev1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
+	"k8s.io/apimachinery/pkg/apis/testapigroup"
+	"k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,13 +30,13 @@ import (
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
-			GroupName:                  example.GroupName,
-			VersionPreferenceOrder:     []string{examplev1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/apiserver/pkg/apis/example",
-			AddInternalObjectsToScheme: example.AddToScheme,
+			GroupName:                  testapigroup.GroupName,
+			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version},
+			ImportPrefix:               "k8s.io/apimachinery/pkg/apis/testapigroup",
+			AddInternalObjectsToScheme: testapigroup.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
-			examplev1.SchemeGroupVersion.Version: examplev1.AddToScheme,
+			v1.SchemeGroupVersion.Version: v1.AddToScheme,
 		},
 	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)
