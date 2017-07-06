@@ -99,6 +99,6 @@ func (s *Registery) Heartbeat(ctx context.Context,
 	}
 
 	return &pluginapi.HeartbeatResponse{
-		Response: pluginapi.HeartbeatNeedsRegistration,
+		Response: pluginapi.HeartbeatKo,
 	}, nil
 }

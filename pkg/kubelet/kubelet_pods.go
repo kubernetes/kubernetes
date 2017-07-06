@@ -1264,6 +1264,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			Image:        cs.Image,
 			ImageID:      cs.ImageID,
 			ContainerID:  cid,
+			Devices:      kubecontainer.ContainerDevicesToV1(cs.Devices),
 		}
 		switch cs.State {
 		case kubecontainer.ContainerStateRunning:
