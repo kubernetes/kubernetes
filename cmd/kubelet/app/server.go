@@ -419,6 +419,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		return err
 	}
 
+	var nodeName types.NodeName
 	if kubeDeps == nil {
 		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
@@ -437,7 +438,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			}
 		}
 
-		nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+		nodeName, err = getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
 		if err != nil {
 			return err
 		}
@@ -453,10 +454,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		var clientCertificateManager certificate.Manager
 		if err == nil {
 			if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
-				nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
-				if err != nil {
-					return err
-				}
 				clientCertificateManager, err = initializeClientCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData, clientConfig.CertFile, clientConfig.KeyFile)
 				if err != nil {
 					return err
@@ -508,9 +505,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		kubeDeps.EventClient = eventClient
 	}
 
-	nodeName, err := getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
-	if err != nil {
-		return err
+	if nodeName == "" {
+		nodeName, err = getNodeName(kubeDeps.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+		if err != nil {
+			return err
+		}
 	}
 
 	if kubeDeps.Auth == nil {
