@@ -74,6 +74,7 @@ go_library(
         "//pkg/util/exec:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//pkg/util/system:go_default_library",
+        "//pkg/util/taints:go_default_library",
         "//pkg/util/version:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
