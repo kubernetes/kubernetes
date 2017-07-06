@@ -50,9 +50,9 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 
 	// prefer the id from the headers. If not available, create a new one.
 	// TODO(audit): do we want to forbid the header for non-front-proxy users?
-	ids := req.Header[auditinternal.HeaderAuditID]
-	if len(ids) > 0 {
-		ev.AuditID = types.UID(ids[0])
+	ids := req.Header.Get(auditinternal.HeaderAuditID)
+	if ids != "" {
+		ev.AuditID = types.UID(ids)
 	} else {
 		ev.AuditID = types.UID(uuid.NewRandom().String())
 	}
