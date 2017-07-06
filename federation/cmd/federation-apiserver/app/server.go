@@ -112,9 +112,7 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	}
 
 	genericConfig := genericapiserver.NewConfig(api.Codecs)
-	if err := s.GenericServerRunOptions.ApplyTo(genericConfig); err != nil {
-		return err
-	}
+	s.GenericServerRunOptions.ApplyTo(genericConfig)
 	insecureServingOptions, err := s.InsecureServing.ApplyTo(genericConfig)
 	if err != nil {
 		return err
