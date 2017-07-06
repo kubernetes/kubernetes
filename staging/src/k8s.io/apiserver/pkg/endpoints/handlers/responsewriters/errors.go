@@ -44,7 +44,6 @@ func BadGatewayError(w http.ResponseWriter, req *http.Request) {
 func Forbidden(ctx request.Context, attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string, s runtime.NegotiatedSerializer) {
 	msg := sanitizer.Replace(forbiddenMessage(attributes))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusForbidden)
 
 	var errMsg string
 	if len(reason) == 0 {

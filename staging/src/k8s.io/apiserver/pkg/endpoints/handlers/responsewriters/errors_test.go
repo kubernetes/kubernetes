@@ -63,18 +63,19 @@ func TestErrors(t *testing.T) {
 func TestForbidden(t *testing.T) {
 	u := &user.DefaultInfo{Name: "NAME"}
 	cases := []struct {
-		expected   string
-		attributes authorizer.Attributes
-		reason     string
+		expected    string
+		attributes  authorizer.Attributes
+		reason      string
+		contentType string
 	}{
 		{`{"metadata":{},"status":"Failure","message":" \"\" is forbidden: User \"NAME\" cannot GET path \"/whatever\".","reason":"Forbidden","details":{},"code":403}
-`, authorizer.AttributesRecord{User: u, Verb: "GET", Path: "/whatever"}, ""},
+`, authorizer.AttributesRecord{User: u, Verb: "GET", Path: "/whatever"}, "", "application/json"},
 		{`{"metadata":{},"status":"Failure","message":" \"\" is forbidden: User \"NAME\" cannot GET path \"/\u0026lt;script\u0026gt;\".","reason":"Forbidden","details":{},"code":403}
-`, authorizer.AttributesRecord{User: u, Verb: "GET", Path: "/<script>"}, ""},
+`, authorizer.AttributesRecord{User: u, Verb: "GET", Path: "/<script>"}, "", "application/json"},
 		{`{"metadata":{},"status":"Failure","message":"pod \"\" is forbidden: User \"NAME\" cannot GET pod at the cluster scope.","reason":"Forbidden","details":{"kind":"pod"},"code":403}
-`, authorizer.AttributesRecord{User: u, Verb: "GET", Resource: "pod", ResourceRequest: true}, ""},
+`, authorizer.AttributesRecord{User: u, Verb: "GET", Resource: "pod", ResourceRequest: true}, "", "application/json"},
 		{`{"metadata":{},"status":"Failure","message":"pod.v2 \"\" is forbidden: User \"NAME\" cannot GET pod.v2/quota in the namespace \"test\".","reason":"Forbidden","details":{"group":"v2","kind":"pod"},"code":403}
-`, authorizer.AttributesRecord{User: u, Verb: "GET", Namespace: "test", APIGroup: "v2", Resource: "pod", Subresource: "quota", ResourceRequest: true}, ""},
+`, authorizer.AttributesRecord{User: u, Verb: "GET", Namespace: "test", APIGroup: "v2", Resource: "pod", Subresource: "quota", ResourceRequest: true}, "", "application/json"},
 	}
 	for _, test := range cases {
 		observer := httptest.NewRecorder()
@@ -83,7 +84,11 @@ func TestForbidden(t *testing.T) {
 		Forbidden(request.NewDefaultContext(), test.attributes, observer, &http.Request{}, test.reason, negotiatedSerializer)
 		result := string(observer.Body.Bytes())
 		if result != test.expected {
-			t.Errorf("Forbidden(%#v...) != %#v, got %#v", test.attributes, test.expected, result)
+			t.Errorf("Forbidden response body(%#v...) != %#v, got %#v", test.attributes, test.expected, result)
+		}
+		resultType := observer.HeaderMap.Get("Content-Type")
+		if resultType != test.contentType {
+			t.Errorf("Forbidden content type(%#v...) != %#v, got %#v", test.attributes, test.expected, result)
 		}
 	}
 }
