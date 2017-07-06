@@ -37,6 +37,13 @@ type testDecodable struct {
 func (d *testDecodable) GetObjectKind() schema.ObjectKind                { return d }
 func (d *testDecodable) SetGroupVersionKind(gvk schema.GroupVersionKind) { d.gvk = gvk }
 func (d *testDecodable) GroupVersionKind() schema.GroupVersionKind       { return d.gvk }
+func (d *testDecodable) DeepCopyObject() runtime.Object {
+	if d == nil {
+		return nil
+	}
+	clone := *d
+	return &clone
+}
 
 type testNestedDecodable struct {
 	Other string
@@ -50,6 +57,13 @@ type testNestedDecodable struct {
 func (d *testNestedDecodable) GetObjectKind() schema.ObjectKind                { return d }
 func (d *testNestedDecodable) SetGroupVersionKind(gvk schema.GroupVersionKind) { d.gvk = gvk }
 func (d *testNestedDecodable) GroupVersionKind() schema.GroupVersionKind       { return d.gvk }
+func (d *testNestedDecodable) DeepCopyObject() runtime.Object {
+	if d == nil {
+		return nil
+	}
+	clone := *d
+	return &clone
+}
 
 func (d *testNestedDecodable) EncodeNestedObjects(e runtime.Encoder) error {
 	d.nestedCalled = true

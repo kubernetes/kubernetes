@@ -589,6 +589,7 @@ staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/fuzzer
 staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1
 staging/src/k8s.io/apimachinery/pkg/conversion
 staging/src/k8s.io/apimachinery/pkg/conversion/unstructured
+staging/src/k8s.io/apimachinery/pkg/labels
 staging/src/k8s.io/apimachinery/pkg/openapi
 staging/src/k8s.io/apimachinery/pkg/runtime/schema
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer

@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -31,6 +32,7 @@ type fakePod struct {
 }
 
 func (obj *fakePod) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *fakePod) DeepCopyObject() runtime.Object   { panic("DeepCopyObject not supported by fakePod") }
 
 func TestUntil(t *testing.T) {
 	fw := NewFake()

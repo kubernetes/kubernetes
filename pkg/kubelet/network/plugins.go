@@ -78,6 +78,8 @@ type NetworkPlugin interface {
 	Status() error
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
 // This struct represents version "v1beta1"
 type PodNetworkStatus struct {

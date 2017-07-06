@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type EmbeddedTest struct {
 	runtime.TypeMeta
 	ID          string
@@ -28,6 +29,7 @@ type EmbeddedTest struct {
 	EmptyObject runtime.Object
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type EmbeddedTestExternal struct {
 	runtime.TypeMeta `json:",inline"`
 	ID               string               `json:"id,omitempty"`
@@ -35,6 +37,7 @@ type EmbeddedTestExternal struct {
 	EmptyObject      runtime.RawExtension `json:"emptyObject,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ObjectTest struct {
 	runtime.TypeMeta
 
@@ -42,6 +45,7 @@ type ObjectTest struct {
 	Items []runtime.Object
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ObjectTestExternal struct {
 	runtime.TypeMeta `yaml:",inline" json:",inline"`
 
@@ -49,46 +53,55 @@ type ObjectTestExternal struct {
 	Items []runtime.RawExtension `json:"items,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type InternalSimple struct {
 	runtime.TypeMeta `json:",inline"`
 	TestString       string `json:"testString"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalSimple struct {
 	runtime.TypeMeta `json:",inline"`
 	TestString       string `json:"testString"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExtensionA struct {
 	runtime.TypeMeta `json:",inline"`
 	TestString       string `json:"testString"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExtensionB struct {
 	runtime.TypeMeta `json:",inline"`
 	TestString       string `json:"testString"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalExtensionType struct {
 	runtime.TypeMeta `json:",inline"`
 	Extension        runtime.RawExtension `json:"extension"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type InternalExtensionType struct {
 	runtime.TypeMeta `json:",inline"`
 	Extension        runtime.Object `json:"extension"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalOptionalExtensionType struct {
 	runtime.TypeMeta `json:",inline"`
 	Extension        runtime.RawExtension `json:"extension,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type InternalOptionalExtensionType struct {
 	runtime.TypeMeta `json:",inline"`
 	Extension        runtime.Object `json:"extension,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type InternalComplex struct {
 	runtime.TypeMeta
 	String    string
@@ -98,6 +111,7 @@ type InternalComplex struct {
 	Bool      bool
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalComplex struct {
 	runtime.TypeMeta `json:",inline"`
 	String           string `json:"string" description:"testing"`
@@ -117,6 +131,7 @@ type MyWeirdCustomEmbeddedVersionKindField struct {
 	Y          uint64 `json:"Y,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TestType1 struct {
 	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
 	A                                     string               `json:"A,omitempty"`
@@ -137,16 +152,19 @@ type TestType1 struct {
 	P                                     []TestType2          `json:"Q,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TestType2 struct {
 	A string `json:"A,omitempty"`
 	B int    `json:"B,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalTestType2 struct {
 	A string `json:"A,omitempty"`
 	B int    `json:"B,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalTestType1 struct {
 	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
 	A                                     string                       `json:"A,omitempty"`
@@ -167,16 +185,19 @@ type ExternalTestType1 struct {
 	P                                     []ExternalTestType2          `json:"Q,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalInternalSame struct {
 	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
 	A                                     TestType2 `json:"A,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type UnversionedType struct {
 	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
 	A                                     string `json:"A,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type UnknownType struct {
 	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
 	A                                     string `json:"A,omitempty"`

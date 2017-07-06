@@ -115,6 +115,7 @@ const CustomResourceCleanupFinalizer = "customresourcecleanup.apiextensions.k8s.
 
 // +genclient=true
 // +nonNamespaced=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
 // <.spec.name>.<.spec.group>.
@@ -127,6 +128,8 @@ type CustomResourceDefinition struct {
 	// Status indicates the actual state of the CustomResourceDefinition
 	Status CustomResourceDefinitionStatus
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
 type CustomResourceDefinitionList struct {
