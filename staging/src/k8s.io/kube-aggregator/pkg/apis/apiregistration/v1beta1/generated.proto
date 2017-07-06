@@ -110,8 +110,6 @@ message APIServiceSpec {
 message APIServiceStatus {
   // Current service state of apiService.
   // +optional
-  // +patchMergeKey=type
-  // +patchStrategy=merge
   repeated APIServiceCondition conditions = 1;
 }
 
