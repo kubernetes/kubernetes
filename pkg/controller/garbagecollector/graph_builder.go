@@ -259,7 +259,7 @@ func (gb *GraphBuilder) enqueueChanges(e *event) {
 // addDependentToOwners adds n to owners' dependents list. If the owner does not
 // exist in the gb.uidToNode yet, a "virtual" node will be created to represent
 // the owner. The "virtual" node will be enqueued to the attemptToDelete, so that
-// processItem() will verify if the owner exists according to the API server.
+// attemptToDeleteItem() will verify if the owner exists according to the API server.
 func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerReference) {
 	for _, owner := range owners {
 		ownerNode, ok := gb.uidToNode.Read(owner.UID)
