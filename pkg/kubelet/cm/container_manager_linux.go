@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
@@ -219,29 +220,11 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	var capacity = v1.ResourceList{}
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
+	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
 	if info, err := cadvisorInterface.MachineInfo(); err == nil {
 		capacity = cadvisor.CapacityFromMachineInfo(info)
 	} else {
 		return nil, err
-	}
-	rootfs, err := cadvisorInterface.RootFsInfo()
-	if err != nil {
-		capacity[v1.ResourceStorageScratch] = resource.MustParse("0Gi")
-	} else {
-		for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
-			capacity[rName] = rCap
-		}
-	}
-
-	if hasDedicatedImageFs, _ := cadvisorInterface.HasDedicatedImageFs(); hasDedicatedImageFs {
-		imagesfs, err := cadvisorInterface.ImagesFsInfo()
-		if err != nil {
-			glog.Errorf("Failed to get Image filesystem information: %v", err)
-		} else {
-			for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(imagesfs) {
-				capacity[rName] = rCap
-			}
-		}
 	}
 
 	cgroupRoot := nodeConfig.CgroupRoot
@@ -551,6 +534,44 @@ func (cm *containerManagerImpl) Start(node *v1.Node, activePods ActivePodsFunc) 
 		}, 5*time.Minute, wait.NeverStop)
 	}
 
+	// Local storage filesystem information from `RootFsInfo` and `ImagesFsInfo` is available at a later time
+	// depending on the time when cadvisor manager updates container stats. Therefore use a go routine to keep
+	// retrieving the information until it is available.
+	stopChan := make(chan struct{})
+	go wait.Until(func() {
+		if err := cm.setFsCapacity(); err != nil {
+			glog.Errorf("[ContainerManager]: %v", err)
+			return
+		}
+		close(stopChan)
+	}, time.Second, stopChan)
+	return nil
+}
+
+func (cm *containerManagerImpl) setFsCapacity() error {
+	rootfs, err := cm.cadvisorInterface.RootFsInfo()
+	if err != nil {
+		return fmt.Errorf("Fail to get rootfs information %v", err)
+	}
+	hasDedicatedImageFs, _ := cm.cadvisorInterface.HasDedicatedImageFs()
+	var imagesfs cadvisorapiv2.FsInfo
+	if hasDedicatedImageFs {
+		imagesfs, err = cm.cadvisorInterface.ImagesFsInfo()
+		if err != nil {
+			return fmt.Errorf("Fail to get imagefs information %v", err)
+		}
+	}
+
+	cm.Lock()
+	for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
+		cm.capacity[rName] = rCap
+	}
+	if hasDedicatedImageFs {
+		for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(imagesfs) {
+			cm.capacity[rName] = rCap
+		}
+	}
+	cm.Unlock()
 	return nil
 }
 
@@ -809,6 +830,8 @@ func getDockerAPIVersion(cadvisor cadvisor.Interface) *utilversion.Version {
 	return dockerAPIVersion
 }
 
-func (m *containerManagerImpl) GetCapacity() v1.ResourceList {
-	return m.capacity
+func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
+	cm.RLock()
+	defer cm.RUnlock()
+	return cm.capacity
 }
