@@ -620,7 +620,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		return nil, fmt.Errorf("Source range restrictions are not supported for openstack load balancers without managing security groups")
 	}
 
-	affinity := v1.ServiceAffinityNone
+	affinity := apiService.Spec.SessionAffinity
 	var persistence *v2pools.SessionPersistence
 	switch affinity {
 	case v1.ServiceAffinityNone:
