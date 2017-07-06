@@ -34,6 +34,9 @@ const (
 	// considered acceptable. Once per hour is fine for now, as long as it
 	// doesn't loose too much logs.
 	maxAllowedRestartsPerHour = 1.0
+	// lastPodIngestionSlack is the amount of time to wait for the last pod's
+	// logs to be ingested by the logging agent.
+	lastPodIngestionSlack = 5 * time.Minute
 )
 
 var _ = framework.KubeDescribe("Cluster level logging implemented by Stackdriver [Feature:StackdriverLogging] [Soak]", func() {
@@ -57,20 +60,27 @@ var _ = framework.KubeDescribe("Cluster level logging implemented by Stackdriver
 			float64(time.Hour) * maxAllowedRestartsPerHour))
 
 		podRunDelay := time.Duration(int64(jobDuration) / int64(maxPodCount))
-		podRunCount := int(testDuration.Seconds())/int(podRunDelay.Seconds()) - 1
+		podRunCount := maxPodCount*(int(testDuration/jobDuration)-1) + 1
 		linesPerPod := linesPerPodPerSecond * int(jobDuration.Seconds())
 
-		By("Running short-living pods")
 		pods := []*loggingPod{}
 		for runIdx := 0; runIdx < podRunCount; runIdx++ {
 			for nodeIdx, node := range nodes {
 				podName := fmt.Sprintf("job-logs-generator-%d-%d-%d-%d", maxPodCount, linesPerPod, runIdx, nodeIdx)
-				pods = append(pods, createLoggingPod(f, podName, node.Name, linesPerPod, jobDuration))
-
-				defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
+				pods = append(pods, newLoggingPod(podName, node.Name, linesPerPod, jobDuration))
 			}
-			time.Sleep(podRunDelay)
 		}
+
+		By("Running short-living pods")
+		go func() {
+			for _, pod := range pods {
+				pod.Start(f)
+				time.Sleep(podRunDelay)
+				defer f.PodClient().Delete(pod.Name, &meta_v1.DeleteOptions{})
+			}
+			// Waiting until the last pod has completed
+			time.Sleep(jobDuration - podRunDelay + lastPodIngestionSlack)
+		}()
 
 		By("Waiting for all log lines to be ingested")
 		config := &loggingTestConfig{
