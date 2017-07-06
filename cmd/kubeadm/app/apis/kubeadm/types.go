@@ -93,6 +93,7 @@ type NodeConfiguration struct {
 	DiscoveryToken string
 	// Currently we only pay attention to one api server but hope to support >1 in the future
 	DiscoveryTokenAPIServers []string
+	NodeName                 string
 	TLSBootstrapToken        string
 	Token                    string
 }
