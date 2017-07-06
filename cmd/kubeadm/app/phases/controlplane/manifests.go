@@ -229,23 +229,6 @@ func pkiVolumeMount() v1.VolumeMount {
 	}
 }
 
-func flockVolume() v1.Volume {
-	return v1.Volume{
-		Name: "var-lock",
-		VolumeSource: v1.VolumeSource{
-			HostPath: &v1.HostPathVolumeSource{Path: "/var/lock"},
-		},
-	}
-}
-
-func flockVolumeMount() v1.VolumeMount {
-	return v1.VolumeMount{
-		Name:      "var-lock",
-		MountPath: "/var/lock",
-		ReadOnly:  false,
-	}
-}
-
 func k8sVolume() v1.Volume {
 	return v1.Volume{
 		Name: "k8s",
@@ -445,19 +428,6 @@ func getProxyEnvVars() []v1.EnvVar {
 		}
 	}
 	return envs
-}
-
-func getSelfHostedAPIServerEnv() []v1.EnvVar {
-	podIPEnvVar := v1.EnvVar{
-		Name: "POD_IP",
-		ValueFrom: &v1.EnvVarSource{
-			FieldRef: &v1.ObjectFieldSelector{
-				FieldPath: "status.podIP",
-			},
-		},
-	}
-
-	return append(getProxyEnvVars(), podIPEnvVar)
 }
 
 // getAuthzParameters gets the authorization-related parameters to the api server

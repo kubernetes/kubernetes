@@ -34,6 +34,7 @@ go_library(
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/phases/selfhosting:go_default_library",
         "//cmd/kubeadm/app/phases/token:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",

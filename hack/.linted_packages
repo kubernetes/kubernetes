@@ -22,7 +22,9 @@ cmd/kubeadm/app/apis/kubeadm/install
 cmd/kubeadm/app/discovery/https
 cmd/kubeadm/app/phases/apiconfig
 cmd/kubeadm/app/phases/certs
+cmd/kubeadm/app/phases/controlplane
 cmd/kubeadm/app/phases/kubeconfig
+cmd/kubeadm/app/phases/selfhosting
 cmd/kubectl
 cmd/kubelet
 cmd/libs/go2idl/client-gen
