@@ -25,26 +25,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	openapitesting "k8s.io/apiserver/pkg/endpoints/openapi/testing"
 )
-
-type TestType struct {
-}
-
-func (t TestType) GetObjectKind() schema.ObjectKind {
-	return t
-}
-
-func (t TestType) SetGroupVersionKind(kind schema.GroupVersionKind) {
-}
-
-func (t TestType) GroupVersionKind() schema.GroupVersionKind {
-	return schema.GroupVersionKind{
-		Group:   "test",
-		Version: "v1",
-		Kind:    "TestType",
-	}
-}
 
 func assertEqual(t *testing.T, expected, actual interface{}) {
 	var equal bool
@@ -59,17 +41,17 @@ func assertEqual(t *testing.T, expected, actual interface{}) {
 }
 
 func TestGetDefinitionName(t *testing.T) {
-	testType := TestType{}
+	testType := openapitesting.TestType{}
 	// in production, the name is stripped of ".*vendor/" prefix before passed
 	// to GetDefinitionName, so here typePkgName does not have the
 	// "k8s.io/kubernetes/vendor" prefix.
-	typePkgName := "k8s.io/apiserver/pkg/endpoints/openapi.TestType"
-	typeFriendlyName := "io.k8s.apiserver.pkg.endpoints.openapi.TestType"
+	typePkgName := "k8s.io/apiserver/pkg/endpoints/openapi/testing.TestType"
+	typeFriendlyName := "io.k8s.apiserver.pkg.endpoints.openapi.testing.TestType"
 	if strings.HasSuffix(reflect.TypeOf(testType).PkgPath(), "go_default_test") {
 		// the test is running inside bazel where the package name is changed and
 		// "go_default_test" will add to package path.
-		typePkgName = "k8s.io/apiserver/pkg/endpoints/openapi/go_default_test.TestType"
-		typeFriendlyName = "io.k8s.apiserver.pkg.endpoints.openapi.go_default_test.TestType"
+		typePkgName = "k8s.io/apiserver/pkg/endpoints/openapi/testing/go_default_test.TestType"
+		typeFriendlyName = "io.k8s.apiserver.pkg.endpoints.openapi.testing.go_default_test.TestType"
 	}
 	s := runtime.NewScheme()
 	s.AddKnownTypeWithName(testType.GroupVersionKind(), &testType)
