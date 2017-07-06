@@ -21,8 +21,6 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 )
@@ -73,25 +71,7 @@ type F struct {
 	I []float32         `json:"fi"`
 }
 
-// Implement runtime.Object to make types usable for tests.
-
-func (c *C) GetObjectKind() schema.ObjectKind {
-	return schema.EmptyObjectKind
-}
-
-func (d *D) GetObjectKind() schema.ObjectKind {
-	return schema.EmptyObjectKind
-}
-
-func (e *E) GetObjectKind() schema.ObjectKind {
-	return schema.EmptyObjectKind
-}
-
-func (f *F) GetObjectKind() schema.ObjectKind {
-	return schema.EmptyObjectKind
-}
-
-func doRoundTrip(t *testing.T, item runtime.Object) {
+func doRoundTrip(t *testing.T, item interface{}) {
 	data, err := json.Marshal(item)
 	if err != nil {
 		t.Errorf("Error when marshaling object: %v", err)
@@ -127,7 +107,7 @@ func doRoundTrip(t *testing.T, item runtime.Object) {
 		return
 	}
 
-	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
+	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
 	err = DefaultConverter.FromUnstructured(newUnstr, newObj)
 	if err != nil {
 		t.Errorf("FromUnstructured failed: %v", err)
@@ -142,7 +122,7 @@ func doRoundTrip(t *testing.T, item runtime.Object) {
 func TestRoundTrip(t *testing.T) {
 	intVal := int64(42)
 	testCases := []struct {
-		obj runtime.Object
+		obj interface{}
 	}{
 		{
 			// This (among others) tests nil map, slice and pointer.
@@ -223,7 +203,7 @@ func TestRoundTrip(t *testing.T) {
 // 1) serialized json -> object
 // 2) serialized json -> map[string]interface{} -> object
 // produces the same object.
-func doUnrecognized(t *testing.T, jsonData string, item runtime.Object, expectedErr error) {
+func doUnrecognized(t *testing.T, jsonData string, item interface{}, expectedErr error) {
 	unmarshalledObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
 	err := json.Unmarshal([]byte(jsonData), &unmarshalledObj)
 	if (err != nil) != (expectedErr != nil) {
@@ -237,7 +217,7 @@ func doUnrecognized(t *testing.T, jsonData string, item runtime.Object, expected
 		t.Errorf("Error when unmarshaling to unstructured: %v", err)
 		return
 	}
-	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
+	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
 	err = DefaultConverter.FromUnstructured(unstr, newObj)
 	if (err != nil) != (expectedErr != nil) {
 		t.Errorf("Unexpected error in FromUnstructured: %v, expected: %v", err, expectedErr)
@@ -251,7 +231,7 @@ func doUnrecognized(t *testing.T, jsonData string, item runtime.Object, expected
 func TestUnrecognized(t *testing.T) {
 	testCases := []struct {
 		data string
-		obj  runtime.Object
+		obj  interface{}
 		err  error
 	}{
 		{

@@ -251,11 +251,7 @@ func (c *NamingConditionController) sync(key string) error {
 		return nil
 	}
 
-	crd := &apiextensions.CustomResourceDefinition{}
-	if err := apiextensions.DeepCopy_apiextensions_CustomResourceDefinition(inCustomResourceDefinition, crd, cloner); err != nil {
-		return err
-	}
-
+	crd := inCustomResourceDefinition.DeepCopy()
 	crd.Status.AcceptedNames = acceptedNames
 	apiextensions.SetCRDCondition(crd, namingCondition)
 	apiextensions.SetCRDCondition(crd, establishedCondition)
