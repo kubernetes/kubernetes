@@ -20,9 +20,9 @@ import (
 	"errors"
 	"testing"
 
+	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 )
 
 var class1Parameters = map[string]string{

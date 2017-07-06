@@ -196,7 +196,6 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				expandedPath := strings.TrimPrefix(pkg.SourcePath, arguments.OutputBase)
 				if strings.Contains(expandedPath, "/vendor/") {
 					path = expandedPath
-					glog.V(3).Infof("  %s", path)
 				}
 			}
 			packages = append(packages,

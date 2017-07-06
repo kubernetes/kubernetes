@@ -31,8 +31,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/api/core/v1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
 

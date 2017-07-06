@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	authenticationapi "k8s.io/client-go/pkg/apis/authentication/v1beta1"
+	authenticationapi "k8s.io/api/authentication/v1beta1"
 )
 
 type TokenReviewExpansion interface {

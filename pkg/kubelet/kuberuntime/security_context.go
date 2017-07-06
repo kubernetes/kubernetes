@@ -19,8 +19,8 @@ package kuberuntime
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	"k8s.io/api/core/v1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -72,7 +72,8 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 // verifyRunAsNonRoot verifies RunAsNonRoot.
 func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid int64) error {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
-	if effectiveSc == nil || effectiveSc.RunAsNonRoot == nil {
+	// If the option is not set, or if running as root is allowed, return nil.
+	if effectiveSc == nil || effectiveSc.RunAsNonRoot == nil || !*effectiveSc.RunAsNonRoot {
 		return nil
 	}
 

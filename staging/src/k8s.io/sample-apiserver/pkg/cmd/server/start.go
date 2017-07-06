@@ -22,6 +22,7 @@ import (
 	"net"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
@@ -33,6 +34,7 @@ const defaultEtcdPathPrefix = "/registry/wardle.kubernetes.io"
 
 type WardleServerOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
+	Admission          *genericoptions.AdmissionOptions
 
 	StdOut io.Writer
 	StdErr io.Writer
@@ -41,12 +43,18 @@ type WardleServerOptions struct {
 func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 	o := &WardleServerOptions{
 		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Scheme, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
+		Admission:          genericoptions.NewAdmissionOptions(),
 
 		StdOut: out,
 		StdErr: errOut,
 	}
 
 	return o
+}
+
+func (o *WardleServerOptions) addFlags(flags *pflag.FlagSet) {
+	o.RecommendedOptions.AddFlags(flags)
+	o.Admission.AddFlags(flags)
 }
 
 // NewCommandStartMaster provides a CLI handler for 'start master' command
@@ -71,7 +79,7 @@ func NewCommandStartWardleServer(out, errOut io.Writer, stopCh <-chan struct{}) 
 	}
 
 	flags := cmd.Flags()
-	o.RecommendedOptions.AddFlags(flags)
+	o.addFlags(flags)
 
 	return cmd
 }
@@ -92,6 +100,10 @@ func (o WardleServerOptions) Config() (*apiserver.Config, error) {
 
 	serverConfig := genericapiserver.NewConfig(apiserver.Codecs)
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
+		return nil, err
+	}
+
+	if err := o.Admission.ApplyTo(serverConfig); err != nil {
 		return nil, err
 	}
 

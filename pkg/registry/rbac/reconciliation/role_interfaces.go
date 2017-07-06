@@ -17,8 +17,11 @@ limitations under the License.
 package reconciliation
 
 import (
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	core "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 )
 
@@ -59,7 +62,8 @@ func (o RoleRuleOwner) SetRules(in []rbac.PolicyRule) {
 }
 
 type RoleModifier struct {
-	Client internalversion.RolesGetter
+	Client          internalversion.RolesGetter
+	NamespaceClient core.NamespaceInterface
 }
 
 func (c RoleModifier) Get(namespace, name string) (RuleOwner, error) {
@@ -71,6 +75,11 @@ func (c RoleModifier) Get(namespace, name string) (RuleOwner, error) {
 }
 
 func (c RoleModifier) Create(in RuleOwner) (RuleOwner, error) {
+	ns := &api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: in.GetNamespace()}}
+	if _, err := c.NamespaceClient.Create(ns); err != nil && !apierrors.IsAlreadyExists(err) {
+		return nil, err
+	}
+
 	ret, err := c.Client.Roles(in.GetNamespace()).Create(in.(RoleRuleOwner).Role)
 	if err != nil {
 		return nil, err

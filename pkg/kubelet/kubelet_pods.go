@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -42,8 +43,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
@@ -52,7 +53,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
 
@@ -114,7 +115,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 	// - container is not already mounting on /etc/hosts
 	// When the pause container is being created, its IP is still unknown. Hence, PodIP will not have been set.
 	// OS is not Windows
-	mountEtcHostsFile := (pod.Spec.SecurityContext == nil || !pod.Spec.HostNetwork) && len(podIP) > 0 && runtime.GOOS != "windows"
+	mountEtcHostsFile := !pod.Spec.HostNetwork && len(podIP) > 0 && runtime.GOOS != "windows"
 	glog.V(3).Infof("container: %v/%v/%v podIP: %q creating hosts mount: %v", pod.Namespace, pod.Name, container.Name, podIP, mountEtcHostsFile)
 	mounts := []kubecontainer.Mount{}
 	for _, mount := range container.VolumeMounts {
@@ -138,6 +139,15 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			return nil, err
 		}
 		if mount.SubPath != "" {
+			if filepath.IsAbs(mount.SubPath) {
+				return nil, fmt.Errorf("error SubPath `%s` must not be an absolute path", mount.SubPath)
+			}
+
+			err = volumevalidation.ValidatePathNoBacksteps(mount.SubPath)
+			if err != nil {
+				return nil, fmt.Errorf("unable to provision SubPath `%s`: %v", mount.SubPath, err)
+			}
+
 			fileinfo, err := os.Lstat(hostPath)
 			if err != nil {
 				return nil, err
@@ -446,7 +456,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
 				optional := cm.Optional != nil && *cm.Optional
-				configMap, err = kl.kubeClient.Core().ConfigMaps(pod.Namespace).Get(name, metav1.GetOptions{})
+				configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
 				if err != nil {
 					if errors.IsNotFound(err) && optional {
 						// ignore error when marked optional
@@ -554,7 +564,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					if kl.kubeClient == nil {
 						return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
-					configMap, err = kl.kubeClient.Core().ConfigMaps(pod.Namespace).Get(name, metav1.GetOptions{})
+					configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
 					if err != nil {
 						if errors.IsNotFound(err) && optional {
 							// ignore error when marked optional
@@ -733,15 +743,10 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	return status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
 }
 
-// OkToDeletePod returns true if all required node-level resources that a pod was consuming have
-// been reclaimed by the kubelet.  Reclaiming resources is a prerequisite to deleting a pod from the
-// API server.
-func (kl *Kubelet) OkToDeletePod(pod *v1.Pod) bool {
-	if pod.DeletionTimestamp == nil {
-		// We shouldnt delete pods whose DeletionTimestamp is not set
-		return false
-	}
-	if !notRunning(pod.Status.ContainerStatuses) {
+// PodResourcesAreReclaimed returns true if all required node-level resources that a pod was consuming have
+// been reclaimed by the kubelet.  Reclaiming resources is a prerequisite to deleting a pod from the API server.
+func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool {
+	if !notRunning(status.ContainerStatuses) {
 		// We shouldnt delete pods that still have running containers
 		glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 		return false
@@ -759,6 +764,15 @@ func (kl *Kubelet) OkToDeletePod(pod *v1.Pod) bool {
 		}
 	}
 	return true
+}
+
+// podResourcesAreReclaimed simply calls PodResourcesAreReclaimed with the most up-to-date status.
+func (kl *Kubelet) podResourcesAreReclaimed(pod *v1.Pod) bool {
+	status, ok := kl.statusManager.GetPodStatus(pod.UID)
+	if !ok {
+		status = pod.Status
+	}
+	return kl.PodResourcesAreReclaimed(pod, status)
 }
 
 // notRunning returns true if every status is terminated or waiting, or the status list
@@ -878,12 +892,6 @@ func (kl *Kubelet) HandlePodCleanups() error {
 
 	// Remove any orphaned mirror pods.
 	kl.podManager.DeleteOrphanedMirrorPods()
-
-	// Clear out any old bandwidth rules
-	err = kl.cleanupBandwidthLimits(allPods)
-	if err != nil {
-		glog.Errorf("Failed cleaning up bandwidth limits: %v", err)
-	}
 
 	// Remove any cgroups in the hierarchy for pods that are no longer running.
 	if kl.cgroupsPerQOS {
@@ -1225,7 +1233,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 	var apiPodStatus v1.PodStatus
 	apiPodStatus.PodIP = podStatus.IP
 	// set status for Pods created on versions of kube older than 1.6
-	apiPodStatus.QOSClass = qos.GetPodQOS(pod)
+	apiPodStatus.QOSClass = v1qos.GetPodQOS(pod)
 
 	apiPodStatus.ContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,

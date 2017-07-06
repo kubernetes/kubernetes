@@ -7,6 +7,7 @@ load(
     "go_binary",
     "go_library",
 )
+load("//pkg/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "kube-controller-manager",
@@ -17,8 +18,8 @@ go_binary(
         "-static",
     ],
     library = ":go_default_library",
-    linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
+    x_defs = version_x_defs(),
 )
 
 go_library(

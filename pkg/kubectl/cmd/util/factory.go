@@ -34,6 +34,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -46,7 +47,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
@@ -230,17 +231,21 @@ type ObjectMappingFactory interface {
 // Generally they depend upon client mapper functions
 type BuilderFactory interface {
 	// PrinterForCommand returns the default printer for the command. It requires that certain options
-	// are declared on the command (see AddPrinterFlags). Returns a printer, true if the printer is
-	// generic (is not internal), or an error if a printer could not be found.
+	// are declared on the command (see AddPrinterFlags). Returns a printer, or an error if a printer
+	// could not be found.
 	// TODO: Break the dependency on cmd here.
-	PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error)
+	PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
 	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
-	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)
+	// Returns a printer, true if the printer is generic (is not internal), or
+	// an error if a printer could not be found.
+	PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)
 	// PrintObject prints an api object given command line flags to modify the output format
-	PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	// One stop shopping for a Builder
-	NewBuilder() *resource.Builder
+	NewBuilder(allowRemoteCalls bool) *resource.Builder
+	// Resource builder for working with unstructured objects
+	NewUnstructuredBuilder(allowRemoteCalls bool) (*resource.Builder, error)
 	// PluginLoader provides the implementation to be used to load cli plugins.
 	PluginLoader() plugins.PluginLoader
 	// PluginRunner provides the implementation to be used to run cli plugins.
@@ -291,13 +296,13 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels
 	for i := range podList.Items {
 		pod := podList.Items[i]
 		externalPod := &v1.Pod{}
-		v1.Convert_api_Pod_To_v1_Pod(&pod, externalPod, nil)
+		k8s_api_v1.Convert_api_Pod_To_v1_Pod(&pod, externalPod, nil)
 		pods = append(pods, externalPod)
 	}
 	if len(pods) > 0 {
 		sort.Sort(sortBy(pods))
 		internalPod := &api.Pod{}
-		v1.Convert_v1_Pod_To_api_Pod(pods[0], internalPod, nil)
+		k8s_api_v1.Convert_v1_Pod_To_api_Pod(pods[0], internalPod, nil)
 		return internalPod, len(podList.Items), nil
 	}
 

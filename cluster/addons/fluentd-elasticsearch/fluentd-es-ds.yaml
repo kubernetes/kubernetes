@@ -21,13 +21,17 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      serviceAccountName: fluentd-es
       containers:
       - name: fluentd-es
-        image: gcr.io/google_containers/fluentd-elasticsearch:1.22
+        image: gcr.io/google_containers/fluentd-elasticsearch:1.23
         command:
           - '/bin/sh'
           - '-c'
-          - '/usr/sbin/td-agent 2>&1 >> /var/log/fluentd.log'
+          - '/usr/sbin/td-agent $FLUENTD_ARGS'
+        env:
+        - name: FLUENTD_AGRS
+          value: -q
         resources:
           limits:
             memory: 200Mi

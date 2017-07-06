@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion/queryparams"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 )
@@ -126,11 +126,16 @@ func (rc *ResourceClient) List(opts metav1.ListOptions) (runtime.Object, error) 
 }
 
 // Get gets the resource with the specified name.
-func (rc *ResourceClient) Get(name string) (*unstructured.Unstructured, error) {
+func (rc *ResourceClient) Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
+	parameterEncoder := rc.parameterCodec
+	if parameterEncoder == nil {
+		parameterEncoder = defaultParameterEncoder
+	}
 	result := new(unstructured.Unstructured)
 	err := rc.cl.Get().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
+		VersionedParams(&opts, parameterEncoder).
 		Name(name).
 		Do().
 		Into(result)

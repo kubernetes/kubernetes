@@ -33,13 +33,6 @@ gcs_upload(
     },
 )
 
-# TODO: remove this alias after 2017-05-22
-alias(
-    name = "ci-artifacts",
-    actual = "push-build",
-    deprecation = "This rule will be removed after 2017-05-22. Use //:push-build instead.",
-)
-
 filegroup(
     name = "package-srcs",
     srcs = glob(

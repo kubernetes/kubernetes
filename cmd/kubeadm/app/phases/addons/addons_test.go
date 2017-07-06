@@ -32,6 +32,11 @@ func TestGetClusterCIDR(t *testing.T) {
 	if clusterCIDR != "- --cluster-cidr=10.244.0.0/16" {
 		t.Errorf("Invalid format: %s", clusterCIDR)
 	}
+
+	clusterIPv6CIDR := getClusterCIDR("2001:db8::/64")
+	if clusterIPv6CIDR != "- --cluster-cidr=2001:db8::/64" {
+		t.Errorf("Invalid format: %s", clusterIPv6CIDR)
+	}
 }
 
 func TestCompileManifests(t *testing.T) {

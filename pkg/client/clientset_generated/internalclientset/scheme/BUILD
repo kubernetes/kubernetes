@@ -17,6 +17,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/install:go_default_library",
+        "//pkg/apis/admissionregistration/install:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
         "//pkg/apis/authorization/install:go_default_library",
@@ -25,6 +26,7 @@ go_library(
         "//pkg/apis/certificates/install:go_default_library",
         "//pkg/apis/componentconfig/install:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
+        "//pkg/apis/networking/install:go_default_library",
         "//pkg/apis/policy/install:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/apis/settings/install:go_default_library",

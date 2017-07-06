@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package noderestriction
 
 import (
 	"fmt"
 	"io"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -34,26 +35,25 @@ const (
 	PluginName = "NodeRestriction"
 )
 
-func init() {
-	kubeapiserveradmission.Plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		return NewPlugin(nodeidentifier.NewDefaultNodeIdentifier(), false), nil
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
+		return NewPlugin(nodeidentifier.NewDefaultNodeIdentifier()), nil
 	})
 }
 
 // NewPlugin creates a new NodeRestriction admission plugin.
 // This plugin identifies requests from nodes
-func NewPlugin(nodeIdentifier nodeidentifier.NodeIdentifier, strict bool) *nodePlugin {
+func NewPlugin(nodeIdentifier nodeidentifier.NodeIdentifier) *nodePlugin {
 	return &nodePlugin{
 		Handler:        admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 		nodeIdentifier: nodeIdentifier,
-		strict:         strict,
 	}
 }
 
 // nodePlugin holds state for and implements the admission plugin.
 type nodePlugin struct {
 	*admission.Handler
-	strict         bool
 	nodeIdentifier nodeidentifier.NodeIdentifier
 	podsGetter     coreinternalversion.PodsGetter
 }
@@ -91,12 +91,8 @@ func (c *nodePlugin) Admit(a admission.Attributes) error {
 	}
 
 	if len(nodeName) == 0 {
-		if c.strict {
-			// In strict mode, disallow requests from nodes we cannot match to a particular node
-			return admission.NewForbidden(a, fmt.Errorf("could not determine node identity from user"))
-		}
-		// Our job is just to restrict identifiable nodes
-		return nil
+		// disallow requests we cannot match to a particular node
+		return admission.NewForbidden(a, fmt.Errorf("could not determine node from user %s", a.GetUserInfo().GetName()))
 	}
 
 	switch a.GetResource().GroupResource() {
@@ -160,8 +156,12 @@ func (c *nodePlugin) admitPod(nodeName string, a admission.Attributes) error {
 		return nil
 
 	case admission.Delete:
-		// get the existing pod
+		// get the existing pod from the server cache
 		existingPod, err := c.podsGetter.Pods(a.GetNamespace()).Get(a.GetName(), v1.GetOptions{ResourceVersion: "0"})
+		if errors.IsNotFound(err) {
+			// wasn't found in the server cache, do a live lookup before forbidding
+			existingPod, err = c.podsGetter.Pods(a.GetNamespace()).Get(a.GetName(), v1.GetOptions{})
+		}
 		if err != nil {
 			return admission.NewForbidden(a, err)
 		}

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -40,6 +40,10 @@ const (
 	// VolumeGidAnnotationKey is the of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
 	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
+
+	// VolumeDynamicallyCreatedByKey is the key of the annotation on PersistentVolume
+	// object created dynamically
+	VolumeDynamicallyCreatedByKey = "kubernetes.io/createdby"
 )
 
 // GetUniquePodName returns a unique identifier to reference a pod by

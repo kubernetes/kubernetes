@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -233,7 +233,7 @@ type diskIsAttachedCall struct {
 	ret        error
 }
 
-func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName) (string, string, error) {
+func (testcase *testcase) AttachDisk(diskName string, storagePolicyName string, nodeName types.NodeName) (string, string, error) {
 	expected := &testcase.attach
 
 	if expected.diskName == "" && expected.nodeName == "" {

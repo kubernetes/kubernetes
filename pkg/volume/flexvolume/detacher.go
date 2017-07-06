@@ -28,20 +28,21 @@ import (
 )
 
 type flexVolumeDetacher struct {
-	plugin *flexVolumePlugin
+	plugin *flexVolumeAttachablePlugin
 }
 
 var _ volume.Detacher = &flexVolumeDetacher{}
 
 // Detach is part of the volume.Detacher interface.
-func (d *flexVolumeDetacher) Detach(deviceName string, hostName types.NodeName) error {
+func (d *flexVolumeDetacher) Detach(pvOrVolumeName string, hostName types.NodeName) error {
+
 	call := d.plugin.NewDriverCall(detachCmd)
-	call.Append(deviceName)
+	call.Append(pvOrVolumeName)
 	call.Append(string(hostName))
 
 	_, err := call.Run()
 	if isCmdNotSupportedErr(err) {
-		return (*detacherDefaults)(d).Detach(deviceName, hostName)
+		return (*detacherDefaults)(d).Detach(pvOrVolumeName, hostName)
 	}
 	return err
 }

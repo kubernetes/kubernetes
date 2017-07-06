@@ -21,10 +21,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
@@ -97,12 +97,12 @@ func TestReconcile(t *testing.T) {
 				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{cluster + "-02", "node-2", "10.120.1.0/24", false},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{cluster + "-02", "node-2", "10.120.1.0/24", false},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
@@ -114,11 +114,11 @@ func TestReconcile(t *testing.T) {
 				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{cluster + "-02", "node-2", "10.120.1.0/24", false},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
@@ -131,8 +131,8 @@ func TestReconcile(t *testing.T) {
 			},
 			initialRoutes: []*cloudprovider.Route{},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{cluster + "-02", "node-2", "10.120.1.0/24", false},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
@@ -144,14 +144,14 @@ func TestReconcile(t *testing.T) {
 				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
-				{cluster + "-03", "node-3", "10.120.2.0/24"},
-				{cluster + "-04", "node-4", "10.120.3.0/24"},
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{cluster + "-02", "node-2", "10.120.1.0/24", false},
+				{cluster + "-03", "node-3", "10.120.2.0/24", false},
+				{cluster + "-04", "node-4", "10.120.3.0/24", false},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{cluster + "-02", "node-2", "10.120.1.0/24", false},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
@@ -163,12 +163,12 @@ func TestReconcile(t *testing.T) {
 				&node2,
 			},
 			initialRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-03", "node-3", "10.120.2.0/24"},
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{cluster + "-03", "node-3", "10.120.2.0/24", false},
 			},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
-				{cluster + "-02", "node-2", "10.120.1.0/24"},
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{cluster + "-02", "node-2", "10.120.1.0/24", false},
 			},
 			expectedNetworkUnavailable: []bool{true, true},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
@@ -181,10 +181,47 @@ func TestReconcile(t *testing.T) {
 			},
 			initialRoutes: []*cloudprovider.Route{},
 			expectedRoutes: []*cloudprovider.Route{
-				{cluster + "-01", "node-1", "10.120.0.0/24"},
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
 			},
 			expectedNetworkUnavailable: []bool{true, false},
 			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, nodeNoCidr}}),
+		},
+		// 2 nodes, an extra blackhole route in our range
+		{
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{cluster + "-02", "node-2", "10.120.1.0/24", false},
+				{cluster + "-03", "", "10.120.2.0/24", true},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{cluster + "-02", "node-2", "10.120.1.0/24", false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		// 2 nodes, an extra blackhole route not in our range
+		{
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{cluster + "-02", "node-2", "10.120.1.0/24", false},
+				{cluster + "-03", "", "10.1.2.0/24", true},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{cluster + "-01", "node-1", "10.120.0.0/24", false},
+				{cluster + "-02", "node-2", "10.120.1.0/24", false},
+				{cluster + "-03", "", "10.1.2.0/24", true},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
 		},
 	}
 	for i, testCase := range testCases {

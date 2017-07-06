@@ -20,15 +20,14 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = framework.KubeDescribe("Downward API volume", func() {
@@ -71,8 +70,8 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 
 	It("should provide podname as non-root with fsgroup [Feature:FSGroup] [Volume]", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
-		uid := types.UnixUserID(1001)
-		gid := types.UnixGroupID(1234)
+		uid := int64(1001)
+		gid := int64(1234)
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			RunAsUser: &uid,
@@ -85,8 +84,8 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 
 	It("should provide podname as non-root with fsgroup and defaultMode [Feature:FSGroup] [Volume]", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
-		uid := types.UnixUserID(1001)
-		gid := types.UnixGroupID(1234)
+		uid := int64(1001)
+		gid := int64(1234)
 		mode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podname", &mode, nil)
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{

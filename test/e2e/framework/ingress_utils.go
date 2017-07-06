@@ -27,7 +27,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
@@ -39,21 +38,19 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -478,7 +475,7 @@ func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 
 func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
-	beList, err := gceCloud.ListBackendServices()
+	beList, err := gceCloud.ListGlobalBackendServices()
 	if err != nil {
 		if cont.isHTTPErrorCode(err, http.StatusNotFound) {
 			return msg
@@ -495,7 +492,7 @@ func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 		}
 		if del {
 			Logf("Deleting backed-service: %s", be.Name)
-			if err := gceCloud.DeleteBackendService(be.Name); err != nil &&
+			if err := gceCloud.DeleteGlobalBackendService(be.Name); err != nil &&
 				!cont.isHTTPErrorCode(err, http.StatusNotFound) {
 				msg += fmt.Sprintf("Failed to delete backend service %v: %v\n", be.Name, err)
 			}
@@ -717,9 +714,10 @@ func (cont *GCEIngressController) Init() {
 // invoking deleteStaticIPs.
 func (cont *GCEIngressController) CreateStaticIP(name string) string {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
-	ip, err := gceCloud.ReserveGlobalStaticIP(name, "")
+	addr := &compute.Address{Name: name}
+	ip, err := gceCloud.ReserveGlobalAddress(addr)
 	if err != nil {
-		if delErr := gceCloud.DeleteGlobalStaticIP(name); delErr != nil {
+		if delErr := gceCloud.DeleteGlobalAddress(name); delErr != nil {
 			if cont.isHTTPErrorCode(delErr, http.StatusNotFound) {
 				Logf("Static ip with name %v was not allocated, nothing to delete", name)
 			} else {
@@ -824,14 +822,16 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 		Logf("creating secret")
 		RunKubectlOrDie("create", "-f", mkpath("secret.yaml"), fmt.Sprintf("--namespace=%v", ns))
 	}
-	j.Ingress = createIngressFromManifest(mkpath("ing.yaml"))
+	Logf("Parsing ingress from %v", filepath.Join(manifestPath, "ing.yaml"))
+	var err error
+	j.Ingress, err = manifest.IngressFromManifest(filepath.Join(manifestPath, "ing.yaml"))
+	ExpectNoError(err)
 	j.Ingress.Namespace = ns
 	j.Ingress.Annotations = map[string]string{ingressClass: j.Class}
 	for k, v := range ingAnnotations {
 		j.Ingress.Annotations[k] = v
 	}
 	Logf(fmt.Sprintf("creating" + j.Ingress.Name + " ingress"))
-	var err error
 	j.Ingress, err = j.Client.Extensions().Ingresses(ns).Create(j.Ingress)
 	ExpectNoError(err)
 }
@@ -882,9 +882,12 @@ func (j *IngressTestJig) GetRootCA(secretName string) (rootCA []byte) {
 	return
 }
 
-// DeleteIngress deletes the ingress resource
-func (j *IngressTestJig) DeleteIngress() {
-	ExpectNoError(j.Client.Extensions().Ingresses(j.Ingress.Namespace).Delete(j.Ingress.Name, nil))
+// TryDeleteIngress attempts to delete the ingress resource and logs errors if they occur.
+func (j *IngressTestJig) TryDeleteIngress() {
+	err := j.Client.Extensions().Ingresses(j.Ingress.Namespace).Delete(j.Ingress.Name, nil)
+	if err != nil {
+		Logf("Error while deleting the ingress %v/%v: %v", j.Ingress.Namespace, j.Ingress.Name, err)
+	}
 }
 
 // WaitForIngress waits till the ingress acquires an IP, then waits for its
@@ -973,14 +976,13 @@ func (j *IngressTestJig) GetIngressNodePorts() []string {
 }
 
 // ConstructFirewallForIngress returns the expected GCE firewall rule for the ingress resource
-func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressController) *compute.Firewall {
-	nodeTags := GetNodeTags(j.Client, gceController.Cloud)
+func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressController, nodeTags []string) *compute.Firewall {
 	nodePorts := j.GetIngressNodePorts()
 
 	fw := compute.Firewall{}
 	fw.Name = gceController.GetFirewallRuleName()
 	fw.SourceRanges = gcecloud.LoadBalancerSrcRanges()
-	fw.TargetTags = nodeTags.Items
+	fw.TargetTags = nodeTags
 	fw.Allowed = []*compute.FirewallAllowed{
 		{
 			IPProtocol: "tcp",
@@ -988,20 +990,6 @@ func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressCo
 		},
 	}
 	return &fw
-}
-
-// createIngressFromManifest reads a .json/yaml file and returns the rc in it.
-func createIngressFromManifest(fileName string) *extensions.Ingress {
-	var ing extensions.Ingress
-	Logf("Parsing ingress from %v", fileName)
-	data, err := ioutil.ReadFile(fileName)
-	ExpectNoError(err)
-
-	json, err := utilyaml.ToJSON(data)
-	ExpectNoError(err)
-
-	ExpectNoError(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &ing))
-	return &ing
 }
 
 func (cont *GCEIngressController) getL7AddonUID() (string, error) {

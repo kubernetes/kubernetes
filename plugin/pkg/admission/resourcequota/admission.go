@@ -31,10 +31,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/validation"
 )
 
-func init() {
-	Register(&kubeapiserveradmission.Plugins)
-}
-
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register("ResourceQuota",

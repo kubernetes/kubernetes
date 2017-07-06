@@ -25,18 +25,17 @@ import (
 	"reflect"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
+	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
@@ -348,22 +347,15 @@ func (s *ServiceController) persistUpdate(service *v1.Service) error {
 }
 
 func (s *ServiceController) createLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
-	nodes, err := s.nodeLister.List(labels.Everything())
+	nodes, err := s.nodeLister.ListWithPredicate(getNodeConditionPredicate())
 	if err != nil {
 		return nil, err
-	}
-
-	lbNodes := []*v1.Node{}
-	for ix := range nodes {
-		if includeNodeFromNodeList(nodes[ix]) {
-			lbNodes = append(lbNodes, nodes[ix])
-		}
 	}
 
 	// - Only one protocol supported per service
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
-	return s.balancer.EnsureLoadBalancer(s.clusterName, service, lbNodes)
+	return s.balancer.EnsureLoadBalancer(s.clusterName, service, nodes)
 }
 
 // ListKeys implements the interface required by DeltaFIFO to list the keys we
@@ -472,6 +464,16 @@ func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.S
 	if oldService.UID != newService.UID {
 		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "UID", "%v -> %v",
 			oldService.UID, newService.UID)
+		return true
+	}
+	if oldService.Spec.ExternalTrafficPolicy != newService.Spec.ExternalTrafficPolicy {
+		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "ExternalTrafficPolicy", "%v -> %v",
+			oldService.Spec.ExternalTrafficPolicy, newService.Spec.ExternalTrafficPolicy)
+		return true
+	}
+	if oldService.Spec.HealthCheckNodePort != newService.Spec.HealthCheckNodePort {
+		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "HealthCheckNodePort", "%v -> %v",
+			oldService.Spec.HealthCheckNodePort, newService.Spec.HealthCheckNodePort)
 		return true
 	}
 

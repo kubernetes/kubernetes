@@ -33,12 +33,12 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -224,6 +224,25 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	} else {
 		return nil, err
 	}
+	rootfs, err := cadvisorInterface.RootFsInfo()
+	if err != nil {
+		capacity[v1.ResourceStorageScratch] = resource.MustParse("0Gi")
+	} else {
+		for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
+			capacity[rName] = rCap
+		}
+	}
+
+	if hasDedicatedImageFs, _ := cadvisorInterface.HasDedicatedImageFs(); hasDedicatedImageFs {
+		imagesfs, err := cadvisorInterface.ImagesFsInfo()
+		if err != nil {
+			glog.Errorf("Failed to get Image filesystem information: %v", err)
+		} else {
+			for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(imagesfs) {
+				capacity[rName] = rCap
+			}
+		}
+	}
 
 	cgroupRoot := nodeConfig.CgroupRoot
 	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
@@ -312,6 +331,8 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 		utilsysctl.VmPanicOnOOM:       utilsysctl.VmPanicOnOOMInvokeOOMKiller,
 		utilsysctl.KernelPanic:        utilsysctl.KernelPanicRebootTimeout,
 		utilsysctl.KernelPanicOnOops:  utilsysctl.KernelPanicOnOopsAlways,
+		utilsysctl.RootMaxKeys:        utilsysctl.RootMaxKeysSetting,
+		utilsysctl.RootMaxBytes:       utilsysctl.RootMaxBytesSetting,
 	}
 
 	sysctl := utilsysctl.New()

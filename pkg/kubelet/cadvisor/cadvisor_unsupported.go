@@ -31,7 +31,7 @@ type cadvisorUnsupported struct {
 
 var _ Interface = new(cadvisorUnsupported)
 
-func New(port uint, runtime string, rootPath string) (Interface, error) {
+func New(address string, port uint, runtime string, rootPath string) (Interface, error) {
 	return &cadvisorUnsupported{}, nil
 }
 
@@ -75,4 +75,8 @@ func (cu *cadvisorUnsupported) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 
 func (cu *cadvisorUnsupported) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return nil, unsupportedErr
+}
+
+func (cu *cadvisorUnsupported) HasDedicatedImageFs() (bool, error) {
+	return false, unsupportedErr
 }

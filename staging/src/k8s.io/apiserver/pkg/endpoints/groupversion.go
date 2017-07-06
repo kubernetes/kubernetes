@@ -87,6 +87,10 @@ type APIGroupVersion struct {
 	// ResourceLister is an interface that knows how to list resources
 	// for this API Group.
 	ResourceLister discovery.APIResourceLister
+
+	// EnableAPIResponseCompression indicates whether API Responses should support compression
+	// if the client requests it via Accept-Encoding
+	EnableAPIResponseCompression bool
 }
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
@@ -100,7 +104,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	if lister == nil {
 		lister = staticLister{apiResources}
 	}
-	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, lister)
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, lister, g.Context)
 	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
 	return utilerrors.NewAggregate(registrationErrors)
@@ -129,7 +133,7 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 	if lister == nil {
 		lister = staticLister{apiResources}
 	}
-	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, lister)
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, lister, g.Context)
 	versionDiscoveryHandler.AddToWebService(ws)
 	return utilerrors.NewAggregate(registrationErrors)
 }
@@ -138,9 +142,10 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 func (g *APIGroupVersion) newInstaller() *APIInstaller {
 	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
-		group:             g,
-		prefix:            prefix,
-		minRequestTimeout: g.MinRequestTimeout,
+		group:                        g,
+		prefix:                       prefix,
+		minRequestTimeout:            g.MinRequestTimeout,
+		enableAPIResponseCompression: g.EnableAPIResponseCompression,
 	}
 	return installer
 }

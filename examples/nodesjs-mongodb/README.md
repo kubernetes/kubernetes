@@ -6,7 +6,7 @@ For more a in-depth explanation of this example, please [read this post.](https:
 
 ### Prerequisites
 
-This example assumes that you have a basic understanding of Kubernetes conecepts (Pods, Services, Replication Controllers), a Kubernetes cluster up and running, and that you have installed the ```kubectl``` command line tool somewhere in your path.  Please see the [getting started](../../docs/getting-started-guides/) for installation instructions for your platform.
+This example assumes that you have a basic understanding of Kubernetes conecepts (Pods, Services, Replication Controllers), a Kubernetes cluster up and running, and that you have installed the ```kubectl``` command line tool somewhere in your path.  Please see the [getting started](https://kubernetes.io/docs/getting-started-guides/) for installation instructions for your platform.
 
 Note: This example was tested on [Google Container Engine](https://cloud.google.com/container-engine/docs/). Some optional commands require the [Google Cloud SDK](https://cloud.google.com/sdk/).
 
@@ -147,7 +147,7 @@ spec:
 
 [Download file](web-service.yaml)
 
-This service is called "web," and it uses a [LoadBalancer](../../docs/user-guide/services.md#type-loadbalancer) to distribute traffic on port 80 to port 3000 running on Pods with the "web" tag. Port 80 is the standard HTTP port, and port 3000 is the standard Node.js port.
+This service is called "web," and it uses a [LoadBalancer](https://kubernetes.io/docs/user-guide/services.md#type-loadbalancer) to distribute traffic on port 80 to port 3000 running on Pods with the "web" tag. Port 80 is the standard HTTP port, and port 3000 is the standard Node.js port.
 
 On Google Container Engine, a [network load balancer](https://cloud.google.com/compute/docs/load-balancing/network/) and [firewall rule](https://cloud.google.com/compute/docs/networking#addingafirewall) to allow traffic are automatically created.
 
@@ -157,7 +157,7 @@ To start the service, run:
 kubectl create -f examples/nodesjs-mongodb/web-service.yaml
 ```
 
-If you are running on a platform that does not support LoadBalancer (i.e Bare Metal), you need to use a [NodePort](../../docs/user-guide/services.md#type-nodeport) with your own load balancer.
+If you are running on a platform that does not support LoadBalancer (i.e Bare Metal), you need to use a [NodePort](https://kubernetes.io/docs/user-guide/services.md#type-nodeport) with your own load balancer.
 
 You may also need to open appropriate Firewall ports to allow traffic.
 

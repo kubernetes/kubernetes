@@ -28,12 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
-
-func init() {
-	Register(&kubeapiserveradmission.Plugins)
-}
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {

@@ -24,8 +24,6 @@ import (
 
 	"os"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	"github.com/golang/glog"
 )
 
@@ -37,7 +35,7 @@ const (
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, fsGroup *types.UnixGroupID) error {
+func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 
 	if fsGroup == nil {
 		return nil

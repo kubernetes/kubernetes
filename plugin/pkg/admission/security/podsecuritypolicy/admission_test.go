@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package admission
+package podsecuritypolicy
 
 import (
 	"fmt"
@@ -25,7 +25,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kadmission "k8s.io/apiserver/pkg/admission"
@@ -835,7 +834,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 		// doesn't matter if we set it here or on the container, the
 		// admission controller uses DetermineEffectiveSC to get the defaulting
 		// behavior so it can validate what will be applied at runtime
-		userID := types.UnixUserID(user)
+		userID := int64(user)
 		pod.Spec.SecurityContext.RunAsUser = &userID
 		return pod
 	}
@@ -855,7 +854,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 		pod               *kapi.Pod
 		psps              []*extensions.PodSecurityPolicy
 		shouldPass        bool
-		expectedRunAsUser *types.UnixUserID
+		expectedRunAsUser *int64
 		expectedPSP       string
 	}{
 		"runAsAny no pod request": {
@@ -941,8 +940,8 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 		// doesn't matter if we set it here or on the container, the
 		// admission controller uses DetermineEffectiveSC to get the defaulting
 		// behavior so it can validate what will be applied at runtime
-		groupID := types.UnixGroupID(group)
-		pod.Spec.SecurityContext.SupplementalGroups = []types.UnixGroupID{groupID}
+		groupID := int64(group)
+		pod.Spec.SecurityContext.SupplementalGroups = []int64{groupID}
 		return pod
 	}
 
@@ -957,28 +956,28 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 		pod               *kapi.Pod
 		psps              []*extensions.PodSecurityPolicy
 		shouldPass        bool
-		expectedSupGroups []types.UnixGroupID
+		expectedSupGroups []int64
 		expectedPSP       string
 	}{
 		"runAsAny no pod request": {
 			pod:               goodPod(),
 			psps:              []*extensions.PodSecurityPolicy{runAsAny},
 			shouldPass:        true,
-			expectedSupGroups: []types.UnixGroupID{},
+			expectedSupGroups: []int64{},
 			expectedPSP:       runAsAny.Name,
 		},
 		"runAsAny pod request": {
 			pod:               createPodWithSupGroup(1),
 			psps:              []*extensions.PodSecurityPolicy{runAsAny},
 			shouldPass:        true,
-			expectedSupGroups: []types.UnixGroupID{1},
+			expectedSupGroups: []int64{1},
 			expectedPSP:       runAsAny.Name,
 		},
 		"mustRunAs no pod request": {
 			pod:               goodPod(),
 			psps:              []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPass:        true,
-			expectedSupGroups: []types.UnixGroupID{mustRunAs.Spec.SupplementalGroups.Ranges[0].Min},
+			expectedSupGroups: []int64{mustRunAs.Spec.SupplementalGroups.Ranges[0].Min},
 			expectedPSP:       mustRunAs.Name,
 		},
 		"mustRunAs bad pod request": {
@@ -990,7 +989,7 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 			pod:               createPodWithSupGroup(999),
 			psps:              []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPass:        true,
-			expectedSupGroups: []types.UnixGroupID{999},
+			expectedSupGroups: []int64{999},
 			expectedPSP:       mustRunAs.Name,
 		},
 	}
@@ -1035,7 +1034,7 @@ func TestAdmitFSGroup(t *testing.T) {
 		pod             *kapi.Pod
 		psps            []*extensions.PodSecurityPolicy
 		shouldPass      bool
-		expectedFSGroup *types.UnixGroupID
+		expectedFSGroup *int64
 		expectedPSP     string
 	}{
 		"runAsAny no pod request": {
@@ -1711,7 +1710,7 @@ func restrictivePSP() *extensions.PodSecurityPolicy {
 			RunAsUser: extensions.RunAsUserStrategyOptions{
 				Rule: extensions.RunAsUserStrategyMustRunAs,
 				Ranges: []extensions.UserIDRange{
-					{Min: types.UnixUserID(999), Max: types.UnixUserID(999)},
+					{Min: int64(999), Max: int64(999)},
 				},
 			},
 			SELinux: extensions.SELinuxStrategyOptions{
@@ -1723,13 +1722,13 @@ func restrictivePSP() *extensions.PodSecurityPolicy {
 			FSGroup: extensions.FSGroupStrategyOptions{
 				Rule: extensions.FSGroupStrategyMustRunAs,
 				Ranges: []extensions.GroupIDRange{
-					{Min: types.UnixGroupID(999), Max: types.UnixGroupID(999)},
+					{Min: int64(999), Max: int64(999)},
 				},
 			},
 			SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
 				Rule: extensions.SupplementalGroupsStrategyMustRunAs,
 				Ranges: []extensions.GroupIDRange{
-					{Min: types.UnixGroupID(999), Max: types.UnixGroupID(999)},
+					{Min: int64(999), Max: int64(999)},
 				},
 			},
 		},
@@ -1774,12 +1773,12 @@ func goodPod() *kapi.Pod {
 	}
 }
 
-func userIDPtr(i int) *types.UnixUserID {
-	userID := types.UnixUserID(i)
+func userIDPtr(i int) *int64 {
+	userID := int64(i)
 	return &userID
 }
 
-func groupIDPtr(i int) *types.UnixGroupID {
-	groupID := types.UnixGroupID(i)
+func groupIDPtr(i int) *int64 {
+	groupID := int64(i)
 	return &groupID
 }

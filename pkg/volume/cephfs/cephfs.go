@@ -22,9 +22,9 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -107,7 +107,7 @@ func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.
 		}
 		for name, data := range secretName.Data {
 			secret = string(data)
-			glog.V(1).Infof("found ceph secret info: %s", name)
+			glog.V(4).Infof("found ceph secret info: %s", name)
 		}
 	}
 	return plugin.newMounterInternal(spec, pod.UID, plugin.host.GetMounter(), secret)
@@ -217,12 +217,12 @@ func (cephfsMounter *cephfsMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (cephfsVolume *cephfsMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (cephfsVolume *cephfsMounter) SetUp(fsGroup *int64) error {
 	return cephfsVolume.SetUpAt(cephfsVolume.GetPath(), fsGroup)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := cephfsVolume.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("CephFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {

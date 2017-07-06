@@ -41,6 +41,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -49,7 +50,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -94,6 +94,8 @@ const (
 	k8sRktContainerHashAnno          = "rkt.kubernetes.io/container-hash"
 	k8sRktRestartCountAnno           = "rkt.kubernetes.io/restart-count"
 	k8sRktTerminationMessagePathAnno = "rkt.kubernetes.io/termination-message-path"
+
+	k8sRktLimitNoFileAnno = "systemd-unit-option.rkt.kubernetes.io/LimitNOFILE"
 
 	// TODO(euank): This has significant security concerns as a stage1 image is
 	// effectively root.
@@ -1148,6 +1150,23 @@ func constructSyslogIdentifier(generateName string, podName string) string {
 	return podName
 }
 
+// Setup additional systemd field specified in the Pod Annotation
+func setupSystemdCustomFields(annotations map[string]string, unitOptionArray []*unit.UnitOption) ([]*unit.UnitOption, error) {
+	// LimitNOFILE
+	if strSize := annotations[k8sRktLimitNoFileAnno]; strSize != "" {
+		size, err := strconv.Atoi(strSize)
+		if err != nil {
+			return unitOptionArray, err
+		}
+		if size < 1 {
+			return unitOptionArray, fmt.Errorf("invalid value for %s: %s", k8sRktLimitNoFileAnno, strSize)
+		}
+		unitOptionArray = append(unitOptionArray, newUnitOption("Service", "LimitNOFILE", strSize))
+	}
+
+	return unitOptionArray, nil
+}
+
 // preparePod will:
 //
 // 1. Invoke 'rkt prepare' to prepare the pod, and get the rkt pod uuid.
@@ -1235,6 +1254,11 @@ func (r *Runtime) preparePod(pod *v1.Pod, podIP string, pullSecrets []v1.Secret,
 		units = append(units, newUnitOption("Service", "SELinuxContext", selinuxContext))
 	}
 
+	units, err = setupSystemdCustomFields(pod.Annotations, units)
+	if err != nil {
+		glog.Warningf("fail to add custom systemd fields provided by pod Annotations: %q", err)
+	}
+
 	serviceName := makePodServiceFileName(uuid)
 	glog.V(4).Infof("rkt: Creating service file %q for pod %q", serviceName, format.Pod(pod))
 	serviceFile, err := r.os.Create(serviceFilePath(serviceName))
@@ -1271,13 +1295,13 @@ func (r *Runtime) generateEvents(runtimePod *kubecontainer.Pod, reason string, f
 		uuid := utilstrings.ShortenString(id.uuid, 8)
 		switch reason {
 		case "Created":
-			r.recorder.Eventf(ref, v1.EventTypeNormal, events.CreatedContainer, "Created with rkt id %v", uuid)
+			r.recorder.Eventf(events.ToObjectReference(ref), v1.EventTypeNormal, events.CreatedContainer, "Created with rkt id %v", uuid)
 		case "Started":
-			r.recorder.Eventf(ref, v1.EventTypeNormal, events.StartedContainer, "Started with rkt id %v", uuid)
+			r.recorder.Eventf(events.ToObjectReference(ref), v1.EventTypeNormal, events.StartedContainer, "Started with rkt id %v", uuid)
 		case "Failed":
-			r.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToStartContainer, "Failed to start with rkt id %v with error %v", uuid, failure)
+			r.recorder.Eventf(events.ToObjectReference(ref), v1.EventTypeWarning, events.FailedToStartContainer, "Failed to start with rkt id %v with error %v", uuid, failure)
 		case "Killing":
-			r.recorder.Eventf(ref, v1.EventTypeNormal, events.KillingContainer, "Killing with rkt id %v", uuid)
+			r.recorder.Eventf(events.ToObjectReference(ref), v1.EventTypeNormal, events.KillingContainer, "Killing with rkt id %v", uuid)
 		default:
 			glog.Errorf("rkt: Unexpected event %q", reason)
 		}
@@ -1955,7 +1979,7 @@ func (r *Runtime) getPodSystemdServiceFiles() ([]os.FileInfo, error) {
 // - If the number of containers exceeds gcPolicy.MaxContainers,
 //   then containers whose ages are older than gcPolicy.minAge will
 //   be removed.
-func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
+func (r *Runtime) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool, _ bool) error {
 	var errlist []error
 	var totalInactiveContainers int
 	var inactivePods []*rktapi.Pod

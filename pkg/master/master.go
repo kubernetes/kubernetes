@@ -24,35 +24,36 @@ import (
 	"strconv"
 	"time"
 
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
+	authorizationapiv1 "k8s.io/api/authorization/v1"
+	authorizationapiv1beta1 "k8s.io/api/authorization/v1beta1"
+	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
+	batchapiv1 "k8s.io/api/batch/v1"
+	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
+	apiv1 "k8s.io/api/core/v1"
+	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
+	networkingapiv1 "k8s.io/api/networking/v1"
+	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
+	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	settingv1alpha1 "k8s.io/api/settings/v1alpha1"
+	storageapiv1 "k8s.io/api/storage/v1"
+	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	authenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
-	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
-	authorizationapiv1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
-	authorizationapiv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
-	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	certificatesapiv1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	policyapiv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
-	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
-	settingsapi "k8s.io/kubernetes/pkg/apis/settings/v1alpha1"
-	storageapiv1 "k8s.io/kubernetes/pkg/apis/storage/v1"
-	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	corev1client "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master/thirdparty"
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/routes"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -61,6 +62,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	// RESTStorage installers
+	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
 	appsrest "k8s.io/kubernetes/pkg/registry/apps/rest"
 	authenticationrest "k8s.io/kubernetes/pkg/registry/authentication/rest"
 	authorizationrest "k8s.io/kubernetes/pkg/registry/authorization/rest"
@@ -69,6 +71,7 @@ import (
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
+	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	settingsrest "k8s.io/kubernetes/pkg/registry/settings/rest"
@@ -206,18 +209,18 @@ func (c *Config) SkipComplete() completedConfig {
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 //   KubeletClientConfig
-func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Master, error) {
+func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget, crdRESTOptionsGetter genericregistry.RESTOptionsGetter) (*Master, error) {
 	if reflect.DeepEqual(c.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
 
-	s, err := c.Config.GenericConfig.SkipComplete().New(delegationTarget) // completion is done in Complete, no need for a second time
+	s, err := c.Config.GenericConfig.SkipComplete().New("kube-apiserver", delegationTarget) // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
 	}
 
 	if c.EnableUISupport {
-		routes.UIRedirect{}.Install(s.Handler.PostGoRestfulMux)
+		routes.UIRedirect{}.Install(s.Handler.NonGoRestfulMux)
 	}
 	if c.EnableLogsSupport {
 		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
@@ -244,13 +247,19 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// The order here is preserved in discovery.
 	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
 	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
+	// This priority order is used for local discovery, but it ends up aggregated in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go
+	// with specific priorities.
+	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
+	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authenticator},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{},
-		extensionsrest.RESTStorageProvider{ResourceInterface: thirdparty.NewThirdPartyResourceServer(s, s.DiscoveryGroupManager, c.StorageFactory)},
+		// TODO(enisoc): Remove crdRESTOptionsGetter input argument when TPR code is removed.
+		extensionsrest.RESTStorageProvider{},
+		networkingrest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
 		settingsrest.RESTStorageProvider{},
@@ -258,6 +267,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
 		// See https://github.com/kubernetes/kubernetes/issues/42392
 		appsrest.RESTStorageProvider{},
+		admissionregistrationrest.RESTStorageProvider{},
 	}
 	m.InstallAPIs(c.Config.APIResourceConfigSource, c.Config.GenericConfig.RESTOptionsGetter, restStorageProviders...)
 
@@ -369,6 +379,7 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 
 func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret := serverstorage.NewResourceConfig()
+	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
 	ret.EnableVersions(
 		apiv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
@@ -379,13 +390,18 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		appsv1beta1.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,
-		rbacapi.SchemeGroupVersion,
-		settingsapi.SchemeGroupVersion,
+		// Don't copy this pattern. We enable rbac/v1alpha1 and settings/v1laph1
+		// by default only because they were enabled in previous releases.
+		// See https://github.com/kubernetes/kubernetes/pull/47690.
+		// TODO: disable rbac/v1alpha1 and settings/v1alpha1 by default in 1.8
+		rbacv1alpha1.SchemeGroupVersion,
+		settingv1alpha1.SchemeGroupVersion,
 		storageapiv1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1beta1.SchemeGroupVersion,
 		authorizationapiv1.SchemeGroupVersion,
 		authorizationapiv1beta1.SchemeGroupVersion,
+		networkingapiv1.SchemeGroupVersion,
 	)
 
 	// all extensions resources except these are disabled by default

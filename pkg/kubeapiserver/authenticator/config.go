@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	"k8s.io/apiserver/pkg/authentication/request/union"
+	"k8s.io/apiserver/pkg/authentication/request/websocket"
 	"k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/keystone"
@@ -126,7 +127,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		if err != nil {
 			return nil, nil, err
 		}
-		authenticators = append(authenticators, tokenAuth)
+		authenticators = append(authenticators, bearertoken.New(tokenAuth), websocket.NewProtocolAuthenticator(tokenAuth))
 		hasTokenAuth = true
 	}
 	if len(config.ServiceAccountKeyFiles) > 0 {
@@ -134,13 +135,13 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		if err != nil {
 			return nil, nil, err
 		}
-		authenticators = append(authenticators, serviceAccountAuth)
+		authenticators = append(authenticators, bearertoken.New(serviceAccountAuth), websocket.NewProtocolAuthenticator(serviceAccountAuth))
 		hasTokenAuth = true
 	}
 	if config.BootstrapToken {
 		if config.BootstrapTokenAuthenticator != nil {
 			// TODO: This can sometimes be nil because of
-			authenticators = append(authenticators, bearertoken.New(config.BootstrapTokenAuthenticator))
+			authenticators = append(authenticators, bearertoken.New(config.BootstrapTokenAuthenticator), websocket.NewProtocolAuthenticator(config.BootstrapTokenAuthenticator))
 			hasTokenAuth = true
 		}
 	}
@@ -155,7 +156,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		if err != nil {
 			return nil, nil, err
 		}
-		authenticators = append(authenticators, oidcAuth)
+		authenticators = append(authenticators, bearertoken.New(oidcAuth), websocket.NewProtocolAuthenticator(oidcAuth))
 		hasTokenAuth = true
 	}
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
@@ -163,13 +164,13 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		if err != nil {
 			return nil, nil, err
 		}
-		authenticators = append(authenticators, webhookTokenAuth)
+		authenticators = append(authenticators, bearertoken.New(webhookTokenAuth), websocket.NewProtocolAuthenticator(webhookTokenAuth))
 		hasTokenAuth = true
 	}
 
 	// always add anytoken last, so that every other token authenticator gets to try first
 	if config.AnyToken {
-		authenticators = append(authenticators, bearertoken.New(anytoken.AnyTokenAuthenticator{}))
+		authenticators = append(authenticators, bearertoken.New(anytoken.AnyTokenAuthenticator{}), websocket.NewProtocolAuthenticator(anytoken.AnyTokenAuthenticator{}))
 		hasTokenAuth = true
 	}
 
@@ -234,17 +235,17 @@ func newAuthenticatorFromBasicAuthFile(basicAuthFile string) (authenticator.Requ
 }
 
 // newAuthenticatorFromTokenFile returns an authenticator.Request or an error
-func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request, error) {
+func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Token, error) {
 	tokenAuthenticator, err := tokenfile.NewCSV(tokenAuthFile)
 	if err != nil {
 		return nil, err
 	}
 
-	return bearertoken.New(tokenAuthenticator), nil
+	return tokenAuthenticator, nil
 }
 
 // newAuthenticatorFromOIDCIssuerURL returns an authenticator.Request or an error.
-func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, groupsClaim string) (authenticator.Request, error) {
+func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, groupsClaim string) (authenticator.Token, error) {
 	tokenAuthenticator, err := oidc.New(oidc.OIDCOptions{
 		IssuerURL:     issuerURL,
 		ClientID:      clientID,
@@ -256,11 +257,11 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 		return nil, err
 	}
 
-	return bearertoken.New(tokenAuthenticator), nil
+	return tokenAuthenticator, nil
 }
 
 // newServiceAccountAuthenticator returns an authenticator.Request or an error
-func newServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Request, error) {
+func newServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
 	allPublicKeys := []interface{}{}
 	for _, keyfile := range keyfiles {
 		publicKeys, err := serviceaccount.ReadPublicKeys(keyfile)
@@ -271,7 +272,7 @@ func newServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccou
 	}
 
 	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(allPublicKeys, lookup, serviceAccountGetter)
-	return bearertoken.New(tokenAuthenticator), nil
+	return tokenAuthenticator, nil
 }
 
 // newAuthenticatorFromClientCAFile returns an authenticator.Request or an error
@@ -297,11 +298,11 @@ func newAuthenticatorFromKeystoneURL(keystoneURL string, keystoneCAFile string) 
 	return basicauth.New(keystoneAuthenticator), nil
 }
 
-func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration) (authenticator.Request, error) {
+func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration) (authenticator.Token, error) {
 	webhookTokenAuthenticator, err := webhook.New(webhookConfigFile, ttl)
 	if err != nil {
 		return nil, err
 	}
 
-	return bearertoken.New(webhookTokenAuthenticator), nil
+	return webhookTokenAuthenticator, nil
 }

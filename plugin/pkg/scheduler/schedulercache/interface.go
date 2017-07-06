@@ -17,8 +17,8 @@ limitations under the License.
 package schedulercache
 
 import (
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // Cache collects pods' information and provides node-level aggregated information.

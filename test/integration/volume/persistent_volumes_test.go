@@ -25,14 +25,14 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/ref"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
@@ -48,14 +48,14 @@ import (
 // KUBE_INTEGRATION_PV_OBJECTS - nr. of PVs/PVCs to be created
 //      (100 by default)
 // KUBE_INTEGRATION_PV_SYNC_PERIOD - volume controller sync period
-//      (10s by default)
+//      (1s by default)
 // KUBE_INTEGRATION_PV_END_SLEEP - for how long should
 //      TestPersistentVolumeMultiPVsPVCs sleep when it's finished (0s by
 //      default). This is useful to test how long does it take for periodic sync
 //      to process bound PVs/PVCs.
 //
 const defaultObjectCount = 100
-const defaultSyncPeriod = 10 * time.Second
+const defaultSyncPeriod = 1 * time.Second
 
 const provisionerPluginName = "kubernetes.io/mock-provisioner"
 

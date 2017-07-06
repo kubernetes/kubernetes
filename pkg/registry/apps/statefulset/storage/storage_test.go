@@ -42,7 +42,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 // createStatefulSet is a helper function that returns a StatefulSet with the updated resource version.
 func createStatefulSet(storage *REST, ps apps.StatefulSet, t *testing.T) (apps.StatefulSet, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), ps.Namespace)
-	obj, err := storage.Create(ctx, &ps)
+	obj, err := storage.Create(ctx, &ps, false)
 	if err != nil {
 		t.Errorf("Failed to create StatefulSet, %v", err)
 	}
@@ -58,7 +58,8 @@ func validNewStatefulSet() *apps.StatefulSet {
 			Labels:    map[string]string{"a": "b"},
 		},
 		Spec: apps.StatefulSetSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -75,7 +76,8 @@ func validNewStatefulSet() *apps.StatefulSet {
 					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
-			Replicas: 7,
+			Replicas:       7,
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
 		Status: apps.StatefulSetStatus{},
 	}
@@ -184,6 +186,14 @@ func TestWatch(t *testing.T) {
 			{"metadata.name": "bar"},
 		},
 	)
+}
+
+func TestCategories(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage, expected)
 }
 
 // TODO: Test generation number.

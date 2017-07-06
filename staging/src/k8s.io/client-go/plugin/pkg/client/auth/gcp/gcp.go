@@ -124,10 +124,7 @@ func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restcli
 }
 
 func (g *gcpAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
-	return &oauth2.Transport{
-		Source: g.tokenSource,
-		Base:   rt,
-	}
+	return &conditionalTransport{&oauth2.Transport{Source: g.tokenSource, Base: rt}, g.persister}
 }
 
 func (g *gcpAuthProvider) Login() error { return nil }
@@ -283,4 +280,29 @@ func parseJSONPath(input interface{}, name, template string) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+type conditionalTransport struct {
+	oauthTransport *oauth2.Transport
+	persister      restclient.AuthProviderConfigPersister
+}
+
+func (t *conditionalTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if len(req.Header.Get("Authorization")) != 0 {
+		return t.oauthTransport.Base.RoundTrip(req)
+	}
+
+	res, err := t.oauthTransport.RoundTrip(req)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode == 401 {
+		glog.V(4).Infof("The credentials that were supplied are invalid for the target cluster")
+		emptyCache := make(map[string]string)
+		t.persister.Persist(emptyCache)
+	}
+
+	return res, nil
 }

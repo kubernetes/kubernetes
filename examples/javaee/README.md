@@ -8,7 +8,7 @@ https://github.com/kubernetes/kubernetes/blob/master/docs/user-guide/prereqs.md
 
 ### Start MySQL Pod
 
-In Kubernetes a [_Pod_](../../docs/user-guide/pods.md) is the smallest deployable unit that can be created, scheduled, and managed. It's a collocated group of containers that share an IP and storage volume.
+In Kubernetes a [_Pod_](https://kubernetes.io/docs/user-guide/pods.md) is the smallest deployable unit that can be created, scheduled, and managed. It's a collocated group of containers that share an IP and storage volume.
 
 Here is the config for MySQL pod: [mysql-pod.yaml](mysql-pod.yaml)
 
@@ -36,7 +36,7 @@ Wait for the status to `1/1` and `Running`.
 
 ### Start MySQL Service
 
-We are creating a [_Service_](../../docs/user-guide/services.md) to expose the TCP port of the MySQL server. A Service distributes traffic across a set of Pods. The order of Service and the targeted Pods does not matter. However Service needs to be started before any other Pods consuming the Service are started.
+We are creating a [_Service_](https://kubernetes.io/docs/user-guide/services.md) to expose the TCP port of the MySQL server. A Service distributes traffic across a set of Pods. The order of Service and the targeted Pods does not matter. However Service needs to be started before any other Pods consuming the Service are started.
 
 In this application, we will use a Kubernetes Service to provide a discoverable endpoints for the MySQL endpoint in the cluster.  MySQL service target pods with the labels `name: mysql-pod` and `context: docker-k8s-lab`.
 
@@ -78,7 +78,7 @@ Our service name is ``mysql-service'' and so ``MYSQL_SERVICE_SERVICE_HOST'' and 
 
 WildFly is a lightweight Java EE 7 compliant application server. It is wrapped in a Replication Controller and used as the Java EE runtime.
 
-In Kubernetes a [_Replication Controller_](../../docs/user-guide/replication-controller.md) is responsible for replicating sets of identical pods. Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a service it also has a desired number of replicas, and it will create or delete pods to ensure that the number of pods matches up with it's desired state.
+In Kubernetes a [_Replication Controller_](https://kubernetes.io/docs/user-guide/replication-controller.md) is responsible for replicating sets of identical pods. Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a service it also has a desired number of replicas, and it will create or delete pods to ensure that the number of pods matches up with it's desired state.
 
 Here is definition of the MySQL service: [wildfly-rc.yaml](wildfly-rc.yaml).
 

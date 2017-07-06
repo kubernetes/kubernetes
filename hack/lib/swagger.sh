@@ -127,13 +127,25 @@ kube::swagger::gen_api_ref_docs() {
   find . -type f | cut -sd / -f 2- | LC_ALL=C sort > .generated_html
   popd > /dev/null
 
+  if LANG=C sed --help 2>&1 | grep -q GNU; then
+    SED="sed"
+  elif which gsed &>/dev/null; then
+    SED="gsed"
+  else
+    echo "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
+    exit 1
+  fi
+
   while read file; do
     if [[ -e "${output_dir}/${file}" && -e "${output_tmp}/${file}" ]]; then
       echo "comparing ${output_dir}/${file} with ${output_tmp}/${file}"
 
+      # Remove the timestamp to reduce conflicts in PR(s)
+      $SED -i 's/^Last updated.*$//' "${output_tmp}/${file}"
+
       # By now, the contents should be normalized and stripped of any
       # auto-managed content.
-      if diff -NauprB -I 'Last update' "${output_dir}/${file}" "${output_tmp}/${file}" >/dev/null; then
+      if diff -NauprB "${output_dir}/${file}" "${output_tmp}/${file}" >/dev/null; then
         # actual contents same, overwrite generated with original.
         cp "${output_dir}/${file}" "${output_tmp}/${file}"
       fi
@@ -141,6 +153,9 @@ kube::swagger::gen_api_ref_docs() {
   done <"${output_tmp}/.generated_html"
 
   echo "Moving api reference docs from ${output_tmp} to ${output_dir}"
+
+  # Create output_dir if doesn't exist. Prevents error on copy.
+  mkdir -p "${output_dir}"
 
   cp -af "${output_tmp}"/* "${output_dir}"
   rm -r "${output_tmp}"

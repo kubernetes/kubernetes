@@ -34,15 +34,16 @@ import (
 	cadvisorclient "github.com/google/cadvisor/client/v2"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_node/perftype"
 
 	. "github.com/onsi/gomega"
 )
@@ -440,19 +441,11 @@ func newTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod 
 	return pods
 }
 
-// Time series of resource usage
-type ResourceSeries struct {
-	Timestamp            []int64           `json:"ts"`
-	CPUUsageInMilliCores []int64           `json:"cpu"`
-	MemoryRSSInMegaBytes []int64           `json:"memory"`
-	Units                map[string]string `json:"unit"`
-}
-
 // GetResourceSeriesWithLabels gets the time series of resource usage of each container.
-func (r *ResourceCollector) GetResourceTimeSeries() map[string]*ResourceSeries {
-	resourceSeries := make(map[string]*ResourceSeries)
+func (r *ResourceCollector) GetResourceTimeSeries() map[string]*perftype.ResourceSeries {
+	resourceSeries := make(map[string]*perftype.ResourceSeries)
 	for key, name := range systemContainers {
-		newSeries := &ResourceSeries{Units: map[string]string{
+		newSeries := &perftype.ResourceSeries{Units: map[string]string{
 			"cpu":    "mCPU",
 			"memory": "MB",
 		}}

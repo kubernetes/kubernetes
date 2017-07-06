@@ -18,12 +18,11 @@ package main
 
 import (
 	"fmt"
-	"time"
 
+	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/flag"
 	clientgoclientset "k8s.io/client-go/kubernetes"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
@@ -56,9 +55,8 @@ type HollowNodeConfig struct {
 }
 
 const (
-	maxPods            = 110
-	podsPerCore        = 0
-	configResyncPeriod = 15 * time.Minute
+	maxPods     = 110
+	podsPerCore = 0
 )
 
 var knownMorphs = sets.NewString("kubelet", "proxy")

@@ -17,13 +17,9 @@ limitations under the License.
 package podanalyzer
 
 import (
-	"fmt"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	api_v1 "k8s.io/api/core/v1"
 )
 
 type PodAnalysisResult struct {
@@ -42,41 +38,26 @@ const (
 	UnschedulableThreshold = 60 * time.Second
 )
 
-// A function that calculates how many pods from the list are in one of
+// AnalyzePods calculates how many pods from the list are in one of
 // the meaningful (from the replica set perspective) states. This function is
 // a temporary workaround against the current lack of ownerRef in pods.
-func AnalysePods(selectorv1 *metav1.LabelSelector, allPods []util.FederatedObject, currentTime time.Time) (map[string]PodAnalysisResult, error) {
-	selector, err := metav1.LabelSelectorAsSelector(selectorv1)
-	if err != nil {
-		return nil, fmt.Errorf("invalid selector: %v", err)
-	}
-	result := make(map[string]PodAnalysisResult)
-
-	for _, fedObject := range allPods {
-		pod, isPod := fedObject.Object.(*api_v1.Pod)
-		if !isPod {
-			return nil, fmt.Errorf("invalid arg content - not a *pod")
-		}
-		if !selector.Empty() && selector.Matches(labels.Set(pod.Labels)) {
-			status := result[fedObject.ClusterName]
-			status.Total++
-			for _, condition := range pod.Status.Conditions {
-				if pod.Status.Phase == api_v1.PodRunning {
-					if condition.Type == api_v1.PodReady {
-						status.RunningAndReady++
-					}
-				} else {
-					if condition.Type == api_v1.PodScheduled &&
-						condition.Status == api_v1.ConditionFalse &&
-						condition.Reason == api_v1.PodReasonUnschedulable &&
-						condition.LastTransitionTime.Add(UnschedulableThreshold).Before(currentTime) {
-
-						status.Unschedulable++
-					}
+func AnalyzePods(pods *api_v1.PodList, currentTime time.Time) PodAnalysisResult {
+	result := PodAnalysisResult{}
+	for _, pod := range pods.Items {
+		result.Total++
+		for _, condition := range pod.Status.Conditions {
+			if pod.Status.Phase == api_v1.PodRunning {
+				if condition.Type == api_v1.PodReady {
+					result.RunningAndReady++
 				}
+			} else if condition.Type == api_v1.PodScheduled &&
+				condition.Status == api_v1.ConditionFalse &&
+				condition.Reason == api_v1.PodReasonUnschedulable &&
+				condition.LastTransitionTime.Add(UnschedulableThreshold).Before(currentTime) {
+
+				result.Unschedulable++
 			}
-			result[fedObject.ClusterName] = status
 		}
 	}
-	return result, nil
+	return result
 }

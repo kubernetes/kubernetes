@@ -20,6 +20,7 @@ spec:
         version: v1
         kubernetes.io/cluster-service: "true"
     spec:
+      serviceAccountName: elasticsearch-logging
       containers:
       - image: gcr.io/google_containers/elasticsearch:v2.4.1-2
         name: elasticsearch-logging

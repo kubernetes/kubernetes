@@ -62,8 +62,8 @@ type CacherConfig struct {
 	// KeyFunc is used to get a key in the underlying storage for a given object.
 	KeyFunc func(runtime.Object) (string, error)
 
-	// GetAttrsFunc is used to get object labels and fields.
-	GetAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error)
+	// GetAttrsFunc is used to get object labels, fields, and the uninitialized bool
+	GetAttrsFunc func(runtime.Object) (label labels.Set, field fields.Set, uninitialized bool, err error)
 
 	// TriggerPublisherFunc is used for optimizing amount of watchers that
 	// needs to process an incoming event.
@@ -131,7 +131,7 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type) {
 	}
 }
 
-type watchFilterFunc func(string, labels.Set, fields.Set) bool
+type watchFilterFunc func(key string, l labels.Set, f fields.Set, uninitialized bool) bool
 
 // Cacher is responsible for serving WATCH and LIST requests for a given
 // resource from its internal cache and updating its cache in the background
@@ -639,6 +639,11 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 		if lock {
 			c.Lock()
 			defer c.Unlock()
+		} else {
+			// false is currently passed only if we are forcing watcher to close due
+			// to its unresponsiveness and blocking other watchers.
+			// TODO: Get this information in cleaner way.
+			glog.V(1).Infof("Forcing watcher close due to unresponsiveness: %v", c.objectType.String())
 		}
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simulaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
@@ -658,11 +663,11 @@ func filterFunction(key string, p SelectionPredicate) func(string, runtime.Objec
 }
 
 func watchFilterFunction(key string, p SelectionPredicate) watchFilterFunc {
-	filterFunc := func(objKey string, label labels.Set, field fields.Set) bool {
+	filterFunc := func(objKey string, label labels.Set, field fields.Set, uninitialized bool) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
 		}
-		return p.MatchesLabelsAndFields(label, field)
+		return p.MatchesObjectAttributes(label, field, uninitialized)
 	}
 	return filterFunc
 }
@@ -840,28 +845,38 @@ func (c *cacheWatcher) add(event *watchCacheEvent, budget *timeBudget) {
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
 func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
-	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields)
+	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields, event.ObjUninitialized)
 	oldObjPasses := false
 	if event.PrevObject != nil {
-		oldObjPasses = c.filter(event.Key, event.PrevObjLabels, event.PrevObjFields)
+		oldObjPasses = c.filter(event.Key, event.PrevObjLabels, event.PrevObjFields, event.PrevObjUninitialized)
 	}
 	if !curObjPasses && !oldObjPasses {
 		// Watcher is not interested in that object.
 		return
 	}
 
-	object, err := c.copier.Copy(event.Object)
-	if err != nil {
-		glog.Errorf("unexpected copy error: %v", err)
-		return
-	}
 	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:
+		object, err := c.copier.Copy(event.Object)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
+			return
+		}
 		watchEvent = watch.Event{Type: watch.Added, Object: object}
 	case curObjPasses && oldObjPasses:
+		object, err := c.copier.Copy(event.Object)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
+			return
+		}
 		watchEvent = watch.Event{Type: watch.Modified, Object: object}
 	case !curObjPasses && oldObjPasses:
+		object, err := c.copier.Copy(event.PrevObject)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
+			return
+		}
 		watchEvent = watch.Event{Type: watch.Deleted, Object: object}
 	}
 

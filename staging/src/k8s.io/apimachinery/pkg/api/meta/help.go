@@ -67,6 +67,9 @@ func GetItemsPtr(list runtime.Object) (interface{}, error) {
 // EachListItem invokes fn on each runtime.Object in the list. Any error immediately terminates
 // the loop.
 func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
+	if unstructured, ok := obj.(runtime.Unstructured); ok {
+		return unstructured.EachListItem(fn)
+	}
 	// TODO: Change to an interface call?
 	itemsPtr, err := GetItemsPtr(obj)
 	if err != nil {

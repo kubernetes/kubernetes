@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -49,10 +51,16 @@ var cloudproviders = []string{
 	"vsphere",
 }
 
+// Describes the authorization modes that are enforced by kubeadm
+var requiredAuthzModes = []string{
+	authzmodes.ModeRBAC,
+	authzmodes.ModeNode,
+}
+
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateCloudProvider(c.CloudProvider, field.NewPath("cloudprovider"))...)
-	allErrs = append(allErrs, ValidateAuthorizationModes(c.AuthorizationModes, field.NewPath("authorization-mode"))...)
+	allErrs = append(allErrs, ValidateAuthorizationModes(c.AuthorizationModes, field.NewPath("authorization-modes"))...)
 	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateAPIServerCertSANs(c.APIServerCertSANs, field.NewPath("cert-altnames"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificates-dir"))...)
@@ -72,19 +80,23 @@ func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 
 func ValidateAuthorizationModes(authzModes []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	found := map[string]bool{}
+
 	for _, authzMode := range authzModes {
 		if !authzmodes.IsValidAuthorizationMode(authzMode) {
 			allErrs = append(allErrs, field.Invalid(fldPath, authzMode, "invalid authorization mode"))
 		}
-	}
 
-	found := map[string]bool{}
-	for _, authzMode := range authzModes {
 		if found[authzMode] {
 			allErrs = append(allErrs, field.Invalid(fldPath, authzMode, "duplicate authorization mode"))
 			continue
 		}
 		found[authzMode] = true
+	}
+	for _, requiredMode := range requiredAuthzModes {
+		if !found[requiredMode] {
+			allErrs = append(allErrs, field.Required(fldPath, fmt.Sprintf("authorization mode %s must be enabled", requiredMode)))
+		}
 	}
 	return allErrs
 }
@@ -238,4 +250,11 @@ func ValidateCloudProvider(provider string, fldPath *field.Path) field.ErrorList
 	}
 	allErrs = append(allErrs, field.Invalid(fldPath, provider, "cloudprovider not supported"))
 	return allErrs
+}
+
+func ValidateMixedArguments(flag *pflag.FlagSet) error {
+	if flag.Changed("config") && flag.NFlag() != 1 {
+		return fmt.Errorf("can not mix '--config' with other arguments")
+	}
+	return nil
 }

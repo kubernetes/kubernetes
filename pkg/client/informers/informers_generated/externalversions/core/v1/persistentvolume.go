@@ -19,11 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/internalinterfaces"
 	v1 "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -51,7 +51,7 @@ func newPersistentVolumeInformer(client clientset.Interface, resyncPeriod time.D
 				return client.CoreV1().PersistentVolumes().Watch(options)
 			},
 		},
-		&api_v1.PersistentVolume{},
+		&core_v1.PersistentVolume{},
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -60,7 +60,7 @@ func newPersistentVolumeInformer(client clientset.Interface, resyncPeriod time.D
 }
 
 func (f *persistentVolumeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api_v1.PersistentVolume{}, newPersistentVolumeInformer)
+	return f.factory.InformerFor(&core_v1.PersistentVolume{}, newPersistentVolumeInformer)
 }
 
 func (f *persistentVolumeInformer) Lister() v1.PersistentVolumeLister {

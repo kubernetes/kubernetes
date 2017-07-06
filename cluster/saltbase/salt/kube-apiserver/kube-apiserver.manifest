@@ -176,8 +176,24 @@
 {% endif -%}
 
 {% set audit_log = "" -%}
+{% set audit_policy_config_mount = "" -%}
+{% set audit_policy_config_volume = "" -%}
+{% set audit_webhook_config_mount = "" -%}
+{% set audit_webhook_config_volume = "" -%}
 {% if pillar['enable_apiserver_basic_audit'] is defined and pillar['enable_apiserver_basic_audit'] in ['true']  -%}
   {% set audit_log = "--audit-log-path=/var/log/kube-apiserver-audit.log --audit-log-maxage=0 --audit-log-maxbackup=0 --audit-log-maxsize=2000000000" -%}
+{% elif pillar['enable_apiserver_advanced_audit'] is defined and pillar['enable_apiserver_advanced_audit'] in ['true']  -%}
+  {% set audit_log = "--audit-policy-file=/etc/audit_policy.config" -%}
+  {% set audit_policy_config_mount = "{\"name\": \"auditpolicyconfigmount\",\"mountPath\": \"/etc/audit_policy.config\", \"readOnly\": true}," -%}
+  {% set audit_policy_config_volume = "{\"name\": \"auditpolicyconfigmount\",\"hostPath\": {\"path\": \"/etc/audit_policy.config\"}}," -%}
+  {% if pillar['advanced_audit_backend'] is defined and 'log' in pillar['advanced_audit_backend'] -%}
+    {% set audit_log = audit_log + " --audit-log-path=/var/log/kube-apiserver-audit.log --audit-log-maxage=0 --audit-log-maxbackup=0 --audit-log-maxsize=2000000000" -%}
+  {% endif %}
+  {% if pillar['advanced_audit_backend'] is defined and 'webhook' in pillar['advanced_audit_backend'] -%}
+    {% set audit_log = audit_log + " --audit-webhook-mode=batch" -%}
+    {% set audit_webhook_config_mount = "{\"name\": \"auditwebhookconfigmount\",\"mountPath\": \"/etc/audit_webhook.config\", \"readOnly\": true}," -%}
+    {% set audit_webhook_config_volume = "{\"name\": \"auditwebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/audit_webhook.config\"}}," -%}
+  {% endif %}
 {% endif -%}
 
 {% set params = address + " " + storage_backend + " " + storage_media_type + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + max_requests_inflight + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector + " " + etcd_quorum_read + " " + audit_log -%}
@@ -196,6 +212,9 @@
 "metadata": {
   "name":"kube-apiserver",
   "namespace": "kube-system",
+  "annotations": {
+    "scheduler.alpha.kubernetes.io/critical-pod": ""
+  },
   "labels": {
     "tier": "control-plane",
     "component": "kube-apiserver"
@@ -240,6 +259,8 @@
         {{additional_cloud_config_mount}}
         {{webhook_config_mount}}
         {{webhook_authn_config_mount}}
+        {{audit_policy_config_mount}}
+        {{audit_webhook_config_mount}}
         {{admission_controller_config_mount}}
         {{image_policy_webhook_config_mount}}
         { "name": "srvkube",
@@ -277,6 +298,8 @@
   {{additional_cloud_config_volume}}
   {{webhook_config_volume}}
   {{webhook_authn_config_volume}}
+  {{audit_policy_config_volume}}
+  {{audit_webhook_config_volume}}
   {{admission_controller_config_volume}}
   {{image_policy_webhook_config_volume}}
   { "name": "srvkube",

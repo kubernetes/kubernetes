@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -107,6 +107,13 @@ func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
+
+	namespace := obj.(*v1.Namespace)
+	// don't queue if we aren't deleted
+	if namespace.DeletionTimestamp == nil || namespace.DeletionTimestamp.IsZero() {
+		return
+	}
+
 	// delay processing namespace events to allow HA api servers to observe namespace deletion,
 	// and HA etcd servers to observe last minute object creations inside the namespace
 	nm.queue.AddAfter(key, namespaceDeletionGracePeriod)

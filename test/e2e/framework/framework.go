@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,7 +41,6 @@ import (
 	clientreporestclient "k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/metrics"
@@ -51,8 +51,10 @@ import (
 )
 
 const (
-	maxKubectlExecRetries           = 5
-	DefaultNamespaceDeletionTimeout = 5 * time.Minute
+	maxKubectlExecRetries = 5
+	// TODO(mikedanese): reset this to 5 minutes once #47135 is resolved.
+	// ref https://github.com/kubernetes/kubernetes/issues/47135
+	DefaultNamespaceDeletionTimeout = 10 * time.Minute
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
@@ -325,9 +327,8 @@ func (f *Framework) AfterEach() {
 
 	if TestContext.GatherMetricsAfterTest {
 		By("Gathering metrics")
-		// Grab apiserver metrics and nodes' kubelet metrics (for non-kubemark case).
-		// TODO: enable Scheduler and ControllerManager metrics grabbing when Master's Kubelet will be registered.
-		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, !ProviderIs("kubemark"), false, false, true)
+		// Grab apiserver, scheduler, controller-manager metrics and nodes' kubelet metrics (for non-kubemark case).
+		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, !ProviderIs("kubemark"), true, true, true)
 		if err != nil {
 			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 		} else {

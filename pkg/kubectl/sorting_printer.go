@@ -24,13 +24,13 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/jsonpath"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/printers"
 
 	"vbom.ml/util/sortorder"
@@ -60,8 +60,12 @@ func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 }
 
 // TODO: implement HandledResources()
-func (p *SortingPrinter) HandledResources() []string {
+func (s *SortingPrinter) HandledResources() []string {
 	return []string{}
+}
+
+func (s *SortingPrinter) IsGeneric() bool {
+	return s.Delegate.IsGeneric()
 }
 
 func (s *SortingPrinter) sortObj(obj runtime.Object) error {

@@ -115,7 +115,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.PrintObject = func(mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
-		return f.PrintObject(cmd, mapper, obj, out)
+		return f.PrintObject(cmd, o.Local, mapper, obj, out)
 	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -123,11 +123,12 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	builder := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	builder := f.NewBuilder(!o.Local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		Flatten()
+
 	if !o.Local {
 		builder = builder.
 			SelectorParam(o.Selector).
@@ -224,7 +225,6 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 
 		if o.Local || o.DryRun {
-			fmt.Fprintln(o.Out, "running in local/dry-run mode...")
 			return o.PrintObject(o.Mapper, info.Object, o.Out)
 		}
 

@@ -18,8 +18,9 @@ package cadvisor
 
 import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
@@ -29,6 +30,24 @@ func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
 			resource.DecimalSI),
 		v1.ResourceMemory: *resource.NewQuantity(
 			int64(info.MemoryCapacity),
+			resource.BinarySI),
+	}
+	return c
+}
+
+func StorageScratchCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceList {
+	c := v1.ResourceList{
+		v1.ResourceStorageScratch: *resource.NewQuantity(
+			int64(info.Capacity),
+			resource.BinarySI),
+	}
+	return c
+}
+
+func StorageOverlayCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceList {
+	c := v1.ResourceList{
+		v1.ResourceStorageOverlay: *resource.NewQuantity(
+			int64(info.Capacity),
 			resource.BinarySI),
 	}
 	return c

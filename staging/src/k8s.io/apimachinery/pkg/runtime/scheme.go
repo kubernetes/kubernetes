@@ -151,8 +151,8 @@ func (s *Scheme) AddUnversionedTypes(version schema.GroupVersion, types ...Objec
 		t := reflect.TypeOf(obj).Elem()
 		gvk := version.WithKind(t.Name())
 		s.unversionedTypes[t] = gvk
-		if _, ok := s.unversionedKinds[gvk.Kind]; ok {
-			panic(fmt.Sprintf("%v has already been registered as unversioned kind %q - kind name must be unique", reflect.TypeOf(t), gvk.Kind))
+		if old, ok := s.unversionedKinds[gvk.Kind]; ok && t != old {
+			panic(fmt.Sprintf("%v.%v has already been registered as unversioned kind %q - kind name must be unique", old.PkgPath(), old.Name(), gvk))
 		}
 		s.unversionedKinds[gvk.Kind] = t
 	}

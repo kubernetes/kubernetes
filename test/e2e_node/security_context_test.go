@@ -22,10 +22,10 @@ import (
 	"os/exec"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -274,4 +274,45 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 	})
 
+	Context("When creating a container with runAsUser", func() {
+		makeUserPod := func(podName, image string, command []string, userid int64) *v1.Pod {
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Image:   image,
+							Name:    podName,
+							Command: command,
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: &userid,
+							},
+						},
+					},
+				},
+			}
+		}
+		createAndWaitUserPod := func(userid int64) {
+			podName := fmt.Sprintf("busybox-user-%d-%s", userid, uuid.NewUUID())
+			podClient.Create(makeUserPod(podName,
+				"gcr.io/google_containers/busybox:1.24",
+				[]string{"sh", "-c", fmt.Sprintf("test $(id -u) -eq %d", userid)},
+				userid,
+			))
+
+			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+		}
+
+		It("should run the container with uid 65534", func() {
+			createAndWaitUserPod(65534)
+		})
+
+		It("should run the container with uid 0", func() {
+			createAndWaitUserPod(0)
+		})
+
+	})
 })

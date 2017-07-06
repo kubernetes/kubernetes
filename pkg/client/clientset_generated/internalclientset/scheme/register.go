@@ -24,6 +24,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	core "k8s.io/kubernetes/pkg/api/install"
+	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	apps "k8s.io/kubernetes/pkg/apis/apps/install"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication/install"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization/install"
@@ -31,6 +32,7 @@ import (
 	batch "k8s.io/kubernetes/pkg/apis/batch/install"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/install"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/install"
+	networking "k8s.io/kubernetes/pkg/apis/networking/install"
 	policy "k8s.io/kubernetes/pkg/apis/policy/install"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac/install"
 	settings "k8s.io/kubernetes/pkg/apis/settings/install"
@@ -52,6 +54,7 @@ func init() {
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
+	admissionregistration.Install(groupFactoryRegistry, registry, scheme)
 	core.Install(groupFactoryRegistry, registry, scheme)
 	apps.Install(groupFactoryRegistry, registry, scheme)
 	authentication.Install(groupFactoryRegistry, registry, scheme)
@@ -60,6 +63,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	batch.Install(groupFactoryRegistry, registry, scheme)
 	certificates.Install(groupFactoryRegistry, registry, scheme)
 	extensions.Install(groupFactoryRegistry, registry, scheme)
+	networking.Install(groupFactoryRegistry, registry, scheme)
 	policy.Install(groupFactoryRegistry, registry, scheme)
 	rbac.Install(groupFactoryRegistry, registry, scheme)
 	settings.Install(groupFactoryRegistry, registry, scheme)

@@ -105,7 +105,7 @@ function copy-logs-from-node() {
         gce|gke|kubemark)
           # get-serial-port-output lets you ask for ports 1-4, but currently (11/21/2016) only port 1 contains useful information
           gcloud compute instances get-serial-port-output --project "${PROJECT}" --zone "${ZONE}" --port 1 "${node}" > "${dir}/serial-1.log" || true
-          gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
+          gcloud compute scp --recurse --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
           ;;
         aws)
           local ip=$(get_ssh_hostname "${node}")
@@ -224,8 +224,19 @@ function dump_nodes() {
     return
   fi
 
+  nodes_selected_for_logs=()
+  if [[ -n "${LOGDUMP_ONLY_N_RANDOM_NODES:-}" ]]; then
+    # We randomly choose 'LOGDUMP_ONLY_N_RANDOM_NODES' many nodes for fetching logs.
+    for index in `shuf -i 0-$(( ${#node_names[*]} - 1 )) -n ${LOGDUMP_ONLY_N_RANDOM_NODES}`
+    do
+      nodes_selected_for_logs+=("${node_names[$index]}")
+    done
+  else
+    nodes_selected_for_logs=( "${node_names[@]}" )
+  fi
+
   proc=${max_scp_processes}
-  for node_name in "${node_names[@]}"; do
+  for node_name in "${nodes_selected_for_logs[@]}"; do
     node_dir="${report_dir}/${node_name}"
     mkdir -p "${node_dir}"
     # Save logs in the background. This speeds up things when there are

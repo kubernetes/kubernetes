@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/listers/core/v1"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )
@@ -51,7 +51,7 @@ func newResourceQuotaInformer(client kubernetes.Interface, resyncPeriod time.Dur
 				return client.CoreV1().ResourceQuotas(meta_v1.NamespaceAll).Watch(options)
 			},
 		},
-		&api_v1.ResourceQuota{},
+		&core_v1.ResourceQuota{},
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
@@ -60,7 +60,7 @@ func newResourceQuotaInformer(client kubernetes.Interface, resyncPeriod time.Dur
 }
 
 func (f *resourceQuotaInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api_v1.ResourceQuota{}, newResourceQuotaInformer)
+	return f.factory.InformerFor(&core_v1.ResourceQuota{}, newResourceQuotaInformer)
 }
 
 func (f *resourceQuotaInformer) Lister() v1.ResourceQuotaLister {

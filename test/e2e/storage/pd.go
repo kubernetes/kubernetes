@@ -30,12 +30,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -43,7 +43,7 @@ import (
 const (
 	gcePDDetachTimeout  = 10 * time.Minute
 	gcePDDetachPollTime = 10 * time.Second
-	nodeStatusTimeout   = 1 * time.Minute
+	nodeStatusTimeout   = 10 * time.Minute
 	nodeStatusPollTime  = 1 * time.Second
 	maxReadRetry        = 3
 )
@@ -428,6 +428,10 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			By("Cleaning up PD-RW test env")
 			podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
 			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
+			framework.WaitForNodeToBeReady(f.ClientSet, string(host0Name), nodeStatusTimeout)
+			framework.WaitForAllNodesSchedulable(f.ClientSet, nodeStatusTimeout)
+			nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+			Expect(len(nodes.Items)).To(Equal(initialGroupSize), "Requires node count to return to initial group size.")
 		}()
 
 		By("submitting host0Pod to kubernetes")
@@ -477,7 +481,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		originalCount := len(nodes.Items)
 		containerName := "mycontainer"
 		nodeToDelete := &nodes.Items[0]
-		defer func() error {
+		defer func() {
 			By("Cleaning up PD-RW test env")
 			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
 			nodeToDelete.ObjectMeta.SetResourceVersion("0")
@@ -486,10 +490,9 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			framework.ExpectNoError(err, "Unable to re-create the deleted node")
 			framework.ExpectNoError(framework.WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get the node group back to the original size")
 			framework.WaitForNodeToBeReady(f.ClientSet, nodeToDelete.Name, nodeStatusTimeout)
-			if len(nodes.Items) != originalCount {
-				return fmt.Errorf("The node count is not back to original count")
-			}
-			return nil
+			framework.WaitForAllNodesSchedulable(f.ClientSet, nodeStatusTimeout)
+			nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+			Expect(len(nodes.Items)).To(Equal(originalCount), "Requires node count to return to original node count.")
 		}()
 
 		By("submitting host0Pod to kubernetes")

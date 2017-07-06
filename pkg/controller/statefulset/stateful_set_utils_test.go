@@ -28,10 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	apps "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/history"
 )
 
 func TestGetParentNameAndOrdinal(t *testing.T) {
@@ -228,9 +229,6 @@ func TestIsRunningAndReady(t *testing.T) {
 
 func TestAscendingOrdinal(t *testing.T) {
 	set := newStatefulSet(10)
-	for i := 0; i < 10; i++ {
-
-	}
 	pods := make([]*v1.Pod, 10)
 	perm := rand.Perm(10)
 	for i, v := range perm {
@@ -284,6 +282,26 @@ func TestNewPodControllerRef(t *testing.T) {
 	}
 	if got, want := *controllerRef.Controller, true; got != want {
 		t.Errorf("controllerRef.Controller = %v, want %v", got, want)
+	}
+}
+
+func TestCreateApplyRevision(t *testing.T) {
+	set := newStatefulSet(1)
+	revision, err := newRevision(set, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set.Spec.Template.Spec.Containers[0].Name = "foo"
+	restoredSet, err := applyRevision(set, revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restoredRevision, err := newRevision(restoredSet, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !history.EqualRevision(revision, restoredRevision) {
+		t.Errorf("wanted %v got %v", string(revision.Data.Raw), string(restoredRevision.Data.Raw))
 	}
 }
 
@@ -354,6 +372,11 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 			Template:             template,
 			VolumeClaimTemplates: claims,
 			ServiceName:          "governingsvc",
+			UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			RevisionHistoryLimit: func() *int32 {
+				limit := int32(2)
+				return &limit
+			}(),
 		},
 	}
 }

@@ -20,19 +20,16 @@ import (
 	"testing"
 	"time"
 
+	api_v1 "k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAnalyze(t *testing.T) {
 	now := time.Now()
-	replicaSet := newReplicaSet(map[string]string{"A": "B"})
-	replicaSet2 := newReplicaSet(map[string]string{"C": "D"})
-	podRunning := newPod("p1", replicaSet,
+	podRunning := newPod("p1",
 		api_v1.PodStatus{
 			Phase: api_v1.PodRunning,
 			Conditions: []api_v1.PodCondition{
@@ -42,7 +39,7 @@ func TestAnalyze(t *testing.T) {
 				},
 			},
 		})
-	podUnschedulable := newPod("pU", replicaSet,
+	podUnschedulable := newPod("pU",
 		api_v1.PodStatus{
 			Phase: api_v1.PodPending,
 			Conditions: []api_v1.PodCondition{
@@ -54,42 +51,25 @@ func TestAnalyze(t *testing.T) {
 				},
 			},
 		})
-	podOther := newPod("pO", replicaSet,
-		api_v1.PodStatus{
-			Phase:      api_v1.PodPending,
-			Conditions: []api_v1.PodCondition{},
-		})
-	podOtherRS := newPod("pO", replicaSet2,
+	podOther := newPod("pO",
 		api_v1.PodStatus{
 			Phase:      api_v1.PodPending,
 			Conditions: []api_v1.PodCondition{},
 		})
 
-	federatedObjects := []util.FederatedObject{
-		{ClusterName: "c1", Object: podRunning},
-		{ClusterName: "c1", Object: podRunning},
-		{ClusterName: "c1", Object: podRunning},
-		{ClusterName: "c1", Object: podUnschedulable},
-		{ClusterName: "c1", Object: podUnschedulable},
-		{ClusterName: "c2", Object: podOther},
-		{ClusterName: "c2", Object: podOtherRS},
-	}
-
-	raport, err := AnalysePods(replicaSet.Spec.Selector, federatedObjects, now)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, len(raport))
-	c1Raport := raport["c1"]
-	c2Raport := raport["c2"]
+	result := AnalyzePods(&api_v1.PodList{Items: []api_v1.Pod{*podRunning, *podRunning, *podRunning, *podUnschedulable, *podUnschedulable}}, now)
 	assert.Equal(t, PodAnalysisResult{
 		Total:           5,
 		RunningAndReady: 3,
 		Unschedulable:   2,
-	}, c1Raport)
+	}, result)
+
+	result = AnalyzePods(&api_v1.PodList{Items: []api_v1.Pod{*podOther}}, now)
 	assert.Equal(t, PodAnalysisResult{
 		Total:           1,
 		RunningAndReady: 0,
 		Unschedulable:   0,
-	}, c2Raport)
+	}, result)
 }
 
 func newReplicaSet(selectorMap map[string]string) *v1beta1.ReplicaSet {
@@ -97,7 +77,7 @@ func newReplicaSet(selectorMap map[string]string) *v1beta1.ReplicaSet {
 	rs := &v1beta1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foobar",
-			Namespace: "default",
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: v1beta1.ReplicaSetSpec{
 			Replicas: &replicas,
@@ -107,12 +87,11 @@ func newReplicaSet(selectorMap map[string]string) *v1beta1.ReplicaSet {
 	return rs
 }
 
-func newPod(name string, rs *v1beta1.ReplicaSet, status api_v1.PodStatus) *api_v1.Pod {
+func newPod(name string, status api_v1.PodStatus) *api_v1.Pod {
 	return &api_v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: rs.Namespace,
-			Labels:    rs.Spec.Selector.MatchLabels,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Status: status,
 	}

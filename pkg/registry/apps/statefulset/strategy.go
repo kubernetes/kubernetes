@@ -112,12 +112,12 @@ func StatefulSetToSelectableFields(statefulSet *apps.StatefulSet) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	statefulSet, ok := obj.(*apps.StatefulSet)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not an StatefulSet.")
+		return nil, nil, false, fmt.Errorf("given object is not an StatefulSet.")
 	}
-	return labels.Set(statefulSet.ObjectMeta.Labels), StatefulSetToSelectableFields(statefulSet), nil
+	return labels.Set(statefulSet.ObjectMeta.Labels), StatefulSetToSelectableFields(statefulSet), statefulSet.Initializers != nil, nil
 }
 
 // MatchStatefulSet is the filter used by the generic etcd backend to watch events

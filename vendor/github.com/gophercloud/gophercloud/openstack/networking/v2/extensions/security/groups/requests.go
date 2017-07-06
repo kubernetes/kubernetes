@@ -40,9 +40,9 @@ type CreateOptsBuilder interface {
 
 // CreateOpts contains all the values needed to create a new security group.
 type CreateOpts struct {
-	// Required. Human-readable name for the VIP. Does not have to be unique.
+	// Required. Human-readable name for the Security Group. Does not have to be unique.
 	Name string `json:"name" required:"true"`
-	// Required for admins. Indicates the owner of the VIP.
+	// Required for admins. Indicates the owner of the Security Group.
 	TenantID string `json:"tenant_id,omitempty"`
 	// Optional. Describes the security group.
 	Description string `json:"description,omitempty"`
@@ -61,6 +61,36 @@ func Create(c *gophercloud.ServiceClient, opts CreateOptsBuilder) (r CreateResul
 		return
 	}
 	_, r.Err = c.Post(rootURL(c), b, &r.Body, nil)
+	return
+}
+
+type UpdateOptsBuilder interface {
+	ToSecGroupUpdateMap() (map[string]interface{}, error)
+}
+
+// UpdateOpts contains all the values needed to update an existing security group.
+type UpdateOpts struct {
+	// Human-readable name for the Security Group. Does not have to be unique.
+	Name string `json:"name,omitempty"`
+	// Optional. Describes the security group.
+	Description string `json:"description,omitempty"`
+}
+
+func (opts UpdateOpts) ToSecGroupUpdateMap() (map[string]interface{}, error) {
+	return gophercloud.BuildRequestBody(opts, "security_group")
+}
+
+// Update is an operation which updates an existing security group.
+func Update(c *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder) (r UpdateResult) {
+	b, err := opts.ToSecGroupUpdateMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+
+	_, r.Err = c.Put(resourceURL(c, id), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
 	return
 }
 

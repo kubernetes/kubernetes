@@ -28,6 +28,7 @@ import (
 	"github.com/emicklei/go-restful-swagger12"
 	"github.com/golang/glog"
 
+	"github.com/go-openapi/spec"
 	"k8s.io/apimachinery/pkg/apimachinery"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,11 +38,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/audit"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/openapi"
 	"k8s.io/apiserver/pkg/server/routes"
 	restclient "k8s.io/client-go/rest"
 )
@@ -129,6 +132,9 @@ type GenericAPIServer struct {
 	swaggerConfig *swagger.Config
 	openAPIConfig *openapicommon.Config
 
+	// Enables updating OpenAPI spec using update method.
+	OpenAPIService *openapi.OpenAPIService
+
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guarantee of ordering between them.  The map key is a name used for error reporting.
 	// It may kill the process with a panic if it wishes to by returning an error.
@@ -141,6 +147,13 @@ type GenericAPIServer struct {
 	healthzLock    sync.Mutex
 	healthzChecks  []healthz.HealthzChecker
 	healthzCreated bool
+
+	// auditing. The backend is started after the server starts listening.
+	AuditBackend audit.Backend
+
+	// enableAPIResponseCompression indicates whether API Responses should support compression
+	// if the client requests it via Accept-Encoding
+	enableAPIResponseCompression bool
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -161,10 +174,14 @@ type DelegationTarget interface {
 
 	// ListedPaths returns the paths for supporting an index
 	ListedPaths() []string
+
+	// OpenAPISpec returns the OpenAPI spec of the delegation target if exists, nil otherwise.
+	OpenAPISpec() *spec.Swagger
 }
 
 func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
-	return s.Handler.GoRestfulContainer.ServeMux
+	// when we delegate, we need the server we're delegating to choose whether or not to use gorestful
+	return s.Handler.Director
 }
 func (s *GenericAPIServer) PostStartHooks() map[string]postStartHookEntry {
 	return s.postStartHooks
@@ -174,6 +191,9 @@ func (s *GenericAPIServer) HealthzChecks() []healthz.HealthzChecker {
 }
 func (s *GenericAPIServer) ListedPaths() []string {
 	return s.listedPathProvider.ListedPaths()
+}
+func (s *GenericAPIServer) OpenAPISpec() *spec.Swagger {
+	return s.OpenAPIService.GetSpec()
 }
 
 var EmptyDelegate = emptyDelegate{
@@ -198,6 +218,9 @@ func (s emptyDelegate) ListedPaths() []string {
 }
 func (s emptyDelegate) RequestContextMapper() apirequest.RequestContextMapper {
 	return s.requestContextMapper
+}
+func (s emptyDelegate) OpenAPISpec() *spec.Swagger {
+	return nil
 }
 
 func init() {
@@ -228,15 +251,20 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	if s.swaggerConfig != nil {
 		routes.Swagger{Config: s.swaggerConfig}.Install(s.Handler.GoRestfulContainer)
 	}
-	if s.openAPIConfig != nil {
-		routes.OpenAPI{
-			Config: s.openAPIConfig,
-		}.Install(s.Handler.GoRestfulContainer, s.Handler.PostGoRestfulMux)
-	}
+	s.PrepareOpenAPIService()
 
 	s.installHealthz()
 
 	return preparedGenericAPIServer{s}
+}
+
+// PrepareOpenAPIService installs OpenAPI handler if it does not exists.
+func (s *GenericAPIServer) PrepareOpenAPIService() {
+	if s.openAPIConfig != nil && s.OpenAPIService == nil {
+		s.OpenAPIService = routes.OpenAPI{
+			Config: s.openAPIConfig,
+		}.Install(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+	}
 }
 
 // Run spawns the secure http server. It only returns if stopCh is closed
@@ -271,6 +299,14 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 		<-stopCh
 		close(internalStopCh)
 	}()
+
+	// Start the audit backend before any request comes in. This means we cannot turn it into a
+	// post start hook because without calling Backend.Run the Backend.ProcessEvents call might block.
+	if s.AuditBackend != nil {
+		if err := s.AuditBackend.Run(stopCh); err != nil {
+			return fmt.Errorf("failed to run the audit backend: %v", err)
+		}
+	}
 
 	s.RunPostStartHooks(stopCh)
 
@@ -322,7 +358,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	}
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
-	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions).WebService())
+	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions, s.requestContextMapper).WebService())
 	return nil
 }
 
@@ -355,18 +391,18 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 			Version:      groupVersion.Version,
 		})
 	}
-	preferedVersionForDiscovery := metav1.GroupVersionForDiscovery{
+	preferredVersionForDiscovery := metav1.GroupVersionForDiscovery{
 		GroupVersion: apiGroupInfo.GroupMeta.GroupVersion.String(),
 		Version:      apiGroupInfo.GroupMeta.GroupVersion.Version,
 	}
 	apiGroup := metav1.APIGroup{
 		Name:             apiGroupInfo.GroupMeta.GroupVersion.Group,
 		Versions:         apiVersionsForDiscovery,
-		PreferredVersion: preferedVersionForDiscovery,
+		PreferredVersion: preferredVersionForDiscovery,
 	}
 
 	s.DiscoveryGroupManager.AddGroup(apiGroup)
-	s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup).WebService())
+	s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup, s.requestContextMapper).WebService())
 
 	return nil
 }
@@ -399,9 +435,10 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Linker: apiGroupInfo.GroupMeta.SelfLinker,
 		Mapper: apiGroupInfo.GroupMeta.RESTMapper,
 
-		Admit:             s.admissionControl,
-		Context:           s.RequestContextMapper(),
-		MinRequestTimeout: s.minRequestTimeout,
+		Admit:                        s.admissionControl,
+		Context:                      s.RequestContextMapper(),
+		MinRequestTimeout:            s.minRequestTimeout,
+		EnableAPIResponseCompression: s.enableAPIResponseCompression,
 	}
 }
 

@@ -41,6 +41,8 @@ import (
 	"github.com/elazarl/goproxy"
 	"github.com/ghodss/yaml"
 
+	"k8s.io/api/core/v1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,8 +53,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/api/v1"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -98,6 +99,7 @@ const (
 	nginxDeployment1Filename = "nginx-deployment1.yaml"
 	nginxDeployment2Filename = "nginx-deployment2.yaml"
 	nginxDeployment3Filename = "nginx-deployment3.yaml"
+	redisImage               = "gcr.io/k8s-testimages/redis:e2e"
 )
 
 var (
@@ -140,6 +142,10 @@ var (
 	// Returning container command exit codes in kubectl run/exec was introduced in #26541 (v1.4)
 	// so we don't expect tests that verifies return code to work on kubectl clients before that.
 	kubectlContainerExitCodeVersion = utilversion.MustParseSemantic("v1.4.0-alpha.3")
+
+	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
+
+	ScheduledJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}
 )
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
@@ -958,7 +964,7 @@ metadata:
 						return false, nil
 					}
 					if len(uidToPort) > 1 {
-						Fail("Too many endpoints found")
+						framework.Failf("Too many endpoints found")
 					}
 					for _, port := range uidToPort {
 						if port[0] != redisPort {
@@ -2013,6 +2019,7 @@ func newStreamingUpload(filePath string) (*io.PipeReader, *multipart.Writer, err
 	if err != nil {
 		return nil, nil, err
 	}
+	defer file.Close()
 
 	r, w := io.Pipe()
 

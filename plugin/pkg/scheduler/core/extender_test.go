@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -109,6 +109,7 @@ type FakeExtender struct {
 	prioritizers     []priorityConfig
 	weight           int
 	nodeCacheCapable bool
+	filteredNodes    []*v1.Node
 }
 
 func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) ([]*v1.Node, schedulerapi.FailedNodesMap, error) {
@@ -133,6 +134,7 @@ func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[
 		}
 	}
 
+	f.filteredNodes = filtered
 	if f.nodeCacheCapable {
 		return filtered, failedNodesMap, nil
 	}
@@ -160,6 +162,25 @@ func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 		result = append(result, schedulerapi.HostPriority{Host: host, Score: score})
 	}
 	return &result, f.weight, nil
+}
+
+func (f *FakeExtender) Bind(binding *v1.Binding) error {
+	if len(f.filteredNodes) != 0 {
+		for _, node := range f.filteredNodes {
+			if node.Name == binding.Target.Name {
+				f.filteredNodes = nil
+				return nil
+			}
+		}
+		err := fmt.Errorf("Node %v not in filtered nodes %v", binding.Target.Name, f.filteredNodes)
+		f.filteredNodes = nil
+		return err
+	}
+	return nil
+}
+
+func (f *FakeExtender) IsBinder() bool {
+	return true
 }
 
 func TestGenericSchedulerWithExtenders(t *testing.T) {

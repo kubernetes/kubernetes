@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 
 	"github.com/Azure/azure-sdk-for-go/arm/network"
@@ -585,15 +585,44 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"subscriptionId": "--subscription-id--",
 		"aadClientId": "--aad-client-id--",
 		"aadClientSecret": "--aad-client-secret--",
+		"aadClientCertPath": "--aad-client-cert-path--",
+		"aadClientCertPassword": "--aad-client-cert-password--",
 		"resourceGroup": "--resource-group--",
 		"location": "--location--",
 		"subnetName": "--subnet-name--",
 		"securityGroupName": "--security-group-name--",
 		"vnetName": "--vnet-name--",
 		"routeTableName": "--route-table-name--",
-		"primaryAvailabilitySetName": "--primary-availability-set-name--"
+		"primaryAvailabilitySetName": "--primary-availability-set-name--",
+		"cloudProviderBackoff": true,
+		"cloudProviderBackoffRetries": 6,
+		"cloudProviderBackoffExponent": 1.5,
+		"cloudProviderBackoffDuration": 5,
+		"cloudProviderBackoffJitter": 1.0,
+		"cloudProviderRatelimit": true,
+		"cloudProviderRateLimitQPS": 0.5,
+		"cloudProviderRateLimitBucket": 5
 	}`
 	validateConfig(t, config)
+}
+
+// Test Backoff and Rate Limit defaults (json)
+func TestCloudDefaultConfigFromJSON(t *testing.T) {
+	config := `{
+                "aadClientId": "--aad-client-id--",
+                "aadClientSecret": "--aad-client-secret--"
+        }`
+
+	validateEmptyConfig(t, config)
+}
+
+// Test Backoff and Rate Limit defaults (yaml)
+func TestCloudDefaultConfigFromYAML(t *testing.T) {
+	config := `
+aadClientId: --aad-client-id--
+aadClientSecret: --aad-client-secret--
+`
+	validateEmptyConfig(t, config)
 }
 
 // Test Configuration deserialization (yaml)
@@ -603,6 +632,8 @@ tenantId: --tenant-id--
 subscriptionId: --subscription-id--
 aadClientId: --aad-client-id--
 aadClientSecret: --aad-client-secret--
+aadClientCertPath: --aad-client-cert-path--
+aadClientCertPassword: --aad-client-cert-password--
 resourceGroup: --resource-group--
 location: --location--
 subnetName: --subnet-name--
@@ -610,21 +641,20 @@ securityGroupName: --security-group-name--
 vnetName: --vnet-name--
 routeTableName: --route-table-name--
 primaryAvailabilitySetName: --primary-availability-set-name--
+cloudProviderBackoff: true
+cloudProviderBackoffRetries: 6
+cloudProviderBackoffExponent: 1.5
+cloudProviderBackoffDuration: 5
+cloudProviderBackoffJitter: 1.0
+cloudProviderRatelimit: true
+cloudProviderRateLimitQPS: 0.5
+cloudProviderRateLimitBucket: 5
 `
 	validateConfig(t, config)
 }
 
 func validateConfig(t *testing.T, config string) {
-	configReader := strings.NewReader(config)
-	cloud, err := NewCloud(configReader)
-	if err != nil {
-		t.Error(err)
-	}
-
-	azureCloud, ok := cloud.(*Cloud)
-	if !ok {
-		t.Error("NewCloud returned incorrect type")
-	}
+	azureCloud := getCloudFromConfig(t, config)
 
 	if azureCloud.TenantID != "--tenant-id--" {
 		t.Errorf("got incorrect value for TenantID")
@@ -637,6 +667,12 @@ func validateConfig(t *testing.T, config string) {
 	}
 	if azureCloud.AADClientSecret != "--aad-client-secret--" {
 		t.Errorf("got incorrect value for AADClientSecret")
+	}
+	if azureCloud.AADClientCertPath != "--aad-client-cert-path--" {
+		t.Errorf("got incorrect value for AADClientCertPath")
+	}
+	if azureCloud.AADClientCertPassword != "--aad-client-cert-password--" {
+		t.Errorf("got incorrect value for AADClientCertPassword")
 	}
 	if azureCloud.ResourceGroup != "--resource-group--" {
 		t.Errorf("got incorrect value for ResourceGroup")
@@ -659,6 +695,58 @@ func validateConfig(t *testing.T, config string) {
 	if azureCloud.PrimaryAvailabilitySetName != "--primary-availability-set-name--" {
 		t.Errorf("got incorrect value for PrimaryAvailabilitySetName")
 	}
+	if azureCloud.CloudProviderBackoff != true {
+		t.Errorf("got incorrect value for CloudProviderBackoff")
+	}
+	if azureCloud.CloudProviderBackoffRetries != 6 {
+		t.Errorf("got incorrect value for CloudProviderBackoffRetries")
+	}
+	if azureCloud.CloudProviderBackoffExponent != 1.5 {
+		t.Errorf("got incorrect value for CloudProviderBackoffExponent")
+	}
+	if azureCloud.CloudProviderBackoffDuration != 5 {
+		t.Errorf("got incorrect value for CloudProviderBackoffDuration")
+	}
+	if azureCloud.CloudProviderBackoffJitter != 1.0 {
+		t.Errorf("got incorrect value for CloudProviderBackoffJitter")
+	}
+	if azureCloud.CloudProviderRateLimit != true {
+		t.Errorf("got incorrect value for CloudProviderRateLimit")
+	}
+	if azureCloud.CloudProviderRateLimitQPS != 0.5 {
+		t.Errorf("got incorrect value for CloudProviderRateLimitQPS")
+	}
+	if azureCloud.CloudProviderRateLimitBucket != 5 {
+		t.Errorf("got incorrect value for CloudProviderRateLimitBucket")
+	}
+}
+
+func getCloudFromConfig(t *testing.T, config string) *Cloud {
+	configReader := strings.NewReader(config)
+	cloud, err := NewCloud(configReader)
+	if err != nil {
+		t.Error(err)
+	}
+	azureCloud, ok := cloud.(*Cloud)
+	if !ok {
+		t.Error("NewCloud returned incorrect type")
+	}
+	return azureCloud
+}
+
+// TODO include checks for other appropriate default config parameters
+func validateEmptyConfig(t *testing.T, config string) {
+	azureCloud := getCloudFromConfig(t, config)
+
+	// backoff should be disabled by default if not explicitly enabled in config
+	if azureCloud.CloudProviderBackoff != false {
+		t.Errorf("got incorrect value for CloudProviderBackoff")
+	}
+
+	// rate limits should be disabled by default if not explicitly enabled in config
+	if azureCloud.CloudProviderRateLimit != false {
+		t.Errorf("got incorrect value for CloudProviderRateLimit")
+	}
 }
 
 func TestDecodeInstanceInfo(t *testing.T) {
@@ -675,5 +763,56 @@ func TestDecodeInstanceInfo(t *testing.T) {
 
 	if *faultDomain != "99" {
 		t.Error("got incorrect fault domain")
+	}
+}
+
+func TestSplitProviderID(t *testing.T) {
+	providers := []struct {
+		providerID string
+		name       types.NodeName
+
+		fail bool
+	}{
+		{
+			providerID: CloudProviderName + ":///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			fail:       false,
+		},
+		{
+			providerID: CloudProviderName + ":/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "",
+			fail:       true,
+		},
+		{
+			providerID: CloudProviderName + "://",
+			name:       "",
+			fail:       true,
+		},
+		{
+			providerID: ":///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "",
+			fail:       true,
+		},
+		{
+			providerID: "aws:///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "",
+			fail:       true,
+		},
+	}
+
+	for _, test := range providers {
+		name, err := splitProviderID(test.providerID)
+		if (err != nil) != test.fail {
+			t.Errorf("Expected to failt=%t, with pattern %v", test.fail, test)
+		}
+
+		if test.fail {
+			continue
+		}
+
+		if name != test.name {
+			t.Errorf("Expected %v, but got %v", test.name, name)
+		}
+
 	}
 }

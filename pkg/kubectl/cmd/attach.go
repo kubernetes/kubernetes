@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -34,7 +35,6 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -128,10 +128,10 @@ type AttachOptions struct {
 // Complete verifies command line arguments and loads data from the command environment
 func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string) error {
 	if len(argsIn) == 0 {
-		return cmdutil.UsageError(cmd, "at least one argument is required for attach")
+		return cmdutil.UsageErrorf(cmd, "at least 1 argument is required for attach")
 	}
 	if len(argsIn) > 2 {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("expected fewer than three arguments: POD or TYPE/NAME or TYPE NAME, saw %d: %s", len(argsIn), argsIn))
+		return cmdutil.UsageErrorf(cmd, "expected POD, TYPE/NAME, or TYPE NAME, (at most 2 arguments) saw %d: %v", len(argsIn), argsIn)
 	}
 
 	namespace, _, err := f.DefaultNamespace()
@@ -141,11 +141,10 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 
 	p.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
-		return cmdutil.UsageError(cmd, err.Error())
+		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 
-	mapper, typer := f.Object()
-	builder := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	builder := f.NewBuilder(true).
 		NamespaceParam(namespace).DefaultNamespace()
 
 	switch len(argsIn) {
@@ -191,13 +190,13 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 func (p *AttachOptions) Validate() error {
 	allErrs := []error{}
 	if len(p.PodName) == 0 {
-		allErrs = append(allErrs, fmt.Errorf("pod name must be specified"))
+		allErrs = append(allErrs, errors.New("pod name must be specified"))
 	}
 	if p.Out == nil || p.Err == nil {
-		allErrs = append(allErrs, fmt.Errorf("both output and error output must be provided"))
+		allErrs = append(allErrs, errors.New("both output and error output must be provided"))
 	}
 	if p.Attach == nil || p.PodClient == nil || p.Config == nil {
-		allErrs = append(allErrs, fmt.Errorf("client, client config, and attach must be provided"))
+		allErrs = append(allErrs, errors.New("client, client config, and attach must be provided"))
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

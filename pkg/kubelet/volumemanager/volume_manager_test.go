@@ -23,15 +23,15 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -56,15 +56,12 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager())
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
 
 	node, pod, pv, claim := createObjects()
 	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
 
-	manager, err := newTestVolumeManager(tmpDir, podManager, kubeClient)
-	if err != nil {
-		t.Fatalf("Failed to initialize volume manager: %v", err)
-	}
+	manager := newTestVolumeManager(tmpDir, podManager, kubeClient)
 
 	stopCh := runVolumeManager(manager)
 	defer close(stopCh)
@@ -101,7 +98,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager())
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
 
 	node, pod, _, claim := createObjects()
 
@@ -150,11 +147,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		}
 		kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
 
-		manager, err := newTestVolumeManager(tmpDir, podManager, kubeClient)
-		if err != nil {
-			t.Errorf("Failed to initialize volume manager: %v", err)
-			continue
-		}
+		manager := newTestVolumeManager(tmpDir, podManager, kubeClient)
 
 		stopCh := runVolumeManager(manager)
 		defer func() {
@@ -182,17 +175,14 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 	}
 }
 
-func newTestVolumeManager(
-	tmpDir string,
-	podManager pod.Manager,
-	kubeClient clientset.Interface) (VolumeManager, error) {
+func newTestVolumeManager(tmpDir string, podManager pod.Manager, kubeClient clientset.Interface) VolumeManager {
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	fakeRecorder := &record.FakeRecorder{}
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins([]volume.VolumePlugin{plug}, volumetest.NewFakeVolumeHost(tmpDir, kubeClient, nil))
 	statusManager := status.NewManager(kubeClient, podManager, &statustest.FakePodDeletionSafetyProvider{})
 
-	vm, err := NewVolumeManager(
+	vm := NewVolumeManager(
 		true,
 		testHostname,
 		podManager,
@@ -206,7 +196,7 @@ func newTestVolumeManager(
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount */
 		false /* keepTerminatedPodVolumes */)
 
-	return vm, err
+	return vm
 }
 
 // createObjects returns objects for making a fake clientset. The pv is
@@ -241,7 +231,7 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 				},
 			},
 			SecurityContext: &v1.PodSecurityContext{
-				SupplementalGroups: []kubetypes.UnixGroupID{555},
+				SupplementalGroups: []int64{555},
 			},
 		},
 	}
@@ -275,10 +265,7 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 	return node, pod, pv, claim
 }
 
-func simulateVolumeInUseUpdate(
-	volumeName v1.UniqueVolumeName,
-	stopCh <-chan struct{},
-	volumeManager VolumeManager) {
+func simulateVolumeInUseUpdate(volumeName v1.UniqueVolumeName, stopCh <-chan struct{}, volumeManager VolumeManager) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {

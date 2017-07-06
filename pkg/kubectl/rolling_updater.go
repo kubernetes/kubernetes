@@ -17,13 +17,13 @@ limitations under the License.
 package kubectl
 
 import (
-	goerrors "errors"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,13 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/retry"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/kubectl/util"
 )
 
 const (
@@ -424,7 +424,7 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController, minR
 		}
 		for _, pod := range pods.Items {
 			v1Pod := &v1.Pod{}
-			if err := v1.Convert_api_Pod_To_v1_Pod(&pod, v1Pod, nil); err != nil {
+			if err := k8s_api_v1.Convert_api_Pod_To_v1_Pod(&pod, v1Pod, nil); err != nil {
 				return 0, 0, err
 			}
 			// Do not count deleted pods as ready
@@ -565,10 +565,7 @@ func Rename(c coreclient.ReplicationControllersGetter, rc *api.ReplicationContro
 	}
 	// Then create the same RC with the new name.
 	_, err = c.ReplicationControllers(rc.Namespace).Create(rc)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func LoadExistingNextReplicationController(c coreclient.ReplicationControllersGetter, namespace, newName string) (*api.ReplicationController, error) {
@@ -616,18 +613,18 @@ func CreateNewControllerFromCurrentController(rcClient coreclient.ReplicationCon
 	}
 
 	if len(newRc.Spec.Template.Spec.Containers) > 1 && len(cfg.Container) == 0 {
-		return nil, goerrors.New("Must specify container to update when updating a multi-container pod")
+		return nil, fmt.Errorf("must specify container to update when updating a multi-container pod")
 	}
 
 	if len(newRc.Spec.Template.Spec.Containers) == 0 {
-		return nil, goerrors.New(fmt.Sprintf("Pod has no containers! (%v)", newRc))
+		return nil, fmt.Errorf("pod has no containers! (%v)", newRc)
 	}
 	newRc.Spec.Template.Spec.Containers[containerIndex].Image = cfg.Image
 	if len(cfg.PullPolicy) != 0 {
 		newRc.Spec.Template.Spec.Containers[containerIndex].ImagePullPolicy = cfg.PullPolicy
 	}
 
-	newHash, err := helper.HashObject(newRc, codec)
+	newHash, err := util.HashObject(newRc, codec)
 	if err != nil {
 		return nil, err
 	}
@@ -684,14 +681,14 @@ func UpdateExistingReplicationController(rcClient coreclient.ReplicationControll
 	if _, found := oldRc.Spec.Selector[deploymentKey]; !found {
 		SetNextControllerAnnotation(oldRc, newName)
 		return AddDeploymentKeyToReplicationController(oldRc, rcClient, podClient, deploymentKey, deploymentValue, namespace, out)
-	} else {
-		// If we didn't need to update the controller for the deployment key, we still need to write
-		// the "next" controller.
-		applyUpdate := func(rc *api.ReplicationController) {
-			SetNextControllerAnnotation(rc, newName)
-		}
-		return updateRcWithRetries(rcClient, namespace, oldRc, applyUpdate)
 	}
+
+	// If we didn't need to update the controller for the deployment key, we still need to write
+	// the "next" controller.
+	applyUpdate := func(rc *api.ReplicationController) {
+		SetNextControllerAnnotation(rc, newName)
+	}
+	return updateRcWithRetries(rcClient, namespace, oldRc, applyUpdate)
 }
 
 func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, rcClient coreclient.ReplicationControllersGetter, podClient coreclient.PodsGetter, deploymentKey, deploymentValue, namespace string, out io.Writer) (*api.ReplicationController, error) {

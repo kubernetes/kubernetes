@@ -19,7 +19,6 @@ package util
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -63,6 +62,7 @@ func GetAllFSTypesAsSet() sets.String {
 		string(extensions.Quobyte),
 		string(extensions.AzureDisk),
 		string(extensions.PhotonPersistentDisk),
+		string(extensions.StorageOS),
 		string(extensions.Projected),
 		string(extensions.PortworxVolume),
 		string(extensions.ScaleIO),
@@ -119,6 +119,8 @@ func GetVolumeFSType(v api.Volume) (extensions.FSType, error) {
 		return extensions.AzureDisk, nil
 	case v.PhotonPersistentDisk != nil:
 		return extensions.PhotonPersistentDisk, nil
+	case v.StorageOS != nil:
+		return extensions.StorageOS, nil
 	case v.Projected != nil:
 		return extensions.Projected, nil
 	case v.PortworxVolume != nil:
@@ -160,11 +162,11 @@ func PSPAllowsFSType(psp *extensions.PodSecurityPolicy, fsType extensions.FSType
 }
 
 // UserFallsInRange is a utility to determine it the id falls in the valid range.
-func UserFallsInRange(id types.UnixUserID, rng extensions.UserIDRange) bool {
+func UserFallsInRange(id int64, rng extensions.UserIDRange) bool {
 	return id >= rng.Min && id <= rng.Max
 }
 
 // GroupFallsInRange is a utility to determine it the id falls in the valid range.
-func GroupFallsInRange(id types.UnixGroupID, rng extensions.GroupIDRange) bool {
+func GroupFallsInRange(id int64, rng extensions.GroupIDRange) bool {
 	return id >= rng.Min && id <= rng.Max
 }

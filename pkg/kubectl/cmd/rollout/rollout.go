@@ -28,15 +28,20 @@ import (
 
 var (
 	rollout_long = templates.LongDesc(`
-		Manage a deployment using subcommands like "kubectl rollout undo deployment/abc"`)
+		Manage the rollout of a resource.` + rollout_valid_resources)
 
 	rollout_example = templates.Examples(`
 		# Rollback to the previous deployment
-		kubectl rollout undo deployment/abc`)
+		kubectl rollout undo deployment/abc
+		
+		# Check the rollout status of a daemonset
+		kubectl rollout status daemonset/foo`)
 
 	rollout_valid_resources = dedent.Dedent(`
 		Valid resource types include:
+
 		   * deployments
+		   * daemonsets
 		`)
 )
 
@@ -44,7 +49,7 @@ func NewCmdRollout(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "rollout SUBCOMMAND",
-		Short:   i18n.T("Manage a deployment rollout"),
+		Short:   i18n.T("Manage the rollout of a resource"),
 		Long:    rollout_long,
 		Example: rollout_example,
 		Run:     cmdutil.DefaultSubCommandRun(errOut),
@@ -54,7 +59,6 @@ func NewCmdRollout(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdRolloutPause(f, out))
 	cmd.AddCommand(NewCmdRolloutResume(f, out))
 	cmd.AddCommand(NewCmdRolloutUndo(f, out))
-
 	cmd.AddCommand(NewCmdRolloutStatus(f, out))
 
 	return cmd

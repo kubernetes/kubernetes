@@ -31,7 +31,7 @@ type RecommendedOptions struct {
 	SecureServing  *SecureServingOptions
 	Authentication *DelegatingAuthenticationOptions
 	Authorization  *DelegatingAuthorizationOptions
-	Audit          *AuditLogOptions
+	Audit          *AuditOptions
 	Features       *FeatureOptions
 }
 
@@ -41,7 +41,7 @@ func NewRecommendedOptions(prefix string, copier runtime.ObjectCopier, codec run
 		SecureServing:  NewSecureServingOptions(),
 		Authentication: NewDelegatingAuthenticationOptions(),
 		Authorization:  NewDelegatingAuthorizationOptions(),
-		Audit:          NewAuditLogOptions(),
+		Audit:          NewAuditOptions(),
 		Features:       NewFeatureOptions(),
 	}
 }

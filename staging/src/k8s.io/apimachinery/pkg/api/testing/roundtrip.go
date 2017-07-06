@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"reflect"
@@ -280,6 +281,23 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 	if !apiequality.Semantic.DeepEqual(original, object) {
 		t.Errorf("0: %v: encode altered the object, diff: %v", name, diff.ObjectReflectDiff(original, object))
 		return
+	}
+
+	// encode (serialize) a second time to verify that it was not varying
+	secondData, err := runtime.Encode(codec, object)
+	if err != nil {
+		if runtime.IsNotRegisteredError(err) {
+			t.Logf("%v: not registered: %v (%s)", name, err, printer.Sprintf("%#v", object))
+		} else {
+			t.Errorf("%v: %v (%s)", name, err, printer.Sprintf("%#v", object))
+		}
+		return
+	}
+
+	// serialization to the wire must be stable to ensure that we don't write twice to the DB
+	// when the object hasn't changed.
+	if !bytes.Equal(data, secondData) {
+		t.Errorf("%v: serialization is not stable: %s", name, printer.Sprintf("%#v", object))
 	}
 
 	// decode (deserialize) the encoded data back into an object

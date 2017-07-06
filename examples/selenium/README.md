@@ -4,7 +4,7 @@ Selenium is a browser automation tool used primarily for testing web application
 
 ### Prerequisites
 
-This example assumes you have a working Kubernetes cluster and a properly configured kubectl client. See the [Getting Started Guides](../../docs/getting-started-guides/) for details.
+This example assumes you have a working Kubernetes cluster and a properly configured kubectl client. See the [Getting Started Guides](https://kubernetes.io/docs/getting-started-guides/) for details.
 
 Google Container Engine is also a quick way to get Kubernetes up and running: https://cloud.google.com/container-engine/
 

@@ -19,14 +19,14 @@ package addons
 import (
 	"fmt"
 	"net"
-
 	"runtime"
 
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -80,13 +80,13 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	if err != nil {
 		return err
 	}
-	fmt.Println("[addons] Created essential addon: kube-proxy")
+	fmt.Println("[addons] Applied essential addon: kube-proxy")
 
 	err = CreateKubeDNSAddon(dnsDeploymentBytes, dnsServiceBytes, client)
 	if err != nil {
 		return err
 	}
-	fmt.Println("[addons] Created essential addon: kube-dns")
+	fmt.Println("[addons] Applied essential addon: kube-dns")
 	return nil
 }
 
@@ -97,17 +97,28 @@ func CreateKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client *clients
 	}
 
 	if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(kubeproxyConfigMap); err != nil {
-		return fmt.Errorf("unable to create a new kube-proxy configmap: %v", err)
+		if !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("unable to create a new kube-proxy configmap: %v", err)
+		}
+
+		if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(kubeproxyConfigMap); err != nil {
+			return fmt.Errorf("unable to update the kube-proxy configmap: %v", err)
+		}
 	}
 
 	kubeproxyDaemonSet := &extensions.DaemonSet{}
 	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
 		return fmt.Errorf("unable to decode kube-proxy daemonset %v", err)
 	}
-	kubeproxyDaemonSet.Spec.Template.Spec.Tolerations = []v1.Toleration{kubeadmconstants.MasterToleration}
 
 	if _, err := client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Create(kubeproxyDaemonSet); err != nil {
-		return fmt.Errorf("unable to create a new kube-proxy daemonset: %v", err)
+		if !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("unable to create a new kube-proxy daemonset: %v", err)
+		}
+
+		if _, err := client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Update(kubeproxyDaemonSet); err != nil {
+			return fmt.Errorf("unable to update the kube-proxy daemonset: %v", err)
+		}
 	}
 	return nil
 }
@@ -117,17 +128,15 @@ func CreateKubeDNSAddon(deploymentBytes, serviceBytes []byte, client *clientset.
 	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), deploymentBytes, kubednsDeployment); err != nil {
 		return fmt.Errorf("unable to decode kube-dns deployment %v", err)
 	}
-	kubednsDeployment.Spec.Template.Spec.Tolerations = []v1.Toleration{
-		kubeadmconstants.MasterToleration,
-		{
-			Key:      "CriticalAddonsOnly",
-			Operator: "Exists",
-		},
-	}
 
-	// TODO: All these .Create(foo) calls should instead be more like "kubectl apply -f" commands; they should not fail if there are existing objects with the same name
 	if _, err := client.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).Create(kubednsDeployment); err != nil {
-		return fmt.Errorf("unable to create a new kube-dns deployment: %v", err)
+		if !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("unable to create a new kube-dns deployment: %v", err)
+		}
+
+		if _, err := client.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).Update(kubednsDeployment); err != nil {
+			return fmt.Errorf("unable to update the kube-dns deployment: %v", err)
+		}
 	}
 
 	kubednsService := &v1.Service{}
@@ -136,7 +145,16 @@ func CreateKubeDNSAddon(deploymentBytes, serviceBytes []byte, client *clientset.
 	}
 
 	if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(kubednsService); err != nil {
-		return fmt.Errorf("unable to create a new kube-dns service: %v", err)
+		// Ignore if the Service is invalid with this error message:
+		// 	Service "kube-dns" is invalid: spec.clusterIP: Invalid value: "10.96.0.10": provided IP is already allocated
+
+		if !apierrors.IsAlreadyExists(err) && !apierrors.IsInvalid(err) {
+			return fmt.Errorf("unable to create a new kube-dns service: %v", err)
+		}
+
+		if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Update(kubednsService); err != nil {
+			return fmt.Errorf("unable to create/update the kube-dns service: %v", err)
+		}
 	}
 	return nil
 }

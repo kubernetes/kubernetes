@@ -152,7 +152,7 @@ func TestTimeProto(t *testing.T) {
 		input Time
 	}{
 		{Time{}},
-		{Date(1998, time.May, 5, 1, 5, 5, 50, time.Local)},
+		{Date(1998, time.May, 5, 1, 5, 5, 0, time.Local)},
 		{Date(1998, time.May, 5, 5, 5, 5, 0, time.Local)},
 	}
 

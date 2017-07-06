@@ -17,10 +17,10 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/autoscaling/v1"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/scheme"
-	v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 )
 
 type AutoscalingV1Interface interface {

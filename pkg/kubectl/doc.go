@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package kubectl is a set of libraries that are used by the kubectl command line tool.
-// They are separated out into a library to support unit testing.  Most functionality should
-// be included in this package, and the main kubectl should really just be an entry point.
+// Package kubectl provides the functions used by the kubectl command line tool
+// under k8s.io/kubernetes/cmd. The functions are kept in this package to better
+// support unit testing. The main() method for kubectl is only an entry point
+// and should contain no functionality.
 package kubectl // import "k8s.io/kubernetes/pkg/kubectl"

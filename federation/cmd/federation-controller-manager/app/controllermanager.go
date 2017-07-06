@@ -37,11 +37,10 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
-	deploymentcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/deployment"
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
 	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
-	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
+	servicednscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service/dns"
 	synccontroller "k8s.io/kubernetes/federation/pkg/federation-controller/sync"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/version"
@@ -136,9 +135,9 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	clustercontroller.StartClusterController(restClientCfg, stopChan, s.ClusterMonitorPeriod.Duration)
 
 	if controllerEnabled(s.Controllers, serverResources, servicecontroller.ControllerName, servicecontroller.RequiredResources, true) {
-		if controllerEnabled(s.Controllers, serverResources, servicecontroller.DNSControllerName, servicecontroller.RequiredResources, true) {
-			serviceDNScontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.DNSUserAgentName))
-			serviceDNSController, err := servicecontroller.NewServiceDNSController(serviceDNScontrollerClientset, s.DnsProvider, s.DnsConfigFile, s.FederationName, s.ServiceDnsSuffix, s.ZoneName, s.ZoneID)
+		if controllerEnabled(s.Controllers, serverResources, servicednscontroller.ControllerName, servicecontroller.RequiredResources, true) {
+			serviceDNScontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicednscontroller.UserAgentName))
+			serviceDNSController, err := servicednscontroller.NewServiceDNSController(serviceDNScontrollerClientset, s.DnsProvider, s.DnsConfigFile, s.FederationName, s.ServiceDnsSuffix, s.ZoneName, s.ZoneID)
 			if err != nil {
 				glog.Fatalf("Failed to start service dns controller: %v", err)
 			} else {
@@ -164,23 +163,6 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		if controllerEnabled(s.Controllers, serverResources, federatedType.ControllerName, federatedType.RequiredResources, true) {
 			synccontroller.StartFederationSyncController(kind, federatedType.AdapterFactory, restClientCfg, stopChan, minimizeLatency)
 		}
-	}
-
-	if controllerEnabled(s.Controllers, serverResources, replicasetcontroller.ControllerName, replicasetcontroller.RequiredResources, true) {
-		glog.V(3).Infof("Loading client config for replica set controller %q", replicasetcontroller.UserAgentName)
-		replicaSetClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, replicasetcontroller.UserAgentName))
-		replicaSetController := replicasetcontroller.NewReplicaSetController(replicaSetClientset)
-		glog.V(3).Infof("Running replica set controller")
-		go replicaSetController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
-	}
-
-	if controllerEnabled(s.Controllers, serverResources, deploymentcontroller.ControllerName, deploymentcontroller.RequiredResources, true) {
-		glog.V(3).Infof("Loading client config for deployment controller %q", deploymentcontroller.UserAgentName)
-		deploymentClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, deploymentcontroller.UserAgentName))
-		deploymentController := deploymentcontroller.NewDeploymentController(deploymentClientset)
-		glog.V(3).Infof("Running deployment controller")
-		// TODO: rename s.ConcurrentReplicaSetSyncs
-		go deploymentController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, ingresscontroller.ControllerName, ingresscontroller.RequiredResources, true) {

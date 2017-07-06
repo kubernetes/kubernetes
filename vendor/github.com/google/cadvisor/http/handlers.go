@@ -17,6 +17,7 @@ package http
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/google/cadvisor/api"
 	"github.com/google/cadvisor/healthz"
@@ -30,6 +31,7 @@ import (
 	auth "github.com/abbot/go-http-auth"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func RegisterHandlers(mux httpmux.Mux, containerManager manager.Manager, httpAuthFile, httpAuthRealm, httpDigestFile, httpDigestRealm string) error {
@@ -54,7 +56,7 @@ func RegisterHandlers(mux httpmux.Mux, containerManager manager.Manager, httpAut
 	// Redirect / to containers page.
 	mux.Handle("/", http.RedirectHandler(pages.ContainersPage, http.StatusTemporaryRedirect))
 
-	var authenticated bool = false
+	var authenticated bool
 
 	// Setup the authenticator object
 	if httpAuthFile != "" {
@@ -89,13 +91,16 @@ func RegisterHandlers(mux httpmux.Mux, containerManager manager.Manager, httpAut
 	return nil
 }
 
-// RegisterPrometheusHandler creates a new PrometheusCollector, registers it
-// on the global registry and configures the provided HTTP mux to handle the
-// given Prometheus endpoint.
+// RegisterPrometheusHandler creates a new PrometheusCollector and configures
+// the provided HTTP mux to handle the given Prometheus endpoint.
 func RegisterPrometheusHandler(mux httpmux.Mux, containerManager manager.Manager, prometheusEndpoint string, f metrics.ContainerLabelsFunc) {
-	collector := metrics.NewPrometheusCollector(containerManager, f)
-	prometheus.MustRegister(collector)
-	mux.Handle(prometheusEndpoint, prometheus.Handler())
+	r := prometheus.NewRegistry()
+	r.MustRegister(
+		metrics.NewPrometheusCollector(containerManager, f),
+		prometheus.NewGoCollector(),
+		prometheus.NewProcessCollector(os.Getpid(), ""),
+	)
+	mux.Handle(prometheusEndpoint, promhttp.HandlerFor(r, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}))
 }
 
 func staticHandlerNoAuth(w http.ResponseWriter, r *http.Request) {

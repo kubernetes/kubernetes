@@ -44,10 +44,9 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
 	"github.com/golang/glog"
@@ -76,11 +75,18 @@ type VolumeTestConfig struct {
 	ServerImage string
 	// Ports to export from the server pod. TCP only.
 	ServerPorts []int
+	// Commands to run in the container image.
+	ServerCmds []string
 	// Arguments to pass to the container image.
 	ServerArgs []string
 	// Volumes needed to be mounted to the server container from the host
 	// map <host (source) path> -> <container (dst.) path>
 	ServerVolumes map[string]string
+	// Wait for the pod to terminate successfully
+	// False indicates that the pod is long running
+	WaitForCompletion bool
+	// NodeName to run pod on.  Default is any node.
+	NodeName string
 }
 
 // VolumeTest contains a volume to mount into a client pod and its
@@ -133,6 +139,11 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 	By(fmt.Sprint("creating ", serverPodName, " pod"))
 	privileged := new(bool)
 	*privileged = true
+
+	restartPolicy := v1.RestartPolicyAlways
+	if config.WaitForCompletion {
+		restartPolicy = v1.RestartPolicyNever
+	}
 	serverPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -153,12 +164,15 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 					SecurityContext: &v1.SecurityContext{
 						Privileged: privileged,
 					},
+					Command:      config.ServerCmds,
 					Args:         config.ServerArgs,
 					Ports:        serverPodPorts,
 					VolumeMounts: mounts,
 				},
 			},
-			Volumes: volumes,
+			Volumes:       volumes,
+			RestartPolicy: restartPolicy,
+			NodeName:      config.NodeName,
 		},
 	}
 
@@ -176,12 +190,16 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 			ExpectNoError(err, "Failed to create %q pod: %v", serverPodName, err)
 		}
 	}
-	ExpectNoError(WaitForPodRunningInNamespace(client, serverPod))
-
-	if pod == nil {
-		By(fmt.Sprintf("locating the %q server pod", serverPodName))
-		pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
-		ExpectNoError(err, "Cannot locate the server pod %q: %v", serverPodName, err)
+	if config.WaitForCompletion {
+		ExpectNoError(WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
+		ExpectNoError(podClient.Delete(serverPod.Name, nil))
+	} else {
+		ExpectNoError(WaitForPodRunningInNamespace(client, serverPod))
+		if pod == nil {
+			By(fmt.Sprintf("locating the %q server pod", serverPodName))
+			pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
+			ExpectNoError(err, "Cannot locate the server pod %q: %v", serverPodName, err)
+		}
 	}
 	return pod
 }
@@ -224,7 +242,7 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 // and check that the pod sees expected data, e.g. from the server pod.
 // Multiple VolumeTests can be specified to mount multiple volumes to a single
 // pod.
-func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *types.UnixGroupID, tests []VolumeTest) {
+func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, tests []VolumeTest) {
 	By(fmt.Sprint("starting ", config.Prefix, " client"))
 	clientPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{

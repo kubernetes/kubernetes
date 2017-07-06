@@ -16,6 +16,7 @@ go_library(
         "register.go",
         "types.generated.go",
         "types.go",
+        "types_swagger_doc_generated.go",
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
@@ -23,9 +24,9 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/admission:go_default_library",
-        "//pkg/apis/authentication/v1:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/ugorji/go/codec:go_default_library",
+        "//vendor/k8s.io/api/authentication/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

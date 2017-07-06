@@ -17,7 +17,6 @@ limitations under the License.
 package user
 
 import (
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -34,7 +33,7 @@ func NewRunAsAny(options *extensions.RunAsUserStrategyOptions) (RunAsUserStrateg
 }
 
 // Generate creates the uid based on policy rules.
-func (s *runAsAny) Generate(pod *api.Pod, container *api.Container) (*types.UnixUserID, error) {
+func (s *runAsAny) Generate(pod *api.Pod, container *api.Container) (*int64, error) {
 	return nil, nil
 }
 

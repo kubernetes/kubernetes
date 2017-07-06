@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -110,7 +109,7 @@ func CreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command
 			EnvFileSource:  cmdutil.GetFlagString(cmd, "from-env-file"),
 		}
 	default:
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
+		return errUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
@@ -177,7 +176,7 @@ func CreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.
 	requiredFlags := []string{"docker-username", "docker-password", "docker-email", "docker-server"}
 	for _, requiredFlag := range requiredFlags {
 		if value := cmdutil.GetFlagString(cmd, requiredFlag); len(value) == 0 {
-			return cmdutil.UsageError(cmd, "flag %s is required", requiredFlag)
+			return cmdutil.UsageErrorf(cmd, "flag %s is required", requiredFlag)
 		}
 	}
 	var generator kubectl.StructuredGenerator
@@ -191,7 +190,7 @@ func CreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.
 			Server:   cmdutil.GetFlagString(cmd, "docker-server"),
 		}
 	default:
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
+		return errUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
@@ -242,7 +241,7 @@ func CreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, ar
 	requiredFlags := []string{"cert", "key"}
 	for _, requiredFlag := range requiredFlags {
 		if value := cmdutil.GetFlagString(cmd, requiredFlag); len(value) == 0 {
-			return cmdutil.UsageError(cmd, "flag %s is required", requiredFlag)
+			return cmdutil.UsageErrorf(cmd, "flag %s is required", requiredFlag)
 		}
 	}
 	var generator kubectl.StructuredGenerator
@@ -254,7 +253,7 @@ func CreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, ar
 			Cert: cmdutil.GetFlagString(cmd, "cert"),
 		}
 	default:
-		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
+		return errUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,

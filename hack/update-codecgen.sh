@@ -27,6 +27,9 @@ kube::golang::setup_env
 # list (since there aren't many dependencies).
 
 generated_files=($(
+  find ./vendor/k8s.io/api/ \
+    -name '*.generated.go' | LC_ALL=C sort -r
+
   find . -not \( \
       \( \
         -wholename './output' \

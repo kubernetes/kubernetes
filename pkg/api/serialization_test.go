@@ -29,6 +29,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/ugorji/go/codec"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
@@ -43,9 +45,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	k8s_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate
@@ -76,16 +78,16 @@ func dataAsString(data []byte) string {
 
 func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.ReplicaSet, out *api.ReplicationController, s conversion.Scope) error {
 	intermediate1 := &extensions.ReplicaSet{}
-	if err := v1beta1.Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in, intermediate1, s); err != nil {
+	if err := k8s_v1beta1.Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in, intermediate1, s); err != nil {
 		return err
 	}
 
 	intermediate2 := &v1.ReplicationController{}
-	if err := v1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
+	if err := k8s_api_v1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
 		return err
 	}
 
-	return v1.Convert_v1_ReplicationController_To_api_ReplicationController(intermediate2, out, s)
+	return k8s_api_v1.Convert_v1_ReplicationController_To_api_ReplicationController(intermediate2, out, s)
 }
 
 func TestSetControllerConversion(t *testing.T) {
@@ -137,7 +139,7 @@ func TestSetControllerConversion(t *testing.T) {
 // debug issues that arise while adding a new API type.
 func TestSpecificKind(t *testing.T) {
 	// Uncomment the following line to enable logging of which conversions
-	// api.scheme.Log(t)
+	// api.Scheme.Log(t)
 	internalGVK := schema.GroupVersionKind{Group: "extensions", Version: runtime.APIVersionInternal, Kind: "DaemonSet"}
 
 	seed := rand.Int63()

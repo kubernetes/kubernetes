@@ -17,11 +17,14 @@ limitations under the License.
 package azure
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"time"
 
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/version"
@@ -32,10 +35,21 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
+	"github.com/golang/glog"
+	"golang.org/x/crypto/pkcs12"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-// CloudProviderName is the value used for the --cloud-provider flag
-const CloudProviderName = "azure"
+const (
+	// CloudProviderName is the value used for the --cloud-provider flag
+	CloudProviderName      = "azure"
+	rateLimitQPSDefault    = 1.0
+	rateLimitBucketDefault = 5
+	backoffRetriesDefault  = 6
+	backoffExponentDefault = 1.5
+	backoffDurationDefault = 5 // in seconds
+	backoffJitterDefault   = 1.0
+)
 
 // Config holds the configuration parsed from the --cloud-config flag
 // All fields are required unless otherwise specified
@@ -69,25 +83,95 @@ type Config struct {
 	AADClientID string `json:"aadClientId" yaml:"aadClientId"`
 	// The ClientSecret for an AAD application with RBAC access to talk to Azure RM APIs
 	AADClientSecret string `json:"aadClientSecret" yaml:"aadClientSecret"`
+	// The path of a client certificate for an AAD application with RBAC access to talk to Azure RM APIs
+	AADClientCertPath string `json:"aadClientCertPath" yaml:"aadClientCertPath"`
+	// The password of the client certificate for an AAD application with RBAC access to talk to Azure RM APIs
+	AADClientCertPassword string `json:"aadClientCertPassword" yaml:"aadClientCertPassword"`
+	// Enable exponential backoff to manage resource request retries
+	CloudProviderBackoff bool `json:"cloudProviderBackoff" yaml:"cloudProviderBackoff"`
+	// Backoff retry limit
+	CloudProviderBackoffRetries int `json:"cloudProviderBackoffRetries" yaml:"cloudProviderBackoffRetries"`
+	// Backoff exponent
+	CloudProviderBackoffExponent float64 `json:"cloudProviderBackoffExponent" yaml:"cloudProviderBackoffExponent"`
+	// Backoff duration
+	CloudProviderBackoffDuration int `json:"cloudProviderBackoffDuration" yaml:"cloudProviderBackoffDuration"`
+	// Backoff jitter
+	CloudProviderBackoffJitter float64 `json:"cloudProviderBackoffJitter" yaml:"cloudProviderBackoffJitter"`
+	// Enable rate limiting
+	CloudProviderRateLimit bool `json:"cloudProviderRateLimit" yaml:"cloudProviderRateLimit"`
+	// Rate limit QPS
+	CloudProviderRateLimitQPS float32 `json:"cloudProviderRateLimitQPS" yaml:"cloudProviderRateLimitQPS"`
+	// Rate limit Bucket Size
+	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket" yaml:"cloudProviderRateLimitBucket"`
 }
 
 // Cloud holds the config and clients
 type Cloud struct {
 	Config
-	Environment             azure.Environment
-	RoutesClient            network.RoutesClient
-	SubnetsClient           network.SubnetsClient
-	InterfacesClient        network.InterfacesClient
-	RouteTablesClient       network.RouteTablesClient
-	LoadBalancerClient      network.LoadBalancersClient
-	PublicIPAddressesClient network.PublicIPAddressesClient
-	SecurityGroupsClient    network.SecurityGroupsClient
-	VirtualMachinesClient   compute.VirtualMachinesClient
-	StorageAccountClient    storage.AccountsClient
+	Environment              azure.Environment
+	RoutesClient             network.RoutesClient
+	SubnetsClient            network.SubnetsClient
+	InterfacesClient         network.InterfacesClient
+	RouteTablesClient        network.RouteTablesClient
+	LoadBalancerClient       network.LoadBalancersClient
+	PublicIPAddressesClient  network.PublicIPAddressesClient
+	SecurityGroupsClient     network.SecurityGroupsClient
+	VirtualMachinesClient    compute.VirtualMachinesClient
+	StorageAccountClient     storage.AccountsClient
+	operationPollRateLimiter flowcontrol.RateLimiter
+	resourceRequestBackoff   wait.Backoff
 }
 
 func init() {
 	cloudprovider.RegisterCloudProvider(CloudProviderName, NewCloud)
+}
+
+// decodePkcs12 decodes a PKCS#12 client certificate by extracting the public certificate and
+// the private RSA key
+func decodePkcs12(pkcs []byte, password string) (*x509.Certificate, *rsa.PrivateKey, error) {
+	privateKey, certificate, err := pkcs12.Decode(pkcs, password)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decoding the PKCS#12 client certificate: %v", err)
+	}
+	rsaPrivateKey, isRsaKey := privateKey.(*rsa.PrivateKey)
+	if !isRsaKey {
+		return nil, nil, fmt.Errorf("PKCS#12 certificate must contain a RSA private key")
+	}
+
+	return certificate, rsaPrivateKey, nil
+}
+
+// newServicePrincipalToken creates a new service principal token based on the configuration
+func newServicePrincipalToken(az *Cloud) (*azure.ServicePrincipalToken, error) {
+	oauthConfig, err := az.Environment.OAuthConfigForTenant(az.TenantID)
+	if err != nil {
+		return nil, fmt.Errorf("creating the OAuth config: %v", err)
+	}
+
+	if len(az.AADClientSecret) > 0 {
+		return azure.NewServicePrincipalToken(
+			*oauthConfig,
+			az.AADClientID,
+			az.AADClientSecret,
+			az.Environment.ServiceManagementEndpoint)
+	} else if len(az.AADClientCertPath) > 0 && len(az.AADClientCertPassword) > 0 {
+		certData, err := ioutil.ReadFile(az.AADClientCertPath)
+		if err != nil {
+			return nil, fmt.Errorf("reading the client certificate from file %s: %v", az.AADClientCertPath, err)
+		}
+		certificate, privateKey, err := decodePkcs12(certData, az.AADClientCertPassword)
+		if err != nil {
+			return nil, fmt.Errorf("decoding the client certificate: %v", err)
+		}
+		return azure.NewServicePrincipalTokenFromCertificate(
+			*oauthConfig,
+			az.AADClientID,
+			certificate,
+			privateKey,
+			az.Environment.ServiceManagementEndpoint)
+	} else {
+		return nil, fmt.Errorf("No credentials provided for AAD application %s", az.AADClientID)
+	}
 }
 
 // NewCloud returns a Cloud with initialized clients
@@ -112,16 +196,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		}
 	}
 
-	oauthConfig, err := az.Environment.OAuthConfigForTenant(az.TenantID)
-	if err != nil {
-		return nil, err
-	}
-
-	servicePrincipalToken, err := azure.NewServicePrincipalToken(
-		*oauthConfig,
-		az.AADClientID,
-		az.AADClientSecret,
-		az.Environment.ServiceManagementEndpoint)
+	servicePrincipalToken, err := newServicePrincipalToken(&az)
 	if err != nil {
 		return nil, err
 	}
@@ -176,6 +251,54 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 
 	az.StorageAccountClient = storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
 	az.StorageAccountClient.Authorizer = servicePrincipalToken
+
+	// Conditionally configure rate limits
+	if az.CloudProviderRateLimit {
+		// Assign rate limit defaults if no configuration was passed in
+		if az.CloudProviderRateLimitQPS == 0 {
+			az.CloudProviderRateLimitQPS = rateLimitQPSDefault
+		}
+		if az.CloudProviderRateLimitBucket == 0 {
+			az.CloudProviderRateLimitBucket = rateLimitBucketDefault
+		}
+		az.operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
+			az.CloudProviderRateLimitQPS,
+			az.CloudProviderRateLimitBucket)
+		glog.V(2).Infof("Azure cloudprovider using rate limit config: QPS=%d, bucket=%d",
+			az.CloudProviderRateLimitQPS,
+			az.CloudProviderRateLimitBucket)
+	} else {
+		// if rate limits are configured off, az.operationPollRateLimiter.Accept() is a no-op
+		az.operationPollRateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+	}
+
+	// Conditionally configure resource request backoff
+	if az.CloudProviderBackoff {
+		// Assign backoff defaults if no configuration was passed in
+		if az.CloudProviderBackoffRetries == 0 {
+			az.CloudProviderBackoffRetries = backoffRetriesDefault
+		}
+		if az.CloudProviderBackoffExponent == 0 {
+			az.CloudProviderBackoffExponent = backoffExponentDefault
+		}
+		if az.CloudProviderBackoffDuration == 0 {
+			az.CloudProviderBackoffDuration = backoffDurationDefault
+		}
+		if az.CloudProviderBackoffJitter == 0 {
+			az.CloudProviderBackoffJitter = backoffJitterDefault
+		}
+		az.resourceRequestBackoff = wait.Backoff{
+			Steps:    az.CloudProviderBackoffRetries,
+			Factor:   az.CloudProviderBackoffExponent,
+			Duration: time.Duration(az.CloudProviderBackoffDuration) * time.Second,
+			Jitter:   az.CloudProviderBackoffJitter,
+		}
+		glog.V(2).Infof("Azure cloudprovider using retry backoff: retries=%d, exponent=%f, duration=%d, jitter=%f",
+			az.CloudProviderBackoffRetries,
+			az.CloudProviderBackoffExponent,
+			az.CloudProviderBackoffDuration,
+			az.CloudProviderBackoffJitter)
+	}
 
 	return &az, nil
 }

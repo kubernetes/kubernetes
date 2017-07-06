@@ -27,6 +27,9 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
+	clientv1 "k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,13 +37,10 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
@@ -356,7 +356,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 	if d := dc.getDeploymentForPod(pod); d != nil && d.Spec.Strategy.Type == extensions.RecreateDeploymentStrategyType {
 		// Sync if this Deployment now has no more Pods.
-		rsList, err := dc.getReplicaSetsForDeployment(d)
+		rsList, err := util.ListReplicaSets(d, util.RsListFromClient(dc.client))
 		if err != nil {
 			return
 		}
@@ -574,7 +574,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to retrieve deployment %v from store: %v", key, err))
 		return err
 	}
 
@@ -593,20 +592,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 			dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d)
 		}
 		return nil
-	}
-
-	// This is the point at which we used to add/remove the overlap annotation.
-	// Now we always remove it if it exists, because it is obsolete as of 1.6.
-	// Although the server no longer adds or looks at the annotation,
-	// it's important to remove it from controllers created before the upgrade,
-	// so that old clients (e.g. kubectl reaper) know they can no longer assume
-	// the controller is blocked due to selector overlap and has no dependents.
-	if _, ok := d.Annotations[util.OverlapAnnotation]; ok {
-		delete(d.Annotations, util.OverlapAnnotation)
-		d, err = dc.client.ExtensionsV1beta1().Deployments(d.Namespace).UpdateStatus(d)
-		if err != nil {
-			return fmt.Errorf("couldn't remove obsolete overlap annotation from deployment %v: %v", key, err)
-		}
 	}
 
 	// List ReplicaSets owned by this Deployment, while reconciling ControllerRef

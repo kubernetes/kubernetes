@@ -37,9 +37,7 @@ import (
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
-	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -47,11 +45,12 @@ const (
 	Timeout  = time.Minute * 5
 )
 
-// A Reaper handles terminating an object as gracefully as possible.
-// timeout is how long we'll wait for the termination to be successful
-// gracePeriod is time given to an API object for it to delete itself cleanly,
-// e.g., pod shutdown. It may or may not be supported by the API object.
+// A Reaper terminates an object as gracefully as possible.
 type Reaper interface {
+	// Stop a given object within a namespace. timeout is how long we'll
+	// wait for the termination to be successful. gracePeriod is time given
+	// to an API object for it to delete itself cleanly (e.g., pod
+	// shutdown). It may or may not be supported by the API object.
 	Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error
 }
 
@@ -134,11 +133,6 @@ type StatefulSetReaper struct {
 	client                appsclient.StatefulSetsGetter
 	podClient             coreclient.PodsGetter
 	pollInterval, timeout time.Duration
-}
-
-type objInterface interface {
-	Delete(name string) error
-	Get(name string) (metav1.Object, error)
 }
 
 // getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.
@@ -337,40 +331,14 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	}
 	if timeout == 0 {
 		numReplicas := ss.Spec.Replicas
+
+		// BUG: this timeout is never used.
 		timeout = Timeout + time.Duration(10*numReplicas)*time.Second
 	}
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
 	waitForStatefulSet := NewRetryParams(reaper.pollInterval, reaper.timeout)
 	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForStatefulSet); err != nil {
 		return err
-	}
-
-	// TODO: This shouldn't be needed, see corresponding TODO in StatefulSetHasDesiredReplicas.
-	// StatefulSet should track generation number.
-	pods := reaper.podClient.Pods(namespace)
-	selector, _ := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
-	options := metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err := pods.List(options)
-	if err != nil {
-		return err
-	}
-
-	errList := []error{}
-	for i := range podList.Items {
-		pod := &podList.Items[i]
-		controllerRef := controller.GetControllerOf(pod)
-		// Ignore Pod if it's an orphan or owned by someone else.
-		if controllerRef == nil || controllerRef.UID != ss.UID {
-			continue
-		}
-		if err := pods.Delete(pod.Name, gracePeriod); err != nil {
-			if !errors.IsNotFound(err) {
-				errList = append(errList, err)
-			}
-		}
-	}
-	if len(errList) > 0 {
-		return utilerrors.NewAggregate(errList)
 	}
 
 	// TODO: Cleanup volumes? We don't want to accidentally delete volumes from
@@ -432,7 +400,8 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	deployment, err := reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
 		// set deployment's history and scale to 0
 		// TODO replace with patch when available: https://github.com/kubernetes/kubernetes/issues/20527
-		d.Spec.RevisionHistoryLimit = util.Int32Ptr(0)
+		rhl := int32(0)
+		d.Spec.RevisionHistoryLimit = &rhl
 		d.Spec.Replicas = 0
 		d.Spec.Paused = true
 	})
@@ -445,13 +414,6 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 		return deployments.Get(name, metav1.GetOptions{})
 	}, deployment.Generation, 1*time.Second, 1*time.Minute); err != nil {
 		return err
-	}
-
-	// Do not cascade deletion for overlapping deployments.
-	// A Deployment with this annotation will not create or manage anything,
-	// so we can assume any matching ReplicaSets belong to another Deployment.
-	if len(deployment.Annotations[deploymentutil.OverlapAnnotation]) > 0 {
-		return deployments.Delete(name, nil)
 	}
 
 	// Stop all replica sets belonging to this Deployment.

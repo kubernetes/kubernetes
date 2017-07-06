@@ -34,10 +34,10 @@ import (
 	cnitypes020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
+	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -179,12 +179,14 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componen
 
 // TODO: move thic logic into cni bridge plugin and remove this from kubenet
 func (plugin *kubenetNetworkPlugin) ensureMasqRule() error {
-	if _, err := plugin.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting,
-		"-m", "comment", "--comment", "kubenet: SNAT for outbound traffic from cluster",
-		"-m", "addrtype", "!", "--dst-type", "LOCAL",
-		"!", "-d", plugin.nonMasqueradeCIDR,
-		"-j", "MASQUERADE"); err != nil {
-		return fmt.Errorf("Failed to ensure that %s chain %s jumps to MASQUERADE: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, err)
+	if plugin.nonMasqueradeCIDR != "0.0.0.0/0" {
+		if _, err := plugin.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting,
+			"-m", "comment", "--comment", "kubenet: SNAT for outbound traffic from cluster",
+			"-m", "addrtype", "!", "--dst-type", "LOCAL",
+			"!", "-d", plugin.nonMasqueradeCIDR,
+			"-j", "MASQUERADE"); err != nil {
+			return fmt.Errorf("Failed to ensure that %s chain %s jumps to MASQUERADE: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, err)
+		}
 	}
 	return nil
 }
@@ -257,7 +259,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	if err == nil {
 		setHairpin := plugin.hairpinMode == componentconfig.HairpinVeth
 		// Set bridge address to first address in IPNet
-		cidr.IP.To4()[3] += 1
+		cidr.IP[len(cidr.IP)-1] += 1
 
 		json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, podCIDR, cidr.IP.String())
 		glog.V(2).Infof("CNI network config set to %v", json)
@@ -302,7 +304,7 @@ func (plugin *kubenetNetworkPlugin) Name() string {
 }
 
 func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
-	return utilsets.NewInt(network.NET_PLUGIN_CAPABILITY_SHAPING)
+	return utilsets.NewInt()
 }
 
 // setup sets up networking through CNI using the given ns/name and sandbox ID.
@@ -739,9 +741,9 @@ func podIsExited(p *kubecontainer.Pod) bool {
 	return true
 }
 
-func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubecontainer.ContainerID) (*libcni.RuntimeConf, error) {
+func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubecontainer.ContainerID, needNetNs bool) (*libcni.RuntimeConf, error) {
 	netnsPath, err := plugin.host.GetNetNS(id.ID)
-	if err != nil {
+	if needNetNs && err != nil {
 		glog.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
 	}
 
@@ -753,7 +755,7 @@ func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubeco
 }
 
 func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.NetworkConfig, ifName, namespace, name string, id kubecontainer.ContainerID) (cnitypes.Result, error) {
-	rt, err := plugin.buildCNIRuntimeConf(ifName, id)
+	rt, err := plugin.buildCNIRuntimeConf(ifName, id, true)
 	if err != nil {
 		return nil, fmt.Errorf("Error building CNI config: %v", err)
 	}
@@ -767,7 +769,7 @@ func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.Network
 }
 
 func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.NetworkConfig, ifName, namespace, name string, id kubecontainer.ContainerID) error {
-	rt, err := plugin.buildCNIRuntimeConf(ifName, id)
+	rt, err := plugin.buildCNIRuntimeConf(ifName, id, false)
 	if err != nil {
 		return fmt.Errorf("Error building CNI config: %v", err)
 	}

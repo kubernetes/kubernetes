@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -184,7 +184,10 @@ func ensureKubeHostportChains(iptables utiliptables.Interface, natInterfaceName 
 		"-m", "addrtype", "--dst-type", "LOCAL",
 		"-j", string(kubeHostportsChain)}
 	for _, tc := range tableChainsNeedJumpServices {
-		if _, err := iptables.EnsureRule(utiliptables.Prepend, tc.table, tc.chain, args...); err != nil {
+		// KUBE-HOSTPORTS chain needs to be appended to the system chains.
+		// This ensures KUBE-SERVICES chain gets processed first.
+		// Since rules in KUBE-HOSTPORTS chain matches broader cases, allow the more specific rules to be processed first.
+		if _, err := iptables.EnsureRule(utiliptables.Append, tc.table, tc.chain, args...); err != nil {
 			return fmt.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", tc.table, tc.chain, kubeHostportsChain, err)
 		}
 	}

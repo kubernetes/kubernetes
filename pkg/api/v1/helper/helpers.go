@@ -24,9 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
@@ -445,21 +445,6 @@ func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	return newNode, true, nil
 }
 
-// GetAffinityFromPodAnnotations gets the json serialized affinity data from Pod.Annotations
-// and converts it to the Affinity type in api.
-// TODO: remove when alpha support for affinity is removed
-func GetAffinityFromPodAnnotations(annotations map[string]string) (*v1.Affinity, error) {
-	if len(annotations) > 0 && annotations[v1.AffinityAnnotationKey] != "" {
-		var affinity v1.Affinity
-		err := json.Unmarshal([]byte(annotations[v1.AffinityAnnotationKey]), &affinity)
-		if err != nil {
-			return nil, err
-		}
-		return &affinity, nil
-	}
-	return nil, nil
-}
-
 // GetPersistentVolumeClass returns StorageClassName.
 func GetPersistentVolumeClass(volume *v1.PersistentVolume) string {
 	// Use beta annotation first
@@ -497,4 +482,34 @@ func PersistentVolumeClaimHasClass(claim *v1.PersistentVolumeClaim) bool {
 	}
 
 	return false
+}
+
+// GetStorageNodeAffinityFromAnnotation gets the json serialized data from PersistentVolume.Annotations
+// and converts it to the NodeAffinity type in api.
+// TODO: update when storage node affinity graduates to beta
+func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*v1.NodeAffinity, error) {
+	if len(annotations) > 0 && annotations[v1.AlphaStorageNodeAffinityAnnotation] != "" {
+		var affinity v1.NodeAffinity
+		err := json.Unmarshal([]byte(annotations[v1.AlphaStorageNodeAffinityAnnotation]), &affinity)
+		if err != nil {
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
+}
+
+// Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
+// TODO: update when storage node affinity graduates to beta
+func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *v1.NodeAffinity) error {
+	if affinity == nil {
+		return nil
+	}
+
+	json, err := json.Marshal(*affinity)
+	if err != nil {
+		return err
+	}
+	annotations[v1.AlphaStorageNodeAffinityAnnotation] = string(json)
+	return nil
 }

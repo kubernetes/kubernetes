@@ -112,7 +112,7 @@ func matchImageIDOnly(inspected dockertypes.ImageInspect, image string) bool {
 
 	digest, isDigested := ref.(dockerref.Digested)
 	if !isDigested {
-		glog.V(4).Infof("the image reference %q was not a digest reference")
+		glog.V(4).Infof("the image reference %q was not a digest reference", image)
 		return false
 	}
 

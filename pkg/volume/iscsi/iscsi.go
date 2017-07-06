@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -136,10 +136,10 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 		iscsiDisk: &iscsiDisk{
 			podUID:         podUID,
 			volName:        spec.Name(),
-			portals:        bkportal,
-			iqn:            iscsi.IQN,
+			Portals:        bkportal,
+			Iqn:            iscsi.IQN,
 			lun:            lun,
-			iface:          iface,
+			Iface:          iface,
 			chap_discovery: iscsi.DiscoveryCHAPAuth,
 			chap_session:   iscsi.SessionCHAPAuth,
 			secret:         secret,
@@ -191,10 +191,10 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 type iscsiDisk struct {
 	volName        string
 	podUID         types.UID
-	portals        []string
-	iqn            string
+	Portals        []string
+	Iqn            string
 	lun            string
-	iface          string
+	Iface          string
 	chap_discovery bool
 	chap_session   bool
 	secret         map[string]string
@@ -236,11 +236,11 @@ func (b *iscsiDiskMounter) CanMount() error {
 	return nil
 }
 
-func (b *iscsiDiskMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (b *iscsiDiskMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
-func (b *iscsiDiskMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (b *iscsiDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
 	if err != nil {

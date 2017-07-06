@@ -24,8 +24,19 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Admission policies
-	_ "k8s.io/kubernetes/plugin/pkg/admission/admit"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/deny"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/gc"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/kubernetes/federation/plugin/pkg/admission/schedulingpolicy"
+	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+	"k8s.io/kubernetes/plugin/pkg/admission/deny"
+	"k8s.io/kubernetes/plugin/pkg/admission/gc"
+	"k8s.io/kubernetes/plugin/pkg/admission/initialization"
 )
+
+// registerAllAdmissionPlugins registers all admission plugins
+func registerAllAdmissionPlugins(plugins *admission.Plugins) {
+	admit.Register(plugins)
+	deny.Register(plugins)
+	gc.Register(plugins)
+	initialization.Register(plugins)
+	schedulingpolicy.Register(plugins)
+}

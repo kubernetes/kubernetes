@@ -17,6 +17,7 @@ limitations under the License.
 package federatedtypes
 
 import (
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -24,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
@@ -131,6 +131,10 @@ func (a *ConfigMapAdapter) ClusterUpdate(client kubeclientset.Interface, obj pkg
 
 func (a *ConfigMapAdapter) ClusterWatch(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (watch.Interface, error) {
 	return client.CoreV1().ConfigMaps(namespace).Watch(options)
+}
+
+func (a *ConfigMapAdapter) IsSchedulingAdapter() bool {
+	return false
 }
 
 func (a *ConfigMapAdapter) NewTestObject(namespace string) pkgruntime.Object {

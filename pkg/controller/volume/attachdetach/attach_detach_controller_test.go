@@ -21,10 +21,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -46,7 +46,8 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		nil, /* cloud */
 		nil, /* plugins */
 		false,
-		time.Second*5)
+		5*time.Second,
+		DefaultTimerConfig)
 
 	// Assert
 	if err != nil {
@@ -212,7 +213,8 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		nil, /* cloud */
 		plugins,
 		false,
-		time.Second*1)
+		1*time.Second,
+		DefaultTimerConfig)
 
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)

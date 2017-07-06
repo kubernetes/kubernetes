@@ -31,6 +31,8 @@ type ResourcePrinter interface {
 	//Can be used to print out warning/clarifications if needed
 	//after all objects were printed
 	AfterPrint(io.Writer, string) error
+	// Identify if it is a generic printer
+	IsGeneric() bool
 }
 
 // ResourcePrinterFunc is a function that can print objects
@@ -48,6 +50,10 @@ func (fn ResourcePrinterFunc) HandledResources() []string {
 
 func (fn ResourcePrinterFunc) AfterPrint(io.Writer, string) error {
 	return nil
+}
+
+func (fn ResourcePrinterFunc) IsGeneric() bool {
+	return true
 }
 
 type PrintOptions struct {
@@ -93,4 +99,14 @@ type ErrNoDescriber struct {
 // Error implements the error interface.
 func (e ErrNoDescriber) Error() string {
 	return fmt.Sprintf("no describer has been defined for %v", e.Types)
+}
+
+// OutputOptions represents resource output options which is used to generate a resource printer.
+type OutputOptions struct {
+	// supported Format types can be found in pkg/printers/printers.go
+	FmtType string
+	FmtArg  string
+
+	// indicates if it is OK to ignore missing keys for rendering an output template.
+	AllowMissingKeys bool
 }

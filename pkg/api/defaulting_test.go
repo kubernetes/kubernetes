@@ -24,15 +24,16 @@ import (
 
 	"github.com/google/gofuzz"
 
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	apiv1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	k8s_batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
 type orderedGroupVersionKinds []schema.GroupVersionKind
@@ -45,7 +46,7 @@ func (o orderedGroupVersionKinds) Less(i, j int) bool {
 
 func TestVerifyDefaulting(t *testing.T) {
 	job := &batchv2alpha1.JobTemplate{}
-	batchv2alpha1.SetObjectDefaults_JobTemplate(job)
+	k8s_batchv2alpha1.SetObjectDefaults_JobTemplate(job)
 	if job.Template.Spec.Template.Spec.DNSPolicy != apiv1.DNSClusterFirst {
 		t.Errorf("unexpected defaulting: %#v", job)
 	}
@@ -103,24 +104,30 @@ func TestDefaulting(t *testing.T) {
 		// This object contains only int fields which currently breaks the defaulting test because
 		// it's pretty stupid. Once we add non integer fields, we should uncomment this.
 		// {Group: "kubeadm.k8s.io", Version: "v1alpha1", Kind: "NodeConfiguration"}:                 {},
-		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSet"}:                              {},
-		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSetList"}:                          {},
-		{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}:                             {},
-		{Group: "extensions", Version: "v1beta1", Kind: "DeploymentList"}:                         {},
-		{Group: "apps", Version: "v1beta1", Kind: "Deployment"}:                                   {},
-		{Group: "apps", Version: "v1beta1", Kind: "DeploymentList"}:                               {},
-		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}:                             {},
-		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSetList"}:                         {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBinding"}:     {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBindingList"}: {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBinding"}:            {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBindingList"}:        {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "ClusterRoleBinding"}:      {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "ClusterRoleBindingList"}:  {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBinding"}:             {},
-		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBindingList"}:         {},
-		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPreset"}:                        {},
-		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPresetList"}:                    {},
+		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSet"}:                                                 {},
+		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSetList"}:                                             {},
+		{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}:                                                {},
+		{Group: "extensions", Version: "v1beta1", Kind: "DeploymentList"}:                                            {},
+		{Group: "apps", Version: "v1beta1", Kind: "Deployment"}:                                                      {},
+		{Group: "apps", Version: "v1beta1", Kind: "DeploymentList"}:                                                  {},
+		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}:                                                {},
+		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSetList"}:                                            {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBinding"}:                        {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBindingList"}:                    {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBinding"}:                               {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBindingList"}:                           {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "ClusterRoleBinding"}:                         {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "ClusterRoleBindingList"}:                     {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBinding"}:                                {},
+		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBindingList"}:                            {},
+		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPreset"}:                                           {},
+		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPresetList"}:                                       {},
+		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfiguration"}:               {},
+		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfigurationList"}:           {},
+		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfiguration"}:     {},
+		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfigurationList"}: {},
+		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}:                                           {},
+		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicyList"}:                                       {},
 	}
 
 	f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))

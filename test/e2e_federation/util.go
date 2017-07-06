@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -27,9 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
@@ -120,6 +120,36 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 	}
 	By(fmt.Sprintf("Creating federated service %q in namespace %q", name, namespace))
 
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: v1.ServiceSpec{
+			Selector: FederatedServiceLabels,
+			Type:     v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{
+				{
+					Name:       "http",
+					Protocol:   v1.ProtocolTCP,
+					Port:       80,
+					TargetPort: intstr.FromInt(8080),
+				},
+			},
+			SessionAffinity: v1.ServiceAffinityNone,
+		},
+	}
+
+	By(fmt.Sprintf("Trying to create service %q in namespace %q", service.Name, namespace))
+	return clientset.Services(namespace).Create(service)
+}
+
+func createLBService(clientset *fedclientset.Clientset, namespace, name string) (*v1.Service, error) {
+	if clientset == nil || len(namespace) == 0 {
+		return nil, fmt.Errorf("Internal error: invalid parameters passed to createService: clientset: %v, namespace: %v", clientset, namespace)
+	}
+	By(fmt.Sprintf("Creating federated service (type: load balancer) %q in namespace %q", name, namespace))
+
 	// Tests can be run in parallel, so we need a different nodePort for
 	// each test.
 	// We add 1 to FederatedSvcNodePortLast because IntnRange's range end
@@ -133,7 +163,7 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 		},
 		Spec: v1.ServiceSpec{
 			Selector: FederatedServiceLabels,
-			Type:     "LoadBalancer",
+			Type:     v1.ServiceTypeLoadBalancer,
 			Ports: []v1.ServicePort{
 				{
 					Name:       "http",
@@ -146,6 +176,7 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 			SessionAffinity: v1.ServiceAffinityNone,
 		},
 	}
+
 	By(fmt.Sprintf("Trying to create service %q in namespace %q", service.Name, namespace))
 	return clientset.Services(namespace).Create(service)
 }
@@ -154,6 +185,13 @@ func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name stri
 	service, err := createService(clientset, namespace, name)
 	framework.ExpectNoError(err, "Creating service %q in namespace %q", service.Name, namespace)
 	By(fmt.Sprintf("Successfully created federated service %q in namespace %q", name, namespace))
+	return service
+}
+
+func createLBServiceOrFail(clientset *fedclientset.Clientset, namespace, name string) *v1.Service {
+	service, err := createLBService(clientset, namespace, name)
+	framework.ExpectNoError(err, "Creating service %q in namespace %q", service.Name, namespace)
+	By(fmt.Sprintf("Successfully created federated service (type: load balancer) %q in namespace %q", name, namespace))
 	return service
 }
 
@@ -205,13 +243,17 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 			continue
 		}
 
+		if cSvc.Spec.Type == v1.ServiceTypeLoadBalancer {
+			// In federation tests, e2e zone names are used to derive federation member cluster names
+			zone := fedframework.GetZoneFromClusterName(name)
+			serviceLBName := cloudprovider.GetLoadBalancerName(cSvc)
+			framework.Logf("cleaning cloud provider resource for service %q in namespace %q, in cluster %q", service.Name, namespace, name)
+			framework.CleanupServiceResources(c.Clientset, serviceLBName, zone)
+		}
+
 		err = cleanupServiceShard(c.Clientset, name, namespace, cSvc, fedframework.FederatedDefaultTestTimeout)
 		if err != nil {
 			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q: %v", service.Name, namespace, name, err)
-		}
-		err = cleanupServiceShardLoadBalancer(name, cSvc, fedframework.FederatedDefaultTestTimeout)
-		if err != nil {
-			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q", service.Name, namespace, name)
 		}
 	}
 }
@@ -225,35 +267,6 @@ func cleanupServiceShard(clientset *kubeclientset.Clientset, clusterName, namesp
 			return false, nil
 		}
 		By(fmt.Sprintf("Service %q in namespace %q in cluster %q deleted", service.Name, namespace, clusterName))
-		return true, nil
-	})
-	return err
-}
-
-func cleanupServiceShardLoadBalancer(clusterName string, service *v1.Service, timeout time.Duration) error {
-	provider := framework.TestContext.CloudConfig.Provider
-	if provider == nil {
-		return fmt.Errorf("cloud provider undefined")
-	}
-
-	internalSvc := &v1.Service{}
-	err := api.Scheme.Convert(service, internalSvc, nil)
-	if err != nil {
-		return fmt.Errorf("failed to convert versioned service object to internal type: %v", err)
-	}
-
-	err = wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		lbi, supported := provider.LoadBalancer()
-		if !supported {
-			return false, fmt.Errorf("%q doesn't support load balancers", provider.ProviderName())
-		}
-		err := lbi.EnsureLoadBalancerDeleted(clusterName, internalSvc)
-		if err != nil {
-			// Deletion failed with an error, try again.
-			framework.Logf("Failed to delete cloud provider resources for service %q in namespace %q, in cluster %q: %v", service.Name, service.Namespace, clusterName, err)
-			return false, nil
-		}
-		By(fmt.Sprintf("Cloud provider resources for Service %q in namespace %q in cluster %q deleted", service.Name, service.Namespace, clusterName))
 		return true, nil
 	})
 	return err
@@ -358,7 +371,7 @@ func createBackendPodsOrFail(clusters fedframework.ClusterSlice, namespace strin
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: "gcr.io/google_containers/echoserver:1.4",
+					Image: "gcr.io/google_containers/echoserver:1.6",
 				},
 			},
 			RestartPolicy: v1.RestartPolicyAlways,

@@ -108,6 +108,32 @@ func TestGetClientIP(t *testing.T) {
 	}
 }
 
+func TestAppendForwardedForHeader(t *testing.T) {
+	testCases := []struct {
+		addr, forwarded, expected string
+	}{
+		{"1.2.3.4:8000", "", "1.2.3.4"},
+		{"1.2.3.4:8000", "8.8.8.8", "8.8.8.8, 1.2.3.4"},
+		{"1.2.3.4:8000", "8.8.8.8, 1.2.3.4", "8.8.8.8, 1.2.3.4, 1.2.3.4"},
+		{"1.2.3.4:8000", "foo,bar", "foo,bar, 1.2.3.4"},
+	}
+	for i, test := range testCases {
+		req := &http.Request{
+			RemoteAddr: test.addr,
+			Header:     make(http.Header),
+		}
+		if test.forwarded != "" {
+			req.Header.Set("X-Forwarded-For", test.forwarded)
+		}
+
+		AppendForwardedForHeader(req)
+		actual := req.Header.Get("X-Forwarded-For")
+		if actual != test.expected {
+			t.Errorf("[%d] Expected %q, Got %q", i, test.expected, actual)
+		}
+	}
+}
+
 func TestProxierWithNoProxyCIDR(t *testing.T) {
 	testCases := []struct {
 		name    string

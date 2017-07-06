@@ -86,6 +86,13 @@ func init() {
 		},
 	})
 	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
+		// role for the cloud providers to access/create kube-system configmaps
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "cloud-provider"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("create", "get", "list", "watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
+		},
+	})
+	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
 		// role for the token-cleaner to be able to remove secrets, but only in kube-system
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "token-cleaner"},
 		Rules: []rbac.PolicyRule{
@@ -93,8 +100,31 @@ func init() {
 			eventsRule(),
 		},
 	})
+	// TODO: Create util on Role+Binding for leader locking if more cases evolve.
+	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
+		// role for the leader locking on supplied configmap
+		ObjectMeta: metav1.ObjectMeta{Name: "system::leader-locking-kube-controller-manager"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
+			rbac.NewRule("get", "update").Groups(legacyGroup).Resources("configmaps").Names("kube-controller-manager").RuleOrDie(),
+		},
+	})
+	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
+		// role for the leader locking on supplied configmap
+		ObjectMeta: metav1.ObjectMeta{Name: "system::leader-locking-kube-scheduler"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
+			rbac.NewRule("get", "update").Groups(legacyGroup).Resources("configmaps").Names("kube-scheduler").RuleOrDie(),
+		},
+	})
+	addNamespaceRoleBinding(metav1.NamespaceSystem,
+		rbac.NewRoleBinding("system::leader-locking-kube-controller-manager", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "kube-controller-manager").BindingOrDie())
+	addNamespaceRoleBinding(metav1.NamespaceSystem,
+		rbac.NewRoleBinding("system::leader-locking-kube-scheduler", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "kube-scheduler").BindingOrDie())
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
 		rbac.NewRoleBinding(saRolePrefix+"bootstrap-signer", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "bootstrap-signer").BindingOrDie())
+	addNamespaceRoleBinding(metav1.NamespaceSystem,
+		rbac.NewRoleBinding(saRolePrefix+"cloud-provider", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "cloud-provider").BindingOrDie())
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
 		rbac.NewRoleBinding(saRolePrefix+"token-cleaner", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "token-cleaner").BindingOrDie())
 

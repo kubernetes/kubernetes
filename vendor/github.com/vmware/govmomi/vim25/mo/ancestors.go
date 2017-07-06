@@ -104,6 +104,8 @@ func Ancestors(ctx context.Context, rt soap.RoundTripper, pc, obj types.ManagedO
 					me.Name = x.Name
 				case DistributedVirtualPortgroup:
 					me.Name = x.Name
+				case OpaqueNetwork:
+					me.Name = x.Name
 				default:
 					// ManagedEntity always has a Name, if we hit this point we missed a case above.
 					panic(fmt.Sprintf("%#v Name is empty", me.Reference()))

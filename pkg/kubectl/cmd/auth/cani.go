@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	internalauthorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -43,10 +42,11 @@ type CanIOptions struct {
 	Namespace     string
 	SelfSARClient internalauthorizationclient.SelfSubjectAccessReviewsGetter
 
-	Verb         string
-	Resource     schema.GroupVersionResource
-	Subresource  string
-	ResourceName string
+	Verb           string
+	Resource       schema.GroupVersionResource
+	NonResourceURL string
+	Subresource    string
+	ResourceName   string
 
 	Out io.Writer
 	Err io.Writer
@@ -57,7 +57,8 @@ var (
 		Check whether an action is allowed.
 
 		VERB is a logical Kubernetes API verb like 'get', 'list', 'watch', 'delete', etc.
-		TYPE is a Kubernetes resource.  Shortcuts and groups will be resolved.
+		TYPE is a Kubernetes resource. Shortcuts and groups will be resolved.
+		NONRESOURCEURL is a partial URL starts with "/".
 		NAME is the name of a particular Kubernetes resource.`)
 
 	canIExample = templates.Examples(`
@@ -73,8 +74,11 @@ var (
 		# Check to see if I can get the job named "bar" in namespace "foo"
 		kubectl auth can-i list jobs.batch/bar -n foo
 
-		# check to see if I can read pod logs
-		kubectl auth can-i get pods --subresource=log`)
+		# Check to see if I can read pod logs
+		kubectl auth can-i get pods --subresource=log
+
+		# Check to see if I can access the URL /logs/
+		kubectl auth can-i get /logs/`)
 )
 
 func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
@@ -84,7 +88,7 @@ func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "can-i VERB [TYPE | TYPE/NAME]",
+		Use:     "can-i VERB [TYPE | TYPE/NAME | NONRESOURCEURL]",
 		Short:   "Check whether an action is allowed",
 		Long:    canILong,
 		Example: canIExample,
@@ -116,9 +120,13 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 
 	switch len(args) {
 	case 2:
+		o.Verb = args[0]
+		if strings.HasPrefix(args[1], "/") {
+			o.NonResourceURL = args[1]
+			break
+		}
 		resourceTokens := strings.SplitN(args[1], "/", 2)
 		restMapper, _ := f.Object()
-		o.Verb = args[0]
 		o.Resource = o.resourceFor(restMapper, resourceTokens[0])
 		if len(resourceTokens) > 1 {
 			o.ResourceName = resourceTokens[1]
@@ -146,22 +154,42 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 }
 
 func (o *CanIOptions) Validate() error {
-	errors := []error{}
-	return utilerrors.NewAggregate(errors)
+	if o.NonResourceURL != "" {
+		if o.Subresource != "" {
+			return fmt.Errorf("--subresource can not be used with nonResourceURL")
+		}
+		if o.Resource != (schema.GroupVersionResource{}) || o.ResourceName != "" {
+			return fmt.Errorf("nonResourceURL and Resource can not specified together")
+		}
+	}
+	return nil
 }
 
 func (o *CanIOptions) RunAccessCheck() (bool, error) {
-	sar := &authorizationapi.SelfSubjectAccessReview{
-		Spec: authorizationapi.SelfSubjectAccessReviewSpec{
-			ResourceAttributes: &authorizationapi.ResourceAttributes{
-				Namespace:   o.Namespace,
-				Verb:        o.Verb,
-				Group:       o.Resource.Group,
-				Resource:    o.Resource.Resource,
-				Subresource: o.Subresource,
-				Name:        o.ResourceName,
+	var sar *authorizationapi.SelfSubjectAccessReview
+	if o.NonResourceURL == "" {
+		sar = &authorizationapi.SelfSubjectAccessReview{
+			Spec: authorizationapi.SelfSubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationapi.ResourceAttributes{
+					Namespace:   o.Namespace,
+					Verb:        o.Verb,
+					Group:       o.Resource.Group,
+					Resource:    o.Resource.Resource,
+					Subresource: o.Subresource,
+					Name:        o.ResourceName,
+				},
 			},
-		},
+		}
+	} else {
+		sar = &authorizationapi.SelfSubjectAccessReview{
+			Spec: authorizationapi.SelfSubjectAccessReviewSpec{
+				NonResourceAttributes: &authorizationapi.NonResourceAttributes{
+					Verb: o.Verb,
+					Path: o.NonResourceURL,
+				},
+			},
+		}
+
 	}
 
 	response, err := o.SelfSARClient.SelfSubjectAccessReviews().Create(sar)

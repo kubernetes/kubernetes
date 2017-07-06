@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/workqueue"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	// install the prometheus plugin
@@ -69,9 +70,17 @@ type GarbageCollector struct {
 	registeredRateLimiter *RegisteredRateLimiter
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *UIDCache
+	sharedInformers  informers.SharedInformerFactory
 }
 
-func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, deletableResources map[schema.GroupVersionResource]struct{}) (*GarbageCollector, error) {
+func NewGarbageCollector(
+	metaOnlyClientPool dynamic.ClientPool,
+	clientPool dynamic.ClientPool,
+	mapper meta.RESTMapper,
+	deletableResources map[schema.GroupVersionResource]struct{},
+	ignoredResources map[schema.GroupResource]struct{},
+	sharedInformers informers.SharedInformerFactory,
+) (*GarbageCollector, error) {
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewUIDCache(500)
@@ -94,6 +103,8 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		attemptToDelete:  attemptToDelete,
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
+		sharedInformers:  sharedInformers,
+		ignoredResources: ignoredResources,
 	}
 	if err := gb.monitorsForResources(deletableResources); err != nil {
 		return nil, err
@@ -207,7 +218,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	// TODO: It's only necessary to talk to the API server if the owner node
 	// is a "virtual" node. The local graph could lag behind the real
 	// status, but in practice, the difference is small.
-	owner, err = client.Resource(resource, item.identity.Namespace).Get(reference.Name)
+	owner, err = client.Resource(resource, item.identity.Namespace).Get(reference.Name, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		gc.absentOwnerCache.Add(reference.UID)
@@ -353,7 +364,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 				break
 			}
 		}
-		glog.V(2).Infof("at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted with Foreground", item.identity)
+		glog.V(2).Infof("at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted in Foreground", item.identity)
 		// the deletion event will be observed by the graphBuilder, so the item
 		// will be processed again in processDeletingDependentsItem. If it
 		// doesn't have dependents, the function will remove the
@@ -364,9 +375,21 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	default:
 		// item doesn't have any solid owner, so it needs to be garbage
 		// collected. Also, none of item's owners is waiting for the deletion of
-		// the dependents, so GC deletes item with Default.
-		glog.V(2).Infof("delete object %s with Default", item.identity)
-		return gc.deleteObject(item.identity, nil)
+		// the dependents, so set propagationPolicy based on existing finalizers.
+		var policy metav1.DeletionPropagation
+		switch {
+		case hasOrphanFinalizer(latest):
+			// if an existing orphan finalizer is already on the object, honor it.
+			policy = metav1.DeletePropagationOrphan
+		case hasDeleteDependentsFinalizer(latest):
+			// if an existing foreground finalizer is already on the object, honor it.
+			policy = metav1.DeletePropagationForeground
+		default:
+			// otherwise, default to background.
+			policy = metav1.DeletePropagationBackground
+		}
+		glog.V(2).Infof("delete object %s with propagation policy %s", item.identity, policy)
+		return gc.deleteObject(item.identity, &policy)
 	}
 }
 
@@ -388,7 +411,6 @@ func (gc *GarbageCollector) processDeletingDependentsItem(item *node) error {
 
 // dependents are copies of pointers to the owner's dependents, they don't need to be locked.
 func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents []*node) error {
-	var failedDependents []objectReference
 	var errorsSlice []error
 	for _, dependent := range dependents {
 		// the dependent.identity.UID is used as precondition
@@ -397,10 +419,10 @@ func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents [
 		// note that if the target ownerReference doesn't exist in the
 		// dependent, strategic merge patch will NOT return an error.
 		if err != nil && !errors.IsNotFound(err) {
-			errorsSlice = append(errorsSlice, fmt.Errorf("orphaning %s failed with %v", dependent.identity, err))
+			errorsSlice = append(errorsSlice, fmt.Errorf("orphaning %s failed, %v", dependent.identity, err))
 		}
 	}
-	if len(failedDependents) != 0 {
+	if len(errorsSlice) != 0 {
 		return fmt.Errorf("failed to orphan dependents of owner %s, got errors: %s", owner, utilerrors.NewAggregate(errorsSlice).Error())
 	}
 	glog.V(5).Infof("successfully updated all dependents of owner %s", owner)

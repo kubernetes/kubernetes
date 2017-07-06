@@ -21,7 +21,6 @@ usage() {
 	err "\t$0 init"
 	err "\t$0 mount <mount dir> <json params>"
 	err "\t$0 unmount <mount dir>"
-	err "\t$0 getvolumename <json params>"
 	exit 1
 }
 
@@ -81,18 +80,10 @@ unmount() {
 	exit 0
 }
 
-getvolumename() {
-	NFS_SERVER=$(echo $1 | jq -r '.server')
-	SHARE=$(echo $1 | jq -r '.share')
-
-	log "{\"status\": \"Success\", \"volumeName\": \"${NFS_SERVER}/${SHARE}\"}"
-	exit 0
-}
-
 op=$1
 
 if [ "$op" = "init" ]; then
-	log "{\"status\": \"Success\"}"
+	log "{\"status\": \"Success\", \"capabilities\": {\"attach\": false}}"
 	exit 0
 fi
 
@@ -109,12 +100,9 @@ case "$op" in
 	unmount)
 		unmount $*
 		;;
-	getvolumename)
-		getvolumename $*
-		;;
 	*)
-		err "{ \"status\": \"Not supported\" }"
-		exit 1
+		log "{ \"status\": \"Not supported\" }"
+		exit 0
 esac
 
 exit 1

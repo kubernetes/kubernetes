@@ -57,7 +57,7 @@ Start up a client pod and open up an interactive, (mostly) Postgres-flavor
 SQL shell using:
 
 ```console
-$ kubectl run -it --rm cockroach-client --image=cockroachdb/cockroach --restart=Never --command -- ./cockroach sql --host cockroachdb-public
+$ kubectl run -it --rm cockroach-client --image=cockroachdb/cockroach --restart=Never --command -- ./cockroach sql --host cockroachdb-public --insecure
 ```
 
 You can see example SQL statements for inserting and querying data in the

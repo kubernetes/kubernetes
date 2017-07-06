@@ -52,6 +52,7 @@ func (g *genProtoIDL) PackageVars(c *generator.Context) []string {
 	}
 	return []string{
 		"option (gogoproto.marshaler_all) = true;",
+		"option (gogoproto.stable_marshaler_all) = true;",
 		"option (gogoproto.sizer_all) = true;",
 		"option (gogoproto.goproto_stringer_all) = false;",
 		"option (gogoproto.stringer_all) = true;",
@@ -598,7 +599,7 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 			protoExtra[parts[0]] = parts[1]
 		case "casttype", "castkey", "castvalue":
 			parts[0] = fmt.Sprintf("(gogoproto.%s)", parts[0])
-			protoExtra[parts[0]] = parts[1]
+			protoExtra[parts[0]] = strconv.Quote(parts[1])
 		}
 	}
 

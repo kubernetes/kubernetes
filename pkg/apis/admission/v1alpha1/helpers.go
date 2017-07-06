@@ -17,10 +17,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
-	authenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 )
 
 // NewAdmissionReview returns an AdmissionReview for the provided admission.Attributes

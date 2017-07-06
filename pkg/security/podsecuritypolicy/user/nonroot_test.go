@@ -19,7 +19,6 @@ package user
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
@@ -50,32 +49,72 @@ func TestNonRootGenerate(t *testing.T) {
 }
 
 func TestNonRootValidate(t *testing.T) {
-	goodUID := types.UnixUserID(1)
-	badUID := types.UnixUserID(0)
+	goodUID := int64(1)
+	badUID := int64(0)
+	untrue := false
+	unfalse := true
 	s, err := NewRunAsNonRoot(&extensions.RunAsUserStrategyOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error initializing NewMustRunAs %v", err)
 	}
-	container := &api.Container{
-		SecurityContext: &api.SecurityContext{
-			RunAsUser: &badUID,
+	tests := []struct {
+		container   *api.Container
+		expectedErr bool
+		msg         string
+	}{
+		{
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsUser: &badUID,
+				},
+			},
+			expectedErr: true,
+			msg:         "in test case %d, expected errors from root uid but got none: %v",
+		},
+		{
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsUser: &goodUID,
+				},
+			},
+			expectedErr: false,
+			msg:         "in test case %d, expected no errors from non-root uid but got %v",
+		},
+		{
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsNonRoot: &untrue,
+				},
+			},
+			expectedErr: true,
+			msg:         "in test case %d, expected errors from RunAsNonRoot but got none: %v",
+		},
+		{
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsNonRoot: &unfalse,
+					RunAsUser:    &goodUID,
+				},
+			},
+			expectedErr: false,
+			msg:         "in test case %d, expected no errors from non-root uid but got %v",
+		},
+		{
+			container: &api.Container{
+				SecurityContext: &api.SecurityContext{
+					RunAsNonRoot: &unfalse,
+					RunAsUser:    &badUID,
+				},
+			},
+			expectedErr: true,
+			msg:         "in test case %d, expected errors from root uid but got %v",
 		},
 	}
 
-	errs := s.Validate(nil, container)
-	if len(errs) == 0 {
-		t.Errorf("expected errors from root uid but got none")
-	}
-
-	container.SecurityContext.RunAsUser = &goodUID
-	errs = s.Validate(nil, container)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors from non-root uid but got %v", errs)
-	}
-
-	container.SecurityContext.RunAsUser = nil
-	errs = s.Validate(nil, container)
-	if len(errs) != 0 {
-		t.Errorf("expected no errors from nil uid but got %v", errs)
+	for i, tc := range tests {
+		errs := s.Validate(nil, tc.container)
+		if (len(errs) == 0) == tc.expectedErr {
+			t.Errorf(tc.msg, i, errs)
+		}
 	}
 }

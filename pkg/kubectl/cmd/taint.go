@@ -25,13 +25,13 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -102,7 +102,7 @@ func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
 				cmdutil.CheckErr(err)
 			}
 			if err := options.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
 			}
 			if err := options.RunTaint(); err != nil {
 				cmdutil.CheckErr(err)
@@ -178,7 +178,7 @@ func parseTaints(spec []string) ([]v1.Taint, []v1.Taint, error) {
 	uniqueTaints := map[v1.TaintEffect]sets.String{}
 
 	for _, taintSpec := range spec {
-		if strings.Index(taintSpec, "=") != -1 && strings.Index(taintSpec, ":") != -1 {
+		if strings.Contains(taintSpec, "=") && strings.Contains(taintSpec, ":") {
 			newTaint, err := utiltaints.ParseTaint(taintSpec)
 			if err != nil {
 				return nil, nil, err
@@ -197,7 +197,7 @@ func parseTaints(spec []string) ([]v1.Taint, []v1.Taint, error) {
 		} else if strings.HasSuffix(taintSpec, "-") {
 			taintKey := taintSpec[:len(taintSpec)-1]
 			var effect v1.TaintEffect
-			if strings.Index(taintKey, ":") != -1 {
+			if strings.Contains(taintKey, ":") {
 				parts := strings.Split(taintKey, ":")
 				taintKey = parts[0]
 				effect = v1.TaintEffect(parts[1])
@@ -244,10 +244,9 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	}
 
 	if o.taintsToAdd, o.taintsToRemove, err = parseTaints(taintArgs); err != nil {
-		return cmdutil.UsageError(cmd, err.Error())
+		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
-	mapper, typer := f.Object()
-	o.builder = resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	o.builder = f.NewBuilder(true).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace()
 	if o.selector != "" {
@@ -373,7 +372,7 @@ func (o TaintOptions) RunTaint() error {
 		mapper, _ := o.f.Object()
 		outputFormat := cmdutil.GetFlagString(o.cmd, "output")
 		if outputFormat != "" {
-			return o.f.PrintObject(o.cmd, mapper, outputObj, o.out)
+			return o.f.PrintObject(o.cmd, false, mapper, outputObj, o.out)
 		}
 
 		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, operation)

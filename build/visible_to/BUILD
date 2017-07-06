@@ -49,6 +49,7 @@ package_group(
     packages = [
         "//test/e2e",
         "//test/e2e/framework",
+        "//test/e2e/workload",
         "//test/integration/etcd",
         "//test/integration/framework",
         "//test/integration/kubectl",
@@ -71,7 +72,7 @@ package_group(
     packages = [
         "//cmd/kubeadm/app",
         "//cmd/kubeadm/app/cmd",
-        "//cmd/kubeadm/app/master",
+        "//cmd/kubeadm/app/phases/controlplane",
     ],
 )
 
@@ -349,6 +350,14 @@ package_group(
     packages = [
         "//pkg/kubectl",
         "//pkg/printers/internalversion",
+    ],
+)
+
+package_group(
+    name = "pkg_kubectl_util_CONSUMERS",
+    packages = [
+        "//pkg/kubectl",
+        "//pkg/kubectl/cmd",
     ],
 )
 

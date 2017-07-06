@@ -19,9 +19,10 @@ package upgrades
 import (
 	"fmt"
 
+	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -40,6 +41,22 @@ type DeploymentUpgradeTest struct {
 }
 
 func (DeploymentUpgradeTest) Name() string { return "deployment-upgrade" }
+
+func (DeploymentUpgradeTest) Skip(upgCtx UpgradeContext) bool {
+	// The Deployment upgrade test currently relies on implementation details to probe the
+	// ReplicaSets belonging to a Deployment. As of 1.7, the client code we call into no
+	// longer supports talking to a server <1.6. (see #47685)
+	minVersion := version.MustParseSemantic("v1.6.0")
+
+	for _, vCtx := range upgCtx.Versions {
+		if vCtx.Version.LessThan(minVersion) {
+			return true
+		}
+	}
+	return false
+}
+
+var _ Skippable = DeploymentUpgradeTest{}
 
 // Setup creates a deployment and makes sure it has a new and an old replica set running.
 // This calls in to client code and should not be expected to work against a cluster more than one minor version away from the current version.

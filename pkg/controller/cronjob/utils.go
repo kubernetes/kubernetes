@@ -17,23 +17,21 @@ limitations under the License.
 package cronjob
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/robfig/cron"
 
+	batchv1 "k8s.io/api/batch/v1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/ref"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -63,28 +61,18 @@ func deleteFromActiveList(sj *batchv2alpha1.CronJob, uid types.UID) {
 
 // getParentUIDFromJob extracts UID of job's parent and whether it was found
 func getParentUIDFromJob(j batchv1.Job) (types.UID, bool) {
-	creatorRefJson, found := j.ObjectMeta.Annotations[v1.CreatedByAnnotation]
-	if !found {
-		glog.V(4).Infof("Job with no created-by annotation, name %s namespace %s", j.Name, j.Namespace)
-		return types.UID(""), false
-	}
-	var sr v1.SerializedReference
-	err := json.Unmarshal([]byte(creatorRefJson), &sr)
-	if err != nil {
-		glog.V(4).Infof("Job with unparsable created-by annotation, name %s namespace %s: %v", j.Name, j.Namespace, err)
-		return types.UID(""), false
-	}
-	if sr.Reference.Kind != "CronJob" {
-		glog.V(4).Infof("Job with non-CronJob parent, name %s namespace %s", j.Name, j.Namespace)
-		return types.UID(""), false
-	}
-	// Don't believe a job that claims to have a parent in a different namespace.
-	if sr.Reference.Namespace != j.Namespace {
-		glog.V(4).Infof("Alleged scheduledJob parent in different namespace (%s) from Job name %s namespace %s", sr.Reference.Namespace, j.Name, j.Namespace)
+	controllerRef := controller.GetControllerOf(&j)
+
+	if controllerRef == nil {
 		return types.UID(""), false
 	}
 
-	return sr.Reference.UID, true
+	if controllerRef.Kind != "CronJob" {
+		glog.V(4).Infof("Job with non-CronJob parent, name %s namespace %s", j.Name, j.Namespace)
+		return types.UID(""), false
+	}
+
+	return controllerRef.UID, true
 }
 
 // groupJobsByParent groups jobs into a map keyed by the job parent UID (e.g. scheduledJob).
@@ -282,42 +270,4 @@ func (o byJobStartTime) Less(i, j int) bool {
 	}
 
 	return (*o[i].Status.StartTime).Before(*o[j].Status.StartTime)
-}
-
-// adoptJobs applies missing ControllerRefs to Jobs created by a CronJob.
-//
-// This should only happen if the Jobs were created by an older version of the
-// CronJob controller, since from now on we add ControllerRef upon creation.
-//
-// CronJob doesn't do actual adoption because it doesn't use label selectors to
-// find its Jobs. However, we should apply ControllerRef for potential
-// server-side cascading deletion, and to advise other controllers we own these
-// objects.
-func adoptJobs(sj *batchv2alpha1.CronJob, js []batchv1.Job, jc jobControlInterface) error {
-	var errs []error
-	controllerRef := newControllerRef(sj)
-	controllerRefJSON, err := json.Marshal(controllerRef)
-	if err != nil {
-		return fmt.Errorf("can't adopt Jobs: failed to marshal ControllerRef %#v: %v", controllerRef, err)
-	}
-
-	for i := range js {
-		job := &js[i]
-		controllerRef := controller.GetControllerOf(job)
-		if controllerRef != nil {
-			continue
-		}
-		controllerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[%s],"uid":"%s"}}`,
-			controllerRefJSON, job.UID)
-		updatedJob, err := jc.PatchJob(job.Namespace, job.Name, types.StrategicMergePatchType, []byte(controllerRefPatch))
-		if err != nil {
-			// If there's a ResourceVersion or other error, don't bother retrying.
-			// We will just try again on a subsequent CronJob sync.
-			errs = append(errs, err)
-			continue
-		}
-		// Save it back to the array for later consumers.
-		js[i] = *updatedJob
-	}
-	return utilerrors.NewAggregate(errs)
 }

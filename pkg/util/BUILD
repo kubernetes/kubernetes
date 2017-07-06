@@ -13,7 +13,6 @@ go_library(
     srcs = [
         "doc.go",
         "template.go",
-        "umask.go",
         "util.go",
     ],
     tags = ["automanaged"],
@@ -48,7 +47,6 @@ filegroup(
         "//pkg/util/bandwidth:all-srcs",
         "//pkg/util/config:all-srcs",
         "//pkg/util/configz:all-srcs",
-        "//pkg/util/crlf:all-srcs",
         "//pkg/util/dbus:all-srcs",
         "//pkg/util/ebtables:all-srcs",
         "//pkg/util/env:all-srcs",

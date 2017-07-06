@@ -24,16 +24,17 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	api "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 type sioVolume struct {
@@ -78,12 +79,12 @@ func (v *sioVolume) CanMount() error {
 	return nil
 }
 
-func (v *sioVolume) SetUp(fsGroup *types.UnixGroupID) error {
+func (v *sioVolume) SetUp(fsGroup *int64) error {
 	return v.SetUpAt(v.GetPath(), fsGroup)
 }
 
 // SetUp bind mounts the disk global mount to the volume path.
-func (v *sioVolume) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 	v.plugin.volumeMtx.LockKey(v.volSpecName)
 	defer v.plugin.volumeMtx.UnlockKey(v.volSpecName)
 
@@ -235,6 +236,10 @@ var _ volume.Provisioner = &sioVolume{}
 func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
 	glog.V(4).Info(log("attempting to dynamically provision pvc %v", v.options.PVName))
 
+	if !volume.AccessModesContainedInAll(v.plugin.GetAccessModes(), v.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", v.options.PVC.Spec.AccessModes, v.plugin.GetAccessModes())
+	}
+
 	// setup volume attrributes
 	name := v.generateVolName()
 	capacity := v.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
@@ -274,7 +279,7 @@ func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
 			Namespace: v.options.PVC.Namespace,
 			Labels:    map[string]string{},
 			Annotations: map[string]string{
-				"kubernetes.io/createdby": "scaleio-dynamic-provisioner",
+				volumehelper.VolumeDynamicallyCreatedByKey: "scaleio-dynamic-provisioner",
 			},
 		},
 		Spec: api.PersistentVolumeSpec{

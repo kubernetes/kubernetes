@@ -23,8 +23,10 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/go-openapi/loads"
-	"github.com/go-openapi/spec"
+	"gopkg.in/yaml.v2"
+
+	"github.com/googleapis/gnostic/OpenAPIv2"
+	"github.com/googleapis/gnostic/compiler"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -220,7 +222,7 @@ type fakeOpenAPIClient struct {
 	err   error
 }
 
-func (f *fakeOpenAPIClient) OpenAPISchema() (*spec.Swagger, error) {
+func (f *fakeOpenAPIClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	f.calls = f.calls + 1
 
 	if f.err != nil {
@@ -235,11 +237,11 @@ var data apiData
 
 type apiData struct {
 	sync.Once
-	data *spec.Swagger
+	data *openapi_v2.Document
 	err  error
 }
 
-func (d *apiData) OpenAPISchema() (*spec.Swagger, error) {
+func (d *apiData) OpenAPISchema() (*openapi_v2.Document, error) {
 	d.Do(func() {
 		// Get the path to the swagger.json file
 		wd, err := os.Getwd()
@@ -261,14 +263,18 @@ func (d *apiData) OpenAPISchema() (*spec.Swagger, error) {
 			d.err = err
 			return
 		}
-		// Load the openapi document
-		doc, err := loads.Spec(specpath)
+		spec, err := ioutil.ReadFile(specpath)
 		if err != nil {
 			d.err = err
 			return
 		}
-
-		d.data = doc.Spec()
+		var info yaml.MapSlice
+		err = yaml.Unmarshal(spec, &info)
+		if err != nil {
+			d.err = err
+			return
+		}
+		d.data, d.err = openapi_v2.NewDocument(info, compiler.NewContext("$root", nil))
 	})
 	return d.data, d.err
 }

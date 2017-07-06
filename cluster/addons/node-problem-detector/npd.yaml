@@ -26,11 +26,11 @@ subjects:
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: npd-v0.3.0
+  name: npd-v0.4.1
   namespace: kube-system
   labels:
     k8s-app: node-problem-detector
-    version: v0.3.0
+    version: v0.4.1
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
@@ -38,17 +38,17 @@ spec:
     metadata:
       labels:
         k8s-app: node-problem-detector
-        version: v0.3.0
+        version: v0.4.1
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
       - name: node-problem-detector
-        image: gcr.io/google_containers/node-problem-detector:v0.3.0
+        image: gcr.io/google_containers/node-problem-detector:v0.4.1
         command:
         - "/bin/sh"
         - "-c"
         # Pass both config to support both journald and syslog.
-        - "/node-problem-detector --logtostderr --system-log-monitors=/config/kernel-monitor.json,/config/kernel-monitor-filelog.json >>/var/log/node-problem-detector.log 2>&1"
+        - "/node-problem-detector --logtostderr --system-log-monitors=/config/kernel-monitor.json,/config/kernel-monitor-filelog.json,/config/docker-monitor.json,/config/docker-monitor-filelog.json >>/var/log/node-problem-detector.log 2>&1"
         securityContext:
           privileged: true
         resources:
@@ -77,3 +77,6 @@ spec:
         hostPath:
           path: /etc/localtime
       serviceAccountName: node-problem-detector
+      tolerations:
+      - operator: "Exists"
+        effect: "NoExecute"

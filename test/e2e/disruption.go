@@ -22,13 +22,13 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
+	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -52,11 +52,11 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 	})
 
 	It("should create a PodDisruptionBudget", func() {
-		createPodDisruptionBudgetOrDie(cs, ns, intstr.FromString("1%"))
+		createPDBMinAvailableOrDie(cs, ns, intstr.FromString("1%"))
 	})
 
 	It("should update PodDisruptionBudget status", func() {
-		createPodDisruptionBudgetOrDie(cs, ns, intstr.FromInt(2))
+		createPDBMinAvailableOrDie(cs, ns, intstr.FromInt(2))
 
 		createPodsOrDie(cs, ns, 3)
 		waitForPodsOrDie(cs, ns, 3)
@@ -71,12 +71,12 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			return pdb.Status.PodDisruptionsAllowed > 0, nil
 		})
 		Expect(err).NotTo(HaveOccurred())
-
 	})
 
 	evictionCases := []struct {
 		description        string
 		minAvailable       intstr.IntOrString
+		maxUnavailable     intstr.IntOrString
 		podCount           int
 		replicaSetSize     int32
 		shouldDeny         bool
@@ -84,29 +84,52 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 		skipForBigClusters bool
 	}{
 		{
-			description:  "no PDB",
-			minAvailable: intstr.FromString(""),
-			podCount:     1,
-			shouldDeny:   false,
+			description:    "no PDB",
+			minAvailable:   intstr.FromString(""),
+			maxUnavailable: intstr.FromString(""),
+			podCount:       1,
+			shouldDeny:     false,
 		}, {
-			description:  "too few pods, absolute",
-			minAvailable: intstr.FromInt(2),
-			podCount:     2,
-			shouldDeny:   true,
+			description:    "too few pods, absolute",
+			minAvailable:   intstr.FromInt(2),
+			maxUnavailable: intstr.FromString(""),
+			podCount:       2,
+			shouldDeny:     true,
 		}, {
-			description:  "enough pods, absolute",
-			minAvailable: intstr.FromInt(2),
-			podCount:     3,
-			shouldDeny:   false,
+			description:    "enough pods, absolute",
+			minAvailable:   intstr.FromInt(2),
+			maxUnavailable: intstr.FromString(""),
+			podCount:       3,
+			shouldDeny:     false,
 		}, {
 			description:    "enough pods, replicaSet, percentage",
 			minAvailable:   intstr.FromString("90%"),
+			maxUnavailable: intstr.FromString(""),
 			replicaSetSize: 10,
 			exclusive:      false,
 			shouldDeny:     false,
 		}, {
 			description:    "too few pods, replicaSet, percentage",
 			minAvailable:   intstr.FromString("90%"),
+			maxUnavailable: intstr.FromString(""),
+			replicaSetSize: 10,
+			exclusive:      true,
+			shouldDeny:     true,
+			// This tests assumes that there is less than replicaSetSize nodes in the cluster.
+			skipForBigClusters: true,
+		},
+		{
+			description:    "maxUnavailable allow single eviction, percentage",
+			minAvailable:   intstr.FromString(""),
+			maxUnavailable: intstr.FromString("10%"),
+			replicaSetSize: 10,
+			exclusive:      false,
+			shouldDeny:     false,
+		},
+		{
+			description:    "maxUnavailable deny evictions, integer",
+			minAvailable:   intstr.FromString(""),
+			maxUnavailable: intstr.FromInt(1),
 			replicaSetSize: 10,
 			exclusive:      true,
 			shouldDeny:     true,
@@ -130,7 +153,11 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			}
 
 			if c.minAvailable.String() != "" {
-				createPodDisruptionBudgetOrDie(cs, ns, c.minAvailable)
+				createPDBMinAvailableOrDie(cs, ns, c.minAvailable)
+			}
+
+			if c.maxUnavailable.String() != "" {
+				createPDBMaxUnavailableOrDie(cs, ns, c.maxUnavailable)
 			}
 
 			// Locate a running pod.
@@ -186,10 +213,9 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			}
 		})
 	}
-
 })
 
-func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvailable intstr.IntOrString) {
+func createPDBMinAvailableOrDie(cs *kubernetes.Clientset, ns string, minAvailable intstr.IntOrString) {
 	pdb := policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
@@ -197,7 +223,22 @@ func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvai
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-			MinAvailable: minAvailable,
+			MinAvailable: &minAvailable,
+		},
+	}
+	_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func createPDBMaxUnavailableOrDie(cs *kubernetes.Clientset, ns string, maxUnavailable intstr.IntOrString) {
+	pdb := policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: ns,
+		},
+		Spec: policy.PodDisruptionBudgetSpec{
+			Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			MaxUnavailable: &maxUnavailable,
 		},
 	}
 	_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
@@ -216,7 +257,7 @@ func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 				Containers: []v1.Container{
 					{
 						Name:  "busybox",
-						Image: "gcr.io/google_containers/echoserver:1.4",
+						Image: "gcr.io/google_containers/echoserver:1.6",
 					},
 				},
 				RestartPolicy: v1.RestartPolicyAlways,
@@ -260,7 +301,7 @@ func waitForPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, exclusive bool) {
 	container := v1.Container{
 		Name:  "busybox",
-		Image: "gcr.io/google_containers/echoserver:1.4",
+		Image: "gcr.io/google_containers/echoserver:1.6",
 	}
 	if exclusive {
 		container.Ports = []v1.ContainerPort{

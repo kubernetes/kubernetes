@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestAddToNodeAddresses(t *testing.T) {
@@ -443,54 +443,84 @@ func TestSysctlsFromPodAnnotation(t *testing.T) {
 	}
 }
 
-// TODO: remove when alpha support for affinity is removed
-func TestGetAffinityFromPodAnnotations(t *testing.T) {
+// TODO: remove when alpha support for topology constraints is removed
+func TestGetNodeAffinityFromAnnotations(t *testing.T) {
 	testCases := []struct {
-		pod       *v1.Pod
-		expectErr bool
+		annotations map[string]string
+		expectErr   bool
 	}{
 		{
-			pod:       &v1.Pod{},
-			expectErr: false,
+			annotations: nil,
+			expectErr:   false,
 		},
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							}]
-						}}}`,
-					},
-				},
+			annotations: map[string]string{},
+			expectErr:   false,
+		},
+		{
+			annotations: map[string]string{
+				v1.AlphaStorageNodeAffinityAnnotation: `{
+                                        "requiredDuringSchedulingIgnoredDuringExecution": {
+                                                "nodeSelectorTerms": [
+                                                        { "matchExpressions": [
+                                                                { "key": "test-key1",
+                                                                  "operator": "In",
+                                                                  "values": ["test-value1", "test-value2"]
+                                                                },
+                                                                { "key": "test-key2",
+                                                                  "operator": "In",
+                                                                  "values": ["test-value1", "test-value2"]
+                                                                }
+                                                        ]}
+                                                ]}
+                                        }`,
 			},
 			expectErr: false,
 		},
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-						`,
-					},
-				},
+			annotations: map[string]string{
+				v1.AlphaStorageNodeAffinityAnnotation: `[{
+                                        "requiredDuringSchedulingIgnoredDuringExecution": {
+                                                "nodeSelectorTerms": [
+                                                        { "matchExpressions": [
+                                                                { "key": "test-key1",
+                                                                  "operator": "In",
+                                                                  "values": ["test-value1", "test-value2"]
+                                                                },
+                                                                { "key": "test-key2",
+                                                                  "operator": "In",
+                                                                  "values": ["test-value1", "test-value2"]
+                                                                }
+                                                        ]}
+                                                ]}
+                                        }]`,
+			},
+			expectErr: true,
+		},
+		{
+			annotations: map[string]string{
+				v1.AlphaStorageNodeAffinityAnnotation: `{
+                                        "requiredDuringSchedulingIgnoredDuringExecution": {
+                                                "nodeSelectorTerms":
+                                                         "matchExpressions": [
+                                                                { "key": "test-key1",
+                                                                  "operator": "In",
+                                                                  "values": ["test-value1", "test-value2"]
+                                                                },
+                                                                { "key": "test-key2",
+                                                                  "operator": "In",
+                                                                  "values": ["test-value1", "test-value2"]
+                                                                }
+                                                        ]}
+                                                }
+                                        }`,
 			},
 			expectErr: true,
 		},
 	}
 
 	for i, tc := range testCases {
-		_, err := GetAffinityFromPodAnnotations(tc.pod.Annotations)
+		_, err := GetStorageNodeAffinityFromAnnotation(tc.annotations)
 		if err == nil && tc.expectErr {
 			t.Errorf("[%v]expected error but got none.", i)
 		}

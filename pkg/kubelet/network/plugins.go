@@ -23,11 +23,11 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -42,12 +42,6 @@ const DefaultPluginName = "kubernetes.io/no-op"
 // controller manager's --allocate-node-cidrs=true option
 const NET_PLUGIN_EVENT_POD_CIDR_CHANGE = "pod-cidr-change"
 const NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
-
-// Plugin capabilities
-const (
-	// Indicates the plugin handles Kubernetes bandwidth shaping annotations internally
-	NET_PLUGIN_CAPABILITY_SHAPING int = 1
-)
 
 // Plugin is an interface to network plugins for the kubelet
 type NetworkPlugin interface {
@@ -144,6 +138,8 @@ type Host interface {
 // CNI plugin wrappers like kubenet.
 type NamespaceGetter interface {
 	// GetNetNS returns network namespace information for the given containerID.
+	// Runtimes should *never* return an empty namespace and nil error for
+	// a container; if error is nil then the namespace string must be valid.
 	GetNetNS(containerID string) (string, error)
 }
 

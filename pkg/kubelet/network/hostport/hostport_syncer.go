@@ -192,11 +192,12 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
 	existingNATChains := make(map[utiliptables.Chain]string)
-	iptablesSaveRaw, err := h.iptables.Save(utiliptables.TableNAT)
+	iptablesData := bytes.NewBuffer(nil)
+	err = h.iptables.SaveInto(utiliptables.TableNAT, iptablesData)
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, iptablesSaveRaw)
+		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, iptablesData.Bytes())
 	}
 
 	natChains := bytes.NewBuffer(nil)

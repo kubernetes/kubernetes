@@ -22,9 +22,9 @@ import (
 	"path"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -191,12 +191,12 @@ func (b *emptyDir) CanMount() error {
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp(fsGroup *types.UnixGroupID) error {
+func (ed *emptyDir) SetUp(fsGroup *int64) error {
 	return ed.SetUpAt(ed.GetPath(), fsGroup)
 }
 
 // SetUpAt creates new directory.
-func (ed *emptyDir) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.

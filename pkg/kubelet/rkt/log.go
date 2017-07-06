@@ -26,8 +26,8 @@ import (
 	"golang.org/x/net/context"
 
 	rktapi "github.com/coreos/rkt/api/v1alpha"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )

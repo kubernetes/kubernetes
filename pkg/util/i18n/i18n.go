@@ -35,6 +35,9 @@ var knownTranslations = map[string][]string{
 		"default",
 		"en_US",
 		"fr_FR",
+		"zh_CN",
+		"ja_JP",
+		"zh_TW",
 	},
 	// only used for unit tests.
 	"test": {

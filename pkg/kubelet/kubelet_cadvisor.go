@@ -45,19 +45,6 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, contai
 	return &ci, nil
 }
 
-// HasDedicatedImageFs returns true if the imagefs has a dedicated device.
-func (kl *Kubelet) HasDedicatedImageFs() (bool, error) {
-	imageFsInfo, err := kl.ImagesFsInfo()
-	if err != nil {
-		return false, err
-	}
-	rootFsInfo, err := kl.RootFsInfo()
-	if err != nil {
-		return false, err
-	}
-	return imageFsInfo.Device != rootFsInfo.Device, nil
-}
-
 // GetContainerInfoV2 returns stats (from Cadvisor) for containers.
 func (kl *Kubelet) GetContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
 	return kl.cadvisor.ContainerInfoV2(name, options)
@@ -99,4 +86,16 @@ func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
 		kl.machineInfo = info
 	}
 	return kl.machineInfo, nil
+}
+
+// GetCachedRootFsInfo assumes that the rootfs info can't change without a reboot
+func (kl *Kubelet) GetCachedRootFsInfo() (cadvisorapiv2.FsInfo, error) {
+	if kl.rootfsInfo == nil {
+		info, err := kl.cadvisor.RootFsInfo()
+		if err != nil {
+			return cadvisorapiv2.FsInfo{}, err
+		}
+		kl.rootfsInfo = &info
+	}
+	return *kl.rootfsInfo, nil
 }

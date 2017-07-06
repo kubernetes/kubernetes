@@ -49,9 +49,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -264,7 +264,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 					ExpectedContent: "Hello from iSCSI",
 				},
 			}
-			fsGroup := types.UnixGroupID(1234)
+			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
@@ -343,7 +343,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 					ExpectedContent: "Hello from RBD",
 				},
 			}
-			fsGroup := types.UnixGroupID(1234)
+			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
@@ -496,7 +496,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 
 			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
-			fsGroup := types.UnixGroupID(1234)
+			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
@@ -550,7 +550,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 
 			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
-			fsGroup := types.UnixGroupID(1234)
+			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
@@ -682,7 +682,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 
 			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
-			fsGroup := types.UnixGroupID(1234)
+			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
@@ -732,7 +732,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 
 			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
-			fsGroup := types.UnixGroupID(1234)
+			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})

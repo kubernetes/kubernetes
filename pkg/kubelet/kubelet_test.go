@@ -28,6 +28,8 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/api/core/v1"
+	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,16 +38,15 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -208,7 +209,9 @@ func newTestKubeletWithImageList(
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
 	secretManager := secret.NewSimpleSecretManager(kubelet.kubeClient)
 	kubelet.secretManager = secretManager
-	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager)
+	configMapManager := configmap.NewSimpleConfigMapManager(kubelet.kubeClient)
+	kubelet.configMapManager = configMapManager
+	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager, kubelet.configMapManager)
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{})
 	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
 	if err != nil {
@@ -267,7 +270,7 @@ func newTestKubeletWithImageList(
 		Namespace: "",
 	}
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers, fakeRecorder), kubelet.imageManager, fakeRecorder, nodeRef, kubelet.clock)
+	evictionManager, evictionAdmitHandler := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers, fakeRecorder), kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock)
 
 	kubelet.evictionManager = evictionManager
 	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
@@ -276,11 +279,11 @@ func newTestKubeletWithImageList(
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(kubelet, kubelet.secretManager, []volume.VolumePlugin{plug})
+		NewInitializedVolumePluginMgr(kubelet, kubelet.secretManager, kubelet.configMapManager, []volume.VolumePlugin{plug})
 	require.NoError(t, err, "Failed to initialize VolumePluginMgr")
 
 	kubelet.mounter = &mount.FakeMounter{}
-	kubelet.volumeManager, err = kubeletvolume.NewVolumeManager(
+	kubelet.volumeManager = kubeletvolume.NewVolumeManager(
 		controllerAttachDetachEnabled,
 		kubelet.nodeName,
 		kubelet.podManager,
@@ -293,7 +296,6 @@ func newTestKubeletWithImageList(
 		kubelet.recorder,
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount*/
 		false /* keepTerminatedPodVolumes */)
-	require.NoError(t, err, "Failed to initialize volume manager")
 
 	// enable active deadline handler
 	activeDeadlineHandler, err := newActiveDeadlineHandler(kubelet.statusManager, kubelet.recorder, kubelet.clock)
@@ -322,32 +324,6 @@ func newTestPods(count int) []*v1.Pod {
 }
 
 var emptyPodUIDs map[types.UID]kubetypes.SyncPodType
-
-func TestSyncLoopTimeUpdate(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	kubelet := testKubelet.kubelet
-
-	loopTime1 := kubelet.LatestLoopEntryTime()
-	require.True(t, loopTime1.IsZero(), "Expect sync loop time to be zero")
-
-	// Start sync ticker.
-	syncCh := make(chan time.Time, 1)
-	housekeepingCh := make(chan time.Time, 1)
-	plegCh := make(chan *pleg.PodLifecycleEvent)
-	syncCh <- time.Now()
-	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh, plegCh)
-	loopTime2 := kubelet.LatestLoopEntryTime()
-	require.False(t, loopTime2.IsZero(), "Expect sync loop time to be non-zero")
-
-	syncCh <- time.Now()
-	kubelet.syncLoopIteration(make(chan kubetypes.PodUpdate), kubelet, syncCh, housekeepingCh, plegCh)
-	loopTime3 := kubelet.LatestLoopEntryTime()
-	require.True(t, loopTime3.After(loopTime1),
-		"Sync Loop Time was not updated correctly. Second update timestamp %v should be greater than first update timestamp %v",
-		loopTime3, loopTime1)
-}
 
 func TestSyncLoopAbort(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -1028,6 +1004,136 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			{Name: "foo"},
 		},
 		HostNetwork: true,
+	})
+	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
+
+	err := kubelet.syncPod(syncPodOptions{
+		pod:        pod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodUpdate,
+	})
+	assert.Error(t, err, "expected pod infra creation to fail")
+}
+
+func TestHostPIDAllowed(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	testKubelet.fakeCadvisor.On("Start").Return(nil)
+	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+
+	kubelet := testKubelet.kubelet
+
+	capabilities.SetForTests(capabilities.Capabilities{
+		PrivilegedSources: capabilities.PrivilegedSources{
+			HostPIDSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
+		},
+	})
+	pod := podWithUidNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "foo"},
+		},
+		HostPID: true,
+	})
+	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
+
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	err := kubelet.syncPod(syncPodOptions{
+		pod:        pod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodUpdate,
+	})
+	assert.NoError(t, err, "expected pod infra creation to succeed")
+}
+
+func TestHostPIDDisallowed(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	testKubelet.fakeCadvisor.On("Start").Return(nil)
+	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+
+	kubelet := testKubelet.kubelet
+
+	capabilities.SetForTests(capabilities.Capabilities{
+		PrivilegedSources: capabilities.PrivilegedSources{
+			HostPIDSources: []string{},
+		},
+	})
+	pod := podWithUidNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "foo"},
+		},
+		HostPID: true,
+	})
+	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
+
+	err := kubelet.syncPod(syncPodOptions{
+		pod:        pod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodUpdate,
+	})
+	assert.Error(t, err, "expected pod infra creation to fail")
+}
+
+func TestHostIPCAllowed(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	testKubelet.fakeCadvisor.On("Start").Return(nil)
+	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+
+	kubelet := testKubelet.kubelet
+
+	capabilities.SetForTests(capabilities.Capabilities{
+		PrivilegedSources: capabilities.PrivilegedSources{
+			HostIPCSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
+		},
+	})
+	pod := podWithUidNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "foo"},
+		},
+		HostIPC: true,
+	})
+	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
+
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	err := kubelet.syncPod(syncPodOptions{
+		pod:        pod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodUpdate,
+	})
+	assert.NoError(t, err, "expected pod infra creation to succeed")
+}
+
+func TestHostIPCDisallowed(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	testKubelet.fakeCadvisor.On("Start").Return(nil)
+	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+
+	kubelet := testKubelet.kubelet
+
+	capabilities.SetForTests(capabilities.Capabilities{
+		PrivilegedSources: capabilities.PrivilegedSources{
+			HostIPCSources: []string{},
+		},
+	})
+	pod := podWithUidNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "foo"},
+		},
+		HostIPC: true,
 	})
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 

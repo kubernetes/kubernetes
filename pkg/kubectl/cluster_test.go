@@ -20,9 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestClusterGenerate(t *testing.T) {
@@ -108,6 +108,62 @@ func TestClusterGenerate(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
+				"name":           "bar-cluster",
+				"client-cidr":    "10.20.30.40/16",
+				"server-address": "http://10.20.30.40",
+				"secret":         "credentials",
+			},
+			expected: &federationapi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar-cluster",
+				},
+				Spec: federationapi.ClusterSpec{
+					ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
+						{
+							ClientCIDR:    "10.20.30.40/16",
+							ServerAddress: "http://10.20.30.40",
+						},
+					},
+					SecretRef: &v1.LocalObjectReference{
+						Name: "credentials",
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			params: map[string]interface{}{
+				"name":                 "bar-cluster",
+				"client-cidr":          "10.20.30.40/16",
+				"server-address":       "http://10.20.30.40",
+				"secret":               "credentials",
+				"service-account-name": "service-account",
+				"cluster-role-name":    "cluster-role",
+			},
+			expected: &federationapi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar-cluster",
+					Annotations: map[string]string{
+						ServiceAccountNameAnnotation: "service-account",
+						ClusterRoleNameAnnotation:    "cluster-role",
+					},
+				},
+				Spec: federationapi.ClusterSpec{
+					ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
+						{
+							ClientCIDR:    "10.20.30.40/16",
+							ServerAddress: "http://10.20.30.40",
+						},
+					},
+					SecretRef: &v1.LocalObjectReference{
+						Name: "credentials",
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			params: map[string]interface{}{
 				"server-address": "https://10.20.30.40",
 			},
 			expected:  nil,
@@ -140,6 +196,28 @@ func TestClusterGenerate(t *testing.T) {
 			params: map[string]interface{}{
 				"name":        "foo",
 				"client-cidr": "10.20.30.40/16",
+			},
+			expected:  nil,
+			expectErr: true,
+		},
+		{
+			params: map[string]interface{}{
+				"name":              "bar-cluster",
+				"client-cidr":       "10.20.30.40/16",
+				"server-address":    "http://10.20.30.40",
+				"secret":            "credentials",
+				"cluster-role-name": "cluster-role",
+			},
+			expected:  nil,
+			expectErr: true,
+		},
+		{
+			params: map[string]interface{}{
+				"name":                 "bar-cluster",
+				"client-cidr":          "10.20.30.40/16",
+				"server-address":       "http://10.20.30.40",
+				"secret":               "credentials",
+				"service-account-name": "service-account",
 			},
 			expected:  nil,
 			expectErr: true,

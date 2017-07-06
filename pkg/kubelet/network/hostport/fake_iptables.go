@@ -227,12 +227,6 @@ func saveChain(chain *fakeChain, data *bytes.Buffer) {
 	}
 }
 
-func (f *fakeIPTables) Save(tableName utiliptables.Table) ([]byte, error) {
-	data := bytes.NewBuffer(nil)
-	err := f.SaveInto(tableName, data)
-	return data.Bytes(), err
-}
-
 func (f *fakeIPTables) SaveInto(tableName utiliptables.Table, buffer *bytes.Buffer) error {
 	table, err := f.getTable(tableName)
 	if err != nil {

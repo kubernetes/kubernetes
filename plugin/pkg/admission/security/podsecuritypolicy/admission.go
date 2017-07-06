@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package admission
+package podsecuritypolicy
 
 import (
 	"fmt"
@@ -43,10 +43,6 @@ import (
 const (
 	PluginName = "PodSecurityPolicy"
 )
-
-func init() {
-	Register(&kubeapiserveradmission.Plugins)
-}
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {

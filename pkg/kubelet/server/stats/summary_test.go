@@ -25,8 +25,8 @@ import (
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 
+	k8sv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubestats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -374,13 +374,6 @@ func checkMemoryStats(t *testing.T, label string, seed int, info v2.ContainerInf
 		expected := info.Spec.Memory.Limit - *stats.WorkingSetBytes
 		assert.EqualValues(t, expected, *stats.AvailableBytes, label+".Mem.AvailableBytes")
 	}
-}
-
-func checkFsStats(t *testing.T, capacity uint64, Available uint64, inodes uint64, inodesFree uint64, fs *kubestats.FsStats) {
-	assert.EqualValues(t, capacity, *fs.CapacityBytes)
-	assert.EqualValues(t, Available, *fs.AvailableBytes)
-	assert.EqualValues(t, inodesFree, *fs.InodesFree)
-	assert.EqualValues(t, inodes, *fs.Inodes)
 }
 
 func TestCustomMetrics(t *testing.T) {

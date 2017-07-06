@@ -70,8 +70,11 @@ mkdir -p $LOG_DIR
 # plugin by default.
 NETWORK_PLUGIN=${NETWORK_PLUGIN:-""}
 
-# NETWORK_PLUGIN_PATH is the path to network plugin binary.
-NETWORK_PLUGIN_PATH=${NETWORK_PLUGIN_PATH:-""}
+# CNI_CONF_DIR is the path to network plugin binaries.
+CNI_CONF_DIR=${CNI_CONF_DIR:-""}
+
+# CNI_BIN_DIR is the path to network plugin config files.
+CNI_BIN_DIR=${CNI_BIN_DIR:-""}
 
 # start_kubelet starts kubelet and redirect kubelet log to $LOG_DIR/kubelet.log.
 kubelet_log=kubelet.log
@@ -150,7 +153,7 @@ allow_privileged=true
 serialize_image_pulls=false
 config_dir=`mktemp -d`
 file_check_frequency=10s
-pod_cidr=10.180.0.0/24
+pod_cidr=10.100.0.0/24
 log_level=4
 start_kubelet --api-servers $apiserver \
   --volume-stats-agg-period $volume_stats_agg_period \
@@ -164,7 +167,8 @@ start_kubelet --api-servers $apiserver \
   --system-cgroups=/system \
   --cgroup-root=/ \
   --network-plugin=$NETWORK_PLUGIN \
-  --network-plugin-dir=$NETWORK_PLUGIN_PATH \
+  --cni-conf-dir=$CNI_CONF_DIR \
+  --cni-bin-dir=$CNI_BIN_DIR \
   --v=$log_level \
   --logtostderr
 

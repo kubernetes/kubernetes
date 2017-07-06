@@ -25,13 +25,13 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	algorithmpredicates "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	algorithmpriorities "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
@@ -410,7 +410,7 @@ func TestHumanReadableFitError(t *testing.T) {
 			"3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
 		},
 	}
-	if strings.Contains(error.Error(), "No nodes are available that match all of the following predicates") {
+	if strings.Contains(error.Error(), NoNodeAvailableMsg) {
 		if strings.Contains(error.Error(), "NodeUnderDiskPressure (2)") && strings.Contains(error.Error(), "NodeUnderMemoryPressure (1)") {
 			return
 		}

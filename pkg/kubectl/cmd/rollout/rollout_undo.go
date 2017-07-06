@@ -54,8 +54,8 @@ var (
 		# Rollback to the previous deployment
 		kubectl rollout undo deployment/abc
 
-		# Rollback to deployment revision 3
-		kubectl rollout undo deployment/abc --to-revision=3
+		# Rollback to daemonset revision 3
+		kubectl rollout undo daemonset/abc --to-revision=3
 
 		# Rollback to the previous deployment with dry-run
 		kubectl rollout undo --dry-run=true deployment/abc`)
@@ -64,7 +64,7 @@ var (
 func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &UndoOptions{}
 
-	validArgs := []string{"deployment"}
+	validArgs := []string{"deployment", "daemonset"}
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
@@ -96,8 +96,8 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
-	if len(args) == 0 && cmdutil.IsFilenameEmpty(o.Filenames) {
-		return cmdutil.UsageError(cmd, "Required resource not specified.")
+	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 
 	o.ToRevision = cmdutil.GetFlagInt64(cmd, "to-revision")
@@ -110,7 +110,7 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 		return err
 	}
 
-	r := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := f.NewBuilder(true).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, args...).

@@ -71,13 +71,14 @@ func Nothing() Selector {
 	return nothingSelector{}
 }
 
+// NewSelector returns a nil selector
 func NewSelector() Selector {
 	return internalSelector(nil)
 }
 
 type internalSelector []Requirement
 
-// Sort by key to obtain determisitic parser
+// ByKey sorts requirements by key to obtain deterministic parser
 type ByKey []Requirement
 
 func (a ByKey) Len() int { return len(a) }
@@ -215,12 +216,17 @@ func (r *Requirement) Matches(ls Labels) bool {
 	}
 }
 
+// Key returns requirement key
 func (r *Requirement) Key() string {
 	return r.key
 }
+
+// Operator returns requirement operator
 func (r *Requirement) Operator() selection.Operator {
 	return r.operator
 }
+
+// Values returns requirement values
 func (r *Requirement) Values() sets.String {
 	ret := sets.String{}
 	for i := range r.strValues {
@@ -229,7 +235,7 @@ func (r *Requirement) Values() sets.String {
 	return ret
 }
 
-// Return true if the internalSelector doesn't restrict selection space
+// Empty returns true if the internalSelector doesn't restrict selection space
 func (lsel internalSelector) Empty() bool {
 	if lsel == nil {
 		return true
@@ -320,23 +326,37 @@ func (lsel internalSelector) String() string {
 	return strings.Join(reqs, ",")
 }
 
-// constants definition for lexer token
+// Token represents constant definition for lexer token
 type Token int
 
 const (
+	// ErrorToken represents scan error
 	ErrorToken Token = iota
+	// EndOfStringToken represents end of string
 	EndOfStringToken
+	// ClosedParToken represents close parenthesis
 	ClosedParToken
+	// CommaToken represents the comma
 	CommaToken
+	// DoesNotExistToken represents logic not
 	DoesNotExistToken
+	// DoubleEqualsToken represents double equals
 	DoubleEqualsToken
+	// EqualsToken represents equal
 	EqualsToken
+	// GreaterThanToken represents greater than
 	GreaterThanToken
-	IdentifierToken // to represent keys and values
+	// IdentifierToken represents identifier, e.g. keys and values
+	IdentifierToken
+	// InToken represents in
 	InToken
+	// LessThanToken represents less than
 	LessThanToken
+	// NotEqualsToken represents not equal
 	NotEqualsToken
+	// NotInToken represents not in
 	NotInToken
+	// OpenParToken represents open parenthesis
 	OpenParToken
 )
 
@@ -356,7 +376,7 @@ var string2token = map[string]Token{
 	"(":     OpenParToken,
 }
 
-// The item produced by the lexer. It contains the Token and the literal.
+// ScannedItem contains the Token and the literal produced by the lexer.
 type ScannedItem struct {
 	tok     Token
 	literal string
@@ -401,8 +421,8 @@ func (l *Lexer) unread() {
 	l.pos--
 }
 
-// scanIdOrKeyword scans string to recognize literal token (for example 'in') or an identifier.
-func (l *Lexer) scanIdOrKeyword() (tok Token, lit string) {
+// scanIDOrKeyword scans string to recognize literal token (for example 'in') or an identifier.
+func (l *Lexer) scanIDOrKeyword() (tok Token, lit string) {
 	var buffer []byte
 IdentifierLoop:
 	for {
@@ -474,7 +494,7 @@ func (l *Lexer) Lex() (tok Token, lit string) {
 		return l.scanSpecialSymbol()
 	default:
 		l.unread()
-		return l.scanIdOrKeyword()
+		return l.scanIDOrKeyword()
 	}
 }
 
@@ -485,14 +505,16 @@ type Parser struct {
 	position     int
 }
 
-// Parser context represents context during parsing:
+// ParserContext represents context during parsing:
 // some literal for example 'in' and 'notin' can be
 // recognized as operator for example 'x in (a)' but
 // it can be recognized as value for example 'value in (in)'
 type ParserContext int
 
 const (
+	// KeyAndOperator represents key and operator
 	KeyAndOperator ParserContext = iota
+	// Values represents values
 	Values
 )
 
@@ -798,11 +820,12 @@ func SelectorFromSet(ls Set) Selector {
 	}
 	var requirements internalSelector
 	for label, value := range ls {
-		if r, err := NewRequirement(label, selection.Equals, []string{value}); err != nil {
+		r, err := NewRequirement(label, selection.Equals, []string{value})
+		if err == nil {
+			requirements = append(requirements, *r)
+		} else {
 			//TODO: double check errors when input comes from serialization?
 			return internalSelector{}
-		} else {
-			requirements = append(requirements, *r)
 		}
 	}
 	// sort to have deterministic string representation

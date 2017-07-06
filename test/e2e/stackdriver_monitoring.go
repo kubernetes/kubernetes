@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"os"
 	"time"
 
 	"golang.org/x/oauth2/google"
@@ -33,7 +34,7 @@ import (
 )
 
 var (
-	// Stackdriver container metrics, as descirbed here:
+	// Stackdriver container metrics, as described here:
 	// https://cloud.google.com/monitoring/api/metrics#gcp-container
 	stackdriverMetrics = []string{
 		"uptime",
@@ -48,12 +49,9 @@ var (
 	}
 
 	pollFrequency = time.Second * 5
-	pollTimeout   = time.Minute * 20
+	pollTimeout   = time.Minute * 7
 
 	rcName            = "resource-consumer"
-	replicas          = 1
-	cpuUsed           = 100
-	cpuLimit    int64 = 200
 	memoryUsed        = 64
 	memoryLimit int64 = 200
 	tolerance         = 0.25
@@ -67,31 +65,43 @@ var _ = framework.KubeDescribe("Stackdriver Monitoring", func() {
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
 
 	It("should have cluster metrics [Feature:StackdriverMonitoring]", func() {
-		projectId := framework.TestContext.CloudConfig.ProjectID
-
-		ctx := context.Background()
-		client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
-		gcmService, err := gcm.New(client)
-		framework.ExpectNoError(err)
-
-		rc := common.NewDynamicResourceConsumer(rcName, common.KindDeployment, replicas, cpuUsed, memoryUsed, 0, cpuLimit, memoryLimit, f)
-		defer rc.CleanUp()
-
-		rc.WaitForReplicas(replicas)
-
-		metricsMap := map[string]bool{}
-		pollingFunction := checkForMetrics(projectId, gcmService, time.Now(), metricsMap)
-		err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
-		if err != nil {
-			framework.Logf("Missing metrics: %+v\n", metricsMap)
-		}
-		framework.ExpectNoError(err)
+		testStackdriverMonitoring(f, 1, 100, 200)
 	})
+
 })
 
-func checkForMetrics(projectId string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool) func() (bool, error) {
+func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, perPodCPU int64) {
+	projectId := framework.TestContext.CloudConfig.ProjectID
+
+	ctx := context.Background()
+	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	gcmService, err := gcm.New(client)
+
+	// set this env var if accessing Stackdriver test endpoint (default is prod):
+	// $ export STACKDRIVER_API_ENDPOINT_OVERRIDE=https://test-monitoring.sandbox.googleapis.com/
+	basePathOverride := os.Getenv("STACKDRIVER_API_ENDPOINT_OVERRIDE")
+	if basePathOverride != "" {
+		gcmService.BasePath = basePathOverride
+	}
+
+	framework.ExpectNoError(err)
+
+	rc := common.NewDynamicResourceConsumer(rcName, common.KindDeployment, pods, allPodsCPU, memoryUsed, 0, perPodCPU, memoryLimit, f)
+	defer rc.CleanUp()
+
+	rc.WaitForReplicas(pods, 15*time.Minute)
+
+	metricsMap := map[string]bool{}
+	pollingFunction := checkForMetrics(projectId, gcmService, time.Now(), metricsMap, allPodsCPU, perPodCPU)
+	err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
+	if err != nil {
+		framework.Logf("Missing metrics: %+v\n", metricsMap)
+	}
+	framework.ExpectNoError(err)
+}
+
+func checkForMetrics(projectId string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool, cpuUsed int, cpuLimit int64) func() (bool, error) {
 	return func() (bool, error) {
-		// TODO: list which metrics are missing in case of failure
 		counter := 0
 		correctUtilization := false
 		for _, metric := range stackdriverMetrics {
@@ -126,7 +136,7 @@ func checkForMetrics(projectId string, gcmService *gcm.Service, start time.Time,
 					framework.Logf("Received %v points for metric %v\n",
 						len(t.Points), metric)
 				}
-				framework.Logf("Most recent cpu/utilization sum: %v\n", sum)
+				framework.Logf("Most recent cpu/utilization sum*cpu/limit: %v\n", sum*float64(cpuLimit))
 				if math.Abs(sum*float64(cpuLimit)-float64(cpuUsed)) > tolerance*float64(cpuUsed) {
 					return false, nil
 				} else {

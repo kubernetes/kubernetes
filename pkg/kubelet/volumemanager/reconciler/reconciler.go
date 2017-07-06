@@ -26,11 +26,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util"
@@ -235,14 +235,16 @@ func (rc *reconciler) reconcile() {
 		} else if !volMounted || cache.IsRemountRequiredError(err) {
 			// Volume is not mounted, or is already mounted, but requires remounting
 			remountingLogStr := ""
-			if cache.IsRemountRequiredError(err) {
+			isRemount := cache.IsRemountRequiredError(err)
+			if isRemount {
 				remountingLogStr = "Volume is already mounted to pod, but remount was requested."
 			}
 			glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.MountVolume", remountingLogStr))
 			err := rc.operationExecutor.MountVolume(
 				rc.waitForAttachTimeout,
 				volumeToMount.VolumeToMount,
-				rc.actualStateOfWorld)
+				rc.actualStateOfWorld,
+				isRemount)
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {

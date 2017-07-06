@@ -21,11 +21,13 @@ import (
 	"os"
 	"regexp"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/validation"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -102,6 +104,7 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volum
 	if err != nil {
 		return nil, err
 	}
+
 	return &hostPathMounter{
 		hostPath: &hostPath{path: hostPathVolumeSource.Path},
 		readOnly: readOnly,
@@ -203,12 +206,16 @@ func (b *hostPathMounter) CanMount() error {
 }
 
 // SetUp does nothing.
-func (b *hostPathMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (b *hostPathMounter) SetUp(fsGroup *int64) error {
+	err := validation.ValidatePathNoBacksteps(b.GetPath())
+	if err != nil {
+		return fmt.Errorf("invalid HostPath `%s`: %v", b.GetPath(), err)
+	}
 	return nil
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
-func (b *hostPathMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (b *hostPathMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return fmt.Errorf("SetUpAt() does not make sense for host paths")
 }
 
@@ -250,7 +257,7 @@ func (r *hostPathProvisioner) Provision() (*v1.PersistentVolume, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: r.options.PVName,
 			Annotations: map[string]string{
-				"kubernetes.io/createdby": "hostpath-dynamic-provisioner",
+				volumehelper.VolumeDynamicallyCreatedByKey: "hostpath-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -297,8 +304,7 @@ func (r *hostPathDeleter) Delete() error {
 	return os.RemoveAll(r.GetPath())
 }
 
-func getVolumeSource(
-	spec *volume.Spec) (*v1.HostPathVolumeSource, bool, error) {
+func getVolumeSource(spec *volume.Spec) (*v1.HostPathVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.HostPath != nil {
 		return spec.Volume.HostPath, spec.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&

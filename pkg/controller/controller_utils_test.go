@@ -19,6 +19,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
 	"net/http/httptest"
 	"reflect"
@@ -27,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,8 +42,6 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -441,5 +442,40 @@ func TestActiveReplicaSetsFiltering(t *testing.T) {
 
 	if expectedNames.Difference(gotNames).Len() != 0 || gotNames.Difference(expectedNames).Len() != 0 {
 		t.Errorf("expected %v, got %v", expectedNames.List(), gotNames.List())
+	}
+}
+
+func int64P(num int64) *int64 {
+	return &num
+}
+
+func TestComputeHash(t *testing.T) {
+	tests := []struct {
+		name                string
+		template            *v1.PodTemplateSpec
+		collisionCount      *int64
+		otherCollisionCount *int64
+	}{
+		{
+			name:                "simple",
+			template:            &v1.PodTemplateSpec{},
+			collisionCount:      int64P(1),
+			otherCollisionCount: int64P(2),
+		},
+		{
+			name:                "using math.MaxInt64",
+			template:            &v1.PodTemplateSpec{},
+			collisionCount:      nil,
+			otherCollisionCount: int64P(int64(math.MaxInt64)),
+		},
+	}
+
+	for _, test := range tests {
+		hash := ComputeHash(test.template, test.collisionCount)
+		otherHash := ComputeHash(test.template, test.otherCollisionCount)
+
+		if hash == otherHash {
+			t.Errorf("expected different hashes but got the same: %d", hash)
+		}
 	}
 }

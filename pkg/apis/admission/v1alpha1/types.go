@@ -17,10 +17,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
-	authenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 )
 
 // AdmissionReview describes an admission request.
@@ -30,7 +30,7 @@ type AdmissionReview struct {
 	// Since this admission controller is non-mutating the webhook should avoid setting this in its response to avoid the
 	// cost of deserializing it.
 	// +optional
-	Spec AdmissionReviewSpec `json:"spec" protobuf:"bytes,1,opt,name=spec"`
+	Spec AdmissionReviewSpec `json:"spec,omitempty" protobuf:"bytes,1,opt,name=spec"`
 	// Status is filled in by the webhook and indicates whether the admission request should be permitted.
 	// +optional
 	Status AdmissionReviewStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`

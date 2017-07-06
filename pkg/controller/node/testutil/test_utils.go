@@ -32,12 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 
+	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/api/v1/ref"
+	"k8s.io/kubernetes/pkg/api/v1/ref"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -225,6 +225,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 		if m.Existing[i].Name == node.Name {
 			origNodeCopy = *m.Existing[i]
 			found = true
+			break
 		}
 	}
 	updatedNodeIndex := -1
@@ -233,6 +234,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 			origNodeCopy = *m.UpdatedNodes[i]
 			updatedNodeIndex = i
 			found = true
+			break
 		}
 	}
 

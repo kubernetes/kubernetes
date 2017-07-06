@@ -25,9 +25,9 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/volume"
@@ -505,7 +505,8 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 				sources: source.Sources,
 				podUID:  pod.UID,
 				plugin: &projectedPlugin{
-					host: host,
+					host:         host,
+					getConfigMap: host.GetConfigMapFunc(),
 				},
 			},
 			source: *source,

@@ -60,7 +60,7 @@ spec:
 <!-- END MUNGE: EXAMPLE ./quobyte-pod.yaml -->
 
 Parameters:
-* **registry** Quobyte registry to use to mount the volume. You can specifiy the registry as <host>:<port> pair or if you want to specify multiple registries you just have to put a comma between them e.q. <host1>:<port>,<host2>:<port>,<host3>:<port>. The host can be an IP address or if you have a working DNS you can also provide the DNS names.
+* **registry** Quobyte registry to use to mount the volume. You can specify the registry as <host>:<port> pair or if you want to specify multiple registries you just have to put a comma between them e.q. <host1>:<port>,<host2>:<port>,<host3>:<port>. The host can be an IP address or if you have a working DNS you can also provide the DNS names.
 * **volume** volume represents a Quobyte volume which must be created before usage.
 * **readOnly** is the boolean that sets the mountpoint readOnly or readWrite.
 * **user** maps all access to this user. Default is `root`.

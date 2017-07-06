@@ -24,7 +24,6 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -83,17 +82,17 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Co
 }
 
 func (o *ViewLastAppliedOptions) Complete(f cmdutil.Factory, args []string) error {
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return err
-	}
-
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	builder, err := f.NewUnstructuredBuilder(true)
+	if err != nil {
+		return err
+	}
+
+	r := builder.
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(enforceNamespace, args...).
@@ -143,13 +142,13 @@ func (o *ViewLastAppliedOptions) RunApplyViewLastApplied() error {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(o.Out, string(jsonBuffer.Bytes()))
+			fmt.Fprint(o.Out, string(jsonBuffer.Bytes()))
 		case "yaml":
 			yamlOutput, err := yaml.JSONToYAML([]byte(str))
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(o.Out, string(yamlOutput))
+			fmt.Fprint(o.Out, string(yamlOutput))
 		}
 	}
 
@@ -167,6 +166,6 @@ func (o *ViewLastAppliedOptions) ValidateOutputArgs(cmd *cobra.Command) error {
 		o.OutputFormat = "yaml"
 		return nil
 	default:
-		return cmdutil.UsageError(cmd, "Unexpected -o output mode: %s, the flag 'output' must be one of yaml|json", format)
+		return cmdutil.UsageErrorf(cmd, "Unexpected -o output mode: %s, the flag 'output' must be one of yaml|json", format)
 	}
 }

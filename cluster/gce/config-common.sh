@@ -36,6 +36,25 @@ function get-master-size {
   echo "${suggested_master_size}"
 }
 
+function get-node-ip-range {
+  if [[ -n "${NODE_IP_RANGE:-}" ]]; then
+    >&2 echo "Using user provided NODE_IP_RANGE: ${NODE_IP_RANGE}"
+    echo "${NODE_IP_RANGE}"
+    return
+  fi
+  local suggested_range="10.40.0.0/22"
+  if [[ "${NUM_NODES}" -gt 1000 ]]; then
+    suggested_range="10.40.0.0/21"
+  fi
+  if [[ "${NUM_NODES}" -gt 2000 ]]; then
+    suggested_range="10.40.0.0/20"
+  fi
+  if [[ "${NUM_NODES}" -gt 4000 ]]; then
+    suggested_range="10.40.0.0/19"
+  fi
+  echo "${suggested_range}"
+}
+
 if [[ "${FEDERATION:-}" == true ]]; then
     NODE_SCOPES="${NODE_SCOPES:-compute-rw,monitoring,logging-write,storage-ro,https://www.googleapis.com/auth/ndev.clouddns.readwrite}"
 else

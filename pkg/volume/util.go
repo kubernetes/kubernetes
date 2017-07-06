@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
 	"hash/fnv"
@@ -180,7 +180,10 @@ func (c *realRecyclerClient) Event(eventtype, message string) {
 }
 
 func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error) {
-	podSelector, _ := fields.ParseSelector("metadata.name=" + name)
+	podSelector, err := fields.ParseSelector("metadata.name=" + name)
+	if err != nil {
+		return nil, err
+	}
 	options := metav1.ListOptions{
 		FieldSelector: podSelector.String(),
 		Watch:         true,
@@ -409,4 +412,48 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 		allMountOptions.Insert(mountOption)
 	}
 	return allMountOptions.UnsortedList()
+}
+
+// ZonesToSet converts a string containing a comma separated list of zones to set
+func ZonesToSet(zonesString string) (sets.String, error) {
+	zonesSlice := strings.Split(zonesString, ",")
+	zonesSet := make(sets.String)
+	for _, zone := range zonesSlice {
+		trimmedZone := strings.TrimSpace(zone)
+		if trimmedZone == "" {
+			return make(sets.String), fmt.Errorf("comma separated list of zones (%q) must not contain an empty zone", zonesString)
+		}
+		zonesSet.Insert(trimmedZone)
+	}
+	return zonesSet, nil
+}
+
+// ValidateZone returns:
+// - an error in case zone is an empty string or contains only any combination of spaces and tab characters
+// - nil otherwise
+func ValidateZone(zone string) error {
+	if strings.TrimSpace(zone) == "" {
+		return fmt.Errorf("the provided %q zone is not valid, it's an empty string or contains only spaces and tab characters", zone)
+	}
+	return nil
+}
+
+// AccessModesContains returns whether the requested mode is contained by modes
+func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
+}
+
+// AccessModesContainedInAll returns whether all of the requested modes are contained by modes
+func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, requestedModes []v1.PersistentVolumeAccessMode) bool {
+	for _, mode := range requestedModes {
+		if !AccessModesContains(indexedModes, mode) {
+			return false
+		}
+	}
+	return true
 }

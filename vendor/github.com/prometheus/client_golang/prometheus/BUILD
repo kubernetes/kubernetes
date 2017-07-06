@@ -14,16 +14,18 @@ go_library(
         "counter.go",
         "desc.go",
         "doc.go",
-        "expvar.go",
+        "expvar_collector.go",
+        "fnv.go",
         "gauge.go",
         "go_collector.go",
         "histogram.go",
         "http.go",
         "metric.go",
+        "observer.go",
         "process_collector.go",
-        "push.go",
         "registry.go",
         "summary.go",
+        "timer.go",
         "untyped.go",
         "value.go",
         "vec.go",
@@ -34,6 +36,7 @@ go_library(
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
+        "//vendor/github.com/prometheus/common/model:go_default_library",
         "//vendor/github.com/prometheus/procfs:go_default_library",
     ],
 )
@@ -47,6 +50,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:all-srcs",
+    ],
     tags = ["automanaged"],
 )

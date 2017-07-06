@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -43,7 +43,7 @@ func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *s
 		affinity = priorityMeta.affinity
 	} else {
 		// We couldn't parse metadata - fallback to the podspec.
-		affinity = schedulercache.ReconcileAffinity(pod)
+		affinity = pod.Spec.Affinity
 	}
 
 	var count int32

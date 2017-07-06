@@ -22,12 +22,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -156,7 +156,7 @@ func NewVolumeManager(
 	kubeletPodsDir string,
 	recorder record.EventRecorder,
 	checkNodeCapabilitiesBeforeMount bool,
-	keepTerminatedPodVolumes bool) (VolumeManager, error) {
+	keepTerminatedPodVolumes bool) VolumeManager {
 
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
@@ -195,7 +195,7 @@ func NewVolumeManager(
 		volumePluginMgr,
 		kubeletPodsDir)
 
-	return vm, nil
+	return vm
 }
 
 // volumeManager implements the VolumeManager interface
@@ -249,8 +249,7 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 	glog.Infof("Shutting down Kubelet Volume Manager")
 }
 
-func (vm *volumeManager) GetMountedVolumesForPod(
-	podName types.UniquePodName) container.VolumeMap {
+func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
 	podVolumes := make(container.VolumeMap)
 	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
 		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{Mounter: mountedVolume.Mounter}
@@ -373,8 +372,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 
 // verifyVolumesMountedFunc returns a method that returns true when all expected
 // volumes are mounted.
-func (vm *volumeManager) verifyVolumesMountedFunc(
-	podName types.UniquePodName, expectedVolumes []string) wait.ConditionFunc {
+func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, expectedVolumes []string) wait.ConditionFunc {
 	return func() (done bool, err error) {
 		return len(vm.getUnmountedVolumes(podName, expectedVolumes)) == 0, nil
 	}
@@ -383,8 +381,7 @@ func (vm *volumeManager) verifyVolumesMountedFunc(
 // getUnmountedVolumes fetches the current list of mounted volumes from
 // the actual state of the world, and uses it to process the list of
 // expectedVolumes. It returns a list of unmounted volumes.
-func (vm *volumeManager) getUnmountedVolumes(
-	podName types.UniquePodName, expectedVolumes []string) []string {
+func (vm *volumeManager) getUnmountedVolumes(podName types.UniquePodName, expectedVolumes []string) []string {
 	mountedVolumes := sets.NewString()
 	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
 		mountedVolumes.Insert(mountedVolume.OuterVolumeSpecName)
@@ -394,8 +391,7 @@ func (vm *volumeManager) getUnmountedVolumes(
 
 // filterUnmountedVolumes adds each element of expectedVolumes that is not in
 // mountedVolumes to a list of unmountedVolumes and returns it.
-func filterUnmountedVolumes(
-	mountedVolumes sets.String, expectedVolumes []string) []string {
+func filterUnmountedVolumes(mountedVolumes sets.String, expectedVolumes []string) []string {
 	unmountedVolumes := []string{}
 	for _, expectedVolume := range expectedVolumes {
 		if !mountedVolumes.Has(expectedVolume) {

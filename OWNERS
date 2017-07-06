@@ -10,6 +10,7 @@ approvers:
   - brendandburns
   - dchen1107
   - jbeda
+  - jregan # To modify BUILD files per proposal #598
   - lavalamp
   - smarterclayton
   - thockin

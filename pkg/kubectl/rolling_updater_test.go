@@ -37,11 +37,11 @@ import (
 	manualfake "k8s.io/client-go/rest/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/kubectl/util"
 )
 
 func oldRc(replicas int, original int) *api.ReplicationController {
@@ -1077,7 +1077,7 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 
 		codec := testapi.Default.Codec()
 
-		deploymentHash, err := helper.HashObject(test.newRc, codec)
+		deploymentHash, err := util.HashObject(test.newRc, codec)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

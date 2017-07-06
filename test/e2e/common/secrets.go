@@ -20,16 +20,14 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = framework.KubeDescribe("Secrets", func() {
@@ -46,8 +44,8 @@ var _ = framework.KubeDescribe("Secrets", func() {
 
 	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Conformance] [Volume]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
-		fsGroup := types.UnixGroupID(1001)
-		uid := types.UnixUserID(1000)
+		fsGroup := int64(1001)
+		uid := int64(1000)
 		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), &fsGroup, &uid)
 	})
 
@@ -155,24 +153,8 @@ var _ = framework.KubeDescribe("Secrets", func() {
 	})
 
 	It("optional updates should be reflected in volume [Conformance] [Volume]", func() {
-
-		// With SecretManager, we may have to wait up to full sync period + TTL of
-		// a secret to elapse before the Kubelet projects the update into the volume
-		// and the container picks it ip.
-		// This timeout is based on default Kubelet sync period (1 minute) plus
-		// maximum secret TTL (based on cluster size) plus additional time for fudge
-		// factor.
-		nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		// Since TTL the kubelet is using are stored in node object, for the timeout
-		// purpose we take it from a first node (all of them should be the same).
-		// We take the TTL from the first node.
-		secretTTL, exists := framework.GetTTLAnnotationFromNode(&nodes.Items[0])
-		if !exists {
-			framework.Logf("Couldn't get ttl annotation from: %#v", nodes.Items[0])
-		}
-		podLogTimeout := 240*time.Second + secretTTL
-
+		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
 		volumeMountPath := "/etc/secret-volumes"
 
@@ -216,6 +198,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 		}
 
 		By(fmt.Sprintf("Creating secret with name %s", deleteSecret.Name))
+		var err error
 		if deleteSecret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(deleteSecret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", deleteSecret.Name, err)
 		}
@@ -263,7 +246,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 					{
 						Name:    deleteContainerName,
 						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/delete/data-1"},
+						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
@@ -275,7 +258,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 					{
 						Name:    updateContainerName,
 						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/update/data-3"},
+						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
@@ -287,7 +270,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 					{
 						Name:    createContainerName,
 						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
+						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
@@ -455,7 +438,7 @@ func secretForTest(namespace, name string) *v1.Secret {
 }
 
 func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secretName string,
-	fsGroup *types.UnixGroupID, uid *types.UnixUserID) {
+	fsGroup *int64, uid *int64) {
 	var (
 		volumeName      = "secret-volume"
 		volumeMountPath = "/etc/secret-volume"

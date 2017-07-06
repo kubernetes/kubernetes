@@ -50,6 +50,10 @@ const (
 	// portion of CPU and basically stop all the real work.
 	// Increasing threshold to 1s is within our SLO and should solve this problem.
 	apiCallLatencyThreshold time.Duration = 1 * time.Second
+
+	// We set a higher threshold for list apicalls as they can take more time when
+	// the list is really big. For eg. list nodes in a 5000-node cluster.
+	apiListCallLatencyThreshold time.Duration = 2 * time.Second
 )
 
 type MetricsForE2E metrics.MetricsCollection
@@ -122,9 +126,23 @@ var InterestingApiServerMetrics = []string{
 }
 
 var InterestingControllerManagerMetrics = []string{
-	"garbage_collector_event_queue_latency",
-	"garbage_collector_dirty_queue_latency",
-	"garbage_collector_orhan_queue_latency",
+	"garbage_collector_attempt_to_delete_queue_latency",
+	"garbage_collector_attempt_to_delete_work_duration",
+	"garbage_collector_attempt_to_orphan_queue_latency",
+	"garbage_collector_attempt_to_orphan_work_duration",
+	"garbage_collector_dirty_processing_latency_microseconds",
+	"garbage_collector_event_processing_latency_microseconds",
+	"garbage_collector_graph_changes_queue_latency",
+	"garbage_collector_graph_changes_work_duration",
+	"garbage_collector_orphan_processing_latency_microseconds",
+
+	"namespace_queue_latency",
+	"namespace_queue_latency_sum",
+	"namespace_queue_latency_count",
+	"namespace_retries",
+	"namespace_work_duration",
+	"namespace_work_duration_sum",
+	"namespace_work_duration_count",
 }
 
 var InterestingKubeletMetrics = []string{
@@ -188,10 +206,11 @@ type SaturationTime struct {
 }
 
 type APICall struct {
-	Resource string        `json:"resource"`
-	Verb     string        `json:"verb"`
-	Latency  LatencyMetric `json:"latency"`
-	Count    int           `json:"count"`
+	Resource    string        `json:"resource"`
+	Subresource string        `json:"subresource"`
+	Verb        string        `json:"verb"`
+	Latency     LatencyMetric `json:"latency"`
+	Count       int           `json:"count"`
 }
 
 type APIResponsiveness struct {
@@ -221,14 +240,14 @@ func (a *APIResponsiveness) Less(i, j int) bool {
 // Set request latency for a particular quantile in the APICall metric entry (creating one if necessary).
 // 0 <= quantile <=1 (e.g. 0.95 is 95%tile, 0.5 is median)
 // Only 0.5, 0.9 and 0.99 quantiles are supported.
-func (a *APIResponsiveness) addMetricRequestLatency(resource, verb string, quantile float64, latency time.Duration) {
+func (a *APIResponsiveness) addMetricRequestLatency(resource, subresource, verb string, quantile float64, latency time.Duration) {
 	for i, apicall := range a.APICalls {
-		if apicall.Resource == resource && apicall.Verb == verb {
+		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb {
 			a.APICalls[i] = setQuantileAPICall(apicall, quantile, latency)
 			return
 		}
 	}
-	apicall := setQuantileAPICall(APICall{Resource: resource, Verb: verb}, quantile, latency)
+	apicall := setQuantileAPICall(APICall{Resource: resource, Subresource: subresource, Verb: verb}, quantile, latency)
 	a.APICalls = append(a.APICalls, apicall)
 }
 
@@ -252,14 +271,14 @@ func setQuantile(metric *LatencyMetric, quantile float64, latency time.Duration)
 }
 
 // Add request count to the APICall metric entry (creating one if necessary).
-func (a *APIResponsiveness) addMetricRequestCount(resource, verb string, count int) {
+func (a *APIResponsiveness) addMetricRequestCount(resource, subresource, verb string, count int) {
 	for i, apicall := range a.APICalls {
-		if apicall.Resource == resource && apicall.Verb == verb {
+		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb {
 			a.APICalls[i].Count += count
 			return
 		}
 	}
-	apicall := APICall{Resource: resource, Verb: verb, Count: count}
+	apicall := APICall{Resource: resource, Subresource: subresource, Verb: verb, Count: count}
 	a.APICalls = append(a.APICalls, apicall)
 }
 
@@ -290,6 +309,7 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 		}
 
 		resource := string(sample.Metric["resource"])
+		subresource := string(sample.Metric["subresource"])
 		verb := string(sample.Metric["verb"])
 		if ignoredResources.Has(resource) || ignoredVerbs.Has(verb) {
 			continue
@@ -302,10 +322,10 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 			if err != nil {
 				return nil, err
 			}
-			a.addMetricRequestLatency(resource, verb, quantile, time.Duration(int64(latency))*time.Microsecond)
+			a.addMetricRequestLatency(resource, subresource, verb, quantile, time.Duration(int64(latency))*time.Microsecond)
 		case "apiserver_request_count":
 			count := sample.Value
-			a.addMetricRequestCount(resource, verb, int(count))
+			a.addMetricRequestCount(resource, subresource, verb, int(count))
 
 		}
 	}
@@ -325,7 +345,9 @@ func HighLatencyRequests(c clientset.Interface) (int, *APIResponsiveness, error)
 	top := 5
 	for i := range metrics.APICalls {
 		isBad := false
-		if metrics.APICalls[i].Latency.Perc99 > apiCallLatencyThreshold {
+		verb := metrics.APICalls[i].Verb
+		if verb != "LIST" && metrics.APICalls[i].Latency.Perc99 > apiCallLatencyThreshold ||
+			verb == "LIST" && metrics.APICalls[i].Latency.Perc99 > apiListCallLatencyThreshold {
 			badMetrics++
 			isBad = true
 		}

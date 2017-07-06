@@ -41,3 +41,26 @@ type Flunder struct {
 	Spec   FlunderSpec
 	Status FlunderStatus
 }
+
+// +genclient=true
+// +nonNamespaced=true
+
+type Fischer struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+
+	// DisallowedFlunders holds a list of Flunder.Names that are disallowed.
+	DisallowedFlunders []string
+}
+
+// +genclient=true
+// +nonNamespaced=true
+
+// FischerList is a list of Fischer objects.
+type FischerList struct {
+	metav1.TypeMeta
+	metav1.ListMeta
+
+	// Items is a list of Fischers
+	Items []Fischer
+}

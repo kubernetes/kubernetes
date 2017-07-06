@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,10 +34,8 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	versionedfake "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -102,8 +102,11 @@ func TestDescribePodTolerations(t *testing.T) {
 		},
 		Spec: api.PodSpec{
 			Tolerations: []api.Toleration{
+				{Key: "key0", Operator: api.TolerationOpExists},
 				{Key: "key1", Value: "value1"},
-				{Key: "key2", Value: "value2", Effect: api.TaintEffectNoExecute, TolerationSeconds: &[]int64{300}[0]},
+				{Key: "key2", Operator: api.TolerationOpEqual, Value: "value2", Effect: api.TaintEffectNoSchedule},
+				{Key: "key3", Value: "value3", Effect: api.TaintEffectNoExecute, TolerationSeconds: &[]int64{300}[0]},
+				{Key: "key4", Effect: api.TaintEffectNoExecute, TolerationSeconds: &[]int64{60}[0]},
 			},
 		},
 	})
@@ -113,8 +116,13 @@ func TestDescribePodTolerations(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "key1=value1") || !strings.Contains(out, "key2=value2:NoExecute for 300s") || !strings.Contains(out, "Tolerations:") {
-		t.Errorf("unexpected out: %s", out)
+	if !strings.Contains(out, "key0\n") ||
+		!strings.Contains(out, "key1=value1\n") ||
+		!strings.Contains(out, "key2=value2:NoSchedule\n") ||
+		!strings.Contains(out, "key3=value3:NoExecute for 300s\n") ||
+		!strings.Contains(out, "key4:NoExecute for 60s\n") ||
+		!strings.Contains(out, "Tolerations:") {
+		t.Errorf("unexpected out:\n%s", out)
 	}
 }
 
@@ -131,6 +139,28 @@ func TestDescribeNamespace(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "myns") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribeConfigMap(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mycm",
+			Namespace: "foo",
+		},
+		Data: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := ConfigMapDescriber{c}
+	out, err := d.Describe("foo", "mycm", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") || !strings.Contains(out, "mycm") || !strings.Contains(out, "key1") || !strings.Contains(out, "value1") || !strings.Contains(out, "key2") || !strings.Contains(out, "value2") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -774,6 +804,7 @@ func TestDescribeStorageClass(t *testing.T) {
 }
 
 func TestDescribePodDisruptionBudget(t *testing.T) {
+	minAvailable := intstr.FromInt(22)
 	f := fake.NewSimpleClientset(&policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:         "ns1",
@@ -781,7 +812,7 @@ func TestDescribePodDisruptionBudget(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
-			MinAvailable: intstr.FromInt(22),
+			MinAvailable: &minAvailable,
 		},
 		Status: policy.PodDisruptionBudgetStatus{
 			PodDisruptionsAllowed: 5,
@@ -1420,5 +1451,139 @@ URL:	http://localhost
 				t.Errorf("Didn't expect to find %q in: %q", test.unexpected, output)
 			}
 		}
+	}
+}
+
+func TestDescribeResourceQuota(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceName(api.ResourceCPU):            resource.MustParse("1"),
+				api.ResourceName(api.ResourceLimitsCPU):      resource.MustParse("2"),
+				api.ResourceName(api.ResourceLimitsMemory):   resource.MustParse("2G"),
+				api.ResourceName(api.ResourceMemory):         resource.MustParse("1G"),
+				api.ResourceName(api.ResourceRequestsCPU):    resource.MustParse("1"),
+				api.ResourceName(api.ResourceRequestsMemory): resource.MustParse("1G"),
+			},
+			Used: api.ResourceList{
+				api.ResourceName(api.ResourceCPU):            resource.MustParse("0"),
+				api.ResourceName(api.ResourceLimitsCPU):      resource.MustParse("0"),
+				api.ResourceName(api.ResourceLimitsMemory):   resource.MustParse("0G"),
+				api.ResourceName(api.ResourceMemory):         resource.MustParse("0G"),
+				api.ResourceName(api.ResourceRequestsCPU):    resource.MustParse("0"),
+				api.ResourceName(api.ResourceRequestsMemory): resource.MustParse("0G"),
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := ResourceQuotaDescriber{c}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedOut := []string{"bar", "foo", "limits.cpu", "2", "limits.memory", "2G", "requests.cpu", "1", "requests.memory", "1G"}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
+	}
+}
+
+// boolPtr returns a pointer to a bool
+func boolPtr(b bool) *bool {
+	o := b
+	return &o
+}
+
+func TestControllerRef(t *testing.T) {
+	f := fake.NewSimpleClientset(
+		&api.ReplicationController{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: "foo",
+				UID:       "123456",
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "ReplicationController",
+			},
+			Spec: api.ReplicationControllerSpec{
+				Replicas: 1,
+				Selector: map[string]string{"abc": "xyz"},
+				Template: &api.PodTemplateSpec{
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{Image: "mytest-image:latest"},
+						},
+					},
+				},
+			},
+		},
+		&api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "barpod",
+				Namespace:       "foo",
+				Labels:          map[string]string{"abc": "xyz"},
+				OwnerReferences: []metav1.OwnerReference{{Name: "bar", UID: "123456", Controller: boolPtr(true)}},
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "Pod",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Image: "mytest-image:latest"},
+				},
+			},
+			Status: api.PodStatus{
+				Phase: api.PodRunning,
+			},
+		},
+		&api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "orphan",
+				Namespace: "foo",
+				Labels:    map[string]string{"abc": "xyz"},
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "Pod",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Image: "mytest-image:latest"},
+				},
+			},
+			Status: api.PodStatus{
+				Phase: api.PodRunning,
+			},
+		},
+		&api.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "buzpod",
+				Namespace:       "foo",
+				Labels:          map[string]string{"abc": "xyz"},
+				OwnerReferences: []metav1.OwnerReference{{Name: "buz", UID: "654321", Controller: boolPtr(true)}},
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "Pod",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Image: "mytest-image:latest"},
+				},
+			},
+			Status: api.PodStatus{
+				Phase: api.PodRunning,
+			},
+		})
+	d := ReplicationControllerDescriber{f}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: false})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "1 Running") {
+		t.Errorf("unexpected out: %s", out)
 	}
 }

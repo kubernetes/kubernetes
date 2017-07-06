@@ -45,7 +45,7 @@ type ScopeNamer interface {
 	SetSelfLink(obj runtime.Object, url string) error
 	// GenerateLink creates an encoded URI for a given runtime object that represents the canonical path
 	// and query.
-	GenerateLink(req *http.Request, obj runtime.Object) (uri string, err error)
+	GenerateLink(requestInfo *request.RequestInfo, obj runtime.Object) (uri string, err error)
 	// GenerateListLink creates an encoded URI for a list that represents the canonical path and query.
 	GenerateListLink(req *http.Request) (uri string, err error)
 }
@@ -90,12 +90,7 @@ func (n ContextBasedNaming) Name(req *http.Request) (namespace, name string, err
 	return ns, requestInfo.Name, nil
 }
 
-func (n ContextBasedNaming) GenerateLink(req *http.Request, obj runtime.Object) (uri string, err error) {
-	requestInfo, ok := request.RequestInfoFrom(n.GetContext(req))
-	if !ok {
-		return "", fmt.Errorf("missing requestInfo")
-	}
-
+func (n ContextBasedNaming) GenerateLink(requestInfo *request.RequestInfo, obj runtime.Object) (uri string, err error) {
 	namespace, name, err := n.ObjectName(obj)
 	if err == errEmptyName && len(requestInfo.Name) > 0 {
 		name = requestInfo.Name

@@ -22,6 +22,9 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	crdinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
+	crdlisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,11 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/extensions/internalversion"
-	listers "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 )
 
 // AutoAPIServiceRegistration is an interface which callers can re-declare locally and properly cast to for
@@ -46,9 +45,9 @@ type AutoAPIServiceRegistration interface {
 	RemoveAPIServiceToSync(name string)
 }
 
-type tprRegistrationController struct {
-	tprLister listers.ThirdPartyResourceLister
-	tprSynced cache.InformerSynced
+type crdRegistrationController struct {
+	crdLister crdlisters.CustomResourceDefinitionLister
+	crdSynced cache.InformerSynced
 
 	apiServiceRegistration AutoAPIServiceRegistration
 
@@ -61,55 +60,57 @@ type tprRegistrationController struct {
 
 // NewAutoRegistrationController returns a controller which will register TPR GroupVersions with the auto APIService registration
 // controller so they automatically stay in sync.
-func NewAutoRegistrationController(tprInformer informers.ThirdPartyResourceInformer, apiServiceRegistration AutoAPIServiceRegistration) *tprRegistrationController {
-	c := &tprRegistrationController{
-		tprLister:              tprInformer.Lister(),
-		tprSynced:              tprInformer.Informer().HasSynced,
+// In order to stay sane with both TPR and CRD present, we have a single controller that manages both.  When choosing whether to have an
+// APIService, we simply iterate through both.
+func NewAutoRegistrationController(crdinformer crdinformers.CustomResourceDefinitionInformer, apiServiceRegistration AutoAPIServiceRegistration) *crdRegistrationController {
+	c := &crdRegistrationController{
+		crdLister:              crdinformer.Lister(),
+		crdSynced:              crdinformer.Informer().HasSynced,
 		apiServiceRegistration: apiServiceRegistration,
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "tpr-autoregister"),
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd-autoregister"),
 	}
-	c.syncHandler = c.handleTPR
+	c.syncHandler = c.handleVersionUpdate
 
-	tprInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	crdinformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			cast := obj.(*extensions.ThirdPartyResource)
-			c.enqueueTPR(cast)
+			cast := obj.(*apiextensions.CustomResourceDefinition)
+			c.enqueueCRD(cast)
 		},
 		UpdateFunc: func(_, obj interface{}) {
-			cast := obj.(*extensions.ThirdPartyResource)
-			c.enqueueTPR(cast)
+			cast := obj.(*apiextensions.CustomResourceDefinition)
+			c.enqueueCRD(cast)
 		},
 		DeleteFunc: func(obj interface{}) {
-			cast, ok := obj.(*extensions.ThirdPartyResource)
+			cast, ok := obj.(*apiextensions.CustomResourceDefinition)
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
 					glog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
 					return
 				}
-				cast, ok = tombstone.Obj.(*extensions.ThirdPartyResource)
+				cast, ok = tombstone.Obj.(*apiextensions.CustomResourceDefinition)
 				if !ok {
 					glog.V(2).Infof("Tombstone contained unexpected object: %#v", obj)
 					return
 				}
 			}
-			c.enqueueTPR(cast)
+			c.enqueueCRD(cast)
 		},
 	})
 
 	return c
 }
 
-func (c *tprRegistrationController) Run(threadiness int, stopCh <-chan struct{}) {
+func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	// make sure the work queue is shutdown which will trigger workers to end
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting tpr-autoregister controller")
-	defer glog.Infof("Shutting down tpr-autoregister controller")
+	glog.Infof("Starting crd-autoregister controller")
+	defer glog.Infof("Shutting down crd-autoregister controller")
 
 	// wait for your secondary caches to fill before starting your work
-	if !controller.WaitForCacheSync("tpr-autoregister", stopCh, c.tprSynced) {
+	if !controller.WaitForCacheSync("crd-autoregister", stopCh, c.crdSynced) {
 		return
 	}
 
@@ -124,7 +125,7 @@ func (c *tprRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 	<-stopCh
 }
 
-func (c *tprRegistrationController) runWorker() {
+func (c *crdRegistrationController) runWorker() {
 	// hot loop until we're told to stop.  processNextWorkItem will automatically wait until there's work
 	// available, so we don't worry about secondary waits
 	for c.processNextWorkItem() {
@@ -132,7 +133,7 @@ func (c *tprRegistrationController) runWorker() {
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (c *tprRegistrationController) processNextWorkItem() bool {
+func (c *crdRegistrationController) processNextWorkItem() bool {
 	// pull the next work item from queue.  It should be a key we use to lookup something in a cache
 	key, quit := c.queue.Get()
 	if quit {
@@ -162,39 +163,25 @@ func (c *tprRegistrationController) processNextWorkItem() bool {
 	return true
 }
 
-func (c *tprRegistrationController) enqueueTPR(tpr *extensions.ThirdPartyResource) {
-	_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(tpr)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
-	for _, version := range tpr.Versions {
-		c.queue.Add(schema.GroupVersion{Group: group, Version: version.Name})
-	}
+func (c *crdRegistrationController) enqueueCRD(crd *apiextensions.CustomResourceDefinition) {
+	c.queue.Add(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version})
 }
 
-func (c *tprRegistrationController) handleTPR(groupVersion schema.GroupVersion) error {
-	// check all TPRs.  There shouldn't that many, but if we have problems later we can index them
-	tprs, err := c.tprLister.List(labels.Everything())
+func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.GroupVersion) error {
+	found := false
+	apiServiceName := groupVersion.Version + "." + groupVersion.Group
+
+	// check all CRDs.  There shouldn't that many, but if we have problems later we can index them
+	crds, err := c.crdLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
-
-	found := false
-	for _, tpr := range tprs {
-		_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(tpr)
-		if err != nil {
-			return err
-		}
-		for _, version := range tpr.Versions {
-			if version.Name == groupVersion.Version && group == groupVersion.Group {
-				found = true
-				break
-			}
+	for _, crd := range crds {
+		if crd.Spec.Version == groupVersion.Version && crd.Spec.Group == groupVersion.Group {
+			found = true
+			break
 		}
 	}
-
-	apiServiceName := groupVersion.Version + "." + groupVersion.Group
 
 	if !found {
 		c.apiServiceRegistration.RemoveAPIServiceToSync(apiServiceName)
@@ -204,9 +191,10 @@ func (c *tprRegistrationController) handleTPR(groupVersion schema.GroupVersion) 
 	c.apiServiceRegistration.AddAPIServiceToSync(&apiregistration.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: apiServiceName},
 		Spec: apiregistration.APIServiceSpec{
-			Group:    groupVersion.Group,
-			Version:  groupVersion.Version,
-			Priority: 500, // TPRs should have relatively low priority
+			Group:                groupVersion.Group,
+			Version:              groupVersion.Version,
+			GroupPriorityMinimum: 1000, // TPRs should have relatively low priority
+			VersionPriority:      100,  // TPRs should have relatively low priority
 		},
 	})
 

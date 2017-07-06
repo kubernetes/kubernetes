@@ -11,6 +11,24 @@ type ListOptsBuilder interface {
 	ToFlavorListQuery() (string, error)
 }
 
+// AccessType maps to OpenStack's Flavor.is_public field. Although the is_public field is boolean, the
+// request options are ternary, which is why AccessType is a string. The following values are
+// allowed:
+//
+//      PublicAccess (the default):  Returns public flavors and private flavors associated with that project.
+//      PrivateAccess (admin only):  Returns private flavors, across all projects.
+//      AllAccess (admin only):      Returns public and private flavors across all projects.
+//
+// The AccessType arguement is optional, and if it is not supplied, OpenStack returns the PublicAccess
+// flavors.
+type AccessType string
+
+const (
+	PublicAccess  AccessType = "true"
+	PrivateAccess AccessType = "false"
+	AllAccess     AccessType = "None"
+)
+
 // ListOpts helps control the results returned by the List() function.
 // For example, a flavor with a minDisk field of 10 will not be returned if you specify MinDisk set to 20.
 // Typically, software will use the last ID of the previous call to List to set the Marker for the current call.
@@ -29,6 +47,10 @@ type ListOpts struct {
 
 	// Limit instructs List to refrain from sending excessively large lists of flavors.
 	Limit int `q:"limit"`
+
+	// AccessType, if provided, instructs List which set of flavors to return. If IsPublic not provided,
+	// flavors for the current project are returned.
+	AccessType AccessType `q:"is_public"`
 }
 
 // ToFlavorListQuery formats a ListOpts into a query string.
@@ -52,6 +74,47 @@ func ListDetail(client *gophercloud.ServiceClient, opts ListOptsBuilder) paginat
 	return pagination.NewPager(client, url, func(r pagination.PageResult) pagination.Page {
 		return FlavorPage{pagination.LinkedPageBase{PageResult: r}}
 	})
+}
+
+type CreateOptsBuilder interface {
+	ToFlavorCreateMap() (map[string]interface{}, error)
+}
+
+// CreateOpts is passed to Create to create a flavor
+// Source:
+// https://github.com/openstack/nova/blob/stable/newton/nova/api/openstack/compute/schemas/flavor_manage.py#L20
+type CreateOpts struct {
+	Name string `json:"name" required:"true"`
+	// memory size, in MBs
+	RAM   int `json:"ram" required:"true"`
+	VCPUs int `json:"vcpus" required:"true"`
+	// disk size, in GBs
+	Disk *int   `json:"disk" required:"true"`
+	ID   string `json:"id,omitempty"`
+	// non-zero, positive
+	Swap       *int    `json:"swap,omitempty"`
+	RxTxFactor float64 `json:"rxtx_factor,omitempty"`
+	IsPublic   *bool   `json:"os-flavor-access:is_public,omitempty"`
+	// ephemeral disk size, in GBs, non-zero, positive
+	Ephemeral *int `json:"OS-FLV-EXT-DATA:ephemeral,omitempty"`
+}
+
+// ToFlavorCreateMap satisfies the CreateOptsBuilder interface
+func (opts *CreateOpts) ToFlavorCreateMap() (map[string]interface{}, error) {
+	return gophercloud.BuildRequestBody(opts, "flavor")
+}
+
+// Create a flavor
+func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) (r CreateResult) {
+	b, err := opts.ToFlavorCreateMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+	_, r.Err = client.Post(createURL(client), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 201},
+	})
+	return
 }
 
 // Get instructs OpenStack to provide details on a single flavor, identified by its ID.

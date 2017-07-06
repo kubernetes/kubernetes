@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -131,13 +130,14 @@ func NewCmdApply(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	// apply subcommands
 	cmd.AddCommand(NewCmdApplyViewLastApplied(f, out, errOut))
 	cmd.AddCommand(NewCmdApplySetLastApplied(f, out, errOut))
+	cmd.AddCommand(NewCmdApplyEditLastApplied(f, out, errOut))
 
 	return cmd
 }
 
 func validateArgs(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
-		return cmdutil.UsageError(cmd, "Unexpected args: %v", args)
+		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
 
 	return nil
@@ -192,7 +192,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		return err
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
+	mapper, _, err := f.UnstructuredObject()
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,12 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		}
 	}
 
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	builder, err := f.NewUnstructuredBuilder(true)
+	if err != nil {
+		return err
+	}
+
+	r := builder.
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -239,6 +244,17 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			visitedNamespaces.Insert(info.Namespace)
 		}
 
+		// Add change-cause annotation to resource info if it should be recorded
+		if cmdutil.ShouldRecord(cmd, info) {
+			recordInObj := info.VersionedObject
+			if info.VersionedObject == nil {
+				recordInObj = info.Object
+			}
+			if err := cmdutil.RecordChangeCause(recordInObj, f.Command(cmd, false)); err != nil {
+				glog.V(4).Infof("error recording current command: %v", err)
+			}
+		}
+
 		// Get the modified configuration of the object. Embed the result
 		// as an annotation in the modified configuration, so that it will appear
 		// in the patch sent to the server.
@@ -255,12 +271,6 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			// First, update the annotation used by kubectl apply
 			if err := kubectl.CreateApplyAnnotation(info, encoder); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
-			}
-
-			if cmdutil.ShouldRecord(cmd, info) {
-				if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
-					return cmdutil.AddSourceToErr("creating", info.Source, err)
-				}
 			}
 
 			if !dryRun {
@@ -310,16 +320,6 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			patchBytes, patchedObject, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
 			if err != nil {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
-			}
-
-			if cmdutil.ShouldRecord(cmd, info) {
-				if patch, patchType, err := cmdutil.ChangeResourcePatch(info, f.Command(cmd, true)); err == nil {
-					if recordedObject, err := helper.Patch(info.Namespace, info.Name, patchType, patch); err != nil {
-						glog.V(4).Infof("error recording reason: %v", err)
-					} else {
-						patchedObject = recordedObject
-					}
-				}
 			}
 
 			info.Refresh(patchedObject, true)

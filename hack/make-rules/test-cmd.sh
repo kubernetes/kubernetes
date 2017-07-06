@@ -34,21 +34,19 @@ function run_kube_apiserver() {
   kube::log::status "Starting kube-apiserver"
 
   # Admission Controllers to invoke prior to persisting objects in cluster
-  ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ResourceQuota"
+  ADMISSION_CONTROL="Initializers,NamespaceLifecycle,LimitRanger,ResourceQuota"
 
   # Include RBAC (to exercise bootstrapping), and AlwaysAllow to allow all actions
   AUTHORIZATION_MODE="RBAC,AlwaysAllow"
 
   "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
-    --address="127.0.0.1" \
-    --public-address-override="127.0.0.1" \
-    --port="${API_PORT}" \
+    --insecure-bind-address="127.0.0.1" \
+    --bind-address="127.0.0.1" \
+    --insecure-port="${API_PORT}" \
     --authorization-mode="${AUTHORIZATION_MODE}" \
     --secure-port="${SECURE_API_PORT}" \
     --admission-control="${ADMISSION_CONTROL}" \
     --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
-    --public-address-override="127.0.0.1" \
-    --kubelet-port=${KUBELET_PORT} \
     --runtime-config=api/v1 \
     --storage-media-type="${KUBE_TEST_API_STORAGE_TYPE-}" \
     --cert-dir="${TMPDIR:-/tmp/}" \

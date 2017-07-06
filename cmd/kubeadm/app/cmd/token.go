@@ -28,10 +28,10 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/token"
@@ -67,7 +67,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 			You can read more about Bootstrap Tokens in this proposal:
 
-			  https://github.com/kubernetes/community/blob/master/contributors/design-proposals/bootstrap-discovery.md
+			  https://git.k8s.io/community/contributors/design-proposals/bootstrap-discovery.md
 		`),
 
 		// Without this callback, if a user runs just the "token"

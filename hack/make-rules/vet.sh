@@ -23,13 +23,20 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 cd "${KUBE_ROOT}"
 
+# If called directly, exit.
+if [[ "${CALLED_FROM_MAIN_MAKEFILE:-""}" == "" ]]; then
+    echo "ERROR: $0 should not be run directly." >&2
+    echo >&2
+    echo "Please run this command using \"make vet\""
+    exit 1
+fi
+
 # This is required before we run govet for the results to be correct.
 # See https://github.com/golang/go/issues/16086 for details.
-make generated_files
 go install ./cmd/...
 
 # Use eval to preserve embedded quoted strings.
-eval "goflags=(${KUBE_GOFLAGS:-})"
+eval "goflags=(${GOFLAGS:-})"
 
 # Filter out arguments that start with "-" and move them to goflags.
 targets=()
@@ -46,5 +53,4 @@ if [[ ${#targets[@]} -eq 0 ]]; then
   targets=$(go list -e ./... | egrep -v "/(third_party|vendor|staging|clientset_generated)/")
 fi
 
-set -x
 go vet "${goflags[@]:+${goflags[@]}}" ${targets[@]}

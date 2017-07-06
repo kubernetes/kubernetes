@@ -200,7 +200,7 @@ func getConfig(fullMethods bool) (*openapi.Config, *restful.Container) {
 				"k8s.io/apiserver/pkg/server/openapi/go_default_test.TestOutput": *TestOutput{}.OpenAPIDefinition(),
 			}
 		},
-		GetDefinitionName: func(_ string, name string) (string, spec.Extensions) {
+		GetDefinitionName: func(name string) (string, spec.Extensions) {
 			friendlyName := name[strings.LastIndex(name, "/")+1:]
 			if strings.HasPrefix(friendlyName, "go_default_test") {
 				friendlyName = "openapi" + friendlyName[len("go_default_test"):]

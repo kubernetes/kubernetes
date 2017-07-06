@@ -46,6 +46,9 @@ audit-log-maxage
 audit-log-maxbackup
 audit-log-maxsize
 audit-log-path
+audit-policy-file
+audit-webhook-config-file
+audit-webhook-mode
 authentication-kubeconfig
 authentication-token-webhook
 authentication-token-webhook-cache-ttl
@@ -103,6 +106,7 @@ cluster-context
 cluster-dns
 cluster-domain
 cluster-ip
+cluster-ip-range
 cluster-monitor-period
 cluster-name
 cluster-signing-cert-file
@@ -190,6 +194,7 @@ dump-logs-on-failure
 duration-sec
 e2e-output-dir
 e2e-verify-service-account
+enable-aggregator-routing
 enable-controller-attach-detach
 enable-custom-metrics
 enable-debugging-handlers
@@ -198,6 +203,7 @@ enable-garbage-collector
 enable-garbage-collector
 enable-garbage-collector
 enable-hostpath-provisioner
+enable-logs-handler
 enable-server
 enable-swagger-ui
 enable-taint-manager
@@ -207,12 +213,14 @@ etcd-cafile
 etcd-certfile
 etcd-config
 etcd-keyfile
+etcd-image
 etcd-metrics-scrape-uri
 etcd-metrics-scrape-uri
 etcd-mutation-timeout
 etcd-persistent-storage
 etcd-prefix
 etcd-pv-capacity
+etcd-pv-storage-class
 etcd-quorum-read
 etcd-server
 etcd-servers
@@ -238,8 +246,10 @@ exit-on-lock-contention
 experimental-allocatable-ignore-eviction
 experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
+bootstrap-kubeconfig
 experimental-bootstrap-token-auth
 experimental-check-node-capabilities-before-mount
+experimental-cluster-signing-duration
 experimental-cri
 experimental-dockershim
 experimental-dockershim-root-directory
@@ -288,6 +298,8 @@ garbage-collector-enabled
 gather-logs-sizes
 gather-metrics-at-teardown
 gather-resource-usage
+gather-suite-metrics-at-teardown
+gce-api-endpoint
 gce-multizone
 gce-project
 gce-service-account
@@ -443,6 +455,7 @@ manifest-url-header
 masquerade-all
 master-os-distro
 master-service-namespace
+master-tag
 max-concurrency
 max-connection-bytes-per-sec
 maximum-dead-containers
@@ -456,6 +469,7 @@ max-outgoing-burst
 max-outgoing-qps
 max-pods
 max-requests-inflight
+max-unavailable
 mesos-authentication-principal
 mesos-authentication-provider
 mesos-authentication-secret-file
@@ -502,9 +516,11 @@ node-schedulable-timeout
 node-startup-grace-period
 node-status-update-frequency
 node-sync-period
+node-tag
 no-headers
 no-headers
 non-masquerade-cidr
+non-resource-url
 no-suggestions
 no-suggestions
 num-nodes

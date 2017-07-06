@@ -21,17 +21,18 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
@@ -175,6 +176,7 @@ func NewDockerService(client libdocker.Interface, seccompProfileRoot string, pod
 		containerManager:  cm.NewContainerManager(cgroupsName, client),
 		checkpointHandler: checkpointHandler,
 		disableSharedPID:  disableSharedPID,
+		networkReady:      make(map[string]bool),
 	}
 
 	// check docker version compatibility.
@@ -248,8 +250,13 @@ type dockerService struct {
 	podSandboxImage    string
 	streamingRuntime   *streamingRuntime
 	streamingServer    streaming.Server
-	network            *network.PluginManager
-	containerManager   cm.ContainerManager
+
+	network *network.PluginManager
+	// Map of podSandboxID :: network-is-ready
+	networkReady     map[string]bool
+	networkReadyLock sync.Mutex
+
+	containerManager cm.ContainerManager
 	// cgroup driver used by Docker runtime.
 	cgroupDriver      string
 	checkpointHandler CheckpointHandler
@@ -315,7 +322,7 @@ func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return getNetworkNamespace(r), nil
+	return getNetworkNamespace(r)
 }
 
 // GetPodPortMappings returns the port mappings of the given podSandbox ID.
@@ -332,7 +339,7 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 		}
 	}
 
-	portMappings := []*hostport.PortMapping{}
+	portMappings := make([]*hostport.PortMapping, 0, len(checkpoint.Data.PortMappings))
 	for _, pm := range checkpoint.Data.PortMappings {
 		proto := toAPIProtocol(*pm.Protocol)
 		portMappings = append(portMappings, &hostport.PortMapping{
@@ -448,9 +455,12 @@ func (ds *dockerService) getDockerVersionFromCache() (*dockertypes.Version, erro
 	// We only store on key in the cache.
 	const dummyKey = "version"
 	value, err := ds.versionCache.Get(dummyKey)
-	dv := value.(*dockertypes.Version)
 	if err != nil {
 		return nil, err
+	}
+	dv, ok := value.(*dockertypes.Version)
+	if !ok {
+		return nil, fmt.Errorf("Converted to *dockertype.Version error")
 	}
 	return dv, nil
 }

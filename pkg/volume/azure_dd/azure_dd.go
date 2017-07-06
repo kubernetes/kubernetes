@@ -25,8 +25,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -234,12 +234,12 @@ func (b *azureDiskMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *azureDiskMounter) SetUp(fsGroup *types.UnixGroupID) error {
+func (b *azureDiskMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (b *azureDiskMounter) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (b *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	b.plugin.volumeLocks.LockKey(b.diskName)
 	defer b.plugin.volumeLocks.UnlockKey(b.diskName)
 

@@ -27,6 +27,10 @@ kube::golang::setup_env
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
+# panic the server on watch decode errors since they are considered coder mistakes
+KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
+export KUBE_PANIC_WATCH_DECODE_ERROR
+
 # Handle case where OS has sha#sum commands, instead of shasum.
 if which shasum >/dev/null 2>&1; then
   SHA1SUM="shasum -a1"
@@ -82,7 +86,7 @@ kube::test::find_dirs() {
     find ./staging/src/k8s.io/kube-aggregator -name '*_test.go' \
       -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
 
-    find ./staging/src/k8s.io/kube-apiextensions-server -not \( \
+    find ./staging/src/k8s.io/apiextensions-apiserver -not \( \
         \( \
           -path '*/test/integration/*' \
         \) -prune \
@@ -164,7 +168,7 @@ done
 shift $((OPTIND - 1))
 
 # Use eval to preserve embedded quoted strings.
-eval "goflags=(${KUBE_GOFLAGS:-})"
+eval "goflags=(${GOFLAGS:-})"
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
 # Used to filter verbose test output.

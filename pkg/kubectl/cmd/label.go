@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -116,10 +115,10 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: labelExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := options.Complete(out, cmd, args); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
 			}
 			if err := options.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
 			}
 			cmdutil.CheckErr(options.RunLabel(f, cmd))
 		},
@@ -163,7 +162,7 @@ func (o *LabelOptions) Complete(out io.Writer, cmd *cobra.Command, args []string
 
 // Validate checks to the LabelOptions to see if there is sufficient information run the command.
 func (o *LabelOptions) Validate() error {
-	if len(o.resources) < 1 && cmdutil.IsFilenameEmpty(o.FilenameOptions.Filenames) {
+	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if len(o.newLabels) < 1 && len(o.removeLabels) < 1 {
@@ -181,11 +180,12 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	changeCause := f.Command(cmd, false)
 
-	mapper, typer, err := f.UnstructuredObject()
+	builder, err := f.NewUnstructuredBuilder(!o.local)
 	if err != nil {
 		return err
 	}
-	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+
+	b := builder.
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -220,6 +220,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			if err != nil {
 				return err
 			}
+			dataChangeMsg = "labeled"
 			outputObj = info.Object
 		} else {
 			obj := info.Object
@@ -275,8 +276,18 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 				return err
 			}
 		}
+
+		var mapper meta.RESTMapper
+		if o.local {
+			mapper, _ = f.Object()
+		} else {
+			mapper, _, err = f.UnstructuredObject()
+			if err != nil {
+				return err
+			}
+		}
 		if o.outputFormat != "" {
-			return f.PrintObject(cmd, mapper, outputObj, o.out)
+			return f.PrintObject(cmd, o.local, mapper, outputObj, o.out)
 		}
 		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, dataChangeMsg)
 		return nil
@@ -297,7 +308,7 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 	labels := map[string]string{}
 	var remove []string
 	for _, labelSpec := range spec {
-		if strings.Index(labelSpec, "=") != -1 {
+		if strings.Contains(labelSpec, "=") {
 			parts := strings.Split(labelSpec, "=")
 			if len(parts) != 2 {
 				return nil, nil, fmt.Errorf("invalid label spec: %v", labelSpec)

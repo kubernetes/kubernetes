@@ -31,6 +31,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -45,7 +46,6 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -134,10 +134,12 @@ type initFederation struct {
 
 type initFederationOptions struct {
 	dnsZoneName                      string
-	image                            string
+	serverImage                      string
 	dnsProvider                      string
 	dnsProviderConfig                string
+	etcdImage                        string
 	etcdPVCapacity                   string
+	etcdPVStorageClass               string
 	etcdPersistentStorage            bool
 	dryRun                           bool
 	apiServerOverridesString         string
@@ -151,12 +153,14 @@ type initFederationOptions struct {
 	apiServerEnableTokenAuth         bool
 }
 
-func (o *initFederationOptions) Bind(flags *pflag.FlagSet, defaultImage string) {
+func (o *initFederationOptions) Bind(flags *pflag.FlagSet, defaultServerImage, defaultEtcdImage string) {
 	flags.StringVar(&o.dnsZoneName, "dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
-	flags.StringVar(&o.image, "image", defaultImage, "Image to use for federation API server and controller manager binaries.")
+	flags.StringVar(&o.serverImage, "image", defaultServerImage, "Image to use for federation API server and controller manager binaries.")
 	flags.StringVar(&o.dnsProvider, "dns-provider", "", "Dns provider to be used for this deployment.")
 	flags.StringVar(&o.dnsProviderConfig, "dns-provider-config", "", "Config file path on local file system for configuring DNS provider.")
+	flags.StringVar(&o.etcdImage, "etcd-image", defaultEtcdImage, "Image to use for etcd server.")
 	flags.StringVar(&o.etcdPVCapacity, "etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
+	flags.StringVar(&o.etcdPVStorageClass, "etcd-pv-storage-class", "", "The storage class of the persistent volume claim used for etcd.   Must be provided if a default storage class is not enabled for the host cluster.")
 	flags.BoolVar(&o.etcdPersistentStorage, "etcd-persistent-storage", true, "Use persistent volume for etcd. Defaults to 'true'.")
 	flags.BoolVar(&o.dryRun, "dry-run", false, "dry run without sending commands to server.")
 	flags.StringVar(&o.apiServerOverridesString, "apiserver-arg-overrides", "", "comma separated list of federation-apiserver arguments to override: Example \"--arg1=value1,--arg2=value2...\"")
@@ -169,7 +173,7 @@ func (o *initFederationOptions) Bind(flags *pflag.FlagSet, defaultImage string) 
 
 // NewCmdInit defines the `init` command that bootstraps a federation
 // control plane inside a set of host clusters.
-func NewCmdInit(cmdOut io.Writer, config util.AdminConfig, defaultImage string) *cobra.Command {
+func NewCmdInit(cmdOut io.Writer, config util.AdminConfig, defaultServerImage, defaultEtcdImage string) *cobra.Command {
 	opts := &initFederation{}
 
 	cmd := &cobra.Command{
@@ -185,7 +189,7 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig, defaultImage string) 
 
 	flags := cmd.Flags()
 	opts.commonOptions.Bind(flags)
-	opts.options.Bind(flags, defaultImage)
+	opts.options.Bind(flags, defaultServerImage, defaultEtcdImage)
 
 	return cmd
 }
@@ -323,7 +327,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	glog.V(4).Info("Creating a persistent volume and a claim to store the federation API server's state, including etcd data")
 	var pvc *api.PersistentVolumeClaim
 	if i.options.etcdPersistentStorage {
-		pvc, err = createPVC(hostClientset, i.commonOptions.FederationSystemNamespace, svc.Name, i.commonOptions.Name, i.options.etcdPVCapacity, i.options.dryRun)
+		pvc, err = createPVC(hostClientset, i.commonOptions.FederationSystemNamespace, svc.Name, i.commonOptions.Name, i.options.etcdPVCapacity, i.options.etcdPVStorageClass, i.options.dryRun)
 		if err != nil {
 			return err
 		}
@@ -341,7 +345,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 
 	fmt.Fprint(cmdOut, "Creating federation component deployments...")
 	glog.V(4).Info("Creating federation control plane components")
-	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.commonOptions.Name, i.options.image, advertiseAddress, serverCredName, i.options.apiServerEnableHTTPBasicAuth, i.options.apiServerEnableTokenAuth, i.options.apiServerOverrides, pvc, i.options.dryRun)
+	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.commonOptions.Name, i.options.serverImage, i.options.etcdImage, advertiseAddress, serverCredName, i.options.apiServerEnableHTTPBasicAuth, i.options.apiServerEnableTokenAuth, i.options.apiServerOverrides, pvc, i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -376,12 +380,12 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 
 	glog.V(4).Info("Creating federation controller manager deployment")
 
-	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.image, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, i.options.dnsProviderConfig, sa.Name, dnsProviderSecret, i.options.controllerManagerOverrides, i.options.dryRun)
+	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.serverImage, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, i.options.dnsProviderConfig, sa.Name, dnsProviderSecret, i.options.controllerManagerOverrides, i.options.dryRun)
 	if err != nil {
 		return err
 	}
 	glog.V(4).Info("Successfully created federation controller manager deployment")
-	fmt.Println(cmdOut, " done")
+	fmt.Fprintln(cmdOut, " done")
 
 	fmt.Fprint(cmdOut, "Updating kubeconfig...")
 	glog.V(4).Info("Updating kubeconfig")
@@ -492,6 +496,7 @@ func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcN
 func getClusterNodeIPs(clientset client.Interface) ([]string, error) {
 	preferredAddressTypes := []api.NodeAddressType{
 		api.NodeExternalIP,
+		api.NodeInternalIP,
 	}
 	nodeList, err := clientset.Core().Nodes().List(metav1.ListOptions{})
 	if err != nil {
@@ -636,10 +641,15 @@ func createControllerManagerKubeconfigSecret(clientset client.Interface, namespa
 	return util.CreateKubeconfigSecret(clientset, config, namespace, kubeconfigName, name, "", dryRun)
 }
 
-func createPVC(clientset client.Interface, namespace, svcName, federationName, etcdPVCapacity string, dryRun bool) (*api.PersistentVolumeClaim, error) {
+func createPVC(clientset client.Interface, namespace, svcName, federationName, etcdPVCapacity, etcdPVStorageClass string, dryRun bool) (*api.PersistentVolumeClaim, error) {
 	capacity, err := resource.ParseQuantity(etcdPVCapacity)
 	if err != nil {
 		return nil, err
+	}
+
+	var storageClassName *string
+	if len(etcdPVStorageClass) > 0 {
+		storageClassName = &etcdPVStorageClass
 	}
 
 	pvc := &api.PersistentVolumeClaim{
@@ -648,8 +658,8 @@ func createPVC(clientset client.Interface, namespace, svcName, federationName, e
 			Namespace: namespace,
 			Labels:    componentLabel,
 			Annotations: map[string]string{
-				"volume.alpha.kubernetes.io/storage-class": "yes",
-				federation.FederationNameAnnotation:        federationName},
+				federation.FederationNameAnnotation: federationName,
+			},
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{
@@ -660,6 +670,7 @@ func createPVC(clientset client.Interface, namespace, svcName, federationName, e
 					api.ResourceStorage: capacity,
 				},
 			},
+			StorageClassName: storageClassName,
 		},
 	}
 
@@ -670,7 +681,7 @@ func createPVC(clientset client.Interface, namespace, svcName, federationName, e
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset client.Interface, namespace, name, federationName, image, advertiseAddress, credentialsName string, hasHTTPBasicAuthFile, hasTokenAuthFile bool, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
+func createAPIServer(clientset client.Interface, namespace, name, federationName, serverImage, etcdImage, advertiseAddress, credentialsName string, hasHTTPBasicAuthFile, hasTokenAuthFile bool, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -717,7 +728,7 @@ func createAPIServer(clientset client.Interface, namespace, name, federationName
 					Containers: []api.Container{
 						{
 							Name:    "apiserver",
-							Image:   image,
+							Image:   serverImage,
 							Command: command,
 							Ports: []api.ContainerPort{
 								{
@@ -739,7 +750,7 @@ func createAPIServer(clientset client.Interface, namespace, name, federationName
 						},
 						{
 							Name:  "etcd",
-							Image: "gcr.io/google_containers/etcd:3.0.17",
+							Image: etcdImage,
 							Command: []string{
 								"/usr/local/bin/etcd",
 								"--data-dir",

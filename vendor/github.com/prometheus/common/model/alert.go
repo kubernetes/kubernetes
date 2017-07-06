@@ -35,8 +35,9 @@ type Alert struct {
 	Annotations LabelSet `json:"annotations"`
 
 	// The known time range for this alert. Both ends are optional.
-	StartsAt time.Time `json:"startsAt,omitempty"`
-	EndsAt   time.Time `json:"endsAt,omitempty"`
+	StartsAt     time.Time `json:"startsAt,omitempty"`
+	EndsAt       time.Time `json:"endsAt,omitempty"`
+	GeneratorURL string    `json:"generatorURL"`
 }
 
 // Name returns the name of the alert. It is equivalent to the "alertname" label.
@@ -60,10 +61,16 @@ func (a *Alert) String() string {
 
 // Resolved returns true iff the activity interval ended in the past.
 func (a *Alert) Resolved() bool {
+	return a.ResolvedAt(time.Now())
+}
+
+// ResolvedAt returns true off the activity interval ended before
+// the given timestamp.
+func (a *Alert) ResolvedAt(ts time.Time) bool {
 	if a.EndsAt.IsZero() {
 		return false
 	}
-	return !a.EndsAt.After(time.Now())
+	return !a.EndsAt.After(ts)
 }
 
 // Status returns the status of the alert.
@@ -72,6 +79,26 @@ func (a *Alert) Status() AlertStatus {
 		return AlertResolved
 	}
 	return AlertFiring
+}
+
+// Validate checks whether the alert data is inconsistent.
+func (a *Alert) Validate() error {
+	if a.StartsAt.IsZero() {
+		return fmt.Errorf("start time missing")
+	}
+	if !a.EndsAt.IsZero() && a.EndsAt.Before(a.StartsAt) {
+		return fmt.Errorf("start time must be before end time")
+	}
+	if err := a.Labels.Validate(); err != nil {
+		return fmt.Errorf("invalid label set: %s", err)
+	}
+	if len(a.Labels) == 0 {
+		return fmt.Errorf("at least one label pair required")
+	}
+	if err := a.Annotations.Validate(); err != nil {
+		return fmt.Errorf("invalid annotations: %s", err)
+	}
+	return nil
 }
 
 // Alert is a list of alerts that can be sorted in chronological order.

@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
+	batch_v1 "k8s.io/api/batch/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/listers/batch/v1"
-	batch_v1 "k8s.io/client-go/pkg/apis/batch/v1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )

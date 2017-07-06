@@ -34,9 +34,10 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 		Expect(err).To(BeNil())
 		instance, err = openapi.NewOpenAPIData(s)
 		Expect(err).To(BeNil())
+		fmt.Fprintf(GinkgoWriter, fmt.Sprintf("CHAO: instance.GroupVersionKindToName=%#v\n", instance.GroupVersionKindToName))
 	})
 
-	deploymentName := "io.k8s.kubernetes.pkg.apis.apps.v1beta1.Deployment"
+	deploymentName := "io.k8s.api.apps.v1beta1.Deployment"
 	gvk := schema.GroupVersionKind{
 		Kind:    "Deployment",
 		Version: "v1beta1",
@@ -45,6 +46,7 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 
 	It("should find the name by its GroupVersionKind", func() {
 		name, found := instance.GroupVersionKindToName[gvk]
+		fmt.Fprintf(GinkgoWriter, fmt.Sprintf("CHAO: instance.GroupVersionKindToName=%#v\n", instance.GroupVersionKindToName))
 		Expect(found).To(BeTrue())
 		Expect(name).To(Equal(deploymentName))
 	})
@@ -93,13 +95,13 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 
 		By("for 'spec'")
 		Expect(definition.Fields).To(HaveKeyWithValue("spec", openapi.Type{
-			TypeName: "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentSpec",
+			TypeName: "io.k8s.api.apps.v1beta1.DeploymentSpec",
 			IsKind:   true,
 		}))
 
 		By("for 'status'")
 		Expect(definition.Fields).To(HaveKeyWithValue("status", openapi.Type{
-			TypeName: "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentStatus",
+			TypeName: "io.k8s.api.apps.v1beta1.DeploymentStatus",
 			IsKind:   true,
 		}))
 	})
@@ -114,7 +116,7 @@ var _ = Describe("Reading apps/v1beta1/DeploymentStatus from openAPIData", func(
 		Expect(err).To(BeNil())
 	})
 
-	deploymentStatusName := "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentStatus"
+	deploymentStatusName := "io.k8s.api.apps.v1beta1.DeploymentStatus"
 
 	var definition openapi.Kind
 	It("should find the definition by name", func() {
@@ -143,10 +145,10 @@ var _ = Describe("Reading apps/v1beta1/DeploymentStatus from openAPIData", func(
 
 		By("for 'conditions'")
 		Expect(definition.Fields).To(HaveKeyWithValue("conditions", openapi.Type{
-			TypeName: "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentCondition array",
+			TypeName: "io.k8s.api.apps.v1beta1.DeploymentCondition array",
 			IsArray:  true,
 			ElementType: &openapi.Type{
-				TypeName: "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentCondition",
+				TypeName: "io.k8s.api.apps.v1beta1.DeploymentCondition",
 				IsKind:   true,
 			},
 			Extensions: spec.Extensions{
@@ -166,7 +168,7 @@ var _ = Describe("Reading apps/v1beta1/DeploymentSpec from openAPIData", func() 
 		Expect(err).To(BeNil())
 	})
 
-	deploymentSpecName := "io.k8s.kubernetes.pkg.apis.apps.v1beta1.DeploymentSpec"
+	deploymentSpecName := "io.k8s.api.apps.v1beta1.DeploymentSpec"
 
 	var definition openapi.Kind
 	It("should find the definition by name", func() {
@@ -189,7 +191,7 @@ var _ = Describe("Reading apps/v1beta1/DeploymentSpec from openAPIData", func() 
 	It("should find the definition fields", func() {
 		By("for 'template'")
 		Expect(definition.Fields).To(HaveKeyWithValue("template", openapi.Type{
-			TypeName: "io.k8s.kubernetes.pkg.api.v1.PodTemplateSpec",
+			TypeName: "io.k8s.api.core.v1.PodTemplateSpec",
 			IsKind:   true,
 		}))
 	})
@@ -273,7 +275,7 @@ var _ = Describe("Reading v1/NodeStatus from openAPIData", func() {
 		Expect(err).To(BeNil())
 	})
 
-	nodeStatusName := "io.k8s.kubernetes.pkg.api.v1.NodeStatus"
+	nodeStatusName := "io.k8s.api.core.v1.NodeStatus"
 
 	var definition openapi.Kind
 	It("should find the definition by name", func() {
@@ -378,7 +380,7 @@ var _ = Describe("Reading authorization/v1/SubjectAccessReviewSpec from openAPID
 		Expect(err).To(BeNil())
 	})
 
-	subjectAccessReviewSpecName := "io.k8s.kubernetes.pkg.apis.authorization.v1.SubjectAccessReviewSpec"
+	subjectAccessReviewSpecName := "io.k8s.api.authorization.v1.SubjectAccessReviewSpec"
 
 	var definition openapi.Kind
 	It("should find the definition by name", func() {

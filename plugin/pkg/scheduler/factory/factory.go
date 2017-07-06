@@ -23,14 +23,16 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"
@@ -186,7 +188,7 @@ func NewConfigFactory(
 	)
 	// ScheduledPodLister is something we provide to plug-in functions that
 	// they may need to call.
-	c.scheduledPodLister = podInformer.Lister()
+	c.scheduledPodLister = assignedPodLister{podInformer.Lister()}
 
 	// Only nodes in the "Ready" condition with status == "True" are schedulable
 	nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -376,15 +378,30 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 			}
 		}
 	}
+	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
+	// Give it higher precedence than scheduler CLI configuration when it is provided.
+	if policy.HardPodAffinitySymmetricWeight != 0 {
+		f.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
+	}
 	return f.CreateFromKeys(predicateKeys, priorityKeys, extenders)
+}
+
+// getBinder returns an extender that supports bind or a default binder.
+func (f *ConfigFactory) getBinder(extenders []algorithm.SchedulerExtender) scheduler.Binder {
+	for i := range extenders {
+		if extenders[i].IsBinder() {
+			return extenders[i]
+		}
+	}
+	return &binder{f.client}
 }
 
 // Creates a scheduler from a set of registered fit predicate keys and priority keys.
 func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*scheduler.Config, error) {
 	glog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
 
-	if f.GetHardPodAffinitySymmetricWeight() < 0 || f.GetHardPodAffinitySymmetricWeight() > 100 {
-		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 0-100", f.GetHardPodAffinitySymmetricWeight())
+	if f.GetHardPodAffinitySymmetricWeight() < 1 || f.GetHardPodAffinitySymmetricWeight() > 100 {
+		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100", f.GetHardPodAffinitySymmetricWeight())
 	}
 
 	predicateFuncs, err := f.GetPredicates(predicateKeys)
@@ -415,7 +432,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		// The scheduler only needs to consider schedulable nodes.
 		NodeLister:          &nodePredicateLister{f.nodeLister},
 		Algorithm:           algo,
-		Binder:              &binder{f.client},
+		Binder:              f.getBinder(extenders),
 		PodConditionUpdater: &podConditionUpdater{f.client},
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(f.StopEverything, f.scheduledPodsHasSynced)
@@ -551,6 +568,65 @@ func assignedNonTerminatedPod(pod *v1.Pod) bool {
 	return true
 }
 
+// assignedPodLister filters the pods returned from a PodLister to
+// only include those that have a node name set.
+type assignedPodLister struct {
+	corelisters.PodLister
+}
+
+// List lists all Pods in the indexer for a given namespace.
+func (l assignedPodLister) List(selector labels.Selector) ([]*v1.Pod, error) {
+	list, err := l.PodLister.List(selector)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]*v1.Pod, 0, len(list))
+	for _, pod := range list {
+		if len(pod.Spec.NodeName) > 0 {
+			filtered = append(filtered, pod)
+		}
+	}
+	return filtered, nil
+}
+
+// List lists all Pods in the indexer for a given namespace.
+func (l assignedPodLister) Pods(namespace string) corelisters.PodNamespaceLister {
+	return assignedPodNamespaceLister{l.PodLister.Pods(namespace)}
+}
+
+// assignedPodNamespaceLister filters the pods returned from a PodNamespaceLister to
+// only include those that have a node name set.
+type assignedPodNamespaceLister struct {
+	corelisters.PodNamespaceLister
+}
+
+// List lists all Pods in the indexer for a given namespace.
+func (l assignedPodNamespaceLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
+	list, err := l.PodNamespaceLister.List(selector)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]*v1.Pod, 0, len(list))
+	for _, pod := range list {
+		if len(pod.Spec.NodeName) > 0 {
+			filtered = append(filtered, pod)
+		}
+	}
+	return filtered, nil
+}
+
+// Get retrieves the Pod from the indexer for a given namespace and name.
+func (l assignedPodNamespaceLister) Get(name string) (*v1.Pod, error) {
+	pod, err := l.PodNamespaceLister.Get(name)
+	if err != nil {
+		return nil, err
+	}
+	if len(pod.Spec.NodeName) > 0 {
+		return pod, nil
+	}
+	return nil, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
+}
+
 type podInformer struct {
 	informer cache.SharedIndexInformer
 }
@@ -577,7 +653,11 @@ func (factory *ConfigFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, pod
 		if err == core.ErrNoNodesAvailable {
 			glog.V(4).Infof("Unable to schedule %v %v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
 		} else {
-			glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
+			if _, ok := err.(*core.FitError); ok {
+				glog.V(4).Infof("Unable to schedule %v %v: no fit: %v; waiting", pod.Namespace, pod.Name, err)
+			} else {
+				glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
+			}
 		}
 		backoff.Gc()
 		// Retry asynchronously.

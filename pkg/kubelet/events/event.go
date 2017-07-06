@@ -17,8 +17,8 @@ limitations under the License.
 package events
 
 import (
-	clientv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
+	clientv1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -47,6 +47,7 @@ const (
 	NodeNotSchedulable                   = "NodeNotSchedulable"
 	StartingKubelet                      = "Starting"
 	KubeletSetupFailed                   = "KubeletSetupFailed"
+	FailedAttachVolume                   = "FailedAttachVolume"
 	FailedDetachVolume                   = "FailedDetachVolume"
 	FailedMountVolume                    = "FailedMount"
 	FailedUnMountVolume                  = "FailedUnMount"

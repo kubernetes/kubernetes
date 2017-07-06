@@ -74,6 +74,12 @@ items:
     verbs:
     - update
   - apiGroups:
+    - authorization.k8s.io
+    resources:
+    - subjectaccessreviews
+    verbs:
+    - create
+  - apiGroups:
     - ""
     resources:
     - events
@@ -180,6 +186,17 @@ items:
     - pods/binding
     verbs:
     - create
+  - apiGroups:
+    - apps
+    resources:
+    - controllerrevisions
+    verbs:
+    - create
+    - delete
+    - list
+    - patch
+    - update
+    - watch
   - apiGroups:
     - ""
     resources:
@@ -664,6 +681,13 @@ items:
   - apiGroups:
     - ""
     resources:
+    - nodes
+    verbs:
+    - get
+    - list
+  - apiGroups:
+    - ""
+    resources:
     - events
     verbs:
     - watch
@@ -951,6 +975,18 @@ items:
     - get
     - patch
     - update
+  - apiGroups:
+    - apps
+    resources:
+    - controllerrevisions
+    verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
   - apiGroups:
     - ""
     resources:

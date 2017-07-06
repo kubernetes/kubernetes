@@ -18,6 +18,7 @@ package endpoints
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,23 +44,30 @@ import (
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/admission"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplefuzzer "k8s.io/apiserver/pkg/apis/example/fuzzer"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/audit"
+	auditpolicy "k8s.io/apiserver/pkg/audit/policy"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/server/filters"
 )
 
 // alwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.
@@ -256,25 +264,25 @@ type defaultAPIServer struct {
 
 // uses the default settings
 func handle(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, admissionControl, selfLinker)
+	return handleInternal(storage, admissionControl, selfLinker, nil)
 }
 
 // tests with a deny admission controller
 func handleDeny(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, alwaysDeny{}, selfLinker)
+	return handleInternal(storage, alwaysDeny{}, selfLinker, nil)
 }
 
 // tests using the new namespace scope mechanism
 func handleNamespaced(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, admissionControl, selfLinker)
+	return handleInternal(storage, admissionControl, selfLinker, nil)
 }
 
 // tests using a custom self linker
 func handleLinker(storage map[string]rest.Storage, selfLinker runtime.SelfLinker) http.Handler {
-	return handleInternal(storage, admissionControl, selfLinker)
+	return handleInternal(storage, admissionControl, selfLinker, nil)
 }
 
-func handleInternal(storage map[string]rest.Storage, admissionControl admission.Interface, selfLinker runtime.SelfLinker) http.Handler {
+func handleInternal(storage map[string]rest.Storage, admissionControl admission.Interface, selfLinker runtime.SelfLinker, auditSink audit.Sink) http.Handler {
 	container := restful.NewContainer()
 	container.Router(restful.CurlyRouter{})
 	mux := container.ServeMux
@@ -332,7 +340,11 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		}
 	}
 
-	handler := genericapifilters.WithRequestInfo(mux, testRequestInfoResolver(), requestContextMapper)
+	handler := genericapifilters.WithAudit(mux, requestContextMapper, auditSink, auditpolicy.FakeChecker(auditinternal.LevelRequestResponse), func(r *http.Request, requestInfo *request.RequestInfo) bool {
+		// simplified long-running check
+		return requestInfo.Verb == "watch" || requestInfo.Verb == "proxy"
+	})
+	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver(), requestContextMapper)
 	handler = request.WithRequestContext(handler, requestContextMapper)
 
 	return &defaultAPIServer{handler, container}
@@ -397,6 +409,7 @@ type SimpleRESTStorage struct {
 	fakeWatch                  *watch.FakeWatcher
 	requestedLabelSelector     labels.Selector
 	requestedFieldSelector     fields.Selector
+	requestedUninitialized     bool
 	requestedResourceVersion   string
 	requestedResourceNamespace string
 
@@ -426,6 +439,10 @@ func (storage *SimpleRESTStorage) Export(ctx request.Context, name string, opts 
 	return obj, storage.errors["export"]
 }
 
+func (storage *SimpleRESTStorage) ConvertToTable(ctx request.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error) {
+	return rest.NewDefaultTableConvertor(schema.GroupResource{Resource: "simple"}).ConvertToTable(ctx, obj, tableOptions)
+}
+
 func (storage *SimpleRESTStorage) List(ctx request.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &genericapitesting.SimpleList{
@@ -439,6 +456,7 @@ func (storage *SimpleRESTStorage) List(ctx request.Context, options *metainterna
 	if options != nil && options.FieldSelector != nil {
 		storage.requestedFieldSelector = options.FieldSelector
 	}
+	storage.requestedUninitialized = options.IncludeUninitialized
 	return result, storage.errors["list"]
 }
 
@@ -512,7 +530,7 @@ func (storage *SimpleRESTStorage) NewList() runtime.Object {
 	return &genericapitesting.SimpleList{}
 }
 
-func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	if err := storage.errors["create"]; err != nil {
@@ -707,7 +725,7 @@ type NamedCreaterRESTStorage struct {
 	createdName string
 }
 
-func (storage *NamedCreaterRESTStorage) Create(ctx request.Context, name string, obj runtime.Object) (runtime.Object, error) {
+func (storage *NamedCreaterRESTStorage) Create(ctx request.Context, name string, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	storage.createdName = name
@@ -747,6 +765,15 @@ func (storage *SimpleTypedStorage) checkContext(ctx request.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
+func bodyOrDie(response *http.Response) string {
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		panic(err)
+	}
+	return string(body)
+}
+
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
 	return extractBodyDecoder(response, object, codec)
 }
@@ -758,6 +785,16 @@ func extractBodyDecoder(response *http.Response, object runtime.Object, decoder 
 		return string(body), err
 	}
 	return string(body), runtime.DecodeInto(decoder, body, object)
+}
+
+func extractBodyObject(response *http.Response, decoder runtime.Decoder) (runtime.Object, string, error) {
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, string(body), err
+	}
+	obj, err := runtime.Decode(decoder, body)
+	return obj, string(body), err
 }
 
 func TestNotFound(t *testing.T) {
@@ -870,25 +907,23 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 		ErrCode int
 	}
 	cases := map[string]T{
-		"groupless GET object":      {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"groupless GET list":        {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
-		"groupless POST list":       {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
-		"groupless PUT object":      {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"groupless DELETE object":   {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"groupless watch list":      {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo", http.StatusNotFound},
-		"groupless watch object":    {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
-		"groupless proxy object":    {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
-		"groupless redirect object": {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/redirect/foo/bar", http.StatusNotFound},
+		"groupless GET object":    {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"groupless GET list":      {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
+		"groupless POST list":     {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
+		"groupless PUT object":    {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"groupless DELETE object": {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"groupless watch list":    {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo", http.StatusNotFound},
+		"groupless watch object":  {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
+		"groupless proxy object":  {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
 
-		"GET object":      {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"GET list":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
-		"POST list":       {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
-		"PUT object":      {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"DELETE object":   {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"watch list":      {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo", http.StatusNotFound},
-		"watch object":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
-		"proxy object":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
-		"redirect object": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/redirect/foo/bar", http.StatusNotFound},
+		"GET object":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"GET list":      {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
+		"POST list":     {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
+		"PUT object":    {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"DELETE object": {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"watch list":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo", http.StatusNotFound},
+		"watch object":  {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
+		"proxy object":  {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
 	}
 	handler := handle(map[string]rest.Storage{
 		"foo": UnimplementedRESTStorage{},
@@ -1088,7 +1123,7 @@ func TestList(t *testing.T) {
 			namespace:   testCase.namespace,
 			expectedSet: testCase.selfLink,
 		}
-		var handler = handleInternal(storage, admissionControl, selfLinker)
+		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
 		server := httptest.NewServer(handler)
 		defer server.Close()
 
@@ -1122,6 +1157,156 @@ func TestList(t *testing.T) {
 		}
 		if simpleStorage.requestedFieldSelector == nil || simpleStorage.requestedFieldSelector.String() != testCase.field {
 			t.Errorf("%d: unexpected field selector: %v", i, simpleStorage.requestedFieldSelector)
+		}
+	}
+}
+
+func TestRequestsWithInvalidQuery(t *testing.T) {
+	storage := map[string]rest.Storage{}
+
+	storage["simple"] = &SimpleRESTStorage{expectedResourceNamespace: "default"}
+	storage["withoptions"] = GetWithOptionsRESTStorage{}
+
+	var handler = handleInternal(storage, admissionControl, selfLinker, nil)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	for i, test := range []struct {
+		postfix string
+		method  string
+	}{
+		{"/simple?labelSelector=<invalid>", http.MethodGet},
+		{"/simple/foo?gracePeriodSeconds=<invalid>", http.MethodDelete},
+		// {"/simple?labelSelector=<value>", http.MethodDelete}, TODO: implement DeleteCollection in  SimpleRESTStorage
+		// {"/simple/foo?export=<invalid>", http.MethodGet}, TODO: there is no invalid bool in conversion. Should we be more strict?
+		// {"/simple/foo?resourceVersion=<invalid>", http.MethodGet}, TODO: there is no invalid resourceVersion. Should we be more strict?
+		// {"/withoptions?labelSelector=<invalid>", http.MethodGet}, TODO: SimpleGetOptions is always valid. Add more validation that can fail.
+	} {
+		baseURL := server.URL + "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default"
+		url := baseURL + test.postfix
+		r, err := http.NewRequest(test.method, url, nil)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		resp, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, url, http.StatusBadRequest, resp)
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
+			t.Logf("%d: body: %s", i, string(body))
+		}
+	}
+}
+
+func TestListCompression(t *testing.T) {
+	testCases := []struct {
+		url            string
+		namespace      string
+		selfLink       string
+		legacy         bool
+		label          string
+		field          string
+		acceptEncoding string
+	}{
+		// list items in a namespace in the path
+		{
+			url:            "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
+			namespace:      "default",
+			selfLink:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
+			acceptEncoding: "",
+		},
+		{
+			url:            "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
+			namespace:      "default",
+			selfLink:       "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/simple",
+			acceptEncoding: "gzip",
+		},
+	}
+	for i, testCase := range testCases {
+		storage := map[string]rest.Storage{}
+		simpleStorage := SimpleRESTStorage{expectedResourceNamespace: testCase.namespace}
+		storage["simple"] = &simpleStorage
+		selfLinker := &setTestSelfLinker{
+			t:           t,
+			namespace:   testCase.namespace,
+			expectedSet: testCase.selfLink,
+		}
+		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
+
+		requestContextMapper = request.NewRequestContextMapper()
+
+		handler = filters.WithCompression(handler, requestContextMapper)
+		handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
+		handler = request.WithRequestContext(handler, requestContextMapper)
+
+		server := httptest.NewServer(handler)
+
+		defer server.Close()
+
+		req, err := http.NewRequest("GET", server.URL+testCase.url, nil)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		// It's necessary to manually set Accept-Encoding here
+		// to prevent http.DefaultClient from automatically
+		// decoding responses
+		req.Header.Set("Accept-Encoding", testCase.acceptEncoding)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, testCase.url, http.StatusOK, resp)
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
+			t.Logf("%d: body: %s", i, string(body))
+			continue
+		}
+		// TODO: future, restore get links
+		if !selfLinker.called {
+			t.Errorf("%d: never set self link", i)
+		}
+		if !simpleStorage.namespacePresent {
+			t.Errorf("%d: namespace not set", i)
+		} else if simpleStorage.actualNamespace != testCase.namespace {
+			t.Errorf("%d: %q unexpected resource namespace: %s", i, testCase.url, simpleStorage.actualNamespace)
+		}
+		if simpleStorage.requestedLabelSelector == nil || simpleStorage.requestedLabelSelector.String() != testCase.label {
+			t.Errorf("%d: unexpected label selector: %v", i, simpleStorage.requestedLabelSelector)
+		}
+		if simpleStorage.requestedFieldSelector == nil || simpleStorage.requestedFieldSelector.String() != testCase.field {
+			t.Errorf("%d: unexpected field selector: %v", i, simpleStorage.requestedFieldSelector)
+		}
+
+		var decoder *json.Decoder
+		if testCase.acceptEncoding == "gzip" {
+			gzipReader, err := gzip.NewReader(resp.Body)
+			if err != nil {
+				t.Fatalf("unexpected error creating gzip reader: %v", err)
+			}
+			decoder = json.NewDecoder(gzipReader)
+		} else {
+			decoder = json.NewDecoder(resp.Body)
+		}
+		var itemOut genericapitesting.SimpleList
+		err = decoder.Decode(&itemOut)
+		if err != nil {
+			t.Errorf("failed to read response body as SimpleList: %v", err)
 		}
 	}
 }
@@ -1441,6 +1626,128 @@ func TestGet(t *testing.T) {
 	}
 }
 
+func TestGetCompression(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		item: genericapitesting.Simple{
+			Other: "foo",
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		name:        "id",
+		namespace:   "default",
+	}
+
+	requestContextMapper = request.NewRequestContextMapper()
+
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	handler = filters.WithCompression(handler, requestContextMapper)
+	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
+	handler = request.WithRequestContext(handler, requestContextMapper)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	tests := []struct {
+		acceptEncoding string
+	}{
+		{acceptEncoding: ""},
+		{acceptEncoding: "gzip"},
+	}
+
+	for _, test := range tests {
+		req, err := http.NewRequest("GET", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/id", nil)
+		if err != nil {
+			t.Fatalf("unexpected error cretaing request: %v", err)
+		}
+		// It's necessary to manually set Accept-Encoding here
+		// to prevent http.DefaultClient from automatically
+		// decoding responses
+		req.Header.Set("Accept-Encoding", test.acceptEncoding)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("unexpected response: %#v", resp)
+		}
+		var decoder *json.Decoder
+		if test.acceptEncoding == "gzip" {
+			gzipReader, err := gzip.NewReader(resp.Body)
+			if err != nil {
+				t.Fatalf("unexpected error creating gzip reader: %v", err)
+			}
+			decoder = json.NewDecoder(gzipReader)
+		} else {
+			decoder = json.NewDecoder(resp.Body)
+		}
+		var itemOut genericapitesting.Simple
+		err = decoder.Decode(&itemOut)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Errorf("unexpected error reading body: %v", err)
+		}
+
+		if itemOut.Name != simpleStorage.item.Name {
+			t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
+		}
+		if !selfLinker.called {
+			t.Errorf("Never set self link")
+		}
+	}
+}
+
+func TestGetUninitialized(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		list: []genericapitesting.Simple{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Initializers: &metav1.Initializers{
+						Pending: []metav1.Initializer{{Name: "test"}},
+					},
+				},
+				Other: "foo",
+			},
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		t:              t,
+		expectedSet:    "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		alternativeSet: sets.NewString("/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"),
+		name:           "id",
+		namespace:      "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple?includeUninitialized=true")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+	var itemOut genericapitesting.SimpleList
+	body, err := extractBody(resp, &itemOut)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(itemOut.Items) != 1 || itemOut.Items[0].Other != "foo" {
+		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
+	}
+	if !simpleStorage.requestedUninitialized {
+		t.Errorf("Didn't set correct flag")
+	}
+}
+
 func TestGetPretty(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
@@ -1520,6 +1827,221 @@ func TestGetPretty(t *testing.T) {
 		}
 		if expect != body {
 			t.Errorf("%d: body did not match expected:\n%s\n%s", i, body, expect)
+		}
+	}
+}
+
+func TestGetTable(t *testing.T) {
+	now := metav1.Now()
+	storage := map[string]rest.Storage{}
+	obj := genericapitesting.Simple{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("abcdef0123")},
+		Other:      "foo",
+	}
+	simpleStorage := SimpleRESTStorage{
+		item: obj,
+	}
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		name:        "id",
+		namespace:   "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	m, err := meta.Accessor(&obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	partial := meta.AsPartialObjectMetadata(m)
+	partial.GetObjectKind().SetGroupVersionKind(metav1alpha1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
+	encodedBody, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1alpha1.SchemeGroupVersion), partial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the codec includes a trailing newline that is not present during decode
+	encodedBody = bytes.TrimSpace(encodedBody)
+
+	metaDoc := metav1.ObjectMeta{}.SwaggerDoc()
+
+	tests := []struct {
+		accept     string
+		params     url.Values
+		pretty     bool
+		expected   *metav1alpha1.Table
+		statusCode int
+	}{
+		{
+			accept:     runtime.ContentTypeJSON + ";as=Table;v=v1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			accept: runtime.ContentTypeJSON + ";as=Table;v=v1alpha1;g=meta.k8s.io",
+			expected: &metav1alpha1.Table{
+				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
+				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
+					{Name: "Name", Type: "string", Description: metaDoc["name"]},
+					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+				},
+				Rows: []metav1alpha1.TableRow{
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+				},
+			},
+		},
+	}
+	for i, test := range tests {
+		u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		u.RawQuery = test.params.Encode()
+		req := &http.Request{Method: "GET", URL: u}
+		req.Header = http.Header{}
+		req.Header.Set("Accept", test.accept)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if test.statusCode != 0 {
+			if resp.StatusCode != test.statusCode {
+				t.Errorf("%d: unexpected response: %#v", resp)
+			}
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("%d: unexpected response: %#v", resp)
+		}
+		var itemOut metav1alpha1.Table
+		if _, err = extractBody(resp, &itemOut); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(test.expected, &itemOut) {
+			t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, &itemOut))
+		}
+	}
+}
+
+func TestGetPartialObjectMetadata(t *testing.T) {
+	now := metav1.Time{metav1.Now().Rfc3339Copy().Local()}
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		item: genericapitesting.Simple{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("abcdef0123")},
+			Other:      "foo",
+		},
+		list: []genericapitesting.Simple{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("newer")},
+				Other:      "foo",
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "ns2", CreationTimestamp: now, UID: types.UID("older")},
+				Other:      "bar",
+			},
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		t:              t,
+		expectedSet:    "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		alternativeSet: sets.NewString("/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"),
+		name:           "id",
+		namespace:      "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	tests := []struct {
+		accept     string
+		params     url.Values
+		pretty     bool
+		list       bool
+		expected   runtime.Object
+		expectKind schema.GroupVersionKind
+		statusCode int
+	}{
+		{
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			list:       true,
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1alpha1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			accept:     runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			accept: runtime.ContentTypeJSON + ";as=PartialObjectMetadata;v=v1alpha1;g=meta.k8s.io",
+			expected: &metav1alpha1.PartialObjectMetadata{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("abcdef0123")},
+			},
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadata", Group: "meta.k8s.io", Version: "v1alpha1"},
+		},
+		{
+			list:   true,
+			accept: runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1alpha1;g=meta.k8s.io",
+			expected: &metav1alpha1.PartialObjectMetadataList{
+				Items: []*metav1alpha1.PartialObjectMetadata{
+					{
+						TypeMeta:   metav1.TypeMeta{APIVersion: "meta.k8s.io/v1alpha1", Kind: "PartialObjectMetadata"},
+						ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("newer")},
+					},
+					{
+						TypeMeta:   metav1.TypeMeta{APIVersion: "meta.k8s.io/v1alpha1", Kind: "PartialObjectMetadata"},
+						ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "ns2", CreationTimestamp: now, UID: types.UID("older")},
+					},
+				},
+			},
+			expectKind: schema.GroupVersionKind{Kind: "PartialObjectMetadataList", Group: "meta.k8s.io", Version: "v1alpha1"},
+		},
+	}
+	for i, test := range tests {
+		suffix := "/namespaces/default/simple/id"
+		if test.list {
+			suffix = "/namespaces/default/simple"
+		}
+		u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + suffix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		u.RawQuery = test.params.Encode()
+		req := &http.Request{Method: "GET", URL: u}
+		req.Header = http.Header{}
+		req.Header.Set("Accept", test.accept)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if test.statusCode != 0 {
+			if resp.StatusCode != test.statusCode {
+				t.Errorf("%d: unexpected response: %#v", i, resp)
+			}
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("%d: invalid status: %#v\n%s", i, resp, bodyOrDie(resp))
+			continue
+		}
+		itemOut, body, err := extractBodyObject(resp, metainternalversion.Codecs.LegacyCodec(metav1alpha1.SchemeGroupVersion))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(test.expected, itemOut) {
+			t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, itemOut))
+		}
+		obj := &unstructured.Unstructured{}
+		if err := json.Unmarshal([]byte(body), obj); err != nil {
+			t.Fatal(err)
+		}
+		if obj.GetObjectKind().GroupVersionKind() != test.expectKind {
+			t.Errorf("%d: unexpected kind: %#v", i, obj.GetObjectKind().GroupVersionKind())
 		}
 	}
 }
@@ -1768,7 +2290,7 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 		namespace:   "foo",
 	}
 	storage["simple"] = &simpleStorage
-	handler := handleInternal(storage, admissionControl, selfLinker)
+	handler := handleInternal(storage, admissionControl, selfLinker, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -2945,12 +3467,13 @@ func TestUpdateChecksDecode(t *testing.T) {
 }
 
 type setTestSelfLinker struct {
-	t           *testing.T
-	expectedSet string
-	name        string
-	namespace   string
-	called      bool
-	err         error
+	t              *testing.T
+	expectedSet    string
+	alternativeSet sets.String
+	name           string
+	namespace      string
+	called         bool
+	err            error
 }
 
 func (s *setTestSelfLinker) Namespace(runtime.Object) (string, error) { return s.namespace, s.err }
@@ -2958,7 +3481,9 @@ func (s *setTestSelfLinker) Name(runtime.Object) (string, error)      { return s
 func (s *setTestSelfLinker) SelfLink(runtime.Object) (string, error)  { return "", s.err }
 func (s *setTestSelfLinker) SetSelfLink(obj runtime.Object, selfLink string) error {
 	if e, a := s.expectedSet, selfLink; e != a {
-		s.t.Errorf("expected '%v', got '%v'", e, a)
+		if !s.alternativeSet.Has(a) {
+			s.t.Errorf("expected '%v', got '%v'", e, a)
+		}
 	}
 	s.called = true
 	return s.err
@@ -3166,7 +3691,7 @@ func TestCreateInvokesAdmissionControl(t *testing.T) {
 		namespace:   "other",
 		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo/bar",
 	}
-	handler := handleInternal(map[string]rest.Storage{"foo": &storage}, alwaysDeny{}, selfLinker)
+	handler := handleInternal(map[string]rest.Storage{"foo": &storage}, alwaysDeny{}, selfLinker, nil)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -3248,7 +3773,7 @@ func (obj *UnregisteredAPIObject) GetObjectKind() schema.ObjectKind {
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		responsewriters.WriteObjectNegotiated(codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
+		responsewriters.WriteObjectNegotiated(request.NewContext(), codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
 	}))
 	defer server.Close()
 	// We send a 200 status code before we encode the object, so we expect OK, but there will

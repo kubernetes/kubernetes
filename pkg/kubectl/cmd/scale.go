@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -61,13 +60,11 @@ var (
 func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
-	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "job"}
+	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "job", "statefulset"}
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
-		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
-		// resize is deprecated
-		Aliases: []string{"resize"},
+		Use:     "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		Short:   i18n.T("Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"),
 		Long:    scaleLong,
 		Example: scaleExample,
@@ -96,17 +93,13 @@ func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 // RunScale executes the scaling
 func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *resource.FilenameOptions) error {
-	if len(os.Args) > 1 && os.Args[1] == "resize" {
-		printDeprecationWarning("scale", "resize")
-	}
-
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	mapper, _ := f.Object()
+	r := f.NewBuilder(true).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -115,7 +108,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		Do()
 	err = r.Err()
 	if resource.IsUsageError(err) {
-		return cmdutil.UsageError(cmd, err.Error())
+		return cmdutil.UsageErrorf(cmd, "%v", err)
 	}
 	if err != nil {
 		return err
@@ -123,7 +116,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 
 	count := cmdutil.GetFlagInt(cmd, "replicas")
 	if count < 0 {
-		return cmdutil.UsageError(cmd, "The --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
+		return cmdutil.UsageErrorf(cmd, "The --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
 	}
 
 	infos := []*resource.Info{}

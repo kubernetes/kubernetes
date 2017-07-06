@@ -23,12 +23,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	// Ensure that autoscaling/v1 package is initialized.
+	_ "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -155,6 +155,14 @@ func TestShortNames(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	expected := []string{"hpa"}
 	registrytest.AssertShortNames(t, storage, expected)
+}
+
+func TestCategories(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage, expected)
 }
 
 // TODO TestUpdateStatus

@@ -183,6 +183,15 @@ for pull in "${PULLS[@]}"; do
 done
 gitamcleanup=false
 
+# Re-generate docs (if needed)
+echo
+echo "Regenerating docs..."
+if ! hack/generate-docs.sh; then
+  echo
+  echo "hack/generate-docs.sh FAILED to complete."
+  exit 1
+fi
+
 if [[ -n "${DRY_RUN}" ]]; then
   echo "!!! Skipping git push and PR creation because you set DRY_RUN."
   echo "To return to the branch you were in when you invoked this script:"

@@ -12,19 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 0.1
-PREFIX = kubernetes
+SRCS=ep
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
+SRC_DIR = $(notdir $(shell pwd))
+export
 
-all: push
+bin:
+	../image-util.sh bin $(SRCS)
 
-ep: ep.go
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./ep.go
-
-image: ep
-	sudo docker build --pull -t $(PREFIX)/eptest:$(TAG) .
-
-push: image
-	sudo docker push $(PREFIX)/eptest:$(TAG)
-
-clean:
-	rm -f ep
+.PHONY: bin

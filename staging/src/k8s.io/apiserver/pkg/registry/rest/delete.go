@@ -39,6 +39,9 @@ type GarbageCollectionPolicy string
 const (
 	DeleteDependents GarbageCollectionPolicy = "DeleteDependents"
 	OrphanDependents GarbageCollectionPolicy = "OrphanDependents"
+	// Unsupported means that the resource knows that it cannot be GC'd, so the finalizers
+	// should never be set in storage.
+	Unsupported GarbageCollectionPolicy = "Unsupported"
 )
 
 // GarbageCollectionDeleteStrategy must be implemented by the registry that wants to

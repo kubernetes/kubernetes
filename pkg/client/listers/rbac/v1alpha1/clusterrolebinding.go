@@ -19,11 +19,11 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 )
 
 // ClusterRoleBindingLister helps list ClusterRoleBindings.

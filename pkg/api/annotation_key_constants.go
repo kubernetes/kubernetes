@@ -19,6 +19,13 @@ limitations under the License.
 package api
 
 const (
+	// ImagePolicyFailedOpenKey is added to pods created by failing open when the image policy
+	// webhook backend fails.
+	ImagePolicyFailedOpenKey string = "alpha.image-policy.k8s.io/failed-open"
+
+	// PodPresetOptOutAnnotationKey represents the annotation key for a pod to exempt itself from pod preset manipulation
+	PodPresetOptOutAnnotationKey string = "podpreset.admission.kubernetes.io/exclude"
+
 	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
 	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
 
@@ -64,11 +71,6 @@ const (
 	// an object (e.g. secret, config map) before fetching it again from apiserver.
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
-
-	// AffinityAnnotationKey represents the key of affinity data (json serialized)
-	// in the Annotations of a Pod.
-	// TODO: remove when alpha support for affinity is removed
-	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
 
 	// annotation key prefix used to identify non-convertible json paths.
 	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"

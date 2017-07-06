@@ -32,7 +32,7 @@ func NewCmdPhase(out io.Writer) *cobra.Command {
 
 	cmd.AddCommand(NewCmdKubeConfig(out))
 	cmd.AddCommand(NewCmdCerts())
-	cmd.AddCommand(NewCmdValidate())
+	cmd.AddCommand(NewCmdPreFlight())
 
 	return cmd
 }
@@ -46,8 +46,8 @@ func subCmdRunE(name string) func(*cobra.Command, []string) error {
 	return func(_ *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return fmt.Errorf("missing subcommand; %q is not meant to be run on its own", name)
-		} else {
-			return fmt.Errorf("invalid subcommand: %q", args[0])
 		}
+
+		return fmt.Errorf("invalid subcommand: %q", args[0])
 	}
 }

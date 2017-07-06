@@ -25,9 +25,9 @@ import (
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
+	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 )
 
 const (
@@ -86,10 +86,7 @@ func MilliCPUToShares(milliCPU int64) int64 {
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 	// sum requests and limits.
-	reqs, limits, err := resource.PodRequestsAndLimits(pod)
-	if err != nil {
-		return &ResourceConfig{}
-	}
+	reqs, limits := resource.PodRequestsAndLimits(pod)
 
 	cpuRequests := int64(0)
 	cpuLimits := int64(0)
@@ -121,7 +118,7 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 	}
 
 	// determine the qos class
-	qosClass := qos.GetPodQOS(pod)
+	qosClass := v1qos.GetPodQOS(pod)
 
 	// build the result
 	result := &ResourceConfig{}

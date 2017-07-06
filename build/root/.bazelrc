@@ -4,3 +4,6 @@ test --test_output=errors
 
 # Include git version info
 build --workspace_status_command hack/print-workspace-status.sh
+
+# Make /tmp hermetic
+build --sandbox_tmpfs_path=/tmp

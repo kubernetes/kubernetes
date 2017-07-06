@@ -89,7 +89,9 @@ func NewHollowKubelet(
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	kubeletapp.RunKubelet(hk.KubeletFlags, hk.KubeletConfiguration, hk.KubeletDeps, false, false)
+	if err := kubeletapp.RunKubelet(hk.KubeletFlags, hk.KubeletConfiguration, hk.KubeletDeps, false, false); err != nil {
+		glog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
+	}
 	select {}
 }
 
@@ -109,6 +111,8 @@ func GetHollowKubeletConfig(
 	// Flags struct
 	f := &options.KubeletFlags{
 		HostnameOverride: nodeName,
+		// Use the default runtime options.
+		ContainerRuntimeOptions: *options.NewContainerRuntimeOptions(),
 	}
 
 	// Config struct
@@ -135,13 +139,12 @@ func GetHollowKubeletConfig(
 	c.MaxPods = int32(maxPods)
 	c.PodsPerCore = int32(podsPerCore)
 	c.ClusterDNS = []string{}
-	c.DockerExecHandlerName = "native"
 	c.ImageGCHighThresholdPercent = 90
 	c.ImageGCLowThresholdPercent = 80
 	c.LowDiskSpaceThresholdMB = 256
 	c.VolumeStatsAggPeriod.Duration = time.Minute
 	c.CgroupRoot = ""
-	c.ContainerRuntime = "docker"
+	c.ContainerRuntime = kubetypes.DockerContainerRuntime
 	c.CPUCFSQuota = true
 	c.RuntimeCgroups = ""
 	c.EnableControllerAttachDetach = false
@@ -166,12 +169,5 @@ func GetHollowKubeletConfig(
 	c.SystemCgroups = ""
 	c.ProtectKernelDefaults = false
 
-	// TODO(mtaufen): Note that PodInfraContainerImage was being set to the empty value before,
-	//                but this may not have been intentional. (previous code (SimpleKubelet)
-	//                was peeling it off of a componentconfig.KubeletConfiguration{}, but may
-	//                have actually wanted the default).
-	//                The default will be present in the KubeletConfiguration contstructed above.
-
 	return f, c
-
 }

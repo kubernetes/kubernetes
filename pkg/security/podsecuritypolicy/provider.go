@@ -19,7 +19,6 @@ package podsecuritypolicy
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -165,7 +164,7 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 	// if we're using the non-root strategy set the marker that this container should not be
 	// run as root which will signal to the kubelet to do a final check either on the runAsUser
 	// or, if runAsUser is not set, the image UID will be checked.
-	if s.psp.Spec.RunAsUser.Rule == extensions.RunAsUserStrategyMustRunAsNonRoot {
+	if sc.RunAsNonRoot == nil && s.psp.Spec.RunAsUser.Rule == extensions.RunAsUserStrategyMustRunAsNonRoot {
 		nonRoot := true
 		sc.RunAsNonRoot = &nonRoot
 	}
@@ -195,7 +194,7 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 		return allErrs
 	}
 
-	fsGroups := []types.UnixGroupID{}
+	fsGroups := []int64{}
 	if pod.Spec.SecurityContext.FSGroup != nil {
 		fsGroups = append(fsGroups, *pod.Spec.SecurityContext.FSGroup)
 	}

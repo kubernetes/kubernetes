@@ -23,8 +23,8 @@ import (
 	"reflect"
 	"testing"
 
+	api "k8s.io/api/core/v1"
 	utiltesting "k8s.io/client-go/util/testing"
-	api "k8s.io/kubernetes/pkg/api/v1"
 )
 
 var (
@@ -167,6 +167,7 @@ func TestUtilSaveConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal("failed to open conf file: ", file)
 	}
+	defer file.Close()
 	dataRcvd := map[string]string{}
 	if err := gob.NewDecoder(file).Decode(&dataRcvd); err != nil {
 		t.Fatal(err)

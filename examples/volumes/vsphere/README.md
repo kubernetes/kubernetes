@@ -5,7 +5,9 @@
     - [Volumes](#volumes)
     - [Persistent Volumes](#persistent-volumes)
     - [Storage Class](#storage-class)
-    - [Virtual SAN policy support inside Kubernetes](#virtual-san-policy-support-inside-kubernetes)
+    - [Storage Policy Management inside kubernetes] (#storage-policy-management-inside-kubernetes)
+      - [Using existing vCenter SPBM policy] (#using-existing-vcenter-spbm-policy)
+      - [Virtual SAN policy support](#virtual-san-policy-support)
     - [Stateful Set](#stateful-set)
 
 ## Prerequisites
@@ -374,7 +376,47 @@
       pvpod       1/1     Running   0          48m
       ```
 
-### Virtual SAN policy support inside Kubernetes
+### Storage Policy Management inside kubernetes
+#### Using existing vCenter SPBM policy
+  Admins can use the existing vCenter Storage Policy Based Management (SPBM) policy to configure a persistent volume with the SPBM policy.
+
+  __Note: Here you don't need to create persistent volume it is created for you.__
+   1. Create Storage Class.
+
+      Example 1:
+
+      ```yaml
+      kind: StorageClass
+      apiVersion: storage.k8s.io/v1
+      metadata:
+        name: fast
+      provisioner: kubernetes.io/vsphere-volume
+      parameters:
+          diskformat: zeroedthick
+          storagePolicyName: gold
+      ```
+      [Download example](vsphere-volume-spbm-policy.yaml?raw=true)
+
+      The admin specifies the SPBM policy - "gold" as part of storage class definition for dynamic volume provisioning. When a PVC is created, the persistent volume will be provisioned on a compatible datastore with maximum free space that satisfies the "gold" storage policy requirements.
+
+      Example 2:
+
+      ```yaml
+      kind: StorageClass
+      apiVersion: storage.k8s.io/v1
+      metadata:
+        name: fast
+      provisioner: kubernetes.io/vsphere-volume
+      parameters:
+          diskformat: zeroedthick
+          storagePolicyName: gold
+          datastore: VSANDatastore
+      ```
+      [Download example](vsphere-volume-spbm-policy-with-datastore.yaml?raw=true)
+
+      The admin can also specify a custom datastore where he wants the volume to be provisioned along with the SPBM policy name. When a PVC is created, the vSphere Cloud Provider checks if the user specified datastore satisfies the "gold" storage policy requirements. If yes, it will provision the persistent volume on user specified datastore. If not, it will error out to the user that the user specified datastore is not compatible with "gold" storage policy requirements.
+
+#### Virtual SAN policy support
 
   Vsphere Infrastructure(VI) Admins will have the ability to specify custom Virtual SAN Storage Capabilities during dynamic volume provisioning. You can now define storage requirements, such as performance and availability, in the form of storage capabilities during dynamic volume provisioning. The storage capability requirements are converted into a Virtual SAN policy which are then pushed down to the Virtual SAN layer when a persistent volume (virtual disk) is being created. The virtual disk is distributed across the Virtual SAN datastore to meet the requirements.
 

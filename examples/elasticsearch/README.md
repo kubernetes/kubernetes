@@ -5,7 +5,7 @@ Current Elasticsearch version is `1.7.1`.
 
 [A more robust example that follows Elasticsearch best-practices of separating nodes concern is also available](production_cluster/README.md).
 
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING" width="25" height="25"> Current pod descriptors use an `emptyDir` for storing data in each data node container. This is meant to be for the sake of simplicity and [should be adapted according to your storage needs](../../docs/design/persistent-storage.md).
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING" width="25" height="25"> Current pod descriptors use an `emptyDir` for storing data in each data node container. This is meant to be for the sake of simplicity and [should be adapted according to your storage needs](https://kubernetes.io/docs/design/persistent-storage.md).
 
 ## Docker image
 
@@ -97,7 +97,7 @@ So we have a 3-node Elasticsearch cluster ready to handle more work.
 
 ## Access the service
 
-*Don't forget* that services in Kubernetes are only acessible from containers in the cluster. For different behavior you should [configure the creation of an external load-balancer](http://kubernetes.io/v1.0/docs/user-guide/services.html#type-loadbalancer). While it's supported within this example service descriptor, its usage is out of scope of this document, for now.
+*Don't forget* that services in Kubernetes are only accessible from containers in the cluster. For different behavior you should [configure the creation of an external load-balancer](http://kubernetes.io/v1.0/docs/user-guide/services.html#type-loadbalancer). While it's supported within this example service descriptor, its usage is out of scope of this document, for now.
 
 ```
 $ kubectl get service elasticsearch

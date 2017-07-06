@@ -26,3 +26,8 @@ options:
     default: "stable"
     description: |
       Snap channel to install Kubernetes master services from
+  client_password:
+    type: string
+    default: ""
+    description: |
+      Password to be used for admin user (leave empty for random password).

@@ -32,9 +32,9 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/term"
 	"k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
-	"k8s.io/kubernetes/pkg/util/term"
 )
 
 var (
@@ -47,7 +47,15 @@ var (
 
 		# Switch to raw terminal mode, sends stdin to 'bash' in ruby-container from pod 123456-7890
 		# and sends stdout/stderr from 'bash' back to the client
-		kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il`))
+		kubectl exec 123456-7890 -c ruby-container -i -t -- bash -il
+
+		# List contents of /usr from the first container of pod 123456-7890 and sort by modification time.
+		# If the command you want to execute in the pod has any flags in common (e.g. -i),
+		# you must use two dashes (--) to separate your command's flags/arguments.
+		# Also note, do not surround your command and its flags/arguments with quotes
+		# unless that is how you would execute it normally (i.e., do ls -t /usr, not "ls -t /usr").
+		kubectl exec 123456-7890 -i -t -- ls -t /usr
+		`))
 )
 
 const (
@@ -144,19 +152,19 @@ type ExecOptions struct {
 func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
 	// Let kubectl exec follow rules for `--`, see #13004 issue
 	if len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0) {
-		return cmdutil.UsageError(cmd, execUsageStr)
+		return cmdutil.UsageErrorf(cmd, execUsageStr)
 	}
 	if len(p.PodName) != 0 {
 		printDeprecationWarning("exec POD_NAME", "-p POD_NAME")
 		if len(argsIn) < 1 {
-			return cmdutil.UsageError(cmd, execUsageStr)
+			return cmdutil.UsageErrorf(cmd, execUsageStr)
 		}
 		p.Command = argsIn
 	} else {
 		p.PodName = argsIn[0]
 		p.Command = argsIn[1:]
 		if len(p.Command) < 1 {
-			return cmdutil.UsageError(cmd, execUsageStr)
+			return cmdutil.UsageErrorf(cmd, execUsageStr)
 		}
 	}
 
