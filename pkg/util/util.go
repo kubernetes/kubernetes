@@ -84,6 +84,15 @@ func FileExists(filename string) (bool, error) {
 	return true, nil
 }
 
+func FileOrSymlinkExists(filename string) (bool, error) {
+	if _, err := os.Lstat(filename); os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // ReadDirNoStat returns a string of files/directories contained
 // in dirname without calling lstat on them.
 func ReadDirNoStat(dirname string) ([]string, error) {
