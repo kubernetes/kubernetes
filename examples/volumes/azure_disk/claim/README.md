@@ -1,13 +1,13 @@
 # Kubernetes Persistent Volume Plugin For Blob and Managed Disks Samples
 
-This repo contains samples that works with the new Azure persistent volume plugin for Kubernetes. The plugin is expected to be in v1.8 release then will become part of Azure ACS 
+This repo contains samples that works with the new Azure persistent volume plugin for Kubernetes. The plugin is expected to be in v1.8 release, and then will become part of Azure ACS 
 
 
 ## What does the plugin do? 
 
 1. Provision PVC based on Azure Managed Disks and Blob Disks
 2. Perform consistent attach/detach/mount/unmount and format when needed for disks 
-3. Supports both standard and premium LRS storage accounts.
+3. Support both standard and premium storage accounts.
 
 ## Get Started
 
@@ -19,10 +19,10 @@ The sequence of events is generally
 3. Create a pod or a replication controller that uses the PVC
 
 ```
-# you can use the following command to create a storage class first
+# you can use the following example command to create a storage class first
 kubectl create -f storageclass-managed-hdd.json
 
-# you can use the following command to create a pvc, which will create an azure disk
+# you can use the following command to create a pvc, which will create an azure managed disk
 kubectl create -f pvc-on-managed-hdd.json
 
 # You can get more details about the created PVC by
@@ -53,15 +53,13 @@ The entire experience is offloaded to Azure to manage disks:storage accounts. Yo
 Blob Disks works in two modes. Controlled by #kind# parameter on the storage class. 
 
 ### Dedicated (default mode)
-When *kind* parameter is set to *dedicated* K8S will create a new dedicated storage account for this new disk. No other disks will be allowed in the this storage account. The account will removed when the PVC is removed (according to K8S PVC reclaim policy) 
-
-> You can still use existing VHDs, again the general rule apply use storage accounts that are part of cluster resource group
+When *kind* parameter is set to *dedicated* K8S will use the specified storage account or create a new dedicated storage account for this new disk. If this account is created by k8s, no other disks will be allowed in the this storage account and the created account will removed when the PVC is removed (according to K8S PVC reclaim policy) 
 
 ### The following storage parameter can be used to control the behaviour
 
-1. *skuname* or *storageaccounttype* to choose the underlying Azure storage account (default is *standard_lrs* allowed values are  *standard_lrs* and *premium_lrs*)
+1. *skuname* or *storageaccounttype* to choose the underlying Azure storage account (default is *standard_lrs* allowed values are  *standard_lrs*, *premium_lrs*, *standard_grs*, *standard_ragrs*, *standard_zrs*)
 2. *cachingmode* controls Azure caching mode when the disk is attached to a VM (default is *readwrite* allowed values are *none*, *readwrite* and *readonly*
-3. *kind* decides on disk kind (default is *shared* allowed values are *shared*, *dedicated* and *managed*)
+3. *kind* decides on disk kind (default is *dedicated* allowed values are *shared*, *dedicated* and *managed*)
 4. *fstype* the file system of this disk (default *ext4*)
 
 ### Shared
