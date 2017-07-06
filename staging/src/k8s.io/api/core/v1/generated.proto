@@ -665,6 +665,8 @@ message ContainerStatus {
   // Container's ID in the format 'docker://<container_id>'.
   // +optional
   optional string containerID = 8;
+
+  repeated Device devices = 9;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -702,6 +704,18 @@ message DeleteOptions {
   // metadata.finalizers and the resource-specific default policy.
   // +optional
   optional string propagationPolicy = 4;
+}
+
+message Device {
+  optional string kind = 1;
+
+  optional string vendor = 2;
+
+  optional string name = 3;
+
+  optional string health = 4;
+
+  map<string, string> properties = 5;
 }
 
 // Represents downward API info for projecting into a projected volume.
@@ -1698,10 +1712,18 @@ message NodeStatus {
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
 
+  // DevCapacity represents devices on a node.
+  // +optional
+  repeated Device devCapacity = 11;
+
   // Allocatable represents the resources of a node that are available for scheduling.
   // Defaults to Capacity.
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> allocatable = 2;
+
+  // DevAvailable represents the devices available for use
+  // +optional
+  repeated Device devAvailable = 12;
 
   // NodePhase is the recently observed lifecycle phase of the node.
   // More info: https://kubernetes.io/docs/concepts/nodes/node/#phase

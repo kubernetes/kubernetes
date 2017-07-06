@@ -48607,6 +48607,12 @@
       "description": "Container's ID in the format 'docker://\u003ccontainer_id\u003e'.",
       "type": "string"
      },
+     "devices": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.Device"
+      }
+     },
      "image": {
       "description": "The image the container is running. More info: https://kubernetes.io/docs/concepts/containers/images",
       "type": "string"
@@ -48648,6 +48654,35 @@
       "description": "Port number of the given endpoint.",
       "type": "integer",
       "format": "int32"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.Device": {
+    "required": [
+     "kind",
+     "vendor",
+     "name",
+     "health",
+     "properties"
+    ],
+    "properties": {
+     "health": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "properties": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "vendor": {
+      "type": "string"
      }
     }
    },
@@ -49894,6 +49929,20 @@
      "daemonEndpoints": {
       "description": "Endpoints of daemons running on the Node.",
       "$ref": "#/definitions/io.k8s.api.core.v1.NodeDaemonEndpoints"
+     },
+     "devAvailable": {
+      "description": "DevAvailable represents the devices available for use",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.Device"
+      }
+     },
+     "devCapacity": {
+      "description": "DevCapacity represents devices on a node.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.Device"
+      }
      },
      "images": {
       "description": "List of container images on this node",

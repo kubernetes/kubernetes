@@ -981,7 +981,9 @@ func (NodeSpec) SwaggerDoc() map[string]string {
 var map_NodeStatus = map[string]string{
 	"":                "NodeStatus is information about the current status of a node.",
 	"capacity":        "Capacity represents the total resources of a node. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
+	"devCapacity":     "DevCapacity represents devices on a node.",
 	"allocatable":     "Allocatable represents the resources of a node that are available for scheduling. Defaults to Capacity.",
+	"devAvailable":    "DevAvailable represents the devices available for use",
 	"phase":           "NodePhase is the recently observed lifecycle phase of the node. More info: https://kubernetes.io/docs/concepts/nodes/node/#phase The field is never populated, and now is deprecated.",
 	"conditions":      "Conditions is an array of current observed node conditions. More info: https://kubernetes.io/docs/concepts/nodes/node/#condition",
 	"addresses":       "List of addresses reachable to the node. Queried from cloud provider, if available. More info: https://kubernetes.io/docs/concepts/nodes/node/#addresses",

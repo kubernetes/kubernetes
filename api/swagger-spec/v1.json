@@ -18355,9 +18355,23 @@
       "type": "object",
       "description": "Capacity represents the total resources of a node. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity"
      },
+     "devCapacity": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Device"
+      },
+      "description": "DevCapacity represents devices on a node."
+     },
      "allocatable": {
       "type": "object",
       "description": "Allocatable represents the resources of a node that are available for scheduling. Defaults to Capacity."
+     },
+     "devAvailable": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Device"
+      },
+      "description": "DevAvailable represents the devices available for use"
      },
      "phase": {
       "type": "string",
@@ -18405,6 +18419,33 @@
        "$ref": "v1.AttachedVolume"
       },
       "description": "List of volumes that are attached to the node."
+     }
+    }
+   },
+   "v1.Device": {
+    "id": "v1.Device",
+    "required": [
+     "kind",
+     "vendor",
+     "name",
+     "health",
+     "properties"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string"
+     },
+     "vendor": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "health": {
+      "type": "string"
+     },
+     "properties": {
+      "type": "object"
      }
     }
    },
@@ -21090,6 +21131,12 @@
      "containerID": {
       "type": "string",
       "description": "Container's ID in the format 'docker://\u003ccontainer_id\u003e'."
+     },
+     "devices": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Device"
+      }
      }
     }
    },
