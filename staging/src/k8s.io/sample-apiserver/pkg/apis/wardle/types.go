@@ -53,7 +53,6 @@ type Fischer struct {
 	DisallowedFlunders []string
 }
 
-// +genclient=true
 // +nonNamespaced=true
 
 // FischerList is a list of Fischer objects.
