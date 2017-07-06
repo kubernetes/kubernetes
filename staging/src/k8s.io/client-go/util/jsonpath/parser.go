@@ -17,6 +17,7 @@ limitations under the License.
 package jsonpath
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -41,6 +42,8 @@ type Parser struct {
 	start int
 	width int
 }
+
+var ErrSyntax = errors.New("invalid syntax")
 
 // Parse parsed the given text and return a node Parser.
 // If an error is encountered, parsing stops and an empty
@@ -159,8 +162,8 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 		p.consumeText()
 	case r == '[':
 		return p.parseArray(cur)
-	case r == '"':
-		return p.parseQuote(cur)
+	case r == '"' || r == '\'':
+		return p.parseQuote(cur, r)
 	case r == '.':
 		return p.parseField(cur)
 	case r == '+' || r == '-' || unicode.IsDigit(r):
@@ -334,13 +337,33 @@ Loop:
 func (p *Parser) parseFilter(cur *ListNode) error {
 	p.pos += len("[?(")
 	p.consumeText()
+	begin := false
+	end := false
+	var pair rune
+
 Loop:
 	for {
-		switch p.next() {
+		r := p.next()
+		switch r {
 		case eof, '\n':
 			return fmt.Errorf("unterminated filter")
+		case '"', '\'':
+			if begin == false {
+				//save the paired rune
+				begin = true
+				pair = r
+				continue
+			}
+			//only add when met paired rune
+			if p.input[p.pos-2] != '\\' && r == pair {
+				end = true
+			}
 		case ')':
-			break Loop
+			//in rightParser below quotes only appear zero or once
+			//and must be paired at the beginning and end
+			if begin == end {
+				break Loop
+			}
 		}
 	}
 	if p.next() != ']' {
@@ -370,19 +393,22 @@ Loop:
 	return p.parseInsideAction(cur)
 }
 
-// parseQuote unquotes string inside double quote
-func (p *Parser) parseQuote(cur *ListNode) error {
+// parseQuote unquotes string inside double or single quote
+func (p *Parser) parseQuote(cur *ListNode, end rune) error {
 Loop:
 	for {
 		switch p.next() {
 		case eof, '\n':
 			return fmt.Errorf("unterminated quoted string")
-		case '"':
-			break Loop
+		case end:
+			//if it's not escape break the Loop
+			if p.input[p.pos-2] != '\\' {
+				break Loop
+			}
 		}
 	}
 	value := p.consumeText()
-	s, err := strconv.Unquote(value)
+	s, err := UnquoteExtend(value)
 	if err != nil {
 		return fmt.Errorf("unquote string %s error %v", value, err)
 	}
@@ -446,4 +472,52 @@ func isAlphaNumeric(r rune) bool {
 // isBool reports whether s is a boolean value.
 func isBool(s string) bool {
 	return s == "true" || s == "false"
+}
+
+//UnquoteExtend is almost same as strconv.Unquote(), but it support parse single quotes as a string
+func UnquoteExtend(s string) (string, error) {
+	n := len(s)
+	if n < 2 {
+		return "", ErrSyntax
+	}
+	quote := s[0]
+	if quote != s[n-1] {
+		return "", ErrSyntax
+	}
+	s = s[1 : n-1]
+
+	if quote != '"' && quote != '\'' {
+		return "", ErrSyntax
+	}
+
+	// Is it trivial?  Avoid allocation.
+	if !contains(s, '\\') && !contains(s, quote) {
+		return s, nil
+	}
+
+	var runeTmp [utf8.UTFMax]byte
+	buf := make([]byte, 0, 3*len(s)/2) // Try to avoid more allocations.
+	for len(s) > 0 {
+		c, multibyte, ss, err := strconv.UnquoteChar(s, quote)
+		if err != nil {
+			return "", err
+		}
+		s = ss
+		if c < utf8.RuneSelf || !multibyte {
+			buf = append(buf, byte(c))
+		} else {
+			n := utf8.EncodeRune(runeTmp[:], c)
+			buf = append(buf, runeTmp[:n]...)
+		}
+	}
+	return string(buf), nil
+}
+
+func contains(s string, c byte) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] == c {
+			return true
+		}
+	}
+	return false
 }
