@@ -552,7 +552,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 			glog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), err)
 		}
 		if podContainerChanges.SandboxID != "" {
-			m.recorder.Eventf(ref, v1.EventTypeNormal, "SandboxChanged", "Pod sandbox changed, it will be killed and re-created.")
+			m.recorder.Eventf(ref, v1.EventTypeNormal, events.SandboxChanged, "Pod sandbox changed, it will be killed and re-created.")
 		} else {
 			glog.V(4).Infof("SyncPod received new pod %q, will create a new sandbox for it", format.Pod(pod))
 		}
