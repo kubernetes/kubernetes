@@ -19,9 +19,12 @@ package filters
 import (
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
@@ -94,6 +97,7 @@ func WithMaxInFlightLimit(
 				defer func() { <-c }()
 				handler.ServeHTTP(w, r)
 			default:
+				metrics.MonitorRequest(r, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", errors.StatusTooManyRequests, time.Now())
 				tooManyRequests(r, w)
 			}
 		}
