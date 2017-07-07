@@ -271,7 +271,7 @@ func (i *Init) Run(out io.Writer) error {
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
 		fmt.Println("[self-hosted] Creating self-hosted control plane...")
-		if err := selfhostingphase.CreateSelfHostedControlPlane(client); err != nil {
+		if err := selfhostingphase.CreateSelfHostedControlPlane(i.cfg, client); err != nil {
 			return err
 		}
 	}
