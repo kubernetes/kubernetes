@@ -272,7 +272,7 @@ func TestProcessEvent(t *testing.T) {
 	var testScenarios = []struct {
 		name string
 		// a series of events that will be supplied to the
-		// GraphBuilder.eventQueue.
+		// GraphBuilder.graphChanges.
 		events []event
 	}{
 		{

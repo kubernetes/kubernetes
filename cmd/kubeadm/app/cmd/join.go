@@ -113,6 +113,9 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		&cfg.DiscoveryToken, "discovery-token", "",
 		"A token used to validate cluster information fetched from the master")
 	cmd.PersistentFlags().StringVar(
+		&cfg.NodeName, "node-name", "",
+		"Specify the node name")
+	cmd.PersistentFlags().StringVar(
 		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
 		"A token used for TLS bootstrapping")
 	cmd.PersistentFlags().StringVar(
@@ -175,9 +178,12 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		return err
+	hostname := j.cfg.NodeName
+	if hostname == "" {
+		hostname, err = os.Hostname()
+		if err != nil {
+			return err
+		}
 	}
 	client, err := kubeconfigutil.KubeConfigToClientSet(cfg)
 	if err != nil {

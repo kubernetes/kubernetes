@@ -19,8 +19,6 @@ package app
 
 import (
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -37,7 +35,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/api/core/v1"
 	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -457,7 +454,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				if err != nil {
 					return err
 				}
-				clientCertificateManager, err = initializeClientCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData, clientConfig.CertFile, clientConfig.KeyFile)
+				clientCertificateManager, err = certificate.NewKubeletClientCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData, clientConfig.CertFile, clientConfig.KeyFile)
 				if err != nil {
 					return err
 				}
@@ -658,52 +655,6 @@ func updateTransport(clientConfig *restclient.Config, clientCertificateManager c
 	clientConfig.CAData = nil
 	clientConfig.CAFile = ""
 	return nil
-}
-
-// initializeClientCertificateManager sets up a certificate manager without a
-// client that can be used to sign new certificates (or rotate). It answers with
-// whatever certificate it is initialized with. If a CSR client is set later, it
-// may begin rotating/renewing the client cert
-func initializeClientCertificateManager(certDirectory string, nodeName types.NodeName, certData []byte, keyData []byte, certFile string, keyFile string) (certificate.Manager, error) {
-	certificateStore, err := certificate.NewFileStore(
-		"kubelet-client",
-		certDirectory,
-		certDirectory,
-		certFile,
-		keyFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize certificate store: %v", err)
-	}
-	clientCertificateManager, err := certificate.NewManager(&certificate.Config{
-		Template: &x509.CertificateRequest{
-			Subject: pkix.Name{
-				Organization: []string{"system:nodes"},
-				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
-			},
-		},
-		Usages: []certificates.KeyUsage{
-			// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
-			//
-			// DigitalSignature allows the certificate to be used to verify
-			// digital signatures including signatures used during TLS
-			// negotiation.
-			certificates.UsageDigitalSignature,
-			// KeyEncipherment allows the cert/key pair to be used to encrypt
-			// keys, including the symetric keys negotiated during TLS setup
-			// and used for data transfer..
-			certificates.UsageKeyEncipherment,
-			// ClientAuth allows the cert to be used by a TLS client to
-			// authenticate itself to the TLS server.
-			certificates.UsageClientAuth,
-		},
-		CertificateStore:        certificateStore,
-		BootstrapCertificatePEM: certData,
-		BootstrapKeyPEM:         keyData,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
-	}
-	return clientCertificateManager, nil
 }
 
 // getNodeName returns the node name according to the cloud provider

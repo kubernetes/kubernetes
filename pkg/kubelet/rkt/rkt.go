@@ -38,7 +38,6 @@ import (
 	appctypes "github.com/appc/spec/schema/types"
 	"github.com/coreos/go-systemd/unit"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
-	"github.com/docker/docker/pkg/term"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -66,6 +65,7 @@ import (
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/pkg/util/term"
 )
 
 const (
@@ -2199,7 +2199,7 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 		defer stdout.Close()
 
 		kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
-			term.SetWinsize(p.Fd(), &term.Winsize{Height: size.Height, Width: size.Width})
+			term.SetSize(p.Fd(), size)
 		})
 
 		if stdin != nil {

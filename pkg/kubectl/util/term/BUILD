@@ -13,7 +13,6 @@ go_library(
     srcs = [
         "resize.go",
         "resizeevents.go",
-        "setsize.go",
         "term.go",
         "term_writer.go",
     ],

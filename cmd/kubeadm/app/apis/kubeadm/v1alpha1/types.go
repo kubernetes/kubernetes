@@ -85,6 +85,7 @@ type NodeConfiguration struct {
 	DiscoveryFile            string   `json:"discoveryFile"`
 	DiscoveryToken           string   `json:"discoveryToken"`
 	DiscoveryTokenAPIServers []string `json:"discoveryTokenAPIServers"`
+	NodeName                 string   `json:"nodeName"`
 	TLSBootstrapToken        string   `json:"tlsBootstrapToken"`
 	Token                    string   `json:"token"`
 }

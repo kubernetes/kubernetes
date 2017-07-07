@@ -137,8 +137,6 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(gc.runAttemptToOrphanWorker, 1*time.Second, stopCh)
 	}
 
-	Register()
-
 	<-stopCh
 }
 

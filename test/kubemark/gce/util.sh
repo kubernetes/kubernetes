@@ -14,34 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../..
+
+source "${KUBE_ROOT}/test/kubemark/common/util.sh"
+
 # Wrapper for gcloud compute, running it $RETRIES times in case of failures.
 # Args:
 # $@: all stuff that goes after 'gcloud compute'
 function run-gcloud-compute-with-retries {
-  RETRIES="${RETRIES:-3}"
-  for attempt in $(seq 1 ${RETRIES}); do
-    exec 5>&1  # Duplicate &1 to &5 for use below.
-    # We don't use 'local' to declare gcloud_result as then ret_val always gets value 0.
-    # We use tee to output to &5 (redirected to stdout) while also storing it in the variable.
-    gcloud_result=$(gcloud compute "$@" 2>&1 | tee >(cat - >&5)) || local ret_val="$?"
-    if [[ "${ret_val:-0}" -ne "0" ]]; then
-      if [[ $(echo "${gcloud_result}" | grep -c "already exists") -gt 0 ]]; then
-        if [[ "${attempt}" == 1 ]]; then
-          echo -e "${color_red}Failed to $1 $2 $3 as the resource hasn't been deleted from a previous run.${color_norm}" >& 2
-          exit 1
-        fi
-        echo -e "${color_yellow}Succeeded to $1 $2 $3 in the previous attempt, but status response wasn't received.${color_norm}"
-        return 0
-      fi
-      echo -e "${color_yellow}Attempt $attempt failed to $1 $2 $3. Retrying.${color_norm}" >& 2
-      sleep $(($attempt * 5))
-    else
-      echo -e "${color_green}Succeeded to gcloud compute $1 $2 $3.${color_norm}"
-      return 0
-    fi
-  done
-  echo -e "${color_red}Failed to $1 $2 $3.${color_norm}" >& 2
-  exit 1
+  run-cmd-with-retries gcloud compute "$@"
 }
 
 function create-master-instance-with-resources {
