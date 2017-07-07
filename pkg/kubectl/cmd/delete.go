@@ -241,7 +241,7 @@ func (o *DeleteOptions) RunDelete() error {
 	if o.Cascade {
 		return ReapResult(o.Result, o.f, o.Out, true, o.IgnoreNotFound, o.Timeout, o.GracePeriod, o.WaitForDeletion, shortOutput, o.Mapper, false)
 	}
-	return DeleteResult(o.Result, o.Out, o.IgnoreNotFound, shortOutput, o.Mapper)
+	return DeleteResult(o.Result, o.Out, o.IgnoreNotFound, o.GracePeriod, shortOutput, o.Mapper)
 }
 
 func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int, waitForDeletion, shortOutput bool, mapper meta.RESTMapper, quiet bool) error {
@@ -289,7 +289,7 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 	return nil
 }
 
-func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortOutput bool, mapper meta.RESTMapper) error {
+func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, gracePeriod int, shortOutput bool, mapper meta.RESTMapper) error {
 	found := 0
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
@@ -302,7 +302,12 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 
 		// if we're here, it means that cascade=false (not the default), so we should orphan as requested
 		orphan := true
-		return deleteResource(info, out, shortOutput, mapper, &metav1.DeleteOptions{OrphanDependents: &orphan})
+		options := &metav1.DeleteOptions{}
+		if gracePeriod >= 0 {
+			options = metav1.NewDeleteOptions(int64(gracePeriod))
+		}
+		options.OrphanDependents = &orphan
+		return deleteResource(info, out, shortOutput, mapper, options)
 	})
 	if err != nil {
 		return err
