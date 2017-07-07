@@ -800,6 +800,8 @@ func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, 
 	// Override kubeconfig qps/burst settings from flags
 	clientConfig.QPS = float32(s.KubeAPIQPS)
 	clientConfig.Burst = int(s.KubeAPIBurst)
+	// TODO: soak this for now, probably should be a flag
+	clientConfig.Timeout = 60 * time.Second
 
 	addChaosToClientConfig(s, clientConfig)
 	return clientConfig, nil
