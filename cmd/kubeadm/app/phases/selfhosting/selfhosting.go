@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
@@ -53,7 +54,15 @@ const (
 // 7. The self-hosted containers should now step up and take over.
 // 8. In order to avoid race conditions, we're still making sure the API /healthz endpoint is healthy
 // 9. Do that for the kube-apiserver, kube-controller-manager and kube-scheduler in a loop
-func CreateSelfHostedControlPlane(client *clientset.Clientset) error {
+func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
+
+	if err := createTLSSecrets(cfg, client); err != nil {
+		return err
+	}
+
+	if err := createOpaqueSecrets(cfg, client); err != nil {
+		return err
+	}
 
 	// The sequence here isn't set in stone, but seems to work well to start with the API server
 	components := []string{kubeAPIServer, kubeControllerManager, kubeScheduler}
@@ -69,7 +78,7 @@ func CreateSelfHostedControlPlane(client *clientset.Clientset) error {
 		}
 
 		// Build a DaemonSet object from the loaded PodSpec
-		ds := buildDaemonSet(componentName, podSpec)
+		ds := buildDaemonSet(cfg, componentName, podSpec)
 
 		// Create the DaemonSet in the API Server
 		if _, err := client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Create(ds); err != nil {
@@ -100,9 +109,9 @@ func CreateSelfHostedControlPlane(client *clientset.Clientset) error {
 }
 
 // buildDaemonSet is responsible for mutating the PodSpec and return a DaemonSet which is suitable for the self-hosting purporse
-func buildDaemonSet(name string, podSpec *v1.PodSpec) *extensions.DaemonSet {
+func buildDaemonSet(cfg *kubeadmapi.MasterConfiguration, name string, podSpec *v1.PodSpec) *extensions.DaemonSet {
 	// Mutate the PodSpec so it's suitable for self-hosting
-	mutatePodSpec(name, podSpec)
+	mutatePodSpec(cfg, name, podSpec)
 
 	// Return a DaemonSet based on that Spec
 	return &extensions.DaemonSet{

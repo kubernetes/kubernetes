@@ -18,38 +18,42 @@ package selfhosting
 
 import (
 	"k8s.io/api/core/v1"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // mutatePodSpec makes a Static Pod-hosted PodSpec suitable for self-hosting
-func mutatePodSpec(name string, podSpec *v1.PodSpec) {
-	mutators := map[string][]func(*v1.PodSpec){
+func mutatePodSpec(cfg *kubeadmapi.MasterConfiguration, name string, podSpec *v1.PodSpec) {
+	mutators := map[string][]func(*kubeadmapi.MasterConfiguration, *v1.PodSpec){
 		kubeAPIServer: {
 			addNodeSelectorToPodSpec,
 			setMasterTolerationOnPodSpec,
 			setRightDNSPolicyOnPodSpec,
+			setVolumesOnKubeAPIServerPodSpec,
 		},
 		kubeControllerManager: {
 			addNodeSelectorToPodSpec,
 			setMasterTolerationOnPodSpec,
 			setRightDNSPolicyOnPodSpec,
+			setVolumesOnKubeControllerManagerPodSpec,
 		},
 		kubeScheduler: {
 			addNodeSelectorToPodSpec,
 			setMasterTolerationOnPodSpec,
 			setRightDNSPolicyOnPodSpec,
+			setVolumesOnKubeSchedulerPodSpec,
 		},
 	}
 
 	// Get the mutator functions for the component in question, then loop through and execute them
 	mutatorsForComponent := mutators[name]
 	for _, mutateFunc := range mutatorsForComponent {
-		mutateFunc(podSpec)
+		mutateFunc(cfg, podSpec)
 	}
 }
 
 // addNodeSelectorToPodSpec makes Pod require to be scheduled on a node marked with the master label
-func addNodeSelectorToPodSpec(podSpec *v1.PodSpec) {
+func addNodeSelectorToPodSpec(cfg *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
 	if podSpec.NodeSelector == nil {
 		podSpec.NodeSelector = map[string]string{kubeadmconstants.LabelNodeRoleMaster: ""}
 		return
@@ -59,7 +63,7 @@ func addNodeSelectorToPodSpec(podSpec *v1.PodSpec) {
 }
 
 // setMasterTolerationOnPodSpec makes the Pod tolerate the master taint
-func setMasterTolerationOnPodSpec(podSpec *v1.PodSpec) {
+func setMasterTolerationOnPodSpec(cfg *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
 	if podSpec.Tolerations == nil {
 		podSpec.Tolerations = []v1.Toleration{kubeadmconstants.MasterToleration}
 		return
@@ -69,6 +73,38 @@ func setMasterTolerationOnPodSpec(podSpec *v1.PodSpec) {
 }
 
 // setRightDNSPolicyOnPodSpec makes sure the self-hosted components can look up things via kube-dns if necessary
-func setRightDNSPolicyOnPodSpec(podSpec *v1.PodSpec) {
+func setRightDNSPolicyOnPodSpec(cfg *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
 	podSpec.DNSPolicy = v1.DNSClusterFirstWithHostNet
+}
+
+// setVolumesOnKubeAPIServerPodSpec makes sure the self-hosted api server has the required files
+func setVolumesOnKubeAPIServerPodSpec(cfg *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
+	setK8sVolume(apiServerProjectedVolume, cfg, podSpec)
+	for _, c := range podSpec.Containers {
+		c.VolumeMounts = append(c.VolumeMounts, k8sSelfHostedVolumeMount())
+	}
+}
+
+// setVolumesOnKubeControllerManagerPodSpec makes sure the self-hosted controller manager has the required files
+func setVolumesOnKubeControllerManagerPodSpec(cfg *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
+	setK8sVolume(controllerManagerProjectedVolume, cfg, podSpec)
+	for _, c := range podSpec.Containers {
+		c.VolumeMounts = append(c.VolumeMounts, k8sSelfHostedVolumeMount())
+	}
+}
+
+// setVolumesOnKubeSchedulerPodSpec makes sure the self-hosted scheduler has the required files
+func setVolumesOnKubeSchedulerPodSpec(cfg *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
+	setK8sVolume(schedulerProjectedVolume, cfg, podSpec)
+	for _, c := range podSpec.Containers {
+		c.VolumeMounts = append(c.VolumeMounts, k8sSelfHostedVolumeMount())
+	}
+}
+
+func setK8sVolume(cb func(cfg *kubeadmapi.MasterConfiguration) v1.Volume, cfg *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
+	for i, v := range podSpec.Volumes {
+		if v.Name == "k8s" {
+			podSpec.Volumes[i] = cb(cfg)
+		}
+	}
 }

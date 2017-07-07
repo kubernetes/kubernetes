@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/ghodss/yaml"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 const (
@@ -90,9 +91,49 @@ spec:
       name: pki
   hostNetwork: true
   volumes:
-  - hostPath:
-      path: /etc/kubernetes
-    name: k8s
+  - name: k8s
+    projected:
+      sources:
+      - secret:
+          items:
+          - key: tls.crt
+            path: ca.crt
+          - key: tls.key
+            path: ca.key
+          name: ca
+      - secret:
+          items:
+          - key: tls.crt
+            path: apiserver.crt
+          - key: tls.key
+            path: apiserver.key
+          name: apiserver
+      - secret:
+          items:
+          - key: tls.crt
+            path: apiserver-kubelet-client.crt
+          - key: tls.key
+            path: apiserver-kubelet-client.key
+          name: apiserver-kubelet-client
+      - secret:
+          items:
+          - key: tls.crt
+            path: sa.pub
+          - key: tls.key
+            path: sa.key
+          name: sa
+      - secret:
+          items:
+          - key: tls.crt
+            path: front-proxy-ca.crt
+          name: front-proxy-ca
+      - secret:
+          items:
+          - key: tls.crt
+            path: front-proxy-client.crt
+          - key: tls.key
+            path: front-proxy-client.key
+          name: front-proxy-client
   - hostPath:
       path: /etc/ssl/certs
     name: certs
@@ -171,9 +212,49 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
       volumes:
-      - hostPath:
-          path: /etc/kubernetes
-        name: k8s
+      - name: k8s
+        projected:
+          sources:
+          - secret:
+              items:
+              - key: tls.crt
+                path: ca.crt
+              - key: tls.key
+                path: ca.key
+              name: ca
+          - secret:
+              items:
+              - key: tls.crt
+                path: apiserver.crt
+              - key: tls.key
+                path: apiserver.key
+              name: apiserver
+          - secret:
+              items:
+              - key: tls.crt
+                path: apiserver-kubelet-client.crt
+              - key: tls.key
+                path: apiserver-kubelet-client.key
+              name: apiserver-kubelet-client
+          - secret:
+              items:
+              - key: tls.crt
+                path: sa.pub
+              - key: tls.key
+                path: sa.key
+              name: sa
+          - secret:
+              items:
+              - key: tls.crt
+                path: front-proxy-ca.crt
+              name: front-proxy-ca
+          - secret:
+              items:
+              - key: tls.crt
+                path: front-proxy-client.crt
+              - key: tls.key
+                path: front-proxy-client.key
+              name: front-proxy-client
       - hostPath:
           path: /etc/ssl/certs
         name: certs
@@ -237,9 +318,23 @@ spec:
       name: pki
   hostNetwork: true
   volumes:
-  - hostPath:
-      path: /etc/kubernetes
-    name: k8s
+  - name: k8s
+    projected:
+      sources:
+      - secret:
+          name: controller-manager.conf
+      - secret:
+          items:
+          - key: tls.crt
+            path: ca.crt
+          - key: tls.key
+            path: ca.key
+          name: ca
+      - secret:
+          items:
+          - key: tls.key
+            path: sa.key
+          name: sa
   - hostPath:
       path: /etc/ssl/certs
     name: certs
@@ -304,9 +399,23 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
       volumes:
-      - hostPath:
-          path: /etc/kubernetes
-        name: k8s
+      - name: k8s
+        projected:
+          sources:
+          - secret:
+              name: controller-manager.conf
+          - secret:
+              items:
+              - key: tls.crt
+                path: ca.crt
+              - key: tls.key
+                path: ca.key
+              name: ca
+          - secret:
+              items:
+              - key: tls.key
+                path: sa.key
+              name: sa
       - hostPath:
           path: /etc/ssl/certs
         name: certs
@@ -360,9 +469,11 @@ spec:
       readOnly: true
   hostNetwork: true
   volumes:
-  - hostPath:
-      path: /etc/kubernetes
-    name: k8s
+  - name: k8s
+    projected:
+      sources:
+      - secret:
+          name: scheduler.conf
 status: {}
 `
 
@@ -411,9 +522,11 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
       volumes:
-      - hostPath:
-          path: /etc/kubernetes
-        name: k8s
+      - name: k8s
+        projected:
+          sources:
+          - secret:
+              name: scheduler.conf
   updateStrategy: {}
 status:
   currentNumberScheduled: 0
@@ -455,7 +568,8 @@ func TestBuildDaemonSet(t *testing.T) {
 			t.Fatalf("couldn't load the specified Pod")
 		}
 
-		ds := buildDaemonSet(rt.component, podSpec)
+		cfg := &kubeadmapi.MasterConfiguration{}
+		ds := buildDaemonSet(cfg, rt.component, podSpec)
 		dsBytes, err := yaml.Marshal(ds)
 		if err != nil {
 			t.Fatalf("failed to marshal daemonset to YAML: %v", err)
