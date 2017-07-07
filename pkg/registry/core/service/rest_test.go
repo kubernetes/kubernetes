@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -1359,6 +1360,12 @@ func TestInitClusterIP(t *testing.T) {
 		if test.name == "Allocate specified ClusterIP" && test.svc.Spec.ClusterIP != "1.2.3.4" {
 			t.Errorf("%q: expected ClusterIP %q, but got %q", test.name, "1.2.3.4", test.svc.Spec.ClusterIP)
 		}
+
+		if hasAllocatedIP {
+			if helper.IsServiceIPSet(test.svc) {
+				storage.serviceIPs.Release(net.ParseIP(test.svc.Spec.ClusterIP))
+			}
+		}
 	}
 }
 
@@ -1524,7 +1531,6 @@ func TestInitNodePorts(t *testing.T) {
 			t.Errorf("%q: unexpected error: %v", test.name, err)
 			continue
 		}
-		_ = nodePortOp.Commit()
 
 		serviceNodePorts := CollectServiceNodePorts(test.service)
 
@@ -1705,7 +1711,6 @@ func TestUpdateNodePorts(t *testing.T) {
 			t.Errorf("%q: unexpected error: %v", test.name, err)
 			continue
 		}
-		_ = nodePortOp.Commit()
 
 		serviceNodePorts := CollectServiceNodePorts(test.newService)
 
