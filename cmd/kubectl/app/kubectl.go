@@ -23,7 +23,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/logs"
+	"k8s.io/kubernetes/pkg/kubectl/util/logs"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 )
 
