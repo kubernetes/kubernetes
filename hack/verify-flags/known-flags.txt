@@ -483,6 +483,7 @@ mesos-launch-grace-period
 mesos-master
 mesos-sandbox-overlay
 mesos-user
+metrics-bind-address
 metrics-path
 min-available
 minimum-container-ttl-duration
