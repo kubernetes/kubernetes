@@ -22,7 +22,7 @@ ENV KUBE_DYNAMIC_CROSSPLATFORMS \
   armhf \
   arm64 \
   s390x \
-  ppc64el
+  ppc64le
 
 ENV KUBE_CROSSPLATFORMS \
   linux/386 \
