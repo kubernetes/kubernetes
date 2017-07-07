@@ -81,24 +81,24 @@ var (
 func makeResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA, storage int64) v1.NodeResources {
 	return v1.NodeResources{
 		Capacity: v1.ResourceList{
-			v1.ResourceCPU:       *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-			v1.ResourceMemory:    *resource.NewQuantity(memory, resource.BinarySI),
-			v1.ResourcePods:      *resource.NewQuantity(pods, resource.DecimalSI),
-			v1.ResourceNvidiaGPU: *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
-			opaqueResourceA:      *resource.NewQuantity(opaqueA, resource.DecimalSI),
-			v1.ResourceStorage:   *resource.NewQuantity(storage, resource.BinarySI),
+			v1.ResourceCPU:            *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+			v1.ResourceMemory:         *resource.NewQuantity(memory, resource.BinarySI),
+			v1.ResourcePods:           *resource.NewQuantity(pods, resource.DecimalSI),
+			v1.ResourceNvidiaGPU:      *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
+			opaqueResourceA:           *resource.NewQuantity(opaqueA, resource.DecimalSI),
+			v1.ResourceStorageScratch: *resource.NewQuantity(storage, resource.BinarySI),
 		},
 	}
 }
 
 func makeAllocatableResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA, storage int64) v1.ResourceList {
 	return v1.ResourceList{
-		v1.ResourceCPU:       *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-		v1.ResourceMemory:    *resource.NewQuantity(memory, resource.BinarySI),
-		v1.ResourcePods:      *resource.NewQuantity(pods, resource.DecimalSI),
-		v1.ResourceNvidiaGPU: *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
-		opaqueResourceA:      *resource.NewQuantity(opaqueA, resource.DecimalSI),
-		v1.ResourceStorage:   *resource.NewQuantity(storage, resource.BinarySI),
+		v1.ResourceCPU:            *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+		v1.ResourceMemory:         *resource.NewQuantity(memory, resource.BinarySI),
+		v1.ResourcePods:           *resource.NewQuantity(pods, resource.DecimalSI),
+		v1.ResourceNvidiaGPU:      *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
+		opaqueResourceA:           *resource.NewQuantity(opaqueA, resource.DecimalSI),
+		v1.ResourceStorageScratch: *resource.NewQuantity(storage, resource.BinarySI),
 	}
 }
 
