@@ -38,6 +38,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	unversionedextensions "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	appslisters "k8s.io/client-go/listers/apps/v1beta1"
@@ -864,7 +865,7 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 		return nil
 	}
 
-	clone, err := api.Scheme.DeepCopy(ds)
+	clone, err := scheme.Scheme.DeepCopy(ds)
 	if err != nil {
 		return err
 	}

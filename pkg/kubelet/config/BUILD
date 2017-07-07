@@ -24,6 +24,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
+        "//pkg/api/install:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/api/validation:go_default_library",

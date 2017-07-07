@@ -51,6 +51,8 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//pkg/api/install:go_default_library",
+        "//pkg/apis/batch/install:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",
         "//vendor/k8s.io/api/batch/v2alpha1:go_default_library",
