@@ -115,10 +115,15 @@ func New(address string, port uint, runtime string, rootPath string) (Interface,
 	if err != nil {
 		return nil, err
 	}
+	err = cadvisorClient.Start()
+	if err != nil {
+		return nil, err
+	}
 	return cadvisorClient, nil
 }
 
 func (cc *cadvisorClient) Start() error {
+	glog.Infoln("starting cadvisor manager ...")
 	return cc.Manager.Start()
 }
 
