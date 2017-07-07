@@ -64,8 +64,6 @@ type TestPatchSubType struct {
 	StringField string `json:"theField"`
 }
 
-func (obj *testPatchType) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
-
 func TestPatchAnonymousField(t *testing.T) {
 	testGV := schema.GroupVersion{Group: "", Version: "v"}
 	scheme.AddKnownTypes(testGV, &testPatchType{})

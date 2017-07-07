@@ -441,15 +441,10 @@ func TestAddKnownTypesIdemPotent(t *testing.T) {
 	}
 }
 
-// EmbeddableTypeMeta passes GetObjectKind to the type which embeds it.
-type EmbeddableTypeMeta runtime.TypeMeta
-
-func (tm *EmbeddableTypeMeta) GetObjectKind() schema.ObjectKind { return (*runtime.TypeMeta)(tm) }
-
 // redefine InternalSimple with the same name, but obviously as a different type than in runtimetesting
 type InternalSimple struct {
-	EmbeddableTypeMeta `json:",inline"`
-	TestString         string `json:"testString"`
+	runtime.TypeMeta `json:",inline"`
+	TestString       string `json:"testString"`
 }
 
 func (s *InternalSimple) DeepCopyObject() runtime.Object { return nil }
