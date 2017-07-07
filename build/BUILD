@@ -131,7 +131,6 @@ filegroup(
     name = "test-targets",
     srcs = [
         "//cmd/gendocs",
-        "//cmd/genkubedocs",
         "//cmd/genman",
         "//cmd/genswaggertypedocs",
         "//cmd/genyaml",
