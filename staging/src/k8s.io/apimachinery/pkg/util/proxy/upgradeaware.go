@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package rest
+package proxy
 
 import (
 	"context"
@@ -32,16 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/apiserver/pkg/util/proxy"
 
 	"github.com/golang/glog"
 	"github.com/mxk/go-flowrate/flowrate"
 )
 
-// UpgradeAwareProxyHandler is a handler for proxy requests that may require an upgrade
-type UpgradeAwareProxyHandler struct {
+// UpgradeAwareHandler is a handler for proxy requests that may require an upgrade
+type UpgradeAwareHandler struct {
 	UpgradeRequired bool
 	Location        *url.URL
 	// Transport provides an optional round tripper to use to proxy. If nil, the default proxy transport is used
@@ -64,10 +61,10 @@ type ErrorResponder interface {
 	Error(err error)
 }
 
-// NewUpgradeAwareProxyHandler creates a new proxy handler with a default flush interval. Responder is required for returning
+// NewUpgradeAwareHandler creates a new proxy handler with a default flush interval. Responder is required for returning
 // errors to the caller.
-func NewUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder ErrorResponder) *UpgradeAwareProxyHandler {
-	return &UpgradeAwareProxyHandler{
+func NewUpgradeAwareHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder ErrorResponder) *UpgradeAwareHandler {
+	return &UpgradeAwareHandler{
 		Location:        location,
 		Transport:       transport,
 		WrapTransport:   wrapTransport,
@@ -78,7 +75,7 @@ func NewUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper,
 }
 
 // ServeHTTP handles the proxy request
-func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if len(h.Location.Scheme) == 0 {
 		h.Location.Scheme = "http"
 	}
@@ -129,7 +126,7 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 }
 
 // tryUpgrade returns true if the request was handled.
-func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.Request) bool {
+func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Request) bool {
 	if !httpstream.IsUpgradeRequest(req) {
 		return false
 	}
@@ -144,7 +141,7 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 	// Only append X-Forwarded-For in the upgrade path, since httputil.NewSingleHostReverseProxy
 	// handles this in the non-upgrade path.
 	utilnet.AppendForwardedForHeader(clone)
-	if h.InterceptRedirects && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects) {
+	if h.InterceptRedirects {
 		backendConn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, h.Location, clone.Header, req.Body, h)
 	} else {
 		clone.URL = h.Location
@@ -214,8 +211,8 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 }
 
 // Dial dials the backend at req.URL and writes req to it.
-func (h *UpgradeAwareProxyHandler) Dial(req *http.Request) (net.Conn, error) {
-	conn, err := proxy.DialURL(req.URL, h.Transport)
+func (h *UpgradeAwareHandler) Dial(req *http.Request) (net.Conn, error) {
+	conn, err := DialURL(req.URL, h.Transport)
 	if err != nil {
 		return nil, fmt.Errorf("error dialing backend: %v", err)
 	}
@@ -228,9 +225,9 @@ func (h *UpgradeAwareProxyHandler) Dial(req *http.Request) (net.Conn, error) {
 	return conn, err
 }
 
-var _ utilnet.Dialer = &UpgradeAwareProxyHandler{}
+var _ utilnet.Dialer = &UpgradeAwareHandler{}
 
-func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL, internalTransport http.RoundTripper) http.RoundTripper {
+func (h *UpgradeAwareHandler) defaultProxyTransport(url *url.URL, internalTransport http.RoundTripper) http.RoundTripper {
 	scheme := url.Scheme
 	host := url.Host
 	suffix := h.Location.Path
@@ -238,7 +235,7 @@ func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL, internalT
 		suffix += "/"
 	}
 	pathPrepend := strings.TrimSuffix(url.Path, suffix)
-	rewritingTransport := &proxy.Transport{
+	rewritingTransport := &Transport{
 		Scheme:       scheme,
 		Host:         host,
 		PathPrepend:  pathPrepend,
