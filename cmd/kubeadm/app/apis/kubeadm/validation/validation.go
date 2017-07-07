@@ -34,6 +34,7 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	"k8s.io/kubernetes/pkg/util/node"
 )
 
 // TODO: Break out the cloudprovider functionality out of core and only support the new flow
@@ -63,6 +64,7 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateAPIServerCertSANs(c.APIServerCertSANs, field.NewPath("cert-altnames"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificates-dir"))...)
+	allErrs = append(allErrs, ValidateNodeName(c.NodeName, field.NewPath("node-name"))...)
 	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
 	return allErrs
 }
@@ -233,6 +235,14 @@ func ValidateAbsolutePath(path string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if !filepath.IsAbs(path) {
 		allErrs = append(allErrs, field.Invalid(fldPath, path, "path is not absolute"))
+	}
+	return allErrs
+}
+
+func ValidateNodeName(nodename string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if node.GetHostname(nodename) != nodename {
+		allErrs = append(allErrs, field.Invalid(fldPath, nodename, "nodename is not valid, must be lower case"))
 	}
 	return allErrs
 }

@@ -21,7 +21,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
-	"os"
 
 	"k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
@@ -124,12 +123,6 @@ func NewFrontProxyClientCertAndKey(frontProxyCACert *x509.Certificate, frontProx
 // getAltNames builds an AltNames object for to be used when generating apiserver certificate
 func getAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNames, error) {
 
-	// host name
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get the hostname: %v", err)
-	}
-
 	// advertise address
 	advertiseAddress := net.ParseIP(cfg.API.AdvertiseAddress)
 	if advertiseAddress == nil {
@@ -150,7 +143,7 @@ func getAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNames, error
 	// create AltNames with defaults DNSNames/IPs
 	altNames := &certutil.AltNames{
 		DNSNames: []string{
-			hostname,
+			cfg.NodeName,
 			"kubernetes",
 			"kubernetes.default",
 			"kubernetes.default.svc",

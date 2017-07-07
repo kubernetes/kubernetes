@@ -19,7 +19,6 @@ package certs
 import (
 	"crypto/x509"
 	"net"
-	"os"
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -36,14 +35,13 @@ func TestNewCACertAndKey(t *testing.T) {
 }
 
 func TestNewAPIServerCertAndKey(t *testing.T) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		t.Errorf("couldn't get the hostname: %v", err)
-	}
+	hostname := "valid-hostname"
+
 	advertiseIP := "1.2.3.4"
 	cfg := &kubeadmapi.MasterConfiguration{
 		API:        kubeadmapi.API{AdvertiseAddress: advertiseIP},
 		Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+		NodeName:   "valid-hostname",
 	}
 	caCert, caKey, err := NewCACertAndKey()
 

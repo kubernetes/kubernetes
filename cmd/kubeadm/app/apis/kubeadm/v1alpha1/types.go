@@ -30,6 +30,7 @@ type MasterConfiguration struct {
 	Networking         Networking `json:"networking"`
 	KubernetesVersion  string     `json:"kubernetesVersion"`
 	CloudProvider      string     `json:"cloudProvider"`
+	NodeName           string     `json:"nodeName"`
 	AuthorizationModes []string   `json:"authorizationModes"`
 
 	Token    string        `json:"token"`

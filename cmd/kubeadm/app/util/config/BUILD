@@ -18,6 +18,7 @@ go_library(
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/token:go_default_library",
         "//pkg/api:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",

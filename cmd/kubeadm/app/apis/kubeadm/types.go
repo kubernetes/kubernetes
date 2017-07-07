@@ -37,6 +37,7 @@ type MasterConfiguration struct {
 	Networking         Networking
 	KubernetesVersion  string
 	CloudProvider      string
+	NodeName           string
 	AuthorizationModes []string
 
 	Token    string
