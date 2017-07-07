@@ -156,9 +156,12 @@ var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate
 	if len(chain[0].Subject.CommonName) == 0 {
 		return nil, false, nil
 	}
+	groups := make([]string, 0)
+	groups = append(groups, chain[0].Subject.Organization...)
+	groups = append(groups, chain[0].Subject.OrganizationalUnit...)
 	return &user.DefaultInfo{
 		Name:   chain[0].Subject.CommonName,
-		Groups: chain[0].Subject.Organization,
+		Groups: groups,
 	}, true, nil
 })
 
