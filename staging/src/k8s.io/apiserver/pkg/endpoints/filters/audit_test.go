@@ -30,12 +30,18 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	pluginlog "k8s.io/apiserver/plugin/pkg/audit/log"
+	// import to call webhook's init() function to register audit.Event to schema
+	_ "k8s.io/apiserver/plugin/pkg/audit/webhook"
 )
 
 type fakeAuditSink struct {
@@ -177,7 +183,7 @@ func (*fakeHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(200)
 }
 
-func TestAudit(t *testing.T) {
+func TestAuditLegacy(t *testing.T) {
 	writingShortRunningPrefix := func(stage string) string {
 		return fmt.Sprintf(`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="%s" ip="127.0.0.1" method="update" user="admin" groups="<none>" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods/foo"`, stage)
 	}
@@ -380,7 +386,7 @@ func TestAudit(t *testing.T) {
 		},
 	} {
 		var buf bytes.Buffer
-		backend := pluginlog.NewBackend(&buf)
+		backend := pluginlog.NewBackend(&buf, pluginlog.FormatLegacy)
 		policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse)
 		handler := WithAudit(http.HandlerFunc(test.handler), &fakeRequestContextMapper{
 			user: &user.DefaultInfo{Name: "admin"},
@@ -415,6 +421,411 @@ func TestAudit(t *testing.T) {
 			}
 			if !match {
 				t.Errorf("[%s] Unexpected line %d of audit: %s", test.desc, i, line[i])
+			}
+		}
+	}
+}
+
+func TestAuditJson(t *testing.T) {
+	shortRunningPath := "/api/v1/namespaces/default/pods/foo"
+	longRunningPath := "/api/v1/namespaces/default/pods?watch=true"
+
+	delay := 500 * time.Millisecond
+
+	for _, test := range []struct {
+		desc     string
+		path     string
+		verb     string
+		handler  func(http.ResponseWriter, *http.Request)
+		expected []auditv1alpha1.Event
+	}{
+		// short running requests with read-only verb
+		{
+			"read-only empty",
+			shortRunningPath,
+			"GET",
+			func(http.ResponseWriter, *http.Request) {},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "get",
+					RequestURI: shortRunningPath,
+				},
+				{
+					Stage:          auditinternal.StageResponseComplete,
+					Verb:           "get",
+					RequestURI:     shortRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+			},
+		},
+		{
+			"read-only panic",
+			shortRunningPath,
+			"GET",
+			func(w http.ResponseWriter, req *http.Request) {
+				panic("kaboom")
+			},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "get",
+					RequestURI: shortRunningPath,
+				},
+				{
+					Stage:          auditinternal.StagePanic,
+					Verb:           "get",
+					RequestURI:     shortRunningPath,
+					ResponseStatus: &metav1.Status{Code: 500},
+				},
+			},
+		},
+		// short running request with non-read-only verb
+		{
+			"writing empty",
+			shortRunningPath,
+			"PUT",
+			func(http.ResponseWriter, *http.Request) {},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "update",
+					RequestURI: shortRunningPath,
+				},
+				{
+					Stage:          auditinternal.StageResponseComplete,
+					Verb:           "update",
+					RequestURI:     shortRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+			},
+		},
+		{
+			"writing sleep",
+			shortRunningPath,
+			"PUT",
+			func(http.ResponseWriter, *http.Request) {
+				time.Sleep(delay)
+			},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "update",
+					RequestURI: shortRunningPath,
+				},
+				{
+					Stage:          auditinternal.StageResponseComplete,
+					Verb:           "update",
+					RequestURI:     shortRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+			},
+		},
+		{
+			"writing 403+write",
+			shortRunningPath,
+			"PUT",
+			func(w http.ResponseWriter, req *http.Request) {
+				w.WriteHeader(403)
+				w.Write([]byte("foo"))
+			},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "update",
+					RequestURI: shortRunningPath,
+				},
+				{
+					Stage:          auditinternal.StageResponseComplete,
+					Verb:           "update",
+					RequestURI:     shortRunningPath,
+					ResponseStatus: &metav1.Status{Code: 403},
+				},
+			},
+		},
+		{
+			"writing panic",
+			shortRunningPath,
+			"PUT",
+			func(w http.ResponseWriter, req *http.Request) {
+				panic("kaboom")
+			},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "update",
+					RequestURI: shortRunningPath,
+				},
+				{
+					Stage:          auditinternal.StagePanic,
+					Verb:           "update",
+					RequestURI:     shortRunningPath,
+					ResponseStatus: &metav1.Status{Code: 500},
+				},
+			},
+		},
+		{
+			"writing write+panic",
+			shortRunningPath,
+			"PUT",
+			func(w http.ResponseWriter, req *http.Request) {
+				w.Write([]byte("foo"))
+				panic("kaboom")
+			},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "update",
+					RequestURI: shortRunningPath,
+				},
+				{
+					Stage:          auditinternal.StagePanic,
+					Verb:           "update",
+					RequestURI:     shortRunningPath,
+					ResponseStatus: &metav1.Status{Code: 500},
+				},
+			},
+		},
+		// long running requests
+		{
+			"empty longrunning",
+			longRunningPath,
+			"GET",
+			func(http.ResponseWriter, *http.Request) {},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "watch",
+					RequestURI: longRunningPath,
+				},
+				{
+					Stage:          auditinternal.StageResponseStarted,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+				{
+					Stage:          auditinternal.StageResponseComplete,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+			},
+		},
+		{
+			"sleep longrunning",
+			longRunningPath,
+			"GET",
+			func(http.ResponseWriter, *http.Request) {
+				time.Sleep(delay)
+			},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "watch",
+					RequestURI: longRunningPath,
+				},
+				{
+					Stage:          auditinternal.StageResponseStarted,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+				{
+					Stage:          auditinternal.StageResponseComplete,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+			},
+		},
+		{
+			"sleep+403 longrunning",
+			longRunningPath,
+			"GET",
+			func(w http.ResponseWriter, req *http.Request) {
+				time.Sleep(delay)
+				w.WriteHeader(403)
+			},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "watch",
+					RequestURI: longRunningPath,
+				},
+				{
+					Stage:          auditinternal.StageResponseStarted,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 403},
+				},
+				{
+					Stage:          auditinternal.StageResponseComplete,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 403},
+				},
+			},
+		},
+		{
+			"write longrunning",
+			longRunningPath,
+			"GET",
+			func(w http.ResponseWriter, req *http.Request) {
+				w.Write([]byte("foo"))
+			},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "watch",
+					RequestURI: longRunningPath,
+				},
+				{
+					Stage:          auditinternal.StageResponseStarted,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+				{
+					Stage:          auditinternal.StageResponseComplete,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+			},
+		},
+		{
+			"403+write longrunning",
+			longRunningPath,
+			"GET",
+			func(w http.ResponseWriter, req *http.Request) {
+				w.WriteHeader(403)
+				w.Write([]byte("foo"))
+			},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "watch",
+					RequestURI: longRunningPath,
+				},
+				{
+					Stage:          auditinternal.StageResponseStarted,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 403},
+				},
+				{
+					Stage:          auditinternal.StageResponseComplete,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 403},
+				},
+			},
+		},
+		{
+			"panic longrunning",
+			longRunningPath,
+			"GET",
+			func(w http.ResponseWriter, req *http.Request) {
+				panic("kaboom")
+			},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "watch",
+					RequestURI: longRunningPath,
+				},
+				{
+					Stage:          auditinternal.StagePanic,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 500},
+				},
+			},
+		},
+		{
+			"write+panic longrunning",
+			longRunningPath,
+			"GET",
+			func(w http.ResponseWriter, req *http.Request) {
+				w.Write([]byte("foo"))
+				panic("kaboom")
+			},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "watch",
+					RequestURI: longRunningPath,
+				},
+				{
+					Stage:          auditinternal.StageResponseStarted,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+				{
+					Stage:          auditinternal.StagePanic,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 500},
+				},
+			},
+		},
+	} {
+		var buf bytes.Buffer
+		backend := pluginlog.NewBackend(&buf, pluginlog.FormatJson)
+		policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse)
+		handler := WithAudit(http.HandlerFunc(test.handler), &fakeRequestContextMapper{
+			user: &user.DefaultInfo{Name: "admin"},
+		}, backend, policyChecker, func(r *http.Request, ri *request.RequestInfo) bool {
+			// simplified long-running check
+			return ri.Verb == "watch"
+		})
+
+		req, _ := http.NewRequest(test.verb, test.path, nil)
+		req.RemoteAddr = "127.0.0.1"
+
+		func() {
+			defer func() {
+				recover()
+			}()
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+		}()
+
+		t.Logf("[%s] audit log: %v", test.desc, buf.String())
+
+		line := strings.Split(strings.TrimSpace(buf.String()), "\n")
+		if len(line) != len(test.expected) {
+			t.Errorf("[%s] Unexpected amount of lines in audit log: %d", test.desc, len(line))
+			continue
+		}
+
+		for i, expect := range test.expected {
+			// decode events back to check json elements.
+			event := &auditv1alpha1.Event{}
+			decoder := audit.Codecs.UniversalDecoder(auditv1alpha1.SchemeGroupVersion)
+			if err := runtime.DecodeInto(decoder, []byte(line[i]), event); err != nil {
+				t.Errorf("failed decoding line %s: %v", line[i], err)
+				continue
+			}
+			if "admin" != event.User.Username {
+				t.Errorf("[%s] Unexpected username: %s", test.desc, event.User.Username)
+			}
+			if event.Stage != expect.Stage {
+				t.Errorf("[%s] Unexpected Stage: %s", test.desc, event.Stage)
+			}
+			if event.Verb != expect.Verb {
+				t.Errorf("[%s] Unexpected Verb: %s", test.desc, event.Verb)
+			}
+			if event.RequestURI != expect.RequestURI {
+				t.Errorf("[%s] Unexpected RequestURI: %s", test.desc, event.RequestURI)
+			}
+			if (event.ResponseStatus == nil) != (expect.ResponseStatus == nil) {
+				t.Errorf("[%s] Unexpected ResponseStatus: %v", test.desc, event.ResponseStatus)
+				continue
+			}
+			if (event.ResponseStatus != nil) && (event.ResponseStatus.Code != expect.ResponseStatus.Code) {
+				t.Errorf("[%s] Unexpected status code : %d", test.desc, event.ResponseStatus.Code)
 			}
 		}
 	}
