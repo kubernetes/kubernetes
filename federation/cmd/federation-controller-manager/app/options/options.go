@@ -28,7 +28,7 @@ import (
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 )
 
 type ControllerManagerConfiguration struct {
@@ -98,7 +98,7 @@ func NewCMServer() *CMServer {
 			ClusterMonitorPeriod:      metav1.Duration{Duration: 40 * time.Second},
 			APIServerQPS:              20.0,
 			APIServerBurst:            30,
-			LeaderElection:            leaderelection.DefaultLeaderElectionConfiguration(),
+			LeaderElection:            leaderelectionconfig.DefaultLeaderElectionConfiguration(),
 			Controllers:               make(utilflag.ConfigurationMap),
 		},
 	}
@@ -129,5 +129,5 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 		"A set of key=value pairs that describe controller configuration "+
 		"to enable/disable specific controllers. Key should be the resource name (like services) and value should be true or false. "+
 		"For example: services=false,ingresses=false")
-	leaderelection.BindFlags(&s.LeaderElection, fs)
+	leaderelectionconfig.BindFlags(&s.LeaderElection, fs)
 }

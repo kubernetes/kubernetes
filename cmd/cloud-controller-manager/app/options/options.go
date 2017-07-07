@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates
@@ -56,7 +56,7 @@ func NewCloudControllerManagerServer() *CloudControllerManagerServer {
 			ContentType:             "application/vnd.kubernetes.protobuf",
 			KubeAPIQPS:              20.0,
 			KubeAPIBurst:            30,
-			LeaderElection:          leaderelection.DefaultLeaderElectionConfiguration(),
+			LeaderElection:          leaderelectionconfig.DefaultLeaderElectionConfiguration(),
 			ControllerStartInterval: metav1.Duration{Duration: 0 * time.Second},
 		},
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
@@ -90,7 +90,7 @@ func (s *CloudControllerManagerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.DurationVar(&s.ControllerStartInterval.Duration, "controller-start-interval", s.ControllerStartInterval.Duration, "Interval between starting controller managers.")
 
-	leaderelection.BindFlags(&s.LeaderElection, fs)
+	leaderelectionconfig.BindFlags(&s.LeaderElection, fs)
 
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }

@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	cs "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
-	cs "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
