@@ -18,6 +18,7 @@ package filters
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -45,10 +46,13 @@ func handleError(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 // WithMaxInFlightLimit limits the number of in-flight requests to buffer size of the passed in channel.
+// disconnectChanceOnMaxRequests controls whether the connection is closed from the server if the request is
+// rejected and should be between 0.0 and 1.0.
 func WithMaxInFlightLimit(
 	handler http.Handler,
 	nonMutatingLimit int,
 	mutatingLimit int,
+	disconnectChanceOnMaxRequests float64,
 	requestContextMapper genericapirequest.RequestContextMapper,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 ) http.Handler {
@@ -98,16 +102,20 @@ func WithMaxInFlightLimit(
 				handler.ServeHTTP(w, r)
 			default:
 				metrics.MonitorRequest(r, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", errors.StatusTooManyRequests, time.Now())
-				tooManyRequests(r, w)
+				tooManyRequests(r, w, disconnectChanceOnMaxRequests)
 			}
 		}
 	})
 }
 
-func tooManyRequests(req *http.Request, w http.ResponseWriter) {
+func tooManyRequests(req *http.Request, w http.ResponseWriter, disconnectChanceOnMaxRequests float64) {
 	// "Too Many Requests" response is returned before logger is setup for the request.
 	// So we need to explicitly log it here.
 	defer httplog.NewLogged(req, &w).Log()
+
+	if disconnectChanceOnMaxRequests > 0 && rand.Float64() < disconnectChanceOnMaxRequests {
+		w.Header().Set("Connection", "close")
+	}
 
 	// Return a 429 status indicating "Too Many Requests"
 	w.Header().Set("Retry-After", retryAfter)

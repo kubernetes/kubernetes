@@ -47,7 +47,7 @@ func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.H
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithPanicRecovery(handler)
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
-	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
+	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.DisconnectChanceOnMaxRequests, c.RequestContextMapper, c.LongRunningFunc)
 	handler = genericapifilters.WithRequestInfo(handler, server.NewRequestInfoResolver(c), c.RequestContextMapper)
 	handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
 
