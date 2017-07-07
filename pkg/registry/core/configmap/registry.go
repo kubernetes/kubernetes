@@ -31,7 +31,7 @@ type Registry interface {
 	WatchConfigMaps(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetConfigMap(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.ConfigMap, error)
 	CreateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
-	UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
+	UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap, transformFuncs ...rest.TransformFunc) (*api.ConfigMap, error)
 	DeleteConfigMap(ctx genericapirequest.Context, name string) error
 }
 
@@ -77,8 +77,8 @@ func (s *storage) CreateConfigMap(ctx genericapirequest.Context, cfg *api.Config
 	return obj.(*api.ConfigMap), nil
 }
 
-func (s *storage) UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error) {
-	obj, _, err := s.Update(ctx, cfg.Name, rest.DefaultUpdatedObjectInfo(cfg, api.Scheme))
+func (s *storage) UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap, transformFuncs ...rest.TransformFunc) (*api.ConfigMap, error) {
+	obj, _, err := s.Update(ctx, cfg.Name, rest.DefaultUpdatedObjectInfo(cfg, api.Scheme, transformFuncs...))
 	if err != nil {
 		return nil, err
 	}
