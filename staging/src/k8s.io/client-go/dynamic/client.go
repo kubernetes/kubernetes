@@ -298,9 +298,9 @@ func (versionedParameterEncoderWithV1Fallback) DecodeParameters(parameters url.V
 }
 
 // VersionedParameterEncoderWithV1Fallback is useful for encoding query
-// parameters for thirdparty resources. It tries to convert object to the
+// parameters for custom resources. It tries to convert object to the
 // specified version before converting it to query parameters, and falls back to
 // converting to v1 if the object is not registered in the specified version.
 // For the record, currently API server always treats query parameters sent to a
-// thirdparty resource endpoint as v1.
+// custom resource endpoint as v1.
 var VersionedParameterEncoderWithV1Fallback runtime.ParameterCodec = versionedParameterEncoderWithV1Fallback{}

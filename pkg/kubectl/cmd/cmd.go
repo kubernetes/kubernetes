@@ -238,7 +238,6 @@ __custom_func() {
     * services (aka 'svc')
     * statefulsets
     * storageclasses
-    * thirdpartyresources
     `
 )
 

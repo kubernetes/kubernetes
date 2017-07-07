@@ -25,7 +25,6 @@ import (
 	"syscall"
 	"testing"
 
-	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -36,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
@@ -319,55 +317,5 @@ func TestDumpReaderToFile(t *testing.T) {
 	stringData := string(data)
 	if stringData != testString {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
-	}
-}
-
-func TestMaybeConvert(t *testing.T) {
-	tests := []struct {
-		input    runtime.Object
-		gv       schema.GroupVersion
-		expected runtime.Object
-	}{
-		{
-			input: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-			},
-			gv: schema.GroupVersion{Group: "", Version: "v1"},
-			expected: &v1.Pod{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "v1",
-					Kind:       "Pod",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-			},
-		},
-		{
-			input: &extensions.ThirdPartyResourceData{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Data: []byte("this is some data"),
-			},
-			expected: &extensions.ThirdPartyResourceData{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Data: []byte("this is some data"),
-			},
-		},
-	}
-
-	for _, test := range tests {
-		obj, err := MaybeConvertObject(test.input, test.gv, testapi.Default.Converter())
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !apiequality.Semantic.DeepEqual(test.expected, obj) {
-			t.Errorf("expected:\n%#v\nsaw:\n%#v\n", test.expected, obj)
-		}
 	}
 }

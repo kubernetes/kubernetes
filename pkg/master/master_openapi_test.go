@@ -54,7 +54,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	}
 	config.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
-	master, err := config.Complete().New(genericapiserver.EmptyDelegate, nil)
+	master, err := config.Complete().New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
