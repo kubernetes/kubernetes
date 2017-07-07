@@ -182,7 +182,7 @@ func DialRegistery1(t *testing.T) {
 	})
 
 	glog.Errorf("resp: %+v", resp)
-	require.Len(t, resp.Error, 0)
+	require.True(t, resp.Error == nil)
 	require.NoError(t, err)
 	c.Close()
 }
@@ -190,7 +190,7 @@ func DialRegistery1(t *testing.T) {
 func TestManager1(t *testing.T) {
 
 	glog.Errorf("ramki: TestManager\n")
-	mgr, err := NewManager(monitorCallback)
+	mgr, err := NewManager(nil, nil, monitorCallback)
 	require.NoError(t, err)
 
 	StartDevicePluginServer1(t)
