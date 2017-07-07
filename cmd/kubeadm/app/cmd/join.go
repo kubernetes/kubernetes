@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 
 	"github.com/renstrom/dedent"
@@ -33,11 +32,12 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
-	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
+	kubeadmnode "k8s.io/kubernetes/cmd/kubeadm/app/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/api"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 var (
@@ -183,21 +183,17 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	hostname := j.cfg.NodeName
-	if hostname == "" {
-		hostname, err = os.Hostname()
-		if err != nil {
-			return err
-		}
-	}
+	// Use j.cfg.NodeName if set, otherwise get that from os.Hostname(). This also makes sure the hostname is lower-cased
+	hostname := nodeutil.GetHostname(j.cfg.NodeName)
+
 	client, err := kubeconfigutil.KubeConfigToClientSet(cfg)
 	if err != nil {
 		return err
 	}
-	if err := kubenode.ValidateAPIServer(client); err != nil {
+	if err := kubeadmnode.ValidateAPIServer(client); err != nil {
 		return err
 	}
-	if err := kubenode.PerformTLSBootstrap(cfg, hostname); err != nil {
+	if err := kubeadmnode.PerformTLSBootstrap(cfg, hostname); err != nil {
 		return err
 	}
 

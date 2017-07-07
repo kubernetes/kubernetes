@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/util/initsystem"
-	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
@@ -267,21 +266,22 @@ func (ipc InPathCheck) Check() (warnings, errors []error) {
 
 // HostnameCheck checks if hostname match dns sub domain regex.
 // If hostname doesn't match this regex, kubelet will not launch static pods like kube-apiserver/kube-controller-manager and so on.
-type HostnameCheck struct{}
+type HostnameCheck struct {
+	nodeName string
+}
 
 func (hc HostnameCheck) Check() (warnings, errors []error) {
 	errors = []error{}
 	warnings = []error{}
-	hostname := node.GetHostname("")
-	for _, msg := range validation.ValidateNodeName(hostname, false) {
-		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, msg))
+	for _, msg := range validation.ValidateNodeName(hc.nodeName, false) {
+		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hc.nodeName, msg))
 	}
-	addr, err := net.LookupHost(hostname)
+	addr, err := net.LookupHost(hc.nodeName)
 	if addr == nil {
-		warnings = append(warnings, fmt.Errorf("hostname \"%s\" could not be reached", hostname))
+		warnings = append(warnings, fmt.Errorf("hostname \"%s\" could not be reached", hc.nodeName))
 	}
 	if err != nil {
-		warnings = append(warnings, fmt.Errorf("hostname \"%s\" %s", hostname, err))
+		warnings = append(warnings, fmt.Errorf("hostname \"%s\" %s", hc.nodeName, err))
 	}
 	return warnings, errors
 }
@@ -488,7 +488,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	checks := []Checker{
 		SystemVerificationCheck{},
 		IsRootCheck{},
-		HostnameCheck{},
+		HostnameCheck{nodeName: cfg.NodeName},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},

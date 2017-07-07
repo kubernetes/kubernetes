@@ -74,6 +74,29 @@ func TestValidateAuthorizationModes(t *testing.T) {
 	}
 }
 
+func TestValidateNodeName(t *testing.T) {
+	var tests = []struct {
+		s        string
+		f        *field.Path
+		expected bool
+	}{
+		{"", nil, false},                 // ok if not provided
+		{"1234", nil, true},              // supported
+		{"valid-hostname", nil, true},    // supported
+		{"INVALID-HOSTNAME", nil, false}, // Upper cases is invalid
+	}
+	for _, rt := range tests {
+		actual := ValidateNodeName(rt.s, rt.f)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateNodeName:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
 func TestValidateCloudProvider(t *testing.T) {
 	var tests = []struct {
 		s        string
@@ -171,6 +194,7 @@ func TestValidateIPNetFromString(t *testing.T) {
 }
 
 func TestValidateMasterConfiguration(t *testing.T) {
+	nodename := "valid-nodename"
 	var tests = []struct {
 		s        *kubeadm.MasterConfiguration
 		expected bool
@@ -183,6 +207,7 @@ func TestValidateMasterConfiguration(t *testing.T) {
 				DNSDomain:     "cluster.local",
 			},
 			CertificatesDir: "/some/cert/dir",
+			NodeName:        nodename,
 		}, false},
 		{&kubeadm.MasterConfiguration{
 			AuthorizationModes: []string{"RBAC"},
@@ -192,6 +217,7 @@ func TestValidateMasterConfiguration(t *testing.T) {
 			},
 			CertificatesDir: "/some/other/cert/dir",
 			Token:           "abcdef.0123456789abcdef",
+			NodeName:        nodename,
 		}, true},
 	}
 	for _, rt := range tests {

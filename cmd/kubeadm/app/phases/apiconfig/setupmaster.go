@@ -30,20 +30,19 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/util/node"
 )
 
 const apiCallRetryInterval = 500 * time.Millisecond
 
 // TODO: Can we think of any unit tests here? Or should this code just be covered through integration/e2e tests?
 
-func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
+func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, nodeName string) error {
 	var n *v1.Node
 
 	// Wait for current node registration
 	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
 		var err error
-		if n, err = client.Nodes().Get(node.GetHostname(""), metav1.GetOptions{}); err != nil {
+		if n, err = client.Nodes().Get(nodeName, metav1.GetOptions{}); err != nil {
 			return false, nil
 		}
 		// The node may appear to have no labels at first,
@@ -75,7 +74,7 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error
 		if apierrs.IsConflict(err) {
 			fmt.Println("[apiclient] Temporarily unable to update master node metadata due to conflict (will retry)")
 			time.Sleep(apiCallRetryInterval)
-			attemptToUpdateMasterRoleLabelsAndTaints(client)
+			attemptToUpdateMasterRoleLabelsAndTaints(client, nodeName)
 		} else {
 			return err
 		}
@@ -95,9 +94,9 @@ func addTaintIfNotExists(n *v1.Node, t v1.Taint) {
 }
 
 // UpdateMasterRoleLabelsAndTaints taints the master and sets the master label
-func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset) error {
+func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, nodeName string) error {
 	// TODO: Use iterate instead of recursion
-	err := attemptToUpdateMasterRoleLabelsAndTaints(client)
+	err := attemptToUpdateMasterRoleLabelsAndTaints(client, nodeName)
 	if err != nil {
 		return fmt.Errorf("failed to update master node - [%v]", err)
 	}

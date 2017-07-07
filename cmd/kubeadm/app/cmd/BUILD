@@ -46,6 +46,7 @@ go_library(
         "//pkg/printers:go_default_library",
         "//pkg/util/i18n:go_default_library",
         "//pkg/util/initsystem:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//pkg/util/version:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",

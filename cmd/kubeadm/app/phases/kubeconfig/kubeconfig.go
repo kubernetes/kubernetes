@@ -29,7 +29,6 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/util/node"
 )
 
 // BuildConfigProperties holds some simple information about how this phase should build the KubeConfig object
@@ -53,12 +52,7 @@ type BuildConfigProperties struct {
 // /etc/kubernetes/{admin,kubelet}.conf exist but not certs => certs will be generated and conflict with the kubeconfig files => error
 
 // CreateInitKubeConfigFiles is called from the main init and does the work for the default phase behaviour
-func CreateInitKubeConfigFiles(masterEndpoint, pkiDir, outDir string) error {
-
-	nodeName := node.GetHostname("")
-	if len(nodeName) == 0 {
-		return fmt.Errorf("unable to get hostname for master node")
-	}
+func CreateInitKubeConfigFiles(masterEndpoint, pkiDir, outDir, nodeName string) error {
 
 	// Create a lightweight specification for what the files should look like
 	filesToCreateFromSpec := map[string]BuildConfigProperties{

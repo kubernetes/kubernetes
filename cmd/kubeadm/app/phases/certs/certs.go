@@ -21,7 +21,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
-	"os"
 
 	setutil "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -43,10 +42,6 @@ import (
 // It generates a self-signed CA certificate and a server certificate (signed by the CA)
 func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 	pkiDir := cfg.CertificatesDir
-	hostname, err := os.Hostname()
-	if err != nil {
-		return fmt.Errorf("couldn't get the hostname: %v", err)
-	}
 
 	_, svcSubnet, err := net.ParseCIDR(cfg.Networking.ServiceSubnet)
 	if err != nil {
@@ -54,7 +49,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 
 	// Build the list of SANs
-	altNames := getAltNames(cfg.APIServerCertSANs, hostname, cfg.Networking.DNSDomain, svcSubnet)
+	altNames := getAltNames(cfg.APIServerCertSANs, cfg.NodeName, cfg.Networking.DNSDomain, svcSubnet)
 	// Append the address the API Server is advertising
 	altNames.IPs = append(altNames.IPs, net.ParseIP(cfg.API.AdvertiseAddress))
 
