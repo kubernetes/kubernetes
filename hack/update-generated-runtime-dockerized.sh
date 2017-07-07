@@ -13,13 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/cri/v1alpha1/runtime/"
+KUBE_DEVICE_PLUGIN_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/device-plugin/v1alpha1/"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -41,6 +41,7 @@ fi
 
 function cleanup {
 	rm -f ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.bak
+	rm -f ${KUBE_DEVICE_PLUGIN_ROOT}/api.pb.go.bak
 }
 
 trap cleanup EXIT
@@ -53,10 +54,20 @@ PATH="${gogopath}:${PATH}" \
   --proto_path="${KUBE_ROOT}/vendor" \
   --gogo_out=plugins=grpc:${KUBE_REMOTE_RUNTIME_ROOT} ${KUBE_REMOTE_RUNTIME_ROOT}/api.proto
 
+PATH="${gogopath}:${PATH}" \
+  protoc \
+  --proto_path="${KUBE_DEVICE_PLUGIN_ROOT}" \
+  --proto_path="${KUBE_ROOT}/vendor" \
+  --gogo_out=plugins=grpc:${KUBE_DEVICE_PLUGIN_ROOT} ${KUBE_DEVICE_PLUGIN_ROOT}/api.proto
+
 # Update boilerplate for the generated file.
 echo "$(cat hack/boilerplate/boilerplate.go.txt ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go)" > ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
 sed -i".bak" "s/Copyright YEAR/Copyright $(date '+%Y')/g" ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
 
+echo "$(cat hack/boilerplate/boilerplate.go.txt ${KUBE_DEVICE_PLUGIN_ROOT}/api.pb.go)" > ${KUBE_DEVICE_PLUGIN_ROOT}/api.pb.go
+sed -i".bak" "s/Copyright YEAR/Copyright $(date '+%Y')/g" ${KUBE_DEVICE_PLUGIN_ROOT}/api.pb.go
+
 # Run gofmt to clean up the generated code.
 kube::golang::verify_go_version
 gofmt -l -s -w ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
+gofmt -l -s -w ${KUBE_DEVICE_PLUGIN_ROOT}/api.pb.go

@@ -573,6 +573,8 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		}
 	}
 
+	kl.setNodeStatusDevice(node)
+
 	// Set Allocatable.
 	if node.Status.Allocatable == nil {
 		node.Status.Allocatable = make(v1.ResourceList)
@@ -597,6 +599,34 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		}
 		node.Status.Allocatable[k] = value
 	}
+}
+
+func (kl *Kubelet) setNodeStatusDevice(node *v1.Node) {
+	hdlr := kl.containerManager.GetDevicePluginHandler()
+	if hdlr == nil {
+		return
+	}
+
+	node.Status.DevCapacity = nil
+
+	for k, v := range hdlr.Devices() {
+		var key v1.ResourceName
+		if k == "nvidia-gpu" {
+			key = v1.ResourceNvidiaGPU
+		} else {
+			key = v1.ResourceName(v1.ResourceOpaqueIntPrefix + k)
+		}
+
+		q := *resource.NewQuantity(int64(len(v)), resource.DecimalSI)
+		node.Status.Capacity[key] = q
+		node.Status.DevCapacity = append(node.Status.DevCapacity, v...)
+	}
+
+	node.Status.DevAvailable = nil
+	for _, v := range hdlr.AvailableDevices() {
+		node.Status.DevAvailable = append(node.Status.DevAvailable, v...)
+	}
+
 }
 
 // Set versioninfo for the node.

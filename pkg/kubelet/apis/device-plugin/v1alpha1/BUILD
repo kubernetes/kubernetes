@@ -10,10 +10,17 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "well_known_annotations.go",
-        "well_known_labels.go",
+        "api.pb.go",
+        "constants.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
+        "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
+        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
+    ],
 )
 
 filegroup(
@@ -25,11 +32,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/kubelet/apis/cri:all-srcs",
-        "//pkg/kubelet/apis/device-plugin/v1alpha1:all-srcs",
-        "//pkg/kubelet/apis/stats/v1alpha1:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

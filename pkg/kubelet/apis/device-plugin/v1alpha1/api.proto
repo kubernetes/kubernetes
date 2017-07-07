@@ -1,0 +1,121 @@
+// To regenerate api.pb.go run hack/update-generated-runtime.sh
+syntax = 'proto3';
+
+package deviceplugin;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.goproto_getters_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_unrecognized_all) = false;
+
+
+service PluginRegistration {
+	rpc Register(RegisterRequest) returns (RegisterResponse) {}
+	rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {}
+}
+
+service DeviceManager {
+	rpc Init(Empty) returns (Empty) {}
+
+	rpc Discover(Empty) returns (stream Device) {}
+	rpc Monitor(Empty) returns (stream DeviceHealth) {}
+
+	rpc Allocate(AllocateRequest) returns (AllocateResponse) {}
+	rpc Deallocate(DeallocateRequest) returns (Error) {}
+}
+
+message RegisterRequest {
+	// Version of the API the Device Plugin was built against
+	string version = 1;
+	// Name of the unix socket the device plugin is listening on
+	string unixsocket = 2;
+	// Name of the devices the device plugin wants to register
+	// A device plugin can only register one kind of devices
+	string vendor = 3;
+}
+
+message RegisterResponse {
+	// Minimum version the Kubelet API supports.
+	string version = 1;
+	// Kubelet fills this field if it encounters any errors
+	// during the registration process or discover process
+	Error error = 2;
+}
+
+message HeartbeatRequest {
+	string vendor = 1;
+}
+
+message HeartbeatResponse {
+	// Kubelet answers with a string telling the device
+	// plugin to either re-register itself or not
+	string response = 1;
+	// Kubelet fills this field if it encountered any errors
+	Error error = 2;
+}
+
+message AllocateRequest {
+	repeated Device devices = 1;
+}
+
+message AllocateResponse {
+	// List of environment variable to set in the container.
+	repeated KeyValue envs = 1;
+	// Mounts for the container.
+	repeated Mount mounts = 2;
+}
+
+message Mount {
+	string name = 1;
+	string host_path = 2;
+	string mount_path = 3;
+	bool read_only = 4;
+}
+
+message DeallocateRequest {
+	repeated Device devices = 1;
+}
+
+message KeyValue {
+    string key = 1;
+    string value = 2;
+}
+
+message Error {
+	bool error = 1;
+	string reason = 2;
+}
+
+/* E.g:
+* struct Device {
+*    Kind: "nvidia-gpu"
+*    Name: "GPU-fef8089b-4820-abfc-e83e-94318197576e"
+*    Properties: {
+*        "Family": "Pascal",
+*        "Memory": "4G",
+*        "ECC"   : "True",
+*    }
+*}
+*/
+message Device {
+	string Kind = 1;
+	string Name = 2;
+	string Health = 3;
+	string Vendor = 4;
+	map<string, string> properties = 5; // Could be [1, 1.2, 1G]
+}
+
+message DeviceHealth {
+	string Name = 1;
+	string Kind = 2;
+	string Vendor = 4;
+	string Health = 3;
+}
+
+message Empty {
+}
