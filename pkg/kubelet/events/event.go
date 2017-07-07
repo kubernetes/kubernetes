@@ -67,6 +67,7 @@ const (
 	FailedNodeAllocatableEnforcement     = "FailedNodeAllocatableEnforcement"
 	SuccessfulNodeAllocatableEnforcement = "NodeAllocatableEnforced"
 	UnsupportedMountOption               = "UnsupportedMountOption"
+	FailedCreatePodSandBox = "FailedCreatePodSandBox"
 
 	// Image manager event reason list
 	InvalidDiskCapacity = "InvalidDiskCapacity"
