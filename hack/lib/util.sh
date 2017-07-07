@@ -513,6 +513,14 @@ kube::util::ensure_godep_version() {
   godep version
 }
 
+# Checks that the GOPATH is simple, i.e. consists only of one directory, not multiple.
+kube::util::ensure_single_dir_gopath() {
+  if [[ "${GOPATH}" == *:* ]]; then
+    echo "GOPATH must consist of a single directory." 1>&2
+    exit 1
+  fi
+}
+
 # Checks whether there are any files matching pattern $2 changed between the
 # current branch and upstream branch named by $1.
 # Returns 1 (false) if there are no changes, 0 (true) if there are changes
