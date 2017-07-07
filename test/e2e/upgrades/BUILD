@@ -14,6 +14,7 @@ go_library(
         "configmaps.go",
         "daemonsets.go",
         "deployments.go",
+        "etcd.go",
         "horizontal_pod_autoscalers.go",
         "ingress.go",
         "job.go",
