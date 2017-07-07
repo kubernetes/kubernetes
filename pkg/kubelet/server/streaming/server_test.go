@@ -237,7 +237,7 @@ func TestServePortForward(t *testing.T) {
 	reqURL, err := url.Parse(resp.Url)
 	require.NoError(t, err)
 
-	exec, err := remotecommand.NewExecutor(&restclient.Config{}, "POST", reqURL)
+	exec, err := remotecommand.NewSPDYExecutor(&restclient.Config{}, "POST", reqURL)
 	require.NoError(t, err)
 	streamConn, _, err := exec.Dial(kubeletportforward.ProtocolV1Name)
 	require.NoError(t, err)
@@ -297,7 +297,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 
 	go func() {
 		defer wg.Done()
-		exec, err := remotecommand.NewExecutor(&restclient.Config{}, "POST", reqURL)
+		exec, err := remotecommand.NewSPDYExecutor(&restclient.Config{}, "POST", reqURL)
 		require.NoError(t, err)
 
 		opts := remotecommand.StreamOptions{

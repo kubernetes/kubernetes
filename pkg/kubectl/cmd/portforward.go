@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -102,7 +103,11 @@ type defaultPortForwarder struct {
 }
 
 func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
-	dialer, err := remotecommand.NewExecutor(opts.Config, method, url)
+	transport, upgrader, err := remotecommand.SPDYRoundTripperFor(opts.Config)
+	if err != nil {
+		return err
+	}
+	dialer, err := remotecommand.NewSPDYDialer(upgrader, &http.Client{Transport: transport}, method, url)
 	if err != nil {
 		return err
 	}

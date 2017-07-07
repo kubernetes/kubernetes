@@ -255,7 +255,7 @@ func TestStream(t *testing.T) {
 			conf := &restclient.Config{
 				Host: server.URL,
 			}
-			e, err := remoteclient.NewExecutor(conf, "POST", req.URL())
+			e, err := remoteclient.NewSPDYExecutor(conf, "POST", req.URL())
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", name, err)
 				continue
@@ -352,7 +352,7 @@ func TestDial(t *testing.T) {
 		called = true
 		return rt
 	}
-	exec, err := remoteclient.NewStreamExecutor(upgrader, testFn, "POST", &url.URL{Host: "something.com", Scheme: "https"})
+	exec, err := newStreamExecutor(upgrader, testFn, "POST", &url.URL{Host: "something.com", Scheme: "https"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,4 +367,21 @@ func TestDial(t *testing.T) {
 		t.Errorf("wrapper not called")
 	}
 	_ = protocol
+}
+
+// newStreamExecutor upgrades the request so that it supports multiplexed bidirectional
+// streams. This method takes a stream upgrader and an optional function that is invoked
+// to wrap the round tripper. This method may be used by clients that are lower level than
+// Kubernetes clients or need to provide their own upgrade round tripper.
+func newStreamExecutor(upgrader httpstream.UpgradeRoundTripper, fn func(http.RoundTripper) http.RoundTripper, method string, url *url.URL) (StreamExecutor, error) {
+	rt := http.RoundTripper(upgrader)
+	if fn != nil {
+		rt = fn(rt)
+	}
+	return &streamExecutor{
+		upgrader:  upgrader,
+		transport: rt,
+		method:    method,
+		url:       url,
+	}, nil
 }

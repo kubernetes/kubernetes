@@ -28,7 +28,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api"
@@ -97,17 +96,16 @@ type RemoteAttach interface {
 type DefaultRemoteAttach struct{}
 
 func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
-	exec, err := remotecommand.NewExecutor(config, method, url)
+	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
 	if err != nil {
 		return err
 	}
 	return exec.Stream(remotecommand.StreamOptions{
-		SupportedProtocols: remotecommandconsts.SupportedStreamingProtocols,
-		Stdin:              stdin,
-		Stdout:             stdout,
-		Stderr:             stderr,
-		Tty:                tty,
-		TerminalSizeQueue:  terminalSizeQueue,
+		Stdin:             stdin,
+		Stdout:            stdout,
+		Stderr:            stderr,
+		Tty:               tty,
+		TerminalSizeQueue: terminalSizeQueue,
 	})
 }
 

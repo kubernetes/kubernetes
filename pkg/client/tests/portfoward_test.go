@@ -132,7 +132,7 @@ func TestForwardPorts(t *testing.T) {
 		server := httptest.NewServer(fakePortForwardServer(t, testName, test.serverSends, test.clientSends))
 
 		url, _ := url.Parse(server.URL)
-		exec, err := remotecommand.NewExecutor(&restclient.Config{}, "POST", url)
+		exec, err := remotecommand.NewSPDYExecutor(&restclient.Config{}, "POST", url)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -202,7 +202,7 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	defer server.Close()
 
 	url, _ := url.Parse(server.URL)
-	exec, err := remotecommand.NewExecutor(&restclient.Config{}, "POST", url)
+	exec, err := remotecommand.NewSPDYExecutor(&restclient.Config{}, "POST", url)
 	if err != nil {
 		t.Fatal(err)
 	}
