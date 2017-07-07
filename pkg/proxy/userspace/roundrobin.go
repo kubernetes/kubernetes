@@ -326,13 +326,20 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoin
 	for portname := range oldPortsToEndpoints {
 		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: oldEndpoints.Namespace, Name: oldEndpoints.Name}, Port: portname}
 		if _, exists := registeredEndpoints[svcPort]; !exists {
-			glog.V(2).Infof("LoadBalancerRR: Removing endpoints for %s", svcPort)
-			// Reset but don't delete.
-			state := lb.services[svcPort]
-			state.endpoints = []string{}
-			state.index = 0
-			state.affinity.affinityMap = map[string]*affinityState{}
+			lb.resetService(svcPort)
 		}
+	}
+}
+
+func (lb *LoadBalancerRR) resetService(svcPort proxy.ServicePortName) {
+	// If the service is still around, reset but don't delete.
+	if state, ok := lb.services[svcPort]; ok {
+		if len(state.endpoints) > 0 {
+			glog.V(2).Infof("LoadBalancerRR: Removing endpoints for %s", svcPort)
+			state.endpoints = []string{}
+		}
+		state.index = 0
+		state.affinity.affinityMap = map[string]*affinityState{}
 	}
 }
 
@@ -344,13 +351,7 @@ func (lb *LoadBalancerRR) OnEndpointsDelete(endpoints *api.Endpoints) {
 
 	for portname := range portsToEndpoints {
 		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}, Port: portname}
-		glog.V(2).Infof("LoadBalancerRR: Removing endpoints for %s", svcPort)
-		// If the service is still around, reset but don't delete.
-		if state, ok := lb.services[svcPort]; ok {
-			state.endpoints = []string{}
-			state.index = 0
-			state.affinity.affinityMap = map[string]*affinityState{}
-		}
+		lb.resetService(svcPort)
 	}
 }
 
