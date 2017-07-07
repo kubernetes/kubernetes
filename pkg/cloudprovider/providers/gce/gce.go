@@ -39,6 +39,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	cloudkms "google.golang.org/api/cloudkms/v1"
+	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
@@ -85,6 +86,7 @@ type GCECloud struct {
 
 	service          *compute.Service
 	serviceBeta      *computebeta.Service
+	serviceAlpha     *computealpha.Service
 	containerService *container.Service
 	cloudkmsService  *cloudkms.Service
 	clientBuilder    controller.ControllerClientBuilder
@@ -273,14 +275,22 @@ func CreateGCECloud(apiEndpoint, projectID, networkProjectID, region, zone strin
 		return nil, err
 	}
 
-	if apiEndpoint != "" {
-		service.BasePath = fmt.Sprintf("%sprojects/", apiEndpoint)
-	}
-
 	client, err = newOauthClient(tokenSource)
 	serviceBeta, err := computebeta.New(client)
 	if err != nil {
 		return nil, err
+	}
+
+	client, err = newOauthClient(tokenSource)
+	serviceAlpha, err := computealpha.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	if apiEndpoint != "" {
+		service.BasePath = fmt.Sprintf("%sprojects/", apiEndpoint)
+		serviceBeta.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(apiEndpoint, "v1", "beta", 0))
+		serviceAlpha.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(apiEndpoint, "v1", "alpha", 0))
 	}
 
 	containerService, err := container.New(client)
