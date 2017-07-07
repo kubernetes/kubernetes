@@ -40,6 +40,7 @@ go_test(
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/portforward:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        "//vendor/k8s.io/client-go/transport/spdy:go_default_library",
         "//vendor/k8s.io/client-go/util/testing:go_default_library",
     ],
 )

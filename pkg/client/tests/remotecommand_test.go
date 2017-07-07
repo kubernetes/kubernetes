@@ -37,6 +37,7 @@ import (
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
 	remoteclient "k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/transport/spdy"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -255,17 +256,16 @@ func TestStream(t *testing.T) {
 			conf := &restclient.Config{
 				Host: server.URL,
 			}
-			e, err := remoteclient.NewSPDYExecutor(conf, "POST", req.URL())
+			e, err := remoteclient.NewSPDYExecutorForProtocols(conf, "POST", req.URL(), testCase.ClientProtocols...)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", name, err)
 				continue
 			}
 			err = e.Stream(remoteclient.StreamOptions{
-				SupportedProtocols: testCase.ClientProtocols,
-				Stdin:              streamIn,
-				Stdout:             streamOut,
-				Stderr:             streamErr,
-				Tty:                testCase.Tty,
+				Stdin:  streamIn,
+				Stdout: streamOut,
+				Stderr: streamErr,
+				Tty:    testCase.Tty,
 			})
 			hasErr := err != nil
 
@@ -311,11 +311,13 @@ type fakeUpgrader struct {
 	conn          httpstream.Connection
 	err, connErr  error
 	checkResponse bool
+	called        bool
 
 	t *testing.T
 }
 
 func (u *fakeUpgrader) RoundTrip(req *http.Request) (*http.Response, error) {
+	u.called = true
 	u.req = req
 	return u.resp, u.err
 }
@@ -344,44 +346,16 @@ func TestDial(t *testing.T) {
 			Body:       ioutil.NopCloser(&bytes.Buffer{}),
 		},
 	}
-	var called bool
-	testFn := func(rt http.RoundTripper) http.RoundTripper {
-		if rt != upgrader {
-			t.Fatalf("unexpected round tripper: %#v", rt)
-		}
-		called = true
-		return rt
-	}
-	exec, err := newStreamExecutor(upgrader, testFn, "POST", &url.URL{Host: "something.com", Scheme: "https"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	conn, protocol, err := exec.Dial("protocol1")
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: upgrader}, "POST", &url.URL{Host: "something.com", Scheme: "https"})
+	conn, protocol, err := dialer.Dial("protocol1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if conn != upgrader.conn {
 		t.Errorf("unexpected connection: %#v", conn)
 	}
-	if !called {
-		t.Errorf("wrapper not called")
+	if !upgrader.called {
+		t.Errorf("request not called")
 	}
 	_ = protocol
-}
-
-// newStreamExecutor upgrades the request so that it supports multiplexed bidirectional
-// streams. This method takes a stream upgrader and an optional function that is invoked
-// to wrap the round tripper. This method may be used by clients that are lower level than
-// Kubernetes clients or need to provide their own upgrade round tripper.
-func newStreamExecutor(upgrader httpstream.UpgradeRoundTripper, fn func(http.RoundTripper) http.RoundTripper, method string, url *url.URL) (StreamExecutor, error) {
-	rt := http.RoundTripper(upgrader)
-	if fn != nil {
-		rt = fn(rt)
-	}
-	return &streamExecutor{
-		upgrader:  upgrader,
-		transport: rt,
-		method:    method,
-		url:       url,
-	}, nil
 }
