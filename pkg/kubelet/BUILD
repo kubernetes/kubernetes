@@ -167,6 +167,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/install:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",

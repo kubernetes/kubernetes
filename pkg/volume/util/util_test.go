@@ -23,6 +23,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	// util.go uses api.Codecs.LegacyCodec so import this package to do some
+	// resource initialization.
+	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/v1/helper"
 )
 

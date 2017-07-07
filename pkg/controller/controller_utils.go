@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/api/install"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/ref"
