@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/golang/glog"
+
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
@@ -37,6 +40,10 @@ func NewExternalAdmissionHookConfigurationManager(c ExternalAdmissionHookConfigu
 	getFn := func() (runtime.Object, error) {
 		list, err := c.List(metav1.ListOptions{})
 		if err != nil {
+			if errors.IsNotFound(err) || errors.IsForbidden(err) {
+				glog.V(5).Infof("ExternalAdmissionHookConfiguration are disabled due to an error: %v", err)
+				return nil, ErrDisabled
+			}
 			return nil, err
 		}
 		return mergeExternalAdmissionHookConfigurations(list), nil
