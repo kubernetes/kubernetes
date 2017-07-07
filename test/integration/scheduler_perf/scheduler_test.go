@@ -42,7 +42,7 @@ func TestSchedule100Node3KPods(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping because we want to run short tests")
 	}
-	config := getBaseConfig(1000, 30000)
+	config := getBaseConfig(100, 3000)
 	writePodAndNodeTopologyToConfig(config)
 	min := schedulePods(config)
 	if min < threshold3K {
