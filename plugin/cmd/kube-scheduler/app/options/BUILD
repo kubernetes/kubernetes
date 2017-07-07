@@ -16,7 +16,7 @@ go_library(
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/install:go_default_library",
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
-        "//pkg/client/leaderelection:go_default_library",
+        "//pkg/client/leaderelectionconfig:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//plugin/pkg/scheduler/factory:go_default_library",
