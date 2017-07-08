@@ -65,7 +65,7 @@ through the API as necessary.`,
 
 // Run runs the specified SchedulerServer.  This should never exit.
 func Run(s *options.SchedulerServer) error {
-	kubecli, err := createClient(s)
+	kubecli, clientgoCli, err := createClient(s)
 	if err != nil {
 		return fmt.Errorf("unable to create kube client: %v", err)
 	}
@@ -121,7 +121,7 @@ func Run(s *options.SchedulerServer) error {
 	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
 		s.LockObjectNamespace,
 		s.LockObjectName,
-		kubecli,
+		clientgoCli,
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
