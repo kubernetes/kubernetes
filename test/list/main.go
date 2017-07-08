@@ -27,6 +27,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -35,12 +36,15 @@ var (
 	dumpTree = flag.Bool("dump", false, "print AST")
 	dumpJson = flag.Bool("json", false, "output test list as JSON")
 	warn     = flag.Bool("warn", false, "print warnings")
+
+	ownerRe = regexp.MustCompile(`(?m)^//\s?OWNER\s?=\s?(sig/\S*)`)
 )
 
 type Test struct {
 	Loc      string
 	Name     string
 	TestName string
+	Owner    string `json:omitempty`
 }
 
 // collect extracts test metadata from a file.
@@ -77,8 +81,28 @@ func collect(filename string, src interface{}) []Test {
 			}
 			name := funcdecl.Name.Name
 			if strings.HasPrefix(name, "Test") {
-				tests = append(tests, Test{fset.Position(funcdecl.Pos()).String(), testPath, name})
+				tests = append(tests, Test{
+					Loc:      fset.Position(funcdecl.Pos()).String(),
+					Name:     testPath,
+					TestName: name,
+				})
 			}
+		}
+	}
+
+	// Look for owner in package-level comments.
+	var owner string
+	for _, cg := range f.Comments {
+		for _, c := range cg.List {
+			m := ownerRe.FindStringSubmatch(c.Text)
+			if m != nil {
+				owner = m[1]
+			}
+		}
+	}
+	if owner != "" {
+		for i := 0; i < len(tests); i++ {
+			tests[i].Owner = owner
 		}
 	}
 
@@ -198,7 +222,11 @@ func (w *walker) Visit(n ast.Node) ast.Visitor {
 			if w.path == "[k8s.io]" && *warn {
 				log.Printf("It without matching Describe: %s\n", w.fset.Position(n.Pos()))
 			}
-			*w.tests = append(*w.tests, Test{w.fset.Position(n.Pos()).String(), w.path, name})
+			*w.tests = append(*w.tests, Test{
+				Loc:      w.fset.Position(n.Pos()).String(),
+				Name:     w.path,
+				TestName: name,
+			})
 			return nil // Stop walking
 		}
 	case *ast.AssignStmt:

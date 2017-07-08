@@ -35,19 +35,19 @@ var collectCases = []struct {
 var num = 3
 func Helper(x int) { return x / 0 }
 func TestStuff(t *Testing.T) {
-}`, []Test{{"test/list/main_test.go:5:1", "k8s.io/kubernetes/test/list", "TestStuff"}},
+}`, []Test{{"test/list/main_test.go:5:1", "k8s.io/kubernetes/test/list", "TestStuff", ""}},
 	},
 	// Describe + It
 	{"e2e/foo.go", `
 var _ = Describe("Feature", func() {
 	It("should work properly", func() {})
-})`, []Test{{"e2e/foo.go:4:2", "[k8s.io] Feature", "should work properly"}},
+})`, []Test{{"e2e/foo.go:4:2", "[k8s.io] Feature", "should work properly", ""}},
 	},
 	// KubeDescribe + It
 	{"e2e/foo.go", `
 var _ = framework.KubeDescribe("Feature", func() {
 	It("should work properly", func() {})
-})`, []Test{{"e2e/foo.go:4:2", "[k8s.io] Feature", "should work properly"}},
+})`, []Test{{"e2e/foo.go:4:2", "[k8s.io] Feature", "should work properly", ""}},
 	},
 	// KubeDescribe + Context + It
 	{"e2e/foo.go", `
@@ -55,33 +55,41 @@ var _ = framework.KubeDescribe("Feature", func() {
 	Context("when offline", func() {
 		It("should work", func() {})
 	})
-})`, []Test{{"e2e/foo.go:5:3", "[k8s.io] Feature when offline", "should work"}},
+})`, []Test{{"e2e/foo.go:5:3", "[k8s.io] Feature when offline", "should work", ""}},
 	},
 	// KubeDescribe + It(Sprintf)
 	{"e2e/foo.go", `
 var _ = framework.KubeDescribe("Feature", func() {
 	It(fmt.Sprintf("handles %d nodes", num), func() {})
-})`, []Test{{"e2e/foo.go:4:2", "[k8s.io] Feature", "handles * nodes"}},
+})`, []Test{{"e2e/foo.go:4:2", "[k8s.io] Feature", "handles * nodes", ""}},
 	},
 	// KubeDescribe + Sprintf + It(var)
 	{"e2e/foo.go", `
 var _ = framework.KubeDescribe("Feature", func() {
 	arg := fmt.Sprintf("does %s and %v at %d", task, desc, num)
 	It(arg, func() {})
-})`, []Test{{"e2e/foo.go:5:2", "[k8s.io] Feature", "does * and * at *"}},
+})`, []Test{{"e2e/foo.go:5:2", "[k8s.io] Feature", "does * and * at *", ""}},
 	},
 	// KubeDescribe + string + It(var)
 	{"e2e/foo.go", `
 var _ = framework.KubeDescribe("Feature", func() {
 	arg := "does stuff"
 	It(arg, func() {})
-})`, []Test{{"e2e/foo.go:5:2", "[k8s.io] Feature", "does stuff"}},
+})`, []Test{{"e2e/foo.go:5:2", "[k8s.io] Feature", "does stuff", ""}},
 	},
 	// KubeDescribe + It(unknown)
 	{"e2e/foo.go", `
 var _ = framework.KubeDescribe("Feature", func() {
 	It(mysteryFunc(), func() {})
-})`, []Test{{"e2e/foo.go:4:2", "[k8s.io] Feature", "*"}},
+})`, []Test{{"e2e/foo.go:4:2", "[k8s.io] Feature", "*", ""}},
+	},
+	// Go unit test + owners
+	{"test/list/main_test.go", `
+// OWNER = sig/testing
+var num = 3
+func Helper(x int) { return x / 0 }
+func TestStuff(t *Testing.T) {
+}`, []Test{{"test/list/main_test.go:6:1", "k8s.io/kubernetes/test/list", "TestStuff", "sig/testing"}},
 	},
 }
 
