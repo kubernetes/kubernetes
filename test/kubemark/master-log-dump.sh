@@ -25,4 +25,4 @@ source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 detect-master
 
 echo "Dumping logs for kubemark master: ${MASTER_NAME}"
-DUMP_ONLY_MASTER_LOGS=true ${KUBE_ROOT}/cluster/log-dump.sh "${REPORT_DIR}"
+DUMP_ONLY_MASTER_LOGS=true ${KUBE_ROOT}/cluster/log-dump/log-dump.sh "${REPORT_DIR}"
