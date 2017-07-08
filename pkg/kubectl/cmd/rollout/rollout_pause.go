@@ -75,16 +75,18 @@ func NewCmdRolloutPause(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    pause_long,
 		Example: pause_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			allErrs := []error{}
-			err := options.CompletePause(f, cmd, out, args)
-			if err != nil {
-				allErrs = append(allErrs, err)
+			completeErr := options.CompletePause(f, cmd, out, args)
+			if completeErr != nil {
+				// Allow to proceed with objects we were able to collect and fail later.
+				if len(options.Infos) == 0 {
+					cmdutil.CheckErr(completeErr)
+				}
 			}
-			err = options.RunPause()
-			if err != nil {
-				allErrs = append(allErrs, err)
+			err := options.RunPause()
+			if err == nil {
+				err = completeErr
 			}
-			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
+			cmdutil.CheckErr(err)
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
