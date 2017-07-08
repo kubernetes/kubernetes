@@ -18,17 +18,20 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
+func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0, the default interface's IP address is used
 	// This is the same logic as the API Server uses
@@ -54,20 +57,27 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
 	}
 
-	fmt.Printf("[init] Using Kubernetes version: %s\n", cfg.KubernetesVersion)
-	fmt.Printf("[init] Using Authorization modes: %v\n", cfg.AuthorizationModes)
-
-	// Warn about the limitations with the current cloudprovider solution.
-	if cfg.CloudProvider != "" {
-		fmt.Println("[init] WARNING: For cloudprovider integrations to work --cloud-provider must be set for all kubelets in the cluster.")
-		fmt.Println("\t(/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)")
-	}
-
 	if cfg.Token == "" {
 		var err error
 		cfg.Token, err = tokenutil.GenerateToken()
 		if err != nil {
 			return fmt.Errorf("couldn't generate random token: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// TryLoadMasterConfiguration tries to loads a Master configuration from the given file (if defined)
+func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapi.MasterConfiguration) error {
+
+	if cfgPath != "" {
+		b, err := ioutil.ReadFile(cfgPath)
+		if err != nil {
+			return fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
+		}
+		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), b, cfg); err != nil {
+			return fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}
 

@@ -37,10 +37,12 @@ const (
 	APIServerCertAndKeyBaseName = "apiserver"
 	APIServerCertName           = "apiserver.crt"
 	APIServerKeyName            = "apiserver.key"
+	APIServerCertCommonName     = "kube-apiserver" //used as subject.commonname attribute (CN)
 
 	APIServerKubeletClientCertAndKeyBaseName = "apiserver-kubelet-client"
 	APIServerKubeletClientCertName           = "apiserver-kubelet-client.crt"
 	APIServerKubeletClientKeyName            = "apiserver-kubelet-client.key"
+	APIServerKubeletClientCertCommonName     = "kube-apiserver-kubelet-client" //used as subject.commonname attribute (CN)
 
 	ServiceAccountKeyBaseName    = "sa"
 	ServiceAccountPublicKeyName  = "sa.pub"
@@ -53,6 +55,7 @@ const (
 	FrontProxyClientCertAndKeyBaseName = "front-proxy-client"
 	FrontProxyClientCertName           = "front-proxy-client.crt"
 	FrontProxyClientKeyName            = "front-proxy-client.key"
+	FrontProxyClientCertCommonName     = "front-proxy-client" //used as subject.commonname attribute (CN)
 
 	AdminKubeConfigFileName             = "admin.conf"
 	KubeletKubeConfigFileName           = "kubelet.conf"

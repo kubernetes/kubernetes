@@ -13,7 +13,6 @@ go_library(
     srcs = [
         "cmd.go",
         "completion.go",
-        "defaults.go",
         "init.go",
         "join.go",
         "reset.go",
@@ -31,13 +30,13 @@ go_library(
         "//cmd/kubeadm/app/node:go_default_library",
         "//cmd/kubeadm/app/phases/addons:go_default_library",
         "//cmd/kubeadm/app/phases/apiconfig:go_default_library",
-        "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/phases/selfhosting:go_default_library",
         "//cmd/kubeadm/app/phases/token:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
+        "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/util/token:go_default_library",
         "//pkg/api:go_default_library",
@@ -55,7 +54,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
@@ -66,7 +64,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "defaults_test.go",
         "reset_test.go",
         "token_test.go",
     ],
