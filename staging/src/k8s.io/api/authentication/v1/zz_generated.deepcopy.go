@@ -96,7 +96,7 @@ func DeepCopy_v1_UserInfo(in interface{}, out interface{}, c *conversion.Cloner)
 		}
 		if in.Extra != nil {
 			in, out := &in.Extra, &out.Extra
-			*out = make(map[string]ExtraValue)
+			*out = make(map[string]ExtraValue, len(*in))
 			for key, val := range *in {
 				if newVal, err := c.DeepCopy(&val); err != nil {
 					return err

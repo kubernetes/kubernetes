@@ -358,7 +358,7 @@ func DeepCopy_v1_LabelSelector(in interface{}, out interface{}, c *conversion.Cl
 		*out = *in
 		if in.MatchLabels != nil {
 			in, out := &in.MatchLabels, &out.MatchLabels
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
@@ -447,14 +447,14 @@ func DeepCopy_v1_ObjectMeta(in interface{}, out interface{}, c *conversion.Clone
 		}
 		if in.Labels != nil {
 			in, out := &in.Labels, &out.Labels
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
 		}
 		if in.Annotations != nil {
 			in, out := &in.Annotations, &out.Annotations
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}

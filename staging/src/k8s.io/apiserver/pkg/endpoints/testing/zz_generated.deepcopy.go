@@ -50,7 +50,7 @@ func DeepCopy_testing_Simple(in interface{}, out interface{}, c *conversion.Clon
 		}
 		if in.Labels != nil {
 			in, out := &in.Labels, &out.Labels
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
@@ -103,7 +103,7 @@ func DeepCopy_testing_SimpleRoot(in interface{}, out interface{}, c *conversion.
 		}
 		if in.Labels != nil {
 			in, out := &in.Labels, &out.Labels
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
@@ -125,7 +125,7 @@ func DeepCopy_testing_SimpleXGSubresource(in interface{}, out interface{}, c *co
 		}
 		if in.Labels != nil {
 			in, out := &in.Labels, &out.Labels
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}

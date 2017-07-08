@@ -328,7 +328,7 @@ func DeepCopy_extensions_DeploymentRollback(in interface{}, out interface{}, c *
 		*out = *in
 		if in.UpdatedAnnotations != nil {
 			in, out := &in.UpdatedAnnotations, &out.UpdatedAnnotations
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}

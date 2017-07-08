@@ -449,7 +449,7 @@ func DeepCopy_api_ConfigMap(in interface{}, out interface{}, c *conversion.Clone
 		}
 		if in.Data != nil {
 			in, out := &in.Data, &out.Data
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
@@ -1142,7 +1142,7 @@ func DeepCopy_api_FlexVolumeSource(in interface{}, out interface{}, c *conversio
 		}
 		if in.Options != nil {
 			in, out := &in.Options, &out.Options
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
@@ -1355,35 +1355,35 @@ func DeepCopy_api_LimitRangeItem(in interface{}, out interface{}, c *conversion.
 		*out = *in
 		if in.Max != nil {
 			in, out := &in.Max, &out.Max
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
 		}
 		if in.Min != nil {
 			in, out := &in.Min, &out.Min
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
 		}
 		if in.Default != nil {
 			in, out := &in.Default, &out.Default
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
 		}
 		if in.DefaultRequest != nil {
 			in, out := &in.DefaultRequest, &out.DefaultRequest
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
 		}
 		if in.MaxLimitRequestRatio != nil {
 			in, out := &in.MaxLimitRequestRatio, &out.MaxLimitRequestRatio
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
@@ -1715,7 +1715,7 @@ func DeepCopy_api_NodeResources(in interface{}, out interface{}, c *conversion.C
 		*out = *in
 		if in.Capacity != nil {
 			in, out := &in.Capacity, &out.Capacity
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
@@ -1804,14 +1804,14 @@ func DeepCopy_api_NodeStatus(in interface{}, out interface{}, c *conversion.Clon
 		*out = *in
 		if in.Capacity != nil {
 			in, out := &in.Capacity, &out.Capacity
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
 		}
 		if in.Allocatable != nil {
 			in, out := &in.Allocatable, &out.Allocatable
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
@@ -1892,14 +1892,14 @@ func DeepCopy_api_ObjectMeta(in interface{}, out interface{}, c *conversion.Clon
 		}
 		if in.Labels != nil {
 			in, out := &in.Labels, &out.Labels
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
 		}
 		if in.Annotations != nil {
 			in, out := &in.Annotations, &out.Annotations
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
@@ -2044,7 +2044,7 @@ func DeepCopy_api_PersistentVolumeClaimStatus(in interface{}, out interface{}, c
 		}
 		if in.Capacity != nil {
 			in, out := &in.Capacity, &out.Capacity
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
@@ -2221,7 +2221,7 @@ func DeepCopy_api_PersistentVolumeSpec(in interface{}, out interface{}, c *conve
 		*out = *in
 		if in.Capacity != nil {
 			in, out := &in.Capacity, &out.Capacity
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
@@ -2572,7 +2572,7 @@ func DeepCopy_api_PodSpec(in interface{}, out interface{}, c *conversion.Cloner)
 		}
 		if in.NodeSelector != nil {
 			in, out := &in.NodeSelector, &out.NodeSelector
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
@@ -2941,7 +2941,7 @@ func DeepCopy_api_ReplicationControllerSpec(in interface{}, out interface{}, c *
 		*out = *in
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
@@ -3035,7 +3035,7 @@ func DeepCopy_api_ResourceQuotaSpec(in interface{}, out interface{}, c *conversi
 		*out = *in
 		if in.Hard != nil {
 			in, out := &in.Hard, &out.Hard
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
@@ -3057,14 +3057,14 @@ func DeepCopy_api_ResourceQuotaStatus(in interface{}, out interface{}, c *conver
 		*out = *in
 		if in.Hard != nil {
 			in, out := &in.Hard, &out.Hard
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
 		}
 		if in.Used != nil {
 			in, out := &in.Used, &out.Used
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
@@ -3081,14 +3081,14 @@ func DeepCopy_api_ResourceRequirements(in interface{}, out interface{}, c *conve
 		*out = *in
 		if in.Limits != nil {
 			in, out := &in.Limits, &out.Limits
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
 		}
 		if in.Requests != nil {
 			in, out := &in.Requests, &out.Requests
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
@@ -3135,7 +3135,7 @@ func DeepCopy_api_Secret(in interface{}, out interface{}, c *conversion.Cloner) 
 		}
 		if in.Data != nil {
 			in, out := &in.Data, &out.Data
-			*out = make(map[string][]byte)
+			*out = make(map[string][]byte, len(*in))
 			for key, val := range *in {
 				if newVal, err := c.DeepCopy(&val); err != nil {
 					return err
@@ -3424,7 +3424,7 @@ func DeepCopy_api_ServiceSpec(in interface{}, out interface{}, c *conversion.Clo
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}

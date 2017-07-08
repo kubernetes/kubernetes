@@ -232,14 +232,14 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		}
 		if in.NodeLabels != nil {
 			in, out := &in.NodeLabels, &out.NodeLabels
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
 		}
 		if in.ExperimentalQOSReserved != nil {
 			in, out := &in.ExperimentalQOSReserved, &out.ExperimentalQOSReserved
-			*out = make(ConfigurationMap)
+			*out = make(ConfigurationMap, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
@@ -251,14 +251,14 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		}
 		if in.SystemReserved != nil {
 			in, out := &in.SystemReserved, &out.SystemReserved
-			*out = make(ConfigurationMap)
+			*out = make(ConfigurationMap, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
 		}
 		if in.KubeReserved != nil {
 			in, out := &in.KubeReserved, &out.KubeReserved
-			*out = make(ConfigurationMap)
+			*out = make(ConfigurationMap, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}

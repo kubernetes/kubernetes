@@ -119,7 +119,7 @@ func DeepCopy_v1_PodSpec(in interface{}, out interface{}, c *conversion.Cloner) 
 		}
 		if in.NodeSelector != nil {
 			in, out := &in.NodeSelector, &out.NodeSelector
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}

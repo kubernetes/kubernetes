@@ -53,7 +53,7 @@ func DeepCopy_v1_StorageClass(in interface{}, out interface{}, c *conversion.Clo
 		}
 		if in.Parameters != nil {
 			in, out := &in.Parameters, &out.Parameters
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}

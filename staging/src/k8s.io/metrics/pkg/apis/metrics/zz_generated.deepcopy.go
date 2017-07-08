@@ -51,7 +51,7 @@ func DeepCopy_metrics_ContainerMetrics(in interface{}, out interface{}, c *conve
 		*out = *in
 		if in.Usage != nil {
 			in, out := &in.Usage, &out.Usage
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
@@ -74,7 +74,7 @@ func DeepCopy_metrics_NodeMetrics(in interface{}, out interface{}, c *conversion
 		out.Timestamp = in.Timestamp.DeepCopy()
 		if in.Usage != nil {
 			in, out := &in.Usage, &out.Usage
-			*out = make(ResourceList)
+			*out = make(ResourceList, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
