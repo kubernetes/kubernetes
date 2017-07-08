@@ -117,3 +117,29 @@ func TestHandlePath(t *testing.T) {
 		t.Error("should skip third_party")
 	}
 }
+
+func TestPrefixes(t *testing.T) {
+	cases := []struct {
+		tests    []Test
+		expected map[string][]string
+	}{
+		{
+			[]Test{Test{Name: "some example", Owner: "a"}, Test{Name: "some other example", Owner: "b"}},
+			map[string][]string{"a": []string{"some example"}, "b": []string{"some other"}},
+		},
+		{
+			[]Test{
+				Test{Name: "ClusterDns blah", Owner: "n"},
+				Test{Name: "Cluster Level does stuff", Owner: "b"},
+				Test{Name: "Cluster Level does other stuff", Owner: "b"},
+			},
+			map[string][]string{"n": []string{"ClusterDns"}, "b": []string{"Cluster Level"}},
+		},
+	}
+	for _, tc := range cases {
+		actual := makePrefixes(tc.tests)
+		if !reflect.DeepEqual(actual, tc.expected) {
+			t.Errorf("Tests:\n%s\ngot %v\nwant %v", tc.tests, actual, tc.expected)
+		}
+	}
+}

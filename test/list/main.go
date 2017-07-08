@@ -33,11 +33,13 @@ import (
 )
 
 var (
-	dumpTree = flag.Bool("dump", false, "print AST")
-	dumpJson = flag.Bool("json", false, "output test list as JSON")
-	warn     = flag.Bool("warn", false, "print warnings")
+	dumpTree     = flag.Bool("dump", false, "print AST")
+	dumpJson     = flag.Bool("json", false, "output test list as JSON")
+	dumpPrefixes = flag.Bool("prefixes", false, "output owner prefixes as JSON")
+	warn         = flag.Bool("warn", false, "print warnings")
 
-	ownerRe = regexp.MustCompile(`(?m)^//\s?OWNER\s?=\s?(sig/\S*)`)
+	ownerRe           = regexp.MustCompile(`(?m)^//\s?OWNER\s?=\s?(sig/\S*)`)
+	normalizeBracesRe = regexp.MustCompile(`\[.*?\]\s*|\{.*?\}\s*`)
 )
 
 type Test struct {
@@ -277,6 +279,63 @@ func (t *testList) handlePath(path string, info os.FileInfo, err error) error {
 	return nil
 }
 
+// Given a test name, strip unnecessary extra braces.
+func normalize(name string) string {
+	return normalizeBracesRe.ReplaceAllString(name, "")
+}
+
+// Given a list of tests with owners, return a list of prefixes that uniquely
+// assign each test to an owner.
+func makePrefixes(tests []Test) map[string][]string {
+	owners := make(map[string]string)
+	for _, test := range tests {
+		if test.Owner != "" {
+			owners[normalize(test.Name+" "+test.TestName)] = test.Owner
+		}
+	}
+	// Returns empty slice if any tests with this prefix have a different owner.
+	FindMatches := func(prefix, prefixOwner string) []string {
+		r := []string{}
+		for name, owner := range owners {
+			if strings.HasPrefix(name, prefix) {
+				if owner != prefixOwner {
+					return []string{}
+				} else {
+					r = append(r, name)
+				}
+			}
+		}
+		return r
+	}
+
+	for changed := true; changed; {
+		changed = false
+		for name, owner := range owners {
+			// try removing the last word in the name, use it if all tests beginning
+			// with this shorter name share the same owner.
+			lastIndex := strings.LastIndex(name, " ")
+			if lastIndex > 0 {
+				newPrefix := name[:lastIndex]
+				matches := FindMatches(newPrefix, owner)
+				if len(matches) > 0 {
+					changed = true
+					for _, matchName := range matches {
+						delete(owners, matchName)
+					}
+					owners[newPrefix] = owner
+					break
+				}
+			}
+		}
+	}
+
+	ret := make(map[string][]string)
+	for name, owner := range owners {
+		ret[owner] = append(ret[owner], name)
+	}
+	return ret
+}
+
 func main() {
 	flag.Parse()
 	args := flag.Args()
@@ -290,7 +349,13 @@ func main() {
 			log.Fatalf("Error walking: %v", err)
 		}
 	}
-	if *dumpJson {
+	if *dumpPrefixes {
+		json, err := json.MarshalIndent(makePrefixes(tests.tests), "", "    ")
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(string(json))
+	} else if *dumpJson {
 		json, err := json.Marshal(tests.tests)
 		if err != nil {
 			log.Fatal(err)
