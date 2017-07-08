@@ -19,10 +19,6 @@ for client-go.
 
 - [**Work queues**](./workqueue): Create a hotloop-free controller with the
   rate-limited workqueue and the [informer framework][informer].
-- [**Third-party resources (deprecated)**](./third-party-resources-deprecated):
-  Register a third-party resource type with the API, create/update/query this third-party
-  type, and write a controller that drives the cluster state based on the changes to
-  the third-party resources.
 - [**Custom Resource Definition (successor of TPR)**](https://git.k8s.io/apiextensions-apiserver/examples/client-go):
   Register a custom resource type with the API, create/update/query this custom
   type, and write a controller that drives the cluster state based on the changes to
