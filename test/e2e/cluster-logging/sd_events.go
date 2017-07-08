@@ -73,7 +73,7 @@ var _ = framework.KubeDescribe("Cluster level logging implemented by Stackdriver
 		By("Running pods to generate events while waiting for some of them to be ingested")
 		wait.PollUntil(eventCreationInterval, func() (bool, error) {
 			podName := "synthlogger"
-			createLoggingPod(f, podName, "", 1, 1*time.Second)
+			startNewLoggingPod(f, podName, "", 1, 1*time.Second)
 			defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
 			err = framework.WaitForPodSuccessInNamespace(f.ClientSet, podName, f.Namespace.Name)
 			if err != nil {
