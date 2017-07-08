@@ -244,18 +244,18 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 		}
 		oldData, err := json.Marshal(node)
 		if err != nil {
-			return fmt.Errorf("failed to marshal old node %#v for node %q: %v", node, data.nodeName, err)
+			return fmt.Errorf("Failed to json.Marshal(%#v) for node %q: %v", node, data.nodeName, err)
 		}
 
 		node.Spec.PodCIDR = data.cidr.String()
 
 		newData, err := json.Marshal(node)
 		if err != nil {
-			return fmt.Errorf("failed to marshal modified node %#v for node %q: %v", node, data.nodeName, err)
+			return fmt.Errorf("Failed to json.Marshal(%#v) for updated node %q: %v", node, data.nodeName, err)
 		}
 
 		if err := patchNode(r.client, oldData, newData, data.nodeName); err != nil {
-			glog.Errorf("Failed while patching Node.Spec.PodCIDR (%d retries left): %v", podCIDRUpdateRetry-rep-1, err)
+			glog.Errorf("Failed while patching Node.Spec.PodCIDR for node %v (%d retries): %v", node, rep+1, err)
 		} else {
 			break
 		}
@@ -278,7 +278,7 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 func patchNode(c clientset.Interface, oldData, newData []byte, nodeName string) error {
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
 	if err != nil {
-		return fmt.Errorf("failed to create patch for node %q: %v", nodeName, err)
+		return fmt.Errorf("Error creating patch for node %q: %v", nodeName, err)
 	}
 
 	_, err = c.Core().Nodes().Patch(string(nodeName), types.StrategicMergePatchType, patchBytes)
