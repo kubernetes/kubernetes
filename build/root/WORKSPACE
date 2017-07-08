@@ -24,9 +24,9 @@ http_archive(
 
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "bbf0ea808ab6c599307b321f360aef2e6a31da4a35aaf14eca305c9878cca0b3",
-    strip_prefix = "rules_docker-d0cf5ea34a6f900370b91227b95e9f0a13722c70",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/d0cf5ea34a6f900370b91227b95e9f0a13722c70.tar.gz"],
+    sha256 = "40d780165c0b9fbb3ddca858df7347381af0e87e430c74863e4ce9d6f6441023",
+    strip_prefix = "rules_docker-8359263f35227a3634ea023ff4ae163189eb4b26",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/8359263f35227a3634ea023ff4ae163189eb4b26.tar.gz"],
 )
 
 load("@io_bazel_rules_go//go:def.bzl", "go_repositories")
