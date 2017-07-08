@@ -67,3 +67,14 @@ type SimpleList struct {
 }
 
 func (obj *SimpleList) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
+
+// SimpleXGSubresource is a cross group subresource, i.e. the subresource does not belong to the
+// same group as its parent resource.
+type SimpleXGSubresource struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
+	SubresourceInfo   string            `json:"subresourceInfo,omitempty"`
+	Labels            map[string]string `json:"labels,omitempty"`
+}
+
+func (obj *SimpleXGSubresource) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
