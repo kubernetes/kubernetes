@@ -95,7 +95,6 @@ go_library(
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/kubectl/util:go_default_library",
         "//pkg/kubectl/util/term:go_default_library",
-        "//pkg/kubelet/types:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/util/exec:go_default_library",
