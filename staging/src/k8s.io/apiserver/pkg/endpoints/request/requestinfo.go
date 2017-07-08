@@ -195,12 +195,17 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 	// if there's no name on the request and we thought it was a get before, then the actual verb is a list or a watch
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
 		// Assumes v1.ListOptions
-		// Duplicates logic of Convert_Slice_string_To_bool
-		switch strings.ToLower(req.URL.Query().Get("watch")) {
-		case "false", "0", "":
+		// Any query value that is not 0 or false is considered true
+		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
+		if values := req.URL.Query()["watch"]; len(values) > 0 {
+			switch strings.ToLower(values[0]) {
+			case "false", "0":
+				requestInfo.Verb = "list"
+			default:
+				requestInfo.Verb = "watch"
+			}
+		} else {
 			requestInfo.Verb = "list"
-		default:
-			requestInfo.Verb = "watch"
 		}
 	}
 	// if there's no name on the request and we thought it was a delete before, then the actual verb is deletecollection
