@@ -84,7 +84,7 @@ var (
 
 	// TODO: consider having 'KIND' for third party resource data
 	thirdPartyResourceDataColumns    = []string{"NAME", "LABELS", "DATA"}
-	horizontalPodAutoscalerColumns   = []string{"NAME", "REFERENCE", "TARGETS", "MINPODS", "MAXPODS", "REPLICAS", "AGE"}
+	horizontalPodAutoscalerColumns   = []string{"NAME", "REFERENCE", "TARGETS", "MINPODS", "MAXPODS", "DESIRED", "CURRENT", "AGE"}
 	deploymentColumns                = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
 	deploymentWideColumns            = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 	configMapColumns                 = []string{"NAME", "DATA", "AGE"}
@@ -1634,6 +1634,7 @@ func printHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, w io
 		minPods = fmt.Sprintf("%d", *hpa.Spec.MinReplicas)
 	}
 	maxPods := hpa.Spec.MaxReplicas
+	desiredReplicas := hpa.Status.DesiredReplicas
 	currentReplicas := hpa.Status.CurrentReplicas
 
 	if options.WithNamespace {
@@ -1642,12 +1643,13 @@ func printHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, w io
 		}
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%d\t%s",
 		name,
 		reference,
 		metrics,
 		minPods,
 		maxPods,
+		desiredReplicas,
 		currentReplicas,
 		translateTimestamp(hpa.CreationTimestamp),
 	); err != nil {

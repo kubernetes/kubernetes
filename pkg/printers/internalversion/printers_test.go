@@ -2014,7 +2014,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<none>\t<unset>\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t<none>\t<unset>\t10\t5\t4\t<unknown>\n",
 		},
 		// pods source type (no current)
 		{
@@ -2042,7 +2042,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown> / 100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t<unknown> / 100m\t2\t10\t5\t4\t<unknown>\n",
 		},
 		// pods source type
 		{
@@ -2079,7 +2079,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m / 100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t50m / 100m\t2\t10\t5\t4\t<unknown>\n",
 		},
 		// object source type (no current)
 		{
@@ -2111,7 +2111,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown> / 100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t<unknown> / 100m\t2\t10\t5\t4\t<unknown>\n",
 		},
 		// object source type
 		{
@@ -2156,7 +2156,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m / 100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t50m / 100m\t2\t10\t5\t4\t<unknown>\n",
 		},
 		// resource source type, targetVal (no current)
 		{
@@ -2184,7 +2184,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown> / 100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t<unknown> / 100m\t2\t10\t5\t4\t<unknown>\n",
 		},
 		// resource source type, targetVal
 		{
@@ -2221,7 +2221,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m / 100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t50m / 100m\t2\t10\t5\t4\t<unknown>\n",
 		},
 		// resource source type, targetUtil (no current)
 		{
@@ -2249,7 +2249,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown> / 80%\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t<unknown> / 80%\t2\t10\t5\t4\t<unknown>\n",
 		},
 		// resource source type, targetUtil
 		{
@@ -2287,7 +2287,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50% / 80%\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t50% / 80%\t2\t10\t5\t4\t<unknown>\n",
 		},
 		// multiple specs
 		{
@@ -2346,7 +2346,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m / 100m, 50% / 80% + 1 more...\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t50m / 100m, 50% / 80% + 1 more...\t2\t10\t5\t4\t<unknown>\n",
 		},
 	}
 
