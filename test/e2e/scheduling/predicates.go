@@ -276,7 +276,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
-		_ = createPausePod(f, pausePodConfig{
+		createPausePod(f, pausePodConfig{
 			Name: labelPodName,
 			NodeSelector: map[string]string{
 				"kubernetes.io/hostname": nodeName,
@@ -350,7 +350,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
-		_ = createPausePod(f, pausePodConfig{
+		createPausePod(f, pausePodConfig{
 			Name: labelPodName,
 			Affinity: &v1.Affinity{
 				NodeAffinity: &v1.NodeAffinity{
@@ -463,7 +463,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to launch the pod, now with podAffinity.")
 		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
-		_ = createPausePod(f, pausePodConfig{
+		createPausePod(f, pausePodConfig{
 			Name: labelPodName,
 			Affinity: &v1.Affinity{
 				PodAffinity: &v1.PodAffinity{
@@ -574,7 +574,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to launch the pod, now with multiple pod affinities with diff LabelOperators.")
 		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
-		_ = createPausePod(f, pausePodConfig{
+		createPausePod(f, pausePodConfig{
 			Name: labelPodName,
 			Affinity: &v1.Affinity{
 				PodAffinity: &v1.PodAffinity{
@@ -689,7 +689,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to relaunch the pod, now with tolerations.")
 		tolerationPodName := "with-tolerations"
-		_ = createPausePod(f, pausePodConfig{
+		createPausePod(f, pausePodConfig{
 			Name:         tolerationPodName,
 			Tolerations:  []v1.Toleration{{Key: testTaint.Key, Value: testTaint.Value, Effect: testTaint.Effect}},
 			NodeSelector: map[string]string{labelKey: labelValue},
