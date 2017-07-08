@@ -42,10 +42,6 @@ type APIRegistrationManager struct {
 	// registeredGroupVersions stores all API group versions for which RegisterGroup is called.
 	registeredVersions map[schema.GroupVersion]struct{}
 
-	// thirdPartyGroupVersions are API versions which are dynamically
-	// registered (and unregistered) via API calls to the apiserver
-	thirdPartyGroupVersions []schema.GroupVersion
-
 	// enabledVersions represents all enabled API versions. It should be a
 	// subset of registeredVersions. Please call EnableVersions() to add
 	// enabled versions.
@@ -66,11 +62,10 @@ type APIRegistrationManager struct {
 // wish to test.
 func NewAPIRegistrationManager(kubeAPIVersions string) (*APIRegistrationManager, error) {
 	m := &APIRegistrationManager{
-		registeredVersions:      map[schema.GroupVersion]struct{}{},
-		thirdPartyGroupVersions: []schema.GroupVersion{},
-		enabledVersions:         map[schema.GroupVersion]struct{}{},
-		groupMetaMap:            map[string]*apimachinery.GroupMeta{},
-		envRequestedVersions:    []schema.GroupVersion{},
+		registeredVersions:   map[schema.GroupVersion]struct{}{},
+		enabledVersions:      map[schema.GroupVersion]struct{}{},
+		groupMetaMap:         map[string]*apimachinery.GroupMeta{},
+		envRequestedVersions: []schema.GroupVersion{},
 	}
 
 	if len(kubeAPIVersions) != 0 {
@@ -209,41 +204,6 @@ func (m *APIRegistrationManager) RegisteredGroupVersions() []schema.GroupVersion
 		ret = append(ret, groupVersion)
 	}
 	return ret
-}
-
-// IsThirdPartyAPIGroupVersion returns true if the api version is a user-registered group/version.
-func (m *APIRegistrationManager) IsThirdPartyAPIGroupVersion(gv schema.GroupVersion) bool {
-	for ix := range m.thirdPartyGroupVersions {
-		if m.thirdPartyGroupVersions[ix] == gv {
-			return true
-		}
-	}
-	return false
-}
-
-// AddThirdPartyAPIGroupVersions sets the list of third party versions,
-// registers them in the API machinery and enables them.
-// Skips GroupVersions that are already registered.
-// Returns the list of GroupVersions that were skipped.
-func (m *APIRegistrationManager) AddThirdPartyAPIGroupVersions(gvs ...schema.GroupVersion) []schema.GroupVersion {
-	filteredGVs := []schema.GroupVersion{}
-	skippedGVs := []schema.GroupVersion{}
-	for ix := range gvs {
-		if !m.IsRegisteredVersion(gvs[ix]) {
-			filteredGVs = append(filteredGVs, gvs[ix])
-		} else {
-			glog.V(3).Infof("Skipping %s, because its already registered", gvs[ix].String())
-			skippedGVs = append(skippedGVs, gvs[ix])
-		}
-	}
-	if len(filteredGVs) == 0 {
-		return skippedGVs
-	}
-	m.RegisterVersions(filteredGVs)
-	m.EnableVersions(filteredGVs...)
-	m.thirdPartyGroupVersions = append(m.thirdPartyGroupVersions, filteredGVs...)
-
-	return skippedGVs
 }
 
 // InterfacesFor is a union meta.VersionInterfacesFunc func for all registered types

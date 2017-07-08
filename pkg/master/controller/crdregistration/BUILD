@@ -10,7 +10,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["tprregistration_controller.go"],
+    srcs = ["crdregistration_controller.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
@@ -44,7 +44,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["tprregistration_controller_test.go"],
+    srcs = ["crdregistration_controller_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [

@@ -165,8 +165,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/master/controller/crdregistration:all-srcs",
         "//pkg/master/ports:all-srcs",
-        "//pkg/master/thirdparty:all-srcs",
         "//pkg/master/tunneler:all-srcs",
     ],
     tags = ["automanaged"],
