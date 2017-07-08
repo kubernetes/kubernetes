@@ -40,6 +40,7 @@ import (
 
 	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -127,7 +128,7 @@ func Run(s *options.CMServer) error {
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
-	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
+	leaderElectionClient := kubernetes.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
 
 	go func() {
 		mux := http.NewServeMux()
