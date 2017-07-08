@@ -14,32 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tests
+package test
 
 import (
 	"testing"
 
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/testapigroup"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func TestDecodeList(t *testing.T) {
-	pl := &api.List{
+	pl := List{
 		Items: []runtime.Object{
-			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+			&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 			&runtime.Unknown{
-				TypeMeta:    runtime.TypeMeta{Kind: "Pod", APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()},
-				Raw:         []byte(`{"kind":"Pod","apiVersion":"` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `","metadata":{"name":"test"}}`),
+				TypeMeta:    runtime.TypeMeta{Kind: "Carp", APIVersion: "v1"},
+				Raw:         []byte(`{"kind":"Carp","apiVersion":"` + "v1" + `","metadata":{"name":"test"}}`),
 				ContentType: runtime.ContentTypeJSON,
 			},
 		},
 	}
-	if errs := runtime.DecodeList(pl.Items, testapi.Default.Codec()); len(errs) != 0 {
+
+	_, codecs := TestScheme()
+	Codec := apitesting.TestCodec(codecs, testapigroup.SchemeGroupVersion)
+
+	if errs := runtime.DecodeList(pl.Items, Codec); len(errs) != 0 {
 		t.Fatalf("unexpected error %v", errs)
 	}
-	if pod, ok := pl.Items[1].(*api.Pod); !ok || pod.Name != "test" {
+	if pod, ok := pl.Items[1].(*testapigroup.Carp); !ok || pod.Name != "test" {
 		t.Errorf("object not converted: %#v", pl.Items[1])
 	}
 }

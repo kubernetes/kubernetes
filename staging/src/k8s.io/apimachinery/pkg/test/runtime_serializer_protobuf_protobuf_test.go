@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tests
+package test
 
 import (
 	"bytes"
@@ -31,8 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
 )
 
 type testObject struct {
@@ -323,9 +321,11 @@ func TestDecodeObjects(t *testing.T) {
 			data: wire1,
 		},
 	}
-
+	scheme := runtime.NewScheme()
 	for i, test := range testCases {
-		s := protobuf.NewSerializer(api.Scheme, api.Scheme, "application/protobuf")
+		scheme.AddKnownTypes(schema.GroupVersion{Version: "v1"}, &v1.Pod{})
+		v1.AddToScheme(scheme)
+		s := protobuf.NewSerializer(scheme, scheme, "application/protobuf")
 		obj, err := runtime.Decode(s, test.data)
 
 		switch {

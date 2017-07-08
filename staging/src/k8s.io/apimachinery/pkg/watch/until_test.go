@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tests
+package watch
 
 import (
 	"errors"
@@ -22,15 +22,20 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	. "k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
 )
+
+type fakePod struct {
+	name string
+}
+
+func (obj *fakePod) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 func TestUntil(t *testing.T) {
 	fw := NewFake()
 	go func() {
-		var obj *api.Pod
+		var obj *fakePod
 		fw.Add(obj)
 		fw.Modify(obj)
 	}()
@@ -50,7 +55,7 @@ func TestUntil(t *testing.T) {
 	if lastEvent.Type != Modified {
 		t.Fatalf("expected MODIFIED event type, got %v", lastEvent.Type)
 	}
-	if got, isPod := lastEvent.Object.(*api.Pod); !isPod {
+	if got, isPod := lastEvent.Object.(*fakePod); !isPod {
 		t.Fatalf("expected a pod event, got %#v", got)
 	}
 }
@@ -58,7 +63,7 @@ func TestUntil(t *testing.T) {
 func TestUntilMultipleConditions(t *testing.T) {
 	fw := NewFake()
 	go func() {
-		var obj *api.Pod
+		var obj *fakePod
 		fw.Add(obj)
 	}()
 	conditions := []ConditionFunc{
@@ -77,7 +82,7 @@ func TestUntilMultipleConditions(t *testing.T) {
 	if lastEvent.Type != Added {
 		t.Fatalf("expected MODIFIED event type, got %v", lastEvent.Type)
 	}
-	if got, isPod := lastEvent.Object.(*api.Pod); !isPod {
+	if got, isPod := lastEvent.Object.(*fakePod); !isPod {
 		t.Fatalf("expected a pod event, got %#v", got)
 	}
 }
@@ -85,7 +90,7 @@ func TestUntilMultipleConditions(t *testing.T) {
 func TestUntilMultipleConditionsFail(t *testing.T) {
 	fw := NewFake()
 	go func() {
-		var obj *api.Pod
+		var obj *fakePod
 		fw.Add(obj)
 	}()
 	conditions := []ConditionFunc{
@@ -105,7 +110,7 @@ func TestUntilMultipleConditionsFail(t *testing.T) {
 	if lastEvent.Type != Added {
 		t.Fatalf("expected ADDED event type, got %v", lastEvent.Type)
 	}
-	if got, isPod := lastEvent.Object.(*api.Pod); !isPod {
+	if got, isPod := lastEvent.Object.(*fakePod); !isPod {
 		t.Fatalf("expected a pod event, got %#v", got)
 	}
 }
@@ -113,7 +118,7 @@ func TestUntilMultipleConditionsFail(t *testing.T) {
 func TestUntilTimeout(t *testing.T) {
 	fw := NewFake()
 	go func() {
-		var obj *api.Pod
+		var obj *fakePod
 		fw.Add(obj)
 		fw.Modify(obj)
 	}()
@@ -137,7 +142,7 @@ func TestUntilTimeout(t *testing.T) {
 	if lastEvent.Type != Modified {
 		t.Fatalf("expected MODIFIED event type, got %v", lastEvent.Type)
 	}
-	if got, isPod := lastEvent.Object.(*api.Pod); !isPod {
+	if got, isPod := lastEvent.Object.(*fakePod); !isPod {
 		t.Fatalf("expected a pod event, got %#v", got)
 	}
 }
@@ -145,7 +150,7 @@ func TestUntilTimeout(t *testing.T) {
 func TestUntilErrorCondition(t *testing.T) {
 	fw := NewFake()
 	go func() {
-		var obj *api.Pod
+		var obj *fakePod
 		fw.Add(obj)
 	}()
 	expected := "something bad"

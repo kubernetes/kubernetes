@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tests
+package test
 
 import (
 	"fmt"
@@ -24,21 +24,21 @@ import (
 	"testing"
 	"time"
 
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/apis/testapigroup"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/validation"
 )
 
 func TestDecodeUnstructured(t *testing.T) {
-	groupVersionString := api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()
+	groupVersionString := "v1"
 	rawJson := fmt.Sprintf(`{"kind":"Pod","apiVersion":"%s","metadata":{"name":"test"}}`, groupVersionString)
-	pl := &api.List{
+	pl := &List{
 		Items: []runtime.Object{
-			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+			&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 			&runtime.Unknown{
 				TypeMeta:    runtime.TypeMeta{Kind: "Pod", APIVersion: groupVersionString},
 				Raw:         []byte(rawJson),
@@ -449,7 +449,7 @@ func TestDecodeNumbers(t *testing.T) {
 
 	// Start with a valid pod
 	originalJSON := []byte(`{
-		"kind":"Pod",
+		"kind":"Carp",
 		"apiVersion":"v1",
 		"metadata":{"name":"pod","namespace":"foo"},
 		"spec":{
@@ -458,20 +458,14 @@ func TestDecodeNumbers(t *testing.T) {
 		}
 	}`)
 
-	pod := &api.Pod{}
+	pod := &testapigroup.Carp{}
 
-	// Decode with structured codec
-	codec, err := testapi.GetCodecForObject(pod)
+	_, codecs := TestScheme()
+	codec := apitesting.TestCodec(codecs, schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal})
+
+	err := runtime.DecodeInto(codec, originalJSON, pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-	err = runtime.DecodeInto(codec, originalJSON, pod)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// ensure pod is valid
-	if errs := validation.ValidatePod(pod); len(errs) > 0 {
-		t.Fatalf("pod should be valid: %v", errs)
 	}
 
 	// Round-trip with unstructured codec
@@ -495,13 +489,11 @@ func TestDecodeNumbers(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// ensure pod is still valid
-	pod2, ok := obj2.(*api.Pod)
+	pod2, ok := obj2.(*testapigroup.Carp)
 	if !ok {
 		t.Fatalf("expected an *api.Pod, got %#v", obj2)
 	}
-	if errs := validation.ValidatePod(pod2); len(errs) > 0 {
-		t.Fatalf("pod should be valid: %v", errs)
-	}
+
 	// ensure round-trip preserved large integers
 	if !reflect.DeepEqual(pod, pod2) {
 		t.Fatalf("Expected\n\t%#v, got \n\t%#v", pod, pod2)

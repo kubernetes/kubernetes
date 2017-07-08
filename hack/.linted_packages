@@ -69,6 +69,7 @@ pkg/api/service
 pkg/api/v1
 pkg/api/v1/node
 pkg/api/v1/service
+pkg/apimachinery/tests
 pkg/apis/abac/v0
 pkg/apis/abac/v1beta1
 pkg/apis/admission/install
@@ -329,6 +330,7 @@ staging/src/k8s.io/apimachinery/pkg/api/equality
 staging/src/k8s.io/apimachinery/pkg/api/errors
 staging/src/k8s.io/apimachinery/pkg/api/resource
 staging/src/k8s.io/apimachinery/pkg/apimachinery
+staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/install
 staging/src/k8s.io/apimachinery/pkg/conversion/queryparams
 staging/src/k8s.io/apimachinery/pkg/fields
 staging/src/k8s.io/apimachinery/pkg/labels
