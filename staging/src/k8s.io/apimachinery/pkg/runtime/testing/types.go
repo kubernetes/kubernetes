@@ -190,23 +190,5 @@ func (obj *MyWeirdCustomEmbeddedVersionKindField) GroupVersionKind() schema.Grou
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.ObjectKind)
 }
 
-func (obj *TestType2) GetObjectKind() schema.ObjectKind            { return schema.EmptyObjectKind }
-func (obj *ExternalTestType2) GetObjectKind() schema.ObjectKind    { return schema.EmptyObjectKind }
-func (obj *InternalComplex) GetObjectKind() schema.ObjectKind      { return &obj.TypeMeta }
-func (obj *ExternalComplex) GetObjectKind() schema.ObjectKind      { return &obj.TypeMeta }
-func (obj *EmbeddedTest) GetObjectKind() schema.ObjectKind         { return &obj.TypeMeta }
-func (obj *EmbeddedTestExternal) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
-func (obj *InternalSimple) GetObjectKind() schema.ObjectKind       { return &obj.TypeMeta }
-func (obj *ExternalSimple) GetObjectKind() schema.ObjectKind       { return &obj.TypeMeta }
-func (obj *InternalOptionalExtensionType) GetObjectKind() schema.ObjectKind {
-	return &obj.TypeMeta
-}
-func (obj *ObjectTestExternal) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
-func (obj *ObjectTest) GetObjectKind() schema.ObjectKind         { return &obj.TypeMeta }
-func (obj *ExternalOptionalExtensionType) GetObjectKind() schema.ObjectKind {
-	return &obj.TypeMeta
-}
-func (obj *InternalExtensionType) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
-func (obj *ExternalExtensionType) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
-func (obj *ExtensionA) GetObjectKind() schema.ObjectKind            { return &obj.TypeMeta }
-func (obj *ExtensionB) GetObjectKind() schema.ObjectKind            { return &obj.TypeMeta }
+func (obj *TestType2) GetObjectKind() schema.ObjectKind         { return schema.EmptyObjectKind }
+func (obj *ExternalTestType2) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }

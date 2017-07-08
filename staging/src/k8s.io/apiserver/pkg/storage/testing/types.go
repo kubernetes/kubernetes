@@ -18,7 +18,6 @@ package testing
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type TestResource struct {
@@ -26,5 +25,3 @@ type TestResource struct {
 	metav1.ObjectMeta `json:"metadata"`
 	Value             int `json:"value"`
 }
-
-func (obj *TestResource) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

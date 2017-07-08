@@ -27,9 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-func (obj *MetadataOnlyObject) GetObjectKind() schema.ObjectKind     { return obj }
-func (obj *MetadataOnlyObjectList) GetObjectKind() schema.ObjectKind { return obj }
-
 type metaOnlyJSONScheme struct{}
 
 // This function can be extended to mapping different gvk to different MetadataOnlyObject,
