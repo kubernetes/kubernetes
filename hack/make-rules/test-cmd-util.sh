@@ -3922,7 +3922,8 @@ run_kubectl_sort_by_tests() {
   # Post-condition: valid-pod is created
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Chcek output of sor-by
-  output_message=$(kubectl get pods --sort-by="{metadata.name}")
+  output_message=$(kubectl get pods --sort-by="{.metadata.name}")
+  echo "${output_message}"
   kube::test::if_has_string "${output_message}" "valid-pod"
 
   set +o nounset
