@@ -274,7 +274,7 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 					},
 				}
 			}
-			configMapPayload, err := configmap.MakePayload(source.ConfigMap.Items, configMap, s.source.DefaultMode, optional)
+			configMapPayload, err := configmap.MakePayload(source.ConfigMap.Items, configMap, s.source.DefaultMode, optional, s.volName, s.pod.Spec)
 			if err != nil {
 				glog.Errorf("Couldn't get configMap payload %v/%v: %v", s.pod.Namespace, source.ConfigMap.Name, err)
 				errlist = append(errlist, err)

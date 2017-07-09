@@ -19,6 +19,7 @@ package util
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -62,8 +63,9 @@ type AtomicWriter struct {
 }
 
 type FileProjection struct {
-	Data []byte
-	Mode int32
+	Data      []byte
+	Mode      int32
+	IsSubPath bool
 }
 
 // NewAtomicWriter creates a new AtomicWriter configured to write to the given
@@ -198,6 +200,11 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 		return err
 	}
 
+	err = w.resolveSubPath(tsDir, cleanPayload)
+	if err != nil {
+		return err
+	}
+
 	// (10)
 	if err = w.removeUserVisiblePaths(pathsToRemove); err != nil {
 		glog.Errorf("%s: error removing old visible symlinks: %v", w.logContext, err)
@@ -212,6 +219,45 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 		}
 	}
 
+	return nil
+}
+
+func (w *AtomicWriter) resolveSubPath(tsDir string, payload map[string]FileProjection) error {
+	for userVisiblePath, fileProjection := range payload {
+		if fileProjection.IsSubPath {
+			targetFile := path.Join(w.targetDir, userVisiblePath)
+			sourceFile := path.Join(tsDir, userVisiblePath)
+			if _, err := os.Stat(sourceFile); err != nil && os.IsNotExist(err) {
+				return fmt.Errorf("%s: error finding file: %v", w.logContext, err)
+			}
+
+			err := copyFile(sourceFile, targetFile)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func copyFile(sourceFile, targetFile string) error {
+	os.Remove(targetFile)
+	srcFile, err := os.Open(sourceFile)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	desFile, err := os.Create(targetFile)
+	if err != nil {
+		return err
+	}
+	defer desFile.Close()
+
+	_, err = io.Copy(desFile, srcFile)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

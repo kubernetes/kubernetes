@@ -18,6 +18,7 @@ package configmap
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -217,7 +218,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		len(configMap.Data),
 		totalBytes)
 
-	payload, err := MakePayload(b.source.Items, configMap, b.source.DefaultMode, optional)
+	payload, err := MakePayload(b.source.Items, configMap, b.source.DefaultMode, optional, b.volName, b.pod.Spec)
 	if err != nil {
 		return err
 	}
@@ -244,8 +245,25 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
+func getSubPaths(volName string, podSpec v1.PodSpec) []string {
+	containers := []v1.Container{}
+	containers = append(containers, podSpec.InitContainers...)
+	containers = append(containers, podSpec.Containers...)
+
+	subPaths := []string{}
+	for _, container := range containers {
+		volumeMounts := container.VolumeMounts
+		for _, volMount := range volumeMounts {
+			if volName == volMount.Name && volMount.SubPath != "" {
+				subPaths = append(subPaths, volMount.SubPath)
+			}
+		}
+	}
+	return subPaths
+}
+
 // Note: this function is exported so that it can be called from the projection volume driver
-func MakePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
+func MakePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *int32, optional bool, volName string, podSpec v1.PodSpec) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
 	}
@@ -260,6 +278,7 @@ func MakePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *
 			payload[name] = fileProjection
 		}
 	} else {
+		subPaths := getSubPaths(volName, podSpec)
 		for _, ktp := range mappings {
 			content, ok := configMap.Data[ktp.Key]
 			if !ok {
@@ -276,6 +295,13 @@ func MakePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *
 				fileProjection.Mode = *ktp.Mode
 			} else {
 				fileProjection.Mode = *defaultMode
+			}
+			for _, subPath := range subPaths {
+				_, err := filepath.Rel(subPath, ktp.Path)
+				if err == nil {
+					fileProjection.IsSubPath = true
+					break
+				}
 			}
 			payload[ktp.Path] = fileProjection
 		}

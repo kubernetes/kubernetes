@@ -237,8 +237,9 @@ func TestMakePayload(t *testing.T) {
 		},
 	}
 
+	podSpec := v1.PodSpec{}
 	for _, tc := range cases {
-		actualPayload, err := MakePayload(tc.mappings, tc.configMap, &tc.mode, tc.optional)
+		actualPayload, err := MakePayload(tc.mappings, tc.configMap, &tc.mode, tc.optional, "", podSpec)
 		if err != nil && tc.success {
 			t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
 			continue
