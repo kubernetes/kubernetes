@@ -42,6 +42,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/httplog:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/metrics:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flushwriter:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
     ],

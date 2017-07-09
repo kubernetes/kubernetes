@@ -27,6 +27,7 @@ import (
 	"strconv"
 
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/metrics"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -173,7 +173,7 @@ func startHTTP(s *options.SchedulerServer) {
 		glog.Errorf("unable to register configz: %s", err)
 	}
 	configz.InstallHandler(mux)
-	mux.Handle("/metrics", prometheus.Handler())
+	mux.Handle("/metrics", metrics.NewPrometheusHandler())
 
 	server := &http.Server{
 		Addr:    net.JoinHostPort(s.Address, strconv.Itoa(int(s.Port))),

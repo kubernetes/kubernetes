@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/metrics"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
@@ -50,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/configz"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -270,7 +270,7 @@ func startHTTP(s *options.CloudControllerManagerServer) {
 		}
 	}
 	configz.InstallHandler(mux)
-	mux.Handle("/metrics", prometheus.Handler())
+	mux.Handle("/metrics", metrics.NewPrometheusHandler())
 
 	server := &http.Server{
 		Addr:    net.JoinHostPort(s.Address, strconv.Itoa(int(s.Port))),

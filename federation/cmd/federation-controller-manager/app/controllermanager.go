@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/metrics"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -56,7 +57,6 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -119,7 +119,7 @@ func Run(s *options.CMServer) error {
 				goruntime.SetBlockProfileRate(1)
 			}
 		}
-		mux.Handle("/metrics", prometheus.Handler())
+		mux.Handle("/metrics", metrics.NewPrometheusHandler())
 
 		server := &http.Server{
 			Addr:    net.JoinHostPort(s.Address, strconv.Itoa(s.Port)),

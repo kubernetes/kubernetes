@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/metrics"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -82,6 +83,8 @@ func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
 	t.Logf("Starting kube-apiserver...")
+	// prevent a collision between prometheus metricst
+	metrics.SetSubsystem("bogus")
 	runErrCh := make(chan error, 1)
 	server, err := app.CreateServerChain(s, stopCh)
 	if err != nil {

@@ -29,6 +29,7 @@ import (
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/metrics"
 	"k8s.io/kubernetes/pkg/api"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 
@@ -41,6 +42,9 @@ import (
 // TestValidOpenAPISpec verifies that the open api is added
 // at the proper endpoint and the spec is valid.
 func TestValidOpenAPISpec(t *testing.T) {
+	// prevent a collision between prometheus metrics
+	metrics.SetSubsystem("bogus")
+
 	etcdserver, config, sharedInformers, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 

@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/metrics"
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
@@ -180,6 +181,9 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 }
 
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+	// prevent a collision between prometheus metrics
+	metrics.SetSubsystem("bogus")
+
 	etcdserver, config, sharedInformers, assert := setUp(t)
 
 	master, err := config.Complete(sharedInformers).New(genericapiserver.EmptyDelegate)

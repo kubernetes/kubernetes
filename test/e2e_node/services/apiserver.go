@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 
+	"k8s.io/apiserver/pkg/server/metrics"
 	apiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
@@ -40,6 +41,7 @@ func NewAPIServer() *APIServer {
 
 // Start starts the apiserver, returns when apiserver is ready.
 func (a *APIServer) Start() error {
+	metrics.SetSubsystem("bogus")
 	config := options.NewServerRunOptions()
 	config.Etcd.StorageConfig.ServerList = []string{getEtcdClientURL()}
 	// TODO: Current setup of etcd in e2e-node tests doesn't support etcd v3
