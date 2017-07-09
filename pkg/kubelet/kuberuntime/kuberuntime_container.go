@@ -76,7 +76,7 @@ func (m *kubeGenericRuntimeManager) recordContainerEvent(pod *v1.Pod, container 
 	if containerID != "" {
 		eventMessage = strings.Replace(eventMessage, containerID, container.Name, -1)
 	}
-	m.recorder.Event(events.ToObjectReference(ref), eventType, reason, eventMessage)
+	m.recorder.Event(ref, eventType, reason, eventMessage)
 }
 
 // startContainer starts a container and returns a message indicates why it is failed on error.
