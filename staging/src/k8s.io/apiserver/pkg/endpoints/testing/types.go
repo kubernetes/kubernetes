@@ -18,7 +18,6 @@ package testing
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type Simple struct {
@@ -30,8 +29,6 @@ type Simple struct {
 	Labels map[string]string `json:"labels,omitempty"`
 }
 
-func (obj *Simple) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
-
 type SimpleRoot struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -40,8 +37,6 @@ type SimpleRoot struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 }
-
-func (obj *SimpleRoot) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 type SimpleGetOptions struct {
 	metav1.TypeMeta `json:",inline"`
@@ -57,8 +52,6 @@ func (SimpleGetOptions) SwaggerDoc() map[string]string {
 	}
 }
 
-func (obj *SimpleGetOptions) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
-
 type SimpleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,inline"`
@@ -66,4 +59,11 @@ type SimpleList struct {
 	Items []Simple `json:"items,omitempty"`
 }
 
-func (obj *SimpleList) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
+// SimpleXGSubresource is a cross group subresource, i.e. the subresource does not belong to the
+// same group as its parent resource.
+type SimpleXGSubresource struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
+	SubresourceInfo   string            `json:"subresourceInfo,omitempty"`
+	Labels            map[string]string `json:"labels,omitempty"`
+}

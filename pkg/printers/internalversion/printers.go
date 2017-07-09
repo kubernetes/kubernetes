@@ -82,8 +82,6 @@ var (
 	storageClassColumns           = []string{"NAME", "PROVISIONER"}
 	statusColumns                 = []string{"STATUS", "REASON", "MESSAGE"}
 
-	// TODO: consider having 'KIND' for third party resource data
-	thirdPartyResourceDataColumns    = []string{"NAME", "LABELS", "DATA"}
 	horizontalPodAutoscalerColumns   = []string{"NAME", "REFERENCE", "TARGETS", "MINPODS", "MAXPODS", "REPLICAS", "AGE"}
 	deploymentColumns                = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
 	deploymentWideColumns            = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
@@ -232,8 +230,6 @@ func AddHandlers(h printers.PrintHandler) {
 	h.Handler(configMapColumns, nil, printConfigMapList)
 	h.Handler(podSecurityPolicyColumns, nil, printPodSecurityPolicy)
 	h.Handler(podSecurityPolicyColumns, nil, printPodSecurityPolicyList)
-	h.Handler(thirdPartyResourceDataColumns, nil, printThirdPartyResourceData)
-	h.Handler(thirdPartyResourceDataColumns, nil, printThirdPartyResourceDataList)
 	h.Handler(clusterColumns, nil, printCluster)
 	h.Handler(clusterColumns, nil, printClusterList)
 	h.Handler(networkPolicyColumns, nil, printExtensionsNetworkPolicy)
@@ -1486,30 +1482,6 @@ func truncate(str string, maxLen int) string {
 		return str[0:maxLen] + "..."
 	}
 	return str
-}
-
-func printThirdPartyResourceData(rsrc *extensions.ThirdPartyResourceData, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, rsrc.Name, options.WithKind)
-
-	l := labels.FormatLabels(rsrc.Labels)
-	truncateCols := 50
-	if options.Wide {
-		truncateCols = 100
-	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", name, l, truncate(string(rsrc.Data), truncateCols)); err != nil {
-		return err
-	}
-	return nil
-}
-
-func printThirdPartyResourceDataList(list *extensions.ThirdPartyResourceDataList, w io.Writer, options printers.PrintOptions) error {
-	for _, item := range list.Items {
-		if err := printThirdPartyResourceData(&item, w, options); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func printDeployment(deployment *extensions.Deployment, w io.Writer, options printers.PrintOptions) error {

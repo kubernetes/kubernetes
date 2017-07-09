@@ -43,7 +43,7 @@ func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, err
 	page := 0
 	for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
 		mc := newRoutesMetricContext("list_page")
-		listCall := gce.service.Routes.List(gce.projectID)
+		listCall := gce.service.Routes.List(gce.networkProjectID)
 
 		prefix := truncateClusterName(clusterName)
 		listCall = listCall.Filter("name eq " + prefix + "-.*")
@@ -92,7 +92,7 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 	}
 
 	mc := newRoutesMetricContext("create")
-	insertOp, err := gce.service.Routes.Insert(gce.projectID, &compute.Route{
+	insertOp, err := gce.service.Routes.Insert(gce.networkProjectID, &compute.Route{
 		Name:            routeName,
 		DestRange:       route.DestinationCIDR,
 		NextHopInstance: fmt.Sprintf("zones/%s/instances/%s", targetInstance.Zone, targetInstance.Name),
@@ -113,7 +113,7 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 
 func (gce *GCECloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
 	mc := newRoutesMetricContext("delete")
-	deleteOp, err := gce.service.Routes.Delete(gce.projectID, route.Name).Do()
+	deleteOp, err := gce.service.Routes.Delete(gce.networkProjectID, route.Name).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}

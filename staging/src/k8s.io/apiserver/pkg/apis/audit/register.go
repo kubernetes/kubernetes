@@ -49,5 +49,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Policy{},
 		&PolicyList{},
 	)
+	scheme.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...)
 	return nil
 }

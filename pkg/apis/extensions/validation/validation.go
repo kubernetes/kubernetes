@@ -40,55 +40,6 @@ import (
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 
-func ValidateThirdPartyResourceUpdate(update, old *extensions.ThirdPartyResource) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, ValidateThirdPartyResource(update)...)
-	return allErrs
-}
-
-func ValidateThirdPartyResourceName(name string, prefix bool) []string {
-	// Make sure it's a valid DNS subdomain
-	if msgs := apivalidation.NameIsDNSSubdomain(name, prefix); len(msgs) != 0 {
-		return msgs
-	}
-
-	// Make sure it's at least three segments (kind + two-segment group name)
-	if !prefix {
-		parts := strings.Split(name, ".")
-		if len(parts) < 3 {
-			return []string{"must be at least three segments long: <kind>.<domain>.<tld>"}
-		}
-	}
-
-	return nil
-}
-
-func ValidateThirdPartyResource(obj *extensions.ThirdPartyResource) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&obj.ObjectMeta, false, ValidateThirdPartyResourceName, field.NewPath("metadata"))...)
-
-	versions := sets.String{}
-	if len(obj.Versions) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("versions"), "must specify at least one version"))
-	}
-	for ix := range obj.Versions {
-		version := &obj.Versions[ix]
-		if len(version.Name) == 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("versions").Index(ix).Child("name"), version, "must not be empty"))
-		} else {
-			for _, msg := range validation.IsDNS1123Label(version.Name) {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("versions").Index(ix).Child("name"), version, msg))
-			}
-		}
-		if versions.Has(version.Name) {
-			allErrs = append(allErrs, field.Duplicate(field.NewPath("versions").Index(ix).Child("name"), version))
-		}
-		versions.Insert(version.Name)
-	}
-	return allErrs
-}
-
 // ValidateDaemonSet tests if required fields in the DaemonSet are set.
 func ValidateDaemonSet(ds *extensions.DaemonSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&ds.ObjectMeta, true, ValidateDaemonSetName, field.NewPath("metadata"))
@@ -425,14 +376,6 @@ func ValidateDeploymentRollback(obj *extensions.DeploymentRollback) field.ErrorL
 	}
 	allErrs = append(allErrs, ValidateRollback(&obj.RollbackTo, field.NewPath("rollback"))...)
 	return allErrs
-}
-
-func ValidateThirdPartyResourceDataUpdate(update, old *extensions.ThirdPartyResourceData) field.ErrorList {
-	return apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
-}
-
-func ValidateThirdPartyResourceData(obj *extensions.ThirdPartyResourceData) field.ErrorList {
-	return apivalidation.ValidateObjectMeta(&obj.ObjectMeta, true, apivalidation.NameIsDNSLabel, field.NewPath("metadata"))
 }
 
 // ValidateIngress tests if required fields in the Ingress are set.

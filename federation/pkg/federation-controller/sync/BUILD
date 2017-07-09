@@ -45,7 +45,6 @@ go_test(
     srcs = [
         "controller_test.go",
         "deploymentcontroller_test.go",
-        "replicasetcontroller_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
@@ -65,8 +64,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/client-go/testing:go_default_library",
     ],
 )
 

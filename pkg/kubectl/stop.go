@@ -81,9 +81,6 @@ func ReaperFor(kind schema.GroupKind, c internalclientset.Interface) (Reaper, er
 	case api.Kind("Pod"):
 		return &PodReaper{c.Core()}, nil
 
-	case api.Kind("Service"):
-		return &ServiceReaper{c.Core()}, nil
-
 	case batch.Kind("Job"):
 		return &JobReaper{c.Batch(), c.Core(), Interval, Timeout}, nil
 
@@ -125,9 +122,6 @@ type DeploymentReaper struct {
 }
 type PodReaper struct {
 	client coreclient.PodsGetter
-}
-type ServiceReaper struct {
-	client coreclient.ServicesGetter
 }
 type StatefulSetReaper struct {
 	client                appsclient.StatefulSetsGetter
@@ -483,15 +477,4 @@ func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gra
 		return err
 	}
 	return pods.Delete(name, gracePeriod)
-}
-
-func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
-	services := reaper.client.Services(namespace)
-	_, err := services.Get(name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	falseVar := false
-	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	return services.Delete(name, deleteOptions)
 }

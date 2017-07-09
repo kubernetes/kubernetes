@@ -63,6 +63,7 @@ type AuditLogOptions struct {
 	MaxAge     int
 	MaxBackups int
 	MaxSize    int
+	Format     string
 }
 
 // AuditWebhookOptions control the webhook configuration for audit events.
@@ -78,6 +79,7 @@ type AuditWebhookOptions struct {
 func NewAuditOptions() *AuditOptions {
 	return &AuditOptions{
 		WebhookOptions: AuditWebhookOptions{Mode: pluginwebhook.ModeBatch},
+		LogOptions:     AuditLogOptions{Format: pluginlog.FormatLegacy},
 	}
 }
 
@@ -103,6 +105,18 @@ func (o *AuditOptions) Validate() []error {
 		}
 		if !validMode {
 			allErrors = append(allErrors, fmt.Errorf("invalid audit webhook mode %s, allowed modes are %q", o.WebhookOptions.Mode, strings.Join(pluginwebhook.AllowedModes, ",")))
+		}
+
+		// check log format
+		validFormat := false
+		for _, f := range pluginlog.AllowedFormats {
+			if f == o.LogOptions.Format {
+				validFormat = true
+				break
+			}
+		}
+		if !validFormat {
+			allErrors = append(allErrors, fmt.Errorf("invalid audit log format %s, allowed formats are %q", o.LogOptions.Format, strings.Join(pluginlog.AllowedFormats, ",")))
 		}
 	}
 	return allErrors
@@ -161,6 +175,10 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 		"The maximum number of old audit log files to retain.")
 	fs.IntVar(&o.MaxSize, "audit-log-maxsize", o.MaxSize,
 		"The maximum size in megabytes of the audit log file before it gets rotated.")
+	fs.StringVar(&o.Format, "audit-log-format", o.Format,
+		"Format of saved audits. \"legacy\" indicates 1-line text format for each event."+
+			" \"json\" indicates structured json format. Requires the 'AdvancedAuditing' feature"+
+			" gate. Known formats are "+strings.Join(pluginlog.AllowedFormats, ",")+".")
 }
 
 func (o *AuditLogOptions) getWriter() io.Writer {
@@ -182,7 +200,7 @@ func (o *AuditLogOptions) getWriter() io.Writer {
 
 func (o *AuditLogOptions) advancedApplyTo(c *server.Config) error {
 	if w := o.getWriter(); w != nil {
-		c.AuditBackend = appendBackend(c.AuditBackend, pluginlog.NewBackend(w))
+		c.AuditBackend = appendBackend(c.AuditBackend, pluginlog.NewBackend(w, o.Format))
 	}
 	return nil
 }

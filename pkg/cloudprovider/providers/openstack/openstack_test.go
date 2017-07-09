@@ -144,6 +144,100 @@ func TestToAuthOptions(t *testing.T) {
 	}
 }
 
+func TestCheckOpenStackOpts(t *testing.T) {
+	delay := MyDuration{60 * time.Second}
+	timeout := MyDuration{30 * time.Second}
+	tests := []struct {
+		name          string
+		openstackOpts *OpenStack
+		expectedError error
+	}{
+		{
+			name: "test1",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					MonitorDelay:         delay,
+					MonitorTimeout:       timeout,
+					MonitorMaxRetries:    uint(3),
+					ManageSecurityGroups: true,
+					NodeSecurityGroupID:  "b41d28c2-d02f-4e1e-8ffb-23b8e4f5c144",
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "test2",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					MonitorDelay:         delay,
+					MonitorTimeout:       timeout,
+					MonitorMaxRetries:    uint(3),
+					ManageSecurityGroups: true,
+					NodeSecurityGroupID:  "b41d28c2-d02f-4e1e-8ffb-23b8e4f5c144",
+				},
+			},
+			expectedError: fmt.Errorf("subnet-id not set in cloud provider config"),
+		},
+		{
+			name: "test3",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					ManageSecurityGroups: true,
+					NodeSecurityGroupID:  "b41d28c2-d02f-4e1e-8ffb-23b8e4f5c144",
+				},
+			},
+			expectedError: fmt.Errorf("monitor-delay not set in cloud provider config"),
+		},
+		{
+			name: "test4",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					MonitorDelay:         delay,
+					MonitorTimeout:       timeout,
+					MonitorMaxRetries:    uint(3),
+					ManageSecurityGroups: true,
+				},
+			},
+			expectedError: fmt.Errorf("node-security-group not set in cloud provider config"),
+		},
+	}
+
+	for _, testcase := range tests {
+		err := checkOpenStackOpts(testcase.openstackOpts)
+
+		if err == nil && testcase.expectedError == nil {
+			continue
+		}
+		if (err != nil && testcase.expectedError == nil) || (err == nil && testcase.expectedError != nil) || err.Error() != testcase.expectedError.Error() {
+			t.Errorf("%s failed: expected err=%q, got %q",
+				testcase.name, testcase.expectedError, err)
+		}
+	}
+}
+
 func TestCaller(t *testing.T) {
 	called := false
 	myFunc := func() { called = true }

@@ -50,18 +50,18 @@ var (
 	logEntryMessageRegex = regexp.MustCompile("(?:I\\d+ \\d+:\\d+:\\d+.\\d+       \\d+ logs_generator.go:67] )?(\\d+) .*")
 )
 
-// Type to track the progress of logs generating pod
-type loggingPod struct {
-	// Name of the pod
-	Name string
-	// Cache of ingested and read entries
-	Occurrences map[int]logEntry
-	// Number of lines expected to be ingested from this pod
-	ExpectedLinesNumber int
-}
-
 type logEntry struct {
 	Payload string
+}
+
+func (entry logEntry) getLogEntryNumber() (int, bool) {
+	submatch := logEntryMessageRegex.FindStringSubmatch(entry.Payload)
+	if submatch == nil || len(submatch) < 2 {
+		return 0, false
+	}
+
+	lineNumber, err := strconv.Atoi(submatch[1])
+	return lineNumber, err == nil
 }
 
 type logsProvider interface {
@@ -79,31 +79,37 @@ type loggingTestConfig struct {
 	MaxAllowedFluentdRestarts int
 }
 
-func (entry logEntry) getLogEntryNumber() (int, bool) {
-	submatch := logEntryMessageRegex.FindStringSubmatch(entry.Payload)
-	if submatch == nil || len(submatch) < 2 {
-		return 0, false
-	}
-
-	lineNumber, err := strconv.Atoi(submatch[1])
-	return lineNumber, err == nil
+// Type to track the progress of logs generating pod
+type loggingPod struct {
+	// Name equals to the pod name and the container name.
+	Name string
+	// NodeName is the name of the node this pod will be
+	// assigned to. Can be empty.
+	NodeName string
+	// Occurrences is a cache of ingested and read entries.
+	Occurrences map[int]logEntry
+	// ExpectedLinesNumber is the number of lines that are
+	// expected to be ingested from this pod.
+	ExpectedLinesNumber int
+	// RunDuration is how long the pod will live.
+	RunDuration time.Duration
 }
 
-func createLoggingPod(f *framework.Framework, podName string, nodeName string, totalLines int, loggingDuration time.Duration) *loggingPod {
-	framework.Logf("Starting pod %s", podName)
-	createLogsGeneratorPod(f, podName, nodeName, totalLines, loggingDuration)
-
+func newLoggingPod(podName string, nodeName string, totalLines int, loggingDuration time.Duration) *loggingPod {
 	return &loggingPod{
 		Name:                podName,
+		NodeName:            nodeName,
 		Occurrences:         make(map[int]logEntry),
 		ExpectedLinesNumber: totalLines,
+		RunDuration:         loggingDuration,
 	}
 }
 
-func createLogsGeneratorPod(f *framework.Framework, podName string, nodeName string, linesCount int, duration time.Duration) {
+func (p *loggingPod) Start(f *framework.Framework) {
+	framework.Logf("Starting pod %s", p.Name)
 	f.PodClient().Create(&api_v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
-			Name: podName,
+			Name: p.Name,
 		},
 		Spec: api_v1.PodSpec{
 			RestartPolicy: api_v1.RestartPolicyNever,
@@ -114,11 +120,11 @@ func createLogsGeneratorPod(f *framework.Framework, podName string, nodeName str
 					Env: []api_v1.EnvVar{
 						{
 							Name:  "LOGS_GENERATOR_LINES_TOTAL",
-							Value: strconv.Itoa(linesCount),
+							Value: strconv.Itoa(p.ExpectedLinesNumber),
 						},
 						{
 							Name:  "LOGS_GENERATOR_DURATION",
-							Value: duration.String(),
+							Value: p.RunDuration.String(),
 						},
 					},
 					Resources: api_v1.ResourceRequirements{
@@ -133,9 +139,15 @@ func createLogsGeneratorPod(f *framework.Framework, podName string, nodeName str
 					},
 				},
 			},
-			NodeName: nodeName,
+			NodeName: p.NodeName,
 		},
 	})
+}
+
+func startNewLoggingPod(f *framework.Framework, podName string, nodeName string, totalLines int, loggingDuration time.Duration) *loggingPod {
+	pod := newLoggingPod(podName, nodeName, totalLines, loggingDuration)
+	pod.Start(f)
+	return pod
 }
 
 func waitForSomeLogs(f *framework.Framework, config *loggingTestConfig) error {
