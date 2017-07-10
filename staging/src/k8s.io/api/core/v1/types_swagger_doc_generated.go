@@ -1014,6 +1014,25 @@ func (NodeSystemInfo) SwaggerDoc() map[string]string {
 	return map_NodeSystemInfo
 }
 
+var map_NutanixVolumeSource = map[string]string{
+	"":                    "Represents Nutanix volume. NutanixVolume can be mounted as read/write once or read only.",
+	"user":                "Prism user id for accessing nutanix cluster via rest API. Either User/Password OR SecretName/SecretNamespace should be provided.",
+	"password":            "Prism password for accessing nutanix cluster via rest API.",
+	"secretNamespace":     "Secret namespace and Secret Name to retrieve credential for accessing nutanix cluster via rest. if SecretNamespace is not specified then default namespace is used.",
+	"secretName":          "Secret name for accessing nutanix cluster via rest.",
+	"prismEndPoint":       "Prism service <IP:port>  for nutanix cluster.",
+	"dataServiceEndPoint": "Data service <IP:port> as configured in nutanix cluster.",
+	"volumeName":          "Volume Name.",
+	"volumeUUID":          "Volume UUID.",
+	"iscsiTarget":         "ISCSI target for the nutanix volume group.",
+	"fsType":              "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly":            "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+}
+
+func (NutanixVolumeSource) SwaggerDoc() map[string]string {
+	return map_NutanixVolumeSource
+}
+
 var map_ObjectFieldSelector = map[string]string{
 	"":           "ObjectFieldSelector selects an APIVersioned field of an object.",
 	"apiVersion": "Version of the schema the FieldPath is written in terms of, defaults to \"v1\".",
@@ -1162,6 +1181,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
 	"local":                "Local represents directly-attached storage with node affinity",
 	"storageos":            "StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md",
+	"nutanixVolume":        "NutanixVolume represents a Nutanix persistent volume attached and mounted on Kubernetes nodes.",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -2010,6 +2030,7 @@ var map_VolumeSource = map[string]string{
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
 	"storageos":            "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.",
+	"nutanixVolume":        "NutanixVolume represents a Nutanix persistent volume attached and mounted on Kubernetes nodes.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

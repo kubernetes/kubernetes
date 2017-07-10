@@ -49983,6 +49983,62 @@
      }
     }
    },
+   "io.k8s.api.core.v1.NutanixVolumeSource": {
+    "description": "Represents Nutanix volume. NutanixVolume can be mounted as read/write once or read only.",
+    "required": [
+     "prismEndPoint",
+     "dataServiceEndPoint",
+     "volumeName",
+     "volumeUUID",
+     "iscsiTarget"
+    ],
+    "properties": {
+     "dataServiceEndPoint": {
+      "description": "Data service \u003cIP:port\u003e as configured in nutanix cluster.",
+      "type": "string"
+     },
+     "fsType": {
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "type": "string"
+     },
+     "iscsiTarget": {
+      "description": "ISCSI target for the nutanix volume group.",
+      "type": "string"
+     },
+     "password": {
+      "description": "Prism password for accessing nutanix cluster via rest API.",
+      "type": "string"
+     },
+     "prismEndPoint": {
+      "description": "Prism service \u003cIP:port\u003e  for nutanix cluster.",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+      "type": "boolean"
+     },
+     "secretName": {
+      "description": "Secret name for accessing nutanix cluster via rest.",
+      "type": "string"
+     },
+     "secretNamespace": {
+      "description": "Secret namespace and Secret Name to retrieve credential for accessing nutanix cluster via rest. if SecretNamespace is not specified then default namespace is used.",
+      "type": "string"
+     },
+     "user": {
+      "description": "Prism user id for accessing nutanix cluster via rest API. Either User/Password OR SecretName/SecretNamespace should be provided.",
+      "type": "string"
+     },
+     "volumeName": {
+      "description": "Volume Name.",
+      "type": "string"
+     },
+     "volumeUUID": {
+      "description": "Volume UUID.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.ObjectFieldSelector": {
     "description": "ObjectFieldSelector selects an APIVersioned field of an object.",
     "required": [
@@ -50307,6 +50363,10 @@
      "nfs": {
       "description": "NFS represents an NFS mount on the host. Provisioned by an admin. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
       "$ref": "#/definitions/io.k8s.api.core.v1.NFSVolumeSource"
+     },
+     "nutanixVolume": {
+      "description": "NutanixVolume represents a Nutanix persistent volume attached and mounted on Kubernetes nodes.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.NutanixVolumeSource"
      },
      "persistentVolumeReclaimPolicy": {
       "description": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
@@ -52020,6 +52080,10 @@
      "nfs": {
       "description": "NFS represents an NFS mount on the host that shares a pod's lifetime More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
       "$ref": "#/definitions/io.k8s.api.core.v1.NFSVolumeSource"
+     },
+     "nutanixVolume": {
+      "description": "NutanixVolume represents a Nutanix persistent volume attached and mounted on Kubernetes nodes.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.NutanixVolumeSource"
      },
      "persistentVolumeClaim": {
       "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
