@@ -57,7 +57,7 @@ func TestIsDNS1123Subdomain(t *testing.T) {
 		"0.a", "01.a", "012.a", "1a.a", "1-a.a", "1--a--b--2",
 		"0.1", "01.1", "012.1", "1a.1", "1-a.1", "1--a--b--2.1",
 		"a.b.c.d.e", "aa.bb.cc.dd.ee", "1.2.3.4.5", "11.22.33.44.55",
-		strings.Repeat("a", 253),
+		strings.Repeat("a", 63) + "." + strings.Repeat("a", 63) + "." + strings.Repeat("a", 63) + "." + strings.Repeat("a", 61),
 	}
 	for _, val := range goodValues {
 		if msgs := IsDNS1123Subdomain(val); len(msgs) != 0 {
@@ -78,6 +78,7 @@ func TestIsDNS1123Subdomain(t *testing.T) {
 		"a@b", "a,b", "a_b", "a;b",
 		"a:b", "a%b", "a?b", "a$b",
 		strings.Repeat("a", 254),
+		strings.Repeat("a", 64) + ".ab",
 	}
 	for _, val := range badValues {
 		if msgs := IsDNS1123Subdomain(val); len(msgs) == 0 {
@@ -236,7 +237,7 @@ func TestIsQualifiedName(t *testing.T) {
 		"example.com/Uppercase_Is_OK_123",
 		"requests.storage-foo",
 		strings.Repeat("a", 63),
-		strings.Repeat("a", 253) + "/" + strings.Repeat("b", 63),
+		strings.Repeat("a", 63) + "." + strings.Repeat("a", 63) + "." + strings.Repeat("a", 63) + "." + strings.Repeat("a", 61) + "/" + strings.Repeat("b", 63),
 	}
 	for i := range successCases {
 		if errs := IsQualifiedName(successCases[i]); len(errs) != 0 {

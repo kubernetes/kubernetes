@@ -122,6 +122,12 @@ func IsDNS1123Subdomain(value string) []string {
 	if !dns1123SubdomainRegexp.MatchString(value) {
 		errs = append(errs, RegexError(dns1123SubdomainErrorMsg, dns1123SubdomainFmt, "example.com"))
 	}
+	subs := strings.Split(value, ".")
+	for _, sub := range subs {
+		if len(sub) > DNS1123LabelMaxLength {
+			errs = append(errs, fmt.Sprintf("each part of subdomain must be no more than %d characters", DNS1123LabelMaxLength))
+		}
+	}
 	return errs
 }
 
