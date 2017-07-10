@@ -1581,7 +1581,11 @@ type HTTPGetAction struct {
 	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 	// Name or number of the port to access on the container.
 	// Number must be in the range 1 to 65535.
-	// Name must be an IANA_SVC_NAME.
+	// Name must be an IANA_SVC_NAME, which may contain only [-a-z0-9]
+	// and must contain at least one letter [a-z]. It must not start or end with a
+	// hyphen, nor contain adjacent hyphens.
+	// If it is an int value, it is treated as a literal.
+	// If it is a string, a port with the same name in the container spec will be resolved.
 	Port intstr.IntOrString `json:"port" protobuf:"bytes,2,opt,name=port"`
 	// Host name to connect to, defaults to the pod IP. You probably want to set
 	// "Host" in httpHeaders instead.
