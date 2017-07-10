@@ -52,6 +52,7 @@ pushd "${KUBE_ROOT}" > /dev/null
     exit 1
   fi
 
+  echo "Running godep save. This will take around 15 minutes."
   GOPATH=${GOPATH}:${KUBE_ROOT}/staging godep save "${REQUIRED_BINS[@]}"
 
   # create a symlink in vendor directory pointing to the staging client. This
@@ -63,4 +64,7 @@ pushd "${KUBE_ROOT}" > /dev/null
   done
 popd > /dev/null
 
-echo "Don't forget to run hack/update-godep-licenses.sh if you added or removed a dependency!"
+echo
+echo "Don't forget to run:"
+echo "- hack/update-bazel.sh to recreate the BUILD files"
+echo "- hack/update-godep-licenses.sh if you added or removed a dependency!"
