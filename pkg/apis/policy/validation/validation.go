@@ -38,7 +38,7 @@ func ValidatePodDisruptionBudgetUpdate(pdb, oldPdb *policy.PodDisruptionBudget) 
 	restoreGeneration := pdb.Generation
 	pdb.Generation = oldPdb.Generation
 
-	if !reflect.DeepEqual(pdb, oldPdb) {
+	if !reflect.DeepEqual(pdb.Spec, oldPdb.Spec) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to poddisruptionbudget spec are forbidden."))
 	}
 	allErrs = append(allErrs, ValidatePodDisruptionBudgetStatus(pdb.Status, field.NewPath("status"))...)
