@@ -186,6 +186,7 @@ func dsFromManifest(url string) *extensions.DaemonSet {
 	return &controller
 }
 
+// OWNER = sig/scheduling
 var _ = framework.KubeDescribe("[Feature:GPU]", func() {
 	f := framework.NewDefaultFramework("gpus")
 	It("run Nvidia GPU tests on Container Optimized OS only", func() {
