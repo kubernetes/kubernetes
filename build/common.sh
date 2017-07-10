@@ -384,7 +384,9 @@ function kube::build::short_hash() {
 # a workaround for bug https://github.com/docker/docker/issues/3968.
 function kube::build::destroy_container() {
   "${DOCKER[@]}" kill "$1" >/dev/null 2>&1 || true
-  "${DOCKER[@]}" wait "$1" >/dev/null 2>&1 || true
+  if docker inspect --type=container "$1" >/dev/null 2>&1; then
+    "${DOCKER[@]}" wait "$1" >/dev/null 2>&1 || true
+  fi
   "${DOCKER[@]}" rm -f -v "$1" >/dev/null 2>&1 || true
 }
 
