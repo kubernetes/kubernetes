@@ -55,7 +55,7 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 	switch {
 	case handler.Exec != nil:
 		var msg string
-		// TODO(timstclair): Pass a proper timeout value.
+		// TODO(tallclair): Pass a proper timeout value.
 		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, 0)
 		if err != nil {
 			msg := fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))

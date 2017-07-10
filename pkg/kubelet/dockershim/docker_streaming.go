@@ -121,7 +121,7 @@ func (ds *dockerService) PortForward(req *runtimeapi.PortForwardRequest) (*runti
 	if err != nil {
 		return nil, err
 	}
-	// TODO(timstclair): Verify that ports are exposed.
+	// TODO(tallclair): Verify that ports are exposed.
 	return ds.streamingServer.GetPortForward(req)
 }
 
