@@ -64,6 +64,9 @@ pushd "${KUBE_ROOT}" > /dev/null
   done
 popd > /dev/null
 
+# Workaround broken symlink in docker repo because godep copies the link, but not the target
+rm -rf ${KUBE_ROOT}/vendor/github.com/docker/docker/project/
+
 echo
 echo "Don't forget to run:"
 echo "- hack/update-bazel.sh to recreate the BUILD files"
