@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+// OWNER = sig/cli
+
+package kubectl
 
 import (
 	"fmt"
@@ -49,7 +51,7 @@ const (
 	proxyHTTPCallTimeout = 30 * time.Second
 )
 
-var _ = framework.KubeDescribe("Proxy", func() {
+var _ = kubectlDescribe("Kubectl Proxy", func() {
 	version := api.Registry.GroupOrDie(v1.GroupName).GroupVersion.Version
 	Context("version "+version, func() {
 		options := framework.FrameworkOptions{

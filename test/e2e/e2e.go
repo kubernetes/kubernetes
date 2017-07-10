@@ -52,6 +52,9 @@ const (
 	// images within this time we simply log their output and carry on
 	// with the tests.
 	imagePrePullingTimeout = 5 * time.Minute
+
+	// TODO: Delete this once all the tests that depend upon it are moved out of test/e2e and into subdirs
+	podName = "pfpod"
 )
 
 var (
