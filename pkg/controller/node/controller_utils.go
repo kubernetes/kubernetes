@@ -28,6 +28,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	clientv1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
@@ -319,7 +320,7 @@ func swapNodeControllerTaint(kubeClient clientset.Interface, taintToAdd, taintTo
 
 func createAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
-		obj, err := api.Scheme.DeepCopy(originalObj)
+		obj, err := scheme.Scheme.DeepCopy(originalObj)
 		if err != nil {
 			utilruntime.HandleError(err)
 			return
@@ -334,12 +335,12 @@ func createAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 
 func createUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldObj, newObj interface{}) {
 	return func(origOldObj, origNewObj interface{}) {
-		oldObj, err := api.Scheme.DeepCopy(origOldObj)
+		oldObj, err := scheme.Scheme.DeepCopy(origOldObj)
 		if err != nil {
 			utilruntime.HandleError(err)
 			return
 		}
-		newObj, err := api.Scheme.DeepCopy(origNewObj)
+		newObj, err := scheme.Scheme.DeepCopy(origNewObj)
 		if err != nil {
 			utilruntime.HandleError(err)
 			return
@@ -355,7 +356,7 @@ func createUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldOb
 
 func createDeleteNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
-		obj, err := api.Scheme.DeepCopy(originalObj)
+		obj, err := scheme.Scheme.DeepCopy(originalObj)
 		if err != nil {
 			utilruntime.HandleError(err)
 			return

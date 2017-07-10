@@ -30,10 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
 	nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
 	clientretry "k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -80,7 +80,7 @@ func NewCloudNodeController(
 	nodeStatusUpdateFrequency time.Duration) *CloudNodeController {
 
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "cloudcontrollermanager"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "cloudcontrollermanager"})
 	eventBroadcaster.StartLogging(glog.Infof)
 	if kubeClient != nil {
 		glog.V(0).Infof("Sending events to api server.")
@@ -179,7 +179,7 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 		}
 		nodeAddresses = []v1.NodeAddress{*nodeIP}
 	}
-	nodeCopy, err := api.Scheme.DeepCopy(node)
+	nodeCopy, err := scheme.Scheme.DeepCopy(node)
 	if err != nil {
 		glog.Errorf("failed to copy node to a new object")
 		return

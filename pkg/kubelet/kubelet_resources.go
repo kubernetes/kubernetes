@@ -22,7 +22,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 )
 
@@ -44,7 +44,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardApi(pod *v1.Pod, container *v1.Con
 	}
 	allocatable := node.Status.Allocatable
 	glog.Errorf("allocatable: %v", allocatable)
-	podCopy, err := api.Scheme.Copy(pod)
+	podCopy, err := scheme.Scheme.Copy(pod)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to perform a deep copy of pod object: %v", err)
 	}
@@ -58,7 +58,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardApi(pod *v1.Pod, container *v1.Con
 
 	var outputContainer *v1.Container
 	if container != nil {
-		containerCopy, err := api.Scheme.DeepCopy(container)
+		containerCopy, err := scheme.Scheme.DeepCopy(container)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to perform a deep copy of container object: %v", err)
 		}
