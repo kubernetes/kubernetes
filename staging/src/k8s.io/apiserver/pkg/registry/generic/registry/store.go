@@ -1150,7 +1150,7 @@ func (e *Store) Watch(ctx genericapirequest.Context, options *metainternalversio
 	return e.WatchPredicate(ctx, predicate, resourceVersion)
 }
 
-// WatchPredicate starts a watch for the items that m matches.
+// WatchPredicate starts a watch for the items that matches.
 func (e *Store) WatchPredicate(ctx genericapirequest.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
@@ -1276,7 +1276,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		return err
 	}
 
-	// Resource prefix must come from the underlying factory
+	// ResourcePrefix must come from the underlying factory
 	prefix := opts.ResourcePrefix
 	if !strings.HasPrefix(prefix, "/") {
 		prefix = "/" + prefix
