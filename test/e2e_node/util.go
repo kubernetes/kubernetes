@@ -32,6 +32,7 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
@@ -99,7 +100,7 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 		if configEnabled {
 			oldCfg, err = getCurrentKubeletConfig()
 			framework.ExpectNoError(err)
-			clone, err := api.Scheme.DeepCopy(oldCfg)
+			clone, err := scheme.Scheme.DeepCopy(oldCfg)
 			framework.ExpectNoError(err)
 			newCfg := clone.(*componentconfig.KubeletConfiguration)
 			updateFunction(newCfg)
@@ -230,7 +231,7 @@ func decodeConfigz(resp *http.Response) (*componentconfig.KubeletConfiguration, 
 		return nil, err
 	}
 
-	err = api.Scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
+	err = scheme.Scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
 	if err != nil {
 		return nil, err
 	}

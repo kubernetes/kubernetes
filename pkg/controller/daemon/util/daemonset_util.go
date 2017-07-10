@@ -22,7 +22,7 @@ import (
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -33,7 +33,7 @@ import (
 // label which contains templateGeneration (for backward compatibility),
 // hash of provided template and sets default daemon tolerations.
 func CreatePodTemplate(template v1.PodTemplateSpec, generation int64, hash string) v1.PodTemplateSpec {
-	obj, _ := api.Scheme.DeepCopy(template)
+	obj, _ := scheme.Scheme.DeepCopy(template)
 	newTemplate := obj.(v1.PodTemplateSpec)
 	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
 	// Add infinite toleration for taint notReady:NoExecute here
