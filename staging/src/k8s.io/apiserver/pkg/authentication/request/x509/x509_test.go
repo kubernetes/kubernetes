@@ -570,7 +570,7 @@ func TestX509(t *testing.T) {
 			User:  CommonNameUserConversion,
 
 			ExpectUserName: "client_cn",
-			ExpectGroups:   []string{"My Org"},
+			ExpectGroups:   []string{"My Org", "My Unit"},
 			ExpectOK:       true,
 			ExpectErr:      false,
 		},
