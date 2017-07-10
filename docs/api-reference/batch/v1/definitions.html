@@ -4211,7 +4211,7 @@ Examples:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">port</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME, which may contain only [-a-z0-9] and must contain at least one letter [a-z]. It must not start or end with a hyphen, nor contain adjacent hyphens. If it is an int value, it is treated as a literal. If it is a string, a port with the same name in the container spec will be resolved.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
