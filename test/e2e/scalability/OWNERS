@@ -1,7 +1,9 @@
 approvers:
 - gmarek
+- shyamjvs
 - wojtek-t
 reviewers:
 - gmarek
-- wojtek-t
+- shyamjvs
 - timothysc
+- wojtek-t
