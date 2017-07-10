@@ -53,6 +53,50 @@ var (
 	creationTime = timestamp.Add(-5 * time.Minute)
 )
 
+func TestRemoveTerminatedContainerInfo(t *testing.T) {
+	const (
+		seedPastPod0Infra      = 1000
+		seedPastPod0Container0 = 2000
+		seedPod0Infra          = 3000
+		seedPod0Container0     = 4000
+	)
+	const (
+		namespace = "test"
+		pName0    = "pod0"
+		cName00   = "c0"
+	)
+	infos := map[string]v2.ContainerInfo{
+		// ContainerInfo with past creation time and no CPU/memory usage for
+		// simulating uncleaned cgroups of already terminated containers, which
+		// should not be shown in the results.
+		"/pod0-i-terminated-1":  summaryTerminatedContainerInfo(seedPastPod0Infra, pName0, namespace, leaky.PodInfraContainerName),
+		"/pod0-c0-terminated-1": summaryTerminatedContainerInfo(seedPastPod0Container0, pName0, namespace, cName00),
+
+		// Same as above but uses the same creation time as the latest
+		// containers. They are terminated containers, so they should not be in
+		// the results.
+		"/pod0-i-terminated-2":  summaryTerminatedContainerInfo(seedPod0Infra, pName0, namespace, leaky.PodInfraContainerName),
+		"/pod0-c0-terminated-2": summaryTerminatedContainerInfo(seedPod0Container0, pName0, namespace, cName00),
+
+		// The latest containers, which should be in the results.
+		"/pod0-i":  summaryTestContainerInfo(seedPod0Infra, pName0, namespace, leaky.PodInfraContainerName),
+		"/pod0-c0": summaryTestContainerInfo(seedPod0Container0, pName0, namespace, cName00),
+
+		// Duplicated containers with non-zero CPU and memory usage. This case
+		// shouldn't happen unless something goes wrong, but we want to test
+		// that the metrics reporting logic works in this scenario.
+		"/pod0-i-duplicated":  summaryTestContainerInfo(seedPod0Infra, pName0, namespace, leaky.PodInfraContainerName),
+		"/pod0-c0-duplicated": summaryTestContainerInfo(seedPod0Container0, pName0, namespace, cName00),
+	}
+	output := removeTerminatedContainerInfo(infos)
+	assert.Len(t, output, 4)
+	for _, c := range []string{"/pod0-i", "/pod0-c0", "/pod0-i-duplicated", "/pod0-c0-duplicated"} {
+		if _, found := output[c]; !found {
+			t.Errorf("%q is expected to be in the output\n", c)
+		}
+	}
+}
+
 func TestBuildSummary(t *testing.T) {
 	node := k8sv1.Node{}
 	node.Name = "FooNode"
@@ -278,6 +322,13 @@ func generateCustomMetrics(spec []v1.MetricSpec) map[string][]v1.MetricVal {
 		ret[metricSpec.Name] = metrics
 	}
 	return ret
+}
+
+func summaryTerminatedContainerInfo(seed int, podName string, podNamespace string, containerName string) v2.ContainerInfo {
+	cinfo := summaryTestContainerInfo(seed, podName, podNamespace, containerName)
+	cinfo.Stats[0].Memory.RSS = 0
+	cinfo.Stats[0].CpuInst.Usage.Total = 0
+	return cinfo
 }
 
 func summaryTestContainerInfo(seed int, podName string, podNamespace string, containerName string) v2.ContainerInfo {
