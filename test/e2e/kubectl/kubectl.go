@@ -98,9 +98,12 @@ const (
 	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
 	redisControllerFilename  = "redis-master-controller.json"
 	redisServiceFilename     = "redis-master-service.json"
+	nginxDaemonsetFilename   = "nginx-daemonset.yaml"
 	nginxDeployment1Filename = "nginx-deployment1.yaml"
 	nginxDeployment2Filename = "nginx-deployment2.yaml"
 	nginxDeployment3Filename = "nginx-deployment3.yaml"
+	nginxReplicasetFilename  = "nginx-replicaset.yaml"
+	nginxStatefulsetFilename = "nginx-statefulset.yaml"
 	redisImage               = "gcr.io/k8s-testimages/redis:e2e"
 )
 
@@ -1695,6 +1698,285 @@ metadata:
 			if err == nil {
 				framework.Failf("Expected kubectl to fail, but it succeeded: %s", out)
 			}
+		})
+	})
+
+	framework.KubeDescribe("Kubectl reaper", func() {
+		var nsFlag string
+		var name string
+		var labelFlag string
+
+		BeforeEach(func() {
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+		})
+
+		It("should delete deployment and all of the resources managed by it", func() {
+			name = "e2e-test-nginx-deployment"
+			labelFlag = fmt.Sprintf("--labels=run=%v", name)
+
+			// Create deployment with a specific label so that replicasets and pods also have the label
+			By("running the image " + nginxImage)
+			framework.RunKubectlOrDie("run", name, "--image="+nginxImage, "--generator=deployment/apps.v1beta1", nsFlag, labelFlag)
+
+			// If the pod is created successfully, it means deployment and replicasets are created successfully too
+			By("verifying the pod controlled by " + name + " gets created")
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
+			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
+			if err != nil {
+				framework.Failf("Failed waiting for pod controlled by %s to be running: %v", name, err)
+			}
+
+			By("deleting the deployment " + name)
+			framework.RunKubectlOrDie("delete", "deployment", name, nsFlag, "--cascade=true")
+
+			By("verifying deployment was deleted")
+			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				_, err := c.AppsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})
+				if apierrs.IsNotFound(err) {
+					return true, nil
+				} else if err != nil {
+					return false, err
+				}
+				return false, nil
+			})
+			if err != nil {
+				framework.Failf("Failed verifying deployment was deleted: %v", err)
+			}
+
+			By("verifying pods were deleted")
+			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(podList.Items)).To(Equal(0))
+
+			By("verifying replicasets were deleted")
+			rsList, err := c.ExtensionsV1beta1().ReplicaSets(ns).List(metav1.ListOptions{LabelSelector: label.String()})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(rsList.Items)).To(Equal(0))
+		})
+
+		It("should delete replication controller and all of the resources managed by it", func() {
+			name = "e2e-test-nginx-rc"
+			labelFlag = fmt.Sprintf("--labels=run=%v", name)
+
+			By("running the image " + nginxImage)
+			framework.RunKubectlOrDie("run", name, "--image="+nginxImage, "--generator=run/v1", nsFlag, labelFlag)
+
+			By("verifying the rc " + name + " was created")
+			rc, err := c.Core().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("Failed getting rc %s: %v", name, err)
+			}
+			containers := rc.Spec.Template.Spec.Containers
+			if containers == nil || len(containers) != 1 || containers[0].Image != nginxImage {
+				framework.Failf("Failed creating rc %s for 1 pod with expected image %s", name, nginxImage)
+			}
+			framework.WaitForRCToStabilize(c, ns, name, framework.PodStartTimeout)
+
+			By("deleting the rc " + name)
+			framework.RunKubectlOrDie("delete", "rc", name, nsFlag, "--cascade=true")
+
+			By("verifying rc was deleted")
+			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				_, err := c.Core().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
+				if apierrs.IsNotFound(err) {
+					return true, nil
+				} else if err != nil {
+					return false, err
+				}
+				return false, nil
+			})
+			if err != nil {
+				framework.Failf("Failed verifying rc was deleted: %v", err)
+			}
+
+			By("verifying pods were deleted")
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
+			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(podList.Items)).To(Equal(0))
+		})
+
+		It("should delete replicaset and all of the resources managed by it", func() {
+			name = "nginx-replicaset"
+			labelFlag = fmt.Sprintf("--labels=run=%v", name)
+			controllerYaml := readTestFileOrDie(nginxReplicasetFilename)
+
+			By("creating the replicaset using a YAML file")
+			framework.RunKubectlOrDieInput(string(controllerYaml), "create", "-f", "-", nsFlag, labelFlag)
+
+			By("verifying the pod controlled by " + name + " gets created")
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
+			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
+			if err != nil {
+				framework.Failf("Failed waiting for pod controlled by %s to be running: %v", name, err)
+			}
+
+			By("deleting the replicaset " + name)
+			framework.RunKubectlOrDie("delete", "replicaset", name, nsFlag, "--cascade=true")
+
+			By("verifying replicaset was deleted")
+			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				_, err := c.ExtensionsV1beta1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+				if apierrs.IsNotFound(err) {
+					return true, nil
+				} else if err != nil {
+					return false, err
+				}
+				return false, nil
+			})
+			if err != nil {
+				framework.Failf("Failed verifying replicaset was deleted: %v", err)
+			}
+
+			By("verifying pods were deleted")
+			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(podList.Items)).To(Equal(0))
+		})
+
+		It("should delete daemonset and all of the resources managed by it", func() {
+			name = "nginx-daemonset"
+			labelFlag = fmt.Sprintf("--labels=run=%v", name)
+			controllerYaml := readTestFileOrDie(nginxDaemonsetFilename)
+
+			By("creating the daemonset using a YAML file")
+			framework.RunKubectlOrDieInput(string(controllerYaml), "create", "-f", "-", nsFlag, labelFlag)
+
+			By("verifying the pod controlled by " + name + " gets created")
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
+			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
+			if err != nil {
+				framework.Failf("Failed waiting for pod controlled by %s to be running: %v", name, err)
+			}
+
+			By("deleting the daemonset " + name)
+			framework.RunKubectlOrDie("delete", "daemonset", name, nsFlag, "--cascade=true")
+
+			By("verifying daemonset was deleted")
+			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				_, err := c.ExtensionsV1beta1().DaemonSets(ns).Get(name, metav1.GetOptions{})
+				if apierrs.IsNotFound(err) {
+					return true, nil
+				} else if err != nil {
+					return false, err
+				}
+				return false, nil
+			})
+			if err != nil {
+				framework.Failf("Failed verifying daemonset was deleted: %v", err)
+			}
+
+			By("verifying pods were deleted")
+			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(podList.Items)).To(Equal(0))
+		})
+
+		It("should delete pod", func() {
+			name = "e2e-test-nginx-pod"
+			labelFlag = fmt.Sprintf("--labels=run=%v", name)
+
+			By("running the image " + nginxImage)
+			framework.RunKubectlOrDie("run", name, "--image="+nginxImage, "--generator=run-pod/v1", nsFlag, labelFlag)
+
+			By("verifying the pod " + name + " gets created")
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
+			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
+			if err != nil {
+				framework.Failf("Failed waiting for pod %s to be running: %v", name, err)
+			}
+
+			By("deleting the pod " + name)
+			framework.RunKubectlOrDie("delete", "pod", name, nsFlag, "--cascade=true")
+
+			By("verifying pod was deleted")
+			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				_, err := c.Core().Pods(ns).Get(name, metav1.GetOptions{})
+				if apierrs.IsNotFound(err) {
+					return true, nil
+				} else if err != nil {
+					return false, err
+				}
+				return false, nil
+			})
+			if err != nil {
+				framework.Failf("Failed verifying pod was deleted: %v", err)
+			}
+		})
+
+		It("should delete job and all of the resources managed by it", func() {
+			name = "e2e-test-nginx-job"
+			labelFlag = fmt.Sprintf("--labels=run=%v", name)
+
+			By("running the image " + nginxImage)
+			framework.RunKubectlOrDie("run", name, "--image="+nginxImage, "--generator=job/v1", nsFlag, labelFlag)
+
+			By("verifying the pod controlled by " + name + " gets created")
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
+			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
+			if err != nil {
+				framework.Failf("Failed waiting for pod controlled by %s to be running: %v", name, err)
+			}
+
+			By("deleting the job " + name)
+			framework.RunKubectlOrDie("delete", "job", name, nsFlag, "--cascade=true")
+
+			By("verifying job was deleted")
+			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				_, err := c.Batch().Jobs(ns).Get(name, metav1.GetOptions{})
+				if apierrs.IsNotFound(err) {
+					return true, nil
+				} else if err != nil {
+					return false, err
+				}
+				return false, nil
+			})
+			if err != nil {
+				framework.Failf("Failed verifying job was deleted: %v", err)
+			}
+
+			By("verifying pods were deleted")
+			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(podList.Items)).To(Equal(0))
+		})
+
+		It("should delete statefulset and all of the resources managed by it", func() {
+			name = "nginx-statefulset"
+			labelFlag = fmt.Sprintf("--labels=run=%v", name)
+			controllerYaml := readTestFileOrDie(nginxStatefulsetFilename)
+
+			By("creating the statefulset using a YAML file")
+			framework.RunKubectlOrDieInput(string(controllerYaml), "create", "-f", "-", nsFlag, labelFlag)
+
+			By("verifying the pod controlled by " + name + " gets created")
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
+			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
+			if err != nil {
+				framework.Failf("Failed waiting for pod controlled by %s to be running: %v", name, err)
+			}
+
+			By("deleting the statefulset " + name)
+			framework.RunKubectlOrDie("delete", "statefulset", name, nsFlag, "--cascade=true")
+
+			By("verifying statefulset was deleted")
+			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				_, err := c.AppsV1beta1().StatefulSets(ns).Get(name, metav1.GetOptions{})
+				if apierrs.IsNotFound(err) {
+					return true, nil
+				} else if err != nil {
+					return false, err
+				}
+				return false, nil
+			})
+			if err != nil {
+				framework.Failf("Failed verifying statefulset was deleted: %v", err)
+			}
+
+			By("verifying pods were deleted")
+			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(podList.Items)).To(Equal(0))
 		})
 	})
 })
