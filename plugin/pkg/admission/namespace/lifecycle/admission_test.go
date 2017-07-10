@@ -132,6 +132,24 @@ func TestAdmissionNamespaceDoesNotExist(t *testing.T) {
 		}
 		t.Errorf("expected error returned from admission handler: %v", actions)
 	}
+
+	// verify create operations in the namespace cause an error
+	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected error rejecting creates in a namespace when it is missing")
+	}
+
+	// verify update operations in the namespace cause an error
+	err = handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+	if err == nil {
+		t.Errorf("Expected error rejecting updates in a namespace when it is missing")
+	}
+
+	// verify delete operations in the namespace can proceed
+	err = handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Delete, nil))
+	if err != nil {
+		t.Errorf("Unexpected error returned from admission handler: %v", err)
+	}
 }
 
 // TestAdmissionNamespaceActive verifies a resource is admitted when the namespace is active.
