@@ -25,6 +25,7 @@ import (
 	"time"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationapiv1 "k8s.io/api/authorization/v1"
@@ -389,6 +390,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		authenticationv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
 		appsv1beta1.SchemeGroupVersion,
+		appsv1beta2.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,
 		// Don't copy this pattern. We enable rbac/v1alpha1 and settings/v1laph1
