@@ -1444,7 +1444,11 @@ func tlsHandshake(t *testing.T, sCfg, cCfg *tls.Config) error {
 		}
 	}()
 
-	c, err := tls.Dial("tcp", s.Addr().String(), cCfg)
+	// workaround [::] not working in ipv4 only systems (https://github.com/golang/go/issues/18806)
+	// TODO: remove with Golang 1.9 with https://go-review.googlesource.com/c/45088/
+	addr := strings.TrimPrefix(s.Addr().String(), "[::]")
+
+	c, err := tls.Dial("tcp", addr, cCfg)
 	if err != nil {
 		// Intentionally not serializing the error received because we want to
 		// test for the failure case in the caller test function.
