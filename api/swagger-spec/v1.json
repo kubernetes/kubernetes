@@ -18318,6 +18318,10 @@
        "$ref": "v1.Taint"
       },
       "description": "If specified, the node's taints."
+     },
+     "configSource": {
+      "$ref": "v1.NodeConfigSource",
+      "description": "If specified, the source to get node configuration from The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field"
      }
     }
    },
@@ -18344,6 +18348,23 @@
      "timeAdded": {
       "type": "string",
       "description": "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints."
+     }
+    }
+   },
+   "v1.NodeConfigSource": {
+    "id": "v1.NodeConfigSource",
+    "description": "NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources"
+     },
+     "configMapRef": {
+      "$ref": "v1.ObjectReference"
      }
     }
    },

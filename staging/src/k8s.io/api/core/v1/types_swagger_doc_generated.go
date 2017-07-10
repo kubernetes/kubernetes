@@ -899,6 +899,14 @@ func (NodeCondition) SwaggerDoc() map[string]string {
 	return map_NodeCondition
 }
 
+var map_NodeConfigSource = map[string]string{
+	"": "NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.",
+}
+
+func (NodeConfigSource) SwaggerDoc() map[string]string {
+	return map_NodeConfigSource
+}
+
 var map_NodeDaemonEndpoints = map[string]string{
 	"":                "NodeDaemonEndpoints lists ports opened by daemons running on the Node.",
 	"kubeletEndpoint": "Endpoint on which Kubelet is listening.",
@@ -972,6 +980,7 @@ var map_NodeSpec = map[string]string{
 	"providerID":    "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
 	"unschedulable": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: https://kubernetes.io/docs/concepts/nodes/node/#manual-node-administration",
 	"taints":        "If specified, the node's taints.",
+	"configSource":  "If specified, the source to get node configuration from The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field",
 }
 
 func (NodeSpec) SwaggerDoc() map[string]string {
