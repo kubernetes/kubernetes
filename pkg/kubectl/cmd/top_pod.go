@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,6 +39,7 @@ type TopPodOptions struct {
 	ResourceName    string
 	Namespace       string
 	Selector        string
+	SortBy          string
 	AllNamespaces   bool
 	PrintContainers bool
 	PodClient       coreclient.PodsGetter
@@ -96,6 +97,7 @@ func NewCmdTopPod(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
 	cmd.Flags().BoolVar(&options.PrintContainers, "containers", false, "If present, print usage of containers within a pod.")
 	cmd.Flags().BoolVar(&options.AllNamespaces, "all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().StringVar(&options.SortBy, "sort-by", "", "If non-empty, sort list types using this field specification. For metrics, the valid fields are 'name', 'cpu' and 'memory'")
 	options.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
@@ -126,6 +128,9 @@ func (o *TopPodOptions) Validate() error {
 	if len(o.ResourceName) > 0 && len(o.Selector) > 0 {
 		return errors.New("only one of NAME or --selector can be provided")
 	}
+	if len(o.SortBy) > 0 && o.SortBy != "name" && o.SortBy != "cpu" && o.SortBy != "memory" {
+		return errors.New("Please select either name, cpu, or memory to sort by")
+	}
 	return nil
 }
 
@@ -152,7 +157,7 @@ func (o TopPodOptions) RunTopPod() error {
 	if err != nil {
 		return err
 	}
-	return o.Printer.PrintPodMetrics(metrics, o.PrintContainers, o.AllNamespaces)
+	return o.Printer.PrintPodMetrics(metrics, o.PrintContainers, o.AllNamespaces, api.ResourceName(o.SortBy))
 }
 
 func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {

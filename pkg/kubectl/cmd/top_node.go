@@ -40,6 +40,7 @@ type TopNodeOptions struct {
 	HeapsterOptions HeapsterTopOptions
 	Client          *metricsutil.HeapsterMetricsClient
 	Printer         *metricsutil.TopCmdPrinter
+	SortBy          string
 }
 
 type HeapsterTopOptions struct {
@@ -82,8 +83,13 @@ func NewCmdTopNode(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			if err := options.Complete(f, cmd, args, out); err != nil {
 				cmdutil.CheckErr(err)
 			}
+			sorting, err := cmd.Flags().GetString("sort-by")
+			options.SortBy = sorting
 			if err := options.Validate(); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
+			}
+			if err != nil {
+				cmdutil.CheckErr(err)
 			}
 			if err := options.RunTopNode(); err != nil {
 				cmdutil.CheckErr(err)
@@ -92,6 +98,7 @@ func NewCmdTopNode(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Aliases: []string{"nodes", "no"},
 	}
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
+	cmd.Flags().StringVar(&options.SortBy, "sort-by", "", "If non-empty, sort list types using this field specification. For metrics, the valid fields are 'name', 'cpu' and 'memory'")
 	options.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
@@ -123,6 +130,9 @@ func (o *TopNodeOptions) Validate() error {
 		if err != nil {
 			return err
 		}
+	}
+	if len(o.SortBy) > 0 && o.SortBy != "name" && o.SortBy != "cpu" && o.SortBy != "memory" {
+		return errors.New("Please select either name, cpu, or memory to sort by")
 	}
 	return nil
 }
@@ -167,5 +177,5 @@ func (o TopNodeOptions) RunTopNode() error {
 		allocatable[n.Name] = n.Status.Allocatable
 	}
 
-	return o.Printer.PrintNodeMetrics(metrics, allocatable)
+	return o.Printer.PrintNodeMetrics(metrics, allocatable, api.ResourceName(o.SortBy))
 }

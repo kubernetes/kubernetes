@@ -19,6 +19,7 @@ package metricsutil
 import (
 	"fmt"
 	"io"
+	"sort"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api"
@@ -51,7 +52,11 @@ func NewTopCmdPrinter(out io.Writer) *TopCmdPrinter {
 	return &TopCmdPrinter{out: out}
 }
 
-func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics, availableResources map[string]api.ResourceList) error {
+func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics, availableResources map[string]api.ResourceList, sorting api.ResourceName) error {
+	if len(sorting) > 0 {
+		sort.Sort(nodeMetricsSort{metrics, sorting})
+	}
+
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -74,7 +79,7 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	return nil
 }
 
-func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool) error {
+func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, sorting api.ResourceName) error {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -88,13 +93,71 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 		printValue(w, PodColumn)
 	}
 	printColumnNames(w, PodColumns)
-	for _, m := range metrics {
-		err := printSinglePodMetrics(w, &m, printContainers, withNamespace)
-		if err != nil {
-			return err
-		}
+
+	allContainers, pods, err := addContainerMetrics(metrics, printContainers)
+	if err != nil {
+		return err
+	}
+
+	if printContainers {
+		sort.Sort(containerMetricsSort{allContainers, sorting})
+		printAllContainers(w, allContainers, withNamespace)
+	} else {
+		sort.Sort(podMetricsSort{metrics, pods, sorting})
+		printAllPods(w, metrics, pods, withNamespace)
 	}
 	return nil
+}
+
+func addContainerMetrics(metrics []metricsapi.PodMetrics, printContainers bool) ([]containerMetrics, []api.ResourceList, error) {
+	allContainers := make([]containerMetrics, 0)
+	pods := make([]api.ResourceList, 0)
+	for i, m := range metrics {
+		podMetrics := make(api.ResourceList)
+		containers := make(map[string]api.ResourceList)
+		for _, res := range MeasuredResources {
+			podMetrics[res], _ = resource.ParseQuantity("0")
+		}
+		for _, c := range m.Containers {
+			var usage api.ResourceList
+			err := api.Scheme.Convert(&c.Usage, &usage, nil)
+			if err != nil {
+				return nil, nil, err
+			}
+			containers[c.Name] = usage
+			allContainers = append(allContainers, containerMetrics{c.Name, &metrics[i], usage})
+			if !printContainers {
+				for _, res := range MeasuredResources {
+					quantity := podMetrics[res]
+					quantity.Add(usage[res])
+					podMetrics[res] = quantity
+				}
+			}
+		}
+		pods = append(pods, podMetrics)
+	}
+	return allContainers, pods, nil
+}
+
+func printAllPods(w io.Writer, metrics []metricsapi.PodMetrics, pods []api.ResourceList, withNamespace bool) error {
+	for idx, m := range metrics {
+		printSinglePodMetrics(w, &m, &pods[idx], withNamespace)
+	}
+	return nil
+}
+
+func printAllContainers(out io.Writer, containers []containerMetrics, withNamespace bool) {
+	for _, c := range containers {
+		if withNamespace {
+			printValue(out, c.pod.Namespace)
+		}
+		printValue(out, c.pod.Name)
+		printMetricsLine(out, &ResourceMetricsInfo{
+			Name:      c.name,
+			Metrics:   c.metrics,
+			Available: api.ResourceList{},
+		})
+	}
 }
 
 func printColumnNames(out io.Writer, names []string) {
@@ -104,51 +167,15 @@ func printColumnNames(out io.Writer, names []string) {
 	fmt.Fprint(out, "\n")
 }
 
-func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, printContainersOnly bool, withNamespace bool) error {
-	containers := make(map[string]api.ResourceList)
-	podMetrics := make(api.ResourceList)
-	for _, res := range MeasuredResources {
-		podMetrics[res], _ = resource.ParseQuantity("0")
+func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, p *api.ResourceList, withNamespace bool) {
+	if withNamespace {
+		printValue(out, m.Namespace)
 	}
-
-	for _, c := range m.Containers {
-		var usage api.ResourceList
-		err := api.Scheme.Convert(&c.Usage, &usage, nil)
-		if err != nil {
-			return err
-		}
-		containers[c.Name] = usage
-		if !printContainersOnly {
-			for _, res := range MeasuredResources {
-				quantity := podMetrics[res]
-				quantity.Add(usage[res])
-				podMetrics[res] = quantity
-			}
-		}
-	}
-	if printContainersOnly {
-		for contName := range containers {
-			if withNamespace {
-				printValue(out, m.Namespace)
-			}
-			printValue(out, m.Name)
-			printMetricsLine(out, &ResourceMetricsInfo{
-				Name:      contName,
-				Metrics:   containers[contName],
-				Available: api.ResourceList{},
-			})
-		}
-	} else {
-		if withNamespace {
-			printValue(out, m.Namespace)
-		}
-		printMetricsLine(out, &ResourceMetricsInfo{
-			Name:      m.Name,
-			Metrics:   podMetrics,
-			Available: api.ResourceList{},
-		})
-	}
-	return nil
+	printMetricsLine(out, &ResourceMetricsInfo{
+		Name:      m.Name,
+		Metrics:   *p,
+		Available: api.ResourceList{},
+	})
 }
 
 func printMetricsLine(out io.Writer, metrics *ResourceMetricsInfo) {
