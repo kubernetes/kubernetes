@@ -259,10 +259,10 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 
 		sliceLength := value.Len()
 		if params[1].Value != params[0].Value { // if you're requesting zero elements, allow it through.
-			if params[0].Value >= sliceLength {
+			if params[0].Value >= sliceLength || params[0].Value < 0 {
 				return input, fmt.Errorf("array index out of bounds: index %d, length %d", params[0].Value, sliceLength)
 			}
-			if params[1].Value > sliceLength {
+			if params[1].Value > sliceLength || params[1].Value < 0 {
 				return input, fmt.Errorf("array index out of bounds: index %d, length %d", params[1].Value-1, sliceLength)
 			}
 		}
