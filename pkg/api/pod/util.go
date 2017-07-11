@@ -60,6 +60,10 @@ func VisitPodSecretNames(pod *api.Pod, visitor Visitor) bool {
 			if source.FlexVolume.SecretRef != nil && !visitor(source.FlexVolume.SecretRef.Name) {
 				return false
 			}
+		case source.NutanixVolume != nil:
+			if len(source.NutanixVolume.SecretName) > 0 && !visitor(source.NutanixVolume.SecretName) {
+				return false
+			}
 		case source.Projected != nil:
 			for j := range source.Projected.Sources {
 				if source.Projected.Sources[j].Secret != nil {

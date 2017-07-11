@@ -744,6 +744,8 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printCephFSVolumeSource(volume.VolumeSource.CephFS, w)
 		case volume.VolumeSource.StorageOS != nil:
 			printStorageOSVolumeSource(volume.VolumeSource.StorageOS, w)
+		case volume.VolumeSource.NutanixVolume != nil:
+			printNutanixVolumeSource(volume.VolumeSource.NutanixVolume, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -959,6 +961,21 @@ func printStorageOSPersistentVolumeSource(storageos *api.StorageOSPersistentVolu
 		"    ReadOnly:\t%v\n",
 		storageos.VolumeName, storageos.VolumeNamespace, storageos.FSType, storageos.ReadOnly)
 }
+func printNutanixVolumeSource(src *api.NutanixVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tNutanixVolume (a persistent volume backed by a Nutanix Volume Group)\n"+
+		"    User Name:\t%v\n"+
+		"    Password:\t%v\n"+
+		"    Secret Name:\t%v\n"+
+		"    Secret Namespace:\t%v\n"+
+		"    Prism EndPoint:\t%v\n"+
+		"    DataServiceEndPoint:\t%v\n"+
+		"    Volume Name:\t%v\n"+
+		"    Volume Uuid:\t%v\n"+
+		"    IscsiTarget:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		src.User, "<Omitted>", src.SecretName, src.SecretNamespace, src.PrismEndPoint, src.DataServiceEndPoint, src.VolumeName, src.VolumeUUID, src.IscsiTarget, src.FSType, src.ReadOnly)
+}
 
 type PersistentVolumeDescriber struct {
 	clientset.Interface
@@ -1035,6 +1052,8 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 			printCephFSVolumeSource(pv.Spec.CephFS, w)
 		case pv.Spec.StorageOS != nil:
 			printStorageOSPersistentVolumeSource(pv.Spec.StorageOS, w)
+		case pv.Spec.NutanixVolume != nil:
+			printNutanixVolumeSource(pv.Spec.NutanixVolume, w)
 		}
 
 		if events != nil {

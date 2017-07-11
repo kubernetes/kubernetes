@@ -108,6 +108,7 @@ filegroup(
         "//pkg/volume/iscsi:all-srcs",
         "//pkg/volume/local:all-srcs",
         "//pkg/volume/nfs:all-srcs",
+        "//pkg/volume/nutanix_volume:all-srcs",
         "//pkg/volume/photon_pd:all-srcs",
         "//pkg/volume/portworx:all-srcs",
         "//pkg/volume/projected:all-srcs",

@@ -1323,23 +1323,44 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "iscsi.secretRef",
 		},
+		// NutanixVolume
 		{
-			name: "empty secret",
+			name: "empty PrismEndPoint",
 			vol: api.Volume{
-				Name: "iscsi",
+				Name: "prismep",
 				VolumeSource: api.VolumeSource{
-					ISCSI: &api.ISCSIVolumeSource{
-						TargetPortal:    "127.0.0.1",
-						IQN:             "iqn.2015-02.example.com:test",
-						Lun:             1,
-						FSType:          "ext4",
-						ReadOnly:        false,
-						SessionCHAPAuth: true,
+					NutanixVolume: &api.NutanixVolumeSource{
+						DataServiceEndPoint: "127.0.0.1:test",
+						PrismEndPoint:       "",
+						User:                "admin",
+						Password:            "mypassword",
+						IscsiTarget:         "iqn.2010-06.com.nutanix:k8-test-volume",
+						FSType:              "ext4",
+						ReadOnly:            false,
 					},
 				},
 			},
 			errtype:  field.ErrorTypeRequired,
-			errfield: "iscsi.secretRef",
+			errfield: "nutanixVolume.prismEndPoint",
+		},
+		{
+			name: "empty DataServiceEndPoint",
+			vol: api.Volume{
+				Name: "dsep",
+				VolumeSource: api.VolumeSource{
+					NutanixVolume: &api.NutanixVolumeSource{
+						DataServiceEndPoint: "",
+						PrismEndPoint:       "127.0.0.1:test",
+						User:                "admin",
+						Password:            "mypassword",
+						IscsiTarget:         "iqn.2010-06.com.nutanix:k8-test-volume",
+						FSType:              "ext4",
+						ReadOnly:            false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "nutanixVolume.dataServiceEndPoint",
 		},
 		// Secret
 		{

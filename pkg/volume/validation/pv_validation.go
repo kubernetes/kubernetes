@@ -42,6 +42,7 @@ func checkMountOption(pv *api.PersistentVolume) field.ErrorList {
 		pv.Spec.RBD != nil ||
 		pv.Spec.Quobyte != nil ||
 		pv.Spec.ISCSI != nil ||
+		pv.Spec.NutanixVolume != nil ||
 		pv.Spec.Cinder != nil ||
 		pv.Spec.CephFS != nil ||
 		pv.Spec.AzureFile != nil ||

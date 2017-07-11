@@ -351,6 +351,9 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
 	// +optional
 	StorageOS *StorageOSVolumeSource `json:"storageos,omitempty" protobuf:"bytes,27,opt,name=storageos"`
+	// NutanixVolume represents a Nutanix persistent volume attached and mounted on Kubernetes nodes.
+	// +optional
+	NutanixVolume *NutanixVolumeSource `json:"nutanixVolume,omitempty" protobuf:"bytes,28,opt,name=nutanixVolume"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -449,6 +452,9 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource `json:"storageos,omitempty" protobuf:"bytes,21,opt,name=storageos"`
+	// NutanixVolume represents a Nutanix persistent volume attached and mounted on Kubernetes nodes.
+	// +optional
+	NutanixVolume *NutanixVolumeSource `json:"nutanixVolume,omitempty" protobuf:"bytes,22,opt,name=nutanixVolume"`
 }
 
 const (
@@ -1090,6 +1096,44 @@ type ISCSIVolumeSource struct {
 	// CHAP secret for iSCSI target and initiator authentication
 	// +optional
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,10,opt,name=secretRef"`
+}
+
+// Represents Nutanix volume.
+// NutanixVolume can be mounted as read/write once or read only.
+type NutanixVolumeSource struct {
+	// Prism user id for accessing nutanix cluster via rest API. Either User/Password
+	// OR SecretName/SecretNamespace should be provided.
+	// +optional
+	User string `json:"user,omitempty" protobuf:"bytes,1,opt,name=user"`
+	// Prism password for accessing nutanix cluster via rest API.
+	// +optional
+	Password string `json:"password,omitempty" protobuf:"bytes,2,opt,name=password"`
+	// Secret namespace and Secret Name to retrieve credential for accessing nutanix
+	// cluster via rest. if SecretNamespace is not specified then default namespace is used.
+	// +optional
+	SecretNamespace string `json:"secretNamespace,omitempty" protobuf:"bytes,3,opt,name=secretNamespace"`
+	// Secret name for accessing nutanix cluster via rest.
+	// +optional
+	SecretName string `json:"secretName,omitempty" protobuf:"bytes,4,opt,name=secretName"`
+	// Prism service <IP:port>  for nutanix cluster.
+	PrismEndPoint string `json:"prismEndPoint" protobuf:"bytes,5,opt,name=prismEndPoint"`
+	// Data service <IP:port> as configured in nutanix cluster.
+	DataServiceEndPoint string `json:"dataServiceEndPoint" protobuf:"bytes,6,opt,name=dataServiceEndPoint"`
+	// Volume Name.
+	VolumeName string `json:"volumeName" protobuf:"bytes,7,opt,name=volumeName"`
+	// Volume UUID.
+	VolumeUUID string `json:"volumeUUID" protobuf:"bytes,8,opt,name=volumeUUID"`
+	// ISCSI target for the nutanix volume group.
+	IscsiTarget string `json:"iscsiTarget" protobuf:"bytes,9,opt,name=iscsiTarget"`
+	// Filesystem type of the volume that you want to mount.
+	// Tip: Ensure that the filesystem type is supported by the host operating system.
+	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,10,opt,name=fsType"`
+	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
+	// Defaults to false.
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,11,opt,name=readOnly"`
 }
 
 // Represents a Fibre Channel volume.

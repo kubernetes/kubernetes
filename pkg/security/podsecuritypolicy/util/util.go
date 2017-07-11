@@ -66,6 +66,7 @@ func GetAllFSTypesAsSet() sets.String {
 		string(extensions.Projected),
 		string(extensions.PortworxVolume),
 		string(extensions.ScaleIO),
+		string(extensions.NutanixVolume),
 	)
 	return fstypes
 }
@@ -127,6 +128,8 @@ func GetVolumeFSType(v api.Volume) (extensions.FSType, error) {
 		return extensions.PortworxVolume, nil
 	case v.ScaleIO != nil:
 		return extensions.ScaleIO, nil
+	case v.NutanixVolume != nil:
+		return extensions.NutanixVolume, nil
 	}
 
 	return "", fmt.Errorf("unknown volume type for volume: %#v", v)

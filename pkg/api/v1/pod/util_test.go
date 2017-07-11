@@ -230,6 +230,9 @@ func TestPodSecrets(t *testing.T) {
 					AzureFile: &v1.AzureFileVolumeSource{
 						SecretName: "Spec.Volumes[*].VolumeSource.AzureFile.SecretName"}}}, {
 				VolumeSource: v1.VolumeSource{
+					NutanixVolume: &v1.NutanixVolumeSource{
+						SecretName: "Spec.Volumes[*].VolumeSource.NutanixVolume.SecretName"}}}, {
+				VolumeSource: v1.VolumeSource{
 					CephFS: &v1.CephFSVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
 							Name: "Spec.Volumes[*].VolumeSource.CephFS.SecretRef"}}}}, {
@@ -276,6 +279,7 @@ func TestPodSecrets(t *testing.T) {
 	// excludedSecretPaths holds struct paths to fields with "secret" in the name that are not actually references to secret API objects
 	excludedSecretPaths := sets.NewString(
 		"Spec.Volumes[*].VolumeSource.CephFS.SecretFile",
+		"Spec.Volumes[*].VolumeSource.NutanixVolume.SecretNamespace",
 	)
 	// expectedSecretPaths holds struct paths to fields with "secret" in the name that are references to secret API objects.
 	// every path here should be represented as an example in the Pod stub above, with the secret name set to the path.
@@ -286,6 +290,7 @@ func TestPodSecrets(t *testing.T) {
 		"Spec.InitContainers[*].EnvFrom[*].SecretRef",
 		"Spec.InitContainers[*].Env[*].ValueFrom.SecretKeyRef",
 		"Spec.Volumes[*].VolumeSource.AzureFile.SecretName",
+		"Spec.Volumes[*].VolumeSource.NutanixVolume.SecretName",
 		"Spec.Volumes[*].VolumeSource.CephFS.SecretRef",
 		"Spec.Volumes[*].VolumeSource.FlexVolume.SecretRef",
 		"Spec.Volumes[*].VolumeSource.Projected.Sources[*].Secret",

@@ -84,6 +84,7 @@ go_library(
         "//pkg/volume/host_path:go_default_library",
         "//pkg/volume/local:go_default_library",
         "//pkg/volume/nfs:go_default_library",
+        "//pkg/volume/nutanix_volume:go_default_library",
         "//pkg/volume/photon_pd:go_default_library",
         "//pkg/volume/portworx:go_default_library",
         "//pkg/volume/quobyte:go_default_library",
