@@ -63,15 +63,16 @@ if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
 fi
 
 # By default a cluster will be started with the master and nodes
-# on Container-optimized OS (cos, previously known as gci). If
-# you are updating the os image versions, update this variable.
+# on Container-VM, the deprecated OS. Some tests assume container-VM,
+# and only when that is fixed can we use Container-Optimized OS
+# (cos, gci) as we do in config-default.sh.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
 CVM_VERSION=${CVM_VERSION:-container-vm-v20170627}
 GCI_VERSION=${KUBE_GCI_VERSION:-cos-stable-59-9460-64-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
-NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
+NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
 NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
