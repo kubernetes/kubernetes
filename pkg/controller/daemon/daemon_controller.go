@@ -46,6 +46,7 @@ import (
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/workqueue"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -904,31 +905,54 @@ func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelet
 
 	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v, creating %d", ds.Name, nodesNeedingDaemonPods, createDiff)
 	createWait := sync.WaitGroup{}
-	createWait.Add(createDiff)
 	template := util.CreatePodTemplate(ds.Spec.Template, ds.Spec.TemplateGeneration, hash)
-	for i := 0; i < createDiff; i++ {
-		go func(ix int) {
-			defer createWait.Done()
-			err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds, metav1.NewControllerRef(ds, controllerKind))
-			if err != nil && errors.IsTimeout(err) {
-				// Pod is created but its initialization has timed out.
-				// If the initialization is successful eventually, the
-				// controller will observe the creation via the informer.
-				// If the initialization fails, or if the pod keeps
-				// uninitialized for a long time, the informer will not
-				// receive any update, and the controller will create a new
-				// pod when the expectation expires.
-				return
-			}
-			if err != nil {
-				glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
+	// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
+	// and double with each successful iteration in a kind of "slow start".
+	// This handles attempts to start large numbers of pods that would
+	// likely all fail with the same error. For example a project with a
+	// low quota that attempts to create a large number of pods will be
+	// prevented from spamming the API service with the pod create requests
+	// after one of its pods fails.  Conveniently, this also prevents the
+	// event spam that those failures would generate.
+	batchSize := integer.IntMin(createDiff, controller.SlowStartInitialBatchSize)
+	for pos := 0; createDiff > pos; batchSize, pos = integer.IntMin(2*batchSize, createDiff-(pos+batchSize)), pos+batchSize {
+		errorCount := len(errCh)
+		createWait.Add(batchSize)
+		for i := pos; i < pos+batchSize; i++ {
+			go func(ix int) {
+				defer createWait.Done()
+				err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds, metav1.NewControllerRef(ds, controllerKind))
+				if err != nil && errors.IsTimeout(err) {
+					// Pod is created but its initialization has timed out.
+					// If the initialization is successful eventually, the
+					// controller will observe the creation via the informer.
+					// If the initialization fails, or if the pod keeps
+					// uninitialized for a long time, the informer will not
+					// receive any update, and the controller will create a new
+					// pod when the expectation expires.
+					return
+				}
+				if err != nil {
+					glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
+					dsc.expectations.CreationObserved(dsKey)
+					errCh <- err
+					utilruntime.HandleError(err)
+				}
+			}(i)
+		}
+		createWait.Wait()
+		// any skipped pods that we never attempted to start shouldn't be expected.
+		skippedPods := createDiff - batchSize
+		if errorCount < len(errCh) && skippedPods > 0 {
+			glog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for set %q/%q", skippedPods, ds.Namespace, ds.Name)
+			for i := 0; i < skippedPods; i++ {
 				dsc.expectations.CreationObserved(dsKey)
-				errCh <- err
-				utilruntime.HandleError(err)
 			}
-		}(i)
+			// The skipped pods will be retried later. The next controller resync will
+			// retry the slow start process.
+			break
+		}
 	}
-	createWait.Wait()
 
 	glog.V(4).Infof("Pods to delete for daemon set %s: %+v, deleting %d", ds.Name, podsToDelete, deleteDiff)
 	deleteWait := sync.WaitGroup{}

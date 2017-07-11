@@ -412,6 +412,28 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 	}
 }
 
+// Simulate a cluster with 100 nodes, but simulate a limit (like a quota limit)
+// of 10 pods, and verify that the ds doesn't make 100 create calls per sync pass
+func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
+	for _, strategy := range updateStrategies() {
+		ds := newDaemonSet("foo")
+		ds.Spec.UpdateStrategy = *strategy
+		manager, podControl, _ := newTestController(ds)
+		podControl.FakePodControl.CreateLimit = 10
+		addNodes(manager.nodeStore, 0, podControl.FakePodControl.CreateLimit*10, nil)
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, podControl.FakePodControl.CreateLimit, 0, 0)
+		expectedLimit := 0
+		for pass := uint8(0); expectedLimit <= podControl.FakePodControl.CreateLimit; pass++ {
+			expectedLimit += controller.SlowStartInitialBatchSize << pass
+		}
+		if podControl.FakePodControl.CreateCallCount > expectedLimit {
+			t.Errorf("Unexpected number of create calls.  Expected <= %d, saw %d\n", podControl.FakePodControl.CreateLimit*2, podControl.FakePodControl.CreateCallCount)
+		}
+
+	}
+}
+
 func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
