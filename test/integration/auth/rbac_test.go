@@ -221,7 +221,7 @@ var (
 `
 	podNamespace = `
 {
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "pod-namespace"%s
@@ -230,7 +230,7 @@ var (
 `
 	jobNamespace = `
 {
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "job-namespace"%s
@@ -239,7 +239,7 @@ var (
 `
 	forbiddenNamespace = `
 {
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "forbidden-namespace"%s
@@ -510,7 +510,7 @@ func TestBootstrapping(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
 
 	watcher, err := clientset.Rbac().ClusterRoles().Watch(metav1.ListOptions{ResourceVersion: "0"})
 	if err != nil {

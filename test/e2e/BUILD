@@ -96,6 +96,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/api/v1/service:go_default_library",
         "//pkg/apis/networking:go_default_library",

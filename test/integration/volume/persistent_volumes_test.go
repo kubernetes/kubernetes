@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1/ref"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
@@ -1099,13 +1100,13 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 	// creates many objects and default values were too low.
 	binderClient := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion},
+		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()},
 		QPS:           1000000,
 		Burst:         1000000,
 	})
 	testClient := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion},
+		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()},
 		QPS:           1000000,
 		Burst:         1000000,
 	})

@@ -29,6 +29,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -54,7 +55,7 @@ func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroy
 
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion},
+		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()},
 		QPS:           5000.0,
 		Burst:         5000,
 	})

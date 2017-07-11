@@ -31,7 +31,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/cloudprovider/providers/vsphere:go_default_library",

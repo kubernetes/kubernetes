@@ -19,7 +19,7 @@ go_test(
         "integration",
     ],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/controller:go_default_library",

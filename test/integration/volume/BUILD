@@ -21,6 +21,7 @@ go_test(
     ],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/ref:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",
         "//pkg/controller/volume/attachdetach:go_default_library",

@@ -74,6 +74,7 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -2331,7 +2332,7 @@ func isNodeUntainted(node *v1.Node) bool {
 	fakePod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "fake-not-scheduled",
