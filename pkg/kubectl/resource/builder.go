@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -87,6 +88,11 @@ Example resource specifications include:
    '--filename=rsrc.json'
    '<resource> <name>'
    '<resource>'`)
+
+var LocalResourceError = errors.New(`error: you must specify resources by --filename when --local is set.
+Example resource specifications include:
+   '-f rsrc.yaml'
+   '--filename=rsrc.json'`)
 
 // TODO: expand this to include other errors.
 func IsUsageError(err error) bool {

@@ -150,7 +150,15 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 			SelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, o.Resources...).
 			Latest()
+	} else {
+		// if a --local flag was provided, and a resource was specified in the form
+		// <resource>/<name>, fail immediately as --local cannot query the api server
+		// for the specified resource.
+		if len(o.Resources) > 0 {
+			return resource.LocalResourceError
+		}
 	}
+
 	o.Infos, err = builder.Do().Infos()
 	if err != nil {
 		return err
