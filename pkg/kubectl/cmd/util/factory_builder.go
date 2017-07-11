@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
@@ -109,9 +110,12 @@ func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, isLocal bool, outpu
 		// as its parameter because of this we have to do a type check on printer and
 		// extract out concrete HumanReadablePrinter from it. We are then able to attach
 		// handlers on it.
-		if humanReadablePrinter, ok := printer.(*printers.HumanReadablePrinter); ok {
+		delegatePrinter := printer
+		if sortingPrinter, ok := printer.(*kubectl.SortingPrinter); ok {
+			delegatePrinter = sortingPrinter.Delegate
+		}
+		if humanReadablePrinter, ok := delegatePrinter.(*printers.HumanReadablePrinter); ok {
 			printersinternal.AddHandlers(humanReadablePrinter)
-			printer = humanReadablePrinter
 		}
 	}
 
