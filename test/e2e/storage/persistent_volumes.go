@@ -97,7 +97,7 @@ func initNFSserverPod(c clientset.Interface, ns string) *v1.Pod {
 	})
 }
 
-var _ = framework.KubeDescribe("PersistentVolumes", func() {
+var _ = SIGDescribe("PersistentVolumes", func() {
 
 	// global vars for the Context()s and It()'s below
 	f := framework.NewDefaultFramework("pv")
@@ -123,7 +123,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 	// Testing configurations of a single a PV/PVC pair, multiple evenly paired PVs/PVCs,
 	// and multiple unevenly paired PV/PVCs
-	framework.KubeDescribe("PersistentVolumes:NFS", func() {
+	SIGDescribe("PersistentVolumes:NFS", func() {
 
 		var (
 			nfsServerPod *v1.Pod

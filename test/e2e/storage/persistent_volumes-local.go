@@ -58,7 +58,7 @@ const (
 	testSC        = "local-test-storagclass"
 )
 
-var _ = framework.KubeDescribe("[Volume] PersistentVolumes-local [Feature:LocalPersistentVolumes] [Serial]", func() {
+var _ = SIGDescribe("[Volume] PersistentVolumes-local [Feature:LocalPersistentVolumes] [Serial]", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-test")
 
 	var (

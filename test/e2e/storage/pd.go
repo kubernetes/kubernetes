@@ -48,7 +48,7 @@ const (
 	maxReadRetry        = 3
 )
 
-var _ = framework.KubeDescribe("Pod Disks", func() {
+var _ = SIGDescribe("Pod Disks", func() {
 	var (
 		podClient  v1core.PodInterface
 		nodeClient v1core.NodeInterface

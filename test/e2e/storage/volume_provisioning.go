@@ -211,7 +211,7 @@ func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
 	return nil
 }
 
-var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
+var _ = SIGDescribe("Dynamic Provisioning", func() {
 	f := framework.NewDefaultFramework("volume-provisioning")
 
 	// filled in BeforeEach
@@ -223,7 +223,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		ns = f.Namespace.Name
 	})
 
-	framework.KubeDescribe("DynamicProvisioner", func() {
+	SIGDescribe("DynamicProvisioner", func() {
 		It("should provision storage with different parameters [Slow] [Volume]", func() {
 			cloudZone := getRandomCloudZone(c)
 
@@ -517,7 +517,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		})
 	})
 
-	framework.KubeDescribe("DynamicProvisioner External", func() {
+	SIGDescribe("DynamicProvisioner External", func() {
 		It("should let an external dynamic provisioner create and delete persistent volumes [Slow] [Volume]", func() {
 			// external dynamic provisioner pods need additional permissions provided by the
 			// persistent-volume-provisioner role
@@ -555,7 +555,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		})
 	})
 
-	framework.KubeDescribe("DynamicProvisioner Default", func() {
+	SIGDescribe("DynamicProvisioner Default", func() {
 		It("should create and delete default persistent volumes [Slow] [Volume]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 

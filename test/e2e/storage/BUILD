@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "framework.go",
         "pd.go",
         "persistent_volumes.go",
         "persistent_volumes-disruptive.go",
