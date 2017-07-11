@@ -23,14 +23,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/server/httplog"
-
-	"github.com/golang/glog"
 )
 
 // Constant for the retry-after interval on rate limiting.
@@ -109,10 +108,6 @@ func WithMaxInFlightLimit(
 }
 
 func tooManyRequests(req *http.Request, w http.ResponseWriter, disconnectChanceOnMaxRequests float64) {
-	// "Too Many Requests" response is returned before logger is setup for the request.
-	// So we need to explicitly log it here.
-	defer httplog.NewLogged(req, &w).Log()
-
 	if disconnectChanceOnMaxRequests > 0 && rand.Float64() < disconnectChanceOnMaxRequests {
 		w.Header().Set("Connection", "close")
 	}
