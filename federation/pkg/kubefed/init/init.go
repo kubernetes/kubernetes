@@ -125,6 +125,10 @@ var (
 		"app":    "federated-cluster",
 		"module": "federation-controller-manager",
 	}
+
+	validDNSProviders = []string{
+		"google-clouddns", "aws-route53", "coredns",
+	}
 )
 
 type initFederation struct {
@@ -208,12 +212,20 @@ type credentials struct {
 	certEntKeyPairs *entityKeyPairs
 }
 
+func isValidDNSProvider(dnsProvider string) bool {
+	for _, v := range validDNSProviders {
+		if v == dnsProvider {
+			return true
+		}
+	}
+	return false
+}
+
 // Complete ensures that options are valid and marshals them if necessary.
 func (i *initFederation) Complete(cmd *cobra.Command, args []string) error {
 	if len(i.options.dnsProvider) == 0 {
 		return fmt.Errorf("--dns-provider is mandatory")
 	}
-
 	err := i.commonOptions.SetName(cmd, args)
 	if err != nil {
 		return err
@@ -259,6 +271,10 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	hostClientset, err := hostFactory.ClientSet()
 	if err != nil {
 		return err
+	}
+
+	if !isValidDNSProvider(i.options.dnsProvider) {
+		return fmt.Errorf("dns-provider should be one of the following: %s", validDNSProviders)
 	}
 
 	rbacAvailable := true

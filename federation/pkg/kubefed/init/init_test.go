@@ -209,6 +209,23 @@ func TestInitFederation(t *testing.T) {
 			apiserverEnableTokenAuth:     true,
 			isRBACAPIAvailable:           true,
 		},
+		{
+			federation:            "union",
+			kubeconfigGlobal:      fakeKubeFiles[0],
+			kubeconfigExplicit:    "",
+			dnsZoneName:           "example.test.",
+			lbIP:                  lbIP,
+			apiserverServiceType:  v1.ServiceTypeLoadBalancer,
+			serverImage:           "example.test/foo:bar",
+			etcdPVCapacity:        "5Gi",
+			etcdPersistence:       "true",
+			expectedErr:           "error: dns-provider should be one of the following: [google-clouddns aws-route53 coredns]",
+			dnsProvider:           "invalidprovider",
+			dnsProviderConfig:     "dns-provider.conf",
+			dryRun:                "",
+			apiserverArgOverrides: "--client-ca-file=override,--log-dir=override",
+			cmArgOverrides:        "--dns-provider=override,--log-dir=override",
+		},
 	}
 
 	defaultEtcdImage := "gcr.io/google_containers/etcd:3.0.17"
@@ -294,6 +311,13 @@ func TestInitFederation(t *testing.T) {
 		}
 
 		cmd.Run(cmd, []string{tc.federation})
+
+		if tc.dnsProvider == "invalidprovider" {
+			if cmdErrMsg != tc.expectedErr {
+				t.Errorf("[%d] expected error: %s, got: %s, output: %s", i, tc.expectedErr, cmdErrMsg, buf.String())
+				return
+			}
+		}
 
 		if tc.expectedErr == "" {
 			// uses the name from the federation, not the response
