@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -52,7 +52,7 @@ const (
 )
 
 var _ = SIGDescribe("Kubectl Proxy", func() {
-	version := api.Registry.GroupOrDie(v1.GroupName).GroupVersion.Version
+	version := testapi.Groups[v1.GroupName].GroupVersion().Version
 	Context("version "+version, func() {
 		options := framework.FrameworkOptions{
 			ClientQPS: -1.0,

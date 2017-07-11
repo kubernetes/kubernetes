@@ -20,8 +20,8 @@ go_test(
         "integration",
     ],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//plugin/pkg/admission/defaulttolerationseconds:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//test/integration/framework:go_default_library",

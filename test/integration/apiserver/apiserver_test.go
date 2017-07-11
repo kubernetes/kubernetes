@@ -102,7 +102,7 @@ func newRS(namespace string) *v1beta1.ReplicaSet {
 var cascDel = `
 {
   "kind": "DeleteOptions",
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "orphanDependents": false
 }
 `

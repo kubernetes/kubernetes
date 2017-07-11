@@ -21,6 +21,7 @@ go_test(
     ],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//plugin/cmd/kube-scheduler/app:go_default_library",
         "//plugin/cmd/kube-scheduler/app/options:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",

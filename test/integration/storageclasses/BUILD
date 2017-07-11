@@ -19,7 +19,7 @@ go_test(
         "integration",
     ],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/storage/v1:go_default_library",
