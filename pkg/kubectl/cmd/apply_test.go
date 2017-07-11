@@ -384,7 +384,7 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 
 	// uses the name from the file, not the response
 	expectRC := "replicationcontroller/" + nameRC + "\n"
-	expectWarning := warningNoLastAppliedConfigAnnotation
+	expectWarning := fmt.Sprintf(warningNoLastAppliedConfigAnnotation, cmd.Root().Name())
 	if errBuf.String() != expectWarning {
 		t.Fatalf("unexpected non-warning: %s\nexpected: %s", errBuf.String(), expectWarning)
 	}
