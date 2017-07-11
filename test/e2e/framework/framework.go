@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -616,7 +618,22 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 // Wrapper function for ginkgo describe.  Adds namespacing.
 // TODO: Support type safe tagging as well https://github.com/kubernetes/kubernetes/pull/22401.
 func KubeDescribe(text string, body func()) bool {
-	return Describe("[k8s.io] "+text, body)
+	// Prefix the name of the test with the director it resides in to make it simple to create dashboards
+	// and figure out ownership
+	_, file, _, ok := runtime.Caller(1)
+	if !ok {
+		return Describe("[k8s.io] "+text, body)
+	}
+
+	// Get the name of the base directory of the test file
+	file = filepath.Base(filepath.Dir(file))
+
+	// Don't add prefix if the test file is at the root
+	if len(file) == 0 || file == "e2e" {
+		return Describe("[k8s.io] "+text, body)
+	}
+
+	return Describe("[k8s.io] ["+file+"] "+text, body)
 }
 
 // PodStateVerification represents a verification of pod state.
