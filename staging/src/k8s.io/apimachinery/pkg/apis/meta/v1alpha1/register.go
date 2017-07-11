@@ -47,5 +47,4 @@ func init() {
 	)
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
-	//scheme.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...)
 }
