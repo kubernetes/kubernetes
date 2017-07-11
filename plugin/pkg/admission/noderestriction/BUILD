@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/pod:go_default_library",
+        "//pkg/apis/policy:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
@@ -32,6 +33,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/apis/policy:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",

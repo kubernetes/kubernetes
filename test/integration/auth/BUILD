@@ -26,6 +26,7 @@ go_test(
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/policy:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/auth/authorizer/abac:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
