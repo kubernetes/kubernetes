@@ -113,6 +113,9 @@ func NodeRules() []rbac.PolicyRule {
 		// Needed for the node to report status of pods it is running.
 		// Use the NodeRestriction admission plugin to limit a node to updating status of pods bound to itself.
 		rbac.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+		// Needed for the node to create pod evictions.
+		// Use the NodeRestriction admission plugin to limit a node to creating evictions for pods bound to itself.
+		rbac.NewRule("create").Groups(legacyGroup).Resources("pods/eviction").RuleOrDie(),
 
 		// Needed for imagepullsecrets, rbd/ceph and secret volumes, and secrets in envs
 		// Needed for configmap volume and envs
