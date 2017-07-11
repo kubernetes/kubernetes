@@ -17,19 +17,18 @@ limitations under the License.
 package reconciler
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	kubetest "k8s.io/kubernetes/pkg/kubelet/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -59,7 +58,9 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createTestClient()
+	node := createTestNode()
+	kubeClient, fnw := createTestClient(node)
+	defer fnw.Close()
 	fakeRecorder := &record.FakeRecorder{}
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(kubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
 	reconciler := NewReconciler(
@@ -97,7 +98,9 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createTestClient()
+	node := createTestNode()
+	kubeClient, fnw := createTestClient(node)
+	defer fnw.Close()
 	fakeRecorder := &record.FakeRecorder{}
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(kubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
 	reconciler := NewReconciler(
@@ -169,7 +172,9 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createTestClient()
+	node := createTestNode()
+	kubeClient, fnw := createTestClient(node)
+	defer fnw.Close()
 	fakeRecorder := &record.FakeRecorder{}
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(kubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
 	reconciler := NewReconciler(
@@ -209,7 +214,16 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	podName := volumehelper.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
-	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
+
+	// Fake node status update
+	stopCh := make(chan struct{})
+	go kubetest.SimulateVolumeInUseUpdate(
+		v1.UniqueVolumeName(generatedVolumeName),
+		stopCh,
+		fnw)
+	defer func() {
+		stopCh <- struct{}{}
+	}()
 
 	// Assert
 	if err != nil {
@@ -242,7 +256,9 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createTestClient()
+	node := createTestNode()
+	kubeClient, fnw := createTestClient(node)
+	defer fnw.Close()
 	fakeRecorder := &record.FakeRecorder{}
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(kubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
 	reconciler := NewReconciler(
@@ -326,7 +342,9 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createTestClient()
+	node := createTestNode()
+	kubeClient, fnw := createTestClient(node)
+	defer fnw.Close()
 	fakeRecorder := &record.FakeRecorder{}
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(kubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount */))
 	reconciler := NewReconciler(
@@ -375,7 +393,16 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	// Act
 	runReconciler(reconciler)
 
-	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
+	// Fake node status update
+	stopCh := make(chan struct{})
+	go kubetest.SimulateVolumeInUseUpdate(
+		v1.UniqueVolumeName(generatedVolumeName),
+		stopCh,
+		fnw)
+	defer func() {
+		stopCh <- struct{}{}
+	}()
+
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
@@ -454,26 +481,29 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 	return wait.ExponentialBackoff(backoff, fn)
 }
 
-func createTestClient() *fake.Clientset {
-	fakeClient := &fake.Clientset{}
-	fakeClient.AddReactor("get", "nodes",
-		func(action core.Action) (bool, runtime.Object, error) {
-			return true, &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: string(nodeName)},
-				Status: v1.NodeStatus{
-					VolumesAttached: []v1.AttachedVolume{
-						{
-							Name:       "fake-plugin/volume-name",
-							DevicePath: "fake/path",
-						},
-					}},
-				Spec: v1.NodeSpec{ExternalID: string(nodeName)},
-			}, nil
-		})
-	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
-	})
-	return fakeClient
+func createTestNode() *v1.Node {
+	return &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: string(nodeName)},
+		Status: v1.NodeStatus{
+			VolumesAttached: []v1.AttachedVolume{
+				{
+					Name:       "fake-plugin/volume-name",
+					DevicePath: "fake/path",
+				},
+			}},
+		Spec: v1.NodeSpec{ExternalID: string(nodeName)},
+	}
+}
+
+func createTestClient(node *v1.Node) (*fake.Clientset, *kubetest.FakeNodeWatchReactor) {
+	fakeClient := fake.NewSimpleClientset()
+
+	// Remove default WatchReactor
+	fakeClient.WatchReactionChain = []core.WatchReactor{}
+
+	fnw := kubetest.AddFakeNodeWatchReactor(fakeClient, node)
+
+	return fakeClient, fnw
 }
 
 func runReconciler(reconciler Reconciler) {

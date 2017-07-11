@@ -40,6 +40,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//pkg/kubelet/testing:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
@@ -49,7 +50,6 @@ go_test(
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
