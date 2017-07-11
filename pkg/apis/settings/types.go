@@ -45,6 +45,9 @@ type PodPresetSpec struct {
 	// EnvFrom defines the collection of EnvFromSource to inject into containers.
 	// +optional
 	EnvFrom []api.EnvFromSource
+	// Affinity defines the group of affinity to inject into containers
+	// +optional
+	Affinity *api.Affinity
 	// Volumes defines the collection of Volume to inject into the pod.
 	// +optional
 	Volumes []api.Volume

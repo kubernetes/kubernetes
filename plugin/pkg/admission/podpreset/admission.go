@@ -184,6 +184,18 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 			pod.Spec.Volumes = r
 		}
 
+		// merge in policy for Affinity
+		if pip.Spec.Affinity != nil {
+			a, err := mergeAffinity(pip, pod.Spec.Affinity)
+			if err != nil {
+				// add vent to pod
+				c.addEvent(pod, pip, err.Error())
+
+				return nil
+			}
+			pod.Spec.Affinity = a
+		}
+
 		glog.V(4).Infof("PodPreset %s merged with pod %s successfully", pip.GetName(), pod.GetName())
 
 		// add annotation
@@ -235,6 +247,38 @@ func mergeEnvFrom(pip *settings.PodPreset, original []api.EnvFromSource) ([]api.
 	return append(original, pip.Spec.EnvFrom...), nil
 }
 
+func mergeAffinity(pip *settings.PodPreset, original *api.Affinity) (*api.Affinity, error) {
+
+	if original == nil {
+		return pip.Spec.Affinity, nil
+	}
+
+	if pip.Spec.Affinity != nil {
+
+		if pip.Spec.Affinity.NodeAffinity != nil {
+			if original.NodeAffinity != nil {
+				return nil, fmt.Errorf("merging affinity for %s has a conflict: Only one nodeAffinity per pod is valid", pip.GetName())
+			}
+			original.NodeAffinity = pip.Spec.Affinity.NodeAffinity
+		}
+
+		if pip.Spec.Affinity.PodAffinity != nil {
+			if original.PodAffinity != nil {
+				return nil, fmt.Errorf("merging affinity for %s has a conflict: Only one podAffinity per pod is valid", pip.GetName())
+			}
+			original.PodAffinity = pip.Spec.Affinity.PodAffinity
+		}
+
+		if pip.Spec.Affinity.PodAntiAffinity != nil {
+			if original.PodAntiAffinity != nil {
+				return nil, fmt.Errorf("merging affinity for %s has a conflict: Only one podAntiAffinity per pod is valid", pip.GetName())
+			}
+			original.PodAntiAffinity = pip.Spec.Affinity.PodAntiAffinity
+		}
+	}
+	return original, nil
+
+}
 func mergeVolumeMounts(pip *settings.PodPreset, original []api.VolumeMount) ([]api.VolumeMount, error) {
 	// if there were no original volume mount just return the pip volume mount
 	if original == nil {

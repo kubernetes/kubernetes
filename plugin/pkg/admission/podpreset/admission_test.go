@@ -33,6 +33,136 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
+var (
+	podAntiAffinity := &api.Affinity{
+		PodAntiAffinity: &api.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "key2",
+								Operator: metav1.LabelSelectorOpExists,
+							},
+						},
+					},
+					TopologyKey: "zone",
+					Namespaces:  []string{"ns"},
+				},
+			},
+		},
+	}
+)
+func TestMergeAffinity(t *testing.T) {
+	
+	podAffinity := &api.Affinity{
+		PodAffinity: &api.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+				{
+					Weight: 5,
+					PodAffinityTerm: api.PodAffinityTerm{
+						LabelSelector: &v1.LabelSelector{
+							MatchExpressions: []v1.LabelSelectorRequirement{
+								{
+									Key:      "security",
+									Operator: v1.LabelSelectorOpIn,
+									Values:   []string{"S1"},
+								},
+							},
+						},
+						TopologyKey: "region",
+					},
+				},
+			},
+		},
+	}
+
+	nodeAffinity := &api.Affinity{
+		NodeAffinity: &api.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+				NodeSelectorTerms: []api.NodeSelectorTerm{
+					{
+						MatchExpressions: []api.NodeSelectorRequirement{
+							{
+								Key:      "test-label-key",
+								Operator: api.NodeSelectorOpIn,
+								Values:   []string{"test-label-value"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := map[string]struct {
+		orig       *api.Affinity
+		mod        *api.Affinity
+		result     *api.Affinity
+		shouldFail bool
+	}{
+		"empty original": {
+			mod:        &api.Affinity{},
+			orig:       &api.Affinity{},
+			result:     &api.Affinity{},
+			shouldFail: false,
+		},
+		"good podAffinity merge": {
+			mod:        podAffinity,
+			orig:       &api.Affinity{},
+			result:     podAffinity,
+			shouldFail: false,
+		},
+		"good nodeAffinity merge": {
+			mod:        nodeAffinity,
+			orig:       &api.Affinity{},
+			result:     nodeAffinity,
+			shouldFail: false,
+		},
+		"good podAntiAffinity merge": {
+			mod:        podAntiAffinity,
+			orig:       &api.Affinity{},
+			result:     podAntiAffinity,
+			shouldFail: false,
+		},
+		"conflict podAffinity merge": {
+			mod:        podAffinity,
+			orig:       podAffinity,
+			shouldFail: true,
+		},
+		"conflict nodeAffinity merge": {
+			mod:        nodeAffinity,
+			orig:       nodeAffinity,
+			shouldFail: true,
+		},
+		"conflict podAntiAffinity merge": {
+			mod:        podAntiAffinity,
+			orig:       podAntiAffinity,
+			shouldFail: true,
+		},
+	}
+
+	for name, test := range tests {
+		result, err := mergeAffinity(
+			&settings.PodPreset{
+				Spec: settings.PodPresetSpec{
+					Affinity: test.mod,
+				},
+			},
+			test.orig,
+		)
+		if test.shouldFail && err == nil {
+			t.Fatalf("expected test %q to fail but got nil", name)
+		}
+		if !test.shouldFail && err != nil {
+			t.Fatalf("test %q failed: %v", name, err)
+		}
+		if !reflect.DeepEqual(test.result, result) {
+			t.Fatalf("results were not equal for test %q: got %#v; expected: %#v", name, result, test.result)
+		}
+	}
+}
+
 func TestMergeEnv(t *testing.T) {
 	tests := map[string]struct {
 		orig       []api.EnvVar
@@ -532,6 +662,7 @@ func TestAdmit(t *testing.T) {
 					},
 				},
 			},
+			Affinity: podAntiAffinity,
 			Volumes: []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Env:     []api.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
 			EnvFrom: []api.EnvFromSource{
@@ -592,6 +723,7 @@ func TestAdmitMirrorPod(t *testing.T) {
 					},
 				},
 			},
+			Affinity: podAntiAffinity,
 			Volumes: []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Env:     []api.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
 			EnvFrom: []api.EnvFromSource{
