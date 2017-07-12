@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package extension
+package apimachinery
 
 import (
 	"bytes"
@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = framework.KubeDescribe("Servers with support for Table transformation", func() {
+var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	f := framework.NewDefaultFramework("tables")
 
 	It("should return pod details", func() {
@@ -42,7 +42,7 @@ var _ = framework.KubeDescribe("Servers with support for Table transformation", 
 		podName := "pod-1"
 		framework.Logf("Creating pod %s", podName)
 
-		_, err := c.Core().Pods(ns).Create(newPod(podName))
+		_, err := c.Core().Pods(ns).Create(newTablePod(podName))
 		Expect(err).NotTo(HaveOccurred())
 
 		table := &metav1alpha1.Table{}
@@ -99,7 +99,7 @@ func printTable(table *metav1alpha1.Table) string {
 	return buf.String()
 }
 
-func newPod(podName string) *v1.Pod {
+func newTablePod(podName string) *v1.Pod {
 	containerName := fmt.Sprintf("%s-container", podName)
 	port := 8080
 	pod := &v1.Pod{

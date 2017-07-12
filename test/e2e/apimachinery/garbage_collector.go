@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package apimachinery
 
 import (
 	"fmt"
@@ -208,7 +208,7 @@ func gatherMetrics(f *framework.Framework) {
 	}
 }
 
-var _ = framework.KubeDescribe("Garbage collector", func() {
+var _ = SIGDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
 	It("should delete pods created by rc when not orphaning", func() {
 		clientSet := f.ClientSet
