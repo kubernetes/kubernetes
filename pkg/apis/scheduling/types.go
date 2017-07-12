@@ -40,7 +40,7 @@ type PriorityClass struct {
 	GlobalDefault bool
 
 	// Description is an arbitrary string that usually provides guidelines on
-	// where this priority class should be used.
+	// when this priority class should be used.
 	// +optional
 	Description string
 }

@@ -37,13 +37,13 @@ type PriorityClass struct {
 	// receive when they have the name of this class in their pod spec.
 	Value int32 `json:"value" protobuf:"bytes,2,opt,name=value"`
 
-	// GlobalDefault specifies whether this PriorityClass should be considered as
+	// globalDefault specifies whether this PriorityClass should be considered as
 	// the default priority for pods that do not have any priority class.
 	// +optional
 	GlobalDefault bool `json:"globalDefault,omitempty" protobuf:"bytes,3,opt,name=globalDefault"`
 
-	// Description is an arbitrary string that usually provides guidelines on
-	// where this priority class should be used.
+	// description is an arbitrary string that usually provides guidelines on
+	// when this priority class should be used.
 	// +optional
 	Description string `json:"description,omitempty" protobuf:"bytes,4,opt,name=description"`
 }
@@ -58,6 +58,6 @@ type PriorityClassList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is the list of StorageClasses
+	// items is the list of PriorityClasses
 	Items []PriorityClass `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
