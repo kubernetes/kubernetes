@@ -17,17 +17,26 @@ limitations under the License.
 package openapi
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto/sha512"
 	"encoding/json"
 	"fmt"
+	"gopkg.in/yaml.v2"
+	"mime"
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
 	restful "github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
+	"github.com/golang/protobuf/proto"
+	"github.com/googleapis/gnostic/OpenAPIv2"
+	"github.com/googleapis/gnostic/compiler"
 
 	"k8s.io/apimachinery/pkg/openapi"
+	genericmux "k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/util/trie"
 )
 
@@ -46,6 +55,10 @@ const (
 type openAPI struct {
 	config       *openapi.Config
 	swagger      *spec.Swagger
+	swaggerBytes []byte
+	swaggerPb    []byte
+	swaggerPbGz  []byte
+	lastModified time.Time
 	protocolList []string
 	definitions  map[string]openapi.OpenAPIDefinition
 }
@@ -54,9 +67,17 @@ func computeEtag(data []byte) string {
 	return fmt.Sprintf("\"%X\"", sha512.Sum512(data))
 }
 
-func BuildSwaggerSpec(webServices []*restful.WebService, config *openapi.Config) (*spec.Swagger, error) {
+// RegisterOpenAPIService registers a handler to provides standard OpenAPI specification.
+func RegisterOpenAPIService(servePath string, webServices []*restful.WebService, config *openapi.Config, mux *genericmux.PathRecorderMux) (err error) {
+
+	if !strings.HasSuffix(servePath, JSON_EXT) {
+		return fmt.Errorf("Serving path must ends with \"%s\".", JSON_EXT)
+	}
+
+	servePathBase := servePath[:len(servePath)-len(JSON_EXT)]
+
 	o := openAPI{
-		config: config,
+		config:    config,
 		swagger: &spec.Swagger{
 			SwaggerProps: spec.SwaggerProps{
 				Swagger:     OpenAPIVersion,
@@ -67,12 +88,44 @@ func BuildSwaggerSpec(webServices []*restful.WebService, config *openapi.Config)
 		},
 	}
 
-	err := o.init(webServices)
+	err = o.init(webServices)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return o.swagger, nil
+	mime.AddExtensionType(".json", MIME_JSON)
+	mime.AddExtensionType(".pb-v1", MIME_PB)
+	mime.AddExtensionType(".gz", MIME_PB_GZ)
+
+	type fileInfo struct {
+		ext  string
+		data []byte
+	}
+
+	files := []fileInfo{
+		{".json", o.swaggerBytes},
+		{"-2.0.0.json", o.swaggerBytes},
+		{"-2.0.0.pb-v1", o.swaggerPb},
+		{"-2.0.0.pb-v1.gz", o.swaggerPbGz},
+	}
+
+	for _, file := range files {
+		path := servePathBase + file.ext
+		data := file.data
+		etag := computeEtag(file.data)
+		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != path {
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte("Path not found!"))
+				return
+			}
+			w.Header().Set("Etag", etag)
+			// ServeContent will take care of caching using eTag.
+			http.ServeContent(w, r, path, o.lastModified, bytes.NewReader(data))
+		})
+	}
+
+	return nil
 }
 
 func (o *openAPI) init(webServices []*restful.WebService) error {
@@ -88,7 +141,7 @@ func (o *openAPI) init(webServices []*restful.WebService) error {
 	}
 	o.definitions = o.config.GetDefinitions(func(name string) spec.Ref {
 		defName, _ := o.config.GetDefinitionName(name)
-		return spec.MustCreateRef(DEFINITION_PREFIX + openapi.EscapeJsonPointer(defName))
+		return spec.MustCreateRef("#/definitions/" + openapi.EscapeJsonPointer(defName))
 	})
 	if o.config.CommonResponses == nil {
 		o.config.CommonResponses = map[int]spec.Response{}
@@ -108,7 +161,39 @@ func (o *openAPI) init(webServices []*restful.WebService) error {
 		}
 	}
 
+	o.swaggerBytes, err = json.MarshalIndent(o.swagger, " ", " ")
+	if err != nil {
+		return err
+	}
+	o.swaggerPb, err = toProtoBinary(o.swaggerBytes)
+	if err != nil {
+		return err
+	}
+	o.swaggerPbGz = toGzip(o.swaggerPb)
+	o.lastModified = time.Now()
+
 	return nil
+}
+
+func toProtoBinary(spec []byte) ([]byte, error) {
+	var info yaml.MapSlice
+	err := yaml.Unmarshal(spec, &info)
+	if err != nil {
+		return nil, err
+	}
+	document, err := openapi_v2.NewDocument(info, compiler.NewContext("$root", nil))
+	if err != nil {
+		return nil, err
+	}
+	return proto.Marshal(document)
+}
+
+func toGzip(data []byte) []byte {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	zw.Write(data)
+	zw.Close()
+	return buf.Bytes()
 }
 
 func getCanonicalizeTypeName(t reflect.Type) string {
@@ -166,7 +251,7 @@ func (o *openAPI) buildDefinitionForType(sample interface{}) (string, error) {
 		return "", err
 	}
 	defName, _ := o.config.GetDefinitionName(name)
-	return DEFINITION_PREFIX + openapi.EscapeJsonPointer(defName), nil
+	return "#/definitions/" + openapi.EscapeJsonPointer(defName), nil
 }
 
 // buildPaths builds OpenAPI paths using go-restful's web services.
