@@ -1687,18 +1687,18 @@
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/client/api/go-client",
-			"Comment": "v4.0.0-22-g7a54b6f",
-			"Rev": "7a54b6fc903feab1e7cb6573177ca09b544eb1e2"
+			"Comment": "2017-06-21T10:47:05Z",
+			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/pkg/glusterfs/api",
-			"Comment": "v4.0.0-22-g7a54b6f",
-			"Rev": "7a54b6fc903feab1e7cb6573177ca09b544eb1e2"
+			"Comment": "2017-06-21T10:47:05Z",
+			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/pkg/utils",
-			"Comment": "v4.0.0-22-g7a54b6f",
-			"Rev": "7a54b6fc903feab1e7cb6573177ca09b544eb1e2"
+			"Comment": "2017-06-21T10:47:05Z",
+			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
 		},
 		{
 			"ImportPath": "github.com/howeyc/gopass",
