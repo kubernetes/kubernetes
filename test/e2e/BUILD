@@ -58,7 +58,6 @@ go_library(
         "dns_common.go",
         "dns_configmap.go",
         "e2e.go",
-        "empty_dir_wrapper.go",
         "etcd_failure.go",
         "events.go",
         "example_cluster_dns.go",
