@@ -211,7 +211,7 @@ func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
 	return nil
 }
 
-var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
+var _ = SIGDescribe("Dynamic Provisioning", func() {
 	f := framework.NewDefaultFramework("volume-provisioning")
 
 	// filled in BeforeEach
@@ -223,8 +223,8 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		ns = f.Namespace.Name
 	})
 
-	framework.KubeDescribe("DynamicProvisioner", func() {
-		It("should provision storage with different parameters [Slow] [Volume]", func() {
+	SIGDescribe("DynamicProvisioner", func() {
+		It("should provision storage with different parameters [Slow]", func() {
 			cloudZone := getRandomCloudZone(c)
 
 			// This test checks that dynamic provisioning can provision a volume
@@ -409,7 +409,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 		// NOTE: Slow!  The test will wait up to 5 minutes (framework.ClaimProvisionTimeout)
 		// when there is no regression.
-		It("should not provision a volume in an unmanaged GCE zone. [Slow] [Volume]", func() {
+		It("should not provision a volume in an unmanaged GCE zone. [Slow]", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			var suffix string = "unmananged"
 
@@ -467,7 +467,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			framework.Logf(err.Error())
 		})
 
-		It("should test that deleting a claim before the volume is provisioned deletes the volume. [Volume]", func() {
+		It("should test that deleting a claim before the volume is provisioned deletes the volume.", func() {
 			// This case tests for the regressions of a bug fixed by PR #21268
 			// REGRESSION: Deleting the PVC before the PV is provisioned can result in the PV
 			// not being deleted.
@@ -517,8 +517,8 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		})
 	})
 
-	framework.KubeDescribe("DynamicProvisioner External", func() {
-		It("should let an external dynamic provisioner create and delete persistent volumes [Slow] [Volume]", func() {
+	SIGDescribe("DynamicProvisioner External", func() {
+		It("should let an external dynamic provisioner create and delete persistent volumes [Slow]", func() {
 			// external dynamic provisioner pods need additional permissions provided by the
 			// persistent-volume-provisioner role
 			framework.BindClusterRole(c.Rbac(), "system:persistent-volume-provisioner", ns,
@@ -555,8 +555,8 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		})
 	})
 
-	framework.KubeDescribe("DynamicProvisioner Default", func() {
-		It("should create and delete default persistent volumes [Slow] [Volume]", func() {
+	SIGDescribe("DynamicProvisioner Default", func() {
+		It("should create and delete default persistent volumes [Slow]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 
 			By("creating a claim with no annotation")
@@ -570,7 +570,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		})
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
-		It("should be disabled by changing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
+		It("should be disabled by changing the default annotation[Slow] [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
 			test := storageClassTest{
@@ -601,7 +601,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		})
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
-		It("should be disabled by removing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
+		It("should be disabled by removing the default annotation[Slow] [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
 			test := storageClassTest{

@@ -10,6 +10,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "empty_dir_wrapper.go",
+        "framework.go",
         "pd.go",
         "persistent_volumes.go",
         "persistent_volumes-disruptive.go",
@@ -58,6 +60,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",

@@ -40,84 +40,84 @@ var _ = framework.KubeDescribe("EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
 	Context("when FSGroup is specified [Feature:FSGroup]", func() {
-		It("new files should be created with FSGroup ownership when container is root [Volume]", func() {
+		It("new files should be created with FSGroup ownership when container is root [sig-storage]", func() {
 			doTestSetgidFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
 
-		It("new files should be created with FSGroup ownership when container is non-root [Volume]", func() {
+		It("new files should be created with FSGroup ownership when container is non-root [sig-storage]", func() {
 			doTestSetgidFSGroup(f, testImageNonRootUid, v1.StorageMediumMemory)
 		})
 
-		It("nonexistent volume subPath should have the correct mode and owner using FSGroup [Volume]", func() {
+		It("nonexistent volume subPath should have the correct mode and owner using FSGroup [sig-storage]", func() {
 			doTestSubPathFSGroup(f, testImageNonRootUid, v1.StorageMediumMemory)
 		})
 
-		It("files with FSGroup ownership should support (root,0644,tmpfs) [Volume]", func() {
+		It("files with FSGroup ownership should support (root,0644,tmpfs) [sig-storage]", func() {
 			doTest0644FSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
 
-		It("volume on default medium should have the correct mode using FSGroup [Volume]", func() {
+		It("volume on default medium should have the correct mode using FSGroup [sig-storage]", func() {
 			doTestVolumeModeFSGroup(f, testImageRootUid, v1.StorageMediumDefault)
 		})
 
-		It("volume on tmpfs should have the correct mode using FSGroup [Volume]", func() {
+		It("volume on tmpfs should have the correct mode using FSGroup [sig-storage]", func() {
 			doTestVolumeModeFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
 	})
 
-	It("volume on tmpfs should have the correct mode [Conformance] [Volume]", func() {
+	It("volume on tmpfs should have the correct mode [Conformance] [sig-storage]", func() {
 		doTestVolumeMode(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
-	It("should support (root,0644,tmpfs) [Conformance] [Volume]", func() {
+	It("should support (root,0644,tmpfs) [Conformance] [sig-storage]", func() {
 		doTest0644(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
-	It("should support (root,0666,tmpfs) [Conformance] [Volume]", func() {
+	It("should support (root,0666,tmpfs) [Conformance] [sig-storage]", func() {
 		doTest0666(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
-	It("should support (root,0777,tmpfs) [Conformance] [Volume]", func() {
+	It("should support (root,0777,tmpfs) [Conformance] [sig-storage]", func() {
 		doTest0777(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
-	It("should support (non-root,0644,tmpfs) [Conformance] [Volume]", func() {
+	It("should support (non-root,0644,tmpfs) [Conformance] [sig-storage]", func() {
 		doTest0644(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
-	It("should support (non-root,0666,tmpfs) [Conformance] [Volume]", func() {
+	It("should support (non-root,0666,tmpfs) [Conformance] [sig-storage]", func() {
 		doTest0666(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
-	It("should support (non-root,0777,tmpfs) [Conformance] [Volume]", func() {
+	It("should support (non-root,0777,tmpfs) [Conformance] [sig-storage]", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
-	It("volume on default medium should have the correct mode [Conformance] [Volume]", func() {
+	It("volume on default medium should have the correct mode [Conformance] [sig-storage]", func() {
 		doTestVolumeMode(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
-	It("should support (root,0644,default) [Conformance] [Volume]", func() {
+	It("should support (root,0644,default) [Conformance] [sig-storage]", func() {
 		doTest0644(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
-	It("should support (root,0666,default) [Conformance] [Volume]", func() {
+	It("should support (root,0666,default) [Conformance] [sig-storage]", func() {
 		doTest0666(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
-	It("should support (root,0777,default) [Conformance] [Volume]", func() {
+	It("should support (root,0777,default) [Conformance] [sig-storage]", func() {
 		doTest0777(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
-	It("should support (non-root,0644,default) [Conformance] [Volume]", func() {
+	It("should support (non-root,0644,default) [Conformance] [sig-storage]", func() {
 		doTest0644(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 
-	It("should support (non-root,0666,default) [Conformance] [Volume]", func() {
+	It("should support (non-root,0666,default) [Conformance] [sig-storage]", func() {
 		doTest0666(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 
-	It("should support (non-root,0777,default) [Conformance] [Volume]", func() {
+	It("should support (non-root,0777,default) [Conformance] [sig-storage]", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 })

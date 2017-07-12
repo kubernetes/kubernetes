@@ -32,46 +32,46 @@ import (
 var _ = framework.KubeDescribe("ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
-	It("should be consumable from pods in volume [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume [Conformance] [sig-storage]", func() {
 		doConfigMapE2EWithoutMappings(f, 0, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with defaultMode set [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume with defaultMode set [Conformance] [sig-storage]", func() {
 		defaultMode := int32(0400)
 		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
 
-	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Feature:FSGroup] [Volume]", func() {
+	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Feature:FSGroup] [sig-storage]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		doConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
 	})
 
-	It("should be consumable from pods in volume as non-root [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume as non-root [Conformance] [sig-storage]", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
 
-	It("should be consumable from pods in volume as non-root with FSGroup [Feature:FSGroup] [Volume]", func() {
+	It("should be consumable from pods in volume as non-root with FSGroup [Feature:FSGroup] [sig-storage]", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume with mappings [Conformance] [sig-storage]", func() {
 		doConfigMapE2EWithMappings(f, 0, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings and Item mode set[Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume with mappings and Item mode set[Conformance] [sig-storage]", func() {
 		mode := int32(0400)
 		doConfigMapE2EWithMappings(f, 0, 0, &mode)
 	})
 
-	It("should be consumable from pods in volume with mappings as non-root [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume with mappings as non-root [Conformance] [sig-storage]", func() {
 		doConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings as non-root with FSGroup [Feature:FSGroup] [Volume]", func() {
+	It("should be consumable from pods in volume with mappings as non-root with FSGroup [Feature:FSGroup] [sig-storage]", func() {
 		doConfigMapE2EWithMappings(f, 1000, 1001, nil)
 	})
 
-	It("updates should be reflected in volume [Conformance] [Volume]", func() {
+	It("updates should be reflected in volume [Conformance] [sig-storage]", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
@@ -149,7 +149,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-2"))
 	})
 
-	It("optional updates should be reflected in volume [Conformance] [Volume]", func() {
+	It("optional updates should be reflected in volume [Conformance] [sig-storage]", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
@@ -410,7 +410,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		})
 	})
 
-	It("should be consumable in multiple volumes in the same pod [Conformance] [Volume]", func() {
+	It("should be consumable in multiple volumes in the same pod [Conformance] [sig-storage]", func() {
 		var (
 			name             = "configmap-test-volume-" + string(uuid.NewUUID())
 			volumeName       = "configmap-volume"

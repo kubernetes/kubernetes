@@ -51,7 +51,7 @@ func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig framework.
 }
 
 // Testing configurations of single a PV/PVC pair attached to a GCE PD
-var _ = framework.KubeDescribe("PersistentVolumes:GCEPD [Volume]", func() {
+var _ = SIGDescribe("PersistentVolumes:GCEPD", func() {
 	var (
 		c         clientset.Interface
 		diskName  string

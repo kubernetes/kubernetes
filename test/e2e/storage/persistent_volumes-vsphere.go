@@ -31,7 +31,7 @@ import (
 )
 
 // Testing configurations of single a PV/PVC pair attached to a vSphere Disk
-var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
+var _ = SIGDescribe("PersistentVolumes:vsphere", func() {
 	var (
 		c          clientset.Interface
 		ns         string

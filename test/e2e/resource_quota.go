@@ -282,7 +282,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should create a ResourceQuota and capture the life of a persistent volume claim. [Volume]", func() {
+	It("should create a ResourceQuota and capture the life of a persistent volume claim. [sig-storage]", func() {
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
@@ -320,7 +320,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should create a ResourceQuota and capture the life of a persistent volume claim with a storage class. [Volume]", func() {
+	It("should create a ResourceQuota and capture the life of a persistent volume claim with a storage class. [sig-storage]", func() {
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
