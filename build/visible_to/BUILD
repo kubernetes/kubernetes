@@ -49,6 +49,7 @@ package_group(
     packages = [
         "//test/e2e",
         "//test/e2e/framework",
+        "//test/e2e/kubectl",
         "//test/e2e/workload",
         "//test/integration/etcd",
         "//test/integration/framework",

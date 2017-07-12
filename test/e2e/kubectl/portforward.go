@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+// OWNER = sig/cli
+
+package kubectl
 
 import (
 	"bytes"
@@ -469,7 +471,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	verifyLogMessage(logOutput, "^Received expected client data$")
 }
 
-var _ = framework.KubeDescribe("Port forwarding", func() {
+var _ = kubectlDescribe("Kubectl Port forwarding", func() {
 	f := framework.NewDefaultFramework("port-forwarding")
 
 	framework.KubeDescribe("With a server listening on 0.0.0.0", func() {

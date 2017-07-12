@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+// OWNER = sig/cli
+
+package kubectl
 
 import (
 	"bytes"
@@ -184,7 +186,7 @@ func runKubectlRetryOrDie(args ...string) string {
 }
 
 // duplicated setup to avoid polluting "normal" clients with alpha features which confuses the generated clients
-var _ = framework.KubeDescribe("Kubectl alpha client", func() {
+var _ = kubectlDescribe("Kubectl alpha client", func() {
 	defer GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
 
@@ -273,7 +275,7 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 	})
 })
 
-var _ = framework.KubeDescribe("Kubectl client", func() {
+var _ = kubectlDescribe("Kubectl client", func() {
 	defer GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
 
