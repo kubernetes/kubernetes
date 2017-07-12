@@ -45,7 +45,7 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	}
 
 	proxyDaemonSetBytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet, struct{ Image, ClusterCIDR, MasterTaintKey string }{
-		Image:          images.GetCoreImage("proxy", cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+		Image:          images.GetCoreImage("proxy", cfg, cfg.UnifiedControlPlaneImage),
 		ClusterCIDR:    getClusterCIDR(cfg.Networking.PodSubnet),
 		MasterTaintKey: kubeadmconstants.LabelNodeRoleMaster,
 	})
@@ -54,7 +54,7 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	}
 
 	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment, struct{ ImageRepository, Arch, Version, DNSDomain, MasterTaintKey string }{
-		ImageRepository: kubeadmapi.GlobalEnvParams.RepositoryPrefix,
+		ImageRepository: cfg.ImageRepository,
 		Arch:            runtime.GOARCH,
 		Version:         KubeDNSVersion,
 		DNSDomain:       cfg.Networking.DNSDomain,

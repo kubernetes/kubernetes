@@ -82,7 +82,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	staticPodSpecs := map[string]v1.Pod{
 		kubeAPIServer: componentPod(v1.Container{
 			Name:          kubeAPIServer,
-			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, cfg.UnifiedControlPlaneImage),
 			Command:       getAPIServerCommand(cfg, false, k8sVersion),
 			VolumeMounts:  volumeMounts,
 			LivenessProbe: componentProbe(int(cfg.API.BindPort), "/healthz", v1.URISchemeHTTPS),
@@ -91,7 +91,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		}, volumes...),
 		kubeControllerManager: componentPod(v1.Container{
 			Name:          kubeControllerManager,
-			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, cfg.UnifiedControlPlaneImage),
 			Command:       getControllerManagerCommand(cfg, false, k8sVersion),
 			VolumeMounts:  volumeMounts,
 			LivenessProbe: componentProbe(10252, "/healthz", v1.URISchemeHTTP),
@@ -100,7 +100,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		}, volumes...),
 		kubeScheduler: componentPod(v1.Container{
 			Name:          kubeScheduler,
-			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, cfg.UnifiedControlPlaneImage),
 			Command:       getSchedulerCommand(cfg, false),
 			VolumeMounts:  []v1.VolumeMount{k8sVolumeMount()},
 			LivenessProbe: componentProbe(10251, "/healthz", v1.URISchemeHTTP),
@@ -115,7 +115,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Name:          etcd,
 			Command:       getEtcdCommand(cfg),
 			VolumeMounts:  []v1.VolumeMount{certsVolumeMount(), etcdVolumeMount(cfg.Etcd.DataDir), k8sVolumeMount()},
-			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
+			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, cfg.Etcd.Image),
 			LivenessProbe: componentProbe(2379, "/health", v1.URISchemeHTTP),
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume())
 
