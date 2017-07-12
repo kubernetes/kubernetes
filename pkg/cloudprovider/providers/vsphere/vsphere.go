@@ -580,7 +580,8 @@ func (vs *VSphere) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (vs *VSphere) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	return []v1.NodeAddress{}, errors.New("unimplemented")
+	vmName := path.Base(providerID)
+	return vs.NodeAddresses(vmNameToNodeName(vmName))
 }
 
 func (vs *VSphere) AddSSHKeyToAllInstances(user string, keyData []byte) error {
@@ -663,7 +664,7 @@ func (vs *VSphere) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (vs *VSphere) InstanceTypeByProviderID(providerID string) (string, error) {
-	return "", errors.New("unimplemented")
+	return "", nil
 }
 
 func (vs *VSphere) InstanceType(name k8stypes.NodeName) (string, error) {
