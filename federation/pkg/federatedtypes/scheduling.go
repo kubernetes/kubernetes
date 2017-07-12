@@ -110,7 +110,7 @@ func (a *schedulingAdapter) GetSchedule(obj pkgruntime.Object, key string, clust
 
 	fedPref, err := replicapreferences.GetAllocationPreferences(obj, a.preferencesAnnotationName)
 	if err != nil {
-		glog.Info("Invalid workload-type specific preference, using default. object: %v, err: %v", obj, err)
+		glog.Infof("Invalid workload-type specific preference, using default. object: %v, err: %v", obj, err)
 	}
 	if fedPref == nil {
 		fedPref = &fedapi.ReplicaAllocationPreferences{
