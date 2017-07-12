@@ -18,18 +18,18 @@ package filters
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/server/httplog"
-
-	"github.com/golang/glog"
 )
 
 // Constant for the retry-after interval on rate limiting.
@@ -45,10 +45,13 @@ func handleError(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 // WithMaxInFlightLimit limits the number of in-flight requests to buffer size of the passed in channel.
+// disconnectChanceOnMaxRequests controls whether the connection is closed from the server if the request is
+// rejected and should be between 0.0 and 1.0.
 func WithMaxInFlightLimit(
 	handler http.Handler,
 	nonMutatingLimit int,
 	mutatingLimit int,
+	disconnectChanceOnMaxRequests float64,
 	requestContextMapper genericapirequest.RequestContextMapper,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 ) http.Handler {
@@ -98,16 +101,16 @@ func WithMaxInFlightLimit(
 				handler.ServeHTTP(w, r)
 			default:
 				metrics.MonitorRequest(r, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", errors.StatusTooManyRequests, time.Now())
-				tooManyRequests(r, w)
+				tooManyRequests(r, w, disconnectChanceOnMaxRequests)
 			}
 		}
 	})
 }
 
-func tooManyRequests(req *http.Request, w http.ResponseWriter) {
-	// "Too Many Requests" response is returned before logger is setup for the request.
-	// So we need to explicitly log it here.
-	defer httplog.NewLogged(req, &w).Log()
+func tooManyRequests(req *http.Request, w http.ResponseWriter, disconnectChanceOnMaxRequests float64) {
+	if disconnectChanceOnMaxRequests > 0 && rand.Float64() < disconnectChanceOnMaxRequests {
+		w.Header().Set("Connection", "close")
+	}
 
 	// Return a 429 status indicating "Too Many Requests"
 	w.Header().Set("Retry-After", retryAfter)

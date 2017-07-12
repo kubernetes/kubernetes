@@ -35,13 +35,14 @@ import (
 type ServerRunOptions struct {
 	AdvertiseAddress net.IP
 
-	CorsAllowedOriginList       []string
-	ExternalHost                string
-	MaxRequestsInFlight         int
-	MaxMutatingRequestsInFlight int
-	MinRequestTimeout           int
-	TargetRAMMB                 int
-	WatchCacheSizes             []string
+	CorsAllowedOriginList         []string
+	ExternalHost                  string
+	MaxRequestsInFlight           int
+	MaxMutatingRequestsInFlight   int
+	DisconnectChanceOnMaxRequests float64
+	MinRequestTimeout             int
+	TargetRAMMB                   int
+	WatchCacheSizes               []string
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -59,6 +60,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.ExternalAddress = s.ExternalHost
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
+	c.DisconnectChanceOnMaxRequests = s.DisconnectChanceOnMaxRequests
 	c.MinRequestTimeout = s.MinRequestTimeout
 	c.PublicAddress = s.AdvertiseAddress
 
@@ -121,6 +123,12 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.MaxMutatingRequestsInFlight, "max-mutating-requests-inflight", s.MaxMutatingRequestsInFlight, ""+
 		"The maximum number of mutating requests in flight at a given time. When the server exceeds this, "+
 		"it rejects requests. Zero for no limit.")
+
+	fs.Float64Var(&s.DisconnectChanceOnMaxRequests, "disconnect-chance-on-max-requests", s.DisconnectChanceOnMaxRequests, ""+
+		"If a request is rejected by either of the inflight request limits, then the server will use this probability to "+
+		"decide whether to disconnect the client. When running multiple servers behind a load balancer this helps load "+
+		"to move from overloaded servers to less busy servers. Set to 0.0 for never disconnect, 1.0 for always disconnect, "+
+		"defaults to 0.0.")
 
 	fs.IntVar(&s.MinRequestTimeout, "min-request-timeout", s.MinRequestTimeout, ""+
 		"An optional field indicating the minimum number of seconds a handler must keep "+

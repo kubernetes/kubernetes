@@ -157,6 +157,10 @@ type Config struct {
 	// MaxMutatingRequestsInFlight is the maximum number of parallel mutating requests. Every further
 	// request has to wait.
 	MaxMutatingRequestsInFlight int
+	// DisconnectChanceOnMaxRequests controls the probability that when the max inflight request settings
+	// reject a request whether the client is disconnected, triggering rebalancing to another server behind
+	// the same load balancer, or allowing a higher level rate limiter to kick in.
+	DisconnectChanceOnMaxRequests float64
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc apirequest.LongRunningRequestCheck
 
@@ -210,20 +214,21 @@ type SecureServingInfo struct {
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	return &Config{
-		Serializer:                   codecs,
-		ReadWritePort:                443,
-		RequestContextMapper:         apirequest.NewRequestContextMapper(),
-		BuildHandlerChainFunc:        DefaultBuildHandlerChain,
-		LegacyAPIGroupPrefixes:       sets.NewString(DefaultLegacyAPIPrefix),
-		DisabledPostStartHooks:       sets.NewString(),
-		HealthzChecks:                []healthz.HealthzChecker{healthz.PingHealthz},
-		EnableIndex:                  true,
-		EnableDiscovery:              true,
-		EnableProfiling:              true,
-		MaxRequestsInFlight:          400,
-		MaxMutatingRequestsInFlight:  200,
-		MinRequestTimeout:            1800,
-		EnableAPIResponseCompression: utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression),
+		Serializer:                    codecs,
+		ReadWritePort:                 443,
+		RequestContextMapper:          apirequest.NewRequestContextMapper(),
+		BuildHandlerChainFunc:         DefaultBuildHandlerChain,
+		LegacyAPIGroupPrefixes:        sets.NewString(DefaultLegacyAPIPrefix),
+		DisabledPostStartHooks:        sets.NewString(),
+		HealthzChecks:                 []healthz.HealthzChecker{healthz.PingHealthz},
+		EnableIndex:                   true,
+		EnableDiscovery:               true,
+		EnableProfiling:               true,
+		MaxRequestsInFlight:           400,
+		MaxMutatingRequestsInFlight:   200,
+		MinRequestTimeout:             1800,
+		DisconnectChanceOnMaxRequests: 0.01,
+		EnableAPIResponseCompression:  utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression),
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
@@ -477,7 +482,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, genericapifilters.Unauthorized(c.RequestContextMapper, c.Serializer, c.SupportsBasicAuth))
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
-	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
+	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.DisconnectChanceOnMaxRequests, c.RequestContextMapper, c.LongRunningFunc)
 	handler = genericapifilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
 	handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
 	handler = genericfilters.WithPanicRecovery(handler)
