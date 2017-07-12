@@ -19,8 +19,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/proxy/iptables:go_default_library",
-        "//pkg/util/dbus:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
