@@ -18,7 +18,6 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//cmd/kubeadm/app/images:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//pkg/api:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
