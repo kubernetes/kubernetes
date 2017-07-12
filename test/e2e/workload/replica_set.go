@@ -74,7 +74,7 @@ func newPodQuota(name, number string) *v1.ResourceQuota {
 	}
 }
 
-var _ = framework.KubeDescribe("ReplicaSet", func() {
+var _ = SIGDescribe("ReplicaSet", func() {
 	f := framework.NewDefaultFramework("replicaset")
 
 	It("should serve a basic image on each replica with a public image [Conformance]", func() {

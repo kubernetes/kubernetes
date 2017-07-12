@@ -55,7 +55,7 @@ var (
 	nilRs *extensions.ReplicaSet
 )
 
-var _ = framework.KubeDescribe("Deployment", func() {
+var _ = SIGDescribe("Deployment", func() {
 	var ns string
 	var c clientset.Interface
 

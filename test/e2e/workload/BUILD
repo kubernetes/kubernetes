@@ -15,6 +15,7 @@ go_library(
         "daemon_set.go",
         "deployment.go",
         "disruption.go",
+        "framework.go",
         "job.go",
         "rc.go",
         "replica_set.go",
