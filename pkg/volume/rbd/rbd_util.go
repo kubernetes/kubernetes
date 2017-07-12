@@ -269,7 +269,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) error {
 
 		// fence off other mappers
 		if err = util.fencing(b); err != nil {
-			return fmt.Errorf("rbd: image %s is locked by other nodes", b.Image)
+			return fmt.Errorf("rbd: failed to lock image %s (maybe locked by other nodes), error %v", b.Image, err)
 		}
 		// rbd lock remove needs ceph and image config
 		// but kubelet doesn't get them from apiserver during teardown
