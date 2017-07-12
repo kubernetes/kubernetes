@@ -188,8 +188,9 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Default networkProjectID to known network project number
-	networkProjectID := networkProjectNumber
+	// Default networkProjectID to projectNumber
+	// TODO: This should default to networkProjectNumber. See kubernetes/kubernetes/issues/48521
+	networkProjectID := projectNumber
 
 	networkURL := gceNetworkURL(apiEndpoint, networkProjectNumber, networkName)
 	subnetworkURL := ""
