@@ -18,6 +18,7 @@ go_library(
         "horizontal_pod_autoscalers.go",
         "ingress.go",
         "job.go",
+        "mysql.go",
         "persistent_volumes.go",
         "secrets.go",
         "services.go",
