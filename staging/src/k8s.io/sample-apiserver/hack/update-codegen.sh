@@ -18,52 +18,60 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../../../..
-EXAMPLE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=${GOPATH}/src/k8s.io/kubernetes
+BASE_PATH=k8s.io/kubernetes/staging/src/
+BASE_PKG=k8s.io/sample-apiserver
+
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+clientgen="${PWD}/client-gen-binary"
+listergen="${PWD}/lister-gen"
+informergen="${PWD}/informer-gen"
 # Register function to be called on EXIT to remove generated binary.
 function cleanup {
-  rm -f "${CLIENTGEN:-}"
+  rm -f "${clientgen:-}"
   rm -f "${listergen:-}"
   rm -f "${informergen:-}"
 }
 trap cleanup EXIT
 
-echo "Building client-gen"
-CLIENTGEN="${PWD}/client-gen-binary"
-go build -o "${CLIENTGEN}" ./cmd/libs/go2idl/client-gen
+function generate_group() {
+  local GROUP_NAME=$1
+  local VERSION=$2
+  local SERVER_BASE=${GOPATH}/src/${BASE_PATH}
+  local CLIENT_PKG=${BASE_PKG}/pkg/client
+  local LISTERS_PKG=${CLIENT_PKG}/listers_generated
+  local INFORMERS_PKG=${CLIENT_PKG}/informers_generated
+  local PREFIX=${BASE_PKG}/pkg/apis
+  local INPUT_APIS=(
+    ${GROUP_NAME}/
+    ${GROUP_NAME}/${VERSION}
+  )
 
-PREFIX=k8s.io/sample-apiserver/pkg/apis
-INPUT_BASE="--input-base ${PREFIX}"
-INPUT_APIS=(
-wardle/
-wardle/v1alpha1
-)
-INPUT="--input ${INPUT_APIS[@]}"
-CLIENTSET_PATH="--clientset-path k8s.io/sample-apiserver/pkg/client/clientset_generated"
+  echo "Building client-gen"
+  go build -o "${clientgen}" k8s.io/kubernetes/cmd/libs/go2idl/client-gen
 
-${CLIENTGEN} ${INPUT_BASE} ${INPUT} ${CLIENTSET_PATH} 
-${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input wardle/v1alpha1 ${CLIENTSET_PATH} 
+  echo "generating clientset for group ${GROUP_NAME} and version ${VERSION} at ${GOPATH}/${BASE_PATH}${CLIENT_PKG}"
+  ${clientgen} --input-base ${PREFIX} --input ${INPUT_APIS[@]} --clientset-path ${CLIENT_PKG}/clientset_generated --output-base=${GOPATH}/src/${BASE_PATH}
+  ${clientgen} --clientset-name="clientset" --input-base ${PREFIX} --input ${GROUP_NAME}/${VERSION} --clientset-path ${CLIENT_PKG}/clientset_generated --output-base=${GOPATH}/src/${BASE_PATH}
+  
+  echo "Building lister-gen"
+  go build -o "${listergen}" k8s.io/kubernetes/cmd/libs/go2idl/lister-gen
 
+  echo "generating listers for group ${GROUP_NAME} and version ${VERSION} at ${GOPATH}/${BASE_PATH}${LISTERS_PKG}"
+  ${listergen} --input-dirs ${BASE_PKG}/pkg/apis/wardle --input-dirs ${BASE_PKG}/pkg/apis/${GROUP_NAME}/${VERSION} --output-package ${LISTERS_PKG} --output-base ${SERVER_BASE}
 
-echo "Building lister-gen"
-listergen="${PWD}/lister-gen"
-go build -o "${listergen}" ./cmd/libs/go2idl/lister-gen
+  echo "Building informer-gen"
+  go build -o "${informergen}" k8s.io/kubernetes/cmd/libs/go2idl/informer-gen
 
-LISTER_INPUT="--input-dirs k8s.io/sample-apiserver/pkg/apis/wardle --input-dirs k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
-LISTER_PATH="--output-package k8s.io/sample-apiserver/pkg/client/listers"
-${listergen} ${LISTER_INPUT} ${LISTER_PATH}
+  echo "generating informers for group ${GROUP_NAME} and version ${VERSION} at ${GOPATH}/${BASE_PATH}${INFORMERS_PKG}"
+  ${informergen} \
+    --input-dirs ${BASE_PKG}/pkg/apis/${GROUP_NAME} --input-dirs ${BASE_PKG}/pkg/apis/${GROUP_NAME}/${VERSION} \
+    --versioned-clientset-package ${CLIENT_PKG}/clientset_generated/clientset \
+    --internal-clientset-package ${CLIENT_PKG}/clientset_generated/internalclientset \
+    --listers-package ${LISTERS_PKG} \
+    --output-package ${INFORMERS_PKG} \
+    --output-base ${SERVER_BASE}
+}
 
-
-echo "Building informer-gen"
-informergen="${PWD}/informer-gen"
-go build -o "${informergen}" ./cmd/libs/go2idl/informer-gen
-
-${informergen} \
-  --input-dirs k8s.io/sample-apiserver/pkg/apis/wardle --input-dirs k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1 \
-  --versioned-clientset-package k8s.io/sample-apiserver/pkg/client/clientset_generated/clientset \
-  --internal-clientset-package k8s.io/sample-apiserver/pkg/client/clientset_generated/internalclientset \
-  --listers-package k8s.io/sample-apiserver/pkg/client/listers \
-  --output-package k8s.io/sample-apiserver/pkg/client/informers
-  "$@"
+generate_group wardle v1alpha1

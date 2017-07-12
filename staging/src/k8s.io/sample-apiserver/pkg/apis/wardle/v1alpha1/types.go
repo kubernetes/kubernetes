@@ -53,7 +53,6 @@ type Fischer struct {
 	DisallowedFlunders []string `json:"disallowedFlunders,omitempty" protobuf:"bytes,2,rep,name=disallowedFlunders"`
 }
 
-// +genclient=true
 // +nonNamespaced=true
 
 // FischerList is a list of Fischer objects.
