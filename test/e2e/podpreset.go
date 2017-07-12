@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	settings "k8s.io/api/settings/v1alpha1"
+	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
@@ -48,12 +48,12 @@ var _ = framework.KubeDescribe("PodPreset", func() {
 	It("should create a pod preset", func() {
 		By("Creating a pod preset")
 
-		pip := &settings.PodPreset{
+		pip := &settingsv1alpha1.PodPreset{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "hello",
 				Namespace: f.Namespace.Name,
 			},
-			Spec: settings.PodPresetSpec{
+			Spec: settingsv1alpha1.PodPresetSpec{
 				Selector: metav1.LabelSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
@@ -153,12 +153,12 @@ var _ = framework.KubeDescribe("PodPreset", func() {
 	It("should not modify the pod on conflict", func() {
 		By("Creating a pod preset")
 
-		pip := &settings.PodPreset{
+		pip := &settingsv1alpha1.PodPreset{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "hello",
 				Namespace: f.Namespace.Name,
 			},
-			Spec: settings.PodPresetSpec{
+			Spec: settingsv1alpha1.PodPresetSpec{
 				Selector: metav1.LabelSelector{
 					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
@@ -257,18 +257,18 @@ var _ = framework.KubeDescribe("PodPreset", func() {
 	})
 })
 
-func getPodPreset(c clientset.Interface, ns, name string) (*settings.PodPreset, error) {
-	return c.Settings().PodPresets(ns).Get(name, metav1.GetOptions{})
+func getPodPreset(c clientset.Interface, ns, name string) (*settingsv1alpha1.PodPreset, error) {
+	return c.SettingsV1alpha1().PodPresets(ns).Get(name, metav1.GetOptions{})
 }
 
-func createPodPreset(c clientset.Interface, ns string, job *settings.PodPreset) (*settings.PodPreset, error) {
-	return c.Settings().PodPresets(ns).Create(job)
+func createPodPreset(c clientset.Interface, ns string, job *settingsv1alpha1.PodPreset) (*settingsv1alpha1.PodPreset, error) {
+	return c.SettingsV1alpha1().PodPresets(ns).Create(job)
 }
 
-func updatePodPreset(c clientset.Interface, ns string, job *settings.PodPreset) (*settings.PodPreset, error) {
-	return c.Settings().PodPresets(ns).Update(job)
+func updatePodPreset(c clientset.Interface, ns string, job *settingsv1alpha1.PodPreset) (*settingsv1alpha1.PodPreset, error) {
+	return c.SettingsV1alpha1().PodPresets(ns).Update(job)
 }
 
 func deletePodPreset(c clientset.Interface, ns, name string) error {
-	return c.Settings().PodPresets(ns).Delete(name, nil)
+	return c.SettingsV1alpha1().PodPresets(ns).Delete(name, nil)
 }

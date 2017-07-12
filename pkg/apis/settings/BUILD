@@ -38,6 +38,7 @@ filegroup(
         ":package-srcs",
         "//pkg/apis/settings/install:all-srcs",
         "//pkg/apis/settings/v1alpha1:all-srcs",
+        "//pkg/apis/settings/v1beta1:all-srcs",
         "//pkg/apis/settings/validation:all-srcs",
     ],
     tags = ["automanaged"],
