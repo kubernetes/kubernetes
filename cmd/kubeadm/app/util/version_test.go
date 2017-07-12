@@ -45,6 +45,7 @@ func TestValidVersion(t *testing.T) {
 		"v1.6.0-alpha.0.536+d60d9f3269288f",
 		"v1.5.0-alpha.0.1078+1044b6822497da-pull",
 		"v1.5.0-alpha.1.822+49b9e32fad9f32-pull-gke-gci",
+		"v1.6.1_coreos.0",
 	}
 	for _, s := range validVersions {
 		ver, err := KubernetesReleaseVersion(s)
@@ -61,8 +62,9 @@ func TestValidVersion(t *testing.T) {
 func TestInvalidVersion(t *testing.T) {
 	invalidVersions := []string{
 		"v1.3",
-		"1.4.0",
-		"1.4.5+git",
+		"1.4",
+		"b1.4.0",
+		"c1.4.5+git",
 		"something1.2",
 	}
 	for _, s := range invalidVersions {
@@ -73,6 +75,24 @@ func TestInvalidVersion(t *testing.T) {
 		}
 		if ver != "" {
 			t.Errorf("KubernetesReleaseVersion should return empty string in case of error. Returned %q for version %q", ver, s)
+		}
+	}
+}
+
+func TestValidConvenientForUserVersion(t *testing.T) {
+	validVersions := []string{
+		"1.4.0",
+		"1.4.5+git",
+		"1.6.1_coreos.0",
+	}
+	for _, s := range validVersions {
+		ver, err := KubernetesReleaseVersion(s)
+		t.Log("Valid: ", s, ver, err)
+		if err != nil {
+			t.Errorf("KubernetesReleaseVersion unexpected error for version %q: %v", s, err)
+		}
+		if ver != "v"+s {
+			t.Errorf("KubernetesReleaseVersion should return semantic version string. %q vs. %q", s, ver)
 		}
 	}
 }
