@@ -43,27 +43,27 @@ func TestGetCoreImage(t *testing.T) {
 		{getCoreImageTest{o: "override"}, "override"},
 		{getCoreImageTest{
 			i: KubeEtcdImage,
-			c: &kubeadmapi.MasterConfiguration{}},
+			c: &kubeadmapi.MasterConfiguration{ImageRepository: gcrPrefix}},
 			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "etcd", runtime.GOARCH, etcdVersion),
 		},
 		{getCoreImageTest{
 			i: KubeAPIServerImage,
-			c: &kubeadmapi.MasterConfiguration{KubernetesVersion: testversion}},
+			c: &kubeadmapi.MasterConfiguration{ImageRepository: gcrPrefix, KubernetesVersion: testversion}},
 			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, testversion),
 		},
 		{getCoreImageTest{
 			i: KubeControllerManagerImage,
-			c: &kubeadmapi.MasterConfiguration{KubernetesVersion: testversion}},
+			c: &kubeadmapi.MasterConfiguration{ImageRepository: gcrPrefix, KubernetesVersion: testversion}},
 			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, testversion),
 		},
 		{getCoreImageTest{
 			i: KubeSchedulerImage,
-			c: &kubeadmapi.MasterConfiguration{KubernetesVersion: testversion}},
+			c: &kubeadmapi.MasterConfiguration{ImageRepository: gcrPrefix, KubernetesVersion: testversion}},
 			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, testversion),
 		},
 		{getCoreImageTest{
 			i: KubeProxyImage,
-			c: &kubeadmapi.MasterConfiguration{KubernetesVersion: testversion}},
+			c: &kubeadmapi.MasterConfiguration{ImageRepository: gcrPrefix, KubernetesVersion: testversion}},
 			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, testversion),
 		},
 	}
