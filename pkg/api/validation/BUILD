@@ -75,6 +75,7 @@ go_test(
         "//pkg/api/testing:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/security/apparmor:go_default_library",
+        "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
