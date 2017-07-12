@@ -37,8 +37,8 @@ import (
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/metrics"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
