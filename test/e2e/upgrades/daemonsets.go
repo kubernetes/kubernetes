@@ -36,7 +36,7 @@ type DaemonSetUpgradeTest struct {
 	daemonSet *extensions.DaemonSet
 }
 
-func (DaemonSetUpgradeTest) Name() string { return "daemonset-upgrade" }
+func (DaemonSetUpgradeTest) Name() string { return "[sig-apps] daemonset-upgrade" }
 
 // Setup creates a DaemonSet and verifies that it's running
 func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {

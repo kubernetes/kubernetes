@@ -40,7 +40,7 @@ type DeploymentUpgradeTest struct {
 	newRS    *extensions.ReplicaSet
 }
 
-func (DeploymentUpgradeTest) Name() string { return "deployment-upgrade" }
+func (DeploymentUpgradeTest) Name() string { return "[sig-apps] deployment-upgrade" }
 
 func (DeploymentUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 	// The Deployment upgrade test currently relies on implementation details to probe the

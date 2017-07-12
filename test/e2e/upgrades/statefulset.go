@@ -34,7 +34,7 @@ type StatefulSetUpgradeTest struct {
 	set     *apps.StatefulSet
 }
 
-func (StatefulSetUpgradeTest) Name() string { return "statefulset-upgrade" }
+func (StatefulSetUpgradeTest) Name() string { return "[sig-apps] statefulset-upgrade" }
 
 func (StatefulSetUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 	minVersion := version.MustParseSemantic("1.5.0")
