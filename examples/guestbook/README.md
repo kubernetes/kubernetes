@@ -236,7 +236,7 @@ If your cluster does not have the DNS service enabled, then you can use environm
 [redis-slave-deployment.yaml](redis-slave-deployment.yaml) and [frontend-deployment.yaml](frontend-deployment.yaml)
 from `dns` to `env` before you start up the app.
 (However, this is unlikely to be necessary. You can check for the DNS service in the list of the cluster's services by
-running `kubectl --namespace=kube-system get rc -l k8s-app=kube-dns`.)
+running `kubectl --namespace=kube-system get rc -l k8s-app=kube-dns` if the DNS service is running as a Replication Controller or `kubectl --namespace=kube-system get rs -l k8s-app=kube-dns` if the DNS service is running as a Deployment, which is the default on Kubernetes >v1.5.)
 Note that switching to env causes creation-order dependencies, since Services need to be created before their clients that require env vars.
 
 #### Create a Deployment
