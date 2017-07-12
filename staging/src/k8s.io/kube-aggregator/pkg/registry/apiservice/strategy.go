@@ -19,6 +19,7 @@ package apiservice
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -92,10 +93,8 @@ func (apiServerStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, o
 	newAPIService := obj.(*apiregistration.APIService)
 	oldAPIService := old.(*apiregistration.APIService)
 	newAPIService.Spec = oldAPIService.Spec
-	newAPIService.Labels = oldAPIService.Labels
-	newAPIService.Annotations = oldAPIService.Annotations
-	newAPIService.Finalizers = oldAPIService.Finalizers
-	newAPIService.OwnerReferences = oldAPIService.OwnerReferences
+
+	metav1.ResetObjectMetaForStatus(newAPIService, oldAPIService)
 }
 
 func (apiServerStatusStrategy) AllowCreateOnUpdate() bool {
