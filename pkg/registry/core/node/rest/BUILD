@@ -17,9 +17,9 @@ go_library(
         "//pkg/kubelet/client:go_default_library",
         "//pkg/registry/core/node:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/proxy:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/registry/generic/rest:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
     ],
 )

@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package proxy provides transport and upgrade support for proxies
-package proxy // import "k8s.io/apiserver/pkg/util/proxy"
+// Package proxy provides transport and upgrade support for proxies.
+package proxy // import "k8s.io/apimachinery/pkg/util/proxy"
