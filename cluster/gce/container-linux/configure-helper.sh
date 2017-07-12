@@ -224,15 +224,24 @@ function create-master-auth {
   cat <<EOF >/etc/gce.conf
 [global]
 EOF
+  if [[ -n "${GCE_API_ENDPOINT:-}" ]]; then
+    cat <<EOF >>/etc/gce.conf
+api-endpoint = ${GCE_API_ENDPOINT}
+EOF
+  fi
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
 token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
-network-project-id = ${NETWORK_PROJECT_ID}
 network-name = ${NODE_NETWORK}
 EOF
+    if [[ -n "${NETWORK_PROJECT_ID:-}" ]]; then
+      cat <<EOF >>/etc/gce.conf
+network-project-id = ${NETWORK_PROJECT_ID}
+EOF
+    fi
     if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
       cat <<EOF >>/etc/gce.conf
 subnetwork-name = ${NODE_SUBNETWORK}

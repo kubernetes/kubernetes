@@ -390,9 +390,13 @@ EOF
 token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
-network-project-id = ${NETWORK_PROJECT_ID}
 network-name = ${NODE_NETWORK}
 EOF
+    if [[ -n "${NETWORK_PROJECT_ID:-}" ]]; then
+        cat <<EOF >>/etc/gce.conf
+network-project-id = ${NETWORK_PROJECT_ID}
+EOF
+    fi
     if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
       cat <<EOF >>/etc/gce.conf
 subnetwork-name = ${NODE_SUBNETWORK}
