@@ -126,6 +126,21 @@ verify: verify_generated_files
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
 endif
 
+define QUICK_VERIFY_HELP_INFO
+# Runs only the presubmission verifications that aren't slow.
+#
+# Example:
+#   make quick-verify
+endef
+.PHONY: quick-verify
+ifeq ($(PRINT_HELP),y)
+quick-verify:
+	@echo "$$QUICK_VERIFY_HELP_INFO"
+else
+quick-verify: verify_generated_files
+	hack/make-rules/verify.sh -v -Q
+endif
+
 define UPDATE_HELP_INFO
 # Runs all the generated updates.
 #
