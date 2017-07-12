@@ -9,7 +9,6 @@ cmd/kube-controller-manager/app
 cmd/kube-proxy/app
 cmd/kubeadm/app
 cmd/kubeadm/app/apis/kubeadm
-cmd/kubeadm/app/apis/kubeadm/fuzzer
 cmd/kubeadm/app/apis/kubeadm/v1alpha1
 cmd/kubeadm/app/apis/kubeadm/validation
 cmd/kubeadm/app/cmd
@@ -579,18 +578,19 @@ staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresource
 staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition
 staging/src/k8s.io/apiextensions-apiserver/test/integration/testserver
 staging/src/k8s.io/apimachinery/pkg/api/meta
-staging/src/k8s.io/apimachinery/pkg/api/testing
+staging/src/k8s.io/apimachinery/pkg/api/testing/fuzzer
+staging/src/k8s.io/apimachinery/pkg/api/testing/roundtrip
 staging/src/k8s.io/apimachinery/pkg/api/validation
 staging/src/k8s.io/apimachinery/pkg/api/validation/path
 staging/src/k8s.io/apimachinery/pkg/apimachinery/announced
 staging/src/k8s.io/apimachinery/pkg/apimachinery/registered
+staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer
 staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/validation
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1alpha1
 staging/src/k8s.io/apimachinery/pkg/apis/testapigroup
-staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/fuzzer
 staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1
 staging/src/k8s.io/apimachinery/pkg/conversion
 staging/src/k8s.io/apimachinery/pkg/conversion/unstructured
@@ -636,7 +636,6 @@ staging/src/k8s.io/apiserver/pkg/apis/audit
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit/validation
 staging/src/k8s.io/apiserver/pkg/apis/example
-staging/src/k8s.io/apiserver/pkg/apis/example/fuzzer
 staging/src/k8s.io/apiserver/pkg/apis/example/v1
 staging/src/k8s.io/apiserver/pkg/audit
 staging/src/k8s.io/apiserver/pkg/audit/policy

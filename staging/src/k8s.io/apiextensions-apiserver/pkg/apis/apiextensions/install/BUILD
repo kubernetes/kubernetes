@@ -10,13 +10,12 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["install_test.go"],
+    srcs = ["roundtrip_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//vendor/github.com/google/gofuzz:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/testing:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
     ],
 )
 

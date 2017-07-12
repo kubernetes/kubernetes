@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package install
 
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	roundtrip "k8s.io/apimachinery/pkg/api/testing/roundtrip"
 )
 
 func TestRoundTripTypes(t *testing.T) {
-	roundtrip.RoundTripTestForScheme(t, Scheme, nil)
+	roundtrip.RoundTripTestForAPIGroup(t, Install, nil)
 }
