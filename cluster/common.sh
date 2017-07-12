@@ -605,6 +605,7 @@ function build-kube-env {
 
   rm -f ${file}
   cat >$file <<EOF
+CLUSTER_NAME: $(yaml-quote ${CLUSTER_NAME})
 ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
 INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
 NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
