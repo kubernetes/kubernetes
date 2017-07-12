@@ -17,158 +17,151 @@ limitations under the License.
 package certs
 
 import (
-	"fmt"
-	"io/ioutil"
+	"crypto/x509"
 	"net"
 	"os"
 	"testing"
 
-	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-func TestCreatePKIAssets(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+func TestNewCACertAndKey(t *testing.T) {
+	caCert, _, err := NewCACertAndKey()
 	if err != nil {
-		t.Fatalf("Couldn't create tmpdir")
+		t.Fatalf("failed call NewCACertAndKey: %v", err)
 	}
-	defer os.RemoveAll(tmpdir)
 
-	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
-		expected bool
-	}{
-		{
-			cfg:      &kubeadmapi.MasterConfiguration{},
-			expected: false,
-		},
-		{
-			// CIDR too small
-			cfg: &kubeadmapi.MasterConfiguration{
-				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.0.0.1/1"},
-				CertificatesDir: fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir),
-			},
-			expected: false,
-		},
-		{
-			// CIDR invalid
-			cfg: &kubeadmapi.MasterConfiguration{
-				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "invalid"},
-				CertificatesDir: fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir),
-			},
-			expected: false,
-		},
-		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.0.0.1/24"},
-				CertificatesDir: fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir),
-			},
-			expected: true,
-		},
+	assertIsCa(t, caCert)
+}
+
+func TestNewAPIServerCertAndKey(t *testing.T) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Errorf("couldn't get the hostname: %v", err)
 	}
-	for _, rt := range tests {
-		actual := CreatePKIAssets(rt.cfg)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed CreatePKIAssets with an error:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(actual == nil),
-			)
-		}
+	advertiseIP := "1.2.3.4"
+	cfg := &kubeadmapi.MasterConfiguration{
+		API:        kubeadmapi.API{AdvertiseAddress: advertiseIP},
+		Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+	}
+	caCert, caKey, err := NewCACertAndKey()
+
+	apiServerCert, _, err := NewAPIServerCertAndKey(cfg, caCert, caKey)
+	if err != nil {
+		t.Fatalf("failed creation of cert and key: %v", err)
+	}
+
+	assertIsSignedByCa(t, apiServerCert, caCert)
+	assertHasServerAuth(t, apiServerCert)
+
+	for _, DNSName := range []string{hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local"} {
+		assertHasDNSNames(t, apiServerCert, DNSName)
+	}
+	for _, IPAddress := range []string{"10.96.0.1", advertiseIP} {
+		assertHasIPAddresses(t, apiServerCert, net.ParseIP(IPAddress))
 	}
 }
 
-func TestCheckAltNamesExist(t *testing.T) {
-	var tests = []struct {
-		IPs              []net.IP
-		DNSNames         []string
-		requiredAltNames certutil.AltNames
-		succeed          bool
-	}{
-		{
-			// equal
-			requiredAltNames: certutil.AltNames{IPs: []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")}, DNSNames: []string{"foo", "bar", "baz"}},
-			IPs:              []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")},
-			DNSNames:         []string{"foo", "bar", "baz"},
-			succeed:          true,
-		},
-		{
-			// the loaded cert has more ips than required, ok
-			requiredAltNames: certutil.AltNames{IPs: []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")}, DNSNames: []string{"foo", "bar", "baz"}},
-			IPs:              []net.IP{net.ParseIP("192.168.2.5"), net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")},
-			DNSNames:         []string{"a", "foo", "b", "bar", "baz"},
-			succeed:          true,
-		},
-		{
-			// the loaded cert doesn't have all ips
-			requiredAltNames: certutil.AltNames{IPs: []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.2.5"), net.ParseIP("192.168.1.2")}, DNSNames: []string{"foo", "bar", "baz"}},
-			IPs:              []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")},
-			DNSNames:         []string{"foo", "bar", "baz"},
-			succeed:          false,
-		},
-		{
-			// the loaded cert doesn't have all ips
-			requiredAltNames: certutil.AltNames{IPs: []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")}, DNSNames: []string{"foo", "bar", "b", "baz"}},
-			IPs:              []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")},
-			DNSNames:         []string{"foo", "bar", "baz"},
-			succeed:          false,
-		},
+func TestNewAPIServerKubeletClientCertAndKey(t *testing.T) {
+	caCert, caKey, err := NewCACertAndKey()
+
+	apiClientCert, _, err := NewAPIServerKubeletClientCertAndKey(caCert, caKey)
+	if err != nil {
+		t.Fatalf("failed creation of cert and key: %v", err)
 	}
 
-	for _, rt := range tests {
-		succeeded := checkAltNamesExist(rt.IPs, rt.DNSNames, rt.requiredAltNames)
-		if succeeded != rt.succeed {
-			t.Errorf(
-				"failed checkAltNamesExist:\n\texpected: %t\n\t  actual: %t",
-				rt.succeed,
-				succeeded,
-			)
-		}
+	assertIsSignedByCa(t, apiClientCert, caCert)
+	assertHasClientAuth(t, apiClientCert)
+	assertHasOrganization(t, apiClientCert, constants.MastersGroup)
+}
+
+func TestNewNewServiceAccountSigningKey(t *testing.T) {
+
+	key, err := NewServiceAccountSigningKey()
+	if err != nil {
+		t.Fatalf("failed creation of key: %v", err)
+	}
+
+	if key.N.BitLen() < 2048 {
+		t.Error("Service account signing key has less than 2048 bits size")
 	}
 }
 
-func TestGetAltNames(t *testing.T) {
-	var tests = []struct {
-		cfgaltnames      []string
-		hostname         string
-		dnsdomain        string
-		servicecidr      string
-		expectedIPs      []string
-		expectedDNSNames []string
-	}{
-		{
-			cfgaltnames:      []string{"foo", "192.168.200.1", "bar.baz"},
-			hostname:         "my-node",
-			dnsdomain:        "cluster.external",
-			servicecidr:      "10.96.0.1/12",
-			expectedIPs:      []string{"192.168.200.1", "10.96.0.1"},
-			expectedDNSNames: []string{"my-node", "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.external", "foo", "bar.baz"},
-		},
+func TestNewFrontProxyCACertAndKey(t *testing.T) {
+	frontProxyCACert, _, err := NewFrontProxyCACertAndKey()
+	if err != nil {
+		t.Fatalf("failed creation of cert and key: %v", err)
 	}
 
-	for _, rt := range tests {
-		_, svcSubnet, _ := net.ParseCIDR(rt.servicecidr)
-		actual := getAltNames(rt.cfgaltnames, rt.hostname, rt.dnsdomain, svcSubnet)
-		for i := range actual.IPs {
-			if rt.expectedIPs[i] != actual.IPs[i].String() {
-				t.Errorf(
-					"failed getAltNames:\n\texpected: %s\n\t  actual: %s",
-					rt.expectedIPs[i],
-					actual.IPs[i].String(),
-				)
-			}
-		}
-		for i := range actual.DNSNames {
-			if rt.expectedDNSNames[i] != actual.DNSNames[i] {
-				t.Errorf(
-					"failed getAltNames:\n\texpected: %s\n\t  actual: %s",
-					rt.expectedDNSNames[i],
-					actual.DNSNames[i],
-				)
-			}
+	assertIsCa(t, frontProxyCACert)
+}
+
+func TestNewFrontProxyClientCertAndKey(t *testing.T) {
+	frontProxyCACert, frontProxyCAKey, err := NewFrontProxyCACertAndKey()
+
+	frontProxyClientCert, _, err := NewFrontProxyClientCertAndKey(frontProxyCACert, frontProxyCAKey)
+	if err != nil {
+		t.Fatalf("failed creation of cert and key: %v", err)
+	}
+
+	assertIsSignedByCa(t, frontProxyClientCert, frontProxyCACert)
+	assertHasClientAuth(t, frontProxyClientCert)
+}
+
+func assertIsCa(t *testing.T, cert *x509.Certificate) {
+	if !cert.IsCA {
+		t.Error("cert is not a valida CA")
+	}
+}
+
+func assertIsSignedByCa(t *testing.T, cert *x509.Certificate, ca *x509.Certificate) {
+	if err := cert.CheckSignatureFrom(ca); err != nil {
+		t.Error("cert is not signed by ca")
+	}
+}
+
+func assertHasClientAuth(t *testing.T, cert *x509.Certificate) {
+	for i := range cert.ExtKeyUsage {
+		if cert.ExtKeyUsage[i] == x509.ExtKeyUsageClientAuth {
+			return
 		}
 	}
+	t.Error("cert is not a ClientAuth")
+}
+
+func assertHasServerAuth(t *testing.T, cert *x509.Certificate) {
+	for i := range cert.ExtKeyUsage {
+		if cert.ExtKeyUsage[i] == x509.ExtKeyUsageServerAuth {
+			return
+		}
+	}
+	t.Error("cert is not a ServerAuth")
+}
+
+func assertHasOrganization(t *testing.T, cert *x509.Certificate, OU string) {
+	for i := range cert.Subject.Organization {
+		if cert.Subject.Organization[i] == OU {
+			return
+		}
+	}
+	t.Errorf("cert does not contain OU %s", OU)
+}
+
+func assertHasDNSNames(t *testing.T, cert *x509.Certificate, DNSName string) {
+	for i := range cert.DNSNames {
+		if cert.DNSNames[i] == DNSName {
+			return
+		}
+	}
+	t.Errorf("cert does not contain DNSName %s", DNSName)
+}
+
+func assertHasIPAddresses(t *testing.T, cert *x509.Certificate, IPAddress net.IP) {
+	for i := range cert.IPAddresses {
+		if cert.IPAddresses[i].Equal(IPAddress) {
+			return
+		}
+	}
+	t.Errorf("cert does not contain IPAddress %s", IPAddress)
 }
