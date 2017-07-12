@@ -44,7 +44,7 @@ filegroup(
         "//pkg/client/conditions:all-srcs",
         "//pkg/client/informers/informers_generated/externalversions:all-srcs",
         "//pkg/client/informers/informers_generated/internalversion:all-srcs",
-        "//pkg/client/leaderelection:all-srcs",
+        "//pkg/client/leaderelectionconfig:all-srcs",
         "//pkg/client/listers/admissionregistration/internalversion:all-srcs",
         "//pkg/client/listers/admissionregistration/v1alpha1:all-srcs",
         "//pkg/client/listers/apps/internalversion:all-srcs",
