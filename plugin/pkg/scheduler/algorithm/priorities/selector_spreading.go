@@ -30,13 +30,9 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-// The maximum priority value to give to a node
-// Priority values range from 0-maxPriority
-const maxPriority float32 = 10
-
 // When zone information is present, give 2/3 of the weighting to zone spreading, 1/3 to node spreading
 // TODO: Any way to justify this weighting?
-const zoneWeighting = 2.0 / 3.0
+const zoneWeighting float64 = 2.0 / 3.0
 
 type SelectorSpread struct {
 	serviceLister     algorithm.ServiceLister
@@ -103,15 +99,15 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *v1.Pod, nodeNameToInfo map
 	selectors := s.getSelectors(pod)
 
 	// Count similar pods by node
-	countsByNodeName := make(map[string]float32, len(nodes))
-	countsByZone := make(map[string]float32, 10)
-	maxCountByNodeName := float32(0)
+	countsByNodeName := make(map[string]float64, len(nodes))
+	countsByZone := make(map[string]float64, 10)
+	maxCountByNodeName := float64(0)
 	countsByNodeNameLock := sync.Mutex{}
 
 	if len(selectors) > 0 {
 		processNodeFunc := func(i int) {
 			nodeName := nodes[i].Name
-			count := float32(0)
+			count := float64(0)
 			for _, nodePod := range nodeNameToInfo[nodeName].Pods() {
 				if pod.Namespace != nodePod.Namespace {
 					continue
@@ -153,7 +149,7 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *v1.Pod, nodeNameToInfo map
 	// Aggregate by-zone information
 	// Compute the maximum number of pods hosted in any zone
 	haveZones := len(countsByZone) != 0
-	maxCountByZone := float32(0)
+	maxCountByZone := float64(0)
 	for _, count := range countsByZone {
 		if count > maxCountByZone {
 			maxCountByZone = count
@@ -165,16 +161,16 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *v1.Pod, nodeNameToInfo map
 	// 0 being the lowest priority and maxPriority being the highest
 	for _, node := range nodes {
 		// initializing to the default/max node score of maxPriority
-		fScore := maxPriority
+		fScore := float64(schedulerapi.MaxPriority)
 		if maxCountByNodeName > 0 {
-			fScore = maxPriority * ((maxCountByNodeName - countsByNodeName[node.Name]) / maxCountByNodeName)
+			fScore = float64(schedulerapi.MaxPriority) * ((maxCountByNodeName - countsByNodeName[node.Name]) / maxCountByNodeName)
 		}
 
 		// If there is zone information present, incorporate it
 		if haveZones {
 			zoneId := utilnode.GetZoneKey(node)
 			if zoneId != "" {
-				zoneScore := maxPriority * ((maxCountByZone - countsByZone[zoneId]) / maxCountByZone)
+				zoneScore := float64(schedulerapi.MaxPriority) * ((maxCountByZone - countsByZone[zoneId]) / maxCountByZone)
 				fScore = (fScore * (1.0 - zoneWeighting)) + (zoneWeighting * zoneScore)
 			}
 		}
@@ -258,9 +254,9 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *v1.Pod, nodeNam
 	// 0 being the lowest priority and maxPriority being the highest
 	for node := range labeledNodes {
 		// initializing to the default/max node score of maxPriority
-		fScore := float32(maxPriority)
+		fScore := float64(schedulerapi.MaxPriority)
 		if numServicePods > 0 {
-			fScore = maxPriority * (float32(numServicePods-podCounts[labeledNodes[node]]) / float32(numServicePods))
+			fScore = float64(schedulerapi.MaxPriority) * (float64(numServicePods-podCounts[labeledNodes[node]]) / float64(numServicePods))
 		}
 		result = append(result, schedulerapi.HostPriority{Host: node, Score: int(fScore)})
 	}

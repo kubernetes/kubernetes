@@ -87,7 +87,7 @@ func CalculateNodeAffinityPriorityReduce(pod *v1.Pod, meta interface{}, nodeName
 	var fScore float64
 	for i := range result {
 		if maxCount > 0 {
-			fScore = 10 * (float64(result[i].Score) / maxCountFloat)
+			fScore = float64(schedulerapi.MaxPriority) * (float64(result[i].Score) / maxCountFloat)
 		} else {
 			fScore = 0
 		}
