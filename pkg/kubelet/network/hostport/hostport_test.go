@@ -131,7 +131,33 @@ func TestEnsureKubeHostportChains(t *testing.T) {
 	jumpRule := "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"
 	masqRule := "-m comment --comment \"SNAT for localhost access to hostports\" -o cbr0 -s 127.0.0.0/8 -j MASQUERADE"
 
-	fakeIPTables := NewFakeIPTables()
+	fakeIPTables := NewFakeIPTables(ProtocolIpv4)
+	assert.NoError(t, ensureKubeHostportChains(fakeIPTables, interfaceName))
+
+	_, _, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain("KUBE-HOSTPORTS"))
+	assert.NoError(t, err)
+
+	_, chain, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.ChainPostrouting)
+	assert.NoError(t, err)
+	assert.EqualValues(t, len(chain.rules), 1)
+	assert.Contains(t, chain.rules[0], masqRule)
+
+	for _, chainName := range builtinChains {
+		_, chain, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain(chainName))
+		assert.NoError(t, err)
+		assert.EqualValues(t, len(chain.rules), 1)
+		assert.Contains(t, chain.rules[0], jumpRule)
+	}
+
+}
+
+func TestEnsureIPv6KubeHostportChains(t *testing.T) {
+	interfaceName := "cbr0"
+	builtinChains := []string{"PREROUTING", "OUTPUT"}
+	jumpRule := "-m comment --comment \"kube hostport portals\" -m addrtype --dst-type LOCAL -j KUBE-HOSTPORTS"
+	masqRule := "-m comment --comment \"SNAT for localhost access to hostports\" -o cbr0 -s ::1/128 -j MASQUERADE"
+
+	fakeIPTables := NewFakeIPTables(ProtocolIpv6)
 	assert.NoError(t, ensureKubeHostportChains(fakeIPTables, interfaceName))
 
 	_, _, err := fakeIPTables.getChain(utiliptables.TableNAT, utiliptables.Chain("KUBE-HOSTPORTS"))

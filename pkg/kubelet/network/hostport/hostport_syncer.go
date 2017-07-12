@@ -49,8 +49,8 @@ type hostportSyncer struct {
 	portOpener  hostportOpener
 }
 
-func NewHostportSyncer() HostportSyncer {
-	iptInterface := utiliptables.New(utilexec.New(), utildbus.New(), utiliptables.ProtocolIpv4)
+func NewHostportSyncer(protocol utiliptables.Protocol) HostportSyncer {
+	iptInterface := utiliptables.New(utilexec.New(), utildbus.New(), protocol)
 	return &hostportSyncer{
 		hostPortMap: make(map[hostport]closeable),
 		iptables:    iptInterface,
@@ -117,7 +117,7 @@ func getPodFullName(pod *PodPortMapping) string {
 func gatherAllHostports(activePodPortMappings []*PodPortMapping) (map[*PortMapping]targetPod, error) {
 	podHostportMap := make(map[*PortMapping]targetPod)
 	for _, pm := range activePodPortMappings {
-		if pm.IP.To4() == nil {
+		if pm.IP.To4() == nil && pm.IP.To16() == nil {
 			return nil, fmt.Errorf("Invalid or missing pod %s IP", getPodFullName(pm))
 		}
 		// should not handle hostports for hostnetwork pods
