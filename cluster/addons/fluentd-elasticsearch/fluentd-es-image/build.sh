@@ -32,6 +32,7 @@ sed -i -e "s/USER=td-agent/USER=root/" -e "s/GROUP=td-agent/GROUP=root/" /etc/in
 # http://docs.fluentd.org/articles/plugin-management
 td-agent-gem install --no-document fluent-plugin-kubernetes_metadata_filter -v 0.27.0
 td-agent-gem install --no-document fluent-plugin-elasticsearch -v 1.9.5
+td-agent-gem install --no-document fluent-plugin-prometheus -v 0.3.0
 
 # Remove docs and postgres references
 rm -rf /opt/td-agent/embedded/share/doc \
