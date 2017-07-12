@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -80,62 +79,6 @@ var _ = framework.KubeDescribe("Federated ReplicaSet [Feature:Federation]", func
 		BeforeEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 			clusters = f.GetRegisteredClusters()
-		})
-
-		// e2e cases for federated replicaset controller
-		Describe("CRUD", func() {
-			var (
-				rs *v1beta1.ReplicaSet
-			)
-
-			BeforeEach(func() {
-				nsName := f.FederationNamespace.Name
-
-				By(fmt.Sprintf("Creating a new replicaset in namespace %q", nsName))
-				rs = createAndWaitForReplicasetOrFail(f.FederationClientset, nsName, clusters)
-			})
-
-			AfterEach(func() {
-				// Delete all replicasets.
-				nsName := f.FederationNamespace.Name
-
-				By(fmt.Sprintf("Deleting replicaset \"%s/%s\"", nsName, rs.Name))
-				orphanDependents := false
-				deleteReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, &orphanDependents)
-			})
-
-			It("should create and update matching replicasets in underlying clusters", func() {
-				nsName := f.FederationNamespace.Name
-
-				// As part of the update, we scale the replicaset here.
-				rs = newReplicaSetWithName(nsName, rs.Name, 15, nil)
-				updateReplicaSetOrFail(f.FederationClientset, rs)
-				waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters, nil)
-				By(fmt.Sprintf("Successfully updated and synced replicaset \"%s/%s\" (%v/%v) to clusters", nsName, rs.Name, rs.Status.Replicas, *rs.Spec.Replicas))
-			})
-
-			It("should be deleted from underlying clusters when OrphanDependents is false", func() {
-				fedframework.SkipUnlessFederated(f.ClientSet)
-				nsName := f.FederationNamespace.Name
-				orphanDependents := false
-				verifyCascadingDeletionForReplicaSet(f.FederationClientset, clusters, &orphanDependents, nsName, rs.Name)
-				By(fmt.Sprintf("Verified that replicasets were deleted from underlying clusters"))
-			})
-
-			It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
-				fedframework.SkipUnlessFederated(f.ClientSet)
-				nsName := f.FederationNamespace.Name
-				orphanDependents := true
-				verifyCascadingDeletionForReplicaSet(f.FederationClientset, clusters, &orphanDependents, nsName, rs.Name)
-				By(fmt.Sprintf("Verified that replicasets were not deleted from underlying clusters"))
-			})
-
-			It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
-				fedframework.SkipUnlessFederated(f.ClientSet)
-				nsName := f.FederationNamespace.Name
-				verifyCascadingDeletionForReplicaSet(f.FederationClientset, clusters, nil, nsName, rs.Name)
-				By(fmt.Sprintf("Verified that replicasets were not deleted from underlying clusters"))
-			})
 		})
 
 		// e2e cases for federated replicaset controller
@@ -248,29 +191,6 @@ func deleteAllReplicaSetsOrFail(clientset *fedclientset.Clientset, nsName string
 	orphanDependents := false
 	for _, replicaset := range replicasetList.Items {
 		deleteReplicaSetOrFail(clientset, nsName, replicaset.Name, &orphanDependents)
-	}
-}
-
-// verifyCascadingDeletionForReplicaSet verifies that replicaSets are deleted
-// from underlying clusters when orphan dependents is false and they are not
-// deleted when orphan dependents is true.
-func verifyCascadingDeletionForReplicaSet(clientset *fedclientset.Clientset, clusters fedframework.ClusterSlice, orphanDependents *bool, nsName, rsName string) {
-	By(fmt.Sprintf("Deleting replica set %s", rsName))
-	deleteReplicaSetOrFail(clientset, nsName, rsName, orphanDependents)
-
-	By(fmt.Sprintf("Verifying replica sets %s in underlying clusters", rsName))
-	errMessages := []string{}
-	for _, cluster := range clusters {
-		clusterName := cluster.Name
-		_, err := cluster.Extensions().ReplicaSets(nsName).Get(rsName, metav1.GetOptions{})
-		if (orphanDependents == nil || *orphanDependents == true) && errors.IsNotFound(err) {
-			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for replica set %s in cluster %s, expected replica set to exist", rsName, clusterName))
-		} else if (orphanDependents != nil && *orphanDependents == false) && (err == nil || !errors.IsNotFound(err)) {
-			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for replica set %s in cluster %s, got error: %v", rsName, clusterName, err))
-		}
-	}
-	if len(errMessages) != 0 {
-		framework.Failf("%s", strings.Join(errMessages, "; "))
 	}
 }
 
