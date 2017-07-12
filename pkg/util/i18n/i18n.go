@@ -49,12 +49,12 @@ var knownTranslations = map[string][]string{
 func loadSystemLanguage() string {
 	langStr := os.Getenv("LANG")
 	if langStr == "" {
-		glog.V(3).Infof("Couldn't find the LANG environment variable, defaulting to en-US")
+		glog.V(3).Infof("Couldn't find the LANG environment variable, defaulting to en_US")
 		return "default"
 	}
 	pieces := strings.Split(langStr, ".")
-	if len(pieces) == 0 {
-		glog.V(3).Infof("Unexpected system language (%s), defaulting to en-US", langStr)
+	if len(pieces) != 2 {
+		glog.V(3).Infof("Unexpected system language (%s), defaulting to en_US", langStr)
 		return "default"
 	}
 	return pieces[0]
