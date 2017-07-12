@@ -23,6 +23,8 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/Azure/azure-sdk-for-go/arm/containerregistry"
+	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/adal"
 	azureapi "github.com/Azure/go-autorest/autorest/azure"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
@@ -94,13 +96,13 @@ func (a *acrProvider) Enabled() bool {
 		return false
 	}
 
-	oauthConfig, err := a.environment.OAuthConfigForTenant(a.config.TenantID)
+	oauthConfig, err := adal.NewOAuthConfig(a.environment.ActiveDirectoryEndpoint, a.config.TenantID)
 	if err != nil {
 		glog.Errorf("Failed to get oauth config: %v", err)
 		return false
 	}
 
-	servicePrincipalToken, err := azureapi.NewServicePrincipalToken(
+	servicePrincipalToken, err := adal.NewServicePrincipalToken(
 		*oauthConfig,
 		a.config.AADClientID,
 		a.config.AADClientSecret,
@@ -112,7 +114,7 @@ func (a *acrProvider) Enabled() bool {
 
 	registryClient := containerregistry.NewRegistriesClient(a.config.SubscriptionID)
 	registryClient.BaseURI = a.environment.ResourceManagerEndpoint
-	registryClient.Authorizer = servicePrincipalToken
+	registryClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	a.registryClient = registryClient
 
 	return true

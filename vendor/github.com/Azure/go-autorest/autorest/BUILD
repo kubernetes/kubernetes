@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "authorization.go",
         "autorest.go",
         "client.go",
         "error.go",
@@ -20,6 +21,7 @@ go_library(
         "version.go",
     ],
     tags = ["automanaged"],
+    deps = ["//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library"],
 )
 
 filegroup(
@@ -33,6 +35,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/github.com/Azure/go-autorest/autorest/adal:all-srcs",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:all-srcs",
         "//vendor/github.com/Azure/go-autorest/autorest/date:all-srcs",
         "//vendor/github.com/Azure/go-autorest/autorest/to:all-srcs",

@@ -13,7 +13,7 @@ go_library(
         "accounts.go",
         "client.go",
         "models.go",
-        "usageoperations.go",
+        "usage.go",
         "version.go",
     ],
     tags = ["automanaged"],
