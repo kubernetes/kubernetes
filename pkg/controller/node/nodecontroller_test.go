@@ -133,6 +133,10 @@ func syncNodeStore(nc *nodeController, fakeNodeHandler *testutil.FakeNodeHandler
 func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	evictionTimeout := 10 * time.Minute
+	labels := map[string]string{
+		kubeletapis.LabelZoneRegion:        "region1",
+		kubeletapis.LabelZoneFailureDomain: "zone1",
+	}
 
 	// Because of the logic that prevents NC from evicting anything when all Nodes are NotReady
 	// we need second healthy node in tests. Because of how the tests are written we need to update
@@ -201,6 +205,42 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			secondNodeNewStatus: healthyNodeNewStatus,
 			expectedEvictPods:   false,
 			description:         "Node created recently, with no status.",
+		},
+		// Node created recently without FailureDomain labels which is added back later, with no status (happens only at cluster startup).
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: fakeNow,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionTrue,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			daemonSets:          nil,
+			timeToPass:          0,
+			newNodeStatus:       v1.NodeStatus{},
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   false,
+			description:         "Node created recently without FailureDomain labels which is added back later, with no status (happens only at cluster startup).",
 		},
 		// Node created long time ago, and kubelet posted NotReady for a short period of time.
 		{
@@ -583,6 +623,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Add(item.timeToPass)} }
 			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
 			item.fakeNodeHandler.Existing[1].Status = item.secondNodeNewStatus
+		}
+		if len(item.fakeNodeHandler.Existing[0].Labels) == 0 && len(item.fakeNodeHandler.Existing[1].Labels) == 0 {
+			item.fakeNodeHandler.Existing[0].Labels = labels
+			item.fakeNodeHandler.Existing[1].Labels = labels
 		}
 		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
