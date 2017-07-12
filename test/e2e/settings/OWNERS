@@ -1,0 +1,11 @@
+approvers:
+- pmorie
+- derekwaynecarr
+- liggitt
+- droot
+reviewers:
+- pmorie
+- derekwaynecarr
+- liggitt
+- droot
+- sig-service-catalog
