@@ -255,7 +255,7 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 		}
 
 		if err := patchNode(r.client, oldData, newData, data.nodeName); err != nil {
-			glog.Errorf("Failed while patching Node.Spec.PodCIDR for node %v (%d retries): %v", node, rep+1, err)
+			glog.Errorf("Failed to patch Node.Spec.PodCIDR for node %v (%d retries): %v", node, rep+1, err)
 		} else {
 			break
 		}
