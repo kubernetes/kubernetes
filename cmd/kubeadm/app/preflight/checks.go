@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"crypto/tls"
@@ -538,6 +539,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		SystemVerificationCheck{},
 		IsRootCheck{},
 		HostnameCheck{},
+		HostResolvesLocalCheck{hostname: "localhost"},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
@@ -601,6 +603,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		SystemVerificationCheck{},
 		IsRootCheck{},
 		HostnameCheck{},
+		HostResolvesLocalCheck{hostname: "localhost"},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		PortOpenCheck{port: 10250},
@@ -665,4 +668,56 @@ func TryStartKubelet() {
 			fmt.Println("[preflight] WARNING: Please ensure kubelet is running manually.")
 		}
 	}
+}
+
+// HostResolvesLocalCheck checks that a given hostname resovles to a local IP address.
+type HostResolvesLocalCheck struct {
+	hostname string
+}
+
+func (lc HostResolvesLocalCheck) Check() (warnings, errors []error) {
+
+	resolvedIPs, err := net.LookupIP(lc.hostname)
+	if err != nil {
+		errors = append(errors, fmt.Errorf("Could not resolve %s: %s", lc.hostname, err))
+		return nil, errors
+	}
+
+	warnings = []error{}
+
+	// Early exit if the address is a loopback address.
+	// note: this does not address the extreme corner case where lo interface is down.
+	for _, ri := range resolvedIPs {
+		if ri.IsLoopback() {
+			return warnings, errors
+		}
+	}
+
+	localIPAddrs, err := net.InterfaceAddrs()
+	if err != nil {
+		errors = append(errors, fmt.Errorf("Could not retrieve interface addresses: %s", err))
+		return nil, errors
+	}
+
+	for _, li := range localIPAddrs {
+		ip, _, err := net.ParseCIDR(li.String())
+		if err != nil {
+			errors = append(errors, fmt.Errorf("Could not parse interface address '%s': %s", li.String(), err))
+			return nil, errors
+		}
+		for _, ri := range resolvedIPs {
+			if ip.Equal(ri) {
+				return warnings, errors
+			}
+		}
+	}
+
+	var resolvedIPStrs []string
+	for _, ip := range resolvedIPs {
+		resolvedIPStrs = append(resolvedIPStrs, ip.String())
+	}
+	warnings = append(warnings, fmt.Errorf("%s resolves to %s, which does not appear to be a local address",
+		lc.hostname, strings.Join(resolvedIPStrs, ", ")))
+
+	return warnings, errors
 }
