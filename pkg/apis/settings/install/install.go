@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/apis/settings/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/settings/v1beta1"
 )
 
 func init() {
@@ -36,12 +37,13 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  settings.GroupName,
-			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
+			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version, v1alpha1.SchemeGroupVersion.Version},
 			ImportPrefix:               "k8s.io/api/settings",
 			AddInternalObjectsToScheme: settings.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
 			v1alpha1.SchemeGroupVersion.Version: v1alpha1.AddToScheme,
+			v1beta1.SchemeGroupVersion.Version:  v1beta1.AddToScheme,
 		},
 	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)

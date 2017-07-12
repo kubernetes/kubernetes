@@ -18,6 +18,7 @@ package rest
 
 import (
 	settingsapiv1alpha1 "k8s.io/api/settings/v1alpha1"
+	settingsapiv1beta1 "k8s.io/api/settings/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -38,12 +39,27 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		apiGroupInfo.VersionedResourcesStorageMap[settingsapiv1alpha1.SchemeGroupVersion.Version] = p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = settingsapiv1alpha1.SchemeGroupVersion
 	}
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(settingsapiv1beta1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[settingsapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.GroupMeta.GroupVersion = settingsapiv1beta1.SchemeGroupVersion
+	}
 
 	return apiGroupInfo, true
 }
 
 func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	version := settingsapiv1alpha1.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("podpresets")) {
+		podPresetStorage := podpresetstore.NewREST(restOptionsGetter)
+		storage["podpresets"] = podPresetStorage
+	}
+	return storage
+}
+
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	version := settingsapiv1beta1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("podpresets")) {
