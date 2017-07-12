@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package storage
 
 import (
 	"k8s.io/api/core/v1"
@@ -50,7 +50,7 @@ const (
 	wrappedVolumeRaceRCNamePrefix            = "wrapped-volume-race-"
 )
 
-var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
+var _ = SIGDescribe("EmptyDir wrapper volumes", func() {
 	f := framework.NewDefaultFramework("emptydir-wrapper")
 
 	It("should not conflict [Volume]", func() {
