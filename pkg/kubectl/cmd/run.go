@@ -88,7 +88,7 @@ var (
 
 func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
+		Use:     `run NAME --image=image [--env="key=value"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]`,
 		Short:   i18n.T("Run a particular image on the cluster"),
 		Long:    runLong,
 		Example: runExample,
@@ -98,44 +98,99 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 			cmdutil.CheckErr(err)
 		},
 	}
-	cmdutil.AddPrinterFlags(cmd)
+
 	addRunFlags(cmd)
-	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddRecordFlag(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
-	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 	return cmd
 }
 
+// addRunFlags is responsible every option available on the "kubectl
+// run" command. However, to perform this task it calls many helpers, some of
+// which are shared with other kubectl commands.
 func addRunFlags(cmd *cobra.Command) {
-	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().String("generator", "", i18n.T("The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."))
-	cmd.Flags().String("image", "", i18n.T("The image for the container to run."))
-	cmd.MarkFlagRequired("image")
-	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"))
-	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
-	cmd.Flags().Bool("rm", false, "If true, delete resources created in this command for attached containers.")
-	cmd.Flags().String("overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
-	cmd.Flags().StringSlice("env", []string{}, "Environment variables to set in the container")
-	cmd.Flags().String("port", "", i18n.T("The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."))
-	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
-	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s).")
-	cmd.Flags().BoolP("stdin", "i", false, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
-	cmd.Flags().BoolP("tty", "t", false, "Allocated a TTY for each container in the pod.")
+	// Flags that are common enough we share the definition with other
+	// commands.
+	// For example, "kubectl create" also supports "pod-running-timeout", a
+	// common creation flag.
+	cmdutil.AddCommonCreationFlags(cmd)
+	cmdutil.AddDeploymentFlags(cmd, "")
+
+	// These are sort of specific to `kubectl run` but some of them are used
+	// in different configurations by other commands.
+	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
+
+	// See the docstrings on these function for details.
+	addFlagsForRunGenerator(cmd)
+	addFlagsForAttaching(cmd)
+}
+
+// addFlagsForAttaching does what it says on the tin.
+// Interestingly enough, we do not have to add the "tty" flag in this function.
+// Said flag is not specific to commands which are attaching. It causes the pod
+// to allocate a TTY, but that TTY may not be used until another command is
+// called.
+func addFlagsForAttaching(cmd *cobra.Command) {
 	cmd.Flags().Bool("attach", false, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true. With '--restart=Never' the exit code of the container process is returned.")
 	cmd.Flags().Bool("leave-stdin-open", false, "If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.")
-	cmd.Flags().String("restart", "Always", i18n.T("The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`."))
-	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
-	cmd.Flags().String("requests", "", i18n.T("The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."))
-	cmd.Flags().String("limits", "", i18n.T("The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."))
-	cmd.Flags().Bool("expose", false, "If true, a public, external service is created for the container(s) which are run")
-	cmd.Flags().String("service-generator", "service/v2", i18n.T("The name of the generator to use for creating a service.  Only used if --expose is true"))
-	cmd.Flags().String("service-overrides", "", i18n.T("An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."))
-	cmd.Flags().Bool("quiet", false, "If true, suppress prompt messages.")
+	cmd.Flags().Bool("rm", false, "If true, delete resources created in this command for attached containers.")
 	cmd.Flags().String("schedule", "", i18n.T("A schedule in the Cron format the job should be run with."))
 }
 
-func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
+// addFlagsForRunGenerator: add flags designed to modify the behavior of the
+// generator based on the user's command-line parameters.
+//
+// TODO(github.com/alexandercampbell): move these into "util/helpers.go" in the
+// function AddDeploymentFlags() and at the same time adjust "kubectl create
+// deployment" to make use of these flags.
+func addFlagsForRunGenerator(cmd *cobra.Command) {
+	// These flags correspond to the flags from the Generator.
+	cmd.Flags().String("overrides", "", i18n.T("Inline JSON override for the generated object. Requires a valid apiVersion field."))
+	cmd.Flags().String("restart", "Always", i18n.T("Legal values are [Always, OnFailure, Never]. If 'Always' create a deployment; if 'OnFailure' create a job; if 'Never', create a regular pod. For the latter two --replicas must be 1. Default 'Always', for CronJobs `Never`."))
+	cmd.Flags().Bool("expose", false, "If true, a public, external service is created for the container(s) which are run")
+	cmd.Flags().String("service-generator", "service/v2", i18n.T("Select a service generator. Ignored unless --expose is provided."))
+	cmd.Flags().String("service-overrides", "", i18n.T("Inline JSON override for the generated service object. Requires a valid apiVersion field. Ignored unless --expose is provided."))
+	cmd.Flags().Bool("quiet", false, "If true, suppress prompt messages.")
+	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s).")
+	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"))
+	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
+	cmd.Flags().String("port", "", i18n.T("The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."))
+	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
+	cmd.Flags().BoolP("tty", "t", false, "Allocated a TTY for each container in the pod.")
+	cmd.Flags().BoolP("stdin", "i", false, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
+	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
+	cmd.Flags().StringSlice("env", []string{}, "Environment variables to set in the container")
+	cmd.Flags().String("requests", "", i18n.T("The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."))
+	cmd.Flags().String("limits", "", i18n.T("The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."))
+}
+
+// RunRun has the following responsibilities:
+//
+//  1. Extract a subset of the values of the flags added in addRunFlags()
+//  2. Validate the combination of flags given to ensure that the flags do not
+//     conflict with each other or represent an impossible state.
+//  3. Process the "generator" and "schedule" flags to determine the appropriate
+//     generator for the deployment.
+//  4. Check that said generator is available on the server (in the case of a
+//     cron generator).
+//  5. Scan through the list of generator parameter names. For each one, attempt
+//     to load a value from the command-line flags (Cobra).
+//  6. Call createGeneratedObject() to make a new deployment with the generator
+//     and parameters now set correctly.
+//  7. If the user provided the "expose" flag, load the "service-generator" flag
+//     and attempt to generate a service with the same namespace & generator
+//     parameters.
+//  8. If the user provided the "attach" flag, scan for a few additional flags
+//     (tty, interactive, quiet, and so on) then attempt to connect to the Pod
+//     containing the deployment. This block in the function seems to "pretend"
+//     it is "kubectl attach".
+//  9. Print a success message including the final object in accordance with the
+//     "output" flag.
+//
+// TODO(github.com/alexandercampbell) I am working to refactor this function
+// into smaller functions and to bring its behavior closer to the behavior of
+// the "kubectl create" family of commands.
+func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer,
+	cmd *cobra.Command, args []string, argsLenAtDash int) error {
+
 	// Let kubectl run follow rules for `--`, see #13004 issue
 	if len(args) == 0 || argsLenAtDash == 0 {
 		return cmdutil.UsageErrorf(cmd, "NAME is required for run")
@@ -146,11 +201,17 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		return cmdutil.UsageErrorf(cmd, "%v", err)
 	}
 
-	// validate image name
-	imageName := cmdutil.GetFlagString(cmd, "image")
-	validImageRef := reference.ReferenceRegexp.MatchString(imageName)
-	if !validImageRef {
-		return fmt.Errorf("Invalid image name %q: %v", imageName, reference.ErrReferenceInvalidFormat)
+	// Validate image name.
+	// TODO(github.com/alexandercampbell): support multiple images here in
+	// "run", just as we do in "create deployment".
+	imageNames := cmdutil.GetFlagStringSlice(cmd, "image")
+	if len(imageNames) != 1 {
+		return fmt.Errorf("Exactly one image name is required")
+	}
+	imageName := imageNames[0]
+	if !reference.ReferenceRegexp.MatchString(imageName) {
+		return fmt.Errorf("Invalid image name %q: %v",
+			imageName, reference.ErrReferenceInvalidFormat)
 	}
 
 	interactive := cmdutil.GetFlagBool(cmd, "stdin")
@@ -562,7 +623,11 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 	return nil
 }
 
-func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kubectl.Generator, names []kubectl.GeneratorParam, params map[string]interface{}, overrides, namespace string) (runtime.Object, string, meta.RESTMapper, *meta.RESTMapping, error) {
+func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command,
+	generator kubectl.Generator, names []kubectl.GeneratorParam,
+	params map[string]interface{}, overrides, namespace string,
+) (runtime.Object, string, meta.RESTMapper, *meta.RESTMapping, error) {
+
 	err := kubectl.ValidateParams(names, params)
 	if err != nil {
 		return nil, "", nil, nil, err

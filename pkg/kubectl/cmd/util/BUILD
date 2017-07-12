@@ -43,6 +43,7 @@ go_library(
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/util/exec:go_default_library",
+        "//pkg/util/i18n:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",

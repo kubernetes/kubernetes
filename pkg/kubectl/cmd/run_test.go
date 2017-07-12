@@ -23,10 +23,10 @@ import (
 	"net/http"
 	"os"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 func TestGetRestartPolicy(t *testing.T) {
@@ -82,7 +81,7 @@ func TestGetRestartPolicy(t *testing.T) {
 	}
 	for _, test := range tests {
 		cmd := &cobra.Command{}
-		cmd.Flags().String("restart", "", i18n.T("dummy restart flag)"))
+		cmd.Flags().String("restart", "", "dummy restart flag")
 		cmd.Flags().Lookup("restart").Value.Set(test.input)
 		policy, err := getRestartPolicy(cmd, test.interactive)
 		if test.expectErr && err == nil {
@@ -320,10 +319,6 @@ func TestGenerateService(t *testing.T) {
 			}),
 		}
 		cmd := &cobra.Command{}
-		cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
-		cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
-		cmdutil.AddPrinterFlags(cmd)
-		cmdutil.AddInclude3rdPartyFlags(cmd)
 		addRunFlags(cmd)
 
 		if !test.expectPOST {
@@ -363,7 +358,7 @@ func TestRunValidations(t *testing.T) {
 		},
 		{
 			args:        []string{"test"},
-			expectedErr: "Invalid image name",
+			expectedErr: "Exactly one image name is required",
 		},
 		{
 			args: []string{"test"},
@@ -425,7 +420,11 @@ func TestRunValidations(t *testing.T) {
 		tf.Client = &fake.RESTClient{
 			APIRegistry:          api.Registry,
 			NegotiatedSerializer: ns,
-			Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", ""))},
+			Resp: &http.Response{
+				StatusCode: 200,
+				Header:     defaultHeader(),
+				Body:       objBody(codec, cmdtesting.NewInternalType("", "", "")),
+			},
 		}
 		tf.Namespace = "test"
 		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
@@ -433,15 +432,15 @@ func TestRunValidations(t *testing.T) {
 		outBuf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 
+		t.Logf("pretending to run kubectl with flags: %+v", test.flags)
 		cmd := NewCmdRun(f, inBuf, outBuf, errBuf)
 		for flagName, flagValue := range test.flags {
 			cmd.Flags().Set(flagName, flagValue)
 		}
+
 		err := RunRun(f, inBuf, outBuf, errBuf, cmd, test.args, cmd.ArgsLenAtDash())
 		if err != nil && len(test.expectedErr) > 0 {
-			if !strings.Contains(err.Error(), test.expectedErr) {
-				t.Errorf("unexpected error: %v", err)
-			}
+			assert.Contains(t, err.Error(), test.expectedErr)
 		}
 	}
 

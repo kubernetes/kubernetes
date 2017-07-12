@@ -54,12 +54,13 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.
 			cmdutil.CheckErr(err)
 		},
 	}
-	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, cmdutil.DeploymentBasicV1Beta1GeneratorName)
-	cmd.Flags().StringSlice("image", []string{}, "Image name to run.")
-	cmd.MarkFlagRequired("image")
+
+	cmdutil.AddCommonCreationFlags(cmd)
+
+	// all the other flags we need already exist in our parent command
+	// "kubectl create"
+	cmdutil.AddDeploymentFlags(cmd, cmdutil.DeploymentBasicV1Beta1GeneratorName)
+
 	return cmd
 }
 
@@ -79,9 +80,7 @@ func fallbackGeneratorNameIfNecessary(
 		!contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
 
 		fmt.Fprintf(cmdErr,
-			"WARNING: New deployments generator %q specified, "+
-				"but apps/v1beta1.Deployments are not available. "+
-				"Falling back to %q.\n",
+			"WARNING: New deployments generator %q specified, but apps/v1beta1.Deployments are not available. Falling back to %q.\n",
 			cmdutil.DeploymentBasicAppsV1Beta1GeneratorName,
 			cmdutil.DeploymentBasicV1Beta1GeneratorName,
 		)

@@ -847,23 +847,19 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 	return &pod, nil
 }
 
-// parseEnvs converts string into EnvVar objects.
+// parseEnvs converts a list of strings into EnvVar objects.
+// The strings should be of the form `key=value`.
 func parseEnvs(envArray []string) ([]v1.EnvVar, error) {
 	envs := make([]v1.EnvVar, 0, len(envArray))
 	for _, env := range envArray {
-		pos := strings.Index(env, "=")
-		if pos == -1 {
-			return nil, fmt.Errorf("invalid env: %v", env)
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("no equals sign in EnvVar: %v", env)
 		}
-		name := env[:pos]
-		value := env[pos+1:]
-		if len(name) == 0 {
-			return nil, fmt.Errorf("invalid env: %v", env)
+		envVar := v1.EnvVar{Name: parts[0], Value: parts[1]}
+		if len(validation.IsCIdentifier(envVar.Name)) != 0 {
+			return nil, fmt.Errorf("%q is not a valid environment variable name", env)
 		}
-		if len(validation.IsCIdentifier(name)) != 0 {
-			return nil, fmt.Errorf("invalid env: %v", env)
-		}
-		envVar := v1.EnvVar{Name: name, Value: value}
 		envs = append(envs, envVar)
 	}
 	return envs, nil
