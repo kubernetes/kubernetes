@@ -35,15 +35,19 @@ import (
 
 	"github.com/PuerkitoBio/purell"
 	"github.com/blang/semver"
+	"github.com/spf13/pflag"
 
 	"net/url"
 
+	apiservoptions "k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/api/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	"k8s.io/kubernetes/pkg/util/node"
+	schoptions "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
@@ -313,6 +317,46 @@ func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
+// ExtraArgsCheck checks if arguments are valid.
+type ExtraArgsCheck struct {
+	APIServerExtraArgs         map[string]string
+	ControllerManagerExtraArgs map[string]string
+	SchedulerExtraArgs         map[string]string
+}
+
+func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
+	argsCheck := func(name string, args map[string]string, f *pflag.FlagSet) []error {
+		errs := []error{}
+		for k, v := range args {
+			if err := f.Set(k, v); err != nil {
+				errs = append(errs, fmt.Errorf("%s: failed to parse extra argument --%s=%s", name, k, v))
+			}
+		}
+		return errs
+	}
+
+	warnings = []error{}
+	if len(eac.APIServerExtraArgs) > 0 {
+		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+		s := apiservoptions.NewServerRunOptions()
+		s.AddFlags(flags)
+		warnings = append(warnings, argsCheck("kube-apiserver", eac.APIServerExtraArgs, flags)...)
+	}
+	if len(eac.ControllerManagerExtraArgs) > 0 {
+		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+		s := cmoptions.NewCMServer()
+		s.AddFlags(flags, []string{}, []string{})
+		warnings = append(warnings, argsCheck("kube-controller-manager", eac.ControllerManagerExtraArgs, flags)...)
+	}
+	if len(eac.SchedulerExtraArgs) > 0 {
+		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+		s := schoptions.NewSchedulerServer()
+		s.AddFlags(flags)
+		warnings = append(warnings, argsCheck("kube-scheduler", eac.SchedulerExtraArgs, flags)...)
+	}
+	return warnings, nil
+}
+
 type SystemVerificationCheck struct{}
 
 func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
@@ -514,6 +558,11 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		InPathCheck{executable: "socat", mandatory: false},
 		InPathCheck{executable: "tc", mandatory: false},
 		InPathCheck{executable: "touch", mandatory: false},
+		ExtraArgsCheck{
+			APIServerExtraArgs:         cfg.APIServerExtraArgs,
+			ControllerManagerExtraArgs: cfg.ControllerManagerExtraArgs,
+			SchedulerExtraArgs:         cfg.SchedulerExtraArgs,
+		},
 	}
 
 	if len(cfg.Etcd.Endpoints) == 0 {
