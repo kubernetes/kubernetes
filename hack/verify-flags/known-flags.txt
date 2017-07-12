@@ -334,6 +334,7 @@ http-port
 ignore-daemonsets
 ignore-not-found
 image-config-file
+image-description
 image-gc-high-threshold
 image-gc-low-threshold
 image-project
