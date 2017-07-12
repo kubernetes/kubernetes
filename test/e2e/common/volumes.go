@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("NFSv4", func() {
-		It("should be mountable for NFSv4 [Volume]", func() {
+		It("should be mountable for NFSv4 [sig-storage]", func() {
 
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
@@ -114,7 +114,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	})
 
 	framework.KubeDescribe("NFSv3", func() {
-		It("should be mountable for NFSv3 [Volume]", func() {
+		It("should be mountable for NFSv3 [sig-storage]", func() {
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
 				Prefix:      "nfs",
@@ -153,7 +153,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("GlusterFS", func() {
-		It("should be mountable [Volume]", func() {
+		It("should be mountable [sig-storage]", func() {
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
 				Prefix:      "gluster",
