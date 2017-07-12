@@ -1025,6 +1025,8 @@ func newInt32(val int) *int32 {
 // type on its own, but we want to also make sure that the logic works through
 // the one-of wrapper, so we just do it all in one place.
 func TestValidateVolumes(t *testing.T) {
+	validInitiatorName := "iqn.2015-02.example.com:init"
+	invalidInitiatorName := "2015-02.example.com:init"
 	testCases := []struct {
 		name      string
 		vol       api.Volume
@@ -1269,6 +1271,36 @@ func TestValidateVolumes(t *testing.T) {
 			},
 		},
 		{
+			name: "valid IQN: eui format",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "eui.0123456789ABCDEF",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+		},
+		{
+			name: "valid IQN: naa format",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "naa.62004567BA64678D0123456789ABCDEF",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+		},
+		{
 			name: "empty portal",
 			vol: api.Volume{
 				Name: "iscsi",
@@ -1301,6 +1333,91 @@ func TestValidateVolumes(t *testing.T) {
 			},
 			errtype:  field.ErrorTypeRequired,
 			errfield: "iscsi.iqn",
+		},
+		{
+			name: "invalid IQN: iqn format",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "iqn.2015-02.example.com:test;ls;",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "iscsi.iqn",
+		},
+		{
+			name: "invalid IQN: eui format",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "eui.0123456789ABCDEFGHIJ",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "iscsi.iqn",
+		},
+		{
+			name: "invalid IQN: naa format",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "naa.62004567BA_4-78D.123456789ABCDEF",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "iscsi.iqn",
+		},
+		{
+			name: "valid initiatorName",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal:  "127.0.0.1",
+						IQN:           "iqn.2015-02.example.com:test",
+						Lun:           1,
+						InitiatorName: &validInitiatorName,
+						FSType:        "ext4",
+						ReadOnly:      false,
+					},
+				},
+			},
+		},
+		{
+			name: "invalid initiatorName",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal:  "127.0.0.1",
+						IQN:           "iqn.2015-02.example.com:test",
+						Lun:           1,
+						InitiatorName: &invalidInitiatorName,
+						FSType:        "ext4",
+						ReadOnly:      false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "iscsi.initiatorname",
 		},
 		{
 			name: "empty secret",
@@ -2475,7 +2592,7 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 		return
 	}
 	for _, tc := range testCases {
-		if errs := validateVolumeSource(&tc, field.NewPath("spec")); len(errs) != 0 {
+		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol"); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -2486,7 +2603,7 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 		return
 	}
 	for _, tc := range testCases {
-		if errs := validateVolumeSource(&tc, field.NewPath("spec")); len(errs) == 0 {
+		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol"); len(errs) == 0 {
 			t.Errorf("expected failure: %v", errs)
 		}
 	}
