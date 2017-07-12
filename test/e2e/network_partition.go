@@ -41,6 +41,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	timeout = 60 * time.Second
+)
+
 func expectNodeReadiness(isReady bool, newNode chan *v1.Node) {
 	timeout := false
 	expected := false
