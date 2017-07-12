@@ -73,7 +73,7 @@ func (sp *summaryProviderImpl) Get() (*stats.Summary, error) {
 		}
 	}
 
-	// TODO(timstclair): Consider returning a best-effort response if any of the following errors
+	// TODO(tallclair): Consider returning a best-effort response if any of the following errors
 	// occur.
 	node, err := sp.provider.GetNode()
 	if err != nil {
