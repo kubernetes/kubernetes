@@ -118,6 +118,7 @@ filegroup(
         ":package-srcs",
         "//cmd/kube-apiserver/app/options:all-srcs",
         "//cmd/kube-apiserver/app/preflight:all-srcs",
+        "//cmd/kube-apiserver/app/testing:all-srcs",
     ],
     tags = ["automanaged"],
 )
