@@ -220,7 +220,7 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 					Containers: []v1.Container{
 						{
 							Name:          "self-hosted-" + kubeAPIServer,
-							Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+							Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, cfg.UnifiedControlPlaneImage),
 							Command:       getAPIServerCommand(cfg, true, kubeVersion),
 							Env:           getSelfHostedAPIServerEnv(),
 							VolumeMounts:  volumeMounts,
@@ -272,7 +272,7 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 					Containers: []v1.Container{
 						{
 							Name:          "self-hosted-" + kubeControllerManager,
-							Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+							Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, cfg.UnifiedControlPlaneImage),
 							Command:       getControllerManagerCommand(cfg, true, kubeVersion),
 							VolumeMounts:  volumeMounts,
 							LivenessProbe: componentProbe(10252, "/healthz", v1.URISchemeHTTP),
@@ -324,7 +324,7 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Vo
 					Containers: []v1.Container{
 						{
 							Name:          "self-hosted-" + kubeScheduler,
-							Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+							Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, cfg.UnifiedControlPlaneImage),
 							Command:       getSchedulerCommand(cfg, true),
 							VolumeMounts:  volumeMounts,
 							LivenessProbe: componentProbe(10251, "/healthz", v1.URISchemeHTTP),

@@ -27,7 +27,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	nodeutil "k8s.io/client-go/pkg/api/v1/node"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -68,7 +67,7 @@ func Validate(kubeconfigPath string) error {
 
 func createAndWaitForADummyDeployment(client *clientset.Clientset) error {
 	dummyDeploymentBytes, err := kubeadmutil.ParseTemplate(DummyDeployment, struct{ ImageRepository, Arch string }{
-		ImageRepository: kubeadmapi.GlobalEnvParams.RepositoryPrefix,
+		ImageRepository: "gcr.io/google_containers",
 		Arch:            runtime.GOARCH,
 	})
 	if err != nil {
