@@ -287,7 +287,7 @@ var _ = SIGDescribe("PersistentVolumes", func() {
 			// This It() tests a scenario where a PV is written to by a Pod, recycled, then the volume checked
 			// for files. If files are found, the checking Pod fails, failing the test.  Otherwise, the pod
 			// (and test) succeed.
-			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Volume]", func() {
+			It("should test that a PV becomes Available and is clean after the PVC is deleted.", func() {
 				By("Writing to the volume.")
 				pod := framework.MakeWritePod(ns, pvc)
 				pod, err = c.CoreV1().Pods(ns).Create(pod)

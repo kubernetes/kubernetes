@@ -79,7 +79,7 @@ func DeleteCinderVolume(name string) error {
 }
 
 // These tests need privileged containers, which are disabled by default.
-var _ = SIGDescribe("Volumes [Volume]", func() {
+var _ = SIGDescribe("Volumes", func() {
 	f := framework.NewDefaultFramework("volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,

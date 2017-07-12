@@ -46,7 +46,7 @@ const (
 	kRestart         kubeletOpt = "restart"
 )
 
-var _ = SIGDescribe("PersistentVolumes [Volume][Disruptive][Flaky]", func() {
+var _ = SIGDescribe("PersistentVolumes[Disruptive][Flaky]", func() {
 
 	f := framework.NewDefaultFramework("disruptive-pv")
 	var (
