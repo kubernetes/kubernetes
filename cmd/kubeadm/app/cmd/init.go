@@ -123,6 +123,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.APIServerCertSANs, "apiserver-cert-extra-sans", cfg.APIServerCertSANs,
 		`Optional extra altnames to use for the API Server serving cert. Can be both IP addresses and dns names.`,
 	)
+	cmd.PersistentFlags().StringVar(
+		&cfg.NodeName, "node-name", cfg.NodeName,
+		`Specify the node name`,
+	)
 
 	cmd.PersistentFlags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
 
@@ -220,7 +224,7 @@ func (i *Init) Run(out io.Writer) error {
 	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
 
 	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddress, i.cfg.API.BindPort)
-	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, i.cfg.CertificatesDir, kubeadmapi.GlobalEnvParams.KubernetesDir)
+	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, i.cfg.CertificatesDir, kubeadmapi.GlobalEnvParams.KubernetesDir, i.cfg.NodeName)
 	if err != nil {
 		return err
 	}
@@ -236,7 +240,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	if err := apiconfigphase.UpdateMasterRoleLabelsAndTaints(client); err != nil {
+	if err := apiconfigphase.UpdateMasterRoleLabelsAndTaints(client, i.cfg.NodeName); err != nil {
 		return err
 	}
 
