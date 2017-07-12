@@ -71,6 +71,7 @@ function run-checks {
   done
 }
 
+SILENT=true
 while getopts ":v" opt; do
   case ${opt} in
     v)
