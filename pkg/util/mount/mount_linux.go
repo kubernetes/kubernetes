@@ -161,6 +161,15 @@ func (*Mounter) List() ([]MountPoint, error) {
 	return listProcMounts(procMountsPath)
 }
 
+func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
+	return ((mp.Path == dir) || (mp.Path == deletedDir))
+}
+
+func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
+	return IsNotMountPoint(mounter, dir)
+}
+
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
 // It is fast but not necessarily ALWAYS correct. If the path is in fact
 // a bind mount from one part of a mount to another it will not be detected.
@@ -168,10 +177,6 @@ func (*Mounter) List() ([]MountPoint, error) {
 // will return true. When in fact /tmp/b is a mount point. If this situation
 // if of interest to you, don't use this function...
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
-	return IsNotMountPoint(file)
-}
-
-func IsNotMountPoint(file string) (bool, error) {
 	stat, err := os.Stat(file)
 	if err != nil {
 		return true, err
