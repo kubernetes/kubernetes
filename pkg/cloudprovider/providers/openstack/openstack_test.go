@@ -18,9 +18,6 @@ package openstack
 
 import (
 	"fmt"
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"os"
 	"reflect"
 	"sort"
@@ -28,7 +25,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"k8s.io/api/core/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -540,6 +541,45 @@ func TestCinderAutoDetectApiVersion(t *testing.T) {
 	for _, suite := range testCases {
 		if autodetectedVersion := doBsApiVersionAutodetect(suite.test_case); autodetectedVersion != suite.wanted_result {
 			t.Fatalf("Autodetect for suite: %s, failed with result: '%s', wanted '%s'", suite.test_case, autodetectedVersion, suite.wanted_result)
+		}
+	}
+}
+
+func TestInstanceIDFromProviderID(t *testing.T) {
+	testCases := []struct {
+		providerID string
+		instanceID string
+		fail       bool
+	}{
+		{
+			providerID: "openstack://7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "7b9cf879-7146-417c-abfd-cb4272f0c935",
+			fail:       false,
+		},
+		{
+			providerID: "7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "",
+			fail:       true,
+		},
+		{
+			providerID: "other-provider://7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "",
+			fail:       true,
+		},
+	}
+
+	for _, test := range testCases {
+		instanceID, err := instanceIDFromProviderID(test.providerID)
+		if (err != nil) != test.fail {
+			t.Errorf("%s yielded `err != nil` as %t. expected %t", test.providerID, (err != nil), test.fail)
+		}
+
+		if test.fail {
+			continue
+		}
+
+		if instanceID != test.instanceID {
+			t.Errorf("%s yielded %s. expected %s", test.providerID, instanceID, test.instanceID)
 		}
 	}
 }
