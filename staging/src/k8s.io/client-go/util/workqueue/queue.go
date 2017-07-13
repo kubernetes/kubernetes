@@ -79,7 +79,7 @@ func (s set) insert(item t) {
 	s[item] = empty{}
 }
 
-func (s set) delete(item t) {
+func (s set) del(item t) {
 	delete(s, item)
 }
 
@@ -133,7 +133,7 @@ func (q *Type) Get() (item interface{}, shutdown bool) {
 	q.metrics.get(item)
 
 	q.processing.insert(item)
-	q.dirty.delete(item)
+	q.dirty.del(item)
 
 	return item, false
 }
@@ -147,7 +147,7 @@ func (q *Type) Done(item interface{}) {
 
 	q.metrics.done(item)
 
-	q.processing.delete(item)
+	q.processing.del(item)
 	if q.dirty.has(item) {
 		q.queue = append(q.queue, item)
 		q.cond.Signal()
