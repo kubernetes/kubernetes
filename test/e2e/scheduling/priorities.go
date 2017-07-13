@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_common"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -188,7 +188,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			}
 			return node.Annotations[v1.PreferAvoidPodsAnnotationKey] == string(val)
 		}
-		success, err := common.ObserveNodeUpdateAfterAction(f, nodeName, predicate, action)
+		success, err := e2e_common.ObserveNodeUpdateAfterAction(f, nodeName, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
 

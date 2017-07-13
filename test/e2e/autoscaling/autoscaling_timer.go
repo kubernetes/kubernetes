@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_common"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -89,15 +89,15 @@ var _ = framework.KubeDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] A
 				nodeMemoryMB := (&nodeMemoryBytes).Value() / 1024 / 1024
 				memRequestMB := nodeMemoryMB / 10 // Ensure each pod takes not more than 10% of node's total memory.
 				replicas := 1
-				resourceConsumer := common.NewDynamicResourceConsumer("resource-consumer", common.KindDeployment, replicas, 0, 0, 0, cpuRequestMillis, memRequestMB, f)
+				resourceConsumer := e2e_common.NewDynamicResourceConsumer("resource-consumer", e2e_common.KindDeployment, replicas, 0, 0, 0, cpuRequestMillis, memRequestMB, f)
 				defer resourceConsumer.CleanUp()
 				resourceConsumer.WaitForReplicas(replicas, 1*time.Minute) // Should finish ~immediately, so 1 minute is more than enough.
 
 				// Enable Horizontal Pod Autoscaler with 50% target utilization and
 				// scale up the CPU usage to trigger autoscaling to 8 pods for target to be satisfied.
 				targetCpuUtilizationPercent := int32(50)
-				hpa := common.CreateCPUHorizontalPodAutoscaler(resourceConsumer, targetCpuUtilizationPercent, 1, 10)
-				defer common.DeleteHorizontalPodAutoscaler(resourceConsumer, hpa.Name)
+				hpa := e2e_common.CreateCPUHorizontalPodAutoscaler(resourceConsumer, targetCpuUtilizationPercent, 1, 10)
+				defer e2e_common.DeleteHorizontalPodAutoscaler(resourceConsumer, hpa.Name)
 				cpuLoad := 8 * cpuRequestMillis * int64(targetCpuUtilizationPercent) / 100 // 8 pods utilized to the target level
 				resourceConsumer.ConsumeCPU(int(cpuLoad))
 

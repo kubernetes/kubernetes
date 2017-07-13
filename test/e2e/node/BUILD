@@ -21,8 +21,8 @@ go_library(
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
-        "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e_common:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

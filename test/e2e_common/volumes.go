@@ -40,7 +40,7 @@ limitations under the License.
 // GlusterFS test is duplicated from test/e2e/volumes.go.  Any changes made there
 // should be duplicated here
 
-package common
+package e2e_common
 
 import (
 	"k8s.io/api/core/v1"

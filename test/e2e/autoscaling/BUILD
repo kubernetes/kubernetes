@@ -18,9 +18,9 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/scheduling:go_default_library",
+        "//test/e2e_common:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

@@ -37,8 +37,8 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientset "k8s.io/client-go/kubernetes"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	commontest "k8s.io/kubernetes/test/e2e_common"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	"k8s.io/kubernetes/test/e2e_node/system"
 

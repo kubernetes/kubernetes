@@ -21,15 +21,15 @@ import (
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_common"
 
 	. "github.com/onsi/ginkgo"
 )
 
 // HPAUpgradeTest tests that HPA rescales target resource correctly before and after a cluster upgrade.
 type HPAUpgradeTest struct {
-	rc  *common.ResourceConsumer
+	rc  *e2e_common.ResourceConsumer
 	hpa *autoscalingv1.HorizontalPodAutoscaler
 }
 
@@ -37,9 +37,9 @@ func (HPAUpgradeTest) Name() string { return "hpa-upgrade" }
 
 // Creates a resource consumer and an HPA object that autoscales the consumer.
 func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
-	t.rc = common.NewDynamicResourceConsumer(
+	t.rc = e2e_common.NewDynamicResourceConsumer(
 		"res-cons-upgrade",
-		common.KindRC,
+		e2e_common.KindRC,
 		1,   /* replicas */
 		250, /* initCPUTotal */
 		0,
@@ -47,7 +47,7 @@ func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
 		500, /* cpuLimit */
 		200, /* memLimit */
 		f)
-	t.hpa = common.CreateCPUHorizontalPodAutoscaler(
+	t.hpa = e2e_common.CreateCPUHorizontalPodAutoscaler(
 		t.rc,
 		20, /* targetCPUUtilizationPercent */
 		1,  /* minPods */
@@ -68,7 +68,7 @@ func (t *HPAUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgr
 // Teardown cleans up any remaining resources.
 func (t *HPAUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
-	common.DeleteHorizontalPodAutoscaler(t.rc, t.hpa.Name)
+	e2e_common.DeleteHorizontalPodAutoscaler(t.rc, t.hpa.Name)
 	t.rc.CleanUp()
 }
 
