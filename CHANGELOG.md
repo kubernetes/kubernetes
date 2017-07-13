@@ -1096,6 +1096,9 @@ JSON API clients should tolerate `null` values for such fields, and treat `null`
 
 * Local volume source paths that are directories and not mount points fail to unmount.  A fix is in process ([#48331](https://github.com/kubernetes/kubernetes/issues/48331)).
 
+* Services of type LoadBalancer (on GCE/GKE) that have static IP addresses will cause the Service Controller to panic and thereby causing the kube-controller-manager to crash loop.
+([#48848](https://github.com/kubernetes/kubernetes/issues/48848))
+
 ## **Deprecations**
 
 ### Cluster provisioning scripts
