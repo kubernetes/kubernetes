@@ -25,13 +25,20 @@ import (
 	apiserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
-// List holds a list of objects, which may not be known by the server.
+// List and ListV1 should be kept in sync with k8s.io/kubernetes/pkg/api#List
+// and k8s.io/api/core/v1#List.
 type List struct {
 	metav1.TypeMeta
-	// +optional
 	metav1.ListMeta
 
 	Items []runtime.Object
+}
+
+type ListV1 struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	Items []runtime.RawExtension `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 func TestScheme() (*runtime.Scheme, apiserializer.CodecFactory) {
