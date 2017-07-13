@@ -313,6 +313,66 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		It("should run the container with uid 0", func() {
 			createAndWaitUserPod(0)
 		})
+	})
 
+	Context("When creating a pod with readOnlyRootFilesystem", func() {
+		makeUserPod := func(podName, image string, command []string, readOnlyRootFilesystem bool) *v1.Pod {
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Image:   image,
+							Name:    podName,
+							Command: command,
+							SecurityContext: &v1.SecurityContext{
+								ReadOnlyRootFilesystem: &readOnlyRootFilesystem,
+							},
+						},
+					},
+				},
+			}
+		}
+		createAndWaitUserPod := func(readOnlyRootFilesystem bool) string {
+			podName := fmt.Sprintf("busybox-readonly-%v-%s", readOnlyRootFilesystem, uuid.NewUUID())
+			podClient.Create(makeUserPod(podName,
+				"gcr.io/google_containers/busybox:1.24",
+				[]string{"sh", "-c", "touch checkfile && [ -f checkfile ] && echo Found || true"},
+				readOnlyRootFilesystem,
+			))
+
+			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+
+			return podName
+		}
+
+		It("should run the container with readonly rootfs when readOnlyRootFilesystem=true", func() {
+			podName := createAndWaitUserPod(true)
+			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
+			if err != nil {
+				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+			}
+
+			framework.Logf("Got logs for pod %q: %q", podName, logs)
+			if strings.Contains(logs, "Found") {
+				framework.Failf("readonly-rootfs container shouldn't be able to write files")
+			}
+		})
+
+		It("should run the container with writable rootfs when readOnlyRootFilesystem=false", func() {
+			podName := createAndWaitUserPod(false)
+			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
+			if err != nil {
+				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+			}
+
+			framework.Logf("Got logs for pod %q: %q", podName, logs)
+			if !strings.Contains(logs, "Found") {
+				framework.Failf("non-readonly-rootfs container should be able to write files")
+			}
+		})
 	})
 })
