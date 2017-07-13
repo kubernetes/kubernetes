@@ -130,7 +130,7 @@ func TestUpdateMasterRoleLabelsAndTaints(t *testing.T) {
 			t.Fatalf("UpdateMasterRoleLabelsAndTaints(%s): unexpected error building clientset: %v", tc.name, err)
 		}
 
-		err = UpdateMasterRoleLabelsAndTaints(cs)
+		err = UpdateMasterRoleLabelsAndTaints(cs, hostname)
 		if err != nil {
 			t.Errorf("UpdateMasterRoleLabelsAndTaints(%s) returned unexpected error: %v", tc.name, err)
 		}

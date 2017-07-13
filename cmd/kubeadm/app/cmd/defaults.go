@@ -27,6 +27,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -76,6 +77,9 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 			return fmt.Errorf("couldn't generate random token: %v", err)
 		}
 	}
+
+	// Use cfg.NodeName if set, otherwise get that from os.Hostname(). This also makes sure the hostname is lower-cased
+	cfg.NodeName = node.GetHostname(cfg.NodeName)
 
 	return nil
 }

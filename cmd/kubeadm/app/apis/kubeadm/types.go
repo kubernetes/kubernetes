@@ -37,6 +37,7 @@ type MasterConfiguration struct {
 	Networking         Networking
 	KubernetesVersion  string
 	CloudProvider      string
+	NodeName           string
 	AuthorizationModes []string
 
 	Token    string
@@ -93,6 +94,7 @@ type NodeConfiguration struct {
 	DiscoveryToken string
 	// Currently we only pay attention to one api server but hope to support >1 in the future
 	DiscoveryTokenAPIServers []string
+	NodeName                 string
 	TLSBootstrapToken        string
 	Token                    string
 }
