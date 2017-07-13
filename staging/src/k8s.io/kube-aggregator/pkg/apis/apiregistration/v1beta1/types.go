@@ -112,8 +112,6 @@ type APIServiceCondition struct {
 type APIServiceStatus struct {
 	// Current service state of apiService.
 	// +optional
-	// +patchMergeKey=type
-	// +patchStrategy=merge
 	Conditions []APIServiceCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
