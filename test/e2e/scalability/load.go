@@ -61,6 +61,7 @@ const (
 	nodeCountPerNamespace = 100
 	// How many threads will be used to create/delete services during this test.
 	serviceOperationsParallelism = 1
+	svcLabelKey                  = "svc-label"
 )
 
 var randomKind = schema.GroupKind{Kind: "Random"}
@@ -458,6 +459,8 @@ func GenerateConfigsForGroup(
 			MemRequest:     26214400, // 25MB
 			SecretNames:    secretNames,
 			ConfigMapNames: configMapNames,
+			// Define a label to group every 2 RCs into one service.
+			Labels: map[string]string{svcLabelKey: groupName + "-" + strconv.Itoa((i+1)/2)},
 		}
 
 		if kind == randomKind {
@@ -483,10 +486,19 @@ func GenerateConfigsForGroup(
 }
 
 func generateServicesForConfigs(configs []testutils.RunObjectConfig) []*v1.Service {
-	services := make([]*v1.Service, 0, len(configs))
+	services := make([]*v1.Service, 0)
+	currentSvcLabel := ""
 	for _, config := range configs {
+		svcLabel, found := config.GetLabelValue(svcLabelKey)
+		if !found || svcLabel == currentSvcLabel {
+			continue
+		}
+		currentSvcLabel = svcLabel
 		serviceName := config.GetName() + "-svc"
-		labels := map[string]string{"name": config.GetName()}
+		labels := map[string]string{
+			"name":      config.GetName(),
+			svcLabelKey: currentSvcLabel,
+		}
 		service := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
