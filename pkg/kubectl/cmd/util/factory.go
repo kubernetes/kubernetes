@@ -224,6 +224,9 @@ type ObjectMappingFactory interface {
 	// AttachablePodForObject returns the pod to which to attach given an object.
 	AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error)
 
+	// MostAccuratePodTemplateForObject return a pod template given an object.
+	MostAccuratePodTemplateForObject(object runtime.Object) (*api.PodTemplateSpec, error)
+
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool, openapi bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
@@ -290,7 +293,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
 
 // GetFirstPod returns a pod matching the namespace and label selector
 // and the number of all pods that match the label selector.
-func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels.Selector, timeout time.Duration, sortBy func([]*v1.Pod) sort.Interface) (*api.Pod, int, error) {
+func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels.Selector, timeout time.Duration, wait bool, sortBy func([]*v1.Pod) sort.Interface) (*api.Pod, int, error) {
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 
 	podList, err := client.Pods(namespace).List(options)
@@ -310,7 +313,9 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels
 		apiv1.Convert_v1_Pod_To_api_Pod(pods[0], internalPod, nil)
 		return internalPod, len(podList.Items), nil
 	}
-
+	if !wait {
+		return nil, 0, nil
+	}
 	// Watch until we observe a pod
 	options.ResourceVersion = podList.ResourceVersion
 	w, err := client.Pods(namespace).Watch(options)
