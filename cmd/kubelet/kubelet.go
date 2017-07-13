@@ -31,9 +31,9 @@ import (
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 	"k8s.io/kubernetes/pkg/version/verflag"
@@ -76,7 +76,7 @@ func main() {
 		die(err)
 	}
 	// if dynamic kubelet config is enabled, bootstrap the kubelet config controller
-	var kubeletConfig *componentconfig.KubeletConfiguration
+	var kubeletConfig *kubeletconfiginternal.KubeletConfiguration
 	var kubeletConfigController *kubeletconfig.Controller
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		var err error

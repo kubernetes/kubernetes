@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/apis/componentconfig/validation"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
 )
 
 const (

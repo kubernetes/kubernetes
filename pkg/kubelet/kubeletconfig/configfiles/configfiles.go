@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	utilfs "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/filesystem"
 )
@@ -28,7 +28,7 @@ import (
 // Loader loads configuration from a storage layer
 type Loader interface {
 	// Load loads and returns the KubeletConfiguration from the storage layer, or an error if a configuration could not be loaded
-	Load() (*componentconfig.KubeletConfiguration, error)
+	Load() (*kubeletconfig.KubeletConfiguration, error)
 }
 
 // fsLoader loads configuration from `configDir`
@@ -47,7 +47,7 @@ func NewFSLoader(fs utilfs.Filesystem, configDir string) Loader {
 	}
 }
 
-func (loader *fsLoader) Load() (*componentconfig.KubeletConfiguration, error) {
+func (loader *fsLoader) Load() (*kubeletconfig.KubeletConfiguration, error) {
 	errfmt := fmt.Sprintf("failed to load Kubelet config files from %q, error: ", loader.configDir) + "%v"
 
 	// require the config be in a file called "kubelet"

@@ -10,7 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = ["cni.go"],
     deps = [
-        "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//vendor/github.com/containernetworking/cni/libcni:go_default_library",
@@ -31,7 +31,7 @@ go_test(
     library = ":go_default_library",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//pkg/apis/componentconfig:go_default_library",
+            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
             "//pkg/kubelet/container:go_default_library",
             "//pkg/kubelet/container/testing:go_default_library",
             "//pkg/kubelet/network:go_default_library",

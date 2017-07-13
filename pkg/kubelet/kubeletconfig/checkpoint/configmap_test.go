@@ -27,8 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	ccv1a1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 )
 
@@ -83,9 +83,9 @@ func TestConfigMapCheckpointUID(t *testing.T) {
 
 func TestConfigMapCheckpointParse(t *testing.T) {
 	// get the built-in default configuration
-	external := &ccv1a1.KubeletConfiguration{}
+	external := &kubeletconfigv1alpha1.KubeletConfiguration{}
 	api.Scheme.Default(external)
-	defaultConfig := &componentconfig.KubeletConfiguration{}
+	defaultConfig := &kubeletconfig.KubeletConfiguration{}
 	err := api.Scheme.Convert(external, defaultConfig, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -94,7 +94,7 @@ func TestConfigMapCheckpointParse(t *testing.T) {
 	cases := []struct {
 		desc   string
 		cm     *apiv1.ConfigMap
-		expect *componentconfig.KubeletConfiguration
+		expect *kubeletconfig.KubeletConfiguration
 		err    string
 	}{
 		{"empty data", &apiv1.ConfigMap{}, nil, "config was empty"},
@@ -108,19 +108,19 @@ func TestConfigMapCheckpointParse(t *testing.T) {
 			"kubelet": "{*"}}, nil, "failed to decode"},
 		// invalid object
 		{"missing kind", &apiv1.ConfigMap{Data: map[string]string{
-			"kubelet": `{"apiVersion":"componentconfig/v1alpha1"}`}}, nil, "failed to decode"},
+			"kubelet": `{"apiVersion":"kubeletconfig/v1alpha1"}`}}, nil, "failed to decode"},
 		{"missing version", &apiv1.ConfigMap{Data: map[string]string{
 			"kubelet": `{"kind":"KubeletConfiguration"}`}}, nil, "failed to decode"},
 		{"unregistered kind", &apiv1.ConfigMap{Data: map[string]string{
-			"kubelet": `{"kind":"BogusKind","apiVersion":"componentconfig/v1alpha1"}`}}, nil, "failed to decode"},
+			"kubelet": `{"kind":"BogusKind","apiVersion":"kubeletconfig/v1alpha1"}`}}, nil, "failed to decode"},
 		{"unregistered version", &apiv1.ConfigMap{Data: map[string]string{
 			"kubelet": `{"kind":"KubeletConfiguration","apiVersion":"bogusversion"}`}}, nil, "failed to decode"},
 		// empty object with correct kind and version should result in the defaults for that kind and version
 		{"default from yaml", &apiv1.ConfigMap{Data: map[string]string{
 			"kubelet": `kind: KubeletConfiguration
-apiVersion: componentconfig/v1alpha1`}}, defaultConfig, ""},
+apiVersion: kubeletconfig/v1alpha1`}}, defaultConfig, ""},
 		{"default from json", &apiv1.ConfigMap{Data: map[string]string{
-			"kubelet": `{"kind":"KubeletConfiguration","apiVersion":"componentconfig/v1alpha1"}`}}, defaultConfig, ""},
+			"kubelet": `{"kind":"KubeletConfiguration","apiVersion":"kubeletconfig/v1alpha1"}`}}, defaultConfig, ""},
 	}
 	for _, c := range cases {
 		cpt := &configMapCheckpoint{c.cm}

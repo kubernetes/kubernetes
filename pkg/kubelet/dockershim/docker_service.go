@@ -30,9 +30,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
@@ -89,7 +89,7 @@ const (
 // runtime process.
 type NetworkPluginSettings struct {
 	// HairpinMode is best described by comments surrounding the kubelet arg
-	HairpinMode componentconfig.HairpinMode
+	HairpinMode kubeletconfig.HairpinMode
 	// NonMasqueradeCIDR is the range of ips which should *not* be included
 	// in any MASQUERADE rules applied by the plugin
 	NonMasqueradeCIDR string
