@@ -471,7 +471,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	verifyLogMessage(logOutput, "^Received expected client data$")
 }
 
-var _ = kubectlDescribe("Kubectl Port forwarding", func() {
+var _ = SIGDescribe("Kubectl Port forwarding", func() {
 	f := framework.NewDefaultFramework("port-forwarding")
 
 	framework.KubeDescribe("With a server listening on 0.0.0.0", func() {

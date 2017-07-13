@@ -186,7 +186,7 @@ func runKubectlRetryOrDie(args ...string) string {
 }
 
 // duplicated setup to avoid polluting "normal" clients with alpha features which confuses the generated clients
-var _ = kubectlDescribe("Kubectl alpha client", func() {
+var _ = SIGDescribe("Kubectl alpha client", func() {
 	defer GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
 
@@ -275,7 +275,7 @@ var _ = kubectlDescribe("Kubectl alpha client", func() {
 	})
 })
 
-var _ = kubectlDescribe("Kubectl client", func() {
+var _ = SIGDescribe("Kubectl client", func() {
 	defer GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
 

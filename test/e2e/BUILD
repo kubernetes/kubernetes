@@ -24,6 +24,7 @@ go_test(
         "//test/e2e/cluster-logging:go_default_library",
         "//test/e2e/extension:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/kubectl:go_default_library",
         "//test/e2e/metrics:go_default_library",
         "//test/e2e/scalability:go_default_library",
         "//test/e2e/scheduling:go_default_library",

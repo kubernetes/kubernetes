@@ -51,7 +51,7 @@ const (
 	proxyHTTPCallTimeout = 30 * time.Second
 )
 
-var _ = kubectlDescribe("Kubectl Proxy", func() {
+var _ = SIGDescribe("Kubectl Proxy", func() {
 	version := api.Registry.GroupOrDie(v1.GroupName).GroupVersion.Version
 	Context("version "+version, func() {
 		options := framework.FrameworkOptions{
