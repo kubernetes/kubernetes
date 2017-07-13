@@ -111,7 +111,7 @@ def get_maintainers():
            "nikhiljindal", "piosz", "pmorie", "pwittrock", "Q-Lee", "quinton-hoole",
            "Random-Liu", "rmmh", "roberthbailey", "saad-ali", "smarterclayton",
            "soltysh", "spxtr", "sttts", "thelinuxfoundation", "thockin",
-           "timothysc", "timstclair", "vishh", "wojtek-t", "xiang90", "yifan-gu",
+           "timothysc", "tallclair", "vishh", "wojtek-t", "xiang90", "yifan-gu",
            "yujuhong", "zmerlynn"}
     return sorted(ret - SKIP_MAINTAINERS)
 

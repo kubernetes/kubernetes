@@ -2201,7 +2201,7 @@ func (c *Cloud) addSecurityGroupIngress(securityGroupID string, addPermissions [
 	request.IpPermissions = changes
 	_, err = c.ec2.AuthorizeSecurityGroupIngress(request)
 	if err != nil {
-		glog.Warning("Error authorizing security group ingress %q", err)
+		glog.Warningf("Error authorizing security group ingress %q", err)
 		return false, fmt.Errorf("error authorizing security group ingress: %q", err)
 	}
 

@@ -47,7 +47,7 @@ import (
 		10. Delete storage class.
 */
 
-var _ = framework.KubeDescribe("vsphere volume operations storm [Volume]", func() {
+var _ = SIGDescribe("vsphere volume operations storm", func() {
 	f := framework.NewDefaultFramework("volume-ops-storm")
 	const DEFAULT_VOLUME_OPS_SCALE = 30
 	var (

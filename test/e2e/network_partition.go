@@ -41,6 +41,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	timeout = 60 * time.Second
+)
+
 func expectNodeReadiness(isReady bool, newNode chan *v1.Node) {
 	timeout := false
 	expected := false
@@ -94,7 +98,7 @@ func newPodOnNode(c clientset.Interface, namespace, podName, nodeName string) er
 	return err
 }
 
-var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
+var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]", func() {
 	f := framework.NewDefaultFramework("network-partition")
 	var systemPodsNo int32
 	var c clientset.Interface

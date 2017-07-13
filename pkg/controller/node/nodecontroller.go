@@ -510,6 +510,26 @@ func (nc *NodeController) Run(stopCh <-chan struct{}) {
 	<-stopCh
 }
 
+// addPodEvictorForNewZone checks if new zone appeared, and if so add new evictor.
+func (nc *NodeController) addPodEvictorForNewZone(node *v1.Node) {
+	zone := utilnode.GetZoneKey(node)
+	if _, found := nc.zoneStates[zone]; !found {
+		nc.zoneStates[zone] = stateInitial
+		if !nc.useTaintBasedEvictions {
+			nc.zonePodEvictor[zone] =
+				NewRateLimitedTimedQueue(
+					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, evictionRateLimiterBurst))
+		} else {
+			nc.zoneNotReadyOrUnreachableTainer[zone] =
+				NewRateLimitedTimedQueue(
+					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, evictionRateLimiterBurst))
+		}
+		// Init the metric for the new zone.
+		glog.Infof("Initializing eviction metric for zone: %v", zone)
+		EvictionsNumber.WithLabelValues(zone).Add(0)
+	}
+}
+
 // monitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
@@ -520,28 +540,17 @@ func (nc *NodeController) monitorNodeStatus() error {
 	if err != nil {
 		return err
 	}
-	added, deleted := nc.checkForNodeAddedDeleted(nodes)
+	added, deleted, newZoneRepresentatives := nc.classifyNodes(nodes)
+
+	for i := range newZoneRepresentatives {
+		nc.addPodEvictorForNewZone(newZoneRepresentatives[i])
+	}
+
 	for i := range added {
 		glog.V(1).Infof("NodeController observed a new Node: %#v", added[i].Name)
 		recordNodeEvent(nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in NodeController", added[i].Name))
 		nc.knownNodeSet[added[i].Name] = added[i]
-		// When adding new Nodes we need to check if new zone appeared, and if so add new evictor.
-		zone := utilnode.GetZoneKey(added[i])
-		if _, found := nc.zoneStates[zone]; !found {
-			nc.zoneStates[zone] = stateInitial
-			if !nc.useTaintBasedEvictions {
-				nc.zonePodEvictor[zone] =
-					NewRateLimitedTimedQueue(
-						flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, evictionRateLimiterBurst))
-			} else {
-				nc.zoneNotReadyOrUnreachableTainer[zone] =
-					NewRateLimitedTimedQueue(
-						flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, evictionRateLimiterBurst))
-			}
-			// Init the metric for the new zone.
-			glog.Infof("Initializing eviction metric for zone: %v", zone)
-			EvictionsNumber.WithLabelValues(zone).Add(0)
-		}
+		nc.addPodEvictorForNewZone(added[i])
 		if nc.useTaintBasedEvictions {
 			nc.markNodeAsHealthy(added[i])
 		} else {
@@ -991,21 +1000,32 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 	return gracePeriod, observedReadyCondition, currentReadyCondition, err
 }
 
-func (nc *NodeController) checkForNodeAddedDeleted(nodes []*v1.Node) (added, deleted []*v1.Node) {
-	for i := range nodes {
-		if _, has := nc.knownNodeSet[nodes[i].Name]; !has {
-			added = append(added, nodes[i])
+// classifyNodes classifies the allNodes to three categories:
+//   1. added: the nodes that in 'allNodes', but not in 'knownNodeSet'
+//   2. deleted: the nodes that in 'knownNodeSet', but not in 'allNodes'
+//   3. newZoneRepresentatives: the nodes that in both 'knownNodeSet' and 'allNodes', but no zone states
+func (nc *NodeController) classifyNodes(allNodes []*v1.Node) (added, deleted, newZoneRepresentatives []*v1.Node) {
+	for i := range allNodes {
+		if _, has := nc.knownNodeSet[allNodes[i].Name]; !has {
+			added = append(added, allNodes[i])
+		} else {
+			// Currently, we only consider new zone as updated.
+			zone := utilnode.GetZoneKey(allNodes[i])
+			if _, found := nc.zoneStates[zone]; !found {
+				newZoneRepresentatives = append(newZoneRepresentatives, allNodes[i])
+			}
 		}
 	}
+
 	// If there's a difference between lengths of known Nodes and observed nodes
 	// we must have removed some Node.
-	if len(nc.knownNodeSet)+len(added) != len(nodes) {
+	if len(nc.knownNodeSet)+len(added) != len(allNodes) {
 		knowSetCopy := map[string]*v1.Node{}
 		for k, v := range nc.knownNodeSet {
 			knowSetCopy[k] = v
 		}
-		for i := range nodes {
-			delete(knowSetCopy, nodes[i].Name)
+		for i := range allNodes {
+			delete(knowSetCopy, allNodes[i].Name)
 		}
 		for i := range knowSetCopy {
 			deleted = append(deleted, knowSetCopy[i])

@@ -94,7 +94,7 @@ func (es *e2eServices) stop() {
 	}
 
 	for _, d := range es.rmDirs {
-		glog.Info("Deleting directory %v", d)
+		glog.Infof("Deleting directory %v", d)
 		err := os.RemoveAll(d)
 		if err != nil {
 			glog.Errorf("Failed to delete directory %s.\n%v", d, err)

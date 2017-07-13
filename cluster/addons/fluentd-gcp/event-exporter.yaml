@@ -46,7 +46,7 @@ spec:
       containers:
       # TODO: Add resources in 1.8
       - name: event-exporter
-        image: gcr.io/google-containers/event-exporter:v0.1.0-r2
+        image: gcr.io/google-containers/event-exporter:v0.1.4
         command:
         - '/event-exporter'
       - name: prometheus-to-sd-exporter

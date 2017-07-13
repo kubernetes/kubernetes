@@ -37,7 +37,7 @@ func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideIma
 	if overrideImage != "" {
 		return overrideImage
 	}
-	repoPrefix := kubeadmapi.GlobalEnvParams.RepositoryPrefix
+	repoPrefix := cfg.ImageRepository
 	return map[string]string{
 		KubeEtcdImage:              fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "etcd", runtime.GOARCH, etcdVersion),
 		KubeAPIServerImage:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-apiserver", runtime.GOARCH, cfg.KubernetesVersion),

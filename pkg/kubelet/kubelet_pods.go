@@ -729,9 +729,8 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
 	return pullSecrets
 }
 
-// Returns true if pod is in the terminated state ("Failed" or "Succeeded").
+// podIsTerminated returns true if pod is in the terminated state ("Failed" or "Succeeded").
 func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
-	var status v1.PodStatus
 	// Check the cached pod status which was set after the last sync.
 	status, ok := kl.statusManager.GetPodStatus(pod.UID)
 	if !ok {
@@ -1418,7 +1417,7 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 	if container == nil {
 		return nil, fmt.Errorf("container not found (%q)", containerName)
 	}
-	// TODO(timstclair): Pass a proper timeout value.
+	// TODO(tallclair): Pass a proper timeout value.
 	return kl.runner.RunInContainer(container.ID, cmd, 0)
 }
 

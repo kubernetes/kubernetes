@@ -83,7 +83,7 @@ const (
    8. Delete PVC, PV and Storage Class
 */
 
-var _ = framework.KubeDescribe("vSphere Storage policy support for dynamic provisioning [Volume]", func() {
+var _ = SIGDescribe("vSphere Storage policy support for dynamic provisioning", func() {
 	f := framework.NewDefaultFramework("volume-vsan-policy")
 	var (
 		client       clientset.Interface

@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	authauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
@@ -63,7 +62,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
@@ -287,30 +285,6 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	if err != nil {
 		closeFn()
 		glog.Fatal(err)
-	}
-
-	// wait for services to be ready
-	if masterConfig.EnableCoreControllers {
-		// TODO Once /healthz is updated for posthooks, we'll wait for good health
-		coreClient := coreclient.NewForConfigOrDie(&cfg)
-		svcWatch, err := coreClient.Services(metav1.NamespaceDefault).Watch(metav1.ListOptions{})
-		if err != nil {
-			closeFn()
-			glog.Fatal(err)
-		}
-		_, err = watch.Until(30*time.Second, svcWatch, func(event watch.Event) (bool, error) {
-			if event.Type != watch.Added {
-				return false, nil
-			}
-			if event.Object.(*v1.Service).Name == "kubernetes" {
-				return true, nil
-			}
-			return false, nil
-		})
-		if err != nil {
-			closeFn()
-			glog.Fatal(err)
-		}
 	}
 
 	return m, s, closeFn

@@ -29,6 +29,16 @@ import (
 
 // NodeAddresses returns the addresses of the specified instance.
 func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
+	if az.UseInstanceMetadata {
+		text, err := QueryMetadataText("instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress")
+		if err != nil {
+			return nil, err
+		}
+		return []v1.NodeAddress{
+			{Type: v1.NodeInternalIP, Address: text},
+			{Type: v1.NodeHostName, Address: string(name)},
+		}, nil
+	}
 	ip, err := az.getIPForMachine(name)
 	if err != nil {
 		glog.Errorf("error: az.NodeAddresses, az.getIPForMachine(%s), err=%v", name, err)

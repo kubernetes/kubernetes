@@ -40,7 +40,7 @@ var _ = framework.KubeDescribe("HostPath", func() {
 		_ = os.Remove("/tmp/test-file")
 	})
 
-	It("should give a volume the correct mode [Conformance] [Volume]", func() {
+	It("should give a volume the correct mode [Conformance] [sig-storage]", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
@@ -56,7 +56,7 @@ var _ = framework.KubeDescribe("HostPath", func() {
 	})
 
 	// This test requires mounting a folder into a container with write privileges.
-	It("should support r/w [Volume]", func() {
+	It("should support r/w [sig-storage]", func() {
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180
 		source := &v1.HostPathVolumeSource{
@@ -80,7 +80,7 @@ var _ = framework.KubeDescribe("HostPath", func() {
 		})
 	})
 
-	It("should support subPath [Volume]", func() {
+	It("should support subPath [sig-storage]", func() {
 		subPath := "sub-path"
 		fileName := "test-file"
 		retryDuration := 180
@@ -112,7 +112,7 @@ var _ = framework.KubeDescribe("HostPath", func() {
 		})
 	})
 
-	It("should support existing directory subPath [Volume]", func() {
+	It("should support existing directory subPath [sig-storage]", func() {
 		framework.SkipUnlessSSHKeyPresent()
 
 		subPath := "sub-path"
@@ -158,7 +158,7 @@ var _ = framework.KubeDescribe("HostPath", func() {
 	})
 
 	// TODO consolidate common code of this test and above
-	It("should support existing single file subPath [Volume]", func() {
+	It("should support existing single file subPath [sig-storage]", func() {
 		framework.SkipUnlessSSHKeyPresent()
 
 		subPath := "sub-path-test-file"

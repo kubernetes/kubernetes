@@ -39,6 +39,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	cloudkms "google.golang.org/api/cloudkms/v1"
+	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
@@ -75,6 +76,8 @@ const (
 	gceHcHealthyThreshold = int64(1)
 	// Defaults to 5 * 2 = 10 seconds before the LB will steer traffic away
 	gceHcUnhealthyThreshold = int64(5)
+
+	gceComputeAPIEndpoint = "https://www.googleapis.com/compute/v1/"
 )
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
@@ -85,6 +88,7 @@ type GCECloud struct {
 
 	service          *compute.Service
 	serviceBeta      *computebeta.Service
+	serviceAlpha     *computealpha.Service
 	containerService *container.Service
 	cloudkmsService  *cloudkms.Service
 	clientBuilder    controller.ControllerClientBuilder
@@ -144,7 +148,8 @@ type Config struct {
 		NodeTags           []string `gcfg:"node-tags"`
 		NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
 		Multizone          bool     `gcfg:"multizone"`
-		ApiEndpoint        string   `gcfg:"api-endpoint"`
+		// Specifying ApiEndpoint will override the default GCE compute API endpoint.
+		ApiEndpoint string `gcfg:"api-endpoint"`
 	}
 }
 
@@ -267,20 +272,37 @@ func CreateGCECloud(apiEndpoint, projectID, networkProjectID, region, zone strin
 	if err != nil {
 		return nil, err
 	}
-
 	service, err := compute.New(client)
 	if err != nil {
 		return nil, err
 	}
 
-	if apiEndpoint != "" {
-		service.BasePath = fmt.Sprintf("%sprojects/", apiEndpoint)
-	}
-
 	client, err = newOauthClient(tokenSource)
+	if err != nil {
+		return nil, err
+	}
 	serviceBeta, err := computebeta.New(client)
 	if err != nil {
 		return nil, err
+	}
+
+	client, err = newOauthClient(tokenSource)
+	if err != nil {
+		return nil, err
+	}
+	serviceAlpha, err := computealpha.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	// Expect override api endpoint to always be v1 api and follows the same pattern as prod.
+	// Generate alpha and beta api endpoints based on override v1 api endpoint.
+	// For example,
+	// staging API endpoint: https://www.googleapis.com/compute/staging_v1/
+	if apiEndpoint != "" {
+		service.BasePath = fmt.Sprintf("%sprojects/", apiEndpoint)
+		serviceBeta.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(apiEndpoint, "v1", "beta", 0))
+		serviceAlpha.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(apiEndpoint, "v1", "alpha", 0))
 	}
 
 	containerService, err := container.New(client)
@@ -413,16 +435,16 @@ var _ cloudprovider.Interface = (*GCECloud)(nil)
 
 func gceNetworkURL(apiEndpoint, project, network string) string {
 	if apiEndpoint == "" {
-		apiEndpoint = "https://www.googleapis.com/compute/v1/"
+		apiEndpoint = gceComputeAPIEndpoint
 	}
-	return fmt.Sprintf("%vprojects/%s/global/networks/%s", apiEndpoint, project, network)
+	return apiEndpoint + strings.Join([]string{"projects", project, "global", "networks", network}, "/")
 }
 
 func gceSubnetworkURL(apiEndpoint, project, region, subnetwork string) string {
 	if apiEndpoint == "" {
-		apiEndpoint = "https://www.googleapis.com/compute/v1/"
+		apiEndpoint = gceComputeAPIEndpoint
 	}
-	return fmt.Sprintf("%vprojects/%s/regions/%s/subnetworks/%s", apiEndpoint, project, region, subnetwork)
+	return apiEndpoint + strings.Join([]string{"projects", project, "regions", region, "subnetworks", subnetwork}, "/")
 }
 
 // Project IDs cannot have a digit for the first characeter. If the id contains a digit,
@@ -431,7 +453,6 @@ func isProjectNumber(idOrNumber string) bool {
 	if len(idOrNumber) == 0 {
 		return false
 	}
-
 	return idOrNumber[0] >= '0' && idOrNumber[0] <= '9'
 }
 

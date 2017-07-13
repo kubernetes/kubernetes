@@ -14,6 +14,7 @@ cmd/kube-apiserver
 cmd/kube-apiserver/app
 cmd/kube-apiserver/app/options
 cmd/kube-apiserver/app/preflight
+cmd/kube-apiserver/app/testing
 cmd/kube-controller-manager
 cmd/kube-controller-manager/app/options
 cmd/kube-proxy
@@ -435,6 +436,7 @@ staging/src/k8s.io/client-go/rest/watch
 staging/src/k8s.io/client-go/tools/auth
 staging/src/k8s.io/client-go/tools/metrics
 staging/src/k8s.io/client-go/tools/remotecommand
+staging/src/k8s.io/client-go/transport/spdy
 staging/src/k8s.io/client-go/util/cert
 staging/src/k8s.io/client-go/util/homedir
 staging/src/k8s.io/client-go/util/workqueue
@@ -453,6 +455,14 @@ staging/src/k8s.io/metrics/pkg/apis/custom_metrics/install
 staging/src/k8s.io/metrics/pkg/apis/metrics/install
 staging/src/k8s.io/sample-apiserver
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/install
+staging/src/k8s.io/sample-apiserver/pkg/client/informers_generated/externalversions
+staging/src/k8s.io/sample-apiserver/pkg/client/informers_generated/externalversions/wardle
+staging/src/k8s.io/sample-apiserver/pkg/client/informers_generated/externalversions/wardle/v1alpha1
+staging/src/k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion
+staging/src/k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion/wardle
+staging/src/k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion/wardle/internalversion
+staging/src/k8s.io/sample-apiserver/pkg/client/listers_generated/wardle/internalversion
+staging/src/k8s.io/sample-apiserver/pkg/client/listers_generated/wardle/v1alpha1
 test/e2e/framework/ginkgowrapper
 test/e2e/manifest
 test/e2e/perftype

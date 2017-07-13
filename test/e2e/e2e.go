@@ -36,12 +36,12 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/logs"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	"k8s.io/kubernetes/test/e2e/manifest"
+	"k8s.io/kubernetes/test/e2e/metrics"
 	federationtest "k8s.io/kubernetes/test/e2e_federation"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -52,6 +52,9 @@ const (
 	// images within this time we simply log their output and carry on
 	// with the tests.
 	imagePrePullingTimeout = 5 * time.Minute
+
+	// TODO: Delete this once all the tests that depend upon it are moved out of test/e2e and into subdirs
+	podName = "pfpod"
 )
 
 var (

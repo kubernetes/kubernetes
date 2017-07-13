@@ -35,15 +35,18 @@ import (
 
 	"github.com/PuerkitoBio/purell"
 	"github.com/blang/semver"
+	"github.com/spf13/pflag"
 
 	"net/url"
 
+	apiservoptions "k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/api/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/util/initsystem"
-	"k8s.io/kubernetes/pkg/util/node"
+	schoptions "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
@@ -267,21 +270,22 @@ func (ipc InPathCheck) Check() (warnings, errors []error) {
 
 // HostnameCheck checks if hostname match dns sub domain regex.
 // If hostname doesn't match this regex, kubelet will not launch static pods like kube-apiserver/kube-controller-manager and so on.
-type HostnameCheck struct{}
+type HostnameCheck struct {
+	nodeName string
+}
 
 func (hc HostnameCheck) Check() (warnings, errors []error) {
 	errors = []error{}
 	warnings = []error{}
-	hostname := node.GetHostname("")
-	for _, msg := range validation.ValidateNodeName(hostname, false) {
-		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, msg))
+	for _, msg := range validation.ValidateNodeName(hc.nodeName, false) {
+		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hc.nodeName, msg))
 	}
-	addr, err := net.LookupHost(hostname)
+	addr, err := net.LookupHost(hc.nodeName)
 	if addr == nil {
-		warnings = append(warnings, fmt.Errorf("hostname \"%s\" could not be reached", hostname))
+		warnings = append(warnings, fmt.Errorf("hostname \"%s\" could not be reached", hc.nodeName))
 	}
 	if err != nil {
-		warnings = append(warnings, fmt.Errorf("hostname \"%s\" %s", hostname, err))
+		warnings = append(warnings, fmt.Errorf("hostname \"%s\" %s", hc.nodeName, err))
 	}
 	return warnings, errors
 }
@@ -311,6 +315,46 @@ func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 		return []error{fmt.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", url, proxy)}, nil
 	}
 	return nil, nil
+}
+
+// ExtraArgsCheck checks if arguments are valid.
+type ExtraArgsCheck struct {
+	APIServerExtraArgs         map[string]string
+	ControllerManagerExtraArgs map[string]string
+	SchedulerExtraArgs         map[string]string
+}
+
+func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
+	argsCheck := func(name string, args map[string]string, f *pflag.FlagSet) []error {
+		errs := []error{}
+		for k, v := range args {
+			if err := f.Set(k, v); err != nil {
+				errs = append(errs, fmt.Errorf("%s: failed to parse extra argument --%s=%s", name, k, v))
+			}
+		}
+		return errs
+	}
+
+	warnings = []error{}
+	if len(eac.APIServerExtraArgs) > 0 {
+		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+		s := apiservoptions.NewServerRunOptions()
+		s.AddFlags(flags)
+		warnings = append(warnings, argsCheck("kube-apiserver", eac.APIServerExtraArgs, flags)...)
+	}
+	if len(eac.ControllerManagerExtraArgs) > 0 {
+		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+		s := cmoptions.NewCMServer()
+		s.AddFlags(flags, []string{}, []string{})
+		warnings = append(warnings, argsCheck("kube-controller-manager", eac.ControllerManagerExtraArgs, flags)...)
+	}
+	if len(eac.SchedulerExtraArgs) > 0 {
+		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+		s := schoptions.NewSchedulerServer()
+		s.AddFlags(flags)
+		warnings = append(warnings, argsCheck("kube-scheduler", eac.SchedulerExtraArgs, flags)...)
+	}
+	return warnings, nil
 }
 
 type SystemVerificationCheck struct{}
@@ -493,7 +537,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	checks := []Checker{
 		SystemVerificationCheck{},
 		IsRootCheck{},
-		HostnameCheck{},
+		HostnameCheck{nodeName: cfg.NodeName},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
@@ -514,6 +558,11 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		InPathCheck{executable: "socat", mandatory: false},
 		InPathCheck{executable: "tc", mandatory: false},
 		InPathCheck{executable: "touch", mandatory: false},
+		ExtraArgsCheck{
+			APIServerExtraArgs:         cfg.APIServerExtraArgs,
+			ControllerManagerExtraArgs: cfg.ControllerManagerExtraArgs,
+			SchedulerExtraArgs:         cfg.SchedulerExtraArgs,
+		},
 	}
 
 	if len(cfg.Etcd.Endpoints) == 0 {

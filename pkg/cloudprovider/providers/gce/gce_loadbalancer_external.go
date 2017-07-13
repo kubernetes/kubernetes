@@ -483,7 +483,7 @@ func (gce *GCECloud) createTargetPool(name, serviceName, ipAddress, region, clus
 
 	var instances []string
 	for _, host := range hosts {
-		instances = append(instances, makeHostURL(gce.projectID, host.Zone, host.Name))
+		instances = append(instances, makeHostURL(gce.service.BasePath, gce.projectID, host.Zone, host.Name))
 	}
 	glog.Infof("Creating targetpool %v with %d healthchecks", name, len(hcLinks))
 	pool := &compute.TargetPool{
@@ -542,7 +542,7 @@ func (gce *GCECloud) updateTargetPool(loadBalancerName string, existing sets.Str
 }
 
 func (gce *GCECloud) targetPoolURL(name, region string) string {
-	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/targetPools/%s", gce.projectID, region, name)
+	return gce.service.BasePath + strings.Join([]string{"projects", gce.projectID, "regions", region, "targetPools", name}, "/")
 }
 
 func makeHttpHealthCheck(name, path string, port int32) *compute.HttpHealthCheck {
@@ -671,10 +671,9 @@ func nodeNames(nodes []*v1.Node) []string {
 	return ret
 }
 
-func makeHostURL(projectID, zone, host string) string {
+func makeHostURL(apiEndpoint, projectID, zone, host string) string {
 	host = canonicalizeInstanceName(host)
-	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/instances/%s",
-		projectID, zone, host)
+	return apiEndpoint + strings.Join([]string{"projects", projectID, "zones", zone, "instances", host}, "/")
 }
 
 func hostURLToComparablePath(hostURL string) string {

@@ -33,8 +33,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubemetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/metrics"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

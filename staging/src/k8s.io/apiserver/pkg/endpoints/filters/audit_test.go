@@ -30,8 +30,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pborman/uuid"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
@@ -436,6 +439,7 @@ func TestAuditJson(t *testing.T) {
 		desc     string
 		path     string
 		verb     string
+		auditID  string
 		handler  func(http.ResponseWriter, *http.Request)
 		expected []auditv1alpha1.Event
 	}{
@@ -444,6 +448,27 @@ func TestAuditJson(t *testing.T) {
 			"read-only empty",
 			shortRunningPath,
 			"GET",
+			"",
+			func(http.ResponseWriter, *http.Request) {},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "get",
+					RequestURI: shortRunningPath,
+				},
+				{
+					Stage:          auditinternal.StageResponseComplete,
+					Verb:           "get",
+					RequestURI:     shortRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+			},
+		},
+		{
+			"short running with auditID",
+			shortRunningPath,
+			"GET",
+			uuid.NewRandom().String(),
 			func(http.ResponseWriter, *http.Request) {},
 			[]auditv1alpha1.Event{
 				{
@@ -463,6 +488,7 @@ func TestAuditJson(t *testing.T) {
 			"read-only panic",
 			shortRunningPath,
 			"GET",
+			"",
 			func(w http.ResponseWriter, req *http.Request) {
 				panic("kaboom")
 			},
@@ -485,6 +511,7 @@ func TestAuditJson(t *testing.T) {
 			"writing empty",
 			shortRunningPath,
 			"PUT",
+			"",
 			func(http.ResponseWriter, *http.Request) {},
 			[]auditv1alpha1.Event{
 				{
@@ -504,6 +531,7 @@ func TestAuditJson(t *testing.T) {
 			"writing sleep",
 			shortRunningPath,
 			"PUT",
+			"",
 			func(http.ResponseWriter, *http.Request) {
 				time.Sleep(delay)
 			},
@@ -525,6 +553,7 @@ func TestAuditJson(t *testing.T) {
 			"writing 403+write",
 			shortRunningPath,
 			"PUT",
+			"",
 			func(w http.ResponseWriter, req *http.Request) {
 				w.WriteHeader(403)
 				w.Write([]byte("foo"))
@@ -547,6 +576,7 @@ func TestAuditJson(t *testing.T) {
 			"writing panic",
 			shortRunningPath,
 			"PUT",
+			"",
 			func(w http.ResponseWriter, req *http.Request) {
 				panic("kaboom")
 			},
@@ -568,6 +598,7 @@ func TestAuditJson(t *testing.T) {
 			"writing write+panic",
 			shortRunningPath,
 			"PUT",
+			"",
 			func(w http.ResponseWriter, req *http.Request) {
 				w.Write([]byte("foo"))
 				panic("kaboom")
@@ -591,6 +622,33 @@ func TestAuditJson(t *testing.T) {
 			"empty longrunning",
 			longRunningPath,
 			"GET",
+			"",
+			func(http.ResponseWriter, *http.Request) {},
+			[]auditv1alpha1.Event{
+				{
+					Stage:      auditinternal.StageRequestReceived,
+					Verb:       "watch",
+					RequestURI: longRunningPath,
+				},
+				{
+					Stage:          auditinternal.StageResponseStarted,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+				{
+					Stage:          auditinternal.StageResponseComplete,
+					Verb:           "watch",
+					RequestURI:     longRunningPath,
+					ResponseStatus: &metav1.Status{Code: 200},
+				},
+			},
+		},
+		{
+			"empty longrunning",
+			longRunningPath,
+			"GET",
+			uuid.NewRandom().String(),
 			func(http.ResponseWriter, *http.Request) {},
 			[]auditv1alpha1.Event{
 				{
@@ -616,6 +674,7 @@ func TestAuditJson(t *testing.T) {
 			"sleep longrunning",
 			longRunningPath,
 			"GET",
+			"",
 			func(http.ResponseWriter, *http.Request) {
 				time.Sleep(delay)
 			},
@@ -643,6 +702,7 @@ func TestAuditJson(t *testing.T) {
 			"sleep+403 longrunning",
 			longRunningPath,
 			"GET",
+			"",
 			func(w http.ResponseWriter, req *http.Request) {
 				time.Sleep(delay)
 				w.WriteHeader(403)
@@ -671,6 +731,7 @@ func TestAuditJson(t *testing.T) {
 			"write longrunning",
 			longRunningPath,
 			"GET",
+			"",
 			func(w http.ResponseWriter, req *http.Request) {
 				w.Write([]byte("foo"))
 			},
@@ -698,6 +759,7 @@ func TestAuditJson(t *testing.T) {
 			"403+write longrunning",
 			longRunningPath,
 			"GET",
+			"",
 			func(w http.ResponseWriter, req *http.Request) {
 				w.WriteHeader(403)
 				w.Write([]byte("foo"))
@@ -726,6 +788,7 @@ func TestAuditJson(t *testing.T) {
 			"panic longrunning",
 			longRunningPath,
 			"GET",
+			"",
 			func(w http.ResponseWriter, req *http.Request) {
 				panic("kaboom")
 			},
@@ -747,6 +810,7 @@ func TestAuditJson(t *testing.T) {
 			"write+panic longrunning",
 			longRunningPath,
 			"GET",
+			"",
 			func(w http.ResponseWriter, req *http.Request) {
 				w.Write([]byte("foo"))
 				panic("kaboom")
@@ -783,6 +847,9 @@ func TestAuditJson(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest(test.verb, test.path, nil)
+		if test.auditID != "" {
+			req.Header.Add("Audit-ID", test.auditID)
+		}
 		req.RemoteAddr = "127.0.0.1"
 
 		func() {
@@ -799,7 +866,7 @@ func TestAuditJson(t *testing.T) {
 			t.Errorf("[%s] Unexpected amount of lines in audit log: %d", test.desc, len(line))
 			continue
 		}
-
+		expectedID := types.UID("")
 		for i, expect := range test.expected {
 			// decode events back to check json elements.
 			event := &auditv1alpha1.Event{}
@@ -819,6 +886,14 @@ func TestAuditJson(t *testing.T) {
 			}
 			if event.RequestURI != expect.RequestURI {
 				t.Errorf("[%s] Unexpected RequestURI: %s", test.desc, event.RequestURI)
+			}
+			if test.auditID != "" && event.AuditID != types.UID(test.auditID) {
+				t.Errorf("[%s] Unexpected AuditID in audit event, AuditID should be the same with Audit-ID http header", test.desc)
+			}
+			if expectedID == types.UID("") {
+				expectedID = event.AuditID
+			} else if expectedID != event.AuditID {
+				t.Errorf("[%s] Audits for one request should share the same AuditID, %s differs from %s", test.desc, expectedID, event.AuditID)
 			}
 			if (event.ResponseStatus == nil) != (expect.ResponseStatus == nil) {
 				t.Errorf("[%s] Unexpected ResponseStatus: %v", test.desc, event.ResponseStatus)

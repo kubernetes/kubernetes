@@ -109,9 +109,6 @@ func WriteObjectNegotiated(ctx request.Context, s runtime.NegotiatedSerializer, 
 		audit.LogResponseObject(ae, object, gv, s)
 	}
 
-	w.Header().Set("Content-Type", serializer.MediaType)
-	w.WriteHeader(statusCode)
-
 	encoder := s.EncoderForVersion(serializer.Serializer, gv)
 	SerializeObject(serializer.MediaType, encoder, w, req, statusCode, object)
 }

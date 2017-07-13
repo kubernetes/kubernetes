@@ -30,8 +30,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 # "${KUBE_ROOT}/cluster/lib/logging.sh" and DEFAULT_KUBECONFIG
 source "${KUBE_ROOT}/cluster/common.sh"
 # For $FEDERATION_NAME, $FEDERATION_NAMESPACE, $FEDERATION_KUBE_CONTEXT,
-# $HOST_CLUSTER_CONTEXT, $KUBEDNS_CONFIGMAP_NAME,
-# $KUBEDNS_CONFIGMAP_NAMESPACE and $KUBEDNS_FEDERATION_FLAG.
+# and $HOST_CLUSTER_CONTEXT.
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
 DNS_ZONE_NAME="${FEDERATION_DNS_ZONE_NAME:-}"
@@ -125,12 +124,5 @@ function join_clusters() {
   done
 }
 
-USE_KUBEFED="${USE_KUBEFED:-}"
-
-if [[ "${USE_KUBEFED}" == "true" ]]; then
-  init
-  join_clusters
-else
-  export FEDERATION_IMAGE_TAG="$(get_version)"
-  create-federation-api-objects
-fi
+init
+join_clusters

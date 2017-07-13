@@ -17,7 +17,11 @@ limitations under the License.
 package azure
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -556,7 +560,7 @@ func TestProtocolTranslationTCP(t *testing.T) {
 	if *transportProto != network.TransportProtocolTCP {
 		t.Errorf("Expected TCP LoadBalancer Rule Protocol. Got %v", transportProto)
 	}
-	if *securityGroupProto != network.TCP {
+	if *securityGroupProto != network.SecurityRuleProtocolTCP {
 		t.Errorf("Expected TCP SecurityGroup Protocol. Got %v", transportProto)
 	}
 	if *probeProto != network.ProbeProtocolTCP {
@@ -570,7 +574,7 @@ func TestProtocolTranslationUDP(t *testing.T) {
 	if *transportProto != network.TransportProtocolUDP {
 		t.Errorf("Expected UDP LoadBalancer Rule Protocol. Got %v", transportProto)
 	}
-	if *securityGroupProto != network.UDP {
+	if *securityGroupProto != network.SecurityRuleProtocolUDP {
 		t.Errorf("Expected UDP SecurityGroup Protocol. Got %v", transportProto)
 	}
 	if probeProto != nil {
@@ -814,5 +818,62 @@ func TestSplitProviderID(t *testing.T) {
 			t.Errorf("Expected %v, but got %v", test.name, name)
 		}
 
+	}
+}
+
+func TestMetadataParsing(t *testing.T) {
+	data := `
+{
+    "interface": [
+      {
+        "ipv4": {
+          "ipAddress": [
+            {
+              "privateIpAddress": "10.0.1.4",
+              "publicIpAddress": "X.X.X.X"
+            }
+          ],
+          "subnet": [
+            {
+              "address": "10.0.1.0",
+              "prefix": "24"
+            }
+          ]
+        },
+        "ipv6": {
+          "ipAddress": [
+
+          ]
+        },
+        "macAddress": "002248020E1E"
+      }
+    ]
+}	
+`
+
+	network := NetworkMetadata{}
+	if err := json.Unmarshal([]byte(data), &network); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	ip := network.Interface[0].IPV4.IPAddress[0].PrivateIP
+	if ip != "10.0.1.4" {
+		t.Errorf("Unexpected value: %s, expected 10.0.1.4", ip)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, data)
+	}))
+	defer server.Close()
+
+	SetMetadataURLForTesting(server.URL)
+
+	networkJSON := NetworkMetadata{}
+	if err := QueryMetadataJSON("/some/path", &networkJSON); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(network, networkJSON) {
+		t.Errorf("Unexpected inequality:\n%#v\nvs\n%#v", network, networkJSON)
 	}
 }

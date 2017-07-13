@@ -30,6 +30,7 @@ type MasterConfiguration struct {
 	Networking         Networking `json:"networking"`
 	KubernetesVersion  string     `json:"kubernetesVersion"`
 	CloudProvider      string     `json:"cloudProvider"`
+	NodeName           string     `json:"nodeName"`
 	AuthorizationModes []string   `json:"authorizationModes"`
 
 	Token    string        `json:"token"`
@@ -48,6 +49,11 @@ type MasterConfiguration struct {
 	APIServerCertSANs []string `json:"apiServerCertSANs"`
 	// CertificatesDir specifies where to store or look for all required certificates
 	CertificatesDir string `json:"certificatesDir"`
+
+	// ImageRepository what container registry to pull control plane images from
+	ImageRepository string `json:"imageRepository"`
+	// UnifiedControlPlaneImage specifies if a specific container image should be used for all control plane components
+	UnifiedControlPlaneImage string `json:"unifiedControlPlaneImage"`
 }
 
 type API struct {
@@ -76,6 +82,8 @@ type Etcd struct {
 	KeyFile   string            `json:"keyFile"`
 	DataDir   string            `json:"dataDir"`
 	ExtraArgs map[string]string `json:"extraArgs"`
+	// Image specifies which container image to use for running etcd. If empty, automatically populated by kubeadm using the image repository and default etcd version
+	Image string `json:"image"`
 }
 
 type NodeConfiguration struct {
