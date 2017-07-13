@@ -19,6 +19,7 @@ package kubelet
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"reflect"
 	goruntime "runtime"
 	"sort"
@@ -28,6 +29,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"github.com/stretchr/testify/assert"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -41,6 +43,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -117,6 +120,85 @@ type localCM struct {
 
 func (lcm *localCM) GetNodeAllocatableReservation() v1.ResourceList {
 	return lcm.allocatable
+}
+
+func TestNodeStatusWithCloudProviderNodeIP(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubelet.hostname = testKubeletHostname
+
+	existingNode := v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
+		Spec:       v1.NodeSpec{},
+	}
+
+	// TODO : is it possible to mock kubelet.validateNodeIP() to avoid relying on the host interface addresses ?
+	addrs, err := net.InterfaceAddrs()
+	assert.NoError(t, err)
+	for _, addr := range addrs {
+		var ip net.IP
+		switch v := addr.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		if ip != nil && !ip.IsLoopback() && ip.To4() != nil {
+			kubelet.nodeIP = ip
+			break
+		}
+	}
+	assert.NotNil(t, kubelet.nodeIP)
+
+	fakeCloud := &fakecloud.FakeCloud{
+		Addresses: []v1.NodeAddress{
+			{
+				Type:    v1.NodeExternalIP,
+				Address: "132.143.154.163",
+			},
+			{
+				Type:    v1.NodeExternalIP,
+				Address: kubelet.nodeIP.String(),
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: "132.143.154.164",
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: kubelet.nodeIP.String(),
+			},
+			{
+				Type:    v1.NodeInternalIP,
+				Address: "132.143.154.165",
+			},
+			{
+				Type:    v1.NodeHostName,
+				Address: testKubeletHostname,
+			},
+		},
+		Err: nil,
+	}
+	kubelet.cloud = fakeCloud
+
+	kubelet.setNodeAddress(&existingNode)
+
+	expectedAddresses := []v1.NodeAddress{
+		{
+			Type:    v1.NodeExternalIP,
+			Address: kubelet.nodeIP.String(),
+		},
+		{
+			Type:    v1.NodeInternalIP,
+			Address: kubelet.nodeIP.String(),
+		},
+		{
+			Type:    v1.NodeHostName,
+			Address: testKubeletHostname,
+		},
+	}
+	assert.True(t, apiequality.Semantic.DeepEqual(expectedAddresses, existingNode.Status.Addresses), "%s", diff.ObjectDiff(expectedAddresses, existingNode.Status.Addresses))
 }
 
 func TestUpdateNewNodeStatus(t *testing.T) {
