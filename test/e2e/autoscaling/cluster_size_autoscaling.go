@@ -1279,7 +1279,7 @@ func getClusterwideStatus(c clientset.Interface) (string, error) {
 	}
 	result := matcher.FindStringSubmatch(status)
 	if len(result) < 2 {
-		return "", fmt.Errorf("Failed to parse CA status configmap")
+		return "", fmt.Errorf("Failed to parse CA status configmap, raw status: %v", status)
 	}
 	return result[1], nil
 }
@@ -1307,7 +1307,7 @@ func getScaleUpStatus(c clientset.Interface) (*scaleUpStatus, error) {
 	}
 	matches := matcher.FindAllStringSubmatch(status, -1)
 	if len(matches) < 1 {
-		return nil, fmt.Errorf("Failed to parse CA status configmap")
+		return nil, fmt.Errorf("Failed to parse CA status configmap, raw status: %v", status)
 	}
 	result := scaleUpStatus{
 		status: caNoScaleUpStatus,
