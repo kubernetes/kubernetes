@@ -62,7 +62,7 @@ var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&podPresetPlugin{})
 // NewPlugin creates a new pod preset admission plugin.
 func NewPlugin() *podPresetPlugin {
 	return &podPresetPlugin{
-		Handler: admission.NewHandler(admission.Create, admission.Update),
+		Handler: admission.NewHandler(admission.Create),
 	}
 }
 
