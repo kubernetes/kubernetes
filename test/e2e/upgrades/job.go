@@ -31,7 +31,7 @@ type JobUpgradeTest struct {
 	namespace string
 }
 
-func (JobUpgradeTest) Name() string { return "job-upgrade" }
+func (JobUpgradeTest) Name() string { return "[sig-apps] job-upgrade" }
 
 // Setup starts a Job with a parallelism of 2 and 2 completions running.
 func (t *JobUpgradeTest) Setup(f *framework.Framework) {
