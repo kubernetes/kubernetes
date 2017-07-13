@@ -40,6 +40,8 @@ function with-retry() {
     sleep 3
   done
 
+  echo "Failed to execute '${cmd[@]}' for $retry_limit times." >&2
+
   return ${rc}
 }
 
