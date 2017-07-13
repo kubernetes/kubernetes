@@ -184,7 +184,7 @@ func createNode(cs clientset.Interface, name string) (*v1.Node, error) {
 	return createNodeWithResource(cs, name, &res)
 }
 
-// createNodes created `numNodes` nodes. The created node names will be in the
+// createNodes creates `numNodes` nodes. The created node names will be in the
 // form of "`prefix`-X" where X is an ordinal.
 func createNodes(cs clientset.Interface, prefix string, numNodes int) ([]*v1.Node, error) {
 	nodes := make([]*v1.Node, numNodes)
@@ -247,7 +247,7 @@ func createPausePod(cs clientset.Interface, conf *pausePodConfig) (*v1.Pod, erro
 }
 
 // createPausePodWithResource creates a pod with "Pause" image and the given
-// resources and return its pointer and error status.
+// resources and returns its pointer and error status.
 func createPausePodWithResource(cs clientset.Interface, podName string, nsName string, res *v1.ResourceList) (*v1.Pod, error) {
 	conf := pausePodConfig{
 		Name:      podName,
@@ -259,7 +259,7 @@ func createPausePodWithResource(cs clientset.Interface, podName string, nsName s
 	return createPausePod(cs, &conf)
 }
 
-// createDefaultPausePod creates a pod with "Pause" image and return its pointer
+// createDefaultPausePod creates a pod with "Pause" image and returns its pointer
 // and error status.
 func createDefaultPausePod(cs clientset.Interface, podName string, nsName string) (*v1.Pod, error) {
 	conf := pausePodConfig{
