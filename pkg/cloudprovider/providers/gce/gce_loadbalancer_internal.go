@@ -624,7 +624,7 @@ func getPortsAndProtocol(svcPorts []v1.ServicePort) (ports []string, protocol v1
 }
 
 func (gce *GCECloud) getBackendServiceLink(name string) string {
-	return gce.service.BasePath + strings.Join([]string{"projects", gce.projectID, "regions", gce.region, "backendServices", name}, "/")
+	return gce.service.BasePath + strings.Join([]string{gce.projectID, "regions", gce.region, "backendServices", name}, "/")
 }
 
 func getNameFromLink(link string) string {

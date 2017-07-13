@@ -542,7 +542,7 @@ func (gce *GCECloud) updateTargetPool(loadBalancerName string, existing sets.Str
 }
 
 func (gce *GCECloud) targetPoolURL(name, region string) string {
-	return gce.service.BasePath + strings.Join([]string{"projects", gce.projectID, "regions", region, "targetPools", name}, "/")
+	return gce.service.BasePath + strings.Join([]string{gce.projectID, "regions", region, "targetPools", name}, "/")
 }
 
 func makeHttpHealthCheck(name, path string, port int32) *compute.HttpHealthCheck {
@@ -671,9 +671,9 @@ func nodeNames(nodes []*v1.Node) []string {
 	return ret
 }
 
-func makeHostURL(apiEndpoint, projectID, zone, host string) string {
+func makeHostURL(projectsApiEndpoint, projectID, zone, host string) string {
 	host = canonicalizeInstanceName(host)
-	return apiEndpoint + strings.Join([]string{"projects", projectID, "zones", zone, "instances", host}, "/")
+	return projectsApiEndpoint + strings.Join([]string{projectID, "zones", zone, "instances", host}, "/")
 }
 
 func hostURLToComparablePath(hostURL string) string {
