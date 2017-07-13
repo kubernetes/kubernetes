@@ -469,14 +469,16 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
 		}
 		if kl.nodeIP != nil {
+			enforcedNodeAddresses := []v1.NodeAddress{}
 			for _, nodeAddress := range nodeAddresses {
 				if nodeAddress.Address == kl.nodeIP.String() {
-					node.Status.Addresses = []v1.NodeAddress{
-						{Type: nodeAddress.Type, Address: nodeAddress.Address},
-						{Type: v1.NodeHostName, Address: kl.GetHostname()},
-					}
-					return nil
+					enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
 				}
+			}
+			if len(enforcedNodeAddresses) > 0 {
+				enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: kl.GetHostname()})
+				node.Status.Addresses = enforcedNodeAddresses
+				return nil
 			}
 			return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", kl.nodeIP)
 		}
