@@ -715,8 +715,7 @@ func (cont *GCEIngressController) Init() {
 func (cont *GCEIngressController) CreateStaticIP(name string) string {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
 	addr := &compute.Address{Name: name}
-	ip, err := gceCloud.ReserveGlobalAddress(addr)
-	if err != nil {
+	if err := gceCloud.ReserveGlobalAddress(addr); err != nil {
 		if delErr := gceCloud.DeleteGlobalAddress(name); delErr != nil {
 			if cont.isHTTPErrorCode(delErr, http.StatusNotFound) {
 				Logf("Static ip with name %v was not allocated, nothing to delete", name)
@@ -724,8 +723,14 @@ func (cont *GCEIngressController) CreateStaticIP(name string) string {
 				Logf("Failed to delete static ip %v: %v", name, delErr)
 			}
 		}
-		Failf("Failed to allocated static ip %v: %v", name, err)
+		Failf("Failed to allocate static ip %v: %v", name, err)
 	}
+
+	ip, err := gceCloud.GetGlobalAddress(name)
+	if err != nil {
+		Failf("Failed to get newly created static ip %v: %v", name, err)
+	}
+
 	cont.staticIPName = ip.Name
 	Logf("Reserved static ip %v: %v", cont.staticIPName, ip.Address)
 	return ip.Address

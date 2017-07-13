@@ -922,8 +922,7 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 		addressObj.Address = existingIP
 	}
 
-	address, err := gce.ReserveRegionAddress(addressObj, region)
-	if err != nil {
+	if err = gce.ReserveRegionAddress(addressObj, region); err != nil {
 		if !isHTTPErrorCode(err, http.StatusConflict) {
 			return "", false, fmt.Errorf("error creating gce static IP address: %v", err)
 		}
@@ -931,5 +930,10 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 		existed = true
 	}
 
-	return address.Address, existed, nil
+	addr, err := gce.GetRegionAddress(name, region)
+	if err != nil {
+		return "", false, fmt.Errorf("error getting static IP address: %v", err)
+	}
+
+	return addr.Address, existed, nil
 }
