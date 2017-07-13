@@ -20,6 +20,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -49,7 +50,7 @@ func (t *JobUpgradeTest) Setup(f *framework.Framework) {
 }
 
 // Test verifies that the Jobs Pods are running after the an upgrade
-func (t *JobUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *JobUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
 	By("Ensuring active pods == parallelism")
 	running, err := framework.CheckForAllJobPodsRunning(f.ClientSet, t.namespace, t.job.Name, 2)

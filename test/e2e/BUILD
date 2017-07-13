@@ -132,6 +132,7 @@ go_library(
         "//test/e2e/manifest:go_default_library",
         "//test/e2e/metrics:go_default_library",
         "//test/e2e/upgrades:go_default_library",
+        "//test/e2e/upgrades/apps:go_default_library",
         "//test/e2e/workload:go_default_library",
         "//test/e2e_federation:go_default_library",
         "//test/images/net/nat:go_default_library",

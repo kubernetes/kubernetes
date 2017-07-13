@@ -24,6 +24,7 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -42,7 +43,7 @@ type DeploymentUpgradeTest struct {
 
 func (DeploymentUpgradeTest) Name() string { return "[sig-apps] deployment-upgrade" }
 
-func (DeploymentUpgradeTest) Skip(upgCtx UpgradeContext) bool {
+func (DeploymentUpgradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
 	// The Deployment upgrade test currently relies on implementation details to probe the
 	// ReplicaSets belonging to a Deployment. As of 1.7, the client code we call into no
 	// longer supports talking to a server <1.6. (see #47685)
@@ -56,7 +57,7 @@ func (DeploymentUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 	return false
 }
 
-var _ Skippable = DeploymentUpgradeTest{}
+var _ upgrades.Skippable = DeploymentUpgradeTest{}
 
 // Setup creates a deployment and makes sure it has a new and an old replica set running.
 // This calls in to client code and should not be expected to work against a cluster more than one minor version away from the current version.
@@ -125,7 +126,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 }
 
 // Test checks whether the replica sets for a deployment are the same after an upgrade.
-func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	// Block until upgrade is done
 	By(fmt.Sprintf("Waiting for upgrade to finish before checking replica sets for deployment %q", t.oldD.Name))
 	<-done

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
+	apps "k8s.io/kubernetes/test/e2e/upgrades/apps"
 	"k8s.io/kubernetes/test/utils/junit"
 
 	. "github.com/onsi/ginkgo"
@@ -38,13 +39,13 @@ import (
 var upgradeTests = []upgrades.Test{
 	&upgrades.ServiceUpgradeTest{},
 	&upgrades.SecretUpgradeTest{},
-	&upgrades.StatefulSetUpgradeTest{},
-	&upgrades.DeploymentUpgradeTest{},
-	&upgrades.JobUpgradeTest{},
+	&apps.StatefulSetUpgradeTest{},
+	&apps.DeploymentUpgradeTest{},
+	&apps.JobUpgradeTest{},
 	&upgrades.ConfigMapUpgradeTest{},
 	&upgrades.HPAUpgradeTest{},
 	&upgrades.PersistentVolumeUpgradeTest{},
-	&upgrades.DaemonSetUpgradeTest{},
+	&apps.DaemonSetUpgradeTest{},
 	&upgrades.IngressUpgradeTest{},
 	&upgrades.AppArmorUpgradeTest{},
 }

@@ -26,6 +26,7 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -87,7 +88,7 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 
 // Test waits until the upgrade has completed and then verifies that the DaemonSet
 // is still running
-func (t *DaemonSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *DaemonSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	By("Waiting for upgradet to complete before re-validating DaemonSet")
 	<-done
 
