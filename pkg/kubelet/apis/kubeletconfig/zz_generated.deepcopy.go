@@ -105,6 +105,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			}
 		}
 	}
+	if in.TLSCipherSuites != nil {
+		in, out := &in.TLSCipherSuites, &out.TLSCipherSuites
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	out.Authentication = in.Authentication
 	out.Authorization = in.Authorization
 	if in.ClusterDNS != nil {
