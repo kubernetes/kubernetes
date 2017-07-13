@@ -23,6 +23,10 @@ import (
 	"github.com/golang/glog"
 )
 
+const (
+	useHTTPS = true
+)
+
 // create file share
 func (az *Cloud) createFileShare(accountName, accountKey, name string, sizeGB int) error {
 	fileClient, err := az.getFileSvcClient(accountName, accountKey)
@@ -55,7 +59,7 @@ func (az *Cloud) deleteFileShare(accountName, accountKey, name string) error {
 		share := fileClient.GetShareReference(name)
 		return share.Delete(nil)
 	}
-	return err
+	return nil
 }
 
 func (az *Cloud) getFileSvcClient(accountName, accountKey string) (*azs.FileServiceClient, error) {
