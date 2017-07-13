@@ -53,5 +53,5 @@ func (gce *GCECloud) ListZonesInRegion(region string) ([]*compute.Zone, error) {
 }
 
 func (gce *GCECloud) getRegionLink(region string) string {
-	return gce.service.BasePath + strings.Join([]string{"projects", gce.projectID, "regions", region}, "/")
+	return gce.service.BasePath + strings.Join([]string{gce.projectID, "regions", region}, "/")
 }

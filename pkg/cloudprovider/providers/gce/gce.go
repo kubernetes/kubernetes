@@ -188,7 +188,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
-	networkURL := gceNetworkURL(apiEndpoint, projectID, networkName)
+	networkURL := gceNetworkURL("", projectID, networkName)
 	subnetworkURL := ""
 
 	// By default, Kubernetes clusters only run against one zone
