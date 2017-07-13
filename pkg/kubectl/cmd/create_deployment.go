@@ -60,6 +60,9 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.DeploymentBasicV1Beta1GeneratorName)
 	cmd.Flags().StringSlice("image", []string{}, "Image name to run.")
 	cmd.MarkFlagRequired("image")
+
+	addCommonDeploymentFlags(cmd)
+
 	return cmd
 }
 
@@ -99,14 +102,20 @@ func generatorFromName(
 	generatorName string,
 	imageNames []string,
 	deploymentName string,
+	replicas int32,
+	command []string,
+	args []string,
 ) (kubectl.StructuredGenerator, bool) {
 
 	switch generatorName {
 	case cmdutil.DeploymentBasicAppsV1Beta1GeneratorName:
 		generator := &kubectl.DeploymentBasicAppsGeneratorV1{
 			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
+				Name:     deploymentName,
+				Images:   imageNames,
+				Replicas: replicas,
+				Command:  command,
+				Args:     args,
 			},
 		}
 		return generator, true
@@ -114,8 +123,11 @@ func generatorFromName(
 	case cmdutil.DeploymentBasicV1Beta1GeneratorName:
 		generator := &kubectl.DeploymentBasicGeneratorV1{
 			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
+				Name:     deploymentName,
+				Images:   imageNames,
+				Replicas: replicas,
+				Command:  command,
+				Args:     args,
 			},
 		}
 		return generator, true
@@ -153,7 +165,18 @@ func createDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer,
 	generatorName = fallbackGeneratorNameIfNecessary(generatorName, resourcesList, cmdErr)
 
 	imageNames := cmdutil.GetFlagStringSlice(cmd, "image")
-	generator, ok := generatorFromName(generatorName, imageNames, deploymentName)
+	replicas := cmdutil.GetFlagInt(cmd, "replicas")
+
+	command := []string{}
+	argsArray := args[1:]
+
+	processArgsAsCommand := cmdutil.GetFlagBool(cmd, "command")
+	if processArgsAsCommand {
+		command, argsArray = argsArray, command
+	}
+
+	generator, ok := generatorFromName(generatorName, imageNames,
+		deploymentName, int32(replicas), command, argsArray)
 	if !ok {
 		return errUnsupportedGenerator(cmd, generatorName)
 	}

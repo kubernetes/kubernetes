@@ -28,15 +28,33 @@ import (
 )
 
 // BaseDeploymentGenerator: implement the common functionality of
-// DeploymentBasicGeneratorV1 and DeploymentBasicAppsGeneratorV1. To reduce
-// confusion, it's best to keep this struct in the same file as those
-// generators.
+// DeploymentBasicGeneratorV1 and DeploymentBasicAppsGeneratorV1 (both of the
+// 'kubectl create deployment' Generators). To reduce confusion, it's best to
+// keep this struct in the same file as those generators.
 type BaseDeploymentGenerator struct {
 	Name   string
 	Images []string
+
+	// Replicas is not optional in this struct but typically it defaults to
+	// 1 in the command system.
+	// Determines the number of replicas on the deployment.
+	Replicas int32
+
+	// Limits and Requests are strings like "cpu=200m,memory=512Mi".
+	Limits   string
+	Requests string
+
+	// Command is validated in a special way. If the command is specified,
+	// there must be exactly 1 image in the Images slice.
+	Command []string
+	Args    []string
 }
 
 // validate: check if the caller has forgotten to set one of our fields.
+// We don't bother to check if the optional fields have been set. Do not add
+// validation to the optional fields if it something that can be caught at a
+// lower level and bubbled up. BaseDeploymentGenerator is just a way to get
+// parameters into a Generator.
 func (b BaseDeploymentGenerator) validate() error {
 	if len(b.Name) == 0 {
 		return fmt.Errorf("name must be specified")
@@ -44,6 +62,16 @@ func (b BaseDeploymentGenerator) validate() error {
 	if len(b.Images) == 0 {
 		return fmt.Errorf("at least one image must be specified")
 	}
+
+	// This is one of the very few edge cases of baseDeploymentGenerator.
+	// We accept Command and Args parameters but *only* if the number of
+	// images is 1.
+	if len(b.Command) > 0 || len(b.Args) > 0 {
+		if len(b.Images) != 1 {
+			return fmt.Errorf("command or args may only be specified if the number of images is exactly 1")
+		}
+	}
+
 	return nil
 }
 
@@ -54,22 +82,38 @@ func (b BaseDeploymentGenerator) structuredGenerate() (
 	podSpec v1.PodSpec,
 	labels map[string]string,
 	selector metav1.LabelSelector,
+	replicas int32,
 	err error,
 ) {
 	err = b.validate()
 	if err != nil {
 		return
 	}
-	podSpec = buildPodSpec(b.Images)
-	labels = map[string]string{}
-	labels["app"] = b.Name
+	limits, err := populateResourceListV1(b.Limits)
+	if err != nil {
+		return
+	}
+	requests, err := populateResourceListV1(b.Requests)
+	if err != nil {
+		return
+	}
+	resourceRequirements := v1.ResourceRequirements{
+		Limits:   limits,
+		Requests: requests,
+	}
+	podSpec = buildPodSpec(b.Images, resourceRequirements, b.Command, b.Args)
+
+	labels = map[string]string{"app": b.Name}
 	selector = metav1.LabelSelector{MatchLabels: labels}
+	replicas = b.Replicas
 	return
 }
 
 // buildPodSpec: parse the image strings and assemble them into the Containers
 // of a PodSpec. This is all you need to create the PodSpec for a deployment.
-func buildPodSpec(images []string) v1.PodSpec {
+func buildPodSpec(images []string, resourceRequirements v1.ResourceRequirements,
+	command []string, args []string) v1.PodSpec {
+
 	podSpec := v1.PodSpec{Containers: []v1.Container{}}
 	for _, imageString := range images {
 		// Retain just the image name
@@ -81,7 +125,13 @@ func buildPodSpec(images []string) v1.PodSpec {
 		} else if strings.Contains(name, "@") {
 			name = strings.Split(name, "@")[0]
 		}
-		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
+		podSpec.Containers = append(podSpec.Containers, v1.Container{
+			Name:      name,
+			Image:     imageString,
+			Resources: resourceRequirements,
+			Command:   command,
+			Args:      args,
+		})
 	}
 	return podSpec
 }
@@ -96,15 +146,14 @@ var _ StructuredGenerator = &DeploymentBasicGeneratorV1{}
 
 // StructuredGenerate outputs a deployment object using the configured fields
 func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error) {
-	podSpec, labels, selector, err := s.structuredGenerate()
-	one := int32(1)
+	podSpec, labels, selector, replicas, err := s.structuredGenerate()
 	return &extensionsv1beta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
 		},
 		Spec: extensionsv1beta1.DeploymentSpec{
-			Replicas: &one,
+			Replicas: &replicas,
 			Selector: &selector,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -126,15 +175,14 @@ var _ StructuredGenerator = &DeploymentBasicAppsGeneratorV1{}
 
 // StructuredGenerate outputs a deployment object using the configured fields
 func (s *DeploymentBasicAppsGeneratorV1) StructuredGenerate() (runtime.Object, error) {
-	podSpec, labels, selector, err := s.structuredGenerate()
-	one := int32(1)
+	podSpec, labels, selector, replicas, err := s.structuredGenerate()
 	return &appsv1beta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
 		},
 		Spec: appsv1beta1.DeploymentSpec{
-			Replicas: &one,
+			Replicas: &replicas,
 			Selector: &selector,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
