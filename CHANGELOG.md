@@ -1222,9 +1222,7 @@ Features for this release were tracked via the use of the [kubernetes/features](
 
   * `kubectl create clusterrole` supports `--non-resource-url` ([#45809](https://github.com/kubernetes/kubernetes/pull/45809), [@CaoShuFeng](https://github.com/CaoShuFeng))
 
-  * `kubectl logs` and `kubectl attach` support specifying a wait timeout with `--pod-running-timeout`
-
-  *  ([#41813](https://github.com/kubernetes/kubernetes/pull/41813), [@shiywang](https://github.com/shiywang))
+  * `kubectl logs` and `kubectl attach` support specifying a wait timeout with `--pod-running-timeout` ([#41813](https://github.com/kubernetes/kubernetes/pull/41813), [@shiywang](https://github.com/shiywang))
 
   * New commands
 
