@@ -176,7 +176,7 @@ func MakeLabels(labels map[string]string) string {
 func ParseLabels(labelSpec interface{}) (map[string]string, error) {
 	labelString, isString := labelSpec.(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v", labelSpec)
+		return nil, fmt.Errorf("expected Labels to be a string, found %#v", labelSpec)
 	}
 	if len(labelString) == 0 {
 		return nil, fmt.Errorf("no label spec passed")
