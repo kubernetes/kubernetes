@@ -3,15 +3,12 @@
 package windows
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 
 	ansiterm "github.com/Azure/go-ansiterm"
 	"github.com/Azure/go-ansiterm/winterm"
-	"github.com/Sirupsen/logrus"
 )
-
-var logger *logrus.Logger
 
 // ansiWriter wraps a standard output file (e.g., os.Stdout) providing ANSI sequence translation.
 type ansiWriter struct {
@@ -24,19 +21,10 @@ type ansiWriter struct {
 	parser         *ansiterm.AnsiParser
 }
 
-func newAnsiWriter(nFile int) *ansiWriter {
-	logFile := ioutil.Discard
-
-	if isDebugEnv := os.Getenv(ansiterm.LogEnv); isDebugEnv == "1" {
-		logFile, _ = os.Create("ansiReaderWriter.log")
-	}
-
-	logger = &logrus.Logger{
-		Out:       logFile,
-		Formatter: new(logrus.TextFormatter),
-		Level:     logrus.DebugLevel,
-	}
-
+// NewAnsiWriter returns an io.Writer that provides VT100 terminal emulation on top of a
+// Windows console output handle.
+func NewAnsiWriter(nFile int) io.Writer {
+	initLogger()
 	file, fd := winterm.GetStdFile(nFile)
 	info, err := winterm.GetConsoleScreenBufferInfo(fd)
 	if err != nil {
