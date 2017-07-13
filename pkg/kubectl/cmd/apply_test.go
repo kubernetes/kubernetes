@@ -47,7 +47,7 @@ func TestApplyExtraArgsFail(t *testing.T) {
 	errBuf := bytes.NewBuffer([]byte{})
 
 	f, _, _, _ := cmdtesting.NewAPIFactory()
-	c := NewCmdApply(f, buf, errBuf)
+	c := NewCmdApply("kubectl", f, buf, errBuf)
 	if validateApplyArgs(c, []string{"rc"}) == nil {
 		t.Fatalf("unexpected non-error")
 	}
@@ -377,14 +377,14 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply(f, buf, errBuf)
+	cmd := NewCmdApply("kubectl", f, buf, errBuf)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
 	expectRC := "replicationcontroller/" + nameRC + "\n"
-	expectWarning := warningNoLastAppliedConfigAnnotation
+	expectWarning := fmt.Sprintf(warningNoLastAppliedConfigAnnotation, "kubectl")
 	if errBuf.String() != expectWarning {
 		t.Fatalf("unexpected non-warning: %s\nexpected: %s", errBuf.String(), expectWarning)
 	}
@@ -422,7 +422,7 @@ func TestApplyObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply(f, buf, errBuf)
+	cmd := NewCmdApply("kubectl", f, buf, errBuf)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -479,7 +479,7 @@ func TestApplyObjectOutput(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply(f, buf, errBuf)
+	cmd := NewCmdApply("kubectl", f, buf, errBuf)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "yaml")
 	cmd.Run(cmd, []string{})
@@ -533,7 +533,7 @@ func TestApplyRetry(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply(f, buf, errBuf)
+	cmd := NewCmdApply("kubectl", f, buf, errBuf)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -578,7 +578,7 @@ func TestApplyNonExistObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply(f, buf, errBuf)
+	cmd := NewCmdApply("kubectl", f, buf, errBuf)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -636,7 +636,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply(f, buf, errBuf)
+	cmd := NewCmdApply("kubectl", f, buf, errBuf)
 	if asList {
 		cmd.Flags().Set("filename", filenameRCSVC)
 	} else {
@@ -729,7 +729,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply(f, buf, errBuf)
+	cmd := NewCmdApply("kubectl", f, buf, errBuf)
 	cmd.Flags().Set("filename", filenameDeployObjClientside)
 	cmd.Flags().Set("output", "name")
 
@@ -789,7 +789,7 @@ func TestUnstructuredApply(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply(f, buf, errBuf)
+	cmd := NewCmdApply("kubectl", f, buf, errBuf)
 	cmd.Flags().Set("filename", filenameWidgetClientside)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -876,7 +876,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply(f, buf, errBuf)
+	cmd := NewCmdApply("kubectl", f, buf, errBuf)
 	cmd.Flags().Set("filename", filenameWidgetClientside)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
