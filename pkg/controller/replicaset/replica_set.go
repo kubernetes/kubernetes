@@ -45,7 +45,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -107,7 +106,7 @@ func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, 
 		kubeClient: kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "replicaset-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "replicaset-controller"}),
 		},
 		burstReplicas: burstReplicas,
 		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),

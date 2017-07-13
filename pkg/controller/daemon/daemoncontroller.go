@@ -47,7 +47,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
@@ -135,10 +134,10 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 	}
 	dsc := &DaemonSetsController{
 		kubeClient:    kubeClient,
-		eventRecorder: eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "daemonset-controller"}),
+		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "daemonset-controller"}),
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "daemon-set"}),
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "daemon-set"}),
 		},
 		crControl: controller.RealControllerRevisionControl{
 			KubeClient: kubeClient,
