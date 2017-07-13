@@ -98,7 +98,7 @@ func newPodOnNode(c clientset.Interface, namespace, podName, nodeName string) er
 	return err
 }
 
-var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
+var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]", func() {
 	f := framework.NewDefaultFramework("network-partition")
 	var systemPodsNo int32
 	var c clientset.Interface

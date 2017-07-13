@@ -41,7 +41,7 @@ const (
 	timeout           = 60 * time.Second
 )
 
-var _ = framework.KubeDescribe("DisruptionController", func() {
+var _ = SIGDescribe("DisruptionController", func() {
 	f := framework.NewDefaultFramework("disruption")
 	var ns string
 	var cs *kubernetes.Clientset
