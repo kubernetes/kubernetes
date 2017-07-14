@@ -131,6 +131,8 @@ type NodeTestContextType struct {
 	PrepullImages bool
 	// KubeletConfig is the kubelet configuration the test is running against.
 	KubeletConfig componentconfig.KubeletConfiguration
+	// ImageDescription is the description of the image on which the test is running.
+	ImageDescription string
 }
 
 type CloudConfig struct {
@@ -250,6 +252,7 @@ func RegisterNodeFlags() {
 	// It is hard and unnecessary to deal with the complexity inside the test suite.
 	flag.BoolVar(&TestContext.NodeConformance, "conformance", false, "If true, the test suite will not start kubelet, and fetch system log (kernel, docker, kubelet log etc.) to the report directory.")
 	flag.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
+	flag.StringVar(&TestContext.ImageDescription, "image-description", "", "The description of the image which the test will be running on.")
 }
 
 // ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.
