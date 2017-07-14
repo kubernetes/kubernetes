@@ -513,6 +513,23 @@ kube::util::ensure_godep_version() {
   godep version
 }
 
+# Installs the specified go package at a particular commit.
+kube::util::go_install_from_commit() {
+  local -r pkg=$1
+  local -r commit=$2
+
+  kube::util::ensure-temp-dir
+  mkdir -p "${KUBE_TEMP}/go/src"
+  GOPATH="${KUBE_TEMP}/go" go get -d -u "${pkg}" 2>/dev/null
+  (
+    cd "${KUBE_TEMP}/go/src/${pkg}"
+    git checkout -q "${commit}"
+    GOPATH="${KUBE_TEMP}/go" go install "${pkg}"
+  )
+  PATH="${KUBE_TEMP}/go/bin:${PATH}"
+  hash -r # force bash to clear PATH cache
+}
+
 # Checks that the GOPATH is simple, i.e. consists only of one directory, not multiple.
 kube::util::ensure_single_dir_gopath() {
   if [[ "${GOPATH}" == *:* ]]; then
