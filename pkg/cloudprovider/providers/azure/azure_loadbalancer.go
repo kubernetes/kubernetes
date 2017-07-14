@@ -25,6 +25,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 
+	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
@@ -871,11 +872,21 @@ func findSecurityRule(rules []network.SecurityRule, rule network.SecurityRule) b
 // This ensures the given VM's Primary NIC's Primary IP Configuration is
 // participating in the specified LoadBalancer Backend Pool.
 func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, backendPoolID string) error {
+	var machine compute.VirtualMachine
 	vmName := mapNodeNameToVMName(nodeName)
 	az.operationPollRateLimiter.Accept()
 	machine, err := az.VirtualMachinesClient.Get(az.ResourceGroup, vmName, "")
 	if err != nil {
-		return err
+		if az.CloudProviderBackoff {
+			glog.V(2).Infof("ensureHostInPool(%s, %s, %s) backing off", serviceName, nodeName, backendPoolID)
+			machine, err = az.VirtualMachineClientGetWithRetry(az.ResourceGroup, vmName, "")
+			if err != nil {
+				glog.V(2).Infof("ensureHostInPool(%s, %s, %s) abort backoff", serviceName, nodeName, backendPoolID)
+				return err
+			}
+		} else {
+			return err
+		}
 	}
 
 	primaryNicID, err := getPrimaryInterfaceID(machine)
