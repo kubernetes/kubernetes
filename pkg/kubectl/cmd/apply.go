@@ -66,7 +66,7 @@ const (
 	// how many times we can retry before back off
 	triesBeforeBackOff = 1
 
-	warningNoLastAppliedConfigAnnotation = "Warning: kubectl apply should be used on resource created by either kubectl create --save-config or kubectl apply\n"
+	warningNoLastAppliedConfigAnnotation = "Warning: %[1]s apply should be used on resource created by either %[1]s create --save-config or %[1]s apply\n"
 )
 
 var (
@@ -299,7 +299,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				return err
 			}
 			if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
-				fmt.Fprintf(errOut, warningNoLastAppliedConfigAnnotation)
+				fmt.Fprintf(errOut, fmt.Sprintf(warningNoLastAppliedConfigAnnotation, cmd.Root().Name()))
 			}
 			overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
 			helper := resource.NewHelper(info.Client, info.Mapping)
