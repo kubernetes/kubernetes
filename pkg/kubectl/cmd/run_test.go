@@ -296,14 +296,12 @@ func TestGenerateService(t *testing.T) {
 					body := objBody(codec, &test.service)
 					data, err := ioutil.ReadAll(req.Body)
 					if err != nil {
-						t.Errorf("unexpected error: %v", err)
-						t.FailNow()
+						t.Fatalf("unexpected error: %v", err)
 					}
 					defer req.Body.Close()
 					svc := &api.Service{}
 					if err := runtime.DecodeInto(codec, data, svc); err != nil {
-						t.Errorf("unexpected error: %v", err)
-						t.FailNow()
+						t.Fatalf("unexpected error: %v", err)
 					}
 					// Copy things that are defaulted by the system
 					test.service.Annotations = svc.Annotations
