@@ -71,23 +71,7 @@ func (kl *Kubelet) GetPodDir(podUID types.UID) string {
 // getPodDir returns the full path to the per-pod directory for the pod with
 // the given UID.
 func (kl *Kubelet) getPodDir(podUID types.UID) string {
-	// Backwards compat.  The "old" stuff should be removed before 1.0
-	// release.  The thinking here is this:
-	//     !old && !new = use new
-	//     !old && new  = use new
-	//     old && !new  = use old
-	//     old && new   = use new (but warn)
-	oldPath := filepath.Join(kl.getRootDir(), string(podUID))
-	oldExists := dirExists(oldPath)
-	newPath := filepath.Join(kl.getPodsDir(), string(podUID))
-	newExists := dirExists(newPath)
-	if oldExists && !newExists {
-		return oldPath
-	}
-	if oldExists {
-		glog.Warningf("Data dir for pod %q exists in both old and new form, using new", podUID)
-	}
-	return newPath
+	return filepath.Join(kl.getPodsDir(), string(podUID))
 }
 
 // getPodVolumesDir returns the full path to the per-pod data directory under
@@ -122,23 +106,7 @@ func (kl *Kubelet) getPodPluginDir(podUID types.UID, pluginName string) string {
 // which container data is held for the specified pod.  This directory may not
 // exist if the pod or container does not exist.
 func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
-	// Backwards compat.  The "old" stuff should be removed before 1.0
-	// release.  The thinking here is this:
-	//     !old && !new = use new
-	//     !old && new  = use new
-	//     old && !new  = use old
-	//     old && new   = use new (but warn)
-	oldPath := filepath.Join(kl.getPodDir(podUID), ctrName)
-	oldExists := dirExists(oldPath)
-	newPath := filepath.Join(kl.getPodDir(podUID), options.DefaultKubeletContainersDirName, ctrName)
-	newExists := dirExists(newPath)
-	if oldExists && !newExists {
-		return oldPath
-	}
-	if oldExists {
-		glog.Warningf("Data dir for pod %q, container %q exists in both old and new form, using new", podUID, ctrName)
-	}
-	return newPath
+	return filepath.Join(kl.getPodDir(podUID), options.DefaultKubeletContainersDirName, ctrName)
 }
 
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror
