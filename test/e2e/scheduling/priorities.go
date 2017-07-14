@@ -398,7 +398,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 
 		needCreateResource["memory"] = *resource.NewQuantity(int64((ratio-memFraction)*float64(memAllocatableVal)), resource.BinarySI)
 
-		err := testutils.StartPods(cs, 1, ns, "priority-balanced-mem-"+node.Name,
+		err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
 			*initPausePod(f, pausePodConfig{
 				Name:   "",
 				Labels: balancePodLabel,
