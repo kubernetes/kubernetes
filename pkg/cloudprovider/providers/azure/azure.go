@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
+	"github.com/Azure/azure-sdk-for-go/arm/disk"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/azure-sdk-for-go/arm/storage"
 	"github.com/Azure/go-autorest/autorest"
@@ -122,8 +123,13 @@ type Cloud struct {
 	SecurityGroupsClient     network.SecurityGroupsClient
 	VirtualMachinesClient    compute.VirtualMachinesClient
 	StorageAccountClient     storage.AccountsClient
+	DisksClient              disk.DisksClient
 	operationPollRateLimiter flowcontrol.RateLimiter
 	resourceRequestBackoff   wait.Backoff
+
+	*BlobDiskController
+	*ManagedDiskController
+	*controllerCommon
 }
 
 func init() {
@@ -255,6 +261,11 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 
 	az.StorageAccountClient = storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
 	az.StorageAccountClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	configureUserAgent(&az.StorageAccountClient.Client)
+
+	az.DisksClient = disk.NewDisksClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
+	az.DisksClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	configureUserAgent(&az.DisksClient.Client)
 
 	// Conditionally configure rate limits
 	if az.CloudProviderRateLimit {
@@ -304,6 +315,9 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			az.CloudProviderBackoffJitter)
 	}
 
+	if err := initDiskControllers(&az); err != nil {
+		return nil, err
+	}
 	return &az, nil
 }
 
@@ -352,4 +366,43 @@ func (az *Cloud) ProviderName() string {
 func configureUserAgent(client *autorest.Client) {
 	k8sVersion := version.Get().GitVersion
 	client.UserAgent = fmt.Sprintf("%s; kubernetes-cloudprovider/%s", client.UserAgent, k8sVersion)
+}
+
+func initDiskControllers(az *Cloud) error {
+	// Common controller contains the function
+	// needed by both blob disk and managed disk controllers
+
+	common := &controllerCommon{
+		aadResourceEndPoint:   az.Environment.ServiceManagementEndpoint,
+		clientID:              az.AADClientID,
+		clientSecret:          az.AADClientSecret,
+		location:              az.Location,
+		storageEndpointSuffix: az.Environment.StorageEndpointSuffix,
+		managementEndpoint:    az.Environment.ResourceManagerEndpoint,
+		resourceGroup:         az.ResourceGroup,
+		tenantID:              az.TenantID,
+		tokenEndPoint:         az.Environment.ActiveDirectoryEndpoint,
+		subscriptionID:        az.SubscriptionID,
+		cloud:                 az,
+	}
+
+	// BlobDiskController: contains the function needed to
+	// create/attach/detach/delete blob based (unmanaged disks)
+	blobController, err := newBlobDiskController(common)
+	if err != nil {
+		return fmt.Errorf("AzureDisk -  failed to init Blob Disk Controller with error (%s)", err.Error())
+	}
+
+	// ManagedDiskController: contains the functions needed to
+	// create/attach/detach/delete managed disks
+	managedController, err := newManagedDiskController(common)
+	if err != nil {
+		return fmt.Errorf("AzureDisk -  failed to init Managed  Disk Controller with error (%s)", err.Error())
+	}
+
+	az.BlobDiskController = blobController
+	az.ManagedDiskController = managedController
+	az.controllerCommon = common
+
+	return nil
 }
