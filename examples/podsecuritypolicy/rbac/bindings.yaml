@@ -31,7 +31,8 @@ roleRef:
    kind: ClusterRole
    name: restricted-psp-user
 ---
-# edit grants edit role to system:authenticated.
+# edit grants edit role to the groups
+# restricted and privileged.
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
