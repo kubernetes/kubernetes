@@ -84,8 +84,8 @@ const (
 	MinimumAddressesInServiceSubnet = 10
 
 	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
-	// Default behaviour is "never expire" == 0
-	DefaultTokenDuration = 0
+	// Default behaviour is 24 hours
+	DefaultTokenDuration = 24 * time.Hour
 
 	// LabelNodeRoleMaster specifies that a node is a master
 	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112

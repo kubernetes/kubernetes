@@ -10,7 +10,11 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["deployment_test.go"],
+    size = "large",
+    srcs = [
+        "deployment_test.go",
+        "main_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [

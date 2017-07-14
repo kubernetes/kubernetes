@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,25 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package azure
+package etcd
 
 import (
-	"bytes"
-	"encoding/binary"
+	"testing"
 
-	"github.com/rubiojr/go-vhd/vhd"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
-const (
-	vhdHeaderSize = vhd.VHD_HEADER_SIZE
-)
-
-func createVHDHeader(size uint64) ([]byte, error) {
-	h := vhd.CreateFixedHeader(size, &vhd.VHDOptions{})
-	b := new(bytes.Buffer)
-	err := binary.Write(b, binary.BigEndian, h)
-	if err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
+func TestMain(m *testing.M) {
+	framework.EtcdMain(m.Run)
 }

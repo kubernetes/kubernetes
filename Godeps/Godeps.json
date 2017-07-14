@@ -39,6 +39,11 @@
 			"Rev": "786cc84138518bf7fd6d60e92fad1ac9d1a117ad"
 		},
 		{
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/disk",
+			"Comment": "v10.0.4-beta-1-g786cc84",
+			"Rev": "786cc84138518bf7fd6d60e92fad1ac9d1a117ad"
+		},
+		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/network",
 			"Comment": "v10.0.4-beta-1-g786cc84",
 			"Rev": "786cc84138518bf7fd6d60e92fad1ac9d1a117ad"
@@ -55,11 +60,11 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm",
-			"Rev": "fa152c58bc15761d0200cb75fe958b89a9d4888e"
+			"Rev": "70b2c90b260171e829f1ebd7c17f600c11858dbe"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm/winterm",
-			"Rev": "fa152c58bc15761d0200cb75fe958b89a9d4888e"
+			"Rev": "70b2c90b260171e829f1ebd7c17f600c11858dbe"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",

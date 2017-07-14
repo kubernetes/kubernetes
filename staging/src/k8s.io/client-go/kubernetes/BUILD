@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "clientset.go",
         "doc.go",
+        "import.go",
     ],
     tags = ["automanaged"],
     deps = [

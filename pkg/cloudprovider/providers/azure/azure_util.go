@@ -19,7 +19,9 @@ package azure
 import (
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -292,4 +294,59 @@ func splitProviderID(providerID string) (types.NodeName, error) {
 		return "", errors.New("error splitting providerID")
 	}
 	return types.NodeName(matches[1]), nil
+}
+
+var polyTable = crc32.MakeTable(crc32.Koopman)
+
+//MakeCRC32 : convert string to CRC32 format
+func MakeCRC32(str string) string {
+	crc := crc32.New(polyTable)
+	crc.Write([]byte(str))
+	hash := crc.Sum32()
+	return strconv.FormatUint(uint64(hash), 10)
+}
+
+//ExtractVMData : extract dataDisks, storageProfile from a map struct
+func ExtractVMData(vmData map[string]interface{}) (dataDisks []interface{},
+	storageProfile map[string]interface{},
+	hardwareProfile map[string]interface{}, err error) {
+	props, ok := vmData["properties"].(map[string]interface{})
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("convert vmData(properties) to map error")
+	}
+
+	storageProfile, ok = props["storageProfile"].(map[string]interface{})
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("convert vmData(storageProfile) to map error")
+	}
+
+	hardwareProfile, ok = props["hardwareProfile"].(map[string]interface{})
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("convert vmData(hardwareProfile) to map error")
+	}
+
+	dataDisks, ok = storageProfile["dataDisks"].([]interface{})
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("convert vmData(dataDisks) to map error")
+	}
+	return dataDisks, storageProfile, hardwareProfile, nil
+}
+
+//ExtractDiskData : extract provisioningState, diskState from a map struct
+func ExtractDiskData(diskData interface{}) (provisioningState string, diskState string, err error) {
+	fragment, ok := diskData.(map[string]interface{})
+	if !ok {
+		return "", "", fmt.Errorf("convert diskData to map error")
+	}
+
+	properties, ok := fragment["properties"].(map[string]interface{})
+	if !ok {
+		return "", "", fmt.Errorf("convert diskData(properties) to map error")
+	}
+
+	provisioningState, ok = properties["provisioningState"].(string) // if there is a disk, provisioningState property will be there
+	if ref, ok := properties["diskState"]; ok {
+		diskState = ref.(string)
+	}
+	return provisioningState, diskState, nil
 }
