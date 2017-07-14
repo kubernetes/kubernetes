@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 )
 
 // StatefulSetUpgradeTest implements an upgrade test harness for StatefulSet upgrade testing.
@@ -36,7 +37,7 @@ type StatefulSetUpgradeTest struct {
 
 func (StatefulSetUpgradeTest) Name() string { return "[sig-apps] statefulset-upgrade" }
 
-func (StatefulSetUpgradeTest) Skip(upgCtx UpgradeContext) bool {
+func (StatefulSetUpgradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
 	minVersion := version.MustParseSemantic("1.5.0")
 
 	for _, vCtx := range upgCtx.Versions {
@@ -81,7 +82,7 @@ func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 }
 
 // Waits for the upgrade to complete and verifies the StatefulSet basic functionality
-func (t *StatefulSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *StatefulSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
 	t.verify()
 }
