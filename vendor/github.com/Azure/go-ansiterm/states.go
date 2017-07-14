@@ -1,52 +1,52 @@
 package ansiterm
 
-type stateID int
+type StateId int
 
-type state interface {
+type State interface {
 	Enter() error
 	Exit() error
-	Handle(byte) (state, error)
+	Handle(byte) (State, error)
 	Name() string
-	Transition(state) error
+	Transition(State) error
 }
 
-type baseState struct {
+type BaseState struct {
 	name   string
 	parser *AnsiParser
 }
 
-func (base baseState) Enter() error {
+func (base BaseState) Enter() error {
 	return nil
 }
 
-func (base baseState) Exit() error {
+func (base BaseState) Exit() error {
 	return nil
 }
 
-func (base baseState) Handle(b byte) (s state, e error) {
+func (base BaseState) Handle(b byte) (s State, e error) {
 
 	switch {
 	case b == CSI_ENTRY:
-		return base.parser.csiEntry, nil
+		return base.parser.CsiEntry, nil
 	case b == DCS_ENTRY:
-		return base.parser.dcsEntry, nil
+		return base.parser.DcsEntry, nil
 	case b == ANSI_ESCAPE_PRIMARY:
-		return base.parser.escape, nil
+		return base.parser.Escape, nil
 	case b == OSC_STRING:
-		return base.parser.oscString, nil
-	case sliceContains(toGroundBytes, b):
-		return base.parser.ground, nil
+		return base.parser.OscString, nil
+	case sliceContains(ToGroundBytes, b):
+		return base.parser.Ground, nil
 	}
 
 	return nil, nil
 }
 
-func (base baseState) Name() string {
+func (base BaseState) Name() string {
 	return base.name
 }
 
-func (base baseState) Transition(s state) error {
-	if s == base.parser.ground {
+func (base BaseState) Transition(s State) error {
+	if s == base.parser.Ground {
 		execBytes := []byte{0x18}
 		execBytes = append(execBytes, 0x1A)
 		execBytes = append(execBytes, getByteRange(0x80, 0x8F)...)
@@ -62,10 +62,10 @@ func (base baseState) Transition(s state) error {
 	return nil
 }
 
-type dcsEntryState struct {
-	baseState
+type DcsEntryState struct {
+	BaseState
 }
 
-type errorState struct {
-	baseState
+type ErrorState struct {
+	BaseState
 }
