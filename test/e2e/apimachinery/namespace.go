@@ -142,7 +142,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	}
 	go func() {
 		_, err = f.ClientSet.Core().Pods(namespace.Name).Create(podB)
-		// This error is ok, beacuse we will delete the pod before it completes initialization
+		// This error is ok, because we will delete the pod before it completes initialization
 		framework.Logf("error from create uninitialized namespace: %v", err)
 	}()
 	podB = waitForPodInNamespace(f.ClientSet, namespace.Name, podB.Name)
