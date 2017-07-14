@@ -86,7 +86,7 @@ func normalizeConfigDuration(name string, scale, value, min, max, defaultValue t
 	value *= scale
 
 	// check value is within range
-	if value <= min || value > max {
+	if value < min || value > max {
 		return value, fmt.Errorf("valid value is between %v and %v, got %v", min, max, value)
 	}
 	return value, nil
