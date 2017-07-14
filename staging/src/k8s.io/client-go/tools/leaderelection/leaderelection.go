@@ -200,7 +200,7 @@ func (le *LeaderElector) renew() {
 			return
 		}
 		le.config.Lock.RecordEvent("stopped leading")
-		glog.Infof("failed to renew lease %v", desc)
+		glog.Infof("failed to renew lease %v: %v", desc, err)
 		close(stop)
 	}, 0, stop)
 }
