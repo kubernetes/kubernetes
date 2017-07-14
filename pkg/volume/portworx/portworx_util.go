@@ -189,8 +189,13 @@ func createDriverClient(hostname string) (*osdclient.Client, error) {
 // getPortworxDriver() returns a Portworx volume driver which can be used for volume operations
 // localOnly: If true, the returned driver will be connected to Portworx API server on volume host.
 //            If false, driver will be connected to API server on volume host or Portworx k8s service cluster IP
-//            This flag is required to explictly force certain operation requests (mount, unmount, detach, attach) to
-//            go to the volume host instead of the k8s service which might route it to any host.
+//            This flag is required to explicitly force certain operations (mount, unmount, detach, attach) to
+//            go to the volume host instead of the k8s service which might route it to any host. This pertains to how
+//            Portworx mounts and attaches a volume to the running container. The node getting these requests needs to
+//            see the pod container mounts (specifically /var/lib/kubelet/pods/<pod_id>)
+//            Operations like create and delete volume don't need to be restricted to local volume host since
+//            any node in the Portworx cluster can co-ordinate the create/delete request and forward the operations to
+//            the Portworx node that will own/owns the data.
 func (util *PortworxVolumeUtil) getPortworxDriver(volumeHost volume.VolumeHost, localOnly bool) (volumeapi.VolumeDriver, error) {
 	var err error
 	if localOnly {
