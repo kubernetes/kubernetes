@@ -38,12 +38,15 @@ import (
 	storagetests "k8s.io/apiserver/pkg/storage/tests"
 	"k8s.io/apiserver/pkg/storage/value"
 
+	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/integration"
 	"golang.org/x/net/context"
 )
 
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
+
+const defaultTestPrefix = "test!"
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
@@ -84,7 +87,7 @@ func TestCreate(t *testing.T) {
 
 	key := "/testkey"
 	out := &example.Pod{}
-	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", SelfLink: "testlink"}}
 
 	// verify that kv pair is empty before set
 	getResp, err := etcdClient.KV.Get(ctx, key)
@@ -106,14 +109,31 @@ func TestCreate(t *testing.T) {
 	if out.ResourceVersion == "" {
 		t.Errorf("output should have non-empty resource version")
 	}
+	if out.SelfLink != "" {
+		t.Errorf("output should have empty self link")
+	}
 
-	// verify that kv pair is not empty after set
-	getResp, err = etcdClient.KV.Get(ctx, key)
+	checkStorageInvariants(ctx, t, etcdClient, store, key)
+}
+
+func checkStorageInvariants(ctx context.Context, t *testing.T, etcdClient *clientv3.Client, store *store, key string) {
+	getResp, err := etcdClient.KV.Get(ctx, key)
 	if err != nil {
 		t.Fatalf("etcdClient.KV.Get failed: %v", err)
 	}
 	if len(getResp.Kvs) == 0 {
 		t.Fatalf("expecting non empty result on key: %s", key)
+	}
+	decoded, err := runtime.Decode(store.codec, getResp.Kvs[0].Value[len(defaultTestPrefix):])
+	if err != nil {
+		t.Fatalf("expecting successful decode of object from %v\n%v", err, string(getResp.Kvs[0].Value))
+	}
+	obj := decoded.(*example.Pod)
+	if obj.ResourceVersion != "" {
+		t.Errorf("stored object should have empty resource version")
+	}
+	if obj.SelfLink != "" {
+		t.Errorf("stored output should have empty self link")
 	}
 }
 
@@ -316,7 +336,8 @@ func TestGetToList(t *testing.T) {
 func TestGuaranteedUpdate(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storeObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+	etcdClient := cluster.RandClient()
+	key := "/testkey"
 
 	tests := []struct {
 		key                 string
@@ -326,6 +347,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectInvalidObjErr bool
 		expectNoUpdate      bool
 		transformStale      bool
+		hasSelfLink         bool
 	}{{ // GuaranteedUpdate on non-existing key with ignoreNotFound=false
 		key:                 "/non-existing",
 		ignoreNotFound:      false,
@@ -354,6 +376,14 @@ func TestGuaranteedUpdate(t *testing.T) {
 		expectNotFoundErr:   false,
 		expectInvalidObjErr: false,
 		expectNoUpdate:      true,
+	}, { // GuaranteedUpdate with same data AND a self link
+		key:                 key,
+		ignoreNotFound:      false,
+		precondition:        nil,
+		expectNotFoundErr:   false,
+		expectInvalidObjErr: false,
+		expectNoUpdate:      true,
+		hasSelfLink:         true,
 	}, { // GuaranteedUpdate with same data but stale
 		key:                 key,
 		ignoreNotFound:      false,
@@ -379,6 +409,8 @@ func TestGuaranteedUpdate(t *testing.T) {
 	}}
 
 	for i, tt := range tests {
+		key, storeObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+
 		out := &example.Pod{}
 		name := fmt.Sprintf("foo-%d", i)
 		if tt.expectNoUpdate {
@@ -399,6 +431,9 @@ func TestGuaranteedUpdate(t *testing.T) {
 					}
 				}
 				pod := *storeObj
+				if tt.hasSelfLink {
+					pod.SelfLink = "testlink"
+				}
 				pod.Name = name
 				return &pod, nil
 			}))
@@ -422,6 +457,13 @@ func TestGuaranteedUpdate(t *testing.T) {
 		if out.ObjectMeta.Name != name {
 			t.Errorf("#%d: pod name want=%s, get=%s", i, name, out.ObjectMeta.Name)
 		}
+		if out.SelfLink != "" {
+			t.Errorf("#%d: selflink should not be set", i)
+		}
+
+		// verify that kv pair is not empty after set and that the underlying data matches expectations
+		checkStorageInvariants(ctx, t, etcdClient, store, key)
+
 		switch tt.expectNoUpdate {
 		case true:
 			if version != out.ResourceVersion {
@@ -432,7 +474,6 @@ func TestGuaranteedUpdate(t *testing.T) {
 				t.Errorf("#%d: expect version change, but get the same version=%s", i, version)
 			}
 		}
-		storeObj = out
 	}
 }
 
@@ -546,7 +587,7 @@ func TestTransformationFailure(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte("test!")})
+	store := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
 
 	preset := []struct {
@@ -626,7 +667,7 @@ func TestList(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte("test!")})
+	store := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -714,7 +755,7 @@ func TestList(t *testing.T) {
 func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	store := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte("test!")})
+	store := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
 	return ctx, store, cluster
 }
@@ -724,9 +765,12 @@ func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
 	key := "/testkey"
+	err := store.unconditionalDelete(ctx, key, &example.Pod{})
+	if err != nil && !storage.IsNotFound(err) {
+		t.Fatal("Cleanup failed: %v", err)
+	}
 	setOutput := &example.Pod{}
-	err := store.Create(ctx, key, obj, setOutput, 0)
-	if err != nil {
+	if err := store.Create(ctx, key, obj, setOutput, 0); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
 	return key, setOutput
@@ -736,7 +780,7 @@ func TestPrefix(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	transformer := prefixTransformer{prefix: []byte("test!")}
+	transformer := prefixTransformer{prefix: []byte(defaultTestPrefix)}
 	testcases := map[string]string{
 		"custom/prefix":     "/custom/prefix",
 		"/custom//prefix//": "/custom/prefix",
