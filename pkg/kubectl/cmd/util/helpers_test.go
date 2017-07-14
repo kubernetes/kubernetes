@@ -267,7 +267,7 @@ func TestCheckExitError(t *testing.T) {
 	testCheckError(t, []checkErrTestCase{
 		{
 			uexec.CodeExitError{Err: fmt.Errorf("pod foo/bar terminated"), Code: 42},
-			"",
+			"pod foo/bar terminated",
 			42,
 		},
 	})
