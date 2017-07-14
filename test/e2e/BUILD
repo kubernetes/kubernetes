@@ -16,6 +16,7 @@ go_test(
     deps = [
         "//test/e2e/apimachinery:go_default_library",
         "//test/e2e/apps:go_default_library",
+        "//test/e2e/auth:go_default_library",
         "//test/e2e/autoscaling:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
@@ -44,8 +45,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "audit.go",
-        "certificates.go",
         "dashboard.go",
         "e2e.go",
         "events.go",
@@ -61,7 +60,6 @@ go_library(
         "pods.go",
         "pre_stop.go",
         "resource_quota.go",
-        "service_accounts.go",
         "ssh.go",
         "ubernetes_lite.go",
     ],
@@ -75,8 +73,6 @@ go_library(
         "//pkg/kubectl/util/logs:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
-        "//pkg/util/version:go_default_library",
-        "//plugin/pkg/admission/serviceaccount:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
@@ -92,11 +88,9 @@ go_library(
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",
         "//vendor/k8s.io/api/batch/v2alpha1:go_default_library",
-        "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",
         "//vendor/k8s.io/api/settings/v1alpha1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
@@ -111,9 +105,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
-        "//vendor/k8s.io/client-go/util/cert:go_default_library",
     ],
 )
 
@@ -141,6 +133,7 @@ filegroup(
         ":package-srcs",
         "//test/e2e/apimachinery:all-srcs",
         "//test/e2e/apps:all-srcs",
+        "//test/e2e/auth:all-srcs",
         "//test/e2e/autoscaling:all-srcs",
         "//test/e2e/chaosmonkey:all-srcs",
         "//test/e2e/common:all-srcs",
