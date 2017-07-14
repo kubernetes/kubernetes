@@ -88,7 +88,7 @@ func allowHostNetwork(pod *v1.Pod) (bool, error) {
 	return false, nil
 }
 
-// Determined whether the specified pod is allowed to use host networking
+// Determined whether the specified pod is allowed to use host PID
 func allowHostPID(pod *v1.Pod) (bool, error) {
 	podSource, err := kubetypes.GetPodSource(pod)
 	if err != nil {
