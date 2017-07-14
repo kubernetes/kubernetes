@@ -56,6 +56,7 @@ type ApplyOptions struct {
 	GracePeriod     int
 	PruneResources  []pruneResource
 	Timeout         time.Duration
+	cmdBaseName     string
 }
 
 const (
@@ -65,8 +66,6 @@ const (
 	backOffPeriod = 1 * time.Second
 	// how many times we can retry before back off
 	triesBeforeBackOff = 1
-
-	warningNoLastAppliedConfigAnnotation = "Warning: kubectl apply should be used on resource created by either kubectl create --save-config or kubectl apply\n"
 )
 
 var (
@@ -92,10 +91,16 @@ var (
 
 		# Apply the configuration in manifest.yaml and delete all the other configmaps that are not in the file.
 		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`))
+
+	warningNoLastAppliedConfigAnnotation = "Warning: %[1]s apply should be used on resource created by either %[1]s create --save-config or %[1]s apply\n"
 )
 
-func NewCmdApply(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
+func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	var options ApplyOptions
+
+	// Store baseName for use in printing warnings / messages involving the base command name.
+	// This is useful for downstream command that wrap this one.
+	options.cmdBaseName = baseName
 
 	cmd := &cobra.Command{
 		Use:     "apply -f FILENAME",
@@ -299,7 +304,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				return err
 			}
 			if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
-				fmt.Fprintf(errOut, warningNoLastAppliedConfigAnnotation)
+				fmt.Fprintf(errOut, warningNoLastAppliedConfigAnnotation, options.cmdBaseName)
 			}
 			overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
 			helper := resource.NewHelper(info.Client, info.Mapping)
