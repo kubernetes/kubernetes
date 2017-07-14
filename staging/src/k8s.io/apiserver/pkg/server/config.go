@@ -87,6 +87,9 @@ type Config struct {
 	// Authorizer determines whether the subject is allowed to make the request based only
 	// on the RequestURI
 	Authorizer authorizer.Authorizer
+	// RuleResolver is required to get the list of rules that apply to a given user
+	// in a given namespace
+	RuleResolver authorizer.RuleResolver
 	// AdmissionControl performs deep inspection of a given request (including content)
 	// to set values and determine whether its allowed
 	AdmissionControl      admission.Interface
