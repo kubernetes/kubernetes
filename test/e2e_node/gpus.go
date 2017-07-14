@@ -69,6 +69,7 @@ func checkIfNvidiaGPUsExistOnNode() bool {
 }
 
 // Serial because the test updates kubelet configuration.
+// OWNER = sig/scheduling
 var _ = framework.KubeDescribe("GPU [Serial]", func() {
 	f := framework.NewDefaultFramework("gpu-test")
 	Context("attempt to use GPUs if available", func() {
