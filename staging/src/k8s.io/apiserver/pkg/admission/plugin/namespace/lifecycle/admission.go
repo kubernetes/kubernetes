@@ -91,10 +91,12 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 		return errors.NewForbidden(a.GetResource().GroupResource(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))
 	}
 
-	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
-	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
-	// its a namespaced resource.
-	if len(a.GetNamespace()) == 0 || a.GetKind().GroupKind() == v1.SchemeGroupVersion.WithKind("Namespace").GroupKind() {
+	// always allow non-namespaced resources
+	if len(a.GetNamespace()) == 0 && a.GetKind().GroupKind() != v1.SchemeGroupVersion.WithKind("Namespace").GroupKind() {
+		return nil
+	}
+
+	if a.GetKind().GroupKind() == v1.SchemeGroupVersion.WithKind("Namespace").GroupKind() {
 		// if a namespace is deleted, we want to prevent all further creates into it
 		// while it is undergoing termination.  to reduce incidences where the cache
 		// is slow to update, we add the namespace into a force live lookup list to ensure
@@ -102,6 +104,7 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 		if a.GetOperation() == admission.Delete {
 			l.forceLiveLookupCache.Add(a.GetName(), true, forceLiveLookupTTL)
 		}
+		// allow all operations to namespaces
 		return nil
 	}
 
