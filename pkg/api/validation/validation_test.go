@@ -3045,7 +3045,6 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "/bab", SubPath: "baz"},
 		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
-		{Name: "abc", MountPath: "c:/foo/bar"},
 	}
 	if errs := ValidateVolumeMounts(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -3055,6 +3054,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"empty name":          {{Name: "", MountPath: "/foo"}},
 		"name not found":      {{Name: "", MountPath: "/foo"}},
 		"empty mountpath":     {{Name: "abc", MountPath: ""}},
+		"relative mountpath":  {{Name: "abc", MountPath: "bar"}},
 		"mountpath collision": {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
 		"absolute subpath":    {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
 		"subpath in ..":       {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},

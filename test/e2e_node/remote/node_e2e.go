@@ -163,7 +163,7 @@ func updateOSSpecificKubeletFlags(args, host, workspace string) (string, error) 
 }
 
 // RunTest runs test on the node.
-func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testArgs, ginkgoArgs string, timeout time.Duration) (string, error) {
+func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs string, timeout time.Duration) (string, error) {
 	// Install the cni plugins and add a basic CNI configuration.
 	if err := setupCNI(host, workspace); err != nil {
 		return "", err
@@ -186,8 +186,8 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testA
 	glog.V(2).Infof("Starting tests on %q", host)
 	cmd := getSSHCommand(" && ",
 		fmt.Sprintf("cd %s", workspace),
-		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s %s",
-			timeout.Seconds(), ginkgoArgs, host, results, junitFilePrefix, testArgs),
+		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=%s %s",
+			timeout.Seconds(), ginkgoArgs, host, results, junitFilePrefix, imageDesc, testArgs),
 	)
 	return SSH(host, "sh", "-c", cmd)
 }
