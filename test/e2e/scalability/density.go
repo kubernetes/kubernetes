@@ -299,7 +299,6 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 var _ = framework.KubeDescribe("Density", func() {
 	var c clientset.Interface
 	var nodeCount int
-	var name string
 	var additionalPodsPrefix string
 	var ns string
 	var uuid string
@@ -774,48 +773,6 @@ var _ = framework.KubeDescribe("Density", func() {
 			cleanupDensityTest(dConfig)
 		})
 	}
-
-	// Calculate total number of pods from each node's max-pod
-	It("[Feature:ManualPerformance] should allow running maximum capacity pods on nodes", func() {
-		totalPods = 0
-		for _, n := range nodes.Items {
-			totalPods += int(n.Status.Capacity.Pods().Value())
-		}
-		totalPods -= framework.WaitForStableCluster(c, masters)
-
-		fileHndl, err := os.Create(fmt.Sprintf(framework.TestContext.OutputDir+"/%s/pod_states.csv", uuid))
-		framework.ExpectNoError(err)
-		defer fileHndl.Close()
-		collectionCount := 1
-		configs := make([]testutils.RunObjectConfig, collectionCount)
-		podsPerCollection := int(totalPods / collectionCount)
-		for i := 0; i < collectionCount; i++ {
-			if i == collectionCount-1 {
-				podsPerCollection += int(math.Mod(float64(totalPods), float64(collectionCount)))
-			}
-			name = "density" + strconv.Itoa(totalPods) + "-" + strconv.Itoa(i) + "-" + uuid
-			configs[i] = &testutils.RCConfig{Client: c,
-				Image:                framework.GetPauseImageName(f.ClientSet),
-				Name:                 name,
-				Namespace:            ns,
-				Labels:               map[string]string{"type": "densityPod"},
-				PollInterval:         DensityPollInterval,
-				PodStatusFile:        fileHndl,
-				Replicas:             podsPerCollection,
-				MaxContainerFailures: &MaxContainerFailures,
-				Silent:               true,
-				LogFunc:              framework.Logf,
-			}
-		}
-		dConfig := DensityTestConfig{
-			ClientSets:   []clientset.Interface{f.ClientSet},
-			Configs:      configs,
-			PodCount:     totalPods,
-			PollInterval: DensityPollInterval,
-		}
-		e2eStartupTime = runDensityTest(dConfig)
-		cleanupDensityTest(dConfig)
-	})
 })
 
 func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns, image, podType string, cpuRequest, memRequest resource.Quantity) {
