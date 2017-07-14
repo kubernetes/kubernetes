@@ -542,7 +542,7 @@ func (gce *GCECloud) updateTargetPool(loadBalancerName string, existing sets.Str
 }
 
 func (gce *GCECloud) targetPoolURL(name, region string) string {
-	return gce.service.BasePath + strings.Join([]string{"projects", gce.projectID, "regions", region, "targetPools", name}, "/")
+	return gce.service.BasePath + strings.Join([]string{gce.projectID, "regions", region, "targetPools", name}, "/")
 }
 
 func makeHttpHealthCheck(name, path string, port int32) *compute.HttpHealthCheck {
@@ -671,9 +671,9 @@ func nodeNames(nodes []*v1.Node) []string {
 	return ret
 }
 
-func makeHostURL(apiEndpoint, projectID, zone, host string) string {
+func makeHostURL(projectsApiEndpoint, projectID, zone, host string) string {
 	host = canonicalizeInstanceName(host)
-	return apiEndpoint + strings.Join([]string{"projects", projectID, "zones", zone, "instances", host}, "/")
+	return projectsApiEndpoint + strings.Join([]string{projectID, "zones", zone, "instances", host}, "/")
 }
 
 func hostURLToComparablePath(hostURL string) string {
@@ -726,7 +726,7 @@ func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress st
 		return false, false, nil
 	}
 
-	fw, err := gce.GetFirewall(makeFirewallName(name))
+	fw, err := gce.service.Firewalls.Get(gce.projectID, makeFirewallName(name)).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return false, true, nil
@@ -773,7 +773,7 @@ func (gce *GCECloud) ensureHttpHealthCheckFirewall(serviceName, ipAddress, regio
 	ports := []v1.ServicePort{{Protocol: "tcp", Port: hcPort}}
 
 	fwName := MakeHealthCheckFirewallName(clusterID, hcName, isNodesHealthCheck)
-	fw, err := gce.GetFirewall(fwName)
+	fw, err := gce.service.Firewalls.Get(gce.projectID, fwName).Do()
 	if err != nil {
 		if !isHTTPErrorCode(err, http.StatusNotFound) {
 			return fmt.Errorf("error getting firewall for health checks: %v", err)
@@ -921,8 +921,7 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 		addressObj.Address = existingIP
 	}
 
-	address, err := gce.ReserveRegionAddress(addressObj, region)
-	if err != nil {
+	if err = gce.ReserveRegionAddress(addressObj, region); err != nil {
 		if !isHTTPErrorCode(err, http.StatusConflict) {
 			return "", false, fmt.Errorf("error creating gce static IP address: %v", err)
 		}
@@ -930,5 +929,10 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 		existed = true
 	}
 
-	return address.Address, existed, nil
+	addr, err := gce.GetRegionAddress(name, region)
+	if err != nil {
+		return "", false, fmt.Errorf("error getting static IP address: %v", err)
+	}
+
+	return addr.Address, existed, nil
 }

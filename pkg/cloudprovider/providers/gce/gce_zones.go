@@ -45,7 +45,7 @@ func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
 func (gce *GCECloud) ListZonesInRegion(region string) ([]*compute.Zone, error) {
 	mc := newZonesMetricContext("list", region)
 	filter := fmt.Sprintf("region eq %v", gce.getRegionLink(region))
-	list, err := gce.service.Zones.List(gce.networkProjectID).Filter(filter).Do()
+	list, err := gce.service.Zones.List(gce.projectID).Filter(filter).Do()
 	if err != nil {
 		return nil, mc.Observe(err)
 	}
@@ -53,5 +53,5 @@ func (gce *GCECloud) ListZonesInRegion(region string) ([]*compute.Zone, error) {
 }
 
 func (gce *GCECloud) getRegionLink(region string) string {
-	return gce.service.BasePath + strings.Join([]string{"projects", gce.networkProjectID, "regions", region}, "/")
+	return gce.service.BasePath + strings.Join([]string{gce.projectID, "regions", region}, "/")
 }

@@ -33,18 +33,13 @@ func newAddressMetricContext(request, region string) *metricContext {
 // Caller is allocated a random IP if they do not specify an ipAddress. If an
 // ipAddress is specified, it must belong to the current project, eg: an
 // ephemeral IP associated with a global forwarding rule.
-func (gce *GCECloud) ReserveGlobalAddress(addr *compute.Address) (*compute.Address, error) {
+func (gce *GCECloud) ReserveGlobalAddress(addr *compute.Address) error {
 	mc := newAddressMetricContext("reserve", "")
 	op, err := gce.service.GlobalAddresses.Insert(gce.projectID, addr).Do()
 	if err != nil {
-		return nil, mc.Observe(err)
+		return mc.Observe(err)
 	}
-
-	if err := gce.waitForGlobalOp(op, mc); err != nil {
-		return nil, err
-	}
-
-	return gce.GetGlobalAddress(addr.Name)
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // DeleteGlobalAddress deletes a global address by name.
@@ -65,17 +60,13 @@ func (gce *GCECloud) GetGlobalAddress(name string) (*compute.Address, error) {
 }
 
 // ReserveRegionAddress creates a region address
-func (gce *GCECloud) ReserveRegionAddress(addr *compute.Address, region string) (*compute.Address, error) {
+func (gce *GCECloud) ReserveRegionAddress(addr *compute.Address, region string) error {
 	mc := newAddressMetricContext("reserve", region)
 	op, err := gce.service.Addresses.Insert(gce.projectID, region, addr).Do()
 	if err != nil {
-		return nil, mc.Observe(err)
+		return mc.Observe(err)
 	}
-	if err := gce.waitForRegionOp(op, region, mc); err != nil {
-		return nil, err
-	}
-
-	return gce.GetRegionAddress(addr.Name, region)
+	return gce.waitForRegionOp(op, region, mc)
 }
 
 // DeleteRegionAddress deletes a region address by name.

@@ -951,7 +951,7 @@ function start-kubelet {
   fi
   if [[ -n "${NODE_TAINTS:-}" ]]; then
     flags+=" --register-with-taints=${NODE_TAINTS}"
-  fi
+  fi  
   if [[ -n "${EVICTION_HARD:-}" ]]; then
     flags+=" --eviction-hard=${EVICTION_HARD}"
   fi

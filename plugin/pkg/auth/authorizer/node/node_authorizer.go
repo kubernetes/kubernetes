@@ -48,7 +48,7 @@ type NodeAuthorizer struct {
 	nodeRules  []rbacapi.PolicyRule
 }
 
-// New returns a new node authorizer
+// NewAuthorizer returns a new node authorizer
 func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules []rbacapi.PolicyRule) authorizer.Authorizer {
 	return &NodeAuthorizer{
 		graph:      graph,

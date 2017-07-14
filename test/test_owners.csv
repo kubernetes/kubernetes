@@ -599,7 +599,6 @@ k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns,madhusuda
 k8s.io/kubernetes/federation/pkg/federation-controller/cluster,nikhiljindal,0,
 k8s.io/kubernetes/federation/pkg/federation-controller/deployment,zmerlynn,1,
 k8s.io/kubernetes/federation/pkg/federation-controller/ingress,vishh,1,
-k8s.io/kubernetes/federation/pkg/federation-controller/namespace,rrati,0,
 k8s.io/kubernetes/federation/pkg/federation-controller/replicaset,roberthbailey,1,
 k8s.io/kubernetes/federation/pkg/federation-controller/secret,apelisse,1,
 k8s.io/kubernetes/federation/pkg/federation-controller/service,pmorie,1,

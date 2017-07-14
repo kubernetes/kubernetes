@@ -7,7 +7,7 @@ In the pod, you need to provide the following information:
 - *diskName*:  (required) the name of the VHD blob object.
 - *diskURI*: (required) the URI of the vhd blob object.
 - *cachingMode*: (optional) disk caching mode. Must be one of None, ReadOnly, or ReadWrite. Default is None.
-- *fsType*:  (optional) the filesytem type to mount. Default is ext4.
+- *fsType*:  (optional) the filesystem type to mount. Default is ext4.
 - *readOnly*: (optional) whether the filesystem is used as readOnly. Default is false.
 
 

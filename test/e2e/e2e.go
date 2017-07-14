@@ -81,7 +81,6 @@ func setupProviderConfig() error {
 		}
 		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ApiEndpoint,
 			framework.TestContext.CloudConfig.ProjectID,
-			framework.TestContext.CloudConfig.ProjectID,
 			region, zone, managedZones, "" /* networkUrl */, "" /* subnetworkUrl */, nil, /* nodeTags */
 			"" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {

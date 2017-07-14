@@ -234,11 +234,11 @@ func (gce *GCECloud) CreateDisk(
 		return fmt.Errorf("invalid GCE disk type %q", diskType)
 	}
 
-	apiEndpoint := gceComputeAPIEndpoint + "projects/"
+	projectsApiEndpoint := gceComputeAPIEndpoint + "projects/"
 	if gce.service != nil {
-		apiEndpoint = gce.service.BasePath
+		projectsApiEndpoint = gce.service.BasePath
 	}
-	diskTypeUri := apiEndpoint + fmt.Sprintf(diskTypeUriTemplate, gce.projectID, zone, diskType)
+	diskTypeUri := projectsApiEndpoint + fmt.Sprintf(diskTypeUriTemplate, gce.projectID, zone, diskType)
 
 	diskToCreate := &compute.Disk{
 		Name:        name,
