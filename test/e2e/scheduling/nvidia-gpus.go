@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package scheduling
 
 import (
 	"io/ioutil"
@@ -186,7 +186,7 @@ func dsFromManifest(url string) *extensions.DaemonSet {
 	return &controller
 }
 
-var _ = framework.KubeDescribe("[Feature:GPU]", func() {
+var _ = SIGDescribe("[Feature:GPU]", func() {
 	f := framework.NewDefaultFramework("gpus")
 	It("run Nvidia GPU tests on Container Optimized OS only", func() {
 		testNvidiaGPUsOnCOS(f)
