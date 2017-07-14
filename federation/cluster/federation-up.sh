@@ -68,6 +68,29 @@ print json.load(sys.stdin)["KUBE_VERSION"]')"
   echo "${kube_version//+/_}"
 }
 
+function wait_for_rbac() {
+  # The very first thing that kubefed does when it comes up is run RBAC API
+  # discovery. If it doesn't appear to be available, issue 'get role' to ensure
+  # that kubectl updates its cache.
+  ${KUBE_ROOT}/cluster/kubectl.sh get role
+  local i=1
+  local timeout=60
+  while [[ ${i} -le ${timeout} ]]; do
+    if [[ "$(${KUBE_ROOT}/cluster/kubectl.sh api-versions)" =~ "rbac.authorization.k8s.io/" ]]; then
+      break
+    fi
+    ${KUBE_ROOT}/cluster/kubectl.sh get role
+    sleep 1
+    i=$((i+1))
+  done
+  if [[ ${i} -gt ${timeout} ]]; then
+    kube::log::status "rbac.authorization.k8s.io API group not available after at least ${timeout} seconds:"
+    kube::log::status "$(${KUBE_ROOT}/cluster/kubectl.sh api-versions)"
+    exit 123
+  fi
+  kube::log::status "rbac.authorization.k8s.io API group is available"
+}
+
 # Initializes the control plane.
 # TODO(madhusudancs): Move this to federation/develop.sh.
 function init() {
@@ -80,17 +103,7 @@ function init() {
   kube::log::status "DNS_ZONE_NAME: \"${DNS_ZONE_NAME}\", DNS_PROVIDER: \"${DNS_PROVIDER}\""
   kube::log::status "Image: \"${kube_registry}/hyperkube-amd64:${kube_version}\""
 
-  # The very first thing that kubefed does when it comes up is run RBAC API
-  # discovery. If it doesn't appear to be available, issue 'get role' to ensure
-  # that kubectl updates its cache.
-  ${KUBE_ROOT}/cluster/kubectl.sh get role
-  timeout 1m bash <<EOF
-    while [[ ! "$(${KUBE_ROOT}/cluster/kubectl.sh api-versions)" =~ "rbac.authorization.k8s.io/" ]]; do
-      ${KUBE_ROOT}/cluster/kubectl.sh get role
-      echo "Waiting for rbac.authorization.k8s.io API group to appear"
-      sleep 2
-    done
-EOF
+  wait_for_rbac
 
   # Send INT after 20m and KILL 1m after that if process is still alive.
   timeout --signal=INT --kill-after=1m 20m \
