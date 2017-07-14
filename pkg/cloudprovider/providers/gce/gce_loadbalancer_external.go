@@ -140,7 +140,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 			// to this forwarding rule, so we can keep it.
 			isUserOwnedIP = false
 			isSafeToReleaseIP = true
-			ipAddress, _, err = gce.ensureStaticIP(loadBalancerName, serviceName.String(), gce.region, fwdRuleIP)
+			ipAddress, _, err = ensureStaticIP(gce, loadBalancerName, serviceName.String(), gce.region, fwdRuleIP)
 			if err != nil {
 				return nil, fmt.Errorf("failed to ensure static IP %s: %v", fwdRuleIP, err)
 			}
@@ -161,7 +161,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		// IP from ephemeral to static, or it will just get the IP if it is
 		// already static.
 		existed := false
-		ipAddress, existed, err = gce.ensureStaticIP(loadBalancerName, serviceName.String(), gce.region, fwdRuleIP)
+		ipAddress, existed, err = ensureStaticIP(gce, loadBalancerName, serviceName.String(), gce.region, fwdRuleIP)
 		if err != nil {
 			return nil, fmt.Errorf("failed to ensure static IP %s: %v", fwdRuleIP, err)
 		}
@@ -906,7 +906,7 @@ func (gce *GCECloud) projectOwnsStaticIP(name, region string, ipAddress string) 
 	return false, nil
 }
 
-func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string) (ipAddress string, created bool, err error) {
+func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP string) (ipAddress string, existing bool, err error) {
 	// If the address doesn't exist, this will create it.
 	// If the existingIP exists but is ephemeral, this will promote it to static.
 	// If the address already exists, this will harmlessly return a StatusConflict
@@ -921,7 +921,7 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 		addressObj.Address = existingIP
 	}
 
-	if err = gce.ReserveRegionAddress(addressObj, region); err != nil {
+	if err = s.ReserveRegionAddress(addressObj, region); err != nil {
 		if !isHTTPErrorCode(err, http.StatusConflict) {
 			return "", false, fmt.Errorf("error creating gce static IP address: %v", err)
 		}
@@ -929,7 +929,7 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 		existed = true
 	}
 
-	addr, err := gce.GetRegionAddress(name, region)
+	addr, err := s.GetRegionAddress(name, region)
 	if err != nil {
 		return "", false, fmt.Errorf("error getting static IP address: %v", err)
 	}
