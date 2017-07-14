@@ -187,6 +187,7 @@ docker-exec-handler
 docker-password
 docker-server
 docker-username
+dockershim-checkpoint-dir
 driver-port
 drop-embedded-fields
 dry-run

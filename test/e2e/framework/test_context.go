@@ -39,7 +39,8 @@ type TestContextType struct {
 	CertDir            string
 	Host               string
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
-	RepoRoot string
+	RepoRoot                string
+	DockershimCheckpointDir string
 
 	Provider       string
 	CloudConfig    CloudConfig
@@ -183,6 +184,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/rkt/remote).")
 	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "", "The container runtime endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
+	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
 }
 
 // Register flags specific to the cluster e2e test suite.
