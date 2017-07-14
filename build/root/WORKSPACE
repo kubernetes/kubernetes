@@ -12,6 +12,16 @@ http_archive(
     urls = ["https://github.com/kubernetes/repo-infra/archive/9dedd5f4093884c133ad5ea73695b28338b954ab.tar.gz"],
 )
 
+ETCD_VERSION = "3.0.17"
+
+new_http_archive(
+    name = "com_coreos_etcd",
+    build_file = "third_party/etcd.BUILD",
+    sha256 = "274c46a7f8d26f7ae99d6880610f54933cbcf7f3beafa19236c52eb5df8c7a0b",
+    strip_prefix = "etcd-v%s-linux-amd64" % ETCD_VERSION,
+    urls = ["https://github.com/coreos/etcd/releases/download/v%s/etcd-v%s-linux-amd64.tar.gz" % (ETCD_VERSION, ETCD_VERSION)],
+)
+
 # This contains a patch to not prepend ./ to tarfiles produced by pkg_tar.
 # When merged upstream, we'll no longer need to use ixdy's fork:
 # https://bazel-review.googlesource.com/#/c/10390/

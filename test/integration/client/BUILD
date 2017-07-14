@@ -9,9 +9,11 @@ load(
 
 go_test(
     name = "go_default_test",
+    size = "large",
     srcs = [
         "client_test.go",
         "dynamic_client_test.go",
+        "main_test.go",
     ],
     tags = [
         "automanaged",

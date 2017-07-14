@@ -35,7 +35,9 @@ go_library(
 
 go_test(
     name = "go_default_test",
+    size = "large",
     srcs = [
+        "main_test.go",
         "scheduler_bench_test.go",
         "scheduler_test.go",
     ],

@@ -9,9 +9,11 @@ load(
 
 go_test(
     name = "go_default_test",
+    size = "large",
     srcs = [
         "accessreview_test.go",
         "auth_test.go",
+        "main_test.go",
         "node_test.go",
         "rbac_test.go",
     ],
