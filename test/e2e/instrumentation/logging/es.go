@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package logging
 
 import (
 	"fmt"
@@ -22,28 +22,31 @@ import (
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/instrumentation"
 
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("Cluster level logging implemented by Stackdriver", func() {
-	f := framework.NewDefaultFramework("sd-logging")
+var _ = instrumentation.SIGDescribe("Cluster level logging using Elasticsearch [Feature:Elasticsearch]", func() {
+	f := framework.NewDefaultFramework("es-logging")
 
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		// TODO: For now assume we are only testing cluster logging with Elasticsearch
+		// on GCE. Once we are sure that Elasticsearch cluster level logging
+		// works for other providers we should widen this scope of this test.
+		framework.SkipUnlessProviderIs("gce")
 	})
 
-	It("should ingest logs from applications", func() {
+	It("should check that logs from containers are ingested into Elasticsearch", func() {
 		podName := "synthlogger"
+		esLogsProvider, err := newEsLogsProvider(f)
+		framework.ExpectNoError(err, "Failed to create Elasticsearch logs provider")
 
-		sdLogsProvider, err := newSdLogsProvider(f)
-		framework.ExpectNoError(err, "Failed to create Stackdriver logs provider")
+		err = esLogsProvider.Init()
+		defer esLogsProvider.Cleanup()
+		framework.ExpectNoError(err, "Failed to init Elasticsearch logs provider")
 
-		err = sdLogsProvider.Init()
-		defer sdLogsProvider.Cleanup()
-		framework.ExpectNoError(err, "Failed to init Stackdriver logs provider")
-
-		err = ensureSingleFluentdOnEachNode(f, sdLogsProvider.FluentdApplicationName())
+		err = ensureSingleFluentdOnEachNode(f, esLogsProvider.FluentdApplicationName())
 		framework.ExpectNoError(err, "Fluentd deployed incorrectly")
 
 		By("Running synthetic logger")
@@ -54,7 +57,7 @@ var _ = framework.KubeDescribe("Cluster level logging implemented by Stackdriver
 
 		By("Waiting for logs to ingest")
 		config := &loggingTestConfig{
-			LogsProvider:              sdLogsProvider,
+			LogsProvider:              esLogsProvider,
 			Pods:                      []*loggingPod{pod},
 			IngestionTimeout:          10 * time.Minute,
 			MaxAllowedLostFraction:    0,

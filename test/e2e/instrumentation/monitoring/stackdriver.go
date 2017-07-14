@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package monitoring
 
 import (
 	"context"
@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/instrumentation"
 
 	gcm "google.golang.org/api/monitoring/v3"
 )
@@ -57,7 +58,7 @@ var (
 	tolerance         = 0.25
 )
 
-var _ = framework.KubeDescribe("Stackdriver Monitoring", func() {
+var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gke")
 	})
