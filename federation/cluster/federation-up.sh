@@ -84,13 +84,15 @@ function init() {
   # discovery. If it doesn't appear to be available, issue 'get role' to ensure
   # that kubectl updates its cache.
   ${KUBE_ROOT}/cluster/kubectl.sh get role
-  timeout 1m bash <<EOF
-    while [[ ! "$(${KUBE_ROOT}/cluster/kubectl.sh api-versions)" =~ "rbac.authorization.k8s.io/" ]]; do
+  local i
+  for i in $(seq 1 30); do
+      if [[ "$(${KUBE_ROOT}/cluster/kubectl.sh api-versions)" =~ "rbac.authorization.k8s.io/" ]]; then
+          break
+      fi
       ${KUBE_ROOT}/cluster/kubectl.sh get role
       echo "Waiting for rbac.authorization.k8s.io API group to appear"
       sleep 2
-    done
-EOF
+  done
 
   # Send INT after 20m and KILL 1m after that if process is still alive.
   timeout --signal=INT --kill-after=1m 20m \
