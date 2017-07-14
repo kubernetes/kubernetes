@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package apimachinery
 
 import (
 	"fmt"
@@ -257,7 +257,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 // that each have a variable amount of content in the associated Namespace.
 // When run in [Serial] this test appears to delete Namespace objects at a
 // rate of approximately 1 per second.
-var _ = framework.KubeDescribe("Namespaces [Serial]", func() {
+var _ = SIGDescribe("Namespaces [Serial]", func() {
 
 	f := framework.NewDefaultFramework("namespaces")
 

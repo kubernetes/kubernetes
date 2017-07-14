@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package apimachinery
 
 import (
 	"time"
@@ -31,7 +31,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Etcd failure [Disruptive]", func() {
+var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("etcd-failure")
 

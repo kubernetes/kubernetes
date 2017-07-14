@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package apimachinery
 
 import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("CustomResourceDefinition resources", func() {
+var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 
 	f := framework.NewDefaultFramework("custom-resource-definition")
 

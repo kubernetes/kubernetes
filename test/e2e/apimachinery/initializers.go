@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package extension
+package apimachinery
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = framework.KubeDescribe("Initializers", func() {
+var _ = SIGDescribe("Initializers", func() {
 	f := framework.NewDefaultFramework("initializers")
 
 	// TODO: Add failure traps once we have JustAfterEach
@@ -150,7 +150,7 @@ var _ = framework.KubeDescribe("Initializers", func() {
 		ch := make(chan struct{})
 		go func() {
 			defer close(ch)
-			_, err := c.Core().Pods(ns).Create(newPod(podName))
+			_, err := c.Core().Pods(ns).Create(newInitPod(podName))
 			Expect(err).NotTo(HaveOccurred())
 		}()
 
@@ -197,7 +197,7 @@ var _ = framework.KubeDescribe("Initializers", func() {
 		// bypass initialization for mirror pods
 		By("Creating a mirror pod that bypasses initialization")
 		podName = "mirror-pod"
-		pod = newPod(podName)
+		pod = newInitPod(podName)
 		pod.Annotations = map[string]string{
 			v1.MirrorPodAnnotationKey: "true",
 		}
@@ -210,14 +210,14 @@ var _ = framework.KubeDescribe("Initializers", func() {
 })
 
 func newUninitializedPod(podName string) *v1.Pod {
-	pod := newPod(podName)
+	pod := newInitPod(podName)
 	pod.Initializers = &metav1.Initializers{
 		Pending: []metav1.Initializer{{Name: "Test"}},
 	}
 	return pod
 }
 
-func newPod(podName string) *v1.Pod {
+func newInitPod(podName string) *v1.Pod {
 	containerName := fmt.Sprintf("%s-container", podName)
 	port := 8080
 	pod := &v1.Pod{
