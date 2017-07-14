@@ -539,6 +539,20 @@ func Convert_core_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) e
 		delete(out.Annotations, v1.PodDeferContainersAnnotationKey)
 		delete(out.Annotations, v1.PodDeferContainersStatusesKey)
 
+	// DeferContainers related code
+	if len(out.Spec.DeferContainers) > 0 {
+		value, err := json.Marshal(out.Spec.DeferContainers)
+		if err != nil {
+			return err
+		}
+		out.Annotations[v1.PodDeferContainersAnnotationKey] = string(value)
+	}
+	if len(out.Status.DeferContainerStatuses) > 0 {
+		value, err := json.Marshal(out.Status.DeferContainerStatuses)
+		if err != nil {
+			return err
+		}
+		out.Annotations[v1.PodDeferContainersStatusesKey] = string(value)
 	}
 
 	return nil

@@ -2758,7 +2758,7 @@ type PodSpec struct {
 	//List of termination Containers, those will be executed when during the TerminationGracePeriod of the pod
 	// +patchMergeKey=name
 	// +patchStrategy=merge
-	DeferContainers []Container `json:"deferContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,24,rep,name=deferContainers"`
+	DeferContainers []Container `json:"deferContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,26,rep,name=deferContainers"`
 	// Restart policy for all containers within the pod.
 	// One of Always, OnFailure, Never.
 	// Default to Always.
