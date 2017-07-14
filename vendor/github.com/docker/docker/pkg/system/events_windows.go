@@ -6,6 +6,8 @@ package system
 import (
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 var (
@@ -67,7 +69,7 @@ func PulseEvent(handle syscall.Handle) (err error) {
 	return setResetPulse(handle, procPulseEvent)
 }
 
-func setResetPulse(handle syscall.Handle, proc *syscall.LazyProc) (err error) {
+func setResetPulse(handle syscall.Handle, proc *windows.LazyProc) (err error) {
 	r0, _, _ := proc.Call(uintptr(handle))
 	if r0 != 0 {
 		err = syscall.Errno(r0)

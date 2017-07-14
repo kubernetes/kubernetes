@@ -22,10 +22,10 @@ import (
 	"path/filepath"
 	"time"
 
-	dockertypes "github.com/docker/engine-api/types"
-	dockercontainer "github.com/docker/engine-api/types/container"
-	dockerfilters "github.com/docker/engine-api/types/filters"
-	dockerstrslice "github.com/docker/engine-api/types/strslice"
+	dockertypes "github.com/docker/docker/api/types"
+	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerfilters "github.com/docker/docker/api/types/filters"
+	dockerstrslice "github.com/docker/docker/api/types/strslice"
 	"github.com/golang/glog"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -36,8 +36,8 @@ import (
 func (ds *dockerService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
 	opts := dockertypes.ContainerListOptions{All: true}
 
-	opts.Filter = dockerfilters.NewArgs()
-	f := newDockerFilter(&opts.Filter)
+	opts.Filters = dockerfilters.NewArgs()
+	f := newDockerFilter(&opts.Filters)
 	// Add filter to get *only* (non-sandbox) containers.
 	f.AddLabel(containerTypeLabelKey, containerTypeLabelContainer)
 
@@ -249,7 +249,7 @@ func (ds *dockerService) StartContainer(containerID string) error {
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (ds *dockerService) StopContainer(containerID string, timeout int64) error {
-	return ds.client.StopContainer(containerID, int(timeout))
+	return ds.client.StopContainer(containerID, time.Duration(timeout)*time.Second)
 }
 
 // RemoveContainer removes the container.

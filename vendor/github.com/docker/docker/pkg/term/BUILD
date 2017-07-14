@@ -25,6 +25,7 @@ go_library(
     srcs = [
         "ascii.go",
         "term.go",
+        "term_unix.go",
     ],
     library = ":cgo_codegen",
     tags = ["automanaged"],

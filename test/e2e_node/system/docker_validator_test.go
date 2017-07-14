@@ -19,7 +19,7 @@ package system
 import (
 	"testing"
 
-	"github.com/docker/engine-api/types"
+	"github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
 )
 

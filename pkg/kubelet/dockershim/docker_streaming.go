@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 
 	"github.com/golang/glog"
 
@@ -140,7 +140,7 @@ func attachContainer(client libdocker.Interface, containerID string, stdin io.Re
 	// Have to start this before the call to client.AttachToContainer because client.AttachToContainer is a blocking
 	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
 	kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
-		client.ResizeContainerTTY(containerID, int(size.Height), int(size.Width))
+		client.ResizeContainerTTY(containerID, uint(size.Height), uint(size.Width))
 	})
 
 	// TODO(random-liu): Do we really use the *Logs* field here?
