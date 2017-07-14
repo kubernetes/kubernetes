@@ -9,7 +9,11 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["garbage_collector_test.go"],
+    size = "large",
+    srcs = [
+        "garbage_collector_test.go",
+        "main_test.go",
+    ],
     tags = [
         "automanaged",
         "integration",

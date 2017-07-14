@@ -524,6 +524,20 @@ bazel-test:
 endif
 
 ifeq ($(PRINT_HELP),y)
+define BAZEL_TEST_INTEGRATION_HELP_INFO
+# Integration test with bazel
+#
+# Example:
+# make bazel-test-integration
+endef
+bazel-test-integration:
+	@echo "$$BAZEL_TEST_INTEGRATION_HELP_INFO"
+else
+bazel-test-integration:
+	bazel test //test/integration/...
+endif
+
+ifeq ($(PRINT_HELP),y)
 define BAZEL_BUILD_HELP_INFO
 # Build release tars with bazel
 #

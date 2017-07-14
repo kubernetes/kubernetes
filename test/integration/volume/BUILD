@@ -9,8 +9,10 @@ load(
 
 go_test(
     name = "go_default_test",
+    size = "large",
     srcs = [
         "attach_detach_test.go",
+        "main_test.go",
         "persistent_volumes_test.go",
     ],
     tags = [

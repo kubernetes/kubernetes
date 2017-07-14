@@ -29,7 +29,11 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["metrics_test.go"],
+    size = "large",
+    srcs = [
+        "main_test.go",
+        "metrics_test.go",
+    ],
     library = ":go_default_library",
     tags = [
         "automanaged",
