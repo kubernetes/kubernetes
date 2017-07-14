@@ -432,7 +432,7 @@ func (g TestGroup) SelfLink(resource, name string) string {
 	}
 }
 
-// Returns the appropriate path for the given prefix (watch, proxy, redirect, etc), resource, namespace and name.
+// ResourcePathWithPrefix returns the appropriate path for the given prefix (watch, proxy, redirect, etc), resource, namespace and name.
 // For ex, this is of the form:
 // /api/v1/watch/namespaces/foo/pods/pod0 for v1.
 func (g TestGroup) ResourcePathWithPrefix(prefix, resource, namespace, name string) string {
@@ -462,7 +462,7 @@ func (g TestGroup) ResourcePathWithPrefix(prefix, resource, namespace, name stri
 	return path
 }
 
-// Returns the appropriate path for the given resource, namespace and name.
+// ResourcePath returns the appropriate path for the given resource, namespace and name.
 // For example, this is of the form:
 // /api/v1/namespaces/foo/pods/pod0 for v1.
 func (g TestGroup) ResourcePath(resource, namespace, name string) string {
@@ -480,6 +480,7 @@ func (g TestGroup) SubResourcePath(resource, namespace, name, sub string) string
 	return path
 }
 
+// RESTMapper returns RESTMapper in api.Registry.
 func (g TestGroup) RESTMapper() meta.RESTMapper {
 	return api.Registry.RESTMapper()
 }
@@ -494,7 +495,7 @@ func ExternalGroupVersions() schema.GroupVersions {
 	return versions
 }
 
-// Get codec based on runtime.Object
+// GetCodecForObject gets codec based on runtime.Object
 func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	kinds, _, err := api.Scheme.ObjectKinds(obj)
 	if err != nil {
@@ -522,6 +523,7 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	return nil, fmt.Errorf("unexpected kind: %v", kind)
 }
 
+// NewTestGroup creates a new TestGroup.
 func NewTestGroup(external, internal schema.GroupVersion, internalTypes map[string]reflect.Type, externalTypes map[string]reflect.Type) TestGroup {
 	return TestGroup{external, internal, internalTypes, externalTypes}
 }
