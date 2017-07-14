@@ -138,10 +138,7 @@ func TestComposeDNSSearch(t *testing.T) {
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST"},
 			[]string{"AAA", "svc.TEST", "BBB", "TEST"},
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB"},
-			[]string{
-				"Found and omitted duplicated dns domain in host search line: 'svc.TEST' during merging with cluster dns domains",
-				"Found and omitted duplicated dns domain in host search line: 'TEST' during merging with cluster dns domains",
-			},
+			[]string{},
 		},
 
 		{
@@ -156,8 +153,6 @@ func TestComposeDNSSearch(t *testing.T) {
 			[]string{"AAA", "TEST", "BBB", "TEST", "CCC", "DDD"},
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB", "CCC"},
 			[]string{
-				"Found and omitted duplicated dns domain in host search line: 'TEST' during merging with cluster dns domains",
-				"Found and omitted duplicated dns domain in host search line: 'TEST' during merging with cluster dns domains",
 				"Search Line limits were exceeded, some dns names have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA BBB CCC",
 			},
 		},
