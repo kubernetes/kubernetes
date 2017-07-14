@@ -144,6 +144,13 @@ func (in *MasterConfiguration) DeepCopyInto(out *MasterConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.FeatureFlags != nil {
+		in, out := &in.FeatureFlags, &out.FeatureFlags
+		*out = make(map[string]bool, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
