@@ -744,6 +744,8 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printCephFSVolumeSource(volume.VolumeSource.CephFS, w)
 		case volume.VolumeSource.StorageOS != nil:
 			printStorageOSVolumeSource(volume.VolumeSource.StorageOS, w)
+		case volume.VolumeSource.FlexVolume != nil:
+			printFlexVolumeSource(volume.VolumeSource.FlexVolume, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -960,6 +962,16 @@ func printStorageOSPersistentVolumeSource(storageos *api.StorageOSPersistentVolu
 		storageos.VolumeName, storageos.VolumeNamespace, storageos.FSType, storageos.ReadOnly)
 }
 
+func printFlexVolumeSource(flex *api.FlexVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tFlexVolume (a generic volume resource provisioned/attached by an exec based plugin)\n"+
+		"    Driver:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    SecretRef:\t%v\n"+
+		"    ReadOnly:\t%v\n"+
+		"    Options:\t%v\n",
+		flex.Driver, flex.FSType, flex.SecretRef, flex.ReadOnly, flex.Options)
+}
+
 type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
@@ -1035,6 +1047,8 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 			printCephFSVolumeSource(pv.Spec.CephFS, w)
 		case pv.Spec.StorageOS != nil:
 			printStorageOSPersistentVolumeSource(pv.Spec.StorageOS, w)
+		case pv.Spec.FlexVolume != nil:
+			printFlexVolumeSource(pv.Spec.FlexVolume, w)
 		}
 
 		if events != nil {

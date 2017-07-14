@@ -700,6 +700,14 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 				},
 			},
 		},
+		"flexvolume": {
+			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					FlexVolume: &api.FlexVolumeSource{},
+				},
+			},
+		},
 	}
 
 	for name, pv := range tests {
