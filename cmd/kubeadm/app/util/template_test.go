@@ -22,8 +22,8 @@ import (
 
 const (
 	validTmpl    = "image: {{ .ImageRepository }}/pause-{{ .Arch }}:3.0"
-	validTmplOut = "image: gcr.io/google_containers/pause-amd64:3.0"
-	doNothing    = "image: gcr.io/google_containers/pause-amd64:3.0"
+	validTmplOut = "image: gcr.io/google-containers/pause-amd64:3.0"
+	doNothing    = "image: gcr.io/google-containers/pause-amd64:3.0"
 	invalidTmpl1 = "{{ .baz }/d}"
 	invalidTmpl2 = "{{ !foobar }}"
 )
@@ -39,7 +39,7 @@ func TestParseTemplate(t *testing.T) {
 		{
 			template: validTmpl,
 			data: struct{ ImageRepository, Arch string }{
-				ImageRepository: "gcr.io/google_containers",
+				ImageRepository: "gcr.io/google-containers",
 				Arch:            "amd64",
 			},
 			output:      validTmplOut,
@@ -49,7 +49,7 @@ func TestParseTemplate(t *testing.T) {
 		{
 			template: doNothing,
 			data: struct{ ImageRepository, Arch string }{
-				ImageRepository: "gcr.io/google_containers",
+				ImageRepository: "gcr.io/google-containers",
 				Arch:            "amd64",
 			},
 			output:      doNothing,

@@ -50,7 +50,7 @@ func stagingClientPod(name, value string) clientv1.Pod {
 			Containers: []clientv1.Container{
 				{
 					Name:  "nginx",
-					Image: "gcr.io/google_containers/nginx-slim:0.7",
+					Image: "gcr.io/google-containers/nginx-slim:0.7",
 					Ports: []clientv1.ContainerPort{{ContainerPort: 80}},
 				},
 			},
@@ -71,7 +71,7 @@ func testingPod(name, value string) v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
-					Image: "gcr.io/google_containers/nginx-slim:0.7",
+					Image: "gcr.io/google-containers/nginx-slim:0.7",
 					Ports: []v1.ContainerPort{{ContainerPort: 80}},
 					LivenessProbe: &v1.Probe{
 						Handler: v1.Handler{
@@ -244,7 +244,7 @@ func newTestingCronJob(name string, value string) *batchv2alpha1.CronJob {
 							Containers: []v1.Container{
 								{
 									Name:  "c",
-									Image: "gcr.io/google_containers/busybox:1.24",
+									Image: "gcr.io/google-containers/busybox:1.24",
 									VolumeMounts: []v1.VolumeMount{
 										{
 											MountPath: "/data",

@@ -16,7 +16,7 @@
 # This makefile assumes that the kubemark binary is present in this directory.
 
 REGISTRY?=gcr.io
-PROJECT?=google_containers
+PROJECT?=google-containers
 
 all: gcloudpush
 

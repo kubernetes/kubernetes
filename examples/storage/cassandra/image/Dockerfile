@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/google_containers/ubuntu-slim:0.9
+FROM gcr.io/google-containers/ubuntu-slim:0.9
 
 ARG BUILD_DATE
 ARG VCS_REF

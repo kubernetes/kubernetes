@@ -90,7 +90,7 @@ func generateImageTags() []string {
 	// that kubelet report up to maxNamesPerImageInNodeStatus tags.
 	count := rand.IntnRange(maxNamesPerImageInNodeStatus+1, maxImageTagsForTest+1)
 	for ; count > 0; count-- {
-		tagList = append(tagList, "gcr.io/google_containers:v"+strconv.Itoa(count))
+		tagList = append(tagList, "gcr.io/google-containers:v"+strconv.Itoa(count))
 	}
 	return tagList
 }
@@ -485,11 +485,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			// images will be sorted from max to min in node status.
 			Images: []v1.ContainerImage{
 				{
-					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					Names:     []string{"gcr.io/google-containers:v3", "gcr.io/google-containers:v4"},
 					SizeBytes: 456,
 				},
 				{
-					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					Names:     []string{"gcr.io/google-containers:v1", "gcr.io/google-containers:v2"},
 					SizeBytes: 123,
 				},
 			},
@@ -783,11 +783,11 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			},
 			Images: []v1.ContainerImage{
 				{
-					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					Names:     []string{"gcr.io/google-containers:v3", "gcr.io/google-containers:v4"},
 					SizeBytes: 456,
 				},
 				{
-					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					Names:     []string{"gcr.io/google-containers:v1", "gcr.io/google-containers:v2"},
 					SizeBytes: 123,
 				},
 			},

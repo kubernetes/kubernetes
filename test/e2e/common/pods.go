@@ -160,7 +160,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: "gcr.io/google-containers/nginx-slim:0.7",
 					},
 				},
 			},
@@ -281,7 +281,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: "gcr.io/google-containers/nginx-slim:0.7",
 					},
 				},
 			},
@@ -330,7 +330,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: "gcr.io/google-containers/nginx-slim:0.7",
 					},
 				},
 			},
@@ -416,7 +416,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.io/google-containers/busybox:1.24",
 						Command: []string{"sh", "-c", "env"},
 					},
 				},
@@ -455,7 +455,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "main",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.io/google-containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 600"},
 					},
 				},
@@ -525,7 +525,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "main",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.io/google-containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 10000"},
 					},
 				},
@@ -580,7 +580,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.io/google-containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
 					},
 				},
@@ -591,7 +591,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		By("updating the image")
 		podClient.Update(podName, func(pod *v1.Pod) {
-			pod.Spec.Containers[0].Image = "gcr.io/google_containers/nginx-slim:0.7"
+			pod.Spec.Containers[0].Image = "gcr.io/google-containers/nginx-slim:0.7"
 		})
 
 		time.Sleep(syncLoopFrequency)
@@ -621,7 +621,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.io/google-containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
 					},
 				},

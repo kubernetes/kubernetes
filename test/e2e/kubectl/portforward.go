@@ -64,7 +64,7 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 			Containers: []v1.Container{
 				{
 					Name:  "readiness",
-					Image: "gcr.io/google_containers/netexec:1.7",
+					Image: "gcr.io/google-containers/netexec:1.7",
 					ReadinessProbe: &v1.Probe{
 						Handler: v1.Handler{
 							Exec: &v1.ExecAction{
@@ -79,7 +79,7 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 				},
 				{
 					Name:  "portforwardtester",
-					Image: "gcr.io/google_containers/portforwardtester:1.2",
+					Image: "gcr.io/google-containers/portforwardtester:1.2",
 					Env: []v1.EnvVar{
 						{
 							Name:  "BIND_PORT",

@@ -243,7 +243,7 @@ func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]stri
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.io/google-containers/busybox:1.24",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					VolumeMounts: []v1.VolumeMount{
@@ -308,7 +308,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 			Containers: []v1.Container{
 				{
 					Name:         "vsphere-e2e-container-" + string(uuid.NewUUID()),
-					Image:        "gcr.io/google_containers/busybox:1.24",
+					Image:        "gcr.io/google-containers/busybox:1.24",
 					Command:      commands,
 					VolumeMounts: volumeMounts,
 				},

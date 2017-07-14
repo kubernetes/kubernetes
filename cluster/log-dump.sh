@@ -52,7 +52,7 @@ readonly systemd_services="kubelet docker"
 readonly max_scp_processes=25
 
 # This template spits out the external IPs and images for each node in the cluster in a format like so:
-# 52.32.7.85 gcr.io/google_containers/kube-apiserver:1355c18c32d7bef16125120bce194fad gcr.io/google_containers/kube-controller-manager:46365cdd8d28b8207950c3c21d1f3900 [...]
+# 52.32.7.85 gcr.io/google-containers/kube-apiserver:1355c18c32d7bef16125120bce194fad gcr.io/google-containers/kube-controller-manager:46365cdd8d28b8207950c3c21d1f3900 [...]
 readonly ips_and_images='{range .items[*]}{@.status.addresses[?(@.type == "ExternalIP")].address} {@.status.images[*].names[*]}{"\n"}{end}'
 
 function setup() {

@@ -150,7 +150,7 @@ const (
 	ClaimProvisionTimeout = 5 * time.Minute
 
 	// When these values are updated, also update cmd/kubelet/app/options/options.go
-	currentPodInfraContainerImageName    = "gcr.io/google_containers/pause"
+	currentPodInfraContainerImageName    = "gcr.io/google-containers/pause"
 	currentPodInfraContainerImageVersion = "3.0"
 
 	// How long each node is given during a process that restarts all nodes
@@ -180,7 +180,7 @@ const (
 	awsMasterIP = "172.20.0.9"
 
 	// Serve hostname image name
-	ServeHostnameImage = "gcr.io/google_containers/serve_hostname:v1.4"
+	ServeHostnameImage = "gcr.io/google-containers/serve_hostname:v1.4"
 	// ssh port
 	sshPort = "22"
 )
@@ -379,7 +379,7 @@ func ProxyMode(f *Framework) (string, error) {
 			Containers: []v1.Container{
 				{
 					Name:    "detector",
-					Image:   "gcr.io/google_containers/e2e-net-amd64:1.0",
+					Image:   "gcr.io/google-containers/e2e-net-amd64:1.0",
 					Command: []string{"/bin/sleep", "3600"},
 				},
 			},
@@ -3152,7 +3152,7 @@ func NewHostExecPodSpec(ns, name string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:            "hostexec",
-					Image:           "gcr.io/google_containers/hostexec:1.2",
+					Image:           "gcr.io/google-containers/hostexec:1.2",
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
@@ -3202,7 +3202,7 @@ func newExecPodSpec(ns, generateName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "exec",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.io/google-containers/busybox:1.24",
 					Command: []string{"sh", "-c", "while true; do sleep 5; done"},
 				},
 			},
@@ -4217,7 +4217,7 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 			Containers: []v1.Container{
 				{
 					Name:  containerName,
-					Image: "gcr.io/google_containers/porter:4524579c0eb935c056c8e75563b4e1eda31587e0",
+					Image: "gcr.io/google-containers/porter:4524579c0eb935c056c8e75563b4e1eda31587e0",
 					Env:   []v1.EnvVar{{Name: fmt.Sprintf("SERVE_PORT_%d", port), Value: "foo"}},
 					Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
 				},
@@ -4260,7 +4260,7 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeo
 			Containers: []v1.Container{
 				{
 					Name:    contName,
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.io/google-containers/busybox:1.24",
 					Command: command,
 				},
 			},

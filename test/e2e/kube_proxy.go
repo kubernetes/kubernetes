@@ -34,7 +34,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const kubeProxyE2eImage = "gcr.io/google_containers/e2e-net-amd64:1.0"
+const kubeProxyE2eImage = "gcr.io/google-containers/e2e-net-amd64:1.0"
 
 var _ = framework.KubeDescribe("Network", func() {
 	const (

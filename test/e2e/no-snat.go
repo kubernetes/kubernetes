@@ -35,10 +35,10 @@ import (
 
 const (
 	testPodPort  = 8080
-	testPodImage = "gcr.io/google_containers/no-snat-test-amd64:1.0.1"
+	testPodImage = "gcr.io/google-containers/no-snat-test-amd64:1.0.1"
 
 	testProxyPort  = 31235 // Firewall rule allows external traffic on ports 30000-32767. I just picked a random one.
-	testProxyImage = "gcr.io/google_containers/no-snat-test-proxy-amd64:1.0.1"
+	testProxyImage = "gcr.io/google-containers/no-snat-test-proxy-amd64:1.0.1"
 )
 
 var (

@@ -15,7 +15,7 @@
 .PHONY:	build push
 
 TAG = v5.4.0
-PREFIX = gcr.io/google_containers
+PREFIX = gcr.io/google-containers
 
 build:
 	docker build --pull -t $(PREFIX)/kibana:$(TAG) .

@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	defaultSandboxImage = "gcr.io/google_containers/pause-amd64:3.0"
+	defaultSandboxImage = "gcr.io/google-containers/pause-amd64:3.0"
 
 	// Various default sandbox resources requests/limits.
 	defaultSandboxCPUshares int64 = 2

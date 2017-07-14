@@ -1034,7 +1034,7 @@ function start-kube-proxy {
   remove-salt-config-comments "${src_file}"
 
   local -r kubeconfig="--kubeconfig=/var/lib/kube-proxy/kubeconfig"
-  local kube_docker_registry="gcr.io/google_containers"
+  local kube_docker_registry="gcr.io/google-containers"
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     kube_docker_registry=${KUBE_DOCKER_REGISTRY}
   fi
@@ -1180,7 +1180,7 @@ function compute-master-manifest-variables {
     CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\"}},"
     CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
   fi
-  DOCKER_REGISTRY="gcr.io/google_containers"
+  DOCKER_REGISTRY="gcr.io/google-containers"
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY}"
   fi

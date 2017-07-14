@@ -15,7 +15,7 @@
 all: push
 
 TAG = e2e
-PREFIX = gcr.io/google_containers/zookeeper-install-3.5.0-alpha
+PREFIX = gcr.io/google-containers/zookeeper-install-3.5.0-alpha
 
 container:
 	docker build --pull -t $(PREFIX):$(TAG) .

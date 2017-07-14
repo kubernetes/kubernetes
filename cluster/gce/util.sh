@@ -224,12 +224,12 @@ function set-preferred-region() {
   fi
 
   # If we're using regional GCR, and we're outside the US, go to the
-  # regional registry. The gcr.io/google_containers registry is
+  # regional registry. The gcr.io/google-containers registry is
   # appropriate for US (for now).
   if [[ "${REGIONAL_KUBE_ADDONS}" == "true" ]] && [[ "${preferred}" != "us" ]]; then
-    KUBE_ADDON_REGISTRY="${preferred}.gcr.io/google_containers"
+    KUBE_ADDON_REGISTRY="${preferred}.gcr.io/google-containers"
   else
-    KUBE_ADDON_REGISTRY="gcr.io/google_containers"
+    KUBE_ADDON_REGISTRY="gcr.io/google-containers"
   fi
 
   if [[ "${ENABLE_DOCKER_REGISTRY_CACHE:-}" == "true" ]]; then

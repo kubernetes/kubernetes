@@ -110,7 +110,7 @@ func newTablePod(podName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  containerName,
-					Image: "gcr.io/google_containers/porter:4524579c0eb935c056c8e75563b4e1eda31587e0",
+					Image: "gcr.io/google-containers/porter:4524579c0eb935c056c8e75563b4e1eda31587e0",
 					Env:   []v1.EnvVar{{Name: fmt.Sprintf("SERVE_PORT_%d", port), Value: "foo"}},
 					Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
 				},

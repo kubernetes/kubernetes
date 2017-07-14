@@ -46,7 +46,7 @@ func testPreStop(c clientset.Interface, ns string) {
 			Containers: []v1.Container{
 				{
 					Name:  "server",
-					Image: "gcr.io/google_containers/nettest:1.7",
+					Image: "gcr.io/google-containers/nettest:1.7",
 					Ports: []v1.ContainerPort{{ContainerPort: 8080}},
 				},
 			},
@@ -79,7 +79,7 @@ func testPreStop(c clientset.Interface, ns string) {
 			Containers: []v1.Container{
 				{
 					Name:    "tester",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.io/google-containers/busybox:1.24",
 					Command: []string{"sleep", "600"},
 					Lifecycle: &v1.Lifecycle{
 						PreStop: &v1.Handler{

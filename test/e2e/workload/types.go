@@ -22,13 +22,13 @@ import (
 )
 
 const (
-	NautilusImage  = "gcr.io/google_containers/update-demo:nautilus"
-	KittenImage    = "gcr.io/google_containers/update-demo:kitten"
-	NginxImage     = "gcr.io/google_containers/nginx-slim:0.7"
+	NautilusImage  = "gcr.io/google-containers/update-demo:nautilus"
+	KittenImage    = "gcr.io/google-containers/update-demo:kitten"
+	NginxImage     = "gcr.io/google-containers/nginx-slim:0.7"
 	NginxImageName = "nginx"
 	RedisImage     = "gcr.io/k8s-testimages/redis:e2e"
 	RedisImageName = "redis"
-	NewNginxImage  = "gcr.io/google_containers/nginx-slim:0.8"
+	NewNginxImage  = "gcr.io/google-containers/nginx-slim:0.8"
 )
 
 var (

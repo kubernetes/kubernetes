@@ -71,8 +71,8 @@ import (
 )
 
 const (
-	nautilusImage            = "gcr.io/google_containers/update-demo:nautilus"
-	kittenImage              = "gcr.io/google_containers/update-demo:kitten"
+	nautilusImage            = "gcr.io/google-containers/update-demo:nautilus"
+	kittenImage              = "gcr.io/google-containers/update-demo:kitten"
 	updateDemoSelector       = "name=update-demo"
 	updateDemoContainer      = "update-demo"
 	frontendSelector         = "app=guestbook,tier=frontend"
@@ -92,9 +92,9 @@ const (
 	pausePodSelector         = "name=pause"
 	pausePodName             = "pause"
 	runJobTimeout            = 5 * time.Minute
-	busyboxImage             = "gcr.io/google_containers/busybox:1.24"
-	nginxImage               = "gcr.io/google_containers/nginx-slim:0.7"
-	newNginxImage            = "gcr.io/google_containers/nginx-slim:0.8"
+	busyboxImage             = "gcr.io/google-containers/busybox:1.24"
+	nginxImage               = "gcr.io/google-containers/nginx-slim:0.7"
+	newNginxImage            = "gcr.io/google-containers/nginx-slim:0.8"
 	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
 	redisControllerFilename  = "redis-master-controller.json"
 	redisServiceFilename     = "redis-master-service.json"

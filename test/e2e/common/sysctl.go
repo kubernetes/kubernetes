@@ -43,7 +43,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "test-container",
-						Image: "gcr.io/google_containers/busybox:1.24",
+						Image: "gcr.io/google-containers/busybox:1.24",
 					},
 				},
 				RestartPolicy: v1.RestartPolicyNever,

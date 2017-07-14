@@ -14,7 +14,7 @@
 
 .PHONY:	build push
 
-PREFIX = gcr.io/google_containers
+PREFIX = gcr.io/google-containers
 IMAGE = fluentd-elasticsearch
 TAG = 1.24
 

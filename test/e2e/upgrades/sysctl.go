@@ -131,7 +131,7 @@ func sysctlTestPod(name string, sysctls map[string]string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "test-container",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.io/google-containers/busybox:1.24",
 					Command: append([]string{"/bin/sysctl"}, keys...),
 				},
 			},

@@ -59,7 +59,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		}
 		createAndWaitHostPidPod := func(podName string, hostPID bool) {
 			podClient.Create(makeHostPidPod(podName,
-				"gcr.io/google_containers/busybox:1.24",
+				"gcr.io/google-containers/busybox:1.24",
 				[]string{"sh", "-c", "pidof nginx || true"},
 				hostPID,
 			))
@@ -71,7 +71,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		BeforeEach(func() {
 			nginxPodName := "nginx-hostpid-" + string(uuid.NewUUID())
 			podClient.CreateSync(makeHostPidPod(nginxPodName,
-				"gcr.io/google_containers/nginx-slim:0.7",
+				"gcr.io/google-containers/nginx-slim:0.7",
 				nil,
 				true,
 			))
@@ -139,7 +139,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		}
 		createAndWaitHostIPCPod := func(podName string, hostNetwork bool) {
 			podClient.Create(makeHostIPCPod(podName,
-				"gcr.io/google_containers/busybox:1.24",
+				"gcr.io/google-containers/busybox:1.24",
 				[]string{"sh", "-c", "ipcs -m | awk '{print $2}'"},
 				hostNetwork,
 			))
@@ -219,7 +219,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		listListeningPortsCommand := []string{"sh", "-c", "netstat -ln"}
 		createAndWaitHostNetworkPod := func(podName string, hostNetwork bool) {
 			podClient.Create(makeHostNetworkPod(podName,
-				"gcr.io/google_containers/busybox:1.24",
+				"gcr.io/google-containers/busybox:1.24",
 				listListeningPortsCommand,
 				hostNetwork,
 			))
@@ -298,7 +298,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		createAndWaitUserPod := func(userid int64) {
 			podName := fmt.Sprintf("busybox-user-%d-%s", userid, uuid.NewUUID())
 			podClient.Create(makeUserPod(podName,
-				"gcr.io/google_containers/busybox:1.24",
+				"gcr.io/google-containers/busybox:1.24",
 				[]string{"sh", "-c", fmt.Sprintf("test $(id -u) -eq %d", userid)},
 				userid,
 			))

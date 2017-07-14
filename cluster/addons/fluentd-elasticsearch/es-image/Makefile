@@ -19,10 +19,10 @@
 TAG = v5.4.0-1
 
 build:	elasticsearch_logging_discovery
-	docker build --pull -t gcr.io/google_containers/elasticsearch:$(TAG) .
+	docker build --pull -t gcr.io/google-containers/elasticsearch:$(TAG) .
 
 push:
-	gcloud docker -- push gcr.io/google_containers/elasticsearch:$(TAG)
+	gcloud docker -- push gcr.io/google-containers/elasticsearch:$(TAG)
 
 elasticsearch_logging_discovery:
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags "-w" elasticsearch_logging_discovery.go

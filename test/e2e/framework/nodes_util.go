@@ -264,7 +264,7 @@ func gceUpgradeScript() string {
 func waitForSSHTunnels() {
 	Logf("Waiting for SSH tunnels to establish")
 	RunKubectl("run", "ssh-tunnel-test",
-		"--image=gcr.io/google_containers/busybox:1.24",
+		"--image=gcr.io/google-containers/busybox:1.24",
 		"--restart=Never",
 		"--command", "--",
 		"echo", "Hello")
