@@ -203,7 +203,7 @@ func TestToKubeContainerStatus(t *testing.T) {
 	}
 }
 
-func makeExpetectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
+func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
 	container := &pod.Spec.Containers[containerIndex]
 	podIP := ""
 	restartCount := 0
@@ -258,7 +258,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
-	expectedConfig := makeExpetectedConfig(m, pod, 0)
+	expectedConfig := makeExpectedConfig(m, pod, 0)
 	containerConfig, err := m.generateContainerConfig(&pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
