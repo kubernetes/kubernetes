@@ -56,7 +56,7 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
 	cmd.Flags().BoolP("short", "", false, "Print just the version number.")
-	cmd.Flags().String("output", "", "output format, options available are yaml and json")
+	cmd.Flags().StringP("output", "o", "", "output format, options available are yaml and json")
 	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
 }
