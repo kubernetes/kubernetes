@@ -91,7 +91,7 @@ func GetStandardPrinter(outputOpts *OutputOptions, noHeaders bool, mapper meta.R
 
 	case "jsonpath-file":
 		if len(formatArgument) == 0 {
-			return nil, fmt.Errorf("jsonpath file format specified but no template file file given")
+			return nil, fmt.Errorf("jsonpath file format specified but no template file given")
 		}
 		data, err := ioutil.ReadFile(formatArgument)
 		if err != nil {
