@@ -1152,7 +1152,7 @@ Features for this release were tracked via the use of the [kubernetes/features](
 
 #### PodDisruptionBudget
 * [beta] PodDisruptionBudget has a new field MaxUnavailable, which allows users to specify the maximum number of disruptions that can be tolerated during eviction. For more information, see [Pod Disruptions](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/) and [Specifying a Disruption Budget for your Application](https://kubernetes.io/docs/tasks/run-application/configure-pdb/).
-
+* PodDisruptionBudget now uses [ControllerRef](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/controller-ref.md) to make the right decisions about Pod eviction even if the built in application controllers have overlapping selectors.
 
 ### **Security**
 #### Admission Control
