@@ -206,7 +206,7 @@ type Init struct {
 
 // Validate validates configuration passed to "kubeadm init"
 func (i *Init) Validate(cmd *cobra.Command) error {
-	if err := validation.ValidateMixedArguments(cmd.PersistentFlags()); err != nil {
+	if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
 		return err
 	}
 	return validation.ValidateMasterConfiguration(i.cfg).ToAggregate()
