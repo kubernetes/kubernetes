@@ -42,44 +42,43 @@ spec:
 ```
 
 * time, t=0
-```console
-$ kubectl get ing
-NAME           RULE      BACKEND                   ADDRESS
-test-ingress   -         default-http-backend:80
-$ kubectl describe ing
-No events.
-```
+  ```console
+  $ kubectl get ing
+  NAME           RULE      BACKEND                   ADDRESS
+  test-ingress   -         default-http-backend:80
+  $ kubectl describe ing
+  No events.
+  ```
 
 * time, t=1m
-```console
-$ kubectl get ing
-NAME           RULE      BACKEND                   ADDRESS
-test-ingress   -         default-http-backend:80   130.211.5.27
+  ```console
+  $ kubectl get ing
+  NAME           RULE      BACKEND                   ADDRESS
+  test-ingress   -         default-http-backend:80   130.211.5.27
 
-$ kubectl describe ing
-target-proxy:		k8s-tp-default-test-ingress
-url-map:		    k8s-um-default-test-ingress
-backends:		    {"k8s-be-32342":"UNKNOWN"}
-forwarding-rule:	k8s-fw-default-test-ingress
-Events:
-  FirstSeen	LastSeen	Count	From				SubobjectPath	Reason	Message
-  ─────────	────────	─────	────				─────────────	──────	───────
-  46s		46s		1	{loadbalancer-controller }	Success	Created loadbalancer 130.211.5.27
-```
+  $ kubectl describe ing
+  target-proxy:		k8s-tp-default-test-ingress
+  url-map:		    k8s-um-default-test-ingress
+  backends:		    {"k8s-be-32342":"UNKNOWN"}
+  forwarding-rule:	k8s-fw-default-test-ingress
+  Events:
+    FirstSeen	LastSeen	Count	From				SubobjectPath	Reason	Message
+    ─────────	────────	─────	────				─────────────	──────	───────
+    46s		46s		1	{loadbalancer-controller }	Success	Created loadbalancer 130.211.5.27
+  ```
 
 * time, t=5m
-```console
-$ kubectl describe ing
-target-proxy:		k8s-tp-default-test-ingress
-url-map:		    k8s-um-default-test-ingress
-backends:		    {"k8s-be-32342":"HEALTHY"}
-forwarding-rule:	k8s-fw-default-test-ingress
-Events:
-  FirstSeen	LastSeen	Count	From				SubobjectPath	Reason	Message
-  ─────────	────────	─────	────				─────────────	──────	───────
-  46s		46s		1	{loadbalancer-controller }	Success	Created loadbalancer 130.211.5.27
-
-```
+  ```console
+  $ kubectl describe ing
+  target-proxy:		k8s-tp-default-test-ingress
+  url-map:		    k8s-um-default-test-ingress
+  backends:		    {"k8s-be-32342":"HEALTHY"}
+  forwarding-rule:	k8s-fw-default-test-ingress
+  Events:
+    FirstSeen	LastSeen	Count	From				SubobjectPath	Reason	Message
+    ─────────	────────	─────	────				─────────────	──────	───────
+    46s		46s		1	{loadbalancer-controller }	Success	Created loadbalancer 130.211.5.27
+  ```
 
 ## Disabling GLBC
 
@@ -87,20 +86,20 @@ Since GLBC runs as a cluster addon, you cannot simply delete the RC. The easiest
 
 * IFF you want to tear down existing L7 loadbalancers, hit the /delete-all-and-quit endpoint on the pod:
 
-```console
-$ kubectl get pods --namespace=kube-system
-NAME                                               READY     STATUS    RESTARTS   AGE
-l7-lb-controller-7bb21                             1/1       Running   0          1h
-$ kubectl exec l7-lb-controller-7bb21 -c l7-lb-controller curl http://localhost:8081/delete-all-and-quit --namespace=kube-system
-$ kubectl logs l7-lb-controller-7b221 -c l7-lb-controller --follow
-...
-I1007 00:30:00.322528       1 main.go:160] Handled quit, awaiting pod deletion.
-```
+  ```console
+  $ kubectl get pods --namespace=kube-system
+  NAME                                               READY     STATUS    RESTARTS   AGE
+  l7-lb-controller-7bb21                             1/1       Running   0          1h
+  $ kubectl exec l7-lb-controller-7bb21 -c l7-lb-controller curl http://localhost:8081/delete-all-and-quit --namespace=kube-system
+  $ kubectl logs l7-lb-controller-7b221 -c l7-lb-controller --follow
+  ...
+  I1007 00:30:00.322528       1 main.go:160] Handled quit, awaiting pod deletion.
+  ```
 
 * Nullify the RC (but don't delete it or the addon controller will "fix" it for you)
-```console
-$ kubectl scale rc l7-lb-controller --replicas=0 --namespace=kube-system
-```
+  ```console
+  $ kubectl scale rc l7-lb-controller --replicas=0 --namespace=kube-system
+  ```
 
 ## Limitations
 
