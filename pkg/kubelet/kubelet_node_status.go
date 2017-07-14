@@ -577,11 +577,11 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 	if node.Status.Allocatable == nil {
 		node.Status.Allocatable = make(v1.ResourceList)
 	}
-	// Remove opaque integer resources from allocatable that are no longer
+	// Remove extended resources from allocatable that are no longer
 	// present in capacity.
 	for k := range node.Status.Allocatable {
 		_, found := node.Status.Capacity[k]
-		if !found && v1helper.IsOpaqueIntResourceName(k) {
+		if !found && v1helper.IsExtendedResourceName(k) {
 			delete(node.Status.Allocatable, k)
 		}
 	}

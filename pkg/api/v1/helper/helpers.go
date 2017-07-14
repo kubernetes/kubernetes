@@ -24,8 +24,24 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/helper"
 )
+
+// IsExtendedResourceName returns true if the resource name is not in the
+// default namespace, or it has the opaque integer resource prefix.
+func IsExtendedResourceName(name v1.ResourceName) bool {
+	// TODO: Remove OIR part following deprecation.
+	return !IsDefaultNamespaceResource(name) || IsOpaqueIntResourceName(name)
+}
+
+// IsDefaultNamespaceResource returns true if the resource name is in the
+// *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
+// implicitly in the kubernetes.io/ namespace.
+func IsDefaultNamespaceResource(name v1.ResourceName) bool {
+	return !strings.Contains(string(name), "/") ||
+		strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
+}
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
 // integer resource prefix.
@@ -41,6 +57,15 @@ func OpaqueIntResourceName(name string) v1.ResourceName {
 		return v1.ResourceName(name)
 	}
 	return v1.ResourceName(fmt.Sprintf("%s%s", v1.ResourceOpaqueIntPrefix, name))
+}
+
+var overcommitBlacklist = sets.NewString(string(v1.ResourceNvidiaGPU))
+
+// IsOvercommitAllowed returns true if the resource is in the default
+// namespace and not blacklisted.
+func IsOvercommitAllowed(name v1.ResourceName) bool {
+	return IsDefaultNamespaceResource(name) &&
+		!overcommitBlacklist.Has(string(name))
 }
 
 // this function aims to check if the service's ClusterIP is set or not

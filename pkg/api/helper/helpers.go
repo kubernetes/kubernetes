@@ -115,6 +115,21 @@ func IsStandardContainerResourceName(str string) bool {
 	return standardContainerResources.Has(str)
 }
 
+// IsExtendedResourceName returns true if the resource name is not in the
+// default namespace, or it has the opaque integer resource prefix.
+func IsExtendedResourceName(name api.ResourceName) bool {
+	// TODO: Remove OIR part following deprecation.
+	return !IsDefaultNamespaceResource(name) || IsOpaqueIntResourceName(name)
+}
+
+// IsDefaultNamespaceResource returns true if the resource name is in the
+// *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
+// implicitly in the kubernetes.io/ namespace.
+func IsDefaultNamespaceResource(name api.ResourceName) bool {
+	return !strings.Contains(string(name), "/") ||
+		strings.Contains(string(name), api.ResourceDefaultNamespacePrefix)
+}
+
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
 // integer resource prefix.
 func IsOpaqueIntResourceName(name api.ResourceName) bool {
@@ -129,6 +144,15 @@ func OpaqueIntResourceName(name string) api.ResourceName {
 		return api.ResourceName(name)
 	}
 	return api.ResourceName(fmt.Sprintf("%s%s", api.ResourceOpaqueIntPrefix, name))
+}
+
+var overcommitBlacklist = sets.NewString(string(api.ResourceNvidiaGPU))
+
+// IsOvercommitAllowed returns true if the resource is in the default
+// namespace and not blacklisted.
+func IsOvercommitAllowed(name api.ResourceName) bool {
+	return IsDefaultNamespaceResource(name) &&
+		!overcommitBlacklist.Has(string(name))
 }
 
 var standardLimitRangeTypes = sets.NewString(
@@ -204,7 +228,7 @@ var integerResources = sets.NewString(
 
 // IsIntegerResourceName returns true if the resource is measured in integer values
 func IsIntegerResourceName(str string) bool {
-	return integerResources.Has(str) || IsOpaqueIntResourceName(api.ResourceName(str))
+	return integerResources.Has(str) || IsExtendedResourceName(api.ResourceName(str))
 }
 
 // this function aims to check if the service's ClusterIP is set or not

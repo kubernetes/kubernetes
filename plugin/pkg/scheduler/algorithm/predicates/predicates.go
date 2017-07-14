@@ -533,10 +533,10 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 					result.StorageOverlay = overlay
 				}
 			default:
-				if v1helper.IsOpaqueIntResourceName(rName) {
+				if v1helper.IsExtendedResourceName(rName) {
 					value := rQuantity.Value()
-					if value > result.OpaqueIntResources[rName] {
-						result.SetOpaque(rName, value)
+					if value > result.ExtendedResources[rName] {
+						result.SetExtended(rName, value)
 					}
 				}
 			}
@@ -572,7 +572,7 @@ func PodFitsResources(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 		// We couldn't parse metadata - fallback to computing it.
 		podRequest = GetResourceRequest(pod)
 	}
-	if podRequest.MilliCPU == 0 && podRequest.Memory == 0 && podRequest.NvidiaGPU == 0 && podRequest.StorageOverlay == 0 && podRequest.StorageScratch == 0 && len(podRequest.OpaqueIntResources) == 0 {
+	if podRequest.MilliCPU == 0 && podRequest.Memory == 0 && podRequest.NvidiaGPU == 0 && podRequest.StorageOverlay == 0 && podRequest.StorageScratch == 0 && len(podRequest.ExtendedResources) == 0 {
 		return len(predicateFails) == 0, predicateFails, nil
 	}
 
@@ -603,9 +603,9 @@ func PodFitsResources(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceStorageOverlay, podRequest.StorageOverlay, nodeInfo.RequestedResource().StorageOverlay, allocatable.StorageOverlay))
 	}
 
-	for rName, rQuant := range podRequest.OpaqueIntResources {
-		if allocatable.OpaqueIntResources[rName] < rQuant+nodeInfo.RequestedResource().OpaqueIntResources[rName] {
-			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.OpaqueIntResources[rName], nodeInfo.RequestedResource().OpaqueIntResources[rName], allocatable.OpaqueIntResources[rName]))
+	for rName, rQuant := range podRequest.ExtendedResources {
+		if allocatable.ExtendedResources[rName] < rQuant+nodeInfo.RequestedResource().ExtendedResources[rName] {
+			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.ExtendedResources[rName], nodeInfo.RequestedResource().ExtendedResources[rName], allocatable.ExtendedResources[rName]))
 		}
 	}
 
