@@ -141,7 +141,6 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	}
 
 	if u, err := url.ParseRequestURI(clientConfig.Host); err == nil && u.Opaque == "" && len(u.Path) > 1 {
-		u.RawQuery = ""
 		u.Fragment = ""
 		clientConfig.Host = u.String()
 	}
