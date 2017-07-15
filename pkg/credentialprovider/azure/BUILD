@@ -10,7 +10,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["azure_credentials.go"],
+    srcs = [
+        "azure_acr_helper.go",
+        "azure_credentials.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider/providers/azure:go_default_library",
@@ -19,6 +22,7 @@ go_library(
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
+        "//vendor/github.com/dgrijalva/jwt-go:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
