@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "events.go",
+        "framework.go",
         "opaque_resource.go",
         "predicates.go",
         "priorities.go",
