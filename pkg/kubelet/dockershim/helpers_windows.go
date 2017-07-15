@@ -64,11 +64,11 @@ func (ds *dockerService) updateCreateConfig(
 
 func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 	opts := dockertypes.ContainerListOptions{
-		All:    true,
-		Filter: dockerfilters.NewArgs(),
+		All:     true,
+		Filters: dockerfilters.NewArgs(),
 	}
 
-	f := newDockerFilter(&opts.Filter)
+	f := newDockerFilter(&opts.Filters)
 	f.AddLabel(containerTypeLabelKey, containerTypeLabelContainer)
 	f.AddLabel(sandboxIDLabelKey, sandboxID)
 	containers, err := ds.client.ListContainers(opts)
