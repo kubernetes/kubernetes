@@ -36,7 +36,7 @@ const (
 )
 
 // This test requires Rescheduler to be enabled.
-var _ = framework.KubeDescribe("Rescheduler [Serial]", func() {
+var _ = SIGDescribe("Rescheduler [Serial]", func() {
 	f := framework.NewDefaultFramework("rescheduler")
 	var ns string
 	var totalMillicores int
