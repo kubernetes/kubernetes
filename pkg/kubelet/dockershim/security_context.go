@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/blang/semver"
-	dockercontainer "github.com/docker/engine-api/types/container"
+	dockercontainer "github.com/docker/docker/api/types/container"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	knetwork "k8s.io/kubernetes/pkg/kubelet/network"

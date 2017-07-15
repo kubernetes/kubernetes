@@ -126,6 +126,21 @@ verify: verify_generated_files
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
 endif
 
+define QUICK_VERIFY_HELP_INFO
+# Runs only the presubmission verifications that aren't slow.
+#
+# Example:
+#   make quick-verify
+endef
+.PHONY: quick-verify
+ifeq ($(PRINT_HELP),y)
+quick-verify:
+	@echo "$$QUICK_VERIFY_HELP_INFO"
+else
+quick-verify: verify_generated_files
+	hack/make-rules/verify.sh -v -Q
+endif
+
 define UPDATE_HELP_INFO
 # Runs all the generated updates.
 #
@@ -240,6 +255,11 @@ define TEST_E2E_NODE_HELP_INFO
 #  IMAGE_SERVICE_ENDPOINT: remote image endpoint to connect to, to prepull images.
 #   Used when RUNTIME is set to "remote".
 #  IMAGE_CONFIG_FILE: path to a file containing image configuration.
+#  SYSTEM_SPEC_NAME: The name of the system spec to be used for validating the
+#    image in the node conformance test. The specs are located at
+#    test/e2e_node/system/specs/. For example, "SYSTEM_SPEC_NAME=gke" will use
+#    the spec at test/e2e_node/system/specs/gke.yaml. If unspecified, the
+#    default built-in spec (system.DefaultSpec) will be used.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
@@ -521,6 +541,20 @@ bazel-test:
 else
 bazel-test:
 	bazel test --test_tag_filters=-integration --flaky_test_attempts=3 //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all //vendor/k8s.io/...
+endif
+
+ifeq ($(PRINT_HELP),y)
+define BAZEL_TEST_INTEGRATION_HELP_INFO
+# Integration test with bazel
+#
+# Example:
+# make bazel-test-integration
+endef
+bazel-test-integration:
+	@echo "$$BAZEL_TEST_INTEGRATION_HELP_INFO"
+else
+bazel-test-integration:
+	bazel test //test/integration/...
 endif
 
 ifeq ($(PRINT_HELP),y)

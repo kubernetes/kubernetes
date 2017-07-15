@@ -27,7 +27,7 @@ spec:
       hostNetwork: true
       containers:
       - name: fluentd-gcp
-        image: gcr.io/google-containers/fluentd-gcp:2.0.7
+        image: gcr.io/google-containers/fluentd-gcp:2.0.8
         # If fluentd consumes its own logs, the following situation may happen:
         # fluentd fails to send a chunk to the server => writes it to the log =>
         # tries to send this message to the server => fails to send a chunk and so on.
@@ -90,13 +90,13 @@ spec:
                 exit 1;
               fi;
       - name: prometheus-to-sd-exporter
-        image: gcr.io/google-containers/prometheus-to-sd:v0.1.0
+        image: gcr.io/google-containers/prometheus-to-sd:v0.1.3
         command:
           - /monitor
           - --component=fluentd
           - --target-port=31337
           - --stackdriver-prefix=container.googleapis.com/internal/addons
-          - --whitelisted-metrics=logging_line_count,logging_entry_count
+          - --whitelisted-metrics=stackdriver_successful_requests_count,stackdriver_failed_requests_count,stackdriver_ingested_entries_count,stackdriver_dropped_entries_count
         volumeMounts:
         - name: ssl-certs
           mountPath: /etc/ssl/certs

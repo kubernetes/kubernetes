@@ -39,6 +39,11 @@
 			"Rev": "786cc84138518bf7fd6d60e92fad1ac9d1a117ad"
 		},
 		{
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/disk",
+			"Comment": "v10.0.4-beta-1-g786cc84",
+			"Rev": "786cc84138518bf7fd6d60e92fad1ac9d1a117ad"
+		},
+		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/network",
 			"Comment": "v10.0.4-beta-1-g786cc84",
 			"Rev": "786cc84138518bf7fd6d60e92fad1ac9d1a117ad"
@@ -55,11 +60,11 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm",
-			"Rev": "fa152c58bc15761d0200cb75fe958b89a9d4888e"
+			"Rev": "70b2c90b260171e829f1ebd7c17f600c11858dbe"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm/winterm",
-			"Rev": "fa152c58bc15761d0200cb75fe958b89a9d4888e"
+			"Rev": "70b2c90b260171e829f1ebd7c17f600c11858dbe"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
@@ -832,58 +837,138 @@
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/digest",
-			"Comment": "v2.4.0-rc.1-38-gcd27f17",
+			"Comment": "v2.4.0-rc.1-38-gcd27f179",
 			"Rev": "cd27f179f2c10c5d300e6d09025b538c475b0d51"
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/reference",
-			"Comment": "v2.4.0-rc.1-38-gcd27f17",
+			"Comment": "v2.4.0-rc.1-38-gcd27f179",
 			"Rev": "cd27f179f2c10c5d300e6d09025b538c475b0d51"
 		},
 		{
+			"ImportPath": "github.com/docker/docker/api/types",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/blkiodev",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/container",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/events",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/filters",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/mount",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/network",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/reference",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/registry",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/strslice",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/swarm",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/time",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/versions",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/api/types/volume",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/client",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
 			"ImportPath": "github.com/docker/docker/pkg/jsonlog",
-			"Comment": "v1.11.2",
-			"Rev": "b9f10c951893f9a00865890a5232e85d770c1087"
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/jsonmessage",
-			"Comment": "v1.11.2",
-			"Rev": "b9f10c951893f9a00865890a5232e85d770c1087"
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/longpath",
-			"Comment": "v1.11.2",
-			"Rev": "b9f10c951893f9a00865890a5232e85d770c1087"
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/mount",
-			"Comment": "v1.11.2",
-			"Rev": "b9f10c951893f9a00865890a5232e85d770c1087"
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/stdcopy",
-			"Comment": "v1.11.2",
-			"Rev": "b9f10c951893f9a00865890a5232e85d770c1087"
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/symlink",
-			"Comment": "v1.11.2",
-			"Rev": "b9f10c951893f9a00865890a5232e85d770c1087"
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/system",
-			"Comment": "v1.11.2",
-			"Rev": "b9f10c951893f9a00865890a5232e85d770c1087"
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/term",
-			"Comment": "v1.11.2",
-			"Rev": "b9f10c951893f9a00865890a5232e85d770c1087"
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/term/windows",
-			"Comment": "v1.11.2",
-			"Rev": "b9f10c951893f9a00865890a5232e85d770c1087"
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/tlsconfig",
+			"Comment": "v1.13.1-rc2",
+			"Rev": "54f71fd84a0dabab9d45f5fe7543a028b1200ca1"
 		},
 		{
 			"ImportPath": "github.com/docker/engine-api/client",
@@ -2145,6 +2230,7 @@
 		},
 		{
 			"ImportPath": "github.com/pelletier/go-buffruneio",
+			"Comment": "v0.1.0",
 			"Rev": "df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d"
 		},
 		{

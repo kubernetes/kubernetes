@@ -87,6 +87,12 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			i, err := NewInit(cfgPath, internalcfg, skipPreFlight, skipTokenPrint)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate(cmd))
+
+			// TODO: remove this warning in 1.9
+			if !cmd.Flags().Lookup("token-ttl").Changed {
+				fmt.Println("[kubeadm] WARNING: starting in 1.8, tokens expire after 24 hours by default (if you require a non-expiring token use --token-ttl 0)")
+			}
+
 			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
@@ -206,7 +212,7 @@ type Init struct {
 
 // Validate validates configuration passed to "kubeadm init"
 func (i *Init) Validate(cmd *cobra.Command) error {
-	if err := validation.ValidateMixedArguments(cmd.PersistentFlags()); err != nil {
+	if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
 		return err
 	}
 	return validation.ValidateMasterConfiguration(i.cfg).ToAggregate()

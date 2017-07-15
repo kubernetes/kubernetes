@@ -22,7 +22,7 @@ import (
 
 	dockerdigest "github.com/docker/distribution/digest"
 	dockerref "github.com/docker/distribution/reference"
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
 )
 

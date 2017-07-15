@@ -102,7 +102,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			kubeAPIServerOptions.SecureServing.BindPort = kubePort
 			kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 			kubeAPIServerOptions.InsecureServing.BindPort = 0
-			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURLFromEnv()}
+			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
 			kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
 			kubeAPIServerOptions.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
 			kubeAPIServerOptions.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}
@@ -190,7 +190,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 				"--requestheader-allowed-names=kube-aggregator",
 				"--authentication-kubeconfig", kubeconfigFile.Name(),
 				"--authorization-kubeconfig", kubeconfigFile.Name(),
-				"--etcd-servers", framework.GetEtcdURLFromEnv(),
+				"--etcd-servers", framework.GetEtcdURL(),
 				"--cert-dir", wardleCertDir,
 			})
 			if err := wardleCmd.Execute(); err != nil {
@@ -266,7 +266,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 				"--core-kubeconfig", kubeconfigFile.Name(),
 				"--authentication-kubeconfig", kubeconfigFile.Name(),
 				"--authorization-kubeconfig", kubeconfigFile.Name(),
-				"--etcd-servers", framework.GetEtcdURLFromEnv(),
+				"--etcd-servers", framework.GetEtcdURL(),
 				"--cert-dir", aggregatorCertDir,
 			})
 			if err := aggregatorCmd.Execute(); err != nil {

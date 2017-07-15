@@ -153,3 +153,17 @@ func walkSymlinks(path string) (string, error) {
 	}
 	return filepath.Clean(b.String()), nil
 }
+
+func isDriveOrRoot(p string) bool {
+	if p == string(filepath.Separator) {
+		return true
+	}
+
+	length := len(p)
+	if length >= 2 {
+		if p[length-1] == ':' && (('a' <= p[length-2] && p[length-2] <= 'z') || ('A' <= p[length-2] && p[length-2] <= 'Z')) {
+			return true
+		}
+	}
+	return false
+}

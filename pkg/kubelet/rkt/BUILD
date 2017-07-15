@@ -46,7 +46,7 @@ go_library(
         "//vendor/github.com/coreos/go-systemd/dbus:go_default_library",
         "//vendor/github.com/coreos/go-systemd/unit:go_default_library",
         "//vendor/github.com/coreos/rkt/api/v1alpha:go_default_library",
-        "//vendor/github.com/docker/engine-api/types:go_default_library",
+        "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",

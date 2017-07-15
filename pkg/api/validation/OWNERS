@@ -12,7 +12,6 @@ reviewers:
 - mikedanese
 - liggitt
 - nikhiljindal
-- bprashanth
 - gmarek
 - erictune
 - davidopp
@@ -37,4 +36,3 @@ reviewers:
 - krousey
 - rootfs
 - markturansky
-- vmarmol

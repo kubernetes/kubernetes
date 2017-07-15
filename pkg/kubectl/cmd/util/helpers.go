@@ -166,8 +166,7 @@ func checkErr(err error, handleErr func(string, int)) {
 		case utilerrors.Aggregate:
 			handleErr(MultipleErrors(``, err.Errors()), DefaultErrorExitCode)
 		case utilexec.ExitError:
-			// do not print anything, only terminate with given error
-			handleErr("", err.ExitStatus())
+			handleErr(err.Error(), err.ExitStatus())
 		default: // for any other error type
 			msg, ok := StandardErrorMessage(err)
 			if !ok {
