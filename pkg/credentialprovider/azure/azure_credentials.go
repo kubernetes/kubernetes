@@ -23,6 +23,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/arm/containerregistry"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/adal"
 	azureapi "github.com/Azure/go-autorest/autorest/azure"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
@@ -58,10 +59,11 @@ func NewACRProvider(configFile *string) credentialprovider.DockerConfigProvider 
 }
 
 type acrProvider struct {
-	file           *string
-	config         *azure.Config
-	environment    *azureapi.Environment
-	registryClient RegistriesClient
+	file                  *string
+	config                *azure.Config
+	environment           *azureapi.Environment
+	registryClient        RegistriesClient
+	servicePrincipalToken *adal.ServicePrincipalToken
 }
 
 func (a *acrProvider) loadConfig(rdr io.Reader) error {
@@ -92,7 +94,7 @@ func (a *acrProvider) Enabled() bool {
 		return false
 	}
 
-	servicePrincipalToken, err := azure.GetServicePrincipalToken(a.config, a.environment)
+	a.servicePrincipalToken, err = azure.GetServicePrincipalToken(a.config, a.environment)
 	if err != nil {
 		glog.Errorf("Failed to create service principal token: %v", err)
 		return false
@@ -100,7 +102,7 @@ func (a *acrProvider) Enabled() bool {
 
 	registryClient := containerregistry.NewRegistriesClient(a.config.SubscriptionID)
 	registryClient.BaseURI = a.environment.ResourceManagerEndpoint
-	registryClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	registryClient.Authorizer = autorest.NewBearerAuthorizer(a.servicePrincipalToken)
 	a.registryClient = registryClient
 
 	return true
@@ -108,27 +110,64 @@ func (a *acrProvider) Enabled() bool {
 
 func (a *acrProvider) Provide() credentialprovider.DockerConfig {
 	cfg := credentialprovider.DockerConfig{}
-	entry := credentialprovider.DockerConfigEntry{
-		Username: a.config.AADClientID,
-		Password: a.config.AADClientSecret,
-		Email:    dummyRegistryEmail,
-	}
 
+	glog.V(4).Infof("listing registries")
 	res, err := a.registryClient.List()
 	if err != nil {
 		glog.Errorf("Failed to list registries: %v", err)
 		return cfg
 	}
+
 	for ix := range *res.Value {
 		loginServer := getLoginServer((*res.Value)[ix])
-		glog.V(4).Infof("Adding Azure Container Registry docker credential for %s", loginServer)
-		cfg[loginServer] = entry
+		var cred *credentialprovider.DockerConfigEntry
+
+		if a.config.UseManagedIdentityExtension {
+			cred, err = getACRDockerEntryFromARMToken(a, loginServer)
+			if err != nil {
+				continue
+			}
+		} else {
+			cred = &credentialprovider.DockerConfigEntry{
+				Username: a.config.AADClientID,
+				Password: a.config.AADClientSecret,
+				Email:    dummyRegistryEmail,
+			}
+		}
+
+		cfg[loginServer] = *cred
 	}
 	return cfg
 }
 
 func getLoginServer(registry containerregistry.Registry) string {
 	return *(*registry.RegistryProperties).LoginServer
+}
+
+func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credentialprovider.DockerConfigEntry, error) {
+	armAccessToken := a.servicePrincipalToken.AccessToken
+
+	glog.V(4).Infof("discovering auth redirects for: %s", loginServer)
+	directive, err := receiveChallengeFromLoginServer(loginServer)
+	if err != nil {
+		glog.Errorf("failed to receive challenge: %s", err)
+		return nil, err
+	}
+
+	glog.V(4).Infof("exchanging an acr refresh_token")
+	registryRefreshToken, err := performTokenExchange(
+		loginServer, directive, a.config.TenantID, armAccessToken)
+	if err != nil {
+		glog.Errorf("failed to perform token exchange: %s", err)
+		return nil, err
+	}
+
+	glog.V(4).Infof("adding ACR docker config entry for: %s", loginServer)
+	return &credentialprovider.DockerConfigEntry{
+		Username: dockerTokenLoginUsernameGUID,
+		Password: registryRefreshToken,
+		Email:    dummyRegistryEmail,
+	}, nil
 }
 
 func (a *acrProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
