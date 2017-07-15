@@ -940,7 +940,7 @@ func (kl *Kubelet) podKiller() {
 	}
 }
 
-// checkHostPortConflicts detects pods with conflicted host ports.
+// hasHostPortConflicts detects pods with conflicted host ports.
 func hasHostPortConflicts(pods []*v1.Pod) bool {
 	ports := sets.String{}
 	for _, pod := range pods {
@@ -1653,7 +1653,7 @@ func (kl *Kubelet) hasHostMountPVC(pod *v1.Pod) bool {
 			if pvc != nil {
 				referencedVolume, err := kl.kubeClient.Core().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
 				if err != nil {
-					glog.Warningf("unable to retrieve pvc %s - %v", pvc.Spec.VolumeName, err)
+					glog.Warningf("unable to retrieve pv %s - %v", pvc.Spec.VolumeName, err)
 					continue
 				}
 				if referencedVolume != nil && referencedVolume.Spec.HostPath != nil {
