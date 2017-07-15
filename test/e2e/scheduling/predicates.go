@@ -53,7 +53,7 @@ type pausePodConfig struct {
 	NodeName                          string
 }
 
-var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
+var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
 	var systemPodsNo int

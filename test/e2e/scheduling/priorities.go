@@ -57,7 +57,7 @@ var podRequestedResource *v1.ResourceRequirements = &v1.ResourceRequirements{
 }
 
 // This test suite is used to verifies scheduler priority functions based on the default provider
-var _ = framework.KubeDescribe("SchedulerPriorities [Serial]", func() {
+var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
 	var systemPodsNo int
