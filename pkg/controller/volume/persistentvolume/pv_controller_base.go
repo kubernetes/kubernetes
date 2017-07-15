@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -72,7 +71,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	if eventRecorder == nil {
 		broadcaster := record.NewBroadcaster()
 		broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(p.KubeClient.Core().RESTClient()).Events("")})
-		eventRecorder = broadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "persistentvolume-controller"})
+		eventRecorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
 	}
 
 	controller := &PersistentVolumeController{

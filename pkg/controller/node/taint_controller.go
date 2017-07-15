@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -153,7 +152,7 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 // communicate with the API server.
 func NewNoExecuteTaintManager(c clientset.Interface) *NoExecuteTaintManager {
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "controllermanager"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
 	eventBroadcaster.StartLogging(glog.Infof)
 	if c != nil {
 		glog.V(0).Infof("Sending events to api server.")
@@ -417,22 +416,22 @@ func (tc *NoExecuteTaintManager) emitPodDeletionEvent(nsName types.NamespacedNam
 	if tc.recorder == nil {
 		return
 	}
-	ref := &clientv1.ObjectReference{
+	ref := &v1.ObjectReference{
 		Kind:      "Pod",
 		Name:      nsName.Name,
 		Namespace: nsName.Namespace,
 	}
-	tc.recorder.Eventf(ref, clientv1.EventTypeNormal, "TaintManagerEviction", "Marking for deletion Pod %s", nsName.String())
+	tc.recorder.Eventf(ref, v1.EventTypeNormal, "TaintManagerEviction", "Marking for deletion Pod %s", nsName.String())
 }
 
 func (tc *NoExecuteTaintManager) emitCancelPodDeletionEvent(nsName types.NamespacedName) {
 	if tc.recorder == nil {
 		return
 	}
-	ref := &clientv1.ObjectReference{
+	ref := &v1.ObjectReference{
 		Kind:      "Pod",
 		Name:      nsName.Name,
 		Namespace: nsName.Namespace,
 	}
-	tc.recorder.Eventf(ref, clientv1.EventTypeNormal, "TaintManagerEviction", "Cancelling deletion of Pod %s", nsName.String())
+	tc.recorder.Eventf(ref, v1.EventTypeNormal, "TaintManagerEviction", "Cancelling deletion of Pod %s", nsName.String())
 }

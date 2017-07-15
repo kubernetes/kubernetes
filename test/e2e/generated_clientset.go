@@ -23,7 +23,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,8 +36,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func stagingClientPod(name, value string) clientv1.Pod {
-	return clientv1.Pod{
+func stagingClientPod(name, value string) v1.Pod {
+	return v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
@@ -46,12 +45,12 @@ func stagingClientPod(name, value string) clientv1.Pod {
 				"time": value,
 			},
 		},
-		Spec: clientv1.PodSpec{
-			Containers: []clientv1.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "nginx",
 					Image: "gcr.io/google_containers/nginx-slim:0.7",
-					Ports: []clientv1.ContainerPort{{ContainerPort: 80}},
+					Ports: []v1.ContainerPort{{ContainerPort: 80}},
 				},
 			},
 		},

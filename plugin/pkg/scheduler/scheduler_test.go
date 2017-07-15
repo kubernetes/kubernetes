@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -177,13 +176,13 @@ func TestScheduler(t *testing.T) {
 				NextPod: func() *v1.Pod {
 					return item.sendPod
 				},
-				Recorder: eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "scheduler"}),
+				Recorder: eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "scheduler"}),
 			},
 		}
 
 		s, _ := NewFromConfigurator(configurator, nil...)
 		called := make(chan struct{})
-		events := eventBroadcaster.StartEventWatcher(func(e *clientv1.Event) {
+		events := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
 			if e, a := item.eventReason, e.Reason; e != a {
 				t.Errorf("%v: expected %v, got %v", i, e, a)
 			}

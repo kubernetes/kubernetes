@@ -28,7 +28,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 
-	clientv1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
@@ -156,7 +156,7 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 
 			if hcs.recorder != nil {
 				hcs.recorder.Eventf(
-					&clientv1.ObjectReference{
+					&v1.ObjectReference{
 						Kind:      "Service",
 						Namespace: nsn.Namespace,
 						Name:      nsn.Name,

@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -115,11 +114,11 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 				for j, cpu := range containers {
 					cm := metricsapi.ContainerMetrics{
 						Name: fmt.Sprintf("%s-%d-container-%d", podNamePrefix, i, j),
-						Usage: clientv1.ResourceList{
-							clientv1.ResourceCPU: *resource.NewMilliQuantity(
+						Usage: v1.ResourceList{
+							v1.ResourceCPU: *resource.NewMilliQuantity(
 								cpu,
 								resource.DecimalSI),
-							clientv1.ResourceMemory: *resource.NewQuantity(
+							v1.ResourceMemory: *resource.NewQuantity(
 								int64(1024*1024),
 								resource.BinarySI),
 						},
