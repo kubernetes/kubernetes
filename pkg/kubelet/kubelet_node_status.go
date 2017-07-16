@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/device-plugin/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -572,6 +573,8 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		}
 	}
 
+	kl.setNodeStatusDevice(node)
+
 	// Set Allocatable.
 	if node.Status.Allocatable == nil {
 		node.Status.Allocatable = make(v1.ResourceList)
@@ -595,6 +598,37 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 			value.Set(0)
 		}
 		node.Status.Allocatable[k] = value
+	}
+}
+
+func (kl *Kubelet) setNodeStatusDevice(node *v1.Node) {
+	hdlr := kl.containerManager.GetDevicePluginHandler()
+	if hdlr == nil {
+		return
+	}
+
+	//node.Status.DevCapacity = nil
+
+	for k, v := range hdlr.Devices() {
+		var key v1.ResourceName
+		if k == "nvidia-gpu" {
+			key = v1.ResourceNvidiaGPU
+		} else {
+			key = v1.ResourceName(v1.ResourceOpaqueIntPrefix + k)
+		}
+
+		// count number of healthy devices
+		var n int64
+		for _, d := range v {
+			if d.Health == pluginapi.Unhealthy {
+				continue
+			}
+			n++
+		}
+
+		q := *resource.NewQuantity(n, resource.DecimalSI)
+		node.Status.Capacity[key] = q
+		//node.Status.DevCapacity = append(node.Status.DevCapacity, v...)
 	}
 }
 

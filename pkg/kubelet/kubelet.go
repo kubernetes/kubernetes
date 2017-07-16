@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/device-plugin/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -629,6 +630,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dep
 			kubeCfg.CPUCFSQuota,
 			runtimeService,
 			imageService,
+			klet.containerManager,
 		)
 		if err != nil {
 			return nil, err
@@ -770,6 +772,31 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dep
 
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock)
+
+	// Get node status
+	// c := klet.GetKubeClient()
+
+	// var devCapacity []v1.Device
+	/*
+		node, err := c.Core().Nodes().Get(string(klet.nodeName), metav1.GetOptions{})
+		if err != nil {
+			devCapacity = node.Status.DevCapacity
+		}*/
+
+	k := killPodNow(klet.podWorkers, kubeDeps.Recorder)
+	devicePluginHandler, err := cm.NewDevicePluginHandler( /*devCapacity,*/
+		klet.podManager.GetPods(),
+		func(p *v1.Pod, status v1.PodStatus, grace int64) {
+			k(p, status, &grace)
+		},
+		pluginapi.KubeletSocket,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	klet.containerManager.SetDevicePluginHandler(devicePluginHandler)
 
 	klet.evictionManager = evictionManager
 	klet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)

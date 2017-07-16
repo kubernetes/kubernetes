@@ -132,6 +132,24 @@ func V1EnvVarsToMap(envs []v1.EnvVar) map[string]string {
 	return result
 }
 
+/*
+// ContainerDevicesToV1 converts container devices to v1 Devices
+func ContainerDevicesToV1(pluginDevices []*Device) []v1.Device {
+	var devs []v1.Device
+
+	for _, dev := range pluginDevices {
+		devs = append(devs, v1.Device{
+			Kind:       dev.Kind,
+			Vendor:     dev.Vendor,
+			Health:     v1.DeviceHealthStatus(string(dev.Health)),
+			Name:       dev.Name,
+			Properties: dev.Properties,
+		})
+	}
+
+	return devs
+}*/
+
 // ExpandContainerCommandOnlyStatic substitutes only static environment variable values from the
 // container environment definitions. This does *not* include valueFrom substitutions.
 // TODO: callers should use ExpandContainerCommandAndArgs with a fully resolved list of environment.

@@ -305,6 +305,21 @@ type PodStatus struct {
 	SandboxStatuses []*runtimeapi.PodSandboxStatus
 }
 
+type DeviceHealthStatus string
+
+const (
+	DeviceHealthy   = "Healthy"
+	DeviceUnhealthy = "Unhealthy"
+)
+
+type Device struct {
+	Kind       string
+	Vendor     string
+	Name       string
+	Health     DeviceHealthStatus
+	Properties map[string]string
+}
+
 // ContainerStatus represents the status of a container.
 type ContainerStatus struct {
 	// ID of the container.
@@ -335,6 +350,8 @@ type ContainerStatus struct {
 	// Message written by the container before exiting (stored in
 	// TerminationMessagePath).
 	Message string
+
+	Devices []*Device
 }
 
 // FindContainerStatusByName returns container status in the pod status with the given name.
