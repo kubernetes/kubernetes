@@ -20,6 +20,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/cri/v1alpha1/runtime/"
+KUBE_DEVICE_PLUGIN_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/device-plugin/v1alpha1/"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -40,23 +41,28 @@ if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
 fi
 
 function cleanup {
-	rm -f ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.bak
+	for i in $KUBE_REMOTE_RUNTIME_ROOT $KUBE_DEVICE_PLUGIN_ROOT; do
+		rm -f ${i}/api.pb.go.bak
+	done
 }
 
 trap cleanup EXIT
 
 gogopath=$(dirname $(kube::util::find-binary "protoc-gen-gogo"))
 
-PATH="${gogopath}:${PATH}" \
-  protoc \
-  --proto_path="${KUBE_REMOTE_RUNTIME_ROOT}" \
-  --proto_path="${KUBE_ROOT}/vendor" \
-  --gogo_out=plugins=grpc:${KUBE_REMOTE_RUNTIME_ROOT} ${KUBE_REMOTE_RUNTIME_ROOT}/api.proto
+for i in $KUBE_REMOTE_RUNTIME_ROOT $KUBE_DEVICE_PLUGIN_ROOT; do
 
-# Update boilerplate for the generated file.
-echo "$(cat hack/boilerplate/boilerplate.go.txt ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go)" > ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
-sed -i".bak" "s/Copyright YEAR/Copyright $(date '+%Y')/g" ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
+	PATH="${gogopath}:${PATH}" \
+	  protoc \
+	  --proto_path="${i}" \
+	  --proto_path="${KUBE_ROOT}/vendor" \
+	  --gogo_out=plugins=grpc:${i} ${i}/api.proto
 
-# Run gofmt to clean up the generated code.
-kube::golang::verify_go_version
-gofmt -l -s -w ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
+	# Update boilerplate for the generated file.
+	echo "$(cat hack/boilerplate/boilerplate.go.txt ${i}/api.pb.go)" > ${i}/api.pb.go
+	sed -i".bak" "s/Copyright YEAR/Copyright $(date '+%Y')/g" ${i}/api.pb.go
+
+	# Run gofmt to clean up the generated code.
+	kube::golang::verify_go_version
+	gofmt -l -s -w ${i}/api.pb.go
+done
