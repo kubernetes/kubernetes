@@ -494,7 +494,7 @@ func (gce *GCECloud) createTargetPool(name, serviceName, ipAddress, region, clus
 		HealthChecks:    hcLinks,
 	}
 
-	if _, err := gce.CreateTargetPool(pool, region); err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+	if err := gce.CreateTargetPool(pool, region); err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
 		return err
 	}
 	return nil

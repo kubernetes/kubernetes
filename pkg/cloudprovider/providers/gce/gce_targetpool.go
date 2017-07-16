@@ -37,18 +37,14 @@ func (gce *GCECloud) GetTargetPool(name, region string) (*compute.TargetPool, er
 }
 
 // CreateTargetPool creates the passed TargetPool
-func (gce *GCECloud) CreateTargetPool(tp *compute.TargetPool, region string) (*compute.TargetPool, error) {
+func (gce *GCECloud) CreateTargetPool(tp *compute.TargetPool, region string) error {
 	mc := newTargetPoolMetricContext("create", region)
 	op, err := gce.service.TargetPools.Insert(gce.projectID, region, tp).Do()
 	if err != nil {
-		return nil, mc.Observe(err)
+		return mc.Observe(err)
 	}
 
-	if err := gce.waitForRegionOp(op, region, mc); err != nil {
-		return nil, err
-	}
-
-	return gce.GetTargetPool(tp.Name, region)
+	return gce.waitForRegionOp(op, region, mc)
 }
 
 // DeleteTargetPool deletes TargetPool by name.
