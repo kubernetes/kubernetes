@@ -18,6 +18,7 @@ package podsecuritypolicy
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
@@ -308,7 +309,7 @@ func (s *simpleProvider) hasInvalidHostPort(container *api.Container, fldPath *f
 	allErrs := field.ErrorList{}
 	for _, cp := range container.Ports {
 		if cp.HostPort > 0 && !s.isValidHostPort(int(cp.HostPort)) {
-			detail := fmt.Sprintf("Host port %d is not allowed to be used.  Allowed ports: %v", cp.HostPort, s.psp.Spec.HostPorts)
+			detail := fmt.Sprintf("Host port %d is not allowed to be used. Allowed ports: [%s]", cp.HostPort, hostPortRangesToString(s.psp.Spec.HostPorts))
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("hostPort"), cp.HostPort, detail))
 		}
 	}
@@ -328,4 +329,20 @@ func (s *simpleProvider) isValidHostPort(port int) bool {
 // Get the name of the PSP that this provider was initialized with.
 func (s *simpleProvider) GetPSPName() string {
 	return s.psp.Name
+}
+
+func hostPortRangesToString(ranges []extensions.HostPortRange) string {
+	formattedString := ""
+	if ranges != nil {
+		strRanges := []string{}
+		for _, r := range ranges {
+			if r.Min == r.Max {
+				strRanges = append(strRanges, fmt.Sprintf("%d", r.Min))
+			} else {
+				strRanges = append(strRanges, fmt.Sprintf("%d-%d", r.Min, r.Max))
+			}
+		}
+		formattedString = strings.Join(strRanges, ",")
+	}
+	return formattedString
 }
