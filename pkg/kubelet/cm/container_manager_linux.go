@@ -118,6 +118,8 @@ type containerManagerImpl struct {
 	recorder record.EventRecorder
 	// Interface for QoS cgroup management
 	qosContainerManager QOSContainerManager
+
+	devicePluginHdler *DevicePluginHandler
 }
 
 type features struct {
@@ -255,7 +257,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, err
 	}
 
-	return &containerManagerImpl{
+	mgr := &containerManagerImpl{
 		cadvisorInterface:   cadvisorInterface,
 		mountUtil:           mountUtil,
 		NodeConfig:          nodeConfig,
@@ -265,7 +267,10 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		cgroupRoot:          cgroupRoot,
 		recorder:            recorder,
 		qosContainerManager: qosContainerManager,
-	}, nil
+		devicePluginHdler:   nil,
+	}
+
+	return mgr, nil
 }
 
 // NewPodContainerManager is a factory method returns a PodContainerManager object
@@ -834,4 +839,14 @@ func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
 	cm.RLock()
 	defer cm.RUnlock()
 	return cm.capacity
+}
+
+// GetDevicePluginHandler returns the DevicePluginHandler
+func (m *containerManagerImpl) GetDevicePluginHandler() *DevicePluginHandler {
+	return m.devicePluginHdler
+}
+
+// GetDevicePluginHandler sets the DevicePluginHandler
+func (m *containerManagerImpl) SetDevicePluginHandler(d *DevicePluginHandler) {
+	m.devicePluginHdler = d
 }

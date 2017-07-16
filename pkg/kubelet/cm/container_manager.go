@@ -66,6 +66,13 @@ type ContainerManager interface {
 	// UpdateQOSCgroups performs housekeeping updates to ensure that the top
 	// level QoS containers have their desired state in a thread-safe way
 	UpdateQOSCgroups() error
+
+	// SetDevicePluginHandler sets the device plugin handler as
+	// it needs kubelet level information at initialization
+	SetDevicePluginHandler(*DevicePluginHandler)
+
+	// GetDevicePluginHandler returns the DevicePluginHandler
+	GetDevicePluginHandler() *DevicePluginHandler
 }
 
 type NodeConfig struct {
