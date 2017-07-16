@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package logging
 
 import (
 	"fmt"
@@ -27,9 +27,10 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/instrumentation"
 )
 
-var _ = framework.KubeDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
+var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("logging-soak")
 

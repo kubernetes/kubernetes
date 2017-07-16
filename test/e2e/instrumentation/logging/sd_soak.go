@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package logging
 
 import (
 	"fmt"
@@ -23,6 +23,7 @@ import (
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/instrumentation"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -39,7 +40,7 @@ const (
 	lastPodIngestionSlack = 5 * time.Minute
 )
 
-var _ = framework.KubeDescribe("Cluster level logging implemented by Stackdriver [Feature:StackdriverLogging] [Soak]", func() {
+var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackdriver [Feature:StackdriverLogging] [Soak]", func() {
 	f := framework.NewDefaultFramework("sd-logging-load")
 
 	It("should ingest logs from applications running for a prolonged amount of time", func() {

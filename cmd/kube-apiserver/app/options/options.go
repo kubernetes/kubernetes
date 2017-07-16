@@ -143,7 +143,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"Amount of time to retain events.")
 
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged,
-		"If true, allow privileged containers.")
+		"If true, allow privileged containers. [default=false]")
 
 	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
 		"If true, install a /logs handler for the apiserver logs.")

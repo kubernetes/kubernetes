@@ -144,7 +144,7 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 		if isCmdNotSupportedErr(err) {
 			dc.plugin.unsupported(dc.Command)
 		} else {
-			glog.Warningf("FlexVolume: driver call failed: executable: %s, args: %s, error: %s, output: %s", execPath, dc.args, execErr.Error(), output)
+			glog.Warningf("FlexVolume: driver call failed: executable: %s, args: %s, error: %s, output: %q", execPath, dc.args, execErr.Error(), output)
 		}
 		return nil, err
 	}
@@ -222,7 +222,7 @@ func isCmdNotSupportedErr(err error) bool {
 func handleCmdResponse(cmd string, output []byte) (*DriverStatus, error) {
 	var status DriverStatus
 	if err := json.Unmarshal(output, &status); err != nil {
-		glog.Errorf("Failed to unmarshal output for command: %s, output: %s, error: %s", cmd, string(output), err.Error())
+		glog.Errorf("Failed to unmarshal output for command: %s, output: %q, error: %s", cmd, string(output), err.Error())
 		return nil, err
 	} else if status.Status == StatusNotSupported {
 		glog.V(5).Infof("%s command is not supported by the driver", cmd)

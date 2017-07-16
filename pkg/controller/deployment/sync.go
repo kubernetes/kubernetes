@@ -59,6 +59,13 @@ func (dc *DeploymentController) sync(d *extensions.Deployment, rsList []*extensi
 		return err
 	}
 
+	// Clean up the deployment when it's paused and no rollback is in flight.
+	if d.Spec.Paused && d.Spec.RollbackTo == nil {
+		if err := dc.cleanupDeployment(oldRSs, d); err != nil {
+			return err
+		}
+	}
+
 	allRSs := append(oldRSs, newRS)
 	return dc.syncDeploymentStatus(allRSs, newRS, d)
 }
@@ -552,7 +559,6 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*extensions.ReplicaSe
 	sort.Sort(controller.ReplicaSetsByCreationTimestamp(cleanableRSes))
 	glog.V(4).Infof("Looking to cleanup old replica sets for deployment %q", deployment.Name)
 
-	var errList []error
 	for i := int32(0); i < diff; i++ {
 		rs := cleanableRSes[i]
 		// Avoid delete replica set with non-zero replica counts
@@ -561,12 +567,13 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*extensions.ReplicaSe
 		}
 		glog.V(4).Infof("Trying to cleanup replica set %q for deployment %q", rs.Name, deployment.Name)
 		if err := dc.client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, nil); err != nil && !errors.IsNotFound(err) {
-			glog.V(2).Infof("Failed deleting old replica set %v for deployment %v: %v", rs.Name, deployment.Name, err)
-			errList = append(errList, err)
+			// Return error instead of aggregating and continuing DELETEs on the theory
+			// that we may be overloading the api server.
+			return err
 		}
 	}
 
-	return utilerrors.NewAggregate(errList)
+	return nil
 }
 
 // syncDeploymentStatus checks if the status is up-to-date and sync it if necessary

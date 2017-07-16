@@ -63,6 +63,12 @@ func (dc *DeploymentController) rolloutRecreate(d *extensions.Deployment, rsList
 		return err
 	}
 
+	if util.DeploymentComplete(d, &d.Status) {
+		if err := dc.cleanupDeployment(oldRSs, d); err != nil {
+			return err
+		}
+	}
+
 	// Sync deployment status.
 	return dc.syncRolloutStatus(allRSs, newRS, d)
 }

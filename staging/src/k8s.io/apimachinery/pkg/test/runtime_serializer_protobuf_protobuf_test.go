@@ -24,9 +24,9 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
@@ -272,16 +272,12 @@ func TestProtobufDecode(t *testing.T) {
 }
 
 func TestDecodeObjects(t *testing.T) {
-	obj1 := &v1.Pod{
+	obj1 := &v1.Carp{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cool",
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: "test",
-				},
-			},
+		Spec: v1.CarpSpec{
+			Hostname: "coolhost",
 		},
 	}
 	obj1wire, err := obj1.Marshal()
@@ -290,7 +286,7 @@ func TestDecodeObjects(t *testing.T) {
 	}
 
 	wire1, err := (&runtime.Unknown{
-		TypeMeta: runtime.TypeMeta{Kind: "Pod", APIVersion: "v1"},
+		TypeMeta: runtime.TypeMeta{Kind: "Carp", APIVersion: "v1"},
 		Raw:      obj1wire,
 	}).Marshal()
 	if err != nil {
@@ -298,7 +294,7 @@ func TestDecodeObjects(t *testing.T) {
 	}
 
 	unk2 := &runtime.Unknown{
-		TypeMeta: runtime.TypeMeta{Kind: "Pod", APIVersion: "v1"},
+		TypeMeta: runtime.TypeMeta{Kind: "Carp", APIVersion: "v1"},
 	}
 	wire2 := make([]byte, len(wire1)*2)
 	n, err := unk2.NestedMarshalTo(wire2, obj1, uint64(obj1.Size()))
@@ -323,7 +319,7 @@ func TestDecodeObjects(t *testing.T) {
 	}
 	scheme := runtime.NewScheme()
 	for i, test := range testCases {
-		scheme.AddKnownTypes(schema.GroupVersion{Version: "v1"}, &v1.Pod{})
+		scheme.AddKnownTypes(schema.GroupVersion{Version: "v1"}, &v1.Carp{})
 		v1.AddToScheme(scheme)
 		s := protobuf.NewSerializer(scheme, scheme, "application/protobuf")
 		obj, err := runtime.Decode(s, test.data)

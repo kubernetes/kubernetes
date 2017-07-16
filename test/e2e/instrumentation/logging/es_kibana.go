@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package logging
 
 import (
 	"context"
@@ -23,12 +23,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/instrumentation"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Kibana Logging Instances Is Alive [Feature:Elasticsearch]", func() {
+var _ = instrumentation.SIGDescribe("Kibana Logging Instances Is Alive [Feature:Elasticsearch]", func() {
 	f := framework.NewDefaultFramework("kibana-logging")
 
 	BeforeEach(func() {

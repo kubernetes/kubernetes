@@ -65,7 +65,7 @@ function print_forbidden_imports () {
 }
 
 RC=0
-print_forbidden_imports apimachinery || RC=1
+print_forbidden_imports apimachinery should_be_leaf || RC=1
 print_forbidden_imports api k8s.io/apimachinery || RC=1
 print_forbidden_imports client-go k8s.io/apimachinery k8s.io/api || RC=1
 print_forbidden_imports apiserver k8s.io/apimachinery k8s.io/client-go k8s.io/api || RC=1
