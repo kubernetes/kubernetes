@@ -9,16 +9,9 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "netns.go",
-        "netns_unspecified.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "netns_linux.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = ["fake.go"],
     tags = ["automanaged"],
+    deps = ["//pkg/util/ipvs:go_default_library"],
 )
 
 filegroup(
