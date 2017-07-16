@@ -20,13 +20,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/testapigroup"
+	"k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -52,11 +52,11 @@ func TestExtractList(t *testing.T) {
 		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 	}
-	list2 := &v1.List{
+	list2 := &ListV1{
 		Items: []runtime.RawExtension{
 			{Raw: []byte("foo")},
 			{Raw: []byte("bar")},
-			{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "other"}}},
+			{Object: &v1.Carp{ObjectMeta: metav1.ObjectMeta{Name: "other"}}},
 		},
 	}
 	list3 := &fakePtrValueList{
@@ -67,13 +67,6 @@ func TestExtractList(t *testing.T) {
 	}
 	list4 := &testapigroup.CarpList{
 		Items: []testapigroup.Carp{
-			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
-		},
-	}
-	list5 := &v1.PodList{
-		Items: []v1.Pod{
 			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
@@ -90,11 +83,7 @@ func TestExtractList(t *testing.T) {
 			out: []interface{}{},
 		},
 		{
-			in:  &v1.List{},
-			out: []interface{}{},
-		},
-		{
-			in:  &v1.PodList{},
+			in:  &ListV1{},
 			out: []interface{}{},
 		},
 		{
@@ -113,10 +102,6 @@ func TestExtractList(t *testing.T) {
 		{
 			in:  list4,
 			out: []interface{}{&list4.Items[0], &list4.Items[1], &list4.Items[2]},
-		},
-		{
-			in:  list5,
-			out: []interface{}{&list5.Items[0], &list5.Items[1], &list5.Items[2]},
 		},
 	}
 	for i, test := range testCases {
@@ -145,11 +130,11 @@ func TestEachListItem(t *testing.T) {
 		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 		&testapigroup.Carp{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 	}
-	list2 := &v1.List{
+	list2 := &ListV1{
 		Items: []runtime.RawExtension{
 			{Raw: []byte("foo")},
 			{Raw: []byte("bar")},
-			{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "other"}}},
+			{Object: &v1.Carp{ObjectMeta: metav1.ObjectMeta{Name: "other"}}},
 		},
 	}
 	list3 := &fakePtrValueList{
@@ -165,13 +150,6 @@ func TestEachListItem(t *testing.T) {
 			{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
 		},
 	}
-	list5 := &v1.PodList{
-		Items: []v1.Pod{
-			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
-		},
-	}
 
 	testCases := []struct {
 		in  runtime.Object
@@ -182,11 +160,7 @@ func TestEachListItem(t *testing.T) {
 			out: []interface{}{},
 		},
 		{
-			in:  &v1.List{},
-			out: []interface{}{},
-		},
-		{
-			in:  &v1.PodList{},
+			in:  &ListV1{},
 			out: []interface{}{},
 		},
 		{
@@ -204,10 +178,6 @@ func TestEachListItem(t *testing.T) {
 		{
 			in:  list4,
 			out: []interface{}{&list4.Items[0], &list4.Items[1], &list4.Items[2]},
-		},
-		{
-			in:  list5,
-			out: []interface{}{&list5.Items[0], &list5.Items[1], &list5.Items[2]},
 		},
 	}
 	for i, test := range testCases {
