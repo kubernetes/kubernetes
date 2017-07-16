@@ -50,10 +50,6 @@ import (
 )
 
 var (
-	// specialParams lists parameters that are handled specially and which users of Request
-	// are therefore not allowed to set manually.
-	specialParams = sets.NewString("timeout")
-
 	// longThrottleLatency defines threshold for logging requests. All requests being
 	// throttle for more than longThrottleLatency will be logged.
 	longThrottleLatency = 50 * time.Millisecond
@@ -269,7 +265,7 @@ func (r *Request) AbsPath(segments ...string) *Request {
 }
 
 // RequestURI overwrites existing path and parameters with the value of the provided server relative
-// URI. Some parameters (those in specialParameters) cannot be overwritten.
+// URI.
 func (r *Request) RequestURI(uri string) *Request {
 	if r.err != nil {
 		return r
@@ -491,10 +487,6 @@ func (r *Request) VersionedParams(obj runtime.Object, codec runtime.ParameterCod
 }
 
 func (r *Request) setParam(paramName, value string) *Request {
-	if specialParams.Has(paramName) {
-		r.err = fmt.Errorf("must set %v through the corresponding function, not directly.", paramName)
-		return r
-	}
 	if r.params == nil {
 		r.params = make(url.Values)
 	}

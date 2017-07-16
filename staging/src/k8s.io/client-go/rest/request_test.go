@@ -1515,7 +1515,8 @@ func TestUnacceptableParamNames(t *testing.T) {
 		testVal       string
 		expectSuccess bool
 	}{
-		{"timeout", "42", false},
+		// timeout is no longer "protected"
+		{"timeout", "42", true},
 	}
 
 	for _, item := range table {
