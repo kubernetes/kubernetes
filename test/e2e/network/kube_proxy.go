@@ -204,4 +204,15 @@ var _ = SIGDescribe("Network", func() {
 		Expect(math.Abs(float64(timeoutSeconds - expectedTimeoutSeconds))).Should(
 			BeNumerically("<", (epsilonSeconds)))
 	})
+
+	It("should have KubeProxyVersion set", func() {
+		nodes := framework.GetReadySchedulableNodesOrDie(fr.ClientSet)
+		if len(nodes.Items) <= 0 {
+			framework.Failf("No eligible node were found: %d", len(nodes.Items))
+		}
+
+		for _, n := range nodes.Items {
+			Expect(n.Status.NodeInfo.KubeProxyVersion).ToNot(BeEmpty(), "Missing KubeProxyVersion: %q %q", n.ObjectMeta.Name, n.Status.NodeInfo.KubeProxyVersion)
+		}
+	})
 })

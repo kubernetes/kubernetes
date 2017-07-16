@@ -271,7 +271,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				// Used to build serviceLister
 				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
 				rbac.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-
+				rbac.NewRule("patch").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
 				eventsRule(),
 			},
 		},

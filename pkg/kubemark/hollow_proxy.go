@@ -63,7 +63,7 @@ func (*FakeProxier) OnEndpointsSynced()                                       {}
 func NewHollowProxyOrDie(
 	nodeName string,
 	client clientset.Interface,
-	eventClient v1core.EventsGetter,
+	coreClient v1core.CoreV1Interface,
 	iptInterface utiliptables.Interface,
 	sysctl utilsysctl.Interface,
 	execer utilexec.Interface,
@@ -115,7 +115,7 @@ func NewHollowProxyOrDie(
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
 			Client:                client,
-			EventClient:           eventClient,
+			CoreClient:            coreClient,
 			IptInterface:          iptInterface,
 			Proxier:               proxier,
 			Broadcaster:           broadcaster,

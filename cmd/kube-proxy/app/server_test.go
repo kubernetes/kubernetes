@@ -27,24 +27,22 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	clientv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
-
-type fakeNodeInterface struct {
-	node api.Node
-}
-
-func (fake *fakeNodeInterface) Get(hostname string, options metav1.GetOptions) (*api.Node, error) {
-	return &fake.node, nil
-}
 
 type fakeIPTablesVersioner struct {
 	version string // what to return
@@ -65,6 +63,28 @@ func (fake *fakeKernelCompatTester) IsCompatible() error {
 	}
 	return nil
 }
+
+type fakeProxyProvider struct {
+}
+
+func (fake *fakeProxyProvider) Sync()     {}
+func (fake *fakeProxyProvider) SyncLoop() {}
+
+type fakeEndpointsHandler struct {
+}
+
+func (*fakeEndpointsHandler) OnEndpointsAdd(endpoints *api.Endpoints)                  {}
+func (*fakeEndpointsHandler) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {}
+func (*fakeEndpointsHandler) OnEndpointsDelete(endpoints *api.Endpoints)               {}
+func (*fakeEndpointsHandler) OnEndpointsSynced()                                       {}
+
+type fakeServiceHandler struct {
+}
+
+func (*fakeServiceHandler) OnServiceAdd(service *api.Service)                {}
+func (*fakeServiceHandler) OnServiceUpdate(oldService, service *api.Service) {}
+func (*fakeServiceHandler) OnServiceDelete(service *api.Service)             {}
+func (*fakeServiceHandler) OnServiceSynced()                                 {}
 
 func Test_getProxyMode(t *testing.T) {
 	if runtime.GOOS != "linux" {
@@ -394,5 +414,38 @@ func TestLoadConfigFailures(t *testing.T) {
 		if assert.Error(t, err, tc.name) {
 			assert.Contains(t, err.Error(), tc.expErr, tc.name)
 		}
+	}
+}
+
+func TestKubeProxyVersionUpdated(t *testing.T) {
+	node1 := clientv1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}
+	fakeClient := fake.NewSimpleClientset(&node1)
+	nodePatched := make(chan struct{})
+	fakeClient.AddReactor("patch", "nodes", func(action clienttesting.Action) (bool, k8sRuntime.Object, error) {
+		if action.GetSubresource() == "status" {
+			patchAction := action.(clienttesting.PatchActionImpl)
+			if patchAction.Name == node1.ObjectMeta.Name {
+				close(nodePatched)
+			}
+			return true, nil, nil
+		}
+		return false, nil, nil
+	})
+	server := &ProxyServer{
+		Client:                fakeclientset.NewSimpleClientset(),
+		CoreClient:            fakeClient.Core(),
+		EndpointsEventHandler: &fakeEndpointsHandler{},
+		NodeRef: &clientv1.ObjectReference{
+			Name: node1.ObjectMeta.Name,
+		},
+		Proxier:             &fakeProxyProvider{},
+		Recorder:            &record.FakeRecorder{},
+		ServiceEventHandler: &fakeServiceHandler{},
+	}
+	server.Run()
+	select {
+	case <-nodePatched:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("did not receive an update status event")
 	}
 }
