@@ -17,6 +17,7 @@ limitations under the License.
 package preflight
 
 import (
+	"net/url"
 	"testing"
 	"time"
 
@@ -24,14 +25,26 @@ import (
 )
 
 func TestParseServerURIGood(t *testing.T) {
-	host, err := parseServerURI("https://127.0.0.1:2379")
+	connURL, err := parseServerURI("https://127.0.0.1:2379")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	reference := "127.0.0.1:2379"
-	if host != reference {
-		t.Fatalf("server uri was not parsed correctly, host %s was invalid", host)
+	if connURL.Host != reference {
+		t.Fatalf("server uri was not parsed correctly, host %s was invalid", connURL.Host)
+	}
+}
+
+func TestParseServerURIGoodUnix(t *testing.T) {
+	connURL, err := parseServerURI("unix://127.0.0.1:21002112605")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	reference := "127.0.0.1:21002112605"
+	if connURL.Host != reference {
+		t.Fatalf("server uri was not parsed correctly, host %s was invalid", connURL.Host)
 	}
 }
 
@@ -45,7 +58,7 @@ func TestParseServerURIBad(t *testing.T) {
 func TestEtcdConnection(t *testing.T) {
 	etcd := new(EtcdConnection)
 
-	result := etcd.serverReachable("-not a real network address-")
+	result := etcd.serverReachable(&url.URL{Host: "-not a real network address-", Scheme: "tcp"})
 	if result {
 		t.Fatal("checkConnection should not have succeeded")
 	}
