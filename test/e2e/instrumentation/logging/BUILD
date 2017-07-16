@@ -11,7 +11,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "es.go",
+        "es_kibana.go",
         "es_utils.go",
+        "generic_soak.go",
         "sd.go",
         "sd_events.go",
         "sd_soak.go",
@@ -22,6 +24,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/instrumentation:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",

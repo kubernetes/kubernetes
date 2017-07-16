@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package monitoring
 
 import (
 	"bytes"
@@ -29,11 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/instrumentation"
 
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("Monitoring", func() {
+var _ = instrumentation.SIGDescribe("Monitoring", func() {
 	f := framework.NewDefaultFramework("monitoring")
 
 	BeforeEach(func() {
