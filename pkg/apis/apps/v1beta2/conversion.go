@@ -41,9 +41,11 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec,
 		Convert_v1beta2_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy,
 		Convert_apps_StatefulSetUpdateStrategy_To_v1beta2_StatefulSetUpdateStrategy,
+		Convert_extensions_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet,
+		Convert_v1beta2_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
 		// extensions
 		// TODO: below conversions should be dropped in favor of auto-generated
-		// ones, see https://github.com/kubernetes/kubernetextensionsssues/39865
+		// ones, see https://github.com/kubernetes/kubernetes/issues/39865
 		Convert_v1beta2_ScaleStatus_To_extensions_ScaleStatus,
 		Convert_extensions_ScaleStatus_To_v1beta2_ScaleStatus,
 		Convert_v1beta2_DeploymentSpec_To_extensions_DeploymentSpec,
@@ -83,6 +85,23 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		return err
 	}
 
+	return nil
+}
+
+func Convert_apps_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *appsv1beta2.RollingUpdateDaemonSet, s conversion.Scope) error {
+	if out.MaxUnavailable == nil {
+		out.MaxUnavailable = &intstr.IntOrString{}
+	}
+	if err := s.Convert(&in.MaxUnavailable, out.MaxUnavailable, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta2_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *appsv1beta2.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
+	if err := s.Convert(in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
+		return err
+	}
 	return nil
 }
 
