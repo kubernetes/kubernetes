@@ -824,7 +824,8 @@
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
-			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
+			"Comment": "v1.1.0-1-g782f496",
+			"Rev": "782f4967f2dc4564575ca782fe2d04090b5faca8"
 		},
 		{
 			"ImportPath": "github.com/daviddengcn/go-colortext",
@@ -2494,18 +2495,18 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Comment": "v1.0-88-ge3a8ff8",
-			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
+			"Comment": "v1.1.4-66-gf6abca5",
+			"Rev": "f6abca593680b2315d2075e0f5e2a9751e3f431a"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/mock",
-			"Comment": "v1.0-88-ge3a8ff8",
-			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
+			"Comment": "v1.1.4-66-gf6abca5",
+			"Rev": "f6abca593680b2315d2075e0f5e2a9751e3f431a"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/require",
-			"Comment": "v1.0-88-ge3a8ff8",
-			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
+			"Comment": "v1.1.4-66-gf6abca5",
+			"Rev": "f6abca593680b2315d2075e0f5e2a9751e3f431a"
 		},
 		{
 			"ImportPath": "github.com/syndtr/gocapability/capability",
@@ -2639,6 +2640,7 @@
 		},
 		{
 			"ImportPath": "github.com/xiang90/probing",
+			"Comment": "0.0.1",
 			"Rev": "07dd2e8dfe18522e9c447ba95f2fe95262f63bb2"
 		},
 		{

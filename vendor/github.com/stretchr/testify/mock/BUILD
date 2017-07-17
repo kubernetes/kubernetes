@@ -15,6 +15,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
+        "//vendor/github.com/pmezard/go-difflib/difflib:go_default_library",
         "//vendor/github.com/stretchr/objx:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
