@@ -482,6 +482,7 @@ test/images/port-forward-tester
 test/images/porter
 test/images/resource-consumer/consume-cpu
 test/images/serve-hostname
+test/images/test-webserver
 test/integration/apiserver
 test/integration/client
 test/integration/configmap
