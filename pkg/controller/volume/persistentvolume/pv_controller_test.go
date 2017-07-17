@@ -145,8 +145,7 @@ func TestControllerSync(t *testing.T) {
 		}
 		// Simulate a periodic resync, just in case some events arrived in a
 		// wrong order.
-		ctrl.claims.Resync()
-		ctrl.volumes.store.Resync()
+		ctrl.resync()
 
 		err = reactor.waitTest(test)
 		if err != nil {

@@ -88,30 +88,29 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		createProvisionedPVInterval:   createProvisionedPVInterval,
 		claimQueue:                    workqueue.NewNamed("claims"),
 		volumeQueue:                   workqueue.NewNamed("volumes"),
+		resyncPeriod:                  p.SyncPeriod,
 	}
 
 	if err := controller.volumePluginMgr.InitPlugins(p.VolumePlugins, controller); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for PersistentVolume Controller: %v", err)
 	}
 
-	p.VolumeInformer.Informer().AddEventHandlerWithResyncPeriod(
+	p.VolumeInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    func(obj interface{}) { controller.enqueueWork(controller.volumeQueue, obj) },
 			UpdateFunc: func(oldObj, newObj interface{}) { controller.enqueueWork(controller.volumeQueue, newObj) },
 			DeleteFunc: func(obj interface{}) { controller.enqueueWork(controller.volumeQueue, obj) },
 		},
-		p.SyncPeriod,
 	)
 	controller.volumeLister = p.VolumeInformer.Lister()
 	controller.volumeListerSynced = p.VolumeInformer.Informer().HasSynced
 
-	p.ClaimInformer.Informer().AddEventHandlerWithResyncPeriod(
+	p.ClaimInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    func(obj interface{}) { controller.enqueueWork(controller.claimQueue, obj) },
 			UpdateFunc: func(oldObj, newObj interface{}) { controller.enqueueWork(controller.claimQueue, newObj) },
 			DeleteFunc: func(obj interface{}) { controller.enqueueWork(controller.claimQueue, obj) },
 		},
-		p.SyncPeriod,
 	)
 	controller.claimLister = p.ClaimInformer.Lister()
 	controller.claimListerSynced = p.ClaimInformer.Informer().HasSynced
@@ -277,6 +276,7 @@ func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 
 	ctrl.initializeCaches(ctrl.volumeLister, ctrl.claimLister)
 
+	go wait.Until(ctrl.resync, ctrl.resyncPeriod, stopCh)
 	go wait.Until(ctrl.volumeWorker, time.Second, stopCh)
 	go wait.Until(ctrl.claimWorker, time.Second, stopCh)
 
@@ -395,6 +395,31 @@ func (ctrl *PersistentVolumeController) claimWorker() {
 			glog.Infof("claim worker queue shutting down")
 			return
 		}
+	}
+}
+
+// resync supplements short resync period of shared informers - we don't want
+// all consumers of PV/PVC shared informer to have a short resync period,
+// therefore we do our own.
+func (ctrl *PersistentVolumeController) resync() {
+	glog.V(4).Infof("resyncing PV controller")
+
+	pvcs, err := ctrl.claimLister.List(labels.NewSelector())
+	if err != nil {
+		glog.Warningf("cannot list claims: %s", err)
+		return
+	}
+	for _, pvc := range pvcs {
+		ctrl.enqueueWork(ctrl.claimQueue, pvc)
+	}
+
+	pvs, err := ctrl.volumeLister.List(labels.NewSelector())
+	if err != nil {
+		glog.Warningf("cannot list persistent volumes: %s", err)
+		return
+	}
+	for _, pv := range pvs {
+		ctrl.enqueueWork(ctrl.volumeQueue, pv)
 	}
 }
 
