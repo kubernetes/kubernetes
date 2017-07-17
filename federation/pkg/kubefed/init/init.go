@@ -211,7 +211,13 @@ type credentials struct {
 // Complete ensures that options are valid and marshals them if necessary.
 func (i *initFederation) Complete(cmd *cobra.Command, args []string) error {
 	if len(i.options.dnsProvider) == 0 {
-		return fmt.Errorf("--dns-provider is mandatory")
+		return fmt.Errorf("--dns-provider is mandatory. pass '--dns-provider=none', if you need to disable dns controller")
+	}
+	if i.options.dnsProvider == "none" {
+		if len(i.options.controllerManagerOverridesString) != 0 {
+			i.options.controllerManagerOverridesString += ","
+		}
+		i.options.controllerManagerOverridesString += "--controllers=service-dns=false"
 	}
 
 	err := i.commonOptions.SetName(cmd, args)
