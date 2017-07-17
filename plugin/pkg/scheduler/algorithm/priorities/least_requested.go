@@ -53,7 +53,7 @@ func calculateUnusedScore(requested int64, capacity int64, node string) int64 {
 			requested, capacity, node)
 		return 0
 	}
-	return ((capacity - requested) * 10) / capacity
+	return ((capacity - requested) * int64(schedulerapi.MaxPriority)) / capacity
 }
 
 // Calculates host priority based on the amount of unused resources.

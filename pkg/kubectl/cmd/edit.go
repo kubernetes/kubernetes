@@ -107,6 +107,7 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddValidateOptionFlags(cmd, &options.ValidateOptions)
 	cmd.Flags().StringVarP(&options.Output, "output", "o", "yaml", "Output format. One of: yaml|json.")
+	cmd.Flags().BoolVarP(&options.OutputPatch, "output-patch", "", false, "Output the patch if the resource is edited.")
 
 	cmd.Flags().BoolVar(&options.WindowsLineEndings, "windows-line-endings", runtime.GOOS == "windows",
 		"Defaults to the line ending native to your platform.")

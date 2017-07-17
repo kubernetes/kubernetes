@@ -11,5 +11,8 @@ go_library(
     name = "go_default_library",
     srcs = ["registry.go"],
     tags = ["automanaged"],
-    deps = ["//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library"],
+    deps = [
+        "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+    ],
 )

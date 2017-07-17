@@ -22,7 +22,6 @@ import (
 	"net"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
@@ -52,11 +51,6 @@ func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 	return o
 }
 
-func (o *WardleServerOptions) addFlags(flags *pflag.FlagSet) {
-	o.RecommendedOptions.AddFlags(flags)
-	o.Admission.AddFlags(flags)
-}
-
 // NewCommandStartMaster provides a CLI handler for 'start master' command
 func NewCommandStartWardleServer(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
 	o := NewWardleServerOptions(out, errOut)
@@ -79,7 +73,8 @@ func NewCommandStartWardleServer(out, errOut io.Writer, stopCh <-chan struct{}) 
 	}
 
 	flags := cmd.Flags()
-	o.addFlags(flags)
+	o.RecommendedOptions.AddFlags(flags)
+	o.Admission.AddFlags(flags)
 
 	return cmd
 }

@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/scheduling"
@@ -228,12 +229,20 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
 		glog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
 
-		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false, defaultTimeout)
+		By("Get memory available on new node, so we can account for it when creating RC")
+		nodes, err := framework.GetGroupNodes(extraPoolName)
+		framework.ExpectNoError(err)
+		Expect(len(nodes)).Should(Equal(1))
+		node, err := f.ClientSet.Core().Nodes().Get(nodes[0], metav1.GetOptions{})
+		extraMem := node.Status.Capacity[v1.ResourceMemory]
+		extraMemMb := int((&extraMem).Value() / 1024 / 1024)
+
+		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb+extraMemMb, false, defaultTimeout)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
 		// Verify, that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
+			func(size int) bool { return size >= nodeCount+2 }, scaleUpTimeout))
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	})
 
@@ -585,6 +594,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
+		framework.ExpectNoError(err)
 
 		for _, node := range nodes.Items {
 			err = makeNodeUnschedulable(f.ClientSet, &node)
@@ -603,6 +613,51 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size >= len(nodes.Items)+1 }, scaleUpTimeout))
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+	})
+
+	It("Should be able to scale a node group down to 0[Feature:ClusterSizeAutoscalingScaleDown]", func() {
+		framework.SkipUnlessAtLeast(len(originalSizes), 2, "At least 2 node groups are needed for scale-to-0 tests")
+		By("Find smallest node group and manually scale it to a single node")
+		minMig := ""
+		minSize := nodeCount
+		for mig, size := range originalSizes {
+			if size <= minSize {
+				minMig = mig
+				minSize = size
+			}
+		}
+		err := framework.ResizeGroup(minMig, int32(1))
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount-minSize+1, resizeTimeout))
+
+		By("Make the single node unschedulable")
+		allNodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
+			"spec.unschedulable": "false",
+		}.AsSelector().String()})
+		framework.ExpectNoError(err)
+		ngNodes, err := framework.GetGroupNodes(minMig)
+		framework.ExpectNoError(err)
+		By(fmt.Sprintf("Target nodes for scale-down: %s", ngNodes))
+		Expect(len(ngNodes) == 1).To(BeTrue())
+		node, err := f.ClientSet.Core().Nodes().Get(ngNodes[0], metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		makeNodeUnschedulable(f.ClientSet, node)
+
+		By("Manually drain the single node")
+		podOpts := metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
+		pods, err := c.Core().Pods(metav1.NamespaceAll).List(podOpts)
+		framework.ExpectNoError(err)
+		for _, pod := range pods.Items {
+			err = f.ClientSet.Core().Pods(pod.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+			framework.ExpectNoError(err)
+		}
+
+		By("The node should be removed")
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size < len(allNodes.Items) }, scaleDownTimeout))
+		minSize, err = framework.GroupSize(minMig)
+		framework.ExpectNoError(err)
+		Expect(minSize).Should(Equal(0))
 	})
 
 	It("Shouldn't perform scale up operation and should list unhealthy status if most of the cluster is broken[Feature:ClusterSizeAutoscalingScaleUp]", func() {
