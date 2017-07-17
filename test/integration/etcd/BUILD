@@ -23,7 +23,6 @@ go_test(
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/master:go_default_library",
         "//test/integration/framework:go_default_library",

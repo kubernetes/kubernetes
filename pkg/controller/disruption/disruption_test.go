@@ -30,10 +30,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/Azure/go-autorest/autorest/to"
@@ -48,7 +50,7 @@ func (ps *pdbStates) Set(pdb *policy.PodDisruptionBudget) error {
 	if err != nil {
 		return err
 	}
-	obj, err := api.Scheme.DeepCopy(pdb)
+	obj, err := scheme.Scheme.DeepCopy(pdb)
 	if err != nil {
 		return err
 	}

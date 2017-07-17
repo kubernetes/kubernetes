@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kubeclientset "k8s.io/client-go/kubernetes"
+	fakekubeclientset "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
@@ -36,8 +38,6 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	finalizersutil "k8s.io/kubernetes/federation/pkg/federation-controller/util/finalizers"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"

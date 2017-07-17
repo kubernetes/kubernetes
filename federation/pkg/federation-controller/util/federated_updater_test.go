@@ -24,9 +24,9 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	kubeclientset "k8s.io/client-go/kubernetes"
+	fakekubeclientset "k8s.io/client-go/kubernetes/fake"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 
 	"github.com/stretchr/testify/assert"
 )

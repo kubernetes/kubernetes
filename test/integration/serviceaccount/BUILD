@@ -19,10 +19,8 @@ go_test(
         "integration",
     ],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
@@ -41,6 +39,8 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//vendor/k8s.io/client-go/informers:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )

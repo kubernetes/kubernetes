@@ -30,7 +30,6 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/network:go_default_library",
@@ -41,6 +40,7 @@ go_test(
         "//vendor/github.com/containernetworking/cni/pkg/types/020:go_default_library",
         "//vendor/github.com/stretchr/testify/mock:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/util/testing:go_default_library",
     ],
 )

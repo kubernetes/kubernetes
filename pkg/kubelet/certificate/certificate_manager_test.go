@@ -29,7 +29,7 @@ import (
 	certificates "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
-	certificatesclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
+	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 )
 
 type certificateData struct {

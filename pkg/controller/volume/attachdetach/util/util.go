@@ -22,8 +22,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -80,7 +80,7 @@ func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister coreli
 
 	// Do not return the original volume object, since it's from the shared
 	// informer it may be mutated by another consumer.
-	clonedPodVolumeObj, err := api.Scheme.DeepCopy(&podVolume)
+	clonedPodVolumeObj, err := scheme.Scheme.DeepCopy(&podVolume)
 	if err != nil || clonedPodVolumeObj == nil {
 		return nil, fmt.Errorf(
 			"failed to deep copy %q volume object. err=%v", podVolume.Name, err)
@@ -146,7 +146,7 @@ func getPVSpecFromCache(name string, pvcReadOnly bool, expectedClaimUID types.UI
 
 	// Do not return the object from the informer, since the store is shared it
 	// may be mutated by another consumer.
-	clonedPVObj, err := api.Scheme.DeepCopy(pv)
+	clonedPVObj, err := scheme.Scheme.DeepCopy(pv)
 	if err != nil || clonedPVObj == nil {
 		return nil, fmt.Errorf("failed to deep copy %q PV object. err=%v", name, err)
 	}

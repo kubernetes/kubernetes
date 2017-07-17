@@ -24,7 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -94,7 +94,7 @@ var _ = framework.KubeDescribe("GPU [Serial]", func() {
 
 			oldCfg, err = getCurrentKubeletConfig()
 			framework.ExpectNoError(err)
-			clone, err := api.Scheme.DeepCopy(oldCfg)
+			clone, err := scheme.Scheme.DeepCopy(oldCfg)
 			framework.ExpectNoError(err)
 			newCfg := clone.(*componentconfig.KubeletConfiguration)
 			if newCfg.FeatureGates != "" {

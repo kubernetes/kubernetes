@@ -30,15 +30,15 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
-	storageinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/storage/v1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
@@ -72,7 +72,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	if eventRecorder == nil {
 		broadcaster := record.NewBroadcaster()
 		broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(p.KubeClient.Core().RESTClient()).Events("")})
-		eventRecorder = broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "persistentvolume-controller"})
+		eventRecorder = broadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "persistentvolume-controller"})
 	}
 
 	controller := &PersistentVolumeController{
@@ -131,7 +131,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeLister corelister
 		return
 	}
 	for _, volume := range volumeList {
-		clone, err := api.Scheme.DeepCopy(volume)
+		clone, err := scheme.Scheme.DeepCopy(volume)
 		if err != nil {
 			glog.Errorf("error cloning volume %q: %v", volume.Name, err)
 			continue
@@ -148,7 +148,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeLister corelister
 		return
 	}
 	for _, claim := range claimList {
-		clone, err := api.Scheme.DeepCopy(claim)
+		clone, err := scheme.Scheme.DeepCopy(claim)
 		if err != nil {
 			glog.Errorf("error cloning claim %q: %v", claimToClaimKey(claim), err)
 			continue
@@ -408,7 +408,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := api.Scheme.DeepCopy(claim)
+	clone, err := scheme.Scheme.DeepCopy(claim)
 	if err != nil {
 		return nil, fmt.Errorf("Error cloning pv: %v", err)
 	}

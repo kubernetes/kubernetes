@@ -19,7 +19,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/batch/v2alpha1:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/util/exec:go_default_library",
@@ -46,6 +45,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )
 

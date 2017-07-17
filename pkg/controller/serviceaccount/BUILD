@@ -19,9 +19,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/informers/informers_generated/externalversions/core/v1:go_default_library",
-        "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/client/retry:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/registry/core/secret:go_default_library",
@@ -42,6 +39,9 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
+        "//vendor/k8s.io/client-go/informers/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/listers/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
     ],
@@ -57,8 +57,6 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
-        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -69,6 +67,8 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/client-go/informers:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
     ],
 )
