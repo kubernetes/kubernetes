@@ -623,9 +623,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 
 		klet.cpuManager, err = cpumanager.NewManager(
-			kubeCfg.CPUManagerPolicy,
-			runtimeService,               // runtime service
-			klet,                         // kubelet getter interface
+			cpumanager.PolicyName(kubeCfg.CPUManagerPolicy),
+			runtimeService, // runtime service
+			klet,           // kubelet getter interface
 			klet.statusManager)
 		if err != nil {
 			glog.Infof("[cpumanager] cpu manager instantiation yielded error: %v", err)
@@ -712,8 +712,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
 	klet.imageManager = imageManager
-
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) && kubeDeps.TLSOptions != nil {
 		var ips []net.IP
@@ -1255,7 +1253,7 @@ func (kl *Kubelet) initializeModules() error {
 	// Start resource analyzer
 	kl.resourceAnalyzer.Start()
 
-	// Step 9: Start the CPU manager
+	// Start the CPU manager
 	kl.cpuManager.Start()
 
 	return nil

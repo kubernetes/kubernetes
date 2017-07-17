@@ -20,7 +20,59 @@ import (
 	"fmt"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
+
+type CPUDetails map[int]CPUInfo
+
+// Returns a new CPUDetails object with only `cpus` remaining.
+func (d CPUDetails) KeepOnly(cpus cpuset.CPUSet) CPUDetails {
+	result := CPUDetails{}
+	for cpu, info := range d {
+		if cpus.Contains(cpu) {
+			result[cpu] = info
+		}
+	}
+	return result
+}
+
+func (d CPUDetails) Sockets() cpuset.CPUSet {
+	result := cpuset.NewCPUSet()
+	for _, info := range d {
+		result.Add(info.SocketId)
+	}
+	return result
+}
+
+func (d CPUDetails) CPUsInSocket(id int) cpuset.CPUSet {
+	result := cpuset.NewCPUSet()
+	for cpu, info := range d {
+		if info.SocketId == id {
+			result.Add(cpu)
+		}
+	}
+	return result
+}
+
+func (d CPUDetails) CoresInSocket(id int) cpuset.CPUSet {
+	result := cpuset.NewCPUSet()
+	for _, info := range d {
+		if info.SocketId == id {
+			result.Add(info.CoreId)
+		}
+	}
+	return result
+}
+
+func (d CPUDetails) CPUsInCore(id int) cpuset.CPUSet {
+	result := cpuset.NewCPUSet()
+	for cpu, info := range d {
+		if info.CoreId == id {
+			result.Add(cpu)
+		}
+	}
+	return result
+}
 
 //CPU  - logical CPU, cadvisor - thread
 //Core - physical CPU, cadvisor - Core
@@ -30,7 +82,7 @@ type CPUTopology struct {
 	NumCores       int
 	HyperThreading bool
 	NumSockets     int
-	CPUtopoDetails map[int]CPUInfo
+	CPUtopoDetails CPUDetails
 }
 
 type CPUInfo struct {
@@ -44,7 +96,7 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 		return nil, fmt.Errorf("could not detect number of cpus")
 	}
 
-	CPUtopoDetails := make(map[int]CPUInfo)
+	CPUtopoDetails := CPUDetails{}
 
 	numCPUs := machineInfo.NumCores
 	htEnabled := false

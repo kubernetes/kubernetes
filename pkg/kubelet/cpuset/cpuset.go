@@ -19,16 +19,15 @@ package cpuset
 import (
 	"bytes"
 	"fmt"
+	"github.com/golang/glog"
 	"reflect"
 	"sort"
 	. "strconv"
 	"strings"
-	"github.com/golang/glog"
 )
 
 // CPUSet is a set-like data structure for CPU IDs.
 type CPUSet map[int]struct{}
-
 
 func NewCPUSet(cpus ...int) CPUSet {
 	res := CPUSet{}
@@ -75,6 +74,31 @@ func (s CPUSet) Equals(s2 CPUSet) bool {
 	return reflect.DeepEqual(s, s2)
 }
 
+// Filter returns a new CPU set that contains all of the elements from this
+// set that match the supplied predicate, without mutating the source set.
+func (s CPUSet) Filter(predicate func(int) bool) CPUSet {
+	result := NewCPUSet()
+	for cpu := range s {
+		if predicate(cpu) {
+			result.Add(cpu)
+		}
+	}
+	return result
+}
+
+// FilterNot returns a new CPU set that contains all of the elements from this
+// set that do not match the supplied predicate, without mutating the source
+// set.
+func (s CPUSet) FilterNot(predicate func(int) bool) CPUSet {
+	result := NewCPUSet()
+	for cpu := range s {
+		if !predicate(cpu) {
+			result.Add(cpu)
+		}
+	}
+	return result
+}
+
 // IsSubsetOf returns true if the supplied set contains all the elements
 func (s CPUSet) IsSubsetOf(s2 CPUSet) bool {
 	result := true
@@ -105,26 +129,14 @@ func (s CPUSet) Union(s2 CPUSet) CPUSet {
 // that are present in both this set and the supplied set, without mutating
 // either source set.
 func (s CPUSet) Intersection(s2 CPUSet) CPUSet {
-	result := NewCPUSet()
-	for cpu := range s {
-		if s2.Contains(cpu) {
-			result.Add(cpu)
-		}
-	}
-	return result
+	return s.Filter(func(cpu int) bool { return s2.Contains(cpu) })
 }
 
 // Difference returns a new CPU set that contains all of the elements that
 // are present in this set and not the supplied set, without mutating either
 // source set.
 func (s CPUSet) Difference(s2 CPUSet) CPUSet {
-	result := NewCPUSet()
-	for cpu := range s {
-		if !s2.Contains(cpu) {
-			result.Add(cpu)
-		}
-	}
-	return result
+	return s.FilterNot(func(cpu int) bool { return s2.Contains(cpu) })
 }
 
 // AsSlice returns a slice of integers that contains all elements from

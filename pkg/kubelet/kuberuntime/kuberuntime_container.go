@@ -251,9 +251,6 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
 	}
 	lc.Resources.CpuShares = cpuShares
-	// SETH set initial cpuset here maybe?
-	// TODO(CD): Alternatively, could pass in kube/system reserved resources
-	//           to the CPU Manager type constructor and figure it out locally.
 	if memoryLimit != 0 {
 		lc.Resources.MemoryLimitInBytes = memoryLimit
 	}
