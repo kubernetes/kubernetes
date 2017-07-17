@@ -153,7 +153,7 @@ message SubjectAccessReviewSpec {
   // User is the user you're testing for.
   // If you specify "User" but not "Groups", then is it interpreted as "What if User were not a member of any groups
   // +optional
-  optional string verb = 3;
+  optional string user = 3;
 
   // Groups is the groups you're testing for.
   // +optional
