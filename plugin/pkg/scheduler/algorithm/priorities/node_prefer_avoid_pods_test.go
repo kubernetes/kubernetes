@@ -96,7 +96,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 				},
 			},
 			nodes:        testNodes,
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 10}},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
 			test:         "pod managed by ReplicationController should avoid a node, this node get lowest priority score",
 		},
 		{
@@ -109,7 +109,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 				},
 			},
 			nodes:        testNodes,
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 10}},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
 			test:         "ownership by random controller should be ignored",
 		},
 		{
@@ -122,7 +122,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 				},
 			},
 			nodes:        testNodes,
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 10}},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
 			test:         "owner without Controller field set should be ignored",
 		},
 		{
@@ -135,7 +135,7 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 				},
 			},
 			nodes:        testNodes,
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 10}},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: schedulerapi.MaxPriority}},
 			test:         "pod managed by ReplicaSet should avoid a node, this node get lowest priority score",
 		},
 	}
