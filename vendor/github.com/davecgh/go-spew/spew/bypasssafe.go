@@ -1,4 +1,4 @@
-// Copyright (c) 2015 Dave Collins <dave@davec.name>
+// Copyright (c) 2015-2016 Dave Collins <dave@davec.name>
 //
 // Permission to use, copy, modify, and distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -13,9 +13,10 @@
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 // NOTE: Due to the following build constraints, this file will only be compiled
-// when either the code is running on Google App Engine or "-tags disableunsafe"
-// is added to the go build command line.
-// +build appengine disableunsafe
+// when the code is running on Google App Engine, compiled by GopherJS, or
+// "-tags safe" is added to the go build command line.  The "disableunsafe"
+// tag is deprecated and thus should not be used.
+// +build js appengine safe disableunsafe
 
 package spew
 
