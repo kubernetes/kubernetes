@@ -669,6 +669,8 @@ type KubeControllerManagerConfiguration struct {
 	CloudProvider string
 	// cloudConfigFile is the path to the cloud provider configuration file.
 	CloudConfigFile string
+	// run with untagged cloud instances
+	AllowUntaggedCloud bool
 	// concurrentEndpointSyncs is the number of endpoint syncing operations
 	// that will be done concurrently. Larger number = faster endpoint updating,
 	// but more CPU (and network) load.

@@ -539,6 +539,11 @@ func (pc *PCCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []st
 	return nameservers, searches
 }
 
+// HasClusterID returns true if the cluster has a clusterID
+func (pc *PCCloud) HasClusterID() bool {
+	return true
+}
+
 // Attaches given virtual disk volume to the compute running kubelet.
 func (pc *PCCloud) AttachDisk(pdID string, nodeName k8stypes.NodeName) error {
 	photonClient, err := getPhotonClient(pc)
