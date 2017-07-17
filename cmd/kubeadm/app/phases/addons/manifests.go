@@ -88,6 +88,9 @@ spec:
       tolerations:
       - key: {{ .MasterTaintKey }}
         effect: NoSchedule
+      - key: {{ .CloudTaintKey }}
+        value: "true"
+        effect: NoSchedule
       volumes:
       - name: kube-proxy
         configMap:
