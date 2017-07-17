@@ -67,15 +67,6 @@ __kubectl_override_flags()
     done
 }
 
-__kubectl_get_namespaces()
-{
-    local template kubectl_out
-    template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
-    if kubectl_out=$(kubectl get -o template --template="${template}" namespace 2>/dev/null); then
-        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
-    fi
-}
-
 __kubectl_config_get_contexts()
 {
     __kubectl_parse_config "contexts"
@@ -117,6 +108,11 @@ __kubectl_get_resource()
         return 1
     fi
     __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
+}
+
+__kubectl_get_resource_namespace()
+{
+    __kubectl_parse_get "namespace"
 }
 
 __kubectl_get_resource_pod()
@@ -247,7 +243,7 @@ __custom_func() {
 
 var (
 	bash_completion_flags = map[string]string{
-		"namespace": "__kubectl_get_namespaces",
+		"namespace": "__kubectl_get_resource_namespace",
 		"context":   "__kubectl_config_get_contexts",
 		"cluster":   "__kubectl_config_get_clusters",
 		"user":      "__kubectl_config_get_users",
