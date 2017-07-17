@@ -112,7 +112,9 @@ func main() {
 	}
 
 	if config.Morph == "kubelet" {
-		cadvisorInterface := new(cadvisortest.Fake)
+		cadvisorInterface := &cadvisortest.Fake{
+			NodeName: config.NodeName,
+		}
 		containerManager := cm.NewStubContainerManager()
 		fakeDockerClient := libdocker.NewFakeDockerClient().WithTraceDisabled()
 		fakeDockerClient.EnableSleep = true
