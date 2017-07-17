@@ -210,11 +210,7 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 	os.MkdirAll(dir, 0750)
 
-	azure, err := getAzureCloud(b.plugin.host.GetCloudProvider())
-	if err != nil {
-		return err
-	}
-	source := fmt.Sprintf("//%s.file.%s/%s", accountName, azure.Environment.StorageEndpointSuffix, b.shareName)
+	source := fmt.Sprintf("//%s.file.%s/%s", accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), b.shareName)
 	// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
 	options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=0777,file_mode=0777", accountName, accountKey)}
 	if b.readOnly {
@@ -283,4 +279,14 @@ func getAzureCloud(cloudProvider cloudprovider.Interface) (*azure.Cloud, error) 
 	}
 
 	return azure, nil
+}
+
+func getStorageEndpointSuffix(cloudprovider cloudprovider.Interface) string {
+	const publicCloudStorageEndpointSuffix = "core.windows.net"
+	azure, err := getAzureCloud(cloudprovider)
+	if err == nil {
+		glog.Warningf("No Azure cloud provider found. Using the Azure public cloud endpoint: %s", publicCloudStorageEndpointSuffix)
+		return publicCloudStorageEndpointSuffix
+	}
+	return azure.Environment.StorageEndpointSuffix
 }
