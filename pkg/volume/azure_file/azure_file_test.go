@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -85,7 +86,7 @@ func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAcc
 	return false
 }
 
-func getTestCloud(t *testing.T) *azure.Cloud {
+func getAzureTestCloud(t *testing.T) *azure.Cloud {
 	config := `{
                 "aadClientId": "--aad-client-id--",
                 "aadClientSecret": "--aad-client-secret--"
@@ -102,14 +103,36 @@ func getTestCloud(t *testing.T) *azure.Cloud {
 	return azureCloud
 }
 
-func TestPlugin(t *testing.T) {
+func getTestTempDir(t *testing.T) string {
 	tmpDir, err := ioutil.TempDir(os.TempDir(), "azurefileTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
+	return tmpDir
+}
+
+func TestPluginAzureCloudProvider(t *testing.T) {
+	tmpDir := getTestTempDir(t)
 	defer os.RemoveAll(tmpDir)
+	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, getAzureTestCloud(t)))
+}
+
+func TestPluginWithoutCloudProvider(t *testing.T) {
+	tmpDir := getTestTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+}
+
+func TestPluginWithOtherCloudProvider(t *testing.T) {
+	tmpDir := getTestTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	cloud := &fakecloud.FakeCloud{}
+	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, cloud))
+}
+
+func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, getTestCloud(t)))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumeHost)
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/azure-file")
 	if err != nil {

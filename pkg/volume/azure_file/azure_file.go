@@ -284,7 +284,7 @@ func getAzureCloud(cloudProvider cloudprovider.Interface) (*azure.Cloud, error) 
 func getStorageEndpointSuffix(cloudprovider cloudprovider.Interface) string {
 	const publicCloudStorageEndpointSuffix = "core.windows.net"
 	azure, err := getAzureCloud(cloudprovider)
-	if err == nil {
+	if err != nil {
 		glog.Warningf("No Azure cloud provider found. Using the Azure public cloud endpoint: %s", publicCloudStorageEndpointSuffix)
 		return publicCloudStorageEndpointSuffix
 	}
