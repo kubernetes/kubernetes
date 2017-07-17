@@ -121,32 +121,3 @@ const (
 	// Add priority to pods. Priority affects scheduling and preemption of pods.
 	PodPriority utilfeature.Feature = "PodPriority"
 )
-
-func init() {
-	utilfeature.DefaultFeatureGate.Add(defaultKubernetesFeatureGates)
-}
-
-// defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
-// To add a new feature, define a key for it above and add it here. The features will be
-// available throughout Kubernetes binaries.
-var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	ExternalTrafficLocalOnly:                    {Default: true, PreRelease: utilfeature.GA},
-	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
-	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
-	DynamicVolumeProvisioning:                   {Default: true, PreRelease: utilfeature.Alpha},
-	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
-	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
-	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
-	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
-	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
-	RotateKubeletClientCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
-	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
-	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha},
-	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
-	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
-
-	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
-	// unintentionally on either side:
-	StreamingProxyRedirects:          {Default: true, PreRelease: utilfeature.Beta},
-	genericfeatures.AdvancedAuditing: {Default: false, PreRelease: utilfeature.Alpha},
-}

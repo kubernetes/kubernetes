@@ -24,14 +24,12 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
-
-	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
 
 	"github.com/spf13/pflag"
 )
@@ -230,4 +228,9 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
 		"Turns on aggregator routing requests to endoints IP rather than cluster IP.")
 
+	// add binary-specific feature flags to global state
+	utilfeature.DefaultFeatureGate.Add(featureGates)
+
+	// add features to FlagSet struct
+	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
