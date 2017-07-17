@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary endpoint for volume plugins
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&azureFilePlugin{nil}}
 }
