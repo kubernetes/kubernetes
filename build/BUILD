@@ -1,7 +1,18 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build", "docker_bundle")
+load(
+    "@io_bazel_rules_docker//docker/contrib:push-all.bzl",
+    docker_pushall = "docker_push",
+)
 load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
+
+config_setting(
+    name = "actual_release",
+    values = {
+        "define": "RELEASE_FLAVOR=actual",
+    },
+)
 
 filegroup(
     name = "package-srcs",
@@ -65,6 +76,26 @@ DOCKERIZED_BINARIES = {
     images = {"gcr.io/google_containers/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal"},
     stamp = True,
 ) for binary in DOCKERIZED_BINARIES.keys()]
+
+docker_bundle(
+    name = "all_images",
+    images = {
+        "gcr.io/%s/%s:{STABLE_DOCKER_TAG}" % (
+            select({
+                ":actual_release": "google_containers",
+                "//conditions:default": "kubernetes-ci-images/bazel",
+            }),
+            binary,
+        ): binary + "-internal"
+        for binary in DOCKERIZED_BINARIES.keys()
+    },
+    stamp = True,
+)
+
+docker_pushall(
+    name = "push_all_images",
+    bundle = ":all_images",
+)
 
 [genrule(
     name = binary + "_docker_tag",
