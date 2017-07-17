@@ -108,6 +108,7 @@ type RunObjectConfig interface {
 	SetClient(clientset.Interface)
 	SetInternalClient(internalclientset.Interface)
 	GetReplicas() int
+	GetLabelValue(string) (string, bool)
 }
 
 type RCConfig struct {
@@ -498,6 +499,11 @@ func (config *RCConfig) SetInternalClient(c internalclientset.Interface) {
 
 func (config *RCConfig) GetReplicas() int {
 	return config.Replicas
+}
+
+func (config *RCConfig) GetLabelValue(key string) (string, bool) {
+	value, found := config.Labels[key]
+	return value, found
 }
 
 func (config *RCConfig) create() error {
