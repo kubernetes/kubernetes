@@ -4293,7 +4293,14 @@ func CoreDump(dir string) {
 		Logf("Skipping dumping logs from cluster")
 		return
 	}
-	cmd := exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
+	var cmd *exec.Cmd
+	if TestContext.LogexporterGCSPath != "" {
+		Logf("Dumping logs from nodes to GCS directly at path: %s", TestContext.LogexporterGCSPath)
+		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir, TestContext.LogexporterGCSPath)
+	} else {
+		Logf("Dumping logs locally to: %s", dir)
+		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
+	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {

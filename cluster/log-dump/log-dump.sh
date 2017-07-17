@@ -22,6 +22,7 @@ set -o nounset
 set -o pipefail
 
 readonly report_dir="${1:-_artifacts}"
+readonly gcs_artifacts_dir="${2:-}"
 
 # In order to more trivially extend log-dump for custom deployments,
 # check for a function named log_dump_custom_get_instances. If it's
@@ -271,7 +272,6 @@ function dump_nodes_with_logexporter() {
   # Obtain parameters required by logexporter.
   local -r service_account_credentials="$(cat ${GOOGLE_APPLICATION_CREDENTIALS} | base64)"
   local -r cloud_provider="${KUBERNETES_PROVIDER}"
-  local -r gcs_artifacts_dir="${GCS_ARTIFACTS_DIR}"
   local -r enable_hollow_node_logs="${ENABLE_HOLLOW_NODE_LOGS:-false}"
   local -r logexport_timeout_seconds="$(( 30 + NUM_NODES / 10 ))"
 
@@ -347,12 +347,8 @@ function main() {
   fi
 
   # Copy logs from nodes to GCS directly or to artifacts dir locally (through SSH).
-  if [[ "${ENABLE_LOGEXPORTER:-}" == "true" ]]; then
-    if [[ -z "${GCS_ARTIFACTS_DIR:-}" ]]; then
-      echo "Env var GCS_ARTIFACTS_DIR is empty. Failed to dump node logs to GCS."
-      exit 1
-    fi
-    echo "Dumping logs from nodes to GCS directly at '${GCS_ARTIFACTS_DIR}'"
+  if [[ -n "${gcs_artifacts_dir}" ]]; then
+    echo "Dumping logs from nodes to GCS directly at '${gcs_artifacts_dir}' using logexporter"
     dump_nodes_with_logexporter
   else
     echo "Dumping logs from nodes locally to '${report_dir}'"
