@@ -32,6 +32,129 @@ import (
 	. "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
 )
 
+func TestSetDefaultDaemonSetSpec(t *testing.T) {
+	defaultLabels := map[string]string{"foo": "bar"}
+	period := int64(v1.DefaultTerminationGracePeriodSeconds)
+	defaultTemplate := v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			DNSPolicy:                     v1.DNSClusterFirst,
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			SecurityContext:               &v1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: &period,
+			SchedulerName:                 api.DefaultSchedulerName,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: defaultLabels,
+		},
+	}
+	templateNoLabel := v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			DNSPolicy:                     v1.DNSClusterFirst,
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			SecurityContext:               &v1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: &period,
+			SchedulerName:                 api.DefaultSchedulerName,
+		},
+	}
+	tests := []struct {
+		original *appsv1beta2.DaemonSet
+		expected *appsv1beta2.DaemonSet
+	}{
+		{ // Labels change/defaulting test.
+			original: &appsv1beta2.DaemonSet{
+				Spec: appsv1beta2.DaemonSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1beta2.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1beta2.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: defaultLabels,
+					},
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
+						Type: appsv1beta2.OnDeleteDaemonSetStrategyType,
+					},
+					RevisionHistoryLimit: newInt32(10),
+				},
+			},
+		},
+		{ // Labels change/defaulting test.
+			original: &appsv1beta2.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"bar": "foo",
+					},
+				},
+				Spec: appsv1beta2.DaemonSetSpec{
+					Template:             defaultTemplate,
+					RevisionHistoryLimit: newInt32(1),
+				},
+			},
+			expected: &appsv1beta2.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"bar": "foo",
+					},
+				},
+				Spec: appsv1beta2.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: defaultLabels,
+					},
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
+						Type: appsv1beta2.OnDeleteDaemonSetStrategyType,
+					},
+					RevisionHistoryLimit: newInt32(1),
+				},
+			},
+		},
+		{ // Update strategy.
+			original: &appsv1beta2.DaemonSet{},
+			expected: &appsv1beta2.DaemonSet{
+				Spec: appsv1beta2.DaemonSetSpec{
+					Template: templateNoLabel,
+					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
+						Type: appsv1beta2.OnDeleteDaemonSetStrategyType,
+					},
+					RevisionHistoryLimit: newInt32(10),
+				},
+			},
+		},
+		{ // Custom unique label key.
+			original: &appsv1beta2.DaemonSet{
+				Spec: appsv1beta2.DaemonSetSpec{},
+			},
+			expected: &appsv1beta2.DaemonSet{
+				Spec: appsv1beta2.DaemonSetSpec{
+					Template: templateNoLabel,
+					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
+						Type: appsv1beta2.OnDeleteDaemonSetStrategyType,
+					},
+					RevisionHistoryLimit: newInt32(10),
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		original := test.original
+		expected := test.expected
+		obj2 := roundTrip(t, runtime.Object(original))
+		got, ok := obj2.(*appsv1beta2.DaemonSet)
+		if !ok {
+			t.Errorf("(%d) unexpected object: %v", i, got)
+			t.FailNow()
+		}
+		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
+			t.Errorf("(%d) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", i, got.Spec, expected.Spec)
+		}
+	}
+}
+
 func TestSetDefaultDeployment(t *testing.T) {
 	defaultIntOrString := intstr.FromString("25%")
 	differentIntOrString := intstr.FromInt(5)
