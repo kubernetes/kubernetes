@@ -272,32 +272,12 @@ message PodSandboxConfig {
     //
     // In general, in order to preserve a well-defined interface between the
     // kubelet and the container runtime, annotations SHOULD NOT influence
-    // runtime behaviour. For legacy reasons, there are some annotations which
-    // currently explicitly break this rule, listed below; in future versions
-    // of the interface these will be promoted to typed features.
+    // runtime behaviour.
     //
     // Annotations can also be useful for runtime authors to experiment with
     // new features that are opaque to the Kubernetes APIs (both user-facing
     // and the CRI). Whenever possible, however, runtime authors SHOULD
     // consider proposing new typed fields for any new features instead.
-    //
-    // 1. Seccomp
-    //
-    //      key: security.alpha.kubernetes.io/seccomp/pod
-    //      description: the seccomp profile for the containers of an entire pod.
-    //      value: see below.
-    //
-    //      key: security.alpha.kubernetes.io/seccomp/container/<container name>
-    //      description: the seccomp profile for the container (overrides pod).
-    //      value: see below
-    //
-    //      The value of seccomp is runtime agnostic:
-    //      * runtime/default: the default profile for the container runtime
-    //      * unconfined: unconfined profile, ie, no seccomp sandboxing
-    //      * localhost/<profile-name>: the profile installed to the node's
-    //        local seccomp profile root. Note that profile root is set in
-    //        kubelet, and it is not passed in CRI yet, see https://issues.k8s.io/36997.
-    //
     map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
     LinuxPodSandboxConfig linux = 8;
@@ -522,6 +502,12 @@ message LinuxContainerSecurityContext {
     //    (localhost) by name. The possible profile names are detailed at
     //    http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
     string apparmor_profile = 9;
+    // Seccomp profile for the container, candidate values are:
+    // * runtime/default: the default profile for the container runtime
+    // * unconfined: unconfined profile, ie, no seccomp sandboxing
+    // * localhost/<full-path-to-profile>: the profile installed on the node.
+    //   <full-path-to-profile> is the full path of the profile.
+    string seccomp_profile_path = 10;
 }
 
 // LinuxContainerConfig contains platform-specific configuration for
