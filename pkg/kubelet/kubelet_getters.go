@@ -190,7 +190,7 @@ func (kl *Kubelet) GetRuntime() kubecontainer.Runtime {
 // GetNode returns the node info for the configured node name of this Kubelet.
 func (kl *Kubelet) GetNode() (*v1.Node, error) {
 	if kl.standaloneMode {
-		return kl.initialNode()
+		return kl.tryPopulateInitialNodeData()
 	}
 	return kl.nodeInfo.GetNodeInfo(string(kl.nodeName))
 }
@@ -206,7 +206,7 @@ func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 			return n, nil
 		}
 	}
-	return kl.initialNode()
+	return kl.tryPopulateInitialNodeData()
 }
 
 // GetNodeConfig returns the container manager node config.

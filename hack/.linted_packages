@@ -494,6 +494,7 @@ test/integration/federation
 test/integration/garbagecollector
 test/integration/kubectl
 test/integration/metrics
+test/integration/node
 test/integration/objectmeta
 test/integration/openshift
 test/integration/pods
