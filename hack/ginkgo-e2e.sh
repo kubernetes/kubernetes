@@ -76,8 +76,6 @@ fi
 
 if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
   NODE_INSTANCE_GROUP="${NODE_INSTANCE_PREFIX}-group"
-else
-  NODE_INSTANCE_GROUP=""
 fi
 
 if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
@@ -93,7 +91,10 @@ if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
   done
 fi
 
-if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+# TODO(kubernetes/test-infra#3330): Allow NODE_INSTANCE_GROUP to be
+# set before we get here, which eliminates any cluster/gke use if
+# KUBERNETES_CONFORMANCE_PROVIDER is set to "gke".
+if [[ -z "${NODE_INSTANCE_GROUP:-}" ]] && [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
   detect-node-instance-groups
   NODE_INSTANCE_GROUP=$(kube::util::join , "${NODE_INSTANCE_GROUPS[@]}")
 fi
