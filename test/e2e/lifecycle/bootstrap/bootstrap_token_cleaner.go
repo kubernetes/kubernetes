@@ -23,13 +23,14 @@ import (
 	. "github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/lifecycle"
 )
 
 var secretNeedClean string
-var _ = framework.KubeDescribe("[Feature:BootstrapTokens]", func() {
+var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 
 	var c clientset.Interface
 
@@ -49,13 +50,13 @@ var _ = framework.KubeDescribe("[Feature:BootstrapTokens]", func() {
 	})
 	It("should delete the token secret when the secret expired", func() {
 		By("create a new expired bootstrap token secret")
-		tokenId, err := generateTokenId()
+		tokenId, err := GenerateTokenId()
 		Expect(err).NotTo(HaveOccurred())
-		tokenSecret, err := generateTokenSecret()
+		tokenSecret, err := GenerateTokenSecret()
 		Expect(err).NotTo(HaveOccurred())
 
 		secret := newTokenSecret(tokenId, tokenSecret)
-		addSecretExpiration(secret, timeStringFromNow(-time.Hour))
+		addSecretExpiration(secret, TimeStringFromNow(-time.Hour))
 		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
 
 		Expect(err).NotTo(HaveOccurred())
@@ -67,12 +68,12 @@ var _ = framework.KubeDescribe("[Feature:BootstrapTokens]", func() {
 
 	It("should not delete the token secret when the secret is not expired", func() {
 		By("create a new expired bootstrap token secret")
-		tokenId, err := generateTokenId()
+		tokenId, err := GenerateTokenId()
 		Expect(err).NotTo(HaveOccurred())
-		tokenSecret, err := generateTokenSecret()
+		tokenSecret, err := GenerateTokenSecret()
 		Expect(err).NotTo(HaveOccurred())
 		secret := newTokenSecret(tokenId, tokenSecret)
-		addSecretExpiration(secret, timeStringFromNow(time.Hour))
+		addSecretExpiration(secret, TimeStringFromNow(time.Hour))
 		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenId
 		Expect(err).NotTo(HaveOccurred())

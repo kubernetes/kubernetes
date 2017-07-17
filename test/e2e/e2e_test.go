@@ -21,12 +21,12 @@ import (
 
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
 	_ "k8s.io/kubernetes/test/e2e/autoscaling"
-	_ "k8s.io/kubernetes/test/e2e/bootstrap"
 	"k8s.io/kubernetes/test/e2e/framework"
 	_ "k8s.io/kubernetes/test/e2e/instrumentation/logging"
 	_ "k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
 	_ "k8s.io/kubernetes/test/e2e/kubectl"
 	_ "k8s.io/kubernetes/test/e2e/lifecycle"
+	_ "k8s.io/kubernetes/test/e2e/lifecycle/bootstrap"
 	_ "k8s.io/kubernetes/test/e2e/scalability"
 	_ "k8s.io/kubernetes/test/e2e/scheduling"
 	_ "k8s.io/kubernetes/test/e2e/storage"

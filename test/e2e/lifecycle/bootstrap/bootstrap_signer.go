@@ -21,9 +21,10 @@ import (
 	. "github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/lifecycle"
 )
 
 const (
@@ -31,7 +32,7 @@ const (
 	TokenSecretBytes = 8
 )
 
-var _ = framework.KubeDescribe("[Feature:BootstrapTokens]", func() {
+var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 
 	var c clientset.Interface
 
@@ -50,7 +51,7 @@ var _ = framework.KubeDescribe("[Feature:BootstrapTokens]", func() {
 
 	It("should sign the new added bootstrap tokens", func() {
 		By("create a new bootstrap token secret")
-		tokenId, err := generateTokenId()
+		tokenId, err := GenerateTokenId()
 		Expect(err).NotTo(HaveOccurred())
 		secret := newTokenSecret(tokenId, "tokenSecret")
 		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
@@ -65,7 +66,7 @@ var _ = framework.KubeDescribe("[Feature:BootstrapTokens]", func() {
 
 	It("should resign the bootstrap tokens when the clusterInfo ConfigMap updated [Serial][Disruptive]", func() {
 		By("create a new bootstrap token secret")
-		tokenId, err := generateTokenId()
+		tokenId, err := GenerateTokenId()
 		Expect(err).NotTo(HaveOccurred())
 		secret := newTokenSecret(tokenId, "tokenSecret")
 		secret, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
@@ -102,7 +103,7 @@ var _ = framework.KubeDescribe("[Feature:BootstrapTokens]", func() {
 
 	It("should delete the signed bootstrap tokens from clusterInfo ConfigMap when bootstrap token is deleted", func() {
 		By("create a new bootstrap token secret")
-		tokenId, err := generateTokenId()
+		tokenId, err := GenerateTokenId()
 		Expect(err).NotTo(HaveOccurred())
 		secret := newTokenSecret(tokenId, "tokenSecret")
 		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)

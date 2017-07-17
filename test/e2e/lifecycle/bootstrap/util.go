@@ -22,12 +22,12 @@ import (
 	"errors"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -46,14 +46,14 @@ func newTokenSecret(tokenID, tokenSecret string) *v1.Secret {
 	}
 }
 
-func generateTokenId() (string, error) {
+func GenerateTokenId() (string, error) {
 	tokenID, err := randBytes(TokenIDBytes)
 	if err != nil {
 		return "", err
 	}
 	return tokenID, nil
 }
-func generateTokenSecret() (string, error) {
+func GenerateTokenSecret() (string, error) {
 	tokenSecret, err := randBytes(TokenSecretBytes)
 	if err != nil {
 		return "", err
@@ -74,7 +74,7 @@ func addSecretExpiration(s *v1.Secret, expiration string) {
 	s.Data[bootstrapapi.BootstrapTokenExpirationKey] = []byte(expiration)
 }
 
-func timeStringFromNow(delta time.Duration) string {
+func TimeStringFromNow(delta time.Duration) string {
 	return time.Now().Add(delta).Format(time.RFC3339)
 }
 
@@ -141,7 +141,7 @@ func WaitForBootstrapTokenSecretNotDisappear(c clientset.Interface, tokenID stri
 	err := wait.Poll(framework.Poll, t, func() (bool, error) {
 		secret, err := c.CoreV1().Secrets(metav1.NamespaceSystem).Get(bootstrapapi.BootstrapTokenSecretPrefix+tokenID, metav1.GetOptions{})
 		if apierrs.IsNotFound(err) {
-			return true, errors.New("secret not exits")
+			return true, errors.New("secret not exists")
 		}
 		if secret != nil {
 			return false, nil
