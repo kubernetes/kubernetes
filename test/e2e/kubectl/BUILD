@@ -17,7 +17,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",

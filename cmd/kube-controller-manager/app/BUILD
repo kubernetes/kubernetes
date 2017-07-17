@@ -28,6 +28,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
