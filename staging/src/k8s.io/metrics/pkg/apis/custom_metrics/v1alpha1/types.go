@@ -48,7 +48,7 @@ type MetricValue struct {
 	// which these metrics were calculated, when returning rate
 	// metrics calculated from cumulative metrics (or zero for
 	// non-calculated instantaneous metrics).
-	WindowSeconds *int64 `json:"window,omitempty" protobuf:"bytes,4,opt,name=windowSeconds"`
+	WindowSeconds *int64 `json:"window,omitempty" protobuf:"bytes,4,opt,name=window"`
 
 	// the value of the metric for this
 	Value resource.Quantity `json:"value" protobuf:"bytes,5,name=value"`

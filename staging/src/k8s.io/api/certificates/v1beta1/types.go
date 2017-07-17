@@ -51,7 +51,7 @@ type CertificateSigningRequestSpec struct {
 	// valid for.
 	// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
 	//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
-	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=keyUsage"`
+	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
 	// Information about the requesting user.
 	// See user.Info interface for details.
