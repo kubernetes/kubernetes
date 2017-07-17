@@ -51,7 +51,7 @@ function run_kube_apiserver() {
     --storage-media-type="${KUBE_TEST_API_STORAGE_TYPE-}" \
     --cert-dir="${TMPDIR:-/tmp/}" \
     --service-cluster-ip-range="10.0.0.0/24" \
-    --insecure-allow-any-token 1>&2 &
+    --token-auth-file=hack/testdata/auth-tokens.csv 1>&2 &
   APISERVER_PID=$!
 
   kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"

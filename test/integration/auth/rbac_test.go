@@ -31,11 +31,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/plugin/pkg/authenticator/token/anytoken"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 	"k8s.io/kubernetes/pkg/api"
@@ -55,11 +55,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func newFakeAuthenticator() authenticator.Request {
-	return bearertoken.New(anytoken.AnyTokenAuthenticator{})
-}
-
-func clientForUser(user string) *http.Client {
+func clientForToken(user string) *http.Client {
 	return &http.Client{
 		Transport: transport.NewBearerAuthRoundTripper(
 			user,
@@ -68,7 +64,7 @@ func clientForUser(user string) *http.Client {
 	}
 }
 
-func clientsetForUser(user string, config *restclient.Config) clientset.Interface {
+func clientsetForToken(user string, config *restclient.Config) clientset.Interface {
 	configCopy := *config
 	configCopy.BearerToken = user
 	return clientset.NewForConfigOrDie(&configCopy)
@@ -137,8 +133,8 @@ func (b bootstrapRoles) bootstrap(client clientset.Interface) error {
 
 // request is a test case which can.
 type request struct {
-	// The username attempting to send the request.
-	user string
+	// The bearer token sent as part of the request
+	token string
 
 	// Resource metadata
 	verb      string
@@ -155,7 +151,7 @@ type request struct {
 }
 
 func (r request) String() string {
-	return fmt.Sprintf("%s %s %s", r.user, r.verb, r.resource)
+	return fmt.Sprintf("%s %s %s", r.token, r.verb, r.resource)
 }
 
 type statusCode int
@@ -414,14 +410,24 @@ func TestRBAC(t *testing.T) {
 		// Create an API Server.
 		masterConfig := framework.NewIntegrationTestMasterConfig()
 		masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(masterConfig)
-		masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
+		masterConfig.GenericConfig.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+			superUser:                          {Name: "admin", Groups: []string{"system:masters"}},
+			"any-rolebinding-writer":           {Name: "any-rolebinding-writer"},
+			"any-rolebinding-writer-namespace": {Name: "any-rolebinding-writer-namespace"},
+			"bob":                              {Name: "bob"},
+			"job-writer":                       {Name: "job-writer"},
+			"job-writer-namespace":             {Name: "job-writer-namespace"},
+			"nonescalating-rolebinding-writer": {Name: "nonescalating-rolebinding-writer"},
+			"pod-reader":                       {Name: "pod-reader"},
+			"user-with-no-permissions":         {Name: "user-with-no-permissions"},
+		}))
 		_, s, closeFn := framework.RunAMaster(masterConfig)
 		defer closeFn()
 
 		clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 
 		// Bootstrap the API Server with the test case's initial roles.
-		if err := tc.bootstrapRoles.bootstrap(clientsetForUser(superUser, clientConfig)); err != nil {
+		if err := tc.bootstrapRoles.bootstrap(clientsetForToken(superUser, clientConfig)); err != nil {
 			t.Errorf("case %d: failed to apply initial roles: %v", i, err)
 			continue
 		}
@@ -459,7 +465,7 @@ func TestRBAC(t *testing.T) {
 					return
 				}
 
-				resp, err := clientForUser(r.user).Do(req)
+				resp, err := clientForToken(r.token).Do(req)
 				if err != nil {
 					t.Errorf("case %d, req %d: failed to make request: %v", i, j, err)
 					return
@@ -506,7 +512,9 @@ func TestBootstrapping(t *testing.T) {
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(masterConfig)
-	masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
+	masterConfig.GenericConfig.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+		superUser: {Name: "admin", Groups: []string{"system:masters"}},
+	}))
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 

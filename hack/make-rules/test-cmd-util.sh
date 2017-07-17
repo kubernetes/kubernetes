@@ -4132,8 +4132,9 @@ runTests() {
     -s "http://127.0.0.1:${API_PORT}"
   )
 
+  # token defined in hack/testdata/auth-tokens.csv
   kube_flags_with_token=(
-    -s "https://127.0.0.1:${SECURE_API_PORT}" --token=admin/system:masters --insecure-skip-tls-verify=true
+    -s "https://127.0.0.1:${SECURE_API_PORT}" --token=admin-token --insecure-skip-tls-verify=true
   )
 
   if [[ -z "${ALLOW_SKEW:-}" ]]; then
