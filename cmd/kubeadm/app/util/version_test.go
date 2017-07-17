@@ -140,3 +140,28 @@ func TestVersionFromNetwork(t *testing.T) {
 		}
 	}
 }
+
+func TestVersionToTag(t *testing.T) {
+	type T struct {
+		input    string
+		expected string
+	}
+	cases := []T{
+		// NOP
+		{"", ""},
+		// Official releases
+		{"v1.0.0", "v1.0.0"},
+		// CI or custom builds
+		{"v10.1.2-alpha.1.100+0123456789abcdef+SOMETHING", "v10.1.2-alpha.1.100_0123456789abcdef_SOMETHING"},
+		// random and invalid input: should return safe value
+		{"v1,0!0+üñµ", "v1_0_0____"},
+	}
+
+	for _, tc := range cases {
+		tag := KubernetesVersionToImageTag(tc.input)
+		t.Logf("KubernetesVersionToImageTag: Input: %q. Result: %q. Expected: %q", tc.input, tag, tc.expected)
+		if tag != tc.expected {
+			t.Errorf("failed KubernetesVersionToImageTag: Input: %q. Result: %q. Expected: %q", tc.input, tag, tc.expected)
+		}
+	}
+}
