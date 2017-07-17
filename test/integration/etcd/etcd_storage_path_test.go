@@ -249,6 +249,14 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("settings.k8s.io", "v1alpha1", "podpresets"): {
 		stub:             `{"metadata": {"name": "podpre1"}, "spec": {"env": [{"name": "FOO"}]}}`,
 		expectedEtcdPath: "/registry/podpresets/etcdstoragepathtestnamespace/podpre1",
+		expectedGVK:      gvkP("settings.k8s.io", "v1beta1", "PodPreset"),
+	},
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/settings/v1beta1
+	gvr("settings.k8s.io", "v1beta1", "podpresets"): {
+		stub:             `{"metadata": {"name": "podpre2"}, "spec": {"env": [{"name": "FOO"}]}}`,
+		expectedEtcdPath: "/registry/podpresets/etcdstoragepathtestnamespace/podpre2",
 	},
 	// --
 

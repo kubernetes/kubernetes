@@ -122,6 +122,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBindingList"}:                            {},
 		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPreset"}:                                           {},
 		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPresetList"}:                                       {},
+		{Group: "settings.k8s.io", Version: "v1beta1", Kind: "PodPreset"}:                                            {},
+		{Group: "settings.k8s.io", Version: "v1beta1", Kind: "PodPresetList"}:                                        {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfiguration"}:               {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfigurationList"}:           {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfiguration"}:     {},

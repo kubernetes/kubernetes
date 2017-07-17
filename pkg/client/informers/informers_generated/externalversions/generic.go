@@ -34,6 +34,7 @@ import (
 	rbac_v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbac_v1beta1 "k8s.io/api/rbac/v1beta1"
 	settings_v1alpha1 "k8s.io/api/settings/v1alpha1"
+	settings_v1beta1 "k8s.io/api/settings/v1beta1"
 	storage_v1 "k8s.io/api/storage/v1"
 	storage_v1beta1 "k8s.io/api/storage/v1beta1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -179,6 +180,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=Settings, Version=V1alpha1
 	case settings_v1alpha1.SchemeGroupVersion.WithResource("podpresets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Settings().V1alpha1().PodPresets().Informer()}, nil
+
+		// Group=Settings, Version=V1beta1
+	case settings_v1beta1.SchemeGroupVersion.WithResource("podpresets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Settings().V1beta1().PodPresets().Informer()}, nil
 
 		// Group=Storage, Version=V1
 	case storage_v1.SchemeGroupVersion.WithResource("storageclasses"):

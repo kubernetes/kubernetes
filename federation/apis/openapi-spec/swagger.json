@@ -13331,6 +13331,11 @@
       "kind": "DeleteOptions"
      },
      {
+      "group": "settings.k8s.io",
+      "version": "v1beta1",
+      "kind": "DeleteOptions"
+     },
+     {
       "group": "storage.k8s.io",
       "version": "v1",
       "kind": "DeleteOptions"
@@ -13816,6 +13821,11 @@
      {
       "group": "settings.k8s.io",
       "version": "v1alpha1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "settings.k8s.io",
+      "version": "v1beta1",
       "kind": "WatchEvent"
      },
      {

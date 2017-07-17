@@ -78,6 +78,7 @@ filegroup(
         "//pkg/client/listers/rbac/v1beta1:all-srcs",
         "//pkg/client/listers/settings/internalversion:all-srcs",
         "//pkg/client/listers/settings/v1alpha1:all-srcs",
+        "//pkg/client/listers/settings/v1beta1:all-srcs",
         "//pkg/client/listers/storage/internalversion:all-srcs",
         "//pkg/client/listers/storage/v1:all-srcs",
         "//pkg/client/listers/storage/v1beta1:all-srcs",
