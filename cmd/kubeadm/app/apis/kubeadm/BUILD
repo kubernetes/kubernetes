@@ -11,7 +11,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "env.go",
         "register.go",
         "types.go",
     ],

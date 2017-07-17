@@ -24,10 +24,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-const (
-	// KubernetesDir is the directory kubernetes owns for storing various configuration files
-	KubernetesDir = "/etc/kubernetes"
+// KubernetesDir is the directory kubernetes owns for storing various configuration files
+// This semi-constant MUST NOT be modified during runtime. It's a variable solely for use in unit testing.
+var KubernetesDir = "/etc/kubernetes"
 
+const (
 	ManifestsSubDirName = "manifests"
 
 	CACertAndKeyBaseName = "ca"
