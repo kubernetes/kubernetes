@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiconfig
+package markmaster
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -34,11 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
-const masterLabel = kubeadmconstants.LabelNodeRoleMaster
-
-var masterTaint = &apiv1.Taint{Key: kubeadmconstants.LabelNodeRoleMaster, Value: "", Effect: "NoSchedule"}
-
-func TestUpdateMasterRoleLabelsAndTaints(t *testing.T) {
+func TestMarkMaster(t *testing.T) {
 	// Note: this test takes advantage of the deterministic marshalling of
 	// JSON provided by strategicpatch so that "expectedPatch" can use a
 	// string equality test instead of a logical JSON equality test. That
@@ -47,7 +43,7 @@ func TestUpdateMasterRoleLabelsAndTaints(t *testing.T) {
 	tests := []struct {
 		name          string
 		existingLabel string
-		existingTaint *apiv1.Taint
+		existingTaint *v1.Taint
 		expectedPatch string
 	}{
 		{
@@ -59,26 +55,26 @@ func TestUpdateMasterRoleLabelsAndTaints(t *testing.T) {
 		{
 			"master label missing",
 			"",
-			masterTaint,
+			&kubeadmconstants.MasterTaint,
 			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}}}",
 		},
 		{
 			"master taint missing",
-			masterLabel,
+			kubeadmconstants.LabelNodeRoleMaster,
 			nil,
 			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\",\"timeAdded\":null}]}}",
 		},
 		{
 			"nothing missing",
-			masterLabel,
-			masterTaint,
+			kubeadmconstants.LabelNodeRoleMaster,
+			&kubeadmconstants.MasterTaint,
 			"{}",
 		},
 	}
 
 	for _, tc := range tests {
 		hostname := node.GetHostname("")
-		masterNode := &apiv1.Node{
+		masterNode := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: hostname,
 				Labels: map[string]string{
@@ -97,7 +93,7 @@ func TestUpdateMasterRoleLabelsAndTaints(t *testing.T) {
 
 		jsonNode, err := json.Marshal(masterNode)
 		if err != nil {
-			t.Fatalf("UpdateMasterRoleLabelsAndTaints(%s): unexpected encoding error: %v", tc.name, err)
+			t.Fatalf("MarkMaster(%s): unexpected encoding error: %v", tc.name, err)
 		}
 
 		var patchRequest string
@@ -105,7 +101,7 @@ func TestUpdateMasterRoleLabelsAndTaints(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 
 			if req.URL.Path != "/api/v1/nodes/"+hostname {
-				t.Errorf("UpdateMasterRoleLabelsAndTaints(%s): request for unexpected HTTP resource: %v", tc.name, req.URL.Path)
+				t.Errorf("MarkMaster(%s): request for unexpected HTTP resource: %v", tc.name, req.URL.Path)
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
@@ -115,7 +111,7 @@ func TestUpdateMasterRoleLabelsAndTaints(t *testing.T) {
 			case "PATCH":
 				patchRequest = toString(req.Body)
 			default:
-				t.Errorf("UpdateMasterRoleLabelsAndTaints(%s): request for unexpected HTTP verb: %v", tc.name, req.Method)
+				t.Errorf("MarkMaster(%s): request for unexpected HTTP verb: %v", tc.name, req.Method)
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
@@ -127,16 +123,16 @@ func TestUpdateMasterRoleLabelsAndTaints(t *testing.T) {
 
 		cs, err := clientsetFromTestServer(s)
 		if err != nil {
-			t.Fatalf("UpdateMasterRoleLabelsAndTaints(%s): unexpected error building clientset: %v", tc.name, err)
+			t.Fatalf("MarkMaster(%s): unexpected error building clientset: %v", tc.name, err)
 		}
 
-		err = UpdateMasterRoleLabelsAndTaints(cs, hostname)
+		err = MarkMaster(cs, hostname)
 		if err != nil {
-			t.Errorf("UpdateMasterRoleLabelsAndTaints(%s) returned unexpected error: %v", tc.name, err)
+			t.Errorf("MarkMaster(%s) returned unexpected error: %v", tc.name, err)
 		}
 
 		if tc.expectedPatch != patchRequest {
-			t.Errorf("UpdateMasterRoleLabelsAndTaints(%s) wanted patch %v, got %v", tc.name, tc.expectedPatch, patchRequest)
+			t.Errorf("MarkMaster(%s) wanted patch %v, got %v", tc.name, tc.expectedPatch, patchRequest)
 		}
 	}
 }
