@@ -356,25 +356,23 @@ function create-master-auth {
     fi
     append_or_replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER},"      "admin,system:masters"
   fi
+
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
+  cat <<EOF > "${known_tokens_csv}.tmp"
+${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager
+${KUBE_SCHEDULER_TOKEN},system:kube-scheduler,uid:system:kube-scheduler
+${KUBELET_TOKEN},kubelet,uid:kubelet,system:nodes
+${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy
+EOF
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
-  fi
-  if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
-  fi
-  if [[ -n "${KUBE_SCHEDULER_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
-  fi
-  if [[ -n "${KUBELET_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "kubelet,uid:kubelet,system:nodes"
-  fi
-  if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
+    echo "${KUBE_BEARER_TOKEN},admin,admin,system:masters" >> "${known_tokens_csv}.tmp"
   fi
   if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
+    echo "${NODE_PROBLEM_DETECTOR_TOKEN},system:node-problem-detector,uid:node-problem-detector" >> "${known_tokens_csv}.tmp"
   fi
+
+  mv "${known_tokens_csv}.tmp" "${known_tokens_csv}"
+
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
