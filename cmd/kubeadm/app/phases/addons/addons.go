@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 // CreateEssentialAddons creates the kube-proxy and kube-dns addons
@@ -110,7 +111,14 @@ func CreateKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client *clients
 	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
 		return fmt.Errorf("unable to decode kube-proxy daemonset %v", err)
 	}
-	kubeproxyDaemonSet.Spec.Template.Spec.Tolerations = []v1.Toleration{kubeadmconstants.MasterToleration}
+	kubeproxyDaemonSet.Spec.Template.Spec.Tolerations = []v1.Toleration{
+		kubeadmconstants.MasterToleration,
+		{
+			Key:    algorithm.TaintExternalCloudProvider,
+			Value:  "true",
+			Effect: "NoSchedule",
+		},
+	}
 
 	if _, err := client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Create(kubeproxyDaemonSet); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
