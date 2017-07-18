@@ -18,8 +18,8 @@ package storage
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StorageClass describes a named "class" of storage offered in a cluster.

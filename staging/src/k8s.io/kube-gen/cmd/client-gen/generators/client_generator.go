@@ -342,7 +342,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				}
 			} else {
 				// User has not specified any override for this group version.
-				// filter out types which dont have genclient=true.
+				// filter out types which dont have genclient.
 				if tags := util.MustParseClientGenTags(t.SecondClosestCommentLines); !tags.GenerateClient {
 					continue
 				}
