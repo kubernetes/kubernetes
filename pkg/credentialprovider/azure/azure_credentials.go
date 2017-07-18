@@ -17,12 +17,12 @@ limitations under the License.
 package azure
 
 import (
-	"io/ioutil"
+	"io"
+	"os"
 	"time"
 
-	yaml "gopkg.in/yaml.v2"
-
 	"github.com/Azure/azure-sdk-for-go/arm/containerregistry"
+	"github.com/Azure/go-autorest/autorest"
 	azureapi "github.com/Azure/go-autorest/autorest/azure"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
@@ -45,10 +45,12 @@ func init() {
 		})
 }
 
+// RegistriesClient is a testable interface for the ACR client List operation.
 type RegistriesClient interface {
 	List() (containerregistry.RegistryListResult, error)
 }
 
+// NewACRProvider parses the specified configFile and returns a DockerConfigProvider
 func NewACRProvider(configFile *string) credentialprovider.DockerConfigProvider {
 	return &acrProvider{
 		file: configFile,
@@ -57,24 +59,16 @@ func NewACRProvider(configFile *string) credentialprovider.DockerConfigProvider 
 
 type acrProvider struct {
 	file           *string
-	config         azure.Config
-	environment    azureapi.Environment
+	config         *azure.Config
+	environment    *azureapi.Environment
 	registryClient RegistriesClient
 }
 
-func (a *acrProvider) loadConfig(contents []byte) error {
-	err := yaml.Unmarshal(contents, &a.config)
+func (a *acrProvider) loadConfig(rdr io.Reader) error {
+	var err error
+	a.config, a.environment, err = azure.ParseConfig(rdr)
 	if err != nil {
-		return err
-	}
-
-	if a.config.Cloud == "" {
-		a.environment = azureapi.PublicCloud
-	} else {
-		a.environment, err = azureapi.EnvironmentFromName(a.config.Cloud)
-		if err != nil {
-			return err
-		}
+		glog.Errorf("Failed to load azure credential file: %v", err)
 	}
 	return nil
 }
@@ -84,27 +78,21 @@ func (a *acrProvider) Enabled() bool {
 		glog.V(5).Infof("Azure config unspecified, disabling")
 		return false
 	}
-	contents, err := ioutil.ReadFile(*a.file)
+
+	f, err := os.Open(*a.file)
 	if err != nil {
-		glog.Errorf("Failed to load azure credential file: %v", err)
+		glog.Errorf("Failed to load config from file: %s", *a.file)
 		return false
 	}
-	if err := a.loadConfig(contents); err != nil {
-		glog.Errorf("Failed to parse azure credential file: %v", err)
+	defer f.Close()
+
+	err = a.loadConfig(f)
+	if err != nil {
+		glog.Errorf("Failed to load config from file: %s", *a.file)
 		return false
 	}
 
-	oauthConfig, err := a.environment.OAuthConfigForTenant(a.config.TenantID)
-	if err != nil {
-		glog.Errorf("Failed to get oauth config: %v", err)
-		return false
-	}
-
-	servicePrincipalToken, err := azureapi.NewServicePrincipalToken(
-		*oauthConfig,
-		a.config.AADClientID,
-		a.config.AADClientSecret,
-		a.environment.ServiceManagementEndpoint)
+	servicePrincipalToken, err := azure.GetServicePrincipalToken(a.config, a.environment)
 	if err != nil {
 		glog.Errorf("Failed to create service principal token: %v", err)
 		return false
@@ -112,7 +100,7 @@ func (a *acrProvider) Enabled() bool {
 
 	registryClient := containerregistry.NewRegistriesClient(a.config.SubscriptionID)
 	registryClient.BaseURI = a.environment.ResourceManagerEndpoint
-	registryClient.Authorizer = servicePrincipalToken
+	registryClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	a.registryClient = registryClient
 
 	return true

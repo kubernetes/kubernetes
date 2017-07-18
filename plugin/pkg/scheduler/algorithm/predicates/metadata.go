@@ -53,7 +53,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		matchingAntiAffinityTerms: matchingTerms,
 	}
 	for predicateName, precomputeFunc := range predicatePrecomputations {
-		glog.V(10).Info("Precompute: %v", predicateName)
+		glog.V(10).Infof("Precompute: %v", predicateName)
 		precomputeFunc(predicateMetadata)
 	}
 	return predicateMetadata

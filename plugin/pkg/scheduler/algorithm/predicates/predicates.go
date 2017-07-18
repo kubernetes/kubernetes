@@ -44,7 +44,7 @@ import (
 	"k8s.io/metrics/pkg/client/clientset_generated/clientset"
 )
 
-// predicatePrecomputations: Helper types/variables...
+// PredicateMetadataModifier: Helper types/variables...
 type PredicateMetadataModifier func(pm *predicateMetadata)
 
 var predicatePrecomputeRegisterLock sync.Mutex
@@ -56,7 +56,7 @@ func RegisterPredicatePrecomputation(predicateName string, precomp PredicateMeta
 	predicatePrecomputations[predicateName] = precomp
 }
 
-// Other types for predicate functions...
+// NodeInfo: Other types for predicate functions...
 type NodeInfo interface {
 	GetNodeInfo(nodeID string) (*v1.Node, error)
 }
@@ -377,7 +377,7 @@ type VolumeZoneChecker struct {
 	pvcInfo PersistentVolumeClaimInfo
 }
 
-// VolumeZonePredicate evaluates if a pod can fit due to the volumes it requests, given
+// NewVolumeZonePredicate evaluates if a pod can fit due to the volumes it requests, given
 // that some volumes may have zone scheduling constraints.  The requirement is that any
 // volume zone-labels must match the equivalent zone-labels on the node.  It is OK for
 // the node to have more zone-label constraints (for example, a hypothetical replicated
@@ -474,10 +474,10 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 	return true, nil, nil
 }
 
-// Returns a *schedulercache.Resource that covers the largest width in each
-// resource dimension. Because init-containers run sequentially, we collect the
-// max in each dimension iteratively. In contrast, we sum the resource vectors
-// for regular containers since they run simultaneously.
+// GetResourceRequest returns a *schedulercache.Resource that covers the largest
+// width in each resource dimension. Because init-containers run sequentially, we collect
+// the max in each dimension iteratively. In contrast, we sum the resource vectors for
+// regular containers since they run simultaneously.
 //
 // Example:
 //
@@ -499,30 +499,15 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta interface{}, nodeInfo *s
 //
 // Result: CPU: 3, Memory: 3G
 func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
-	result := schedulercache.Resource{}
+	result := &schedulercache.Resource{}
 	for _, container := range pod.Spec.Containers {
-		for rName, rQuantity := range container.Resources.Requests {
-			switch rName {
-			case v1.ResourceMemory:
-				result.Memory += rQuantity.Value()
-			case v1.ResourceCPU:
-				result.MilliCPU += rQuantity.MilliValue()
-			case v1.ResourceNvidiaGPU:
-				result.NvidiaGPU += rQuantity.Value()
-			case v1.ResourceStorageOverlay:
-				result.StorageOverlay += rQuantity.Value()
-			default:
-				if v1helper.IsOpaqueIntResourceName(rName) {
-					result.AddOpaque(rName, rQuantity.Value())
-				}
-			}
-		}
+		result.Add(container.Resources.Requests)
 	}
+
 	// Account for storage requested by emptydir volumes
 	// If the storage medium is memory, should exclude the size
 	for _, vol := range pod.Spec.Volumes {
 		if vol.EmptyDir != nil && vol.EmptyDir.Medium != v1.StorageMediumMemory {
-
 			result.StorageScratch += vol.EmptyDir.SizeLimit.Value()
 		}
 	}
@@ -557,7 +542,8 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 			}
 		}
 	}
-	return &result
+
+	return result
 }
 
 func podName(pod *v1.Pod) string {
@@ -893,11 +879,17 @@ func PodFitsHostPorts(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 
 // search two arrays and return true if they have at least one common element; return false otherwise
 func haveSame(a1, a2 []string) bool {
-	for _, val1 := range a1 {
-		for _, val2 := range a2 {
-			if val1 == val2 {
-				return true
-			}
+	m := map[string]int{}
+
+	for _, val := range a1 {
+		m[val] = 1
+	}
+	for _, val := range a2 {
+		m[val] = m[val] + 1
+	}
+	for _, val := range m {
+		if val > 1 {
+			return true
 		}
 	}
 	return false
@@ -1247,15 +1239,26 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod, node
 
 // PodToleratesNodeTaints checks if a pod tolertaions can tolerate the node taints
 func PodToleratesNodeTaints(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	return podToleratesNodeTaints(pod, nodeInfo, func(t *v1.Taint) bool {
+		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
+		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
+	})
+}
+
+// PodToleratesNodeNoExecuteTaints checks if a pod tolertaions can tolerate the node's NoExecute taints
+func PodToleratesNodeNoExecuteTaints(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	return podToleratesNodeTaints(pod, nodeInfo, func(t *v1.Taint) bool {
+		return t.Effect == v1.TaintEffectNoExecute
+	})
+}
+
+func podToleratesNodeTaints(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo, filter func(t *v1.Taint) bool) (bool, []algorithm.PredicateFailureReason, error) {
 	taints, err := nodeInfo.Taints()
 	if err != nil {
 		return false, nil, err
 	}
 
-	if v1helper.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
-		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
-		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
-	}) {
+	if v1helper.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, filter) {
 		return true, nil, nil
 	}
 	return false, []algorithm.PredicateFailureReason{ErrTaintsTolerationsNotMatch}, nil
@@ -1304,7 +1307,7 @@ type VolumeNodeChecker struct {
 	client  clientset.Interface
 }
 
-// VolumeNodeChecker evaluates if a pod can fit due to the volumes it requests, given
+// NewVolumeNodePredicate evaluates if a pod can fit due to the volumes it requests, given
 // that some volumes have node topology constraints, particularly when using Local PVs.
 // The requirement is that any pod that uses a PVC that is bound to a PV with topology constraints
 // must be scheduled to a node that satisfies the PV's topology labels.

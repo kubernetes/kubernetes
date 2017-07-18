@@ -31,7 +31,8 @@ type getCoreImageTest struct {
 }
 
 const (
-	testversion = "1"
+	testversion = "v10.1.2-alpha.1.100+0123456789abcdef+SOMETHING"
+	expected    = "v10.1.2-alpha.1.100_0123456789abcdef_SOMETHING"
 	gcrPrefix   = "gcr.io/google_containers"
 )
 
@@ -43,28 +44,28 @@ func TestGetCoreImage(t *testing.T) {
 		{getCoreImageTest{o: "override"}, "override"},
 		{getCoreImageTest{
 			i: KubeEtcdImage,
-			c: &kubeadmapi.MasterConfiguration{}},
+			c: &kubeadmapi.MasterConfiguration{ImageRepository: gcrPrefix}},
 			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "etcd", runtime.GOARCH, etcdVersion),
 		},
 		{getCoreImageTest{
 			i: KubeAPIServerImage,
-			c: &kubeadmapi.MasterConfiguration{KubernetesVersion: testversion}},
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, testversion),
+			c: &kubeadmapi.MasterConfiguration{ImageRepository: gcrPrefix, KubernetesVersion: testversion}},
+			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, expected),
 		},
 		{getCoreImageTest{
 			i: KubeControllerManagerImage,
-			c: &kubeadmapi.MasterConfiguration{KubernetesVersion: testversion}},
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, testversion),
+			c: &kubeadmapi.MasterConfiguration{ImageRepository: gcrPrefix, KubernetesVersion: testversion}},
+			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, expected),
 		},
 		{getCoreImageTest{
 			i: KubeSchedulerImage,
-			c: &kubeadmapi.MasterConfiguration{KubernetesVersion: testversion}},
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, testversion),
+			c: &kubeadmapi.MasterConfiguration{ImageRepository: gcrPrefix, KubernetesVersion: testversion}},
+			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, expected),
 		},
 		{getCoreImageTest{
 			i: KubeProxyImage,
-			c: &kubeadmapi.MasterConfiguration{KubernetesVersion: testversion}},
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, testversion),
+			c: &kubeadmapi.MasterConfiguration{ImageRepository: gcrPrefix, KubernetesVersion: testversion}},
+			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, expected),
 		},
 	}
 	for _, it := range imageTest {

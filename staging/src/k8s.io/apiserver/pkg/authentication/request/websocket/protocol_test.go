@@ -59,8 +59,8 @@ func TestAuthenticateRequestTokenInvalid(t *testing.T) {
 	if ok || user != nil {
 		t.Errorf("expected not authenticated user")
 	}
-	if err != invalidToken {
-		t.Errorf("expected invalidToken error, got %v", err)
+	if err != errInvalidToken {
+		t.Errorf("expected errInvalidToken error, got %v", err)
 	}
 }
 

@@ -715,8 +715,7 @@ func (cont *GCEIngressController) Init() {
 func (cont *GCEIngressController) CreateStaticIP(name string) string {
 	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
 	addr := &compute.Address{Name: name}
-	ip, err := gceCloud.ReserveGlobalAddress(addr)
-	if err != nil {
+	if err := gceCloud.ReserveGlobalAddress(addr); err != nil {
 		if delErr := gceCloud.DeleteGlobalAddress(name); delErr != nil {
 			if cont.isHTTPErrorCode(delErr, http.StatusNotFound) {
 				Logf("Static ip with name %v was not allocated, nothing to delete", name)
@@ -724,8 +723,14 @@ func (cont *GCEIngressController) CreateStaticIP(name string) string {
 				Logf("Failed to delete static ip %v: %v", name, delErr)
 			}
 		}
-		Failf("Failed to allocated static ip %v: %v", name, err)
+		Failf("Failed to allocate static ip %v: %v", name, err)
 	}
+
+	ip, err := gceCloud.GetGlobalAddress(name)
+	if err != nil {
+		Failf("Failed to get newly created static ip %v: %v", name, err)
+	}
+
 	cont.staticIPName = ip.Name
 	Logf("Reserved static ip %v: %v", cont.staticIPName, ip.Address)
 	return ip.Address
@@ -882,9 +887,12 @@ func (j *IngressTestJig) GetRootCA(secretName string) (rootCA []byte) {
 	return
 }
 
-// DeleteIngress deletes the ingress resource
-func (j *IngressTestJig) DeleteIngress() {
-	ExpectNoError(j.Client.Extensions().Ingresses(j.Ingress.Namespace).Delete(j.Ingress.Name, nil))
+// TryDeleteIngress attempts to delete the ingress resource and logs errors if they occur.
+func (j *IngressTestJig) TryDeleteIngress() {
+	err := j.Client.Extensions().Ingresses(j.Ingress.Namespace).Delete(j.Ingress.Name, nil)
+	if err != nil {
+		Logf("Error while deleting the ingress %v/%v: %v", j.Ingress.Namespace, j.Ingress.Name, err)
+	}
 }
 
 // WaitForIngress waits till the ingress acquires an IP, then waits for its
@@ -973,13 +981,13 @@ func (j *IngressTestJig) GetIngressNodePorts() []string {
 }
 
 // ConstructFirewallForIngress returns the expected GCE firewall rule for the ingress resource
-func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressController, nodeTag string) *compute.Firewall {
+func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressController, nodeTags []string) *compute.Firewall {
 	nodePorts := j.GetIngressNodePorts()
 
 	fw := compute.Firewall{}
 	fw.Name = gceController.GetFirewallRuleName()
 	fw.SourceRanges = gcecloud.LoadBalancerSrcRanges()
-	fw.TargetTags = []string{nodeTag}
+	fw.TargetTags = nodeTags
 	fw.Allowed = []*compute.FirewallAllowed{
 		{
 			IPProtocol: "tcp",

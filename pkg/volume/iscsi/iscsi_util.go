@@ -114,7 +114,7 @@ func waitForPathToExistInternal(devicePath *string, maxRetries int, deviceTransp
 			if err == nil {
 				return true
 			}
-			if err != nil && !os.IsNotExist(err) {
+			if !os.IsNotExist(err) {
 				return false
 			}
 			if i == maxRetries-1 {

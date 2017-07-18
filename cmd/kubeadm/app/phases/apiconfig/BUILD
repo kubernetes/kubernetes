@@ -45,7 +45,6 @@ go_library(
         "//pkg/apis/rbac/v1beta1:go_default_library",
         "//pkg/bootstrap/api:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
-        "//pkg/util/node:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",

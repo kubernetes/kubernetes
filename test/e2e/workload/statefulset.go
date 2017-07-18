@@ -50,7 +50,7 @@ const (
 
 // GCE Quota requirements: 3 pds, one per stateful pod manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
-var _ = framework.KubeDescribe("StatefulSet", func() {
+var _ = SIGDescribe("StatefulSet", func() {
 	f := framework.NewDefaultFramework("statefulset")
 	var ns string
 	var c clientset.Interface

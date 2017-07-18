@@ -42,7 +42,7 @@ const (
 	cronJobTimeout = 5 * time.Minute
 )
 
-var _ = framework.KubeDescribe("CronJob", func() {
+var _ = SIGDescribe("CronJob", func() {
 	f := framework.NewDefaultFramework("cronjob")
 
 	sleepCommand := []string{"sleep", "300"}

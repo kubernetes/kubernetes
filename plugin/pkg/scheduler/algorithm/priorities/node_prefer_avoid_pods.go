@@ -41,13 +41,13 @@ func CalculateNodePreferAvoidPodsPriorityMap(pod *v1.Pod, meta interface{}, node
 		}
 	}
 	if controllerRef == nil {
-		return schedulerapi.HostPriority{Host: node.Name, Score: 10}, nil
+		return schedulerapi.HostPriority{Host: node.Name, Score: schedulerapi.MaxPriority}, nil
 	}
 
 	avoids, err := v1helper.GetAvoidPodsFromNodeAnnotations(node.Annotations)
 	if err != nil {
 		// If we cannot get annotation, assume it's schedulable there.
-		return schedulerapi.HostPriority{Host: node.Name, Score: 10}, nil
+		return schedulerapi.HostPriority{Host: node.Name, Score: schedulerapi.MaxPriority}, nil
 	}
 	for i := range avoids.PreferAvoidPods {
 		avoid := &avoids.PreferAvoidPods[i]
@@ -55,5 +55,5 @@ func CalculateNodePreferAvoidPodsPriorityMap(pod *v1.Pod, meta interface{}, node
 			return schedulerapi.HostPriority{Host: node.Name, Score: 0}, nil
 		}
 	}
-	return schedulerapi.HostPriority{Host: node.Name, Score: 10}, nil
+	return schedulerapi.HostPriority{Host: node.Name, Score: schedulerapi.MaxPriority}, nil
 }

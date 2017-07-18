@@ -808,7 +808,8 @@ var validDownwardAPIFieldPathExpressions = sets.NewString(
 	"metadata.name",
 	"metadata.namespace",
 	"metadata.labels",
-	"metadata.annotations")
+	"metadata.annotations",
+	"metadata.uid")
 
 func validateDownwardAPIVolumeFile(file *api.DownwardAPIVolumeFile, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1556,7 +1557,7 @@ func ValidateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP")
+var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP")
 var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "requests.cpu", "requests.memory")
 
 func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList {
@@ -1758,6 +1759,9 @@ func ValidateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, fldPath
 		}
 		if mountpoints.Has(mnt.MountPath) {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be unique"))
+		}
+		if !path.IsAbs(mnt.MountPath) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be an absolute path"))
 		}
 		mountpoints.Insert(mnt.MountPath)
 		if len(mnt.SubPath) > 0 {
@@ -2909,6 +2913,22 @@ func ValidateService(service *api.Service) field.ErrorList {
 		nodePorts[key] = true
 	}
 
+	// Check for duplicate TargetPort
+	portsPath = specPath.Child("ports")
+	targetPorts := make(map[api.ServicePort]bool)
+	for i, port := range service.Spec.Ports {
+		if (port.TargetPort.Type == intstr.Int && port.TargetPort.IntVal == 0) || (port.TargetPort.Type == intstr.String && port.TargetPort.StrVal == "") {
+			continue
+		}
+		portPath := portsPath.Index(i)
+		key := api.ServicePort{Protocol: port.Protocol, TargetPort: port.TargetPort}
+		_, found := targetPorts[key]
+		if found {
+			allErrs = append(allErrs, field.Duplicate(portPath.Child("targetPort"), port.TargetPort))
+		}
+		targetPorts[key] = true
+	}
+
 	// Validate SourceRange field and annotation
 	_, ok := service.Annotations[api.AnnotationLoadBalancerSourceRangesKey]
 	if len(service.Spec.LoadBalancerSourceRanges) > 0 || ok {
@@ -4012,12 +4032,10 @@ func validateEndpointSubsets(subsets []api.EndpointSubset, oldSubsets []api.Endp
 		ss := &subsets[i]
 		idxPath := fldPath.Index(i)
 
+		// EndpointSubsets must include endpoint address. For headless service, we allow its endpoints not to have ports.
 		if len(ss.Addresses) == 0 && len(ss.NotReadyAddresses) == 0 {
 			//TODO: consider adding a RequiredOneOf() error for this and similar cases
 			allErrs = append(allErrs, field.Required(idxPath, "must specify `addresses` or `notReadyAddresses`"))
-		}
-		if len(ss.Ports) == 0 {
-			allErrs = append(allErrs, field.Required(idxPath.Child("ports"), ""))
 		}
 		for addr := range ss.Addresses {
 			allErrs = append(allErrs, validateEndpointAddress(&ss.Addresses[addr], idxPath.Child("addresses").Index(addr), ipToNodeName)...)

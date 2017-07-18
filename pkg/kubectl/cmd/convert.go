@@ -122,7 +122,7 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 		return err
 	}
 	if !api.Registry.IsEnabledVersion(o.outputVersion) {
-		cmdutil.UsageError(cmd, "'%s' is not a registered version.", o.outputVersion)
+		cmdutil.UsageErrorf(cmd, "'%s' is not a registered version.", o.outputVersion)
 	}
 
 	// build the builder

@@ -71,8 +71,6 @@ filegroup(
         "//pkg/registry/extensions/podsecuritypolicy:all-srcs",
         "//pkg/registry/extensions/replicaset:all-srcs",
         "//pkg/registry/extensions/rest:all-srcs",
-        "//pkg/registry/extensions/thirdpartyresource:all-srcs",
-        "//pkg/registry/extensions/thirdpartyresourcedata:all-srcs",
         "//pkg/registry/networking/networkpolicy:all-srcs",
         "//pkg/registry/networking/rest:all-srcs",
         "//pkg/registry/policy/poddisruptionbudget:all-srcs",

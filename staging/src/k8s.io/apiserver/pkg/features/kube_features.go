@@ -27,14 +27,14 @@ const (
 	// // alpha: v1.4
 	// MyFeature() bool
 
-	// owner: timstclair
+	// owner: tallclair
 	// alpha: v1.5
 	//
 	// StreamingProxyRedirects controls whether the apiserver should intercept (and follow)
 	// redirects from the backend (Kubelet) for streaming requests (exec/attach/port-forward).
 	StreamingProxyRedirects utilfeature.Feature = "StreamingProxyRedirects"
 
-	// owner: timstclair
+	// owner: tallclair
 	// alpha: v1.7
 	//
 	// AdvancedAuditing enables a much more general API auditing pipeline, which includes support for

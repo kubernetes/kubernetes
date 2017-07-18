@@ -95,8 +95,8 @@ func evalSymlinksInScope(path, root string) (string, error) {
 		// root gets prepended and we Clean again (to remove any trailing slash
 		// if the first Clean gave us just "/")
 		cleanP := filepath.Clean(string(filepath.Separator) + b.String() + p)
-		if cleanP == string(filepath.Separator) {
-			// never Lstat "/" itself
+		if isDriveOrRoot(cleanP) {
+			// never Lstat "/" itself, or drive letters on Windows
 			b.Reset()
 			continue
 		}
@@ -113,7 +113,8 @@ func evalSymlinksInScope(path, root string) (string, error) {
 			return "", err
 		}
 		if fi.Mode()&os.ModeSymlink == 0 {
-			b.WriteString(p + string(filepath.Separator))
+			b.WriteString(p)
+			b.WriteRune(filepath.Separator)
 			continue
 		}
 

@@ -58,7 +58,7 @@ func RetrieveValidatedClusterInfo(discoveryToken string, tokenAPIServers []strin
 		fmt.Printf("[discovery] Created cluster-info discovery client, requesting info from %q\n", bootstrapConfig.Clusters[clusterName].Server)
 
 		var clusterinfo *v1.ConfigMap
-		wait.PollInfinite(constants.DiscoveryRetryInterval, func() (bool, error) {
+		wait.PollImmediateInfinite(constants.DiscoveryRetryInterval, func() (bool, error) {
 			var err error
 			clusterinfo, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 			if err != nil {

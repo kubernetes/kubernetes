@@ -102,7 +102,7 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 	}).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusConflict) {
-			glog.Info("Route %v already exists.")
+			glog.Infof("Route %v already exists.", routeName)
 			return nil
 		} else {
 			return mc.Observe(err)

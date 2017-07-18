@@ -20,12 +20,17 @@ go_library(
     name = "go_default_library",
     srcs = [
         "backoff_utils.go",
+        "testutil.go",
         "utils.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/install:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )

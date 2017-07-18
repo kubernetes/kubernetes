@@ -608,9 +608,10 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 	clusterObj, clusterErr := api.Scheme.DeepCopy(cluster) // Make a clone so that we don't clobber our input param
 	cluster, ok := clusterObj.(*federationapi.Cluster)
 	if clusterErr != nil || !ok {
-		glog.Errorf("Internal error: Failed clone cluster resource while attempting to add master ingress UID annotation (%q = %q) from master cluster %q to cluster %q, will try again later: %v", uidAnnotationKey, masterUID, masterCluster.Name, cluster.Name, err)
-		return "", err
+		glog.Errorf("Internal error: Failed clone cluster resource while attempting to add master ingress UID annotation (%q = %q) from master cluster %q to cluster %q, will try again later: %v", uidAnnotationKey, masterUID, masterCluster.Name, cluster.Name, clusterErr)
+		return "", clusterErr
 	}
+
 	if err == nil {
 		if masterCluster.Name != cluster.Name { // We're not the master, need to get in sync
 			if cluster.ObjectMeta.Annotations == nil {
@@ -629,8 +630,9 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 			return cluster.ObjectMeta.Annotations[uidAnnotationKey], nil
 		}
 	} else {
-		glog.V(2).Infof("No master cluster found to source an ingress UID from for cluster %q.  Attempting to elect new master cluster %q with ingress UID %q = %q", cluster.Name, cluster.Name, uidAnnotationKey, fallbackUID)
+		glog.V(2).Infof("No master cluster found to source an ingress UID from for cluster %q.", cluster.Name)
 		if fallbackUID != "" {
+			glog.V(2).Infof("Attempting to elect new master cluster %q with ingress UID %q = %q", cluster.Name, uidAnnotationKey, fallbackUID)
 			if cluster.ObjectMeta.Annotations == nil {
 				cluster.ObjectMeta.Annotations = map[string]string{}
 			}
@@ -643,7 +645,7 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 				return fallbackUID, nil
 			}
 		} else {
-			glog.Errorf("No master cluster exists, and fallbackUID for cluster %q is invalid (%q).  This probably means that no clusters have an ingress controller configmap with key %q.  Federated Ingress currently supports clusters running Google Loadbalancer Controller (\"GLBC\")", cluster.Name, fallbackUID, uidKey)
+			glog.Errorf("No master cluster exists, and fallbackUID for cluster %q is nil.  This probably means that no clusters have an ingress controller configmap with key %q.  Federated Ingress currently supports clusters running Google Loadbalancer Controller (\"GLBC\")", cluster.Name, uidKey)
 			return "", err
 		}
 	}

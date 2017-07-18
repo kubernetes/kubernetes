@@ -79,7 +79,7 @@ func DeleteCinderVolume(name string) error {
 }
 
 // These tests need privileged containers, which are disabled by default.
-var _ = framework.KubeDescribe("Volumes [Volume]", func() {
+var _ = SIGDescribe("Volumes", func() {
 	f := framework.NewDefaultFramework("volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
@@ -98,7 +98,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// NFS
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("NFS", func() {
+	SIGDescribe("NFS", func() {
 		It("should be mountable", func() {
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
@@ -138,7 +138,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("GlusterFS [Feature:Volumes]", func() {
+	SIGDescribe("GlusterFS [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			//TODO (copejon) GFS is not supported on debian image.
 			framework.SkipUnlessNodeOSDistroIs("gci")
@@ -226,7 +226,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// are installed on all nodes!
 	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=iSCSI"
 
-	framework.KubeDescribe("iSCSI [Feature:Volumes]", func() {
+	SIGDescribe("iSCSI [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
@@ -273,7 +273,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// Ceph RBD
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("Ceph RBD [Feature:Volumes]", func() {
+	SIGDescribe("Ceph RBD [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
@@ -351,7 +351,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// Ceph
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("CephFS [Feature:Volumes]", func() {
+	SIGDescribe("CephFS [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
@@ -429,7 +429,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// and that the usual OpenStack authentication env. variables are set
 	// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
 
-	framework.KubeDescribe("Cinder [Feature:Volumes]", func() {
+	SIGDescribe("Cinder [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("openstack")
 			config := framework.VolumeTestConfig{
@@ -505,7 +505,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// GCE PD
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("PD", func() {
+	SIGDescribe("PD", func() {
 		// Flaky issue: #43977
 		It("should be mountable [Flaky]", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
@@ -559,7 +559,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// ConfigMap
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("ConfigMap", func() {
+	SIGDescribe("ConfigMap", func() {
 		It("should be mountable", func() {
 			config := framework.VolumeTestConfig{
 				Namespace: namespace.Name,
@@ -637,7 +637,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// vSphere
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("vsphere [Feature:Volumes]", func() {
+	SIGDescribe("vsphere [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("vsphere")
 			var (
@@ -689,7 +689,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	////////////////////////////////////////////////////////////////////////
 	// Azure Disk
 	////////////////////////////////////////////////////////////////////////
-	framework.KubeDescribe("Azure Disk [Feature:Volumes]", func() {
+	SIGDescribe("Azure Disk [Feature:Volumes]", func() {
 		It("should be mountable [Slow]", func() {
 			framework.SkipUnlessProviderIs("azure")
 			config := framework.VolumeTestConfig{

@@ -11,6 +11,10 @@ go_library(
     name = "go_default_library",
     srcs = ["windows.go"],
     tags = ["automanaged"],
+    deps = [
+        "//vendor/github.com/Azure/go-ansiterm:go_default_library",
+        "//vendor/github.com/Sirupsen/logrus:go_default_library",
+    ],
 )
 
 filegroup(

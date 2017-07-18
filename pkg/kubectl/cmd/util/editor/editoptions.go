@@ -44,8 +44,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/util/crlf"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/crlf"
 )
 
 // EditOptions contains all the options for running edit cli command.
@@ -53,6 +53,7 @@ type EditOptions struct {
 	resource.FilenameOptions
 
 	Output             string
+	OutputPatch        bool
 	WindowsLineEndings bool
 
 	cmdutil.ValidateOptions
@@ -95,6 +96,10 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 		}
 	}
 	o.editPrinterOptions = getPrinter(o.Output)
+
+	if o.OutputPatch && o.EditMode != NormalEditMode {
+		return fmt.Errorf("the edit mode doesn't support output the patch")
+	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -575,6 +580,10 @@ func (o *EditOptions) visitToPatch(
 				}
 				return err
 			}
+		}
+
+		if o.OutputPatch {
+			fmt.Fprintf(o.Out, "Patch: %s\n", string(patch))
 		}
 
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch)

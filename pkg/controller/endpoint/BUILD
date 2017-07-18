@@ -21,7 +21,6 @@ go_library(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/core/v1:go_default_library",
-        "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
@@ -34,6 +33,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
         "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
     ],
 )

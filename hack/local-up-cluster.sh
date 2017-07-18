@@ -98,6 +98,9 @@ ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
 START_MODE=${START_MODE:-"all"}
 
+# A list of controllers to enable
+KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
+
 # sanity check for OpenStack provider
 if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     if [ "${CLOUD_CONFIG}" == "" ]; then
@@ -574,6 +577,7 @@ function start_controller_manager {
     CTLRMGR_LOG=${LOG_DIR}/kube-controller-manager.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" controller-manager \
       --v=${LOG_LEVEL} \
+      --vmodule="${LOG_SPEC}" \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
       --cluster-signing-cert-file="${CLUSTER_SIGNING_CERT_FILE}" \
@@ -586,6 +590,7 @@ function start_controller_manager {
       --cloud-config="${CLOUD_CONFIG}" \
       --kubeconfig "$CERT_DIR"/controller.kubeconfig \
       --use-service-account-credentials \
+      --controllers="${KUBE_CONTROLLERS}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
@@ -649,6 +654,7 @@ function start_kubelet {
 
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
         --v=${LOG_LEVEL} \
+        --vmodule="${LOG_SPEC}" \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
         --rkt-path="${RKT_PATH}" \

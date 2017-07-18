@@ -17,7 +17,7 @@ limitations under the License.
 package server
 
 import (
-	"strings"
+	"net"
 	"testing"
 )
 
@@ -37,8 +37,8 @@ func TestLoopbackHostPort(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.HasPrefix(host, "127.") {
-		t.Fatalf("expected host to start with 127., got %q", host)
+	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
+		t.Fatalf("expected host to be loopback, got %q", host)
 	}
 	if port != "443" {
 		t.Fatalf("expected 443 as port, got %q", port)

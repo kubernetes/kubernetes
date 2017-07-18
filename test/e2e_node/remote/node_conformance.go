@@ -63,13 +63,17 @@ const (
 // timestamp is used as an unique id of current test.
 var timestamp = getTimestamp()
 
-// getConformanceImageRepo returns conformance image full repo name.
-func getConformanceImageRepo() string {
-	return fmt.Sprintf("%s/node-test-%s:%s", conformanceRegistry, conformanceArch, timestamp)
+// getConformanceTestImageName returns name of the conformance test image given the system spec name.
+func getConformanceTestImageName(systemSpecName string) string {
+	if systemSpecName == "" {
+		return fmt.Sprintf("%s/node-test-%s:%s", conformanceRegistry, conformanceArch, timestamp)
+	} else {
+		return fmt.Sprintf("%s/node-test-%s-%s:%s", conformanceRegistry, systemSpecName, conformanceArch, timestamp)
+	}
 }
 
 // buildConformanceTest builds node conformance test image tarball into binDir.
-func buildConformanceTest(binDir string) error {
+func buildConformanceTest(binDir, systemSpecName string) error {
 	// Get node conformance directory.
 	conformancePath, err := getConformanceDirectory()
 	if err != nil {
@@ -79,13 +83,14 @@ func buildConformanceTest(binDir string) error {
 	cmd := exec.Command("make", "-C", conformancePath, "BIN_DIR="+binDir,
 		"REGISTRY="+conformanceRegistry,
 		"ARCH="+conformanceArch,
-		"VERSION="+timestamp)
+		"VERSION="+timestamp,
+		"SYSTEM_SPEC_NAME="+systemSpecName)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to build node conformance docker image: command - %q, error - %v, output - %q",
 			commandToString(cmd), err, output)
 	}
 	// Save docker image into tar file.
-	cmd = exec.Command("docker", "save", "-o", filepath.Join(binDir, conformanceTarfile), getConformanceImageRepo())
+	cmd = exec.Command("docker", "save", "-o", filepath.Join(binDir, conformanceTarfile), getConformanceTestImageName(systemSpecName))
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to save node conformance docker image into tar file: command - %q, error - %v, output - %q",
 			commandToString(cmd), err, output)
@@ -94,7 +99,7 @@ func buildConformanceTest(binDir string) error {
 }
 
 // SetupTestPackage sets up the test package with binaries k8s required for node conformance test
-func (c *ConformanceRemote) SetupTestPackage(tardir string) error {
+func (c *ConformanceRemote) SetupTestPackage(tardir, systemSpecName string) error {
 	// Build the executables
 	if err := builder.BuildGo(); err != nil {
 		return fmt.Errorf("failed to build the depedencies: %v", err)
@@ -107,8 +112,8 @@ func (c *ConformanceRemote) SetupTestPackage(tardir string) error {
 	}
 
 	// Build node conformance tarball.
-	if err := buildConformanceTest(buildOutputDir); err != nil {
-		return fmt.Errorf("failed to build node conformance test %v", err)
+	if err := buildConformanceTest(buildOutputDir, systemSpecName); err != nil {
+		return fmt.Errorf("failed to build node conformance test: %v", err)
 	}
 
 	// Copy files
@@ -253,7 +258,7 @@ func stopKubelet(host, workspace string) error {
 }
 
 // RunTest runs test on the node.
-func (c *ConformanceRemote) RunTest(host, workspace, results, junitFilePrefix, testArgs, _ string, timeout time.Duration) (string, error) {
+func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, _, systemSpecName string, timeout time.Duration) (string, error) {
 	// Install the cni plugins and add a basic CNI configuration.
 	if err := setupCNI(host, workspace); err != nil {
 		return "", err
@@ -288,7 +293,7 @@ func (c *ConformanceRemote) RunTest(host, workspace, results, junitFilePrefix, t
 	glog.V(2).Infof("Starting tests on %q", host)
 	podManifestPath := getPodManifestPath(workspace)
 	cmd := fmt.Sprintf("'timeout -k 30s %fs docker run --rm --privileged=true --net=host -v /:/rootfs -v %s:%s -v %s:/var/result -e TEST_ARGS=--report-prefix=%s %s'",
-		timeout.Seconds(), podManifestPath, podManifestPath, results, junitFilePrefix, getConformanceImageRepo())
+		timeout.Seconds(), podManifestPath, podManifestPath, results, junitFilePrefix, getConformanceTestImageName(systemSpecName))
 	testOutput, err := SSH(host, "sh", "-c", cmd)
 	if err != nil {
 		return testOutput, err

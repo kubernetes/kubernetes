@@ -124,6 +124,16 @@ func SetInstanceTags(cloudConfig CloudConfig, instanceName, zone string, tags []
 	return resTags.Items
 }
 
+// GetNodeTags gets k8s node tag from one of the nodes
+func GetNodeTags(c clientset.Interface, cloudConfig CloudConfig) []string {
+	nodes := GetReadySchedulableNodesOrDie(c)
+	if len(nodes.Items) == 0 {
+		Logf("GetNodeTags: Found 0 node.")
+		return []string{}
+	}
+	return GetInstanceTags(cloudConfig, nodes.Items[0].Name).Items
+}
+
 // GetInstancePrefix returns the INSTANCE_PREFIX env we set for e2e cluster.
 // From cluster/gce/config-test.sh, master name is set up using below format:
 // MASTER_NAME="${INSTANCE_PREFIX}-master"
@@ -141,21 +151,12 @@ func GetClusterName(instancePrefix string) string {
 	return instancePrefix
 }
 
-// GetClusterIpRange returns the CLUSTER_IP_RANGE env we set for e2e cluster.
-//
-// Warning: this MUST be consistent with the CLUSTER_IP_RANGE set in
-// gce/config-test.sh.
-func GetClusterIpRange() string {
-	return "10.100.0.0/14"
-}
-
 // GetE2eFirewalls returns all firewall rules we create for an e2e cluster.
 // From cluster/gce/util.sh, all firewall rules should be consistent with the ones created by startup scripts.
-func GetE2eFirewalls(masterName, masterTag, nodeTag, network string) []*compute.Firewall {
+func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIpRange string) []*compute.Firewall {
 	instancePrefix, err := GetInstancePrefix(masterName)
 	Expect(err).NotTo(HaveOccurred())
 	clusterName := GetClusterName(instancePrefix)
-	clusterIpRange := GetClusterIpRange()
 
 	fws := []*compute.Firewall{}
 	fws = append(fws, &compute.Firewall{

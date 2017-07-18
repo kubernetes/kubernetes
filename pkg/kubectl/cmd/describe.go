@@ -110,9 +110,9 @@ func RunDescribe(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, a
 	if allNamespaces {
 		enforceNamespace = false
 	}
-	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
+	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
 		fmt.Fprint(cmdErr, "You must specify the type of resource to describe. ", validResources)
-		return cmdutil.UsageError(cmd, "Required resource not specified.")
+		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 
 	builder, err := f.NewUnstructuredBuilder(true)

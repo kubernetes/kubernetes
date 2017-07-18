@@ -45,7 +45,7 @@ var _ = framework.KubeDescribe("Federated types [Feature:Federation][Experimenta
 				if clusterClients == nil {
 					clusterClients = f.GetClusterClients()
 				}
-				adapter := fedType.AdapterFactory(f.FederationClientset)
+				adapter := fedType.AdapterFactory(f.FederationClientset, f.FederationConfig)
 				crudTester := fedframework.NewFederatedTypeCRUDTester(adapter, clusterClients)
 				obj := adapter.NewTestObject(f.FederationNamespace.Name)
 				crudTester.CheckLifecycle(obj)

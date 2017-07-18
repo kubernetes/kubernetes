@@ -9,9 +9,11 @@ load(
 
 go_test(
     name = "go_default_test",
+    size = "large",
     srcs = [
         "api_test.go",
         "crud_test.go",
+        "main_test.go",
     ],
     tags = [
         "automanaged",
@@ -22,6 +24,7 @@ go_test(
         "//federation/pkg/federatedtypes:go_default_library",
         "//federation/pkg/federatedtypes/crudtester:go_default_library",
         "//test/integration/federation/framework:go_default_library",
+        "//test/integration/framework:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",

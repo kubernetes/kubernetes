@@ -224,8 +224,19 @@ function dump_nodes() {
     return
   fi
 
+  nodes_selected_for_logs=()
+  if [[ -n "${LOGDUMP_ONLY_N_RANDOM_NODES:-}" ]]; then
+    # We randomly choose 'LOGDUMP_ONLY_N_RANDOM_NODES' many nodes for fetching logs.
+    for index in `shuf -i 0-$(( ${#node_names[*]} - 1 )) -n ${LOGDUMP_ONLY_N_RANDOM_NODES}`
+    do
+      nodes_selected_for_logs+=("${node_names[$index]}")
+    done
+  else
+    nodes_selected_for_logs=( "${node_names[@]}" )
+  fi
+
   proc=${max_scp_processes}
-  for node_name in "${node_names[@]}"; do
+  for node_name in "${nodes_selected_for_logs[@]}"; do
     node_dir="${report_dir}/${node_name}"
     mkdir -p "${node_dir}"
     # Save logs in the background. This speeds up things when there are

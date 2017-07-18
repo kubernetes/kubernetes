@@ -160,7 +160,7 @@ var _ = framework.KubeDescribe("Firewall rule", func() {
 		}
 
 		By("Checking if e2e firewall rules are correct")
-		for _, expFw := range framework.GetE2eFirewalls(cloudConfig.MasterName, cloudConfig.MasterTag, cloudConfig.NodeTag, cloudConfig.Network) {
+		for _, expFw := range framework.GetE2eFirewalls(cloudConfig.MasterName, cloudConfig.MasterTag, cloudConfig.NodeTag, cloudConfig.Network, cloudConfig.ClusterIPRange) {
 			fw, err := gceCloud.GetFirewall(expFw.Name)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(framework.VerifyFirewallRule(fw, expFw, cloudConfig.Network, false)).NotTo(HaveOccurred())

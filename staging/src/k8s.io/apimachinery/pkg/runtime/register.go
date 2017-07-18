@@ -28,7 +28,7 @@ func (obj *TypeMeta) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 
-func (obj *Unknown) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
+func (obj *TypeMeta) GetObjectKind() schema.ObjectKind { return obj }
 
 // GetObjectKind implements Object for VersionedObjects, returning an empty ObjectKind
 // interface if no objects are provided, or the ObjectKind interface of the object in the

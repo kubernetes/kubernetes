@@ -546,15 +546,6 @@ func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string) (*loa
 	return loadbalancer, nil
 }
 
-func stringInArray(x string, list []string) bool {
-	for _, y := range list {
-		if y == x {
-			return true
-		}
-	}
-	return false
-}
-
 func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	loadbalancer, err := getLoadbalancerByName(lbaas.network, loadBalancerName)
@@ -620,7 +611,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		return nil, fmt.Errorf("Source range restrictions are not supported for openstack load balancers without managing security groups")
 	}
 
-	affinity := v1.ServiceAffinityNone
+	affinity := apiService.Spec.SessionAffinity
 	var persistence *v2pools.SessionPersistence
 	switch affinity {
 	case v1.ServiceAffinityNone:
@@ -763,9 +754,13 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			}
 			waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
 			monitorID = monitor.ID
+		} else if lbaas.opts.CreateMonitor == false {
+			glog.V(4).Infof("Do not create monitor for pool %s when create-monitor is false", pool.ID)
 		}
 
-		glog.V(4).Infof("Monitor for pool %s: %s", pool.ID, monitorID)
+		if monitorID != "" {
+			glog.V(4).Infof("Monitor for pool %s: %s", pool.ID, monitorID)
+		}
 	}
 
 	// All remaining listeners are obsolete, delete
@@ -1106,7 +1101,10 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 			return fmt.Errorf("Error getting pool for listener %s: %v", listener.ID, err)
 		}
 		poolIDs = append(poolIDs, pool.ID)
-		monitorIDs = append(monitorIDs, pool.MonitorID)
+		// If create-monitor of cloud-config is false, pool has not monitor.
+		if pool.MonitorID != "" {
+			monitorIDs = append(monitorIDs, pool.MonitorID)
+		}
 	}
 
 	// get all members associated with each poolIDs
@@ -1287,7 +1285,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 		LBMethod: lbmethod,
 	}).Extract()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error creating pool for openstack load balancer %s: %v", name, err)
 	}
 
 	for _, node := range nodes {
@@ -1302,8 +1300,8 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 			Address:      addr,
 		}).Extract()
 		if err != nil {
-			pools.Delete(lb.network, pool.ID)
-			return nil, err
+			return nil, fmt.Errorf("Error creating member for the pool(%s) of openstack load balancer %s: %v",
+				pool.ID, name, err)
 		}
 	}
 
@@ -1316,15 +1314,13 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 			MaxRetries: int(lb.opts.MonitorMaxRetries),
 		}).Extract()
 		if err != nil {
-			pools.Delete(lb.network, pool.ID)
-			return nil, err
+			return nil, fmt.Errorf("Error creating monitor for openstack load balancer %s: %v", name, err)
 		}
 
 		_, err = pools.AssociateMonitor(lb.network, pool.ID, mon.ID).Extract()
 		if err != nil {
-			monitors.Delete(lb.network, mon.ID)
-			pools.Delete(lb.network, pool.ID)
-			return nil, err
+			return nil, fmt.Errorf("Error associating monitor(%s) with pool(%s) for"+
+				"openstack load balancer %s: %v", mon.ID, pool.ID, name, err)
 		}
 	}
 
@@ -1345,11 +1341,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 
 	vip, err := vips.Create(lb.network, createOpts).Extract()
 	if err != nil {
-		if mon != nil {
-			monitors.Delete(lb.network, mon.ID)
-		}
-		pools.Delete(lb.network, pool.ID)
-		return nil, err
+		return nil, fmt.Errorf("Error creating vip for openstack load balancer %s: %v", name, err)
 	}
 
 	status := &v1.LoadBalancerStatus{}
@@ -1363,7 +1355,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 		}
 		floatIP, err := floatingips.Create(lb.network, floatIPOpts).Extract()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Error creating floatingip for openstack load balancer %s: %v", name, err)
 		}
 
 		status.Ingress = append(status.Ingress, v1.LoadBalancerIngress{IP: floatIP.FloatingIP})

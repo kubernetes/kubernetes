@@ -92,6 +92,44 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	}
 }
 
+func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
+
+	node, pod, pv, claim := createObjects()
+	claim.Status = v1.PersistentVolumeClaimStatus{
+		Phase: v1.ClaimPending,
+	}
+
+	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+
+	manager := newTestVolumeManager(tmpDir, podManager, kubeClient)
+
+	stopCh := runVolumeManager(manager)
+	defer close(stopCh)
+
+	podManager.SetPods([]*v1.Pod{pod})
+
+	// Fake node status update
+	go simulateVolumeInUseUpdate(
+		v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
+		stopCh,
+		manager)
+
+	// delayed claim binding
+	go delayClaimBecomesBound(kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
+
+	err = manager.WaitForAttachAndMount(pod)
+	if err != nil {
+		t.Errorf("Expected success: %v", err)
+	}
+
+}
+
 func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	if err != nil {
@@ -277,6 +315,20 @@ func simulateVolumeInUseUpdate(volumeName v1.UniqueVolumeName, stopCh <-chan str
 			return
 		}
 	}
+}
+
+func delayClaimBecomesBound(
+	kubeClient clientset.Interface,
+	namespace, claimName string,
+) {
+	time.Sleep(500 * time.Millisecond)
+	volumeClaim, _ :=
+		kubeClient.Core().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
+	volumeClaim.Status = v1.PersistentVolumeClaimStatus{
+		Phase: v1.ClaimBound,
+	}
+	kubeClient.Core().PersistentVolumeClaims(namespace).Update(volumeClaim)
+	return
 }
 
 func runVolumeManager(manager VolumeManager) chan struct{} {

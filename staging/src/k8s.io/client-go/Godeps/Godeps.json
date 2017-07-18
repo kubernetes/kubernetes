@@ -16,15 +16,19 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
+			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
+		},
+		{
+			"ImportPath": "github.com/Azure/go-autorest/autorest/adal",
+			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
+			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Rev": "d7c034a8af24eda120dd6460bfcd6d9ed14e43ca"
+			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
 		},
 		{
 			"ImportPath": "github.com/PuerkitoBio/purell",
@@ -68,7 +72,7 @@
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
-			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
+			"Rev": "782f4967f2dc4564575ca782fe2d04090b5faca8"
 		},
 		{
 			"ImportPath": "github.com/dgrijalva/jwt-go",
@@ -99,20 +103,12 @@
 			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 		},
 		{
-			"ImportPath": "github.com/go-openapi/analysis",
-			"Rev": "b44dc874b601d9e4e2f6e19140e794ba24bead3b"
-		},
-		{
 			"ImportPath": "github.com/go-openapi/jsonpointer",
 			"Rev": "46af16f9f7b149af66e5d1bd010e3574dc06de98"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/jsonreference",
 			"Rev": "13c6e3589ad90f49bd3e3bbe2c2cb3d7a4142272"
-		},
-		{
-			"ImportPath": "github.com/go-openapi/loads",
-			"Rev": "18441dfa706d924a39a030ee2c3b1d8d81917b38"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/spec",
@@ -143,8 +139,36 @@
 			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
 		},
 		{
+			"ImportPath": "github.com/golang/protobuf/ptypes",
+			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/any",
+			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/duration",
+			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/timestamp",
+			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+		},
+		{
 			"ImportPath": "github.com/google/gofuzz",
 			"Rev": "44d81051d367757e1c7c6a5a86423ece9afcf63c"
+		},
+		{
+			"ImportPath": "github.com/googleapis/gnostic/OpenAPIv2",
+			"Rev": "68f4ded48ba9414dab2ae69b3f0d69971da73aa5"
+		},
+		{
+			"ImportPath": "github.com/googleapis/gnostic/compiler",
+			"Rev": "68f4ded48ba9414dab2ae69b3f0d69971da73aa5"
+		},
+		{
+			"ImportPath": "github.com/googleapis/gnostic/extensions",
+			"Rev": "68f4ded48ba9414dab2ae69b3f0d69971da73aa5"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/golang-lru",
@@ -192,7 +216,7 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
+			"Rev": "f6abca593680b2315d2075e0f5e2a9751e3f431a"
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",

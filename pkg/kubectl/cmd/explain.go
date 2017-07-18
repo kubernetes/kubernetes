@@ -66,10 +66,10 @@ func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		fmt.Fprint(cmdErr, "You must specify the type of resource to explain. ", validResources)
-		return cmdutil.UsageError(cmd, "Required resource not specified.")
+		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 	if len(args) > 1 {
-		return cmdutil.UsageError(cmd, "We accept only this format: explain RESOURCE")
+		return cmdutil.UsageErrorf(cmd, "We accept only this format: explain RESOURCE")
 	}
 
 	recursive := cmdutil.GetFlagBool(cmd, "recursive")

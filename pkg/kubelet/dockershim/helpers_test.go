@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/blang/semver"
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -218,7 +218,7 @@ func TestEnsureSandboxImageExists(t *testing.T) {
 		t.Logf("TestCase: %q", desc)
 		_, fakeDocker, _ := newTestDockerService()
 		if test.injectImage {
-			images := []dockertypes.Image{{ID: sandboxImage}}
+			images := []dockertypes.ImageSummary{{ID: sandboxImage}}
 			fakeDocker.InjectImages(images)
 			if test.imgNeedsAuth {
 				fakeDocker.MakeImagesPrivate(images, authConfig)
@@ -243,7 +243,7 @@ func TestEnsureSandboxImageExists(t *testing.T) {
 func TestMakePortsAndBindings(t *testing.T) {
 	for desc, test := range map[string]struct {
 		pm           []*runtimeapi.PortMapping
-		exposedPorts map[dockernat.Port]struct{}
+		exposedPorts dockernat.PortSet
 		portmappings map[dockernat.Port][]dockernat.PortBinding
 	}{
 		"no port mapping": {

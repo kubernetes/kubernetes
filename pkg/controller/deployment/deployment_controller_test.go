@@ -389,11 +389,81 @@ func TestPodDeletionDoesntEnqueueRecreateDeployment(t *testing.T) {
 
 	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
 	foo.Spec.Strategy.Type = extensions.RecreateDeploymentStrategyType
-	rs := newReplicaSet(foo, "foo-1", 1)
-	pod := generatePodFromRS(rs)
+	rs1 := newReplicaSet(foo, "foo-1", 1)
+	rs2 := newReplicaSet(foo, "foo-1", 1)
+	pod1 := generatePodFromRS(rs1)
+	pod2 := generatePodFromRS(rs2)
 
 	f.dLister = append(f.dLister, foo)
-	f.rsLister = append(f.rsLister, rs)
+	// Let's pretend this is a different pod. The gist is that the pod lister needs to
+	// return a non-empty list.
+	f.podLister = append(f.podLister, pod1, pod2)
+
+	c, _ := f.newController()
+	enqueued := false
+	c.enqueueDeployment = func(d *extensions.Deployment) {
+		if d.Name == "foo" {
+			enqueued = true
+		}
+	}
+
+	c.deletePod(pod1)
+
+	if enqueued {
+		t.Errorf("expected deployment %q not to be queued after pod deletion", foo.Name)
+	}
+}
+
+// TestPodDeletionPartialReplicaSetOwnershipEnqueueRecreateDeployment ensures that
+// the deletion of a pod will requeue a Recreate deployment iff there is no other
+// pod returned from the client in the case where a deployment has multiple replica
+// sets, some of which have empty owner references.
+func TestPodDeletionPartialReplicaSetOwnershipEnqueueRecreateDeployment(t *testing.T) {
+	f := newFixture(t)
+
+	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	foo.Spec.Strategy.Type = extensions.RecreateDeploymentStrategyType
+	rs1 := newReplicaSet(foo, "foo-1", 1)
+	rs2 := newReplicaSet(foo, "foo-2", 2)
+	rs2.OwnerReferences = nil
+	pod := generatePodFromRS(rs1)
+
+	f.dLister = append(f.dLister, foo)
+	f.rsLister = append(f.rsLister, rs1, rs2)
+	f.objects = append(f.objects, foo, rs1, rs2)
+
+	c, _ := f.newController()
+	enqueued := false
+	c.enqueueDeployment = func(d *extensions.Deployment) {
+		if d.Name == "foo" {
+			enqueued = true
+		}
+	}
+
+	c.deletePod(pod)
+
+	if !enqueued {
+		t.Errorf("expected deployment %q to be queued after pod deletion", foo.Name)
+	}
+}
+
+// TestPodDeletionPartialReplicaSetOwnershipDoesntEnqueueRecreateDeployment that the
+// deletion of a pod will not requeue a Recreate deployment iff there are other pods
+// returned from the client in the case where a deployment has multiple replica sets,
+// some of which have empty owner references.
+func TestPodDeletionPartialReplicaSetOwnershipDoesntEnqueueRecreateDeployment(t *testing.T) {
+	f := newFixture(t)
+
+	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	foo.Spec.Strategy.Type = extensions.RecreateDeploymentStrategyType
+	rs1 := newReplicaSet(foo, "foo-1", 1)
+	rs2 := newReplicaSet(foo, "foo-2", 2)
+	rs2.OwnerReferences = nil
+	pod := generatePodFromRS(rs1)
+
+	f.dLister = append(f.dLister, foo)
+	f.rsLister = append(f.rsLister, rs1, rs2)
+	f.objects = append(f.objects, foo, rs1, rs2)
 	// Let's pretend this is a different pod. The gist is that the pod lister needs to
 	// return a non-empty list.
 	f.podLister = append(f.podLister, pod)

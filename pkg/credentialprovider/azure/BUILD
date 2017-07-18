@@ -16,10 +16,10 @@ go_library(
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/containerregistry:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
 )
 

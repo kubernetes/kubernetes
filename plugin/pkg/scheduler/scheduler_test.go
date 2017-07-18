@@ -33,12 +33,12 @@ import (
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/core"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
 type fakeBinder struct {
@@ -55,7 +55,7 @@ func (fc fakePodConditionUpdater) Update(pod *v1.Pod, podCondition *v1.PodCondit
 
 func podWithID(id, desiredHost string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id)},
+		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: util.Test.SelfLink("pods", id)},
 		Spec: v1.PodSpec{
 			NodeName: desiredHost,
 		},
@@ -65,7 +65,7 @@ func podWithID(id, desiredHost string) *v1.Pod {
 func deletingPod(id string) *v1.Pod {
 	deletionTimestamp := metav1.Now()
 	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id), DeletionTimestamp: &deletionTimestamp},
+		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: util.Test.SelfLink("pods", id), DeletionTimestamp: &deletionTimestamp},
 		Spec: v1.PodSpec{
 			NodeName: "",
 		},

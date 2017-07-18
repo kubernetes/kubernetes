@@ -26,7 +26,7 @@ import (
 
 var (
 	kubeReleaseBucketURL  = "https://storage.googleapis.com/kubernetes-release/release"
-	kubeReleaseRegex      = regexp.MustCompile(`^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$`)
+	kubeReleaseRegex      = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$`)
 	kubeReleaseLabelRegex = regexp.MustCompile(`^[[:lower:]]+(-[-\w_\.]+)?$`)
 )
 
@@ -49,7 +49,10 @@ var (
 //  latest-1.0  (and similarly 1.1, 1.2, 1.3, ...)
 func KubernetesReleaseVersion(version string) (string, error) {
 	if kubeReleaseRegex.MatchString(version) {
-		return version, nil
+		if strings.HasPrefix(version, "v") {
+			return version, nil
+		}
+		return "v" + version, nil
 	} else if kubeReleaseLabelRegex.MatchString(version) {
 		url := fmt.Sprintf("%s/%s.txt", kubeReleaseBucketURL, version)
 		resp, err := http.Get(url)
@@ -68,4 +71,15 @@ func KubernetesReleaseVersion(version string) (string, error) {
 		return KubernetesReleaseVersion(strings.Trim(string(body), " \t\n"))
 	}
 	return "", fmt.Errorf("version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
+}
+
+// KubernetesVersionToImageTag is helper function that replaces all
+// non-allowed symbols in tag strings with underscores.
+// Image tag can only contain lowercase and uppercase letters, digits,
+// underscores, periods and dashes.
+// Current usage is for CI images where all of symbols except '+' are valid,
+// but function is for generic usage where input can't be always pre-validated.
+func KubernetesVersionToImageTag(version string) string {
+	allowed := regexp.MustCompile(`[^-a-zA-Z0-9_\.]`)
+	return allowed.ReplaceAllString(version, "_")
 }

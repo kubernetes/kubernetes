@@ -12,6 +12,8 @@ go_library(
     srcs = [
         "doc.go",
         "forward_requirements.go",
+        "require.go",
+        "require_forward.go",
         "requirements.go",
     ],
     tags = ["automanaged"],

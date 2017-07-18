@@ -43,7 +43,7 @@ func TestCreateDisk_Basic(t *testing.T) {
 	tags := make(map[string]string)
 	tags["test-tag"] = "test-value"
 
-	diskTypeUri := fmt.Sprintf(diskTypeUriTemplate, projectId, zone, diskType)
+	diskTypeUri := gceComputeAPIEndpoint + "projects/" + fmt.Sprintf(diskTypeUriTemplate, projectId, zone, diskType)
 	expectedDescription := "{\"test-tag\":\"test-value\"}"
 
 	/* Act */

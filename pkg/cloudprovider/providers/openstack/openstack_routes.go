@@ -262,8 +262,8 @@ func (r *Routes) DeleteRoute(clusterName string, route *cloudprovider.Route) err
 
 	if index != -1 {
 		// Delete element `index`
-		addr_pairs[index] = addr_pairs[len(routes)-1]
-		addr_pairs = addr_pairs[:len(routes)-1]
+		addr_pairs[index] = addr_pairs[len(addr_pairs)-1]
+		addr_pairs = addr_pairs[:len(addr_pairs)-1]
 
 		unwind, err := updateAllowedAddressPairs(r.network, &port, addr_pairs)
 		if err != nil {

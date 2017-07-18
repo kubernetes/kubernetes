@@ -38,7 +38,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -100,8 +99,6 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 	}
 	r := original
 	changed := r.Param("foo", "bar").
-		LabelsSelectorParam(labels.Set{"a": "b"}.AsSelector()).
-		UintParam("uint", 1).
 		AbsPath("/abs").
 		Prefix("test").
 		Suffix("testing").
@@ -257,7 +254,7 @@ func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 		"resourceVersion": []string{"1", "2"},
 		"timeoutSeconds":  []string{"10"},
 	}) {
-		t.Errorf("should have set a param: %#v", r)
+		t.Errorf("should have set a param: %#v %v", r.params, r.err)
 	}
 }
 
@@ -1276,7 +1273,6 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		Resource("bar").
 		Name("baz").
 		Prefix("foo").
-		LabelsSelectorParam(labels.Set{"name": "foo"}.AsSelector()).
 		Timeout(time.Second).
 		Body(bytes.NewBuffer(reqBodyExpected)).
 		Do().Get()
@@ -1291,7 +1287,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := defaultResourcePathWithPrefix("foo", "bar", "", "baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(v1.SchemeGroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
@@ -1316,7 +1312,6 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		Suffix("baz").
 		Name("bar").
 		Resource("foo").
-		LabelsSelectorParam(labels.Set{"name": "foo"}.AsSelector()).
 		Timeout(time.Second).
 		Body(reqObj).
 		Do().Get()
@@ -1331,7 +1326,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := defaultResourcePathWithPrefix("", "foo", "", "bar/baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(v1.SchemeGroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
@@ -1489,33 +1484,14 @@ func TestAbsPath(t *testing.T) {
 	}
 }
 
-func TestUintParam(t *testing.T) {
-	table := []struct {
-		name      string
-		testVal   uint64
-		expectStr string
-	}{
-		{"foo", 31415, "http://localhost?foo=31415"},
-		{"bar", 42, "http://localhost?bar=42"},
-		{"baz", 0, "http://localhost?baz=0"},
-	}
-
-	for _, item := range table {
-		u, _ := url.Parse("http://localhost")
-		r := NewRequest(nil, "GET", u, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil).AbsPath("").UintParam(item.name, item.testVal)
-		if e, a := item.expectStr, r.URL().String(); e != a {
-			t.Errorf("expected %v, got %v", e, a)
-		}
-	}
-}
-
 func TestUnacceptableParamNames(t *testing.T) {
 	table := []struct {
 		name          string
 		testVal       string
 		expectSuccess bool
 	}{
-		{"timeout", "42", false},
+		// timeout is no longer "protected"
+		{"timeout", "42", true},
 	}
 
 	for _, item := range table {

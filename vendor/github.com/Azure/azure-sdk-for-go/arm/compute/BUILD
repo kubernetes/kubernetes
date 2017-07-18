@@ -12,8 +12,9 @@ go_library(
     srcs = [
         "availabilitysets.go",
         "client.go",
+        "images.go",
         "models.go",
-        "usageoperations.go",
+        "usage.go",
         "version.go",
         "virtualmachineextensionimages.go",
         "virtualmachineextensions.go",

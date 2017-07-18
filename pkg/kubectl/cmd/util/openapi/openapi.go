@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-openapi/spec"
+	"gopkg.in/yaml.v2"
+
 	"github.com/golang/glog"
+	"github.com/googleapis/gnostic/OpenAPIv2"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -98,7 +100,7 @@ type Kind struct {
 	PrimitiveType string
 
 	// Extensions are openapi extensions for the object definition.
-	Extensions spec.Extensions
+	Extensions map[string]interface{}
 
 	// Fields are the fields defined for this Kind
 	Fields map[string]Type
@@ -130,21 +132,45 @@ type Type struct {
 	// Extensions are extensions for this field and may contain
 	// metadata from the types.go struct field tags.
 	// e.g. contains patchStrategy, patchMergeKey, etc
-	Extensions spec.Extensions
+	Extensions map[string]interface{}
+}
+
+func vendorExtensionToMap(e []*openapi_v2.NamedAny) map[string]interface{} {
+	var values map[string]interface{}
+
+	for _, na := range e {
+		if na.GetName() == "" || na.GetValue() == nil {
+			continue
+		}
+		if na.GetValue().GetYaml() == "" {
+			continue
+		}
+		var value interface{}
+		err := yaml.Unmarshal([]byte(na.GetValue().GetYaml()), &value)
+		if err != nil {
+			continue
+		}
+		if values == nil {
+			values = make(map[string]interface{})
+		}
+		values[na.GetName()] = value
+	}
+
+	return values
 }
 
 // NewOpenAPIData parses the resource definitions in openapi data by groupversionkind and name
-func NewOpenAPIData(s *spec.Swagger) (*Resources, error) {
+func NewOpenAPIData(doc *openapi_v2.Document) (*Resources, error) {
 	o := &Resources{
 		GroupVersionKindToName: map[schema.GroupVersionKind]string{},
 		NameToDefinition:       map[string]Kind{},
 	}
 	// Parse and index definitions by name
-	for name, d := range s.Definitions {
-		definition := o.parseDefinition(name, d)
-		o.NameToDefinition[name] = definition
+	for _, ns := range doc.GetDefinitions().GetAdditionalProperties() {
+		definition := o.parseDefinition(ns.GetName(), ns.GetValue())
+		o.NameToDefinition[ns.GetName()] = definition
 		if len(definition.GroupVersionKind.Kind) > 0 {
-			o.GroupVersionKindToName[definition.GroupVersionKind] = name
+			o.GroupVersionKindToName[definition.GroupVersionKind] = ns.GetName()
 		}
 	}
 
@@ -185,12 +211,12 @@ func (o *Resources) getTypeNames(elem Type) []string {
 	return t
 }
 
-func (o *Resources) parseDefinition(name string, s spec.Schema) Kind {
+func (o *Resources) parseDefinition(name string, s *openapi_v2.Schema) Kind {
 	gvk, err := o.getGroupVersionKind(s)
 	value := Kind{
 		Name:             name,
 		GroupVersionKind: gvk,
-		Extensions:       s.Extensions,
+		Extensions:       vendorExtensionToMap(s.GetVendorExtension()),
 		Fields:           map[string]Type{},
 	}
 	if err != nil {
@@ -202,13 +228,13 @@ func (o *Resources) parseDefinition(name string, s spec.Schema) Kind {
 	if o.isPrimitive(s) {
 		value.PrimitiveType = o.getTypeNameForField(s)
 	}
-	for fieldname, property := range s.Properties {
-		value.Fields[fieldname] = o.parseField(property)
+	for _, ns := range s.GetProperties().GetAdditionalProperties() {
+		value.Fields[ns.GetName()] = o.parseField(ns.GetValue())
 	}
 	return value
 }
 
-func (o *Resources) parseField(s spec.Schema) Type {
+func (o *Resources) parseField(s *openapi_v2.Schema) Type {
 	def := Type{
 		TypeName:    o.getTypeNameForField(s),
 		IsPrimitive: o.isPrimitive(s),
@@ -225,14 +251,14 @@ func (o *Resources) parseField(s spec.Schema) Type {
 		def.ElementType = &d
 	}
 
-	def.Extensions = s.Extensions
+	def.Extensions = vendorExtensionToMap(s.GetVendorExtension())
 
 	return def
 }
 
 // isArray returns true if s is an array type.
-func (o *Resources) isArray(s spec.Schema) bool {
-	if len(s.Properties) > 0 {
+func (o *Resources) isArray(s *openapi_v2.Schema) bool {
+	if len(s.GetProperties().GetAdditionalProperties()) > 0 {
 		// Open API can have embedded type definitions, but Kubernetes doesn't generate these.
 		// This should just be a sanity check against changing the format.
 		return false
@@ -241,8 +267,8 @@ func (o *Resources) isArray(s spec.Schema) bool {
 }
 
 // isMap returns true if s is a map type.
-func (o *Resources) isMap(s spec.Schema) bool {
-	if len(s.Properties) > 0 {
+func (o *Resources) isMap(s *openapi_v2.Schema) bool {
+	if len(s.GetProperties().GetAdditionalProperties()) > 0 {
 		// Open API can have embedded type definitions, but Kubernetes doesn't generate these.
 		// This should just be a sanity check against changing the format.
 		return false
@@ -253,8 +279,8 @@ func (o *Resources) isMap(s spec.Schema) bool {
 // isPrimitive returns true if s is a primitive type
 // Note: For object references that represent primitive types - e.g. IntOrString - this will
 // be false, and the referenced Kind will have a non-empty "PrimitiveType".
-func (o *Resources) isPrimitive(s spec.Schema) bool {
-	if len(s.Properties) > 0 {
+func (o *Resources) isPrimitive(s *openapi_v2.Schema) bool {
+	if len(s.GetProperties().GetAdditionalProperties()) > 0 {
 		// Open API can have embedded type definitions, but Kubernetes doesn't generate these.
 		// This should just be a sanity check against changing the format.
 		return false
@@ -266,96 +292,96 @@ func (o *Resources) isPrimitive(s spec.Schema) bool {
 	return false
 }
 
-func (*Resources) getType(s spec.Schema) string {
-	if len(s.Type) != 1 {
+func (*Resources) getType(s *openapi_v2.Schema) string {
+	if len(s.GetType().GetValue()) != 1 {
 		return ""
 	}
-	return strings.ToLower(s.Type[0])
+	return strings.ToLower(s.GetType().GetValue()[0])
 }
 
-func (o *Resources) getTypeNameForField(s spec.Schema) string {
+func (o *Resources) getTypeNameForField(s *openapi_v2.Schema) string {
 	// Get the reference for complex types
 	if o.isDefinitionReference(s) {
 		return o.nameForDefinitionField(s)
 	}
 	// Recurse if type is array
 	if o.isArray(s) {
-		return fmt.Sprintf("%s array", o.getTypeNameForField(*s.Items.Schema))
+		return fmt.Sprintf("%s array", o.getTypeNameForField(s.GetItems().GetSchema()[0]))
 	}
 	if o.isMap(s) {
-		return fmt.Sprintf("%s map", o.getTypeNameForField(*s.AdditionalProperties.Schema))
+		return fmt.Sprintf("%s map", o.getTypeNameForField(s.GetAdditionalProperties().GetSchema()))
 	}
 
 	// Get the value for primitive types
 	if o.isPrimitive(s) {
-		return fmt.Sprintf("%s", s.Type[0])
+		return fmt.Sprintf("%s", s.GetType().GetValue()[0])
 	}
 	return ""
 }
 
 // isDefinitionReference returns true s is a complex type that should have a Kind.
-func (o *Resources) isDefinitionReference(s spec.Schema) bool {
-	if len(s.Properties) > 0 {
+func (o *Resources) isDefinitionReference(s *openapi_v2.Schema) bool {
+	if len(s.GetProperties().GetAdditionalProperties()) > 0 {
 		// Open API can have embedded type definitions, but Kubernetes doesn't generate these.
 		// This should just be a sanity check against changing the format.
 		return false
 	}
-	if len(s.Type) > 0 {
+	if len(s.GetType().GetValue()) > 0 {
 		// Definition references won't have a type
 		return false
 	}
 
-	p := s.SchemaProps.Ref.GetPointer().String()
-	return len(p) > 0 && strings.HasPrefix(p, "/definitions/")
+	p := s.GetXRef()
+	return len(p) > 0 && strings.HasPrefix(p, "#/definitions/")
 }
 
 // getElementType returns the type of an element for arrays
 // returns an error if s is not an array.
-func (o *Resources) getElementType(s spec.Schema) (spec.Schema, error) {
+func (o *Resources) getElementType(s *openapi_v2.Schema) (*openapi_v2.Schema, error) {
 	if !o.isArray(s) {
-		return spec.Schema{}, fmt.Errorf("%v is not an array type", s.Type)
+		return &openapi_v2.Schema{}, fmt.Errorf("%v is not an array type", o.getTypeNameForField(s))
 	}
-	return *s.Items.Schema, nil
+	return s.GetItems().GetSchema()[0], nil
 }
 
-// getElementType returns the type of an element for maps
+// getValueType returns the type of an element for maps
 // returns an error if s is not a map.
-func (o *Resources) getValueType(s spec.Schema) (spec.Schema, error) {
+func (o *Resources) getValueType(s *openapi_v2.Schema) (*openapi_v2.Schema, error) {
 	if !o.isMap(s) {
-		return spec.Schema{}, fmt.Errorf("%v is not an map type", s.Type)
+		return &openapi_v2.Schema{}, fmt.Errorf("%v is not an map type", o.getTypeNameForField(s))
 	}
-	return *s.AdditionalProperties.Schema, nil
+	return s.GetAdditionalProperties().GetSchema(), nil
 }
 
 // nameForDefinitionField returns the definition name for the schema (field) if it is a complex type
-func (o *Resources) nameForDefinitionField(s spec.Schema) string {
-	p := s.SchemaProps.Ref.GetPointer().String()
+func (o *Resources) nameForDefinitionField(s *openapi_v2.Schema) string {
+	p := s.GetXRef()
 	if len(p) == 0 {
 		return ""
 	}
 
 	// Strip the "definitions/" pieces of the reference
-	return strings.Replace(p, "/definitions/", "", -1)
+	return strings.Replace(p, "#/definitions/", "", -1)
 }
 
 // getGroupVersionKind implements OpenAPIData
 // getGVK parses the gropuversionkind for a resource definition from the x-kubernetes
 // extensions
-// Expected format for s.Extensions: map[string][]map[string]string
 // map[x-kubernetes-group-version-kind:[map[Group:authentication.k8s.io Version:v1 Kind:TokenReview]]]
-func (o *Resources) getGroupVersionKind(s spec.Schema) (schema.GroupVersionKind, error) {
+func (o *Resources) getGroupVersionKind(s *openapi_v2.Schema) (schema.GroupVersionKind, error) {
 	empty := schema.GroupVersionKind{}
 
+	extensionMap := vendorExtensionToMap(s.GetVendorExtension())
 	// Get the extensions
-	extList, f := s.Extensions[groupVersionKindExtensionKey]
+	extList, f := extensionMap[groupVersionKindExtensionKey]
 	if !f {
-		return empty, fmt.Errorf("No %s extension present in %v", groupVersionKindExtensionKey, s.Extensions)
+		return empty, fmt.Errorf("No %s extension present in %v", groupVersionKindExtensionKey, extensionMap)
 	}
 
 	// Expect a empty of a list with 1 element
 	extListCasted, ok := extList.([]interface{})
 	if !ok {
-		return empty, fmt.Errorf("%s extension has unexpected type %T in %s", groupVersionKindExtensionKey, extListCasted, s.Extensions)
+		return empty, fmt.Errorf("%s extension has unexpected type %T in %s", groupVersionKindExtensionKey, extListCasted, extensionMap)
 	}
 	if len(extListCasted) == 0 {
 		return empty, fmt.Errorf("No Group Version Kind found in %v", extListCasted)
@@ -366,9 +392,9 @@ func (o *Resources) getGroupVersionKind(s spec.Schema) (schema.GroupVersionKind,
 	gvk := extListCasted[0]
 
 	// Expect a empty of a map with 3 entries
-	gvkMap, ok := gvk.(map[string]interface{})
+	gvkMap, ok := gvk.(map[interface{}]interface{})
 	if !ok {
-		return empty, fmt.Errorf("%s extension has unexpected type %T in %s", groupVersionKindExtensionKey, gvk, s.Extensions)
+		return empty, fmt.Errorf("%s extension has unexpected type %T in %s", groupVersionKindExtensionKey, gvk, extList)
 	}
 	group, ok := gvkMap["group"].(string)
 	if !ok {

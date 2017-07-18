@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "client.go",
         "models.go",
+        "operations.go",
         "registries.go",
         "version.go",
     ],

@@ -44,7 +44,7 @@ import (
    9. delete pvc_vvol
 
 */
-var _ = framework.KubeDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
+var _ = SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 	f := framework.NewDefaultFramework("pvclabelselector")
 	var (
 		c          clientset.Interface
@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:LabelSelector]", func
 
 	})
 
-	framework.KubeDescribe("Selector-Label Volume Binding:vsphere", func() {
+	SIGDescribe("Selector-Label Volume Binding:vsphere", func() {
 		AfterEach(func() {
 			By("Running clean up actions")
 			if framework.ProviderIs("vsphere") {

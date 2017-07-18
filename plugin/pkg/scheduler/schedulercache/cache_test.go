@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
@@ -507,59 +506,15 @@ func TestForgetPod(t *testing.T) {
 	}
 }
 
-// addResource adds ResourceList into Resource.
-func addResource(r *Resource, rl v1.ResourceList) {
-	if r == nil {
-		return
-	}
-
-	for rName, rQuant := range rl {
-		switch rName {
-		case v1.ResourceCPU:
-			r.MilliCPU += rQuant.MilliValue()
-		case v1.ResourceMemory:
-			r.Memory += rQuant.Value()
-		case v1.ResourceNvidiaGPU:
-			r.NvidiaGPU += rQuant.Value()
-		default:
-			if v1helper.IsOpaqueIntResourceName(rName) {
-				r.AddOpaque(rName, rQuant.Value())
-			}
-		}
-	}
-}
-
 // getResourceRequest returns the resource request of all containers in Pods;
 // excuding initContainers.
 func getResourceRequest(pod *v1.Pod) v1.ResourceList {
 	result := &Resource{}
 	for _, container := range pod.Spec.Containers {
-		addResource(result, container.Resources.Requests)
+		result.Add(container.Resources.Requests)
 	}
 
 	return result.ResourceList()
-}
-
-// newResource returns a new Resource by ResourceList.
-func newResource(rl v1.ResourceList) *Resource {
-	res := &Resource{}
-
-	for rName, rQuantity := range rl {
-		switch rName {
-		case v1.ResourceMemory:
-			res.Memory = rQuantity.Value()
-		case v1.ResourceCPU:
-			res.MilliCPU = rQuantity.MilliValue()
-		case v1.ResourceNvidiaGPU:
-			res.NvidiaGPU += rQuantity.Value()
-		default:
-			if v1helper.IsOpaqueIntResourceName(rName) {
-				res.SetOpaque(rName, rQuantity.Value())
-			}
-		}
-	}
-
-	return res
 }
 
 // buildNodeInfo creates a NodeInfo by simulating node operations in cache.
@@ -568,15 +523,15 @@ func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *NodeInfo {
 
 	// Simulate SetNode.
 	expected.node = node
-	expected.allocatableResource = newResource(node.Status.Allocatable)
+	expected.allocatableResource = NewResource(node.Status.Allocatable)
 	expected.taints = node.Spec.Taints
 	expected.generation++
 
 	for _, pod := range pods {
 		// Simulate AddPod
 		expected.pods = append(expected.pods, pod)
-		addResource(expected.requestedResource, getResourceRequest(pod))
-		addResource(expected.nonzeroRequest, getResourceRequest(pod))
+		expected.requestedResource.Add(getResourceRequest(pod))
+		expected.nonzeroRequest.Add(getResourceRequest(pod))
 		expected.usedPorts = schedutil.GetUsedPorts(pod)
 		expected.generation++
 	}

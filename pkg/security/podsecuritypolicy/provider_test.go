@@ -463,7 +463,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		"failHostPortPSP": {
 			pod:           failHostPortPod,
 			psp:           defaultPSP(),
-			expectedError: "Host port 1 is not allowed to be used.  Allowed ports: []",
+			expectedError: "Host port 1 is not allowed to be used. Allowed ports: []",
 		},
 		"failReadOnlyRootFS - nil": {
 			pod:           defaultPod(),
@@ -498,7 +498,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 			continue
 		}
 		if !strings.Contains(errs[0].Error(), v.expectedError) {
-			t.Errorf("%s received unexpected error %v", k, errs)
+			t.Errorf("%s received unexpected error %v\nexpected: %s", k, errs, v.expectedError)
 		}
 	}
 }

@@ -797,7 +797,7 @@ __EOF__
   chmod +x /tmp/tmp-editor.sh
   # Pre-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
-  EDITOR=/tmp/tmp-editor.sh kubectl edit "${kube_flags[@]}" pods/valid-pod
+  [[ "$(EDITOR=/tmp/tmp-editor.sh kubectl edit "${kube_flags[@]}" pods/valid-pod --output-patch=true | grep Patch:)" ]]
   # Post-condition: valid-pod POD has image gcr.io/google_containers/serve_hostname
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.io/google_containers/serve_hostname:'
   # cleaning
@@ -1491,161 +1491,6 @@ __EOF__
   set +o nounset
   set +o errexit
 }
-
-run_tpr_tests() {
-  set -o nounset
-  set -o errexit
-
-  create_and_use_new_namespace
-  kube::log::status "Testing kubectl tpr"
-  kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
-{
-  "kind": "ThirdPartyResource",
-  "apiVersion": "extensions/v1beta1",
-  "metadata": {
-    "name": "foo.company.com"
-  },
-  "versions": [
-    {
-      "name": "v1"
-    }
-  ]
-}
-__EOF__
-
-  # Post-Condition: assertion object exist
-  kube::test::get_object_assert thirdpartyresources "{{range.items}}{{$id_field}}:{{end}}" 'foo.company.com:'
-
-  kubectl "${kube_flags[@]}" create -f - "${kube_flags[@]}" << __EOF__
-{
-  "kind": "ThirdPartyResource",
-  "apiVersion": "extensions/v1beta1",
-  "metadata": {
-    "name": "bar.company.com"
-  },
-  "versions": [
-    {
-      "name": "v1"
-    }
-  ]
-}
-__EOF__
-
-  # Post-Condition: assertion object exist
-  kube::test::get_object_assert thirdpartyresources "{{range.items}}{{$id_field}}:{{end}}" 'bar.company.com:foo.company.com:'
-
-  run_non_native_resource_tests
-
-  # teardown
-  kubectl delete thirdpartyresources/foo.company.com "${kube_flags[@]}"
-  kubectl delete thirdpartyresources/bar.company.com "${kube_flags[@]}"
-
-  set +o nounset
-  set +o errexit
-}
-
-run_tpr_migration_tests() {
-  set -o nounset
-  set -o errexit
-
-  kube::log::status "Testing kubectl tpr migration"
-  local i tries
-  create_and_use_new_namespace
-
-  # Create CRD first. This is sort of backwards so we can create a marker below.
-  kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
-{
-  "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
-  "metadata": {
-    "name": "foos.company.crd"
-  },
-  "spec": {
-    "group": "company.crd",
-    "version": "v1",
-    "names": {
-      "plural": "foos",
-      "kind": "Foo"
-    }
-  }
-}
-__EOF__
-  # Wait for API to become available.
-  tries=0
-  until kubectl "${kube_flags[@]}" get foos.company.crd || [ $tries -gt 10 ]; do
-    tries=$((tries+1))
-    sleep ${tries}
-  done
-  kube::test::get_object_assert foos.company.crd '{{len .items}}' '0'
-
-  # Create a marker that only exists in CRD so we know when CRD is active vs. TPR.
-  kubectl "${kube_flags[@]}" create -f - << __EOF__
-{
-  "kind": "Foo",
-  "apiVersion": "company.crd/v1",
-  "metadata": {
-    "name": "crd-marker"
-  },
-  "testValue": "only exists in CRD"
-}
-__EOF__
-  kube::test::get_object_assert foos.company.crd '{{len .items}}' '1'
-
-  # Now create a TPR that sits in front of the CRD and hides it.
-  kubectl "${kube_flags[@]}" create -f - << __EOF__
-{
-  "kind": "ThirdPartyResource",
-  "apiVersion": "extensions/v1beta1",
-  "metadata": {
-    "name": "foo.company.crd"
-  },
-  "versions": [
-    {
-      "name": "v1"
-    }
-  ]
-}
-__EOF__
-  # The marker should disappear.
-  kube::test::wait_object_assert foos.company.crd '{{len .items}}' '0'
-
-  # Add some items to the TPR.
-  for i in {1..10}; do
-    kubectl "${kube_flags[@]}" create -f - << __EOF__
-{
-  "kind": "Foo",
-  "apiVersion": "company.crd/v1",
-  "metadata": {
-    "name": "tpr-${i}"
-  },
-  "testValue": "migrate-${i}"
-}
-__EOF__
-  done
-  kube::test::get_object_assert foos.company.crd '{{len .items}}' '10'
-
-  # Delete the TPR and wait for the CRD to take over.
-  kubectl "${kube_flags[@]}" delete thirdpartyresource/foo.company.crd
-  tries=0
-  until kubectl "${kube_flags[@]}" get foos.company.crd/crd-marker || [ $tries -gt 10 ]; do
-    tries=$((tries+1))
-    sleep ${tries}
-  done
-  kube::test::get_object_assert foos.company.crd/crd-marker '{{.testValue}}' 'only exists in CRD'
-
-  # Check if the TPR items were migrated to CRD.
-  kube::test::get_object_assert foos.company.crd '{{len .items}}' '11'
-  for i in {1..10}; do
-    kube::test::get_object_assert foos.company.crd/tpr-${i} '{{.testValue}}' "migrate-${i}"
-  done
-
-  # teardown
-  kubectl delete customresourcedefinitions/foos.company.crd "${kube_flags_with_token[@]}"
-
-  set +o nounset
-  set +o errexit
-}
-
 
 kube::util::non_native_resources() {
   local times
@@ -2435,6 +2280,9 @@ run_service_tests() {
   # prove role=master
   kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "redis:master:backend:"
 
+  # Set selector of a local file without talking to the server
+  kubectl set selector -f examples/guestbook/redis-master-service.yaml role=padawan --local -o yaml "${kube_flags[@]}"
+  ! kubectl set selector -f examples/guestbook/redis-master-service.yaml role=padawan --dry-run -o yaml "${kube_flags[@]}"
   # Set command to change the selector.
   kubectl set selector -f examples/guestbook/redis-master-service.yaml role=padawan
   # prove role=padawan
@@ -2442,6 +2290,10 @@ run_service_tests() {
   # Set command to reset the selector back to the original one.
   kubectl set selector -f examples/guestbook/redis-master-service.yaml app=redis,role=master,tier=backend
   # prove role=master
+  kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "redis:master:backend:"
+  # Show dry-run works on running selector
+  kubectl set selector services redis-master role=padawan --dry-run -o yaml "${kube_flags[@]}"
+  ! kubectl set selector services redis-master role=padawan --local -o yaml "${kube_flags[@]}"
   kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "redis:master:backend:"
 
   ### Dump current redis-master service
@@ -4453,13 +4305,6 @@ runTests() {
   # customresourcedefinitions cleanup after themselves.  Run these first, then TPRs
   if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
     record_command run_crd_tests
-  fi
-
-  if kube::test::if_supports_resource "${thirdpartyresources}" ; then
-    record_command run_tpr_tests
-    if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
-      record_command run_tpr_migration_tests
-    fi
   fi
 
   #################

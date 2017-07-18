@@ -205,6 +205,7 @@ kube::util::gen-docs() {
   mkdir -p "${dest}/docs/admin/"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-apiserver"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-controller-manager"
+  "${genkubedocs}" "${dest}/docs/admin/" "cloud-controller-manager"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-proxy"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-scheduler"
   "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
@@ -218,6 +219,7 @@ kube::util::gen-docs() {
   mkdir -p "${dest}/docs/man/man1/"
   "${genman}" "${dest}/docs/man/man1/" "kube-apiserver"
   "${genman}" "${dest}/docs/man/man1/" "kube-controller-manager"
+  "${genman}" "${dest}/docs/man/man1/" "cloud-controller-manager"
   "${genman}" "${dest}/docs/man/man1/" "kube-proxy"
   "${genman}" "${dest}/docs/man/man1/" "kube-scheduler"
   "${genman}" "${dest}/docs/man/man1/" "kubelet"
@@ -509,6 +511,14 @@ kube::util::ensure_godep_version() {
   PATH="${KUBE_TEMP}/go/bin:${PATH}"
   hash -r # force bash to clear PATH cache
   godep version
+}
+
+# Checks that the GOPATH is simple, i.e. consists only of one directory, not multiple.
+kube::util::ensure_single_dir_gopath() {
+  if [[ "${GOPATH}" == *:* ]]; then
+    echo "GOPATH must consist of a single directory." 1>&2
+    exit 1
+  fi
 }
 
 # Checks whether there are any files matching pattern $2 changed between the

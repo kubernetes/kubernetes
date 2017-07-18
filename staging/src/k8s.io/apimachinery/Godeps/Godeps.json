@@ -16,7 +16,7 @@
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
-			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
+			"Rev": "782f4967f2dc4564575ca782fe2d04090b5faca8"
 		},
 		{
 			"ImportPath": "github.com/docker/spdystream",
@@ -107,16 +107,40 @@
 			"Rev": "d5b7844b561a7bc640052f1b935f7b800330d7e0"
 		},
 		{
+			"ImportPath": "github.com/mxk/go-flowrate/flowrate",
+			"Rev": "cca7078d478f8520f85629ad7c68962d31ed7682"
+		},
+		{
 			"ImportPath": "github.com/pborman/uuid",
 			"Rev": "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
+		},
+		{
+			"ImportPath": "github.com/pmezard/go-difflib/difflib",
+			"Rev": "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
 			"Rev": "9ff6c6923cfffbcd502984b8e0c80539a94968b7"
 		},
 		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Rev": "f6abca593680b2315d2075e0f5e2a9751e3f431a"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/require",
+			"Rev": "f6abca593680b2315d2075e0f5e2a9751e3f431a"
+		},
+		{
 			"ImportPath": "github.com/ugorji/go/codec",
 			"Rev": "ded73eae5db7e7a0ef6f55aace87a2873c5d2b74"
+		},
+		{
+			"ImportPath": "golang.org/x/net/html",
+			"Rev": "f2499483f923065a842d38eb4c7f1927e6fc6e6d"
+		},
+		{
+			"ImportPath": "golang.org/x/net/html/atom",
+			"Rev": "f2499483f923065a842d38eb4c7f1927e6fc6e6d"
 		},
 		{
 			"ImportPath": "golang.org/x/net/http2",
@@ -132,6 +156,10 @@
 		},
 		{
 			"ImportPath": "golang.org/x/net/lex/httplex",
+			"Rev": "f2499483f923065a842d38eb4c7f1927e6fc6e6d"
+		},
+		{
+			"ImportPath": "golang.org/x/net/websocket",
 			"Rev": "f2499483f923065a842d38eb4c7f1927e6fc6e6d"
 		},
 		{

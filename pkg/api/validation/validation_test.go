@@ -2589,6 +2589,24 @@ func TestValidateEnv(t *testing.T) {
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
 					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name: "abc",
+			ValueFrom: &api.EnvVarSource{
+				FieldRef: &api.ObjectFieldSelector{
+					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					FieldPath:  "metadata.uid",
+				},
+			},
+		},
+		{
+			Name: "abc",
+			ValueFrom: &api.EnvVarSource{
+				FieldRef: &api.ObjectFieldSelector{
+					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "spec.nodeName",
 				},
 			},
@@ -2644,7 +2662,7 @@ func TestValidateEnv(t *testing.T) {
 		},
 	}
 	if errs := ValidateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
+		t.Errorf("expected success, got: %v", errs)
 	}
 
 	errorCases := []struct {
@@ -2823,7 +2841,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: metadata.name, metadata.namespace, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
 		},
 		{
 			name: "invalid fieldPath annotations",
@@ -2836,7 +2854,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: metadata.name, metadata.namespace, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
 		},
 		{
 			name: "unsupported fieldPath",
@@ -2849,7 +2867,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: metadata.name, metadata.namespace, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
+			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
 		},
 	}
 	for _, tc := range errorCases {
@@ -3027,7 +3045,6 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "/bab", SubPath: "baz"},
 		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
-		{Name: "abc", MountPath: "c:/foo/bar"},
 	}
 	if errs := ValidateVolumeMounts(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -3037,6 +3054,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"empty name":          {{Name: "", MountPath: "/foo"}},
 		"name not found":      {{Name: "", MountPath: "/foo"}},
 		"empty mountpath":     {{Name: "abc", MountPath: ""}},
+		"relative mountpath":  {{Name: "abc", MountPath: "bar"}},
 		"mountpath collision": {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
 		"absolute subpath":    {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
 		"subpath in ..":       {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
@@ -6285,6 +6303,42 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
+			name: "invalid duplicate targetports (number with same protocol)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid duplicate targetports (name with same protocol)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromString("http")})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "TCP", TargetPort: intstr.FromString("http")})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid duplicate targetports (number with different protocols)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "UDP", TargetPort: intstr.FromInt(8080)})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid duplicate targetports (name with different protocols)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromString("http")})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "UDP", TargetPort: intstr.FromString("http")})
+			},
+			numErrs: 0,
+		},
+		{
 			name: "valid type - cluster",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeClusterIP
@@ -9463,6 +9517,14 @@ func TestValidateEndpoints(t *testing.T) {
 				},
 			},
 		},
+		"empty ports": {
+			ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+			Subsets: []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{{IP: "10.10.3.3"}},
+				},
+			},
+		},
 	}
 
 	for k, v := range successCases {
@@ -9500,17 +9562,6 @@ func TestValidateEndpoints(t *testing.T) {
 				Subsets: []api.EndpointSubset{
 					{
 						Ports: []api.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
-					},
-				},
-			},
-			errorType: "FieldValueRequired",
-		},
-		"empty ports": {
-			endpoints: api.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
-				Subsets: []api.EndpointSubset{
-					{
-						Addresses: []api.EndpointAddress{{IP: "10.10.3.3"}},
 					},
 				},
 			},

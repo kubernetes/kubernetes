@@ -18,8 +18,6 @@ package kubelet
 
 import (
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"fmt"
 	"net"
 	"net/http"
@@ -38,7 +36,6 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/api/core/v1"
 	clientv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,7 +57,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -102,7 +98,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/security/apparmor"
-	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
@@ -711,7 +706,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		}
 		ips = append(ips, cloudIPs...)
 		names := append([]string{klet.GetHostname(), hostnameOverride}, cloudNames...)
-		klet.serverCertificateManager, err = initializeServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, ips, names)
+		klet.serverCertificateManager, err = certificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, ips, names)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
 		}
@@ -1027,10 +1022,6 @@ type Kubelet struct {
 	// clusterDomain and clusterDNS.
 	resolverConfig string
 
-	// Optionally shape the bandwidth of a pod
-	// TODO: remove when kubenet plugin is ready
-	shaper bandwidth.BandwidthShaper
-
 	// Information about the ports which are opened by daemons on Node running this Kubelet server.
 	daemonEndpoints *v1.NodeDaemonEndpoints
 
@@ -1114,48 +1105,6 @@ type Kubelet struct {
 	// dockerLegacyService contains some legacy methods for backward compatibility.
 	// It should be set only when docker is using non json-file logging driver.
 	dockerLegacyService dockershim.DockerLegacyService
-}
-
-func initializeServerCertificateManager(kubeClient clientset.Interface, kubeCfg *componentconfig.KubeletConfiguration, nodeName types.NodeName, ips []net.IP, hostnames []string) (certificate.Manager, error) {
-	var certSigningRequestClient clientcertificates.CertificateSigningRequestInterface
-	if kubeClient != nil && kubeClient.Certificates() != nil {
-		certSigningRequestClient = kubeClient.Certificates().CertificateSigningRequests()
-	}
-	certificateStore, err := certificate.NewFileStore(
-		"kubelet-server",
-		kubeCfg.CertDirectory,
-		kubeCfg.CertDirectory,
-		kubeCfg.TLSCertFile,
-		kubeCfg.TLSPrivateKeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize certificate store: %v", err)
-	}
-	return certificate.NewManager(&certificate.Config{
-		CertificateSigningRequestClient: certSigningRequestClient,
-		Template: &x509.CertificateRequest{
-			Subject: pkix.Name{
-				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
-				Organization: []string{"system:nodes"},
-			},
-			DNSNames:    hostnames,
-			IPAddresses: ips,
-		},
-		Usages: []certificates.KeyUsage{
-			// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
-			//
-			// Digital signature allows the certificate to be used to verify
-			// digital signatures used during TLS negotiation.
-			certificates.UsageDigitalSignature,
-			// KeyEncipherment allows the cert/key pair to be used to encrypt
-			// keys, including the symetric keys negotiated during TLS setup
-			// and used for data transfer.
-			certificates.UsageKeyEncipherment,
-			// ServerAuth allows the cert to be used by a TLS server to
-			// authenticate itself to a TLS client.
-			certificates.UsageServerAuth,
-		},
-		CertificateStore: certificateStore,
-	})
 }
 
 func allLocalIPsWithoutLoopback() ([]net.IP, error) {
@@ -1301,7 +1250,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		glog.Fatalf("Failed to start cAdvisor %v", err)
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
-	kl.evictionManager.Start(kl, kl.GetActivePods, kl.podResourcesAreReclaimed, kl, evictionMonitoringPeriod)
+	kl.evictionManager.Start(kl.cadvisor, kl.GetActivePods, kl.podResourcesAreReclaimed, kl, evictionMonitoringPeriod)
 }
 
 // Run starts the kubelet reacting to config updates
@@ -1630,28 +1579,6 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		return err
-	}
-
-	// early successful exit if pod is not bandwidth-constrained
-	if !kl.shapingEnabled() {
-		return nil
-	}
-
-	// Update the traffic shaping for the pod's ingress and egress limits
-	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
-	if err != nil {
-		return err
-	}
-	if egress != nil || ingress != nil {
-		if kubecontainer.IsHostNetworkPod(pod) {
-			kl.recorder.Event(pod, v1.EventTypeWarning, events.HostNetworkNotSupported, "Bandwidth shaping is not currently supported on the host network")
-		} else if kl.shaper != nil {
-			if len(apiPodStatus.PodIP) > 0 {
-				err = kl.shaper.ReconcileCIDR(fmt.Sprintf("%s/32", apiPodStatus.PodIP), egress, ingress)
-			}
-		} else {
-			kl.recorder.Event(pod, v1.EventTypeWarning, events.UndefinedShaper, "Pod requests bandwidth shaping, but the shaper is undefined")
-		}
 	}
 
 	return nil

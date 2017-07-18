@@ -523,9 +523,11 @@ func TestSingleWatch(t *testing.T) {
 	w, err := client.Core().RESTClient().Get().
 		Namespace(ns.Name).
 		Resource("events").
-		Param("resourceVersion", rv1).
-		Param("watch", "true").
-		FieldsSelectorParam(fields.OneTermEqualSelector("metadata.name", "event-9")).
+		VersionedParams(&metav1.ListOptions{
+			ResourceVersion: rv1,
+			Watch:           true,
+			FieldSelector:   fields.OneTermEqualSelector("metadata.name", "event-9").String(),
+		}, metav1.ParameterCodec).
 		Watch()
 
 	if err != nil {

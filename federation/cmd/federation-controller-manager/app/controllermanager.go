@@ -30,16 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
-	deploymentcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/deployment"
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
-	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	servicednscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service/dns"
 	synccontroller "k8s.io/kubernetes/federation/pkg/federation-controller/sync"
@@ -152,27 +149,10 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		go serviceController.Run(s.ConcurrentServiceSyncs, wait.NeverStop)
 	}
 
-	if controllerEnabled(s.Controllers, serverResources, namespacecontroller.ControllerName, namespacecontroller.RequiredResources, true) {
-		glog.V(3).Infof("Loading client config for namespace controller %q", namespacecontroller.UserAgentName)
-		nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, namespacecontroller.UserAgentName))
-		namespaceController := namespacecontroller.NewNamespaceController(nsClientset, dynamic.NewDynamicClientPool(restclient.AddUserAgent(restClientCfg, namespacecontroller.UserAgentName)))
-		glog.V(3).Infof("Running namespace controller")
-		namespaceController.Run(wait.NeverStop)
-	}
-
 	for kind, federatedType := range federatedtypes.FederatedTypes() {
 		if controllerEnabled(s.Controllers, serverResources, federatedType.ControllerName, federatedType.RequiredResources, true) {
 			synccontroller.StartFederationSyncController(kind, federatedType.AdapterFactory, restClientCfg, stopChan, minimizeLatency)
 		}
-	}
-
-	if controllerEnabled(s.Controllers, serverResources, deploymentcontroller.ControllerName, deploymentcontroller.RequiredResources, true) {
-		glog.V(3).Infof("Loading client config for deployment controller %q", deploymentcontroller.UserAgentName)
-		deploymentClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, deploymentcontroller.UserAgentName))
-		deploymentController := deploymentcontroller.NewDeploymentController(deploymentClientset)
-		glog.V(3).Infof("Running deployment controller")
-		// TODO: rename s.ConcurrentReplicaSetSyncs
-		go deploymentController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, ingresscontroller.ControllerName, ingresscontroller.RequiredResources, true) {

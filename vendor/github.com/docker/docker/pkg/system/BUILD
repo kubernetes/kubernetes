@@ -13,6 +13,7 @@ go_library(
         "chtimes.go",
         "chtimes_unix.go",
         "errors.go",
+        "exitcode.go",
         "filesys.go",
         "lstat.go",
         "meminfo.go",

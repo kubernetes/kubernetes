@@ -69,11 +69,29 @@ func Register() {
 	prometheus.MustRegister(requestLatenciesSummary)
 }
 
-func Monitor(verb, resource, subresource *string, client, contentType string, httpCode int, reqStart time.Time) {
+// Monitor records a request to the apiserver endpoints that follow the Kubernetes API conventions.  verb must be
+// uppercase to be backwards compatible with existing monitoring tooling.
+func Monitor(verb, resource, subresource, client, contentType string, httpCode int, reqStart time.Time) {
 	elapsed := float64((time.Since(reqStart)) / time.Microsecond)
-	requestCounter.WithLabelValues(*verb, *resource, *subresource, client, contentType, codeToString(httpCode)).Inc()
-	requestLatencies.WithLabelValues(*verb, *resource, *subresource).Observe(elapsed)
-	requestLatenciesSummary.WithLabelValues(*verb, *resource, *subresource).Observe(elapsed)
+	requestCounter.WithLabelValues(verb, resource, subresource, client, contentType, codeToString(httpCode)).Inc()
+	requestLatencies.WithLabelValues(verb, resource, subresource).Observe(elapsed)
+	requestLatenciesSummary.WithLabelValues(verb, resource, subresource).Observe(elapsed)
+}
+
+// MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record
+// a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
+func MonitorRequest(request *http.Request, verb, resource, subresource, contentType string, httpCode int, reqStart time.Time) {
+	reportedVerb := verb
+	if verb == "LIST" {
+		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
+		if values := request.URL.Query()["watch"]; len(values) > 0 {
+			if value := strings.ToLower(values[0]); value != "0" && value != "false" {
+				reportedVerb = "WATCH"
+			}
+		}
+	}
+	client := cleanUserAgent(utilnet.GetHTTPClient(request))
+	Monitor(reportedVerb, resource, subresource, client, contentType, httpCode, reqStart)
 }
 
 func Reset() {
@@ -103,11 +121,7 @@ func InstrumentRouteFunc(verb, resource, subresource string, routeFunc restful.R
 
 		routeFunc(request, response)
 
-		reportedVerb := verb
-		if verb == "LIST" && strings.ToLower(request.QueryParameter("watch")) == "true" {
-			reportedVerb = "WATCH"
-		}
-		Monitor(&reportedVerb, &resource, &subresource, cleanUserAgent(utilnet.GetHTTPClient(request.Request)), rw.Header().Get("Content-Type"), delegate.status, now)
+		MonitorRequest(request.Request, verb, resource, subresource, rw.Header().Get("Content-Type"), delegate.status, now)
 	})
 }
 

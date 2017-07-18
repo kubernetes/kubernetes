@@ -168,12 +168,11 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if req.URL.Path == "/namespaces/test/replicationcontrollers" {
 					return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, rc)}, nil
-				} else {
-					return &http.Response{
-						StatusCode: http.StatusOK,
-						Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
-					}, nil
 				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
+				}, nil
 			}),
 		}
 		tf.Namespace = "test"
@@ -297,14 +296,12 @@ func TestGenerateService(t *testing.T) {
 					body := objBody(codec, &test.service)
 					data, err := ioutil.ReadAll(req.Body)
 					if err != nil {
-						t.Errorf("unexpected error: %v", err)
-						t.FailNow()
+						t.Fatalf("unexpected error: %v", err)
 					}
 					defer req.Body.Close()
 					svc := &api.Service{}
 					if err := runtime.DecodeInto(codec, data, svc); err != nil {
-						t.Errorf("unexpected error: %v", err)
-						t.FailNow()
+						t.Fatalf("unexpected error: %v", err)
 					}
 					// Copy things that are defaulted by the system
 					test.service.Annotations = svc.Annotations

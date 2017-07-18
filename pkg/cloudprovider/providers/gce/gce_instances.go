@@ -25,7 +25,7 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
-	computealpha "google.golang.org/api/compute/v0.beta"
+	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
 	"k8s.io/api/core/v1"
@@ -69,7 +69,7 @@ func getZone(n *v1.Node) string {
 // ToInstanceReferences returns instance references by links
 func (gce *GCECloud) ToInstanceReferences(zone string, instanceNames []string) (refs []*compute.InstanceReference) {
 	for _, ins := range instanceNames {
-		instanceLink := makeHostURL(gce.projectID, zone, ins)
+		instanceLink := makeHostURL(gce.service.BasePath, gce.projectID, zone, ins)
 		refs = append(refs, &compute.InstanceReference{Instance: instanceLink})
 	}
 	return refs
@@ -303,7 +303,7 @@ func (gce *GCECloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err e
 		return
 	}
 
-	var res *computealpha.Instance
+	var res *computebeta.Instance
 	res, err = gce.serviceBeta.Instances.Get(
 		gce.projectID, instance.Zone, instance.Name).Do()
 	if err != nil {

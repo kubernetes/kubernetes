@@ -48,7 +48,7 @@ type NodeAuthorizer struct {
 	nodeRules  []rbacapi.PolicyRule
 }
 
-// New returns a new node authorizer
+// NewAuthorizer returns a new node authorizer
 func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules []rbacapi.PolicyRule) authorizer.Authorizer {
 	return &NodeAuthorizer{
 		graph:      graph,
@@ -113,7 +113,7 @@ func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, 
 		return false, "no path found to object", nil
 	}
 	if !ok {
-		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		glog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
 		return false, "no path found to object", nil
 	}
 	return ok, "", nil
@@ -126,12 +126,12 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 
 	nodeVertex, exists := r.graph.getVertex_rlocked(nodeVertexType, "", nodeName)
 	if !exists {
-		return false, fmt.Errorf("unknown node %s cannot get %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+		return false, fmt.Errorf("unknown node %q cannot get %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 
 	startingVertex, exists := r.graph.getVertex_rlocked(startingType, startingNamespace, startingName)
 	if !exists {
-		return false, fmt.Errorf("node %s cannot get unknown %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+		return false, fmt.Errorf("node %q cannot get unknown %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 
 	found := false
@@ -158,7 +158,7 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 		return found
 	})
 	if !found {
-		return false, fmt.Errorf("node %s cannot get %s %s/%s, no path was found", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+		return false, fmt.Errorf("node %q cannot get %s %s/%s, no path was found", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 	return true, nil
 }

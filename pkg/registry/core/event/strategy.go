@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
@@ -39,6 +40,10 @@ type eventStrategy struct {
 // Strategy is the default logic that pplies when creating and updating
 // Event objects via the REST API.
 var Strategy = eventStrategy{api.Scheme, names.SimpleNameGenerator}
+
+func (eventStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+	return rest.Unsupported
+}
 
 func (eventStrategy) NamespaceScoped() bool {
 	return true

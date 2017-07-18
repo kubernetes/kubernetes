@@ -13,7 +13,6 @@ go_library(
         "apiserver.go",
         "authn.go",
         "crud.go",
-        "deployment.go",
         "event.go",
         "ingress.go",
         "namespace.go",

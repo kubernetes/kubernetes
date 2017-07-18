@@ -102,7 +102,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			kubeAPIServerOptions.SecureServing.BindPort = kubePort
 			kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 			kubeAPIServerOptions.InsecureServing.BindPort = 0
-			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURLFromEnv()}
+			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
 			kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
 			kubeAPIServerOptions.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
 			kubeAPIServerOptions.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}
@@ -122,7 +122,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			}
 			kubeClientConfigValue.Store(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
 
-			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers, nil)
+			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -190,7 +190,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 				"--requestheader-allowed-names=kube-aggregator",
 				"--authentication-kubeconfig", kubeconfigFile.Name(),
 				"--authorization-kubeconfig", kubeconfigFile.Name(),
-				"--etcd-servers", framework.GetEtcdURLFromEnv(),
+				"--etcd-servers", framework.GetEtcdURL(),
 				"--cert-dir", wardleCertDir,
 			})
 			if err := wardleCmd.Execute(); err != nil {
@@ -266,7 +266,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 				"--core-kubeconfig", kubeconfigFile.Name(),
 				"--authentication-kubeconfig", kubeconfigFile.Name(),
 				"--authorization-kubeconfig", kubeconfigFile.Name(),
-				"--etcd-servers", framework.GetEtcdURLFromEnv(),
+				"--etcd-servers", framework.GetEtcdURL(),
 				"--cert-dir", aggregatorCertDir,
 			})
 			if err := aggregatorCmd.Execute(); err != nil {
@@ -448,9 +448,11 @@ func testAPIResourceList(t *testing.T, client rest.Interface) {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", "/apis/wardle.k8s.io/v1alpha1", err)
 	}
 	assert.Equal(t, groupVersion.String(), apiResourceList.GroupVersion)
-	assert.Equal(t, 1, len(apiResourceList.APIResources))
-	assert.Equal(t, "flunders", apiResourceList.APIResources[0].Name)
-	assert.True(t, apiResourceList.APIResources[0].Namespaced)
+	assert.Equal(t, 2, len(apiResourceList.APIResources))
+	assert.Equal(t, "fischers", apiResourceList.APIResources[0].Name)
+	assert.False(t, apiResourceList.APIResources[0].Namespaced)
+	assert.Equal(t, "flunders", apiResourceList.APIResources[1].Name)
+	assert.True(t, apiResourceList.APIResources[1].Namespaced)
 }
 
 const (

@@ -197,10 +197,6 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		stub:             `{"metadata": {"name": "psp1"}, "spec": {"fsGroup": {"rule": "RunAsAny"}, "privileged": true, "runAsUser": {"rule": "RunAsAny"}, "seLinux": {"rule": "MustRunAs"}, "supplementalGroups": {"rule": "RunAsAny"}}}`,
 		expectedEtcdPath: "/registry/podsecuritypolicy/psp1",
 	},
-	gvr("extensions", "v1beta1", "thirdpartyresources"): {
-		stub:             `{"description": "third party", "metadata": {"name": "kind.domain.tld"}, "versions": [{"name": "v3"}]}`,
-		expectedEtcdPath: "/registry/thirdpartyresources/kind.domain.tld",
-	},
 	gvr("extensions", "v1beta1", "ingresses"): {
 		stub:             `{"metadata": {"name": "ingress1"}, "spec": {"backend": {"serviceName": "service", "servicePort": 5000}}}`,
 		expectedEtcdPath: "/registry/ingress/etcdstoragepathtestnamespace/ingress1",
@@ -372,6 +368,7 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	gvr("extensions", "v1beta1", "replicationcontrollerdummies"), // not stored in etcd
 	gvr("extensions", "v1beta1", "scales"),                       // not stored in etcd, part of kapiv1.ReplicationController
 	gvr("extensions", "v1beta1", "thirdpartyresourcedatas"),      // we cannot create this
+	gvr("extensions", "v1beta1", "thirdpartyresources"),          // these have been removed from the API server, but kept for the client
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1
@@ -591,7 +588,7 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 			kubeAPIServerOptions := options.NewServerRunOptions()
 			kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
 			kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
-			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURLFromEnv()}
+			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
 			kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // TODO use protobuf?
 			kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
 			kubeAPIServerOptions.Authorization.Mode = "RBAC"
@@ -615,7 +612,7 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 
 			kubeAPIServerConfig.APIResourceConfigSource = &allResourceSource{} // force enable all resources
 
-			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers, nil)
+			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers)
 			if err != nil {
 				t.Fatal(err)
 			}

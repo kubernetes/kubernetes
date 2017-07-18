@@ -20,16 +20,19 @@ package system
 type KernelConfig struct {
 	// Name is the general name of the kernel configuration. It is used to
 	// match kernel configuration.
-	Name string
+	Name string `json:"name,omitempty"`
+	// TODO(yguo0905): Support the "or" operation, which will be the same
+	// as the "aliases".
+	//
 	// Aliases are aliases of the kernel configuration. Some configuration
 	// has different names in different kernel version. Names of different
 	// versions will be treated as aliases.
-	Aliases []string
+	Aliases []string `json:"aliases,omitempty"`
 	// Description is the description of the kernel configuration, for example:
 	//  * What is it used for?
 	//  * Why is it needed?
 	//  * Who needs it?
-	Description string
+	Description string `json:"description,omitempty"`
 }
 
 // KernelSpec defines the specification for the kernel. Currently, it contains
@@ -38,31 +41,31 @@ type KernelConfig struct {
 //   * Kernel Configuration
 type KernelSpec struct {
 	// Versions define supported kernel version. It is a group of regexps.
-	Versions []string
+	Versions []string `json:"versions,omitempty"`
 	// Required contains all kernel configurations required to be enabled
 	// (built in or as module).
-	Required []KernelConfig
+	Required []KernelConfig `json:"required,omitempty"`
 	// Optional contains all kernel configurations are required for optional
 	// features.
-	Optional []KernelConfig
+	Optional []KernelConfig `json:"optional,omitempty"`
 	// Forbidden contains all kernel configurations which areforbidden (disabled
 	// or not set)
-	Forbidden []KernelConfig
+	Forbidden []KernelConfig `json:"forbidden,omitempty"`
 }
 
 // DockerSpec defines the requirement configuration for docker. Currently, it only
 // contains spec for graph driver.
 type DockerSpec struct {
 	// Version is a group of regex matching supported docker versions.
-	Version []string
+	Version []string `json:"version,omitempty"`
 	// GraphDriver is the graph drivers supported by kubelet.
-	GraphDriver []string
+	GraphDriver []string `json:"graphDriver,omitempty"`
 }
 
 // RuntimeSpec is the abstract layer for different runtimes. Different runtimes
 // should put their spec inside the RuntimeSpec.
 type RuntimeSpec struct {
-	*DockerSpec
+	*DockerSpec `json:",inline"`
 }
 
 // PackageSpec defines the required packages and their versions.
@@ -72,7 +75,7 @@ type RuntimeSpec struct {
 // either "foo (>=1.0)" or "bar (>=2.0)" is required.
 type PackageSpec struct {
 	// Name is the name of the package to be checked.
-	Name string
+	Name string `json:"name,omitempty"`
 	// VersionRange represents a range of versions that the package must
 	// satisfy. Note that the version requirement will not be enforced if
 	// the version range is empty. For example,
@@ -81,9 +84,11 @@ type PackageSpec struct {
 	// - ">1.0 <2.0" would match between both ranges, so "1.1.1" and "1.8.7"
 	//   but not "1.0.0" or "2.0.0".
 	// - "<2.0.0 || >=3.0.0" would match "1.0.0" and "3.0.0" but not "2.0.0".
-	VersionRange string
+	VersionRange string `json:"versionRange,omitempty"`
 	// Description explains the reason behind this package requirements.
-	Description string
+	//
+	// TODO(yguo0905): Print the description where necessary.
+	Description string `json:"description,omitempty"`
 }
 
 // PackageSpecOverride defines the overrides on the PackageSpec for an OS
@@ -91,31 +96,31 @@ type PackageSpec struct {
 type PackageSpecOverride struct {
 	// OSDistro identifies to which OS distro this override applies.
 	// Must be "ubuntu", "cos" or "coreos".
-	OSDistro string
+	OSDistro string `json:"osDistro,omitempty"`
 	// Subtractions is a list of package names that are excluded from the
 	// package spec.
-	Subtractions []PackageSpec
+	Subtractions []PackageSpec `json:"subtractions,omitempty"`
 	// Additions is a list of additional package requirements included the
 	// package spec.
-	Additions []PackageSpec
+	Additions []PackageSpec `json:"additions,omitempty"`
 }
 
 // SysSpec defines the requirement of supported system. Currently, it only contains
 // spec for OS, Kernel and Cgroups.
 type SysSpec struct {
 	// OS is the operating system of the SysSpec.
-	OS string
+	OS string `json:"os,omitempty"`
 	// KernelConfig defines the spec for kernel.
-	KernelSpec KernelSpec
+	KernelSpec KernelSpec `json:"kernelSpec,omitempty"`
 	// Cgroups is the required cgroups.
-	Cgroups []string
+	Cgroups []string `json:"cgroups,omitempty"`
 	// RuntimeSpec defines the spec for runtime.
-	RuntimeSpec RuntimeSpec
+	RuntimeSpec RuntimeSpec `json:"runtimeSpec,omitempty"`
 	// PackageSpec defines the required packages and their versions.
-	PackageSpecs []PackageSpec
+	PackageSpecs []PackageSpec `json:"packageSpecs,omitempty"`
 	// PackageSpec defines the overrides of the required packages and their
 	// versions for an OS distro.
-	PackageSpecOverrides []PackageSpecOverride
+	PackageSpecOverrides []PackageSpecOverride `json:"packageSpecOverrides,omitempty"`
 }
 
 // DefaultSysSpec is the default SysSpec.

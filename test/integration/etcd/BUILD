@@ -9,7 +9,11 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["etcd_storage_path_test.go"],
+    size = "large",
+    srcs = [
+        "etcd_storage_path_test.go",
+        "main_test.go",
+    ],
     tags = [
         "automanaged",
         "etcd",

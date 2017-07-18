@@ -33,12 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/net"
+	proxyutil "k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/httplog"
-	proxyutil "k8s.io/apiserver/pkg/util/proxy"
 
 	"github.com/golang/glog"
 )
@@ -60,10 +60,12 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var httpCode int
 	reqStart := time.Now()
 	defer func() {
-		metrics.Monitor(&verb, &apiResource, &subresource,
+		metrics.Monitor(
+			verb, apiResource, subresource,
 			net.GetHTTPClient(req),
 			w.Header().Get("Content-Type"),
-			httpCode, reqStart)
+			httpCode, reqStart,
+		)
 	}()
 
 	ctx, ok := r.Mapper.Get(req)

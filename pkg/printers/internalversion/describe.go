@@ -231,7 +231,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 			if slice.ContainsString(skip, skipExpr, nil) {
 				continue
 			}
-			w.Write(level, fmt.Sprintf("%s:\n", smartLabelFor(field)))
+			w.Write(level, "%s:\n", smartLabelFor(field))
 			printUnstructuredContent(w, level+1, typedValue, skipExpr, skip...)
 
 		case []interface{}:
@@ -239,13 +239,13 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 			if slice.ContainsString(skip, skipExpr, nil) {
 				continue
 			}
-			w.Write(level, fmt.Sprintf("%s:\n", smartLabelFor(field)))
+			w.Write(level, "%s:\n", smartLabelFor(field))
 			for _, child := range typedValue {
 				switch typedChild := child.(type) {
 				case map[string]interface{}:
 					printUnstructuredContent(w, level+1, typedChild, skipExpr, skip...)
 				default:
-					w.Write(level+1, fmt.Sprintf("%v\n", typedChild))
+					w.Write(level+1, "%v\n", typedChild)
 				}
 			}
 
@@ -254,7 +254,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 			if slice.ContainsString(skip, skipExpr, nil) {
 				continue
 			}
-			w.Write(level, fmt.Sprintf("%s:\t%v\n", smartLabelFor(field), typedValue))
+			w.Write(level, "%s:\t%v\n", smartLabelFor(field), typedValue)
 		}
 	}
 }
@@ -1421,7 +1421,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string, descri
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, err := getPodStatusForController(pc, labels.SelectorFromSet(controller.Spec.Selector))
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, labels.SelectorFromSet(controller.Spec.Selector), controller.UID)
 	if err != nil {
 		return "", err
 	}
@@ -1498,7 +1498,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, getPodErr := getPodStatusForController(pc, selector)
+	running, waiting, succeeded, failed, getPodErr := getPodStatusForController(pc, selector, rs.UID)
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
@@ -1698,7 +1698,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 	if err != nil {
 		return "", err
 	}
-	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector)
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector, daemon.UID)
 	if err != nil {
 		return "", err
 	}
@@ -2360,7 +2360,6 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
-		w.Write(LEVEL_0, "Role:\t%s\n", findNodeRole(node))
 		printLabelsMultiline(w, "Labels", node.Labels)
 		printAnnotationsMultiline(w, "Annotations", node.Annotations)
 		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
@@ -2453,7 +2452,7 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector)
+	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector, ps.UID)
 	if err != nil {
 		return "", err
 	}
@@ -2838,13 +2837,18 @@ func printReplicaSetsByLabels(matchingRSs []*versionedextension.ReplicaSet) stri
 	return list
 }
 
-func getPodStatusForController(c coreclient.PodInterface, selector labels.Selector) (running, waiting, succeeded, failed int, err error) {
+func getPodStatusForController(c coreclient.PodInterface, selector labels.Selector, uid types.UID) (running, waiting, succeeded, failed int, err error) {
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rcPods, err := c.List(options)
 	if err != nil {
 		return
 	}
 	for _, pod := range rcPods.Items {
+		controllerRef := controller.GetControllerOf(&pod)
+		// Skip pods that are orphans or owned by other controllers.
+		if controllerRef == nil || controllerRef.UID != uid {
+			continue
+		}
 		switch pod.Status.Phase {
 		case api.PodRunning:
 			running++

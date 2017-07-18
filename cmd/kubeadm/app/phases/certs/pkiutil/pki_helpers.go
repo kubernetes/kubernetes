@@ -61,6 +61,16 @@ func NewCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey, config certu
 	return cert, key, nil
 }
 
+// HasServerAuth returns true if the given certificate is a ServerAuth
+func HasServerAuth(cert *x509.Certificate) bool {
+	for i := range cert.ExtKeyUsage {
+		if cert.ExtKeyUsage[i] == x509.ExtKeyUsageServerAuth {
+			return true
+		}
+	}
+	return false
+}
+
 func WriteCertAndKey(pkiPath string, name string, cert *x509.Certificate, key *rsa.PrivateKey) error {
 	if err := WriteKey(pkiPath, name, key); err != nil {
 		return err

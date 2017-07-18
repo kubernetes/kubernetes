@@ -1008,7 +1008,7 @@ type DownwardAPIVolumeSource struct {
 type DownwardAPIVolumeFile struct {
 	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
 	Path string
-	// Required: Selects a field of the pod: only annotations, labels, name and  namespace are supported.
+	// Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.
 	// +optional
 	FieldRef *ObjectFieldSelector
 	// Selects a resource of the container: only resources limits and requests
@@ -1373,7 +1373,7 @@ type EnvVar struct {
 // Only one of its fields may be set.
 type EnvVarSource struct {
 	// Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations,
-	// spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.
+	// metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.
 	// +optional
 	FieldRef *ObjectFieldSelector
 	// Selects a resource of the container: only resources limits and requests
@@ -3852,7 +3852,7 @@ const (
 	// Enable TTY for remote command execution
 	ExecTTYParam = "tty"
 	// Command to run for remote command execution
-	ExecCommandParamm = "command"
+	ExecCommandParam = "command"
 
 	// Name of header that specifies stream type
 	StreamType = "streamType"

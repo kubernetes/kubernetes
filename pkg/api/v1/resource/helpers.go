@@ -27,7 +27,7 @@ import (
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
 // containers of the pod.
-func PodRequestsAndLimits(pod *v1.Pod) (reqs map[v1.ResourceName]resource.Quantity, limits map[v1.ResourceName]resource.Quantity, err error) {
+func PodRequestsAndLimits(pod *v1.Pod) (reqs map[v1.ResourceName]resource.Quantity, limits map[v1.ResourceName]resource.Quantity) {
 	reqs, limits = map[v1.ResourceName]resource.Quantity{}, map[v1.ResourceName]resource.Quantity{}
 	for _, container := range pod.Spec.Containers {
 		for name, quantity := range container.Resources.Requests {

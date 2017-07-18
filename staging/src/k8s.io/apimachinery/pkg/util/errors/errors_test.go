@@ -266,7 +266,7 @@ func TestFlatten(t *testing.T) {
 func TestCreateAggregateFromMessageCountMap(t *testing.T) {
 	testCases := []struct {
 		name     string
-		mcp      MessageCountMap
+		mcm      MessageCountMap
 		expected Aggregate
 	}{
 		{
@@ -279,6 +279,11 @@ func TestCreateAggregateFromMessageCountMap(t *testing.T) {
 			MessageCountMap{"abc": 2, "ghi": 1},
 			aggregate{fmt.Errorf("abc (repeated 2 times)"), fmt.Errorf("ghi")},
 		},
+		{
+			"input has multiple messages",
+			MessageCountMap{"ghi": 1, "abc": 2},
+			aggregate{fmt.Errorf("abc (repeated 2 times)"), fmt.Errorf("ghi")},
+		},
 	}
 
 	var expected, agg []error
@@ -288,8 +293,8 @@ func TestCreateAggregateFromMessageCountMap(t *testing.T) {
 				expected = testCase.expected.Errors()
 				sort.Slice(expected, func(i, j int) bool { return expected[i].Error() < expected[j].Error() })
 			}
-			if testCase.mcp != nil {
-				agg = CreateAggregateFromMessageCountMap(testCase.mcp).Errors()
+			if testCase.mcm != nil {
+				agg = CreateAggregateFromMessageCountMap(testCase.mcm).Errors()
 				sort.Slice(agg, func(i, j int) bool { return agg[i].Error() < agg[j].Error() })
 			}
 			if !reflect.DeepEqual(expected, agg) {

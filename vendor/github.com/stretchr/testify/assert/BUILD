@@ -10,6 +10,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "assertion_format.go",
+        "assertion_forward.go",
         "assertions.go",
         "doc.go",
         "errors.go",

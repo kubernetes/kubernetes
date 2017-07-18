@@ -37,10 +37,12 @@ const (
 	APIServerCertAndKeyBaseName = "apiserver"
 	APIServerCertName           = "apiserver.crt"
 	APIServerKeyName            = "apiserver.key"
+	APIServerCertCommonName     = "kube-apiserver" //used as subject.commonname attribute (CN)
 
 	APIServerKubeletClientCertAndKeyBaseName = "apiserver-kubelet-client"
 	APIServerKubeletClientCertName           = "apiserver-kubelet-client.crt"
 	APIServerKubeletClientKeyName            = "apiserver-kubelet-client.key"
+	APIServerKubeletClientCertCommonName     = "kube-apiserver-kubelet-client" //used as subject.commonname attribute (CN)
 
 	ServiceAccountKeyBaseName    = "sa"
 	ServiceAccountPublicKeyName  = "sa.pub"
@@ -53,6 +55,7 @@ const (
 	FrontProxyClientCertAndKeyBaseName = "front-proxy-client"
 	FrontProxyClientCertName           = "front-proxy-client.crt"
 	FrontProxyClientKeyName            = "front-proxy-client.key"
+	FrontProxyClientCertCommonName     = "front-proxy-client" //used as subject.commonname attribute (CN)
 
 	AdminKubeConfigFileName             = "admin.conf"
 	KubeletKubeConfigFileName           = "kubelet.conf"
@@ -81,8 +84,8 @@ const (
 	MinimumAddressesInServiceSubnet = 10
 
 	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
-	// Default behaviour is "never expire" == 0
-	DefaultTokenDuration = 0
+	// Default behaviour is 24 hours
+	DefaultTokenDuration = 24 * time.Hour
 
 	// LabelNodeRoleMaster specifies that a node is a master
 	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
@@ -107,11 +110,10 @@ var (
 	DefaultTokenUsages = []string{"signing", "authentication"}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.6.0")
-
-	// MinimumCSRSARApproverVersion specifies the minimum kubernetes version that can be used for enabling the new-in-v1.7 CSR approver based on a SubjectAccessReview
-	MinimumCSRSARApproverVersion = version.MustParseSemantic("v1.7.0-beta.0")
-
-	// MinimumAPIAggregationVersion specifies the minimum kubernetes version that can be used enabling the API aggregation in the apiserver and the front proxy flags
-	MinimumAPIAggregationVersion = version.MustParseSemantic("v1.7.0-alpha.1")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.7.0")
 )
+
+// BuildStaticManifestFilepath returns the location on the disk where the Static Pod should be present
+func BuildStaticManifestFilepath(componentName string) string {
+	return filepath.Join(KubernetesDir, ManifestsSubDirName, componentName+".yaml")
+}

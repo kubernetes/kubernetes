@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/blang/semver"
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
@@ -455,9 +455,12 @@ func (ds *dockerService) getDockerVersionFromCache() (*dockertypes.Version, erro
 	// We only store on key in the cache.
 	const dummyKey = "version"
 	value, err := ds.versionCache.Get(dummyKey)
-	dv := value.(*dockertypes.Version)
 	if err != nil {
 		return nil, err
+	}
+	dv, ok := value.(*dockertypes.Version)
+	if !ok {
+		return nil, fmt.Errorf("Converted to *dockertype.Version error")
 	}
 	return dv, nil
 }

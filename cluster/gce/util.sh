@@ -345,6 +345,11 @@ function detect-node-names() {
         --format='value(instance)'))
     done
   fi
+  # Add heapster node name to the list too (if it exists).
+  if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
+    NODE_NAMES+=("${NODE_INSTANCE_PREFIX}-heapster")
+  fi
+
   echo "INSTANCE_GROUPS=${INSTANCE_GROUPS[*]:-}" >&2
   echo "NODE_NAMES=${NODE_NAMES[*]:-}" >&2
 }
@@ -510,7 +515,7 @@ function make-gcloud-network-argument() {
     ret="${ret},aliases=pods-default:${alias_size}"
     ret="${ret} --no-can-ip-forward"
   else
-    if [[ ${PREEXISTING_NETWORK} = "true" && "${PREEXISTING_NETWORK_MODE}" != "custom" ]]; then
+    if [[ ${ENABLE_BIG_CLUSTER_SUBNETS} != "true" || (${PREEXISTING_NETWORK} = "true" && "${PREEXISTING_NETWORK_MODE}" != "custom") ]]; then
       ret="--network ${network}"
     else
       ret="--subnet=${network}"
@@ -533,7 +538,7 @@ function get-template-name-from-version() {
 # Robustly try to create an instance template.
 # $1: The name of the instance template.
 # $2: The scopes flag.
-# $3 and others: Metadata entries (must all be from a file).
+# $3: String of comma-separated metadata entries (must all be from a file).
 function create-node-template() {
   detect-project
   local template_name="$1"
@@ -600,7 +605,7 @@ function create-node-template() {
       ${network} \
       ${preemptible_minions} \
       $2 \
-      --metadata-from-file $(echo ${@:3} | tr ' ' ',') >&2; then
+      --metadata-from-file $3 >&2; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create instance template $template_name ${color_norm}" >&2
           exit 2
@@ -1237,21 +1242,24 @@ function create-nodes-firewall() {
   }
 }
 
-function create-nodes-template() {
-  echo "Creating minions."
-
-  # TODO(zmerlynn): Refactor setting scope flags.
+function get-scope-flags() {
   local scope_flags=
   if [[ -n "${NODE_SCOPES}" ]]; then
     scope_flags="--scopes ${NODE_SCOPES}"
   else
     scope_flags="--no-scopes"
   fi
+  echo "${scope_flags}"
+}
+
+function create-nodes-template() {
+  echo "Creating nodes."
+
+  local scope_flags=$(get-scope-flags)
 
   write-node-env
 
   local template_name="${NODE_INSTANCE_PREFIX}-template"
-
   create-node-instance-template $template_name
 }
 
@@ -1279,7 +1287,13 @@ function set_num_migs() {
 function create-nodes() {
   local template_name="${NODE_INSTANCE_PREFIX}-template"
 
-  local instances_left=${NUM_NODES}
+  if [[ -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
+    local -r nodes="${NUM_NODES}"
+  else
+    local -r nodes=$(( NUM_NODES - 1 ))
+  fi
+
+  local instances_left=${nodes}
 
   #TODO: parallelize this loop to speed up the process
   for ((i=1; i<=${NUM_MIGS}; i++)); do
@@ -1305,6 +1319,47 @@ function create-nodes() {
         --zone "${ZONE}" \
         --project "${PROJECT}" || true;
   done
+
+  if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
+    echo "Creating a special node for heapster with machine-type ${HEAPSTER_MACHINE_TYPE}"
+    create-heapster-node
+  fi
+}
+
+# Assumes:
+# - NODE_INSTANCE_PREFIX
+# - PROJECT
+# - ZONE
+# - HEAPSTER_MACHINE_TYPE
+# - NODE_DISK_TYPE
+# - NODE_DISK_SIZE
+# - NODE_IMAGE_PROJECT
+# - NODE_IMAGE
+# - NODE_TAG
+# - NETWORK
+# - ENABLE_IP_ALIASES
+# - IP_ALIAS_SUBNETWORK
+# - IP_ALIAS_SIZE
+function create-heapster-node() {
+  local network=$(make-gcloud-network-argument \
+      "${NETWORK}" "" \
+      "${ENABLE_IP_ALIASES:-}" \
+      "${IP_ALIAS_SUBNETWORK:-}" \
+      "${IP_ALIAS_SIZE:-}")
+
+  gcloud compute instances \
+      create "${NODE_INSTANCE_PREFIX}-heapster" \
+      --project "${PROJECT}" \
+      --zone "${ZONE}" \
+      --machine-type="${HEAPSTER_MACHINE_TYPE}" \
+      --boot-disk-type "${NODE_DISK_TYPE}" \
+      --boot-disk-size "${NODE_DISK_SIZE}" \
+      --image-project="${NODE_IMAGE_PROJECT}" \
+      --image "${NODE_IMAGE}" \
+      --tags "${NODE_TAG}" \
+      ${network} \
+      $(get-scope-flags) \
+      --metadata-from-file "$(get-node-instance-metadata)"
 }
 
 # Assumes:
@@ -1505,6 +1560,20 @@ function kube-down() {
           "${template}"
       fi
     done
+
+    # Delete the special heapster node (if it exists).
+    if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
+      local -r heapster_machine_name="${NODE_INSTANCE_PREFIX}-heapster"
+      if gcloud compute instances describe "${heapster_machine_name}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
+        # Now we can safely delete the VM.
+        gcloud compute instances delete \
+          --project "${PROJECT}" \
+          --quiet \
+          --delete-disks all \
+          --zone "${ZONE}" \
+          "${heapster_machine_name}"
+      fi
+    fi
   fi
 
   local -r REPLICA_NAME="${KUBE_REPLICA_NAME:-$(get-replica-name)}"
@@ -1875,13 +1944,7 @@ function prepare-push() {
   if [[ "${node}" == "true" ]]; then
     write-node-env
 
-    # TODO(zmerlynn): Refactor setting scope flags.
-    local scope_flags=
-    if [[ -n "${NODE_SCOPES}" ]]; then
-      scope_flags="--scopes ${NODE_SCOPES}"
-    else
-      scope_flags="--no-scopes"
-    fi
+    local scope_flags=$(get-scope-flags)
 
     # Ugly hack: Since it is not possible to delete instance-template that is currently
     # being used, create a temp one, then delete the old one and recreate it once again.

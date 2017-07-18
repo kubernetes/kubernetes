@@ -57,7 +57,7 @@ var podRequestedResource *v1.ResourceRequirements = &v1.ResourceRequirements{
 }
 
 // This test suite is used to verifies scheduler priority functions based on the default provider
-var _ = framework.KubeDescribe("SchedulerPriorities [Serial]", func() {
+var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
 	var systemPodsNo int
@@ -398,7 +398,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 
 		needCreateResource["memory"] = *resource.NewQuantity(int64((ratio-memFraction)*float64(memAllocatableVal)), resource.BinarySI)
 
-		err := testutils.StartPods(cs, 1, ns, "priority-balanced-mem-"+node.Name,
+		err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
 			*initPausePod(f, pausePodConfig{
 				Name:   "",
 				Labels: balancePodLabel,

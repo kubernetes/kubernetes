@@ -22,8 +22,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	dockertypes "github.com/docker/engine-api/types"
-	dockerfilters "github.com/docker/engine-api/types/filters"
+	dockertypes "github.com/docker/docker/api/types"
+	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -155,9 +155,9 @@ func (ds *dockerService) checkLegacyCleanup() (bool, error) {
 // ListLegacyPodSandbox only lists all legacy pod sandboxes.
 func (ds *dockerService) ListLegacyPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
 	// By default, list all containers whether they are running or not.
-	opts := dockertypes.ContainerListOptions{All: true, Filter: dockerfilters.NewArgs()}
+	opts := dockertypes.ContainerListOptions{All: true, Filters: dockerfilters.NewArgs()}
 	filterOutReadySandboxes := false
-	f := newDockerFilter(&opts.Filter)
+	f := newDockerFilter(&opts.Filters)
 	if filter != nil {
 		if filter.Id != "" {
 			f.Add("id", filter.Id)
@@ -218,8 +218,8 @@ func (ds *dockerService) ListLegacyPodSandbox(filter *runtimeapi.PodSandboxFilte
 
 // ListLegacyPodSandbox only lists all legacy containers.
 func (ds *dockerService) ListLegacyContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
-	opts := dockertypes.ContainerListOptions{All: true, Filter: dockerfilters.NewArgs()}
-	f := newDockerFilter(&opts.Filter)
+	opts := dockertypes.ContainerListOptions{All: true, Filters: dockerfilters.NewArgs()}
+	f := newDockerFilter(&opts.Filters)
 
 	if filter != nil {
 		if filter.Id != "" {

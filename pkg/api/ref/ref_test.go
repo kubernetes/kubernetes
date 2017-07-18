@@ -35,8 +35,6 @@ type ExtensionAPIObject struct {
 	metav1.ObjectMeta
 }
 
-func (obj *ExtensionAPIObject) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
-
 func TestGetReference(t *testing.T) {
 
 	// when vendoring kube, if you don't force the set of registered versions (like make test does)

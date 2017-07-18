@@ -10,9 +10,13 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "etcd.go",
         "master_utils.go",
         "perf_utils.go",
         "serializer.go",
+    ],
+    data = [
+        "@com_coreos_etcd//:etcd",
     ],
     tags = ["automanaged"],
     deps = [
@@ -21,7 +25,6 @@ go_library(
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/policy/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/controller:go_default_library",
@@ -51,7 +54,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/versioning:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticatorfactory:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/request/union:go_default_library",

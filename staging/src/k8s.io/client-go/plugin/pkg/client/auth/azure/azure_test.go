@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/adal"
 )
 
 func TestAzureTokenSource(t *testing.T) {
@@ -120,8 +120,8 @@ func token2Cfg(token *azureToken) map[string]string {
 	return cfg
 }
 
-func newFackeAzureToken(accessToken string, expiresOn string) azure.Token {
-	return azure.Token{
+func newFackeAzureToken(accessToken string, expiresOn string) adal.Token {
+	return adal.Token{
 		AccessToken:  accessToken,
 		RefreshToken: "fake",
 		ExpiresIn:    "3600",

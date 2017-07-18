@@ -46,6 +46,7 @@ audit-log-maxage
 audit-log-maxbackup
 audit-log-maxsize
 audit-log-path
+audit-policy-file
 audit-webhook-config-file
 audit-webhook-mode
 authentication-kubeconfig
@@ -105,6 +106,7 @@ cluster-context
 cluster-dns
 cluster-domain
 cluster-ip
+cluster-ip-range
 cluster-monitor-period
 cluster-name
 cluster-signing-cert-file
@@ -185,6 +187,7 @@ docker-exec-handler
 docker-password
 docker-server
 docker-username
+dockershim-checkpoint-dir
 driver-port
 drop-embedded-fields
 dry-run
@@ -297,6 +300,7 @@ gather-logs-sizes
 gather-metrics-at-teardown
 gather-resource-usage
 gather-suite-metrics-at-teardown
+gce-api-endpoint
 gce-multizone
 gce-project
 gce-service-account
@@ -331,6 +335,7 @@ http-port
 ignore-daemonsets
 ignore-not-found
 image-config-file
+image-description
 image-gc-high-threshold
 image-gc-low-threshold
 image-project
@@ -467,19 +472,7 @@ max-outgoing-qps
 max-pods
 max-requests-inflight
 max-unavailable
-mesos-authentication-principal
-mesos-authentication-provider
-mesos-authentication-secret-file
-mesos-cgroup-prefix
-mesos-default-pod-roles
-mesos-executor-cpus
-mesos-executor-mem
-mesos-framework-roles
-mesos-generate-task-discovery
-mesos-launch-grace-period
-mesos-master
-mesos-sandbox-overlay
-mesos-user
+metrics-bind-address
 metrics-path
 min-available
 minimum-container-ttl-duration
@@ -533,6 +526,7 @@ output-base
 output-directory
 output-file-base
 output-package
+output-patch
 output-print-type
 output-version
 out-version
@@ -680,6 +674,8 @@ system-cgroups
 system-pods-startup-timeout
 system-reserved
 system-reserved-cgroup
+system-spec-file
+system-spec-name
 system-validate-mode
 target-port
 target-ram-mb

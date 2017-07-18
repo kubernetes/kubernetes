@@ -52,7 +52,7 @@ import (
 	11. Delete PVC, PV and Storage Class
 */
 
-var _ = framework.KubeDescribe("Volume Disk Format [Volumes]", func() {
+var _ = SIGDescribe("Volume Disk Format", func() {
 	f := framework.NewDefaultFramework("volume-disk-format")
 	var (
 		client            clientset.Interface

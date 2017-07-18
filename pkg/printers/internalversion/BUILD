@@ -59,7 +59,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//federation/apis/federation:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
         "//pkg/api:go_default_library",
@@ -76,7 +75,6 @@ go_library(
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/apis/rbac:go_default_library",
-        "//pkg/apis/settings:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",

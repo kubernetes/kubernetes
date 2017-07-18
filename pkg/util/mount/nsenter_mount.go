@@ -19,6 +19,7 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -160,6 +161,15 @@ func (n *NsenterMounter) Unmount(target string) error {
 // List returns a list of all mounted filesystems in the host's mount namespace.
 func (*NsenterMounter) List() ([]MountPoint, error) {
 	return listProcMounts(hostProcMountsPath)
+}
+
+func (m *NsenterMounter) IsNotMountPoint(dir string) (bool, error) {
+	return IsNotMountPoint(m, dir)
+}
+
+func (*NsenterMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
+	return ((mp.Path == dir) || (mp.Path == deletedDir))
 }
 
 // IsLikelyNotMountPoint determines whether a path is a mountpoint by calling findmnt

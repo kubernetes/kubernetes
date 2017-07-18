@@ -39,7 +39,8 @@ type TestContextType struct {
 	CertDir            string
 	Host               string
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
-	RepoRoot string
+	RepoRoot                string
+	DockershimCheckpointDir string
 
 	Provider       string
 	CloudConfig    CloudConfig
@@ -130,9 +131,12 @@ type NodeTestContextType struct {
 	PrepullImages bool
 	// KubeletConfig is the kubelet configuration the test is running against.
 	KubeletConfig componentconfig.KubeletConfiguration
+	// ImageDescription is the description of the image on which the test is running.
+	ImageDescription string
 }
 
 type CloudConfig struct {
+	ApiEndpoint       string
 	ProjectID         string
 	Zone              string
 	MultiZone         bool
@@ -140,6 +144,7 @@ type CloudConfig struct {
 	MasterName        string
 	NodeInstanceGroup string // comma-delimited list of groups' names
 	NumNodes          int
+	ClusterIPRange    string
 	ClusterTag        string
 	Network           string
 	ConfigFile        string // for azure and openstack
@@ -181,6 +186,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/rkt/remote).")
 	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "", "The container runtime endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
+	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
 }
 
 // Register flags specific to the cluster e2e test suite.
@@ -205,6 +211,7 @@ func RegisterClusterFlags() {
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	cloudConfig := &TestContext.CloudConfig
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
+	flag.StringVar(&cloudConfig.ApiEndpoint, "gce-api-endpoint", "", "The GCE ApiEndpoint being used, if applicable")
 	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
 	flag.BoolVar(&cloudConfig.MultiZone, "gce-multizone", false, "If true, start GCE cloud provider with multizone support.")
@@ -212,6 +219,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws. If there is more than one group: comma separated list of groups.")
 	flag.StringVar(&cloudConfig.Network, "network", "e2e", "The cloud provider network for this e2e cluster.")
 	flag.IntVar(&cloudConfig.NumNodes, "num-nodes", -1, "Number of nodes in the cluster")
+	flag.StringVar(&cloudConfig.ClusterIPRange, "cluster-ip-range", "10.100.0.0/14", "A CIDR notation IP range from which to assign IPs in the cluster.")
 	flag.StringVar(&cloudConfig.NodeTag, "node-tag", "", "Network tags used on node instances. Valid only for gce, gke")
 	flag.StringVar(&cloudConfig.MasterTag, "master-tag", "", "Network tags used on master instances. Valid only for gce, gke")
 
@@ -244,6 +252,7 @@ func RegisterNodeFlags() {
 	// It is hard and unnecessary to deal with the complexity inside the test suite.
 	flag.BoolVar(&TestContext.NodeConformance, "conformance", false, "If true, the test suite will not start kubelet, and fetch system log (kernel, docker, kubelet log etc.) to the report directory.")
 	flag.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
+	flag.StringVar(&TestContext.ImageDescription, "image-description", "", "The description of the image which the test will be running on.")
 }
 
 // ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.

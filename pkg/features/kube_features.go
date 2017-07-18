@@ -28,7 +28,7 @@ const (
 	// // alpha: v1.X
 	// MyFeature utilfeature.Feature = "MyFeature"
 
-	// owner: @timstclair
+	// owner: @tallclair
 	// beta: v1.4
 	AppArmor utilfeature.Feature = "AppArmor"
 
@@ -44,7 +44,7 @@ const (
 	// alpha: v1.4
 	DynamicKubeletConfig utilfeature.Feature = "DynamicKubeletConfig"
 
-	// owner: timstclair
+	// owner: tallclair
 	// alpha: v1.5
 	//
 	// StreamingProxyRedirects controls whether the apiserver should intercept (and follow)

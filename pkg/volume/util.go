@@ -180,7 +180,10 @@ func (c *realRecyclerClient) Event(eventtype, message string) {
 }
 
 func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error) {
-	podSelector, _ := fields.ParseSelector("metadata.name=" + name)
+	podSelector, err := fields.ParseSelector("metadata.name=" + name)
+	if err != nil {
+		return nil, err
+	}
 	options := metav1.ListOptions{
 		FieldSelector: podSelector.String(),
 		Watch:         true,

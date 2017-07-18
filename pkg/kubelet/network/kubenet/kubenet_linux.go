@@ -118,8 +118,8 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 		iptables:          iptInterface,
 		sysctl:            sysctl,
 		vendorDir:         networkPluginDir,
-		hostportSyncer:    hostport.NewHostportSyncer(),
-		hostportManager:   hostport.NewHostportManager(),
+		hostportSyncer:    hostport.NewHostportSyncer(iptInterface),
+		hostportManager:   hostport.NewHostportManager(iptInterface),
 		nonMasqueradeCIDR: "10.0.0.0/8",
 	}
 }
@@ -259,7 +259,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	if err == nil {
 		setHairpin := plugin.hairpinMode == componentconfig.HairpinVeth
 		// Set bridge address to first address in IPNet
-		cidr.IP.To4()[3] += 1
+		cidr.IP[len(cidr.IP)-1] += 1
 
 		json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, podCIDR, cidr.IP.String())
 		glog.V(2).Infof("CNI network config set to %v", json)
@@ -304,7 +304,7 @@ func (plugin *kubenetNetworkPlugin) Name() string {
 }
 
 func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
-	return utilsets.NewInt(network.NET_PLUGIN_CAPABILITY_SHAPING)
+	return utilsets.NewInt()
 }
 
 // setup sets up networking through CNI using the given ns/name and sandbox ID.

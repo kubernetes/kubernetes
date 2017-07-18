@@ -20,21 +20,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/util/json"
 	"math"
-	"reflect"
 	"strings"
 	"time"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -43,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -84,7 +87,6 @@ const (
 	kLocalStorageWarning = "Deleting pods with local storage"
 	kUnmanagedFatal      = "pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet (use --force to override)"
 	kUnmanagedWarning    = "Deleting pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet"
-	kMaxNodeUpdateRetry  = 10
 )
 
 var (
@@ -197,7 +199,7 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 	var err error
 	if len(args) != 1 {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
+		return cmdutil.UsageErrorf(cmd, "USAGE: %s [flags]", cmd.Use)
 	}
 
 	if o.client, err = o.Factory.ClientSet(); err != nil {
@@ -353,7 +355,7 @@ func (o *DrainOptions) daemonsetFilter(pod api.Pod) (bool, *warning, *fatal) {
 }
 
 func mirrorPodFilter(pod api.Pod) (bool, *warning, *fatal) {
-	if _, found := pod.ObjectMeta.Annotations[types.ConfigMirrorAnnotationKey]; found {
+	if _, found := pod.ObjectMeta.Annotations[corev1.MirrorPodAnnotationKey]; found {
 		return false, nil, nil
 	}
 	return true, nil, nil
@@ -621,27 +623,28 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 	}
 
 	if o.nodeInfo.Mapping.GroupVersionKind.Kind == "Node" {
-		unsched := reflect.ValueOf(o.nodeInfo.Object).Elem().FieldByName("Spec").FieldByName("Unschedulable")
-		if unsched.Bool() == desired {
+		obj, err := o.nodeInfo.Mapping.ConvertToVersion(o.nodeInfo.Object, o.nodeInfo.Mapping.GroupVersionKind.GroupVersion())
+		if err != nil {
+			return err
+		}
+		oldData, err := json.Marshal(obj)
+		node, ok := obj.(*corev1.Node)
+		if !ok {
+			return fmt.Errorf("unexpected Type%T, expected Node", obj)
+		}
+		unsched := node.Spec.Unschedulable
+		if unsched == desired {
 			cmdutil.PrintSuccess(o.mapper, false, o.Out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, already(desired))
 		} else {
 			helper := resource.NewHelper(o.restClient, o.nodeInfo.Mapping)
-			unsched.SetBool(desired)
+			node.Spec.Unschedulable = desired
 			var err error
-			for i := 0; i < kMaxNodeUpdateRetry; i++ {
-				// We don't care about what previous versions may exist, we always want
-				// to overwrite, and Replace always sets current ResourceVersion if version is "".
-				helper.Versioner.SetResourceVersion(o.nodeInfo.Object, "")
-				_, err = helper.Replace(cmdNamespace, o.nodeInfo.Name, true, o.nodeInfo.Object)
-				if err != nil {
-					if !apierrors.IsConflict(err) {
-						return err
-					}
-				} else {
-					break
-				}
-				// It's a race, no need to sleep
+			newData, err := json.Marshal(obj)
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+			if err != nil {
+				return err
 			}
+			_, err = helper.Patch(cmdNamespace, o.nodeInfo.Name, types.StrategicMergePatchType, patchBytes)
 			if err != nil {
 				return err
 			}

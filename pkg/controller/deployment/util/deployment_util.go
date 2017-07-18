@@ -483,7 +483,7 @@ func getReplicaSetFraction(rs extensions.ReplicaSet, d extensions.Deployment) in
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
 // The third returned value is the new replica set, and it may be nil if it doesn't exist yet.
 func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, *extensions.ReplicaSet, error) {
-	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
+	rsList, err := ListReplicaSets(deployment, RsListFromClient(c))
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -501,7 +501,7 @@ func GetAllReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 // GetOldReplicaSets returns the old replica sets targeted by the given Deployment; get PodList and ReplicaSetList from client interface.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
 func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
-	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
+	rsList, err := ListReplicaSets(deployment, RsListFromClient(c))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -511,15 +511,15 @@ func GetOldReplicaSets(deployment *extensions.Deployment, c clientset.Interface)
 // GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
 // Returns nil if the new replica set doesn't exist yet.
 func GetNewReplicaSet(deployment *extensions.Deployment, c clientset.Interface) (*extensions.ReplicaSet, error) {
-	rsList, err := ListReplicaSets(deployment, rsListFromClient(c))
+	rsList, err := ListReplicaSets(deployment, RsListFromClient(c))
 	if err != nil {
 		return nil, err
 	}
 	return FindNewReplicaSet(deployment, rsList)
 }
 
-// rsListFromClient returns an rsListFunc that wraps the given client.
-func rsListFromClient(c clientset.Interface) rsListFunc {
+// RsListFromClient returns an rsListFunc that wraps the given client.
+func RsListFromClient(c clientset.Interface) RsListFunc {
 	return func(namespace string, options metav1.ListOptions) ([]*extensions.ReplicaSet, error) {
 		rsList, err := c.Extensions().ReplicaSets(namespace).List(options)
 		if err != nil {
@@ -541,14 +541,14 @@ func podListFromClient(c clientset.Interface) podListFunc {
 }
 
 // TODO: switch this to full namespacers
-type rsListFunc func(string, metav1.ListOptions) ([]*extensions.ReplicaSet, error)
+type RsListFunc func(string, metav1.ListOptions) ([]*extensions.ReplicaSet, error)
 type podListFunc func(string, metav1.ListOptions) (*v1.PodList, error)
 
 // ListReplicaSets returns a slice of RSes the given deployment targets.
 // Note that this does NOT attempt to reconcile ControllerRef (adopt/orphan),
 // because only the controller itself should do that.
 // However, it does filter out anything whose ControllerRef doesn't match.
-func ListReplicaSets(deployment *extensions.Deployment, getRSList rsListFunc) ([]*extensions.ReplicaSet, error) {
+func ListReplicaSets(deployment *extensions.Deployment, getRSList RsListFunc) ([]*extensions.ReplicaSet, error) {
 	// TODO: Right now we list replica sets by their labels. We should list them by selector, i.e. the replica set's selector
 	//       should be a superset of the deployment's selector, see https://github.com/kubernetes/kubernetes/issues/19830.
 	namespace := deployment.Namespace

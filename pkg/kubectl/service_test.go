@@ -560,6 +560,26 @@ func TestGenerateService(t *testing.T) {
 				},
 			},
 		},
+		{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
+				"selector":   "foo=bar",
+				"name":       "test",
+				"cluster-ip": "None",
+			},
+			expected: api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+					},
+					Ports:     []api.ServicePort{},
+					ClusterIP: api.ClusterIPNone,
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		obj, err := test.generator.Generate(test.params)

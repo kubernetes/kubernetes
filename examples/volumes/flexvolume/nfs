@@ -48,7 +48,7 @@ domount() {
 	SHARE=$(echo $2 | jq -r '.share')
 
 	if [ $(ismounted) -eq 1 ] ; then
-		log "{\"status\": \"Success\"}"
+		log '{"status": "Success"}'
 		exit 0
 	fi
 
@@ -59,14 +59,14 @@ domount() {
 		err "{ \"status\": \"Failure\", \"message\": \"Failed to mount ${NFS_SERVER}:${SHARE} at ${MNTPATH}\"}"
 		exit 1
 	fi
-	log "{\"status\": \"Success\"}"
+	log '{"status": "Success"}'
 	exit 0
 }
 
 unmount() {
 	MNTPATH=$1
 	if [ $(ismounted) -eq 0 ] ; then
-		log "{\"status\": \"Success\"}"
+		log '{"status": "Success"}'
 		exit 0
 	fi
 
@@ -76,14 +76,19 @@ unmount() {
 		exit 1
 	fi
 
-	log "{\"status\": \"Success\"}"
+	log '{"status": "Success"}'
 	exit 0
 }
 
 op=$1
 
+if ! command -v jq >/dev/null 2>&1; then
+	err "{ \"status\": \"Failure\", \"message\": \"'jq' binary not found. Please install jq package before using this driver\"}"
+	exit 1
+fi
+
 if [ "$op" = "init" ]; then
-	log "{\"status\": \"Success\", \"capabilities\": {\"attach\": false}}"
+	log '{"status": "Success", "capabilities": {"attach": false}}'
 	exit 0
 fi
 
@@ -101,7 +106,7 @@ case "$op" in
 		unmount $*
 		;;
 	*)
-		log "{ \"status\": \"Not supported\" }"
+		log '{"status": "Not supported"}'
 		exit 0
 esac
 

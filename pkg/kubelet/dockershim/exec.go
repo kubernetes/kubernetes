@@ -23,7 +23,7 @@ import (
 	"os/exec"
 	"time"
 
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
 
 	"k8s.io/client-go/tools/remotecommand"
@@ -150,7 +150,7 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 	// Have to start this before the call to client.StartExec because client.StartExec is a blocking
 	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
 	kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
-		client.ResizeExecTTY(execObj.ID, int(size.Height), int(size.Width))
+		client.ResizeExecTTY(execObj.ID, uint(size.Height), uint(size.Width))
 	})
 
 	startOpts := dockertypes.ExecStartCheck{Detach: false, Tty: tty}
