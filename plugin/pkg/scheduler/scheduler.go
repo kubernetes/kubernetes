@@ -138,12 +138,17 @@ func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Schedul
 	for _, modifier := range modifiers {
 		modifier(cfg)
 	}
+	return NewFromConfig(cfg), nil
+}
+
+// NewFromConfig returns a new scheduler that is based on a precise config if you have one.
+func NewFromConfig(cfg *Config) *Scheduler {
 	// From this point on the config is immutable to the outside.
 	s := &Scheduler{
 		config: cfg,
 	}
 	metrics.Register()
-	return s, nil
+	return s
 }
 
 // Run begins watching and scheduling. It waits for cache to be synced, then starts a goroutine and returns immediately.
