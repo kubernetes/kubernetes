@@ -28,6 +28,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/util:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",

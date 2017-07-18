@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -270,7 +271,7 @@ func (detacher *photonPersistentDiskDetacher) WaitForDetach(devicePath string, t
 		select {
 		case <-ticker.C:
 			glog.V(4).Infof("Checking device %q is detached.", devicePath)
-			if pathExists, err := volumeutil.PathExists(devicePath); err != nil {
+			if pathExists, err := util.FileExists(devicePath); err != nil {
 				return fmt.Errorf("Error checking if device path exists: %v", err)
 			} else if !pathExists {
 				return nil

@@ -26,8 +26,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -148,7 +148,7 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 // Returns the first path that exists, or empty string if none exist.
 func verifyDevicePath(devicePaths []string) (string, error) {
 	for _, path := range devicePaths {
-		if pathExists, err := volumeutil.PathExists(path); err != nil {
+		if pathExists, err := util.FileExists(path); err != nil {
 			return "", fmt.Errorf("Error checking if path exists: %v", err)
 		} else if pathExists {
 			return path, nil
@@ -162,7 +162,7 @@ func verifyDevicePath(devicePaths []string) (string, error) {
 func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
 	allPathsRemoved := true
 	for _, path := range devicePaths {
-		if exists, err := volumeutil.PathExists(path); err != nil {
+		if exists, err := util.FileExists(path); err != nil {
 			return false, fmt.Errorf("Error checking if path exists: %v", err)
 		} else {
 			allPathsRemoved = allPathsRemoved && !exists
