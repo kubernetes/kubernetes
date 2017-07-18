@@ -37,6 +37,7 @@ import (
 	apiconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	selfhostingphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/token"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -246,7 +247,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	if err := apiconfigphase.UpdateMasterRoleLabelsAndTaints(client, i.cfg.NodeName); err != nil {
+	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName); err != nil {
 		return err
 	}
 
