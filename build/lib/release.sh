@@ -258,7 +258,7 @@ function kube::release::build_hyperkube_image() {
   ARCH="${arch}" REGISTRY="${registry}" VERSION="${version}" \
     make -C cluster/images/hyperkube/ build >/dev/null
 
-  local hyperkube_tag="${docker_registry}/hyperkube-${arch}:${docker_tag}"
+  local hyperkube_tag="${registry}/hyperkube-${arch}:${version}"
   if [[ -n "${save_dir}" ]]; then
     "${DOCKER[@]}" save "${hyperkube_tag}" > "${save_dir}/hyperkube-${arch}.tar"
   fi
@@ -284,7 +284,7 @@ function kube::release::create_docker_images_for_server() {
     local images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
 
-    local docker_registry="${KUBE_DOCKER_REGISTRY:-gcr.io/google_containers}"
+    local -r docker_registry="gcr.io/google_containers"
     # Docker tags cannot contain '+'
     local docker_tag="${KUBE_GIT_VERSION/+/_}"
     if [[ -z "${docker_tag}" ]]; then
