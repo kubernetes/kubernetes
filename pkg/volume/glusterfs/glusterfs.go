@@ -413,6 +413,7 @@ type provisionerConfig struct {
 	gidMin          int
 	gidMax          int
 	volumeType      gapi.VolumeDurabilityInfo
+	volumeOptions   []string
 }
 
 type glusterfsVolumeProvisioner struct {
@@ -755,7 +756,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		glog.V(4).Infof("glusterfs: provided clusterIDs: %v", clusterIDs)
 	}
 	gid64 := int64(gid)
-	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Clusters: clusterIDs, Gid: gid64, Durability: p.volumeType}
+	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Clusters: clusterIDs, Gid: gid64, Durability: p.volumeType, GlusterVolumeOptions: p.volumeOptions}
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
 		glog.Errorf("glusterfs: error creating volume %v ", err)
@@ -920,6 +921,8 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 
 	authEnabled := true
 	parseVolumeType := ""
+	parseVolumeOptions := ""
+
 	for k, v := range params {
 		switch dstrings.ToLower(k) {
 		case "resturl":
@@ -964,6 +967,11 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 			cfg.gidMax = parseGidMax
 		case "volumetype":
 			parseVolumeType = v
+
+		case "volumeoptions":
+			if len(v) != 0 {
+				parseVolumeOptions = v
+			}
 
 		default:
 			return nil, fmt.Errorf("glusterfs: invalid option %q for volume plugin %s", k, glusterfsPluginName)
@@ -1036,5 +1044,13 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 		return nil, fmt.Errorf("StorageClass for provisioner %q must have gidMax value >= gidMin", glusterfsPluginName)
 	}
 
+	if len(parseVolumeOptions) != 0 {
+		volOptions := dstrings.Split(parseVolumeOptions, ",")
+		if len(volOptions) == 0 {
+			return nil, fmt.Errorf("StorageClass for provisioner %q must have valid ( for eg, 'client.ssl on') volume option", glusterfsPluginName)
+		}
+		cfg.volumeOptions = volOptions
+
+	}
 	return &cfg, nil
 }
