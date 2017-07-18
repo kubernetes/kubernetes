@@ -135,12 +135,12 @@ func getProtocolsFromKubernetesProtocol(protocol v1.Protocol) (*network.Transpor
 	switch protocol {
 	case v1.ProtocolTCP:
 		transportProto = network.TransportProtocolTCP
-		securityProto = network.TCP
+		securityProto = network.SecurityRuleProtocolTCP
 		probeProto = network.ProbeProtocolTCP
 		return &transportProto, &securityProto, &probeProto, nil
 	case v1.ProtocolUDP:
 		transportProto = network.TransportProtocolUDP
-		securityProto = network.UDP
+		securityProto = network.SecurityRuleProtocolUDP
 		return &transportProto, &securityProto, nil, nil
 	default:
 		return &transportProto, &securityProto, &probeProto, fmt.Errorf("Only TCP and UDP are supported for Azure LoadBalancers")

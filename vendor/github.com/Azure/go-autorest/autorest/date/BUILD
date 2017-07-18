@@ -13,6 +13,7 @@ go_library(
         "date.go",
         "time.go",
         "timerfc1123.go",
+        "unixtime.go",
         "utility.go",
     ],
     tags = ["automanaged"],

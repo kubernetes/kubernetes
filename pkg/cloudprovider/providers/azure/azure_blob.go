@@ -21,6 +21,8 @@ import (
 	"regexp"
 	"strings"
 
+	"bytes"
+
 	azs "github.com/Azure/azure-sdk-for-go/storage"
 )
 
@@ -40,14 +42,21 @@ func (az *Cloud) createVhdBlob(accountName, accountKey, name string, sizeGB int6
 	vhdSize := size + vhdHeaderSize /* header size */
 	// Blob name in URL must end with '.vhd' extension.
 	name = name + ".vhd"
-	err = blobClient.PutPageBlob(vhdContainerName, name, vhdSize, tags)
+	cnt := blobClient.GetContainerReference(vhdContainerName)
+	b := cnt.GetBlobReference(name)
+	b.Properties.ContentLength = vhdSize
+	b.Metadata = tags
+	err = b.PutPageBlob(nil)
 	if err != nil {
 		// if container doesn't exist, create one and retry PutPageBlob
 		detail := err.Error()
 		if strings.Contains(detail, errContainerNotFound) {
-			err = blobClient.CreateContainer(vhdContainerName, azs.ContainerAccessTypePrivate)
+			err = cnt.Create(&azs.CreateContainerOptions{Access: azs.ContainerAccessTypePrivate})
 			if err == nil {
-				err = blobClient.PutPageBlob(vhdContainerName, name, vhdSize, tags)
+				b := cnt.GetBlobReference(name)
+				b.Properties.ContentLength = vhdSize
+				b.Metadata = tags
+				err = b.PutPageBlob(nil)
 			}
 		}
 	}
@@ -61,7 +70,11 @@ func (az *Cloud) createVhdBlob(accountName, accountKey, name string, sizeGB int6
 		az.deleteVhdBlob(accountName, accountKey, name)
 		return "", "", fmt.Errorf("failed to create vhd header, err: %v", err)
 	}
-	if err = blobClient.PutPage(vhdContainerName, name, size, vhdSize-1, azs.PageWriteTypeUpdate, h[:vhdHeaderSize], nil); err != nil {
+	blobRange := azs.BlobRange{
+		Start: uint64(size),
+		End:   uint64(vhdSize - 1),
+	}
+	if err = b.WriteRange(blobRange, bytes.NewBuffer(h[:vhdHeaderSize]), nil); err != nil {
 		az.deleteVhdBlob(accountName, accountKey, name)
 		return "", "", fmt.Errorf("failed to update vhd header, err: %v", err)
 	}
@@ -80,7 +93,9 @@ func (az *Cloud) createVhdBlob(accountName, accountKey, name string, sizeGB int6
 func (az *Cloud) deleteVhdBlob(accountName, accountKey, blobName string) error {
 	blobClient, err := az.getBlobClient(accountName, accountKey)
 	if err == nil {
-		return blobClient.DeleteBlob(vhdContainerName, blobName, nil)
+		cnt := blobClient.GetContainerReference(vhdContainerName)
+		b := cnt.GetBlobReference(blobName)
+		return b.Delete(nil)
 	}
 	return err
 }
