@@ -133,9 +133,6 @@ func SetObjectDefaults_NodeList(in *v1.NodeList) {
 func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 	SetDefaults_PersistentVolume(in)
 	SetDefaults_ResourceList(&in.Spec.Capacity)
-	if in.Spec.PersistentVolumeSource.RBD != nil {
-		SetDefaults_RBDVolumeSource(in.Spec.PersistentVolumeSource.RBD)
-	}
 	if in.Spec.PersistentVolumeSource.ISCSI != nil {
 		SetDefaults_ISCSIVolumeSource(in.Spec.PersistentVolumeSource.ISCSI)
 	}
