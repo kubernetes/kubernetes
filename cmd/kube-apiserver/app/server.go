@@ -344,9 +344,7 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 // BuildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
 func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, informers.SharedInformerFactory, clientgoinformers.SharedInformerFactory, *kubeserver.InsecureServingInfo, aggregatorapiserver.ServiceResolver, error) {
 	genericConfig := genericapiserver.NewConfig(api.Codecs)
-	if err := s.GenericServerRunOptions.ApplyTo(genericConfig); err != nil {
-		return nil, nil, nil, nil, nil, err
-	}
+	s.GenericServerRunOptions.ApplyTo(genericConfig)
 	insecureServingOptions, err := s.InsecureServing.ApplyTo(genericConfig)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err

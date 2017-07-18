@@ -54,15 +54,13 @@ func NewServerRunOptions() *ServerRunOptions {
 }
 
 // ApplyOptions applies the run options to the method receiver and returns self
-func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
+func (s *ServerRunOptions) ApplyTo(c *server.Config) {
 	c.CorsAllowedOriginList = s.CorsAllowedOriginList
 	c.ExternalAddress = s.ExternalHost
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
 	c.MinRequestTimeout = s.MinRequestTimeout
 	c.PublicAddress = s.AdvertiseAddress
-
-	return nil
 }
 
 // DefaultAdvertiseAddress sets the field AdvertiseAddress if unset. The field will be set based on the SecureServingOptions.
