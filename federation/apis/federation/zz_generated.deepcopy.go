@@ -203,7 +203,7 @@ func DeepCopy_federation_ReplicaAllocationPreferences(in interface{}, out interf
 		*out = *in
 		if in.Clusters != nil {
 			in, out := &in.Clusters, &out.Clusters
-			*out = make(map[string]ClusterPreferences)
+			*out = make(map[string]ClusterPreferences, len(*in))
 			for key, val := range *in {
 				newVal := new(ClusterPreferences)
 				if err := DeepCopy_federation_ClusterPreferences(&val, newVal, c); err != nil {

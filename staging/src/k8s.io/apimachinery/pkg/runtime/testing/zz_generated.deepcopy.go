@@ -187,14 +187,14 @@ func DeepCopy_testing_ExternalTestType1(in interface{}, out interface{}, c *conv
 		*out = *in
 		if in.M != nil {
 			in, out := &in.M, &out.M
-			*out = make(map[string]int)
+			*out = make(map[string]int, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
 		}
 		if in.N != nil {
 			in, out := &in.N, &out.N
-			*out = make(map[string]ExternalTestType2)
+			*out = make(map[string]ExternalTestType2, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
@@ -329,14 +329,14 @@ func DeepCopy_testing_TestType1(in interface{}, out interface{}, c *conversion.C
 		*out = *in
 		if in.M != nil {
 			in, out := &in.M, &out.M
-			*out = make(map[string]int)
+			*out = make(map[string]int, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}
 		}
 		if in.N != nil {
 			in, out := &in.N, &out.N
-			*out = make(map[string]TestType2)
+			*out = make(map[string]TestType2, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}

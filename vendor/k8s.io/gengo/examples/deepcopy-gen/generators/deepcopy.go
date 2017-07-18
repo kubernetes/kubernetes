@@ -498,7 +498,7 @@ func (g *genDeepCopy) doBuiltin(t *types.Type, sw *generator.SnippetWriter) {
 }
 
 func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
-	sw.Do("*out = make($.|raw$)\n", t)
+	sw.Do("*out = make($.|raw$, len(*in))\n", t)
 	if t.Key.IsAssignable() {
 		switch {
 		case hasDeepCopyMethod(t.Elem):

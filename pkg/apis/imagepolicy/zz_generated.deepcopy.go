@@ -83,7 +83,7 @@ func DeepCopy_imagepolicy_ImageReviewSpec(in interface{}, out interface{}, c *co
 		}
 		if in.Annotations != nil {
 			in, out := &in.Annotations, &out.Annotations
-			*out = make(map[string]string)
+			*out = make(map[string]string, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val
 			}

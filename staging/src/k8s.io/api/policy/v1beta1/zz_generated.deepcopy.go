@@ -143,7 +143,7 @@ func DeepCopy_v1beta1_PodDisruptionBudgetStatus(in interface{}, out interface{},
 		*out = *in
 		if in.DisruptedPods != nil {
 			in, out := &in.DisruptedPods, &out.DisruptedPods
-			*out = make(map[string]v1.Time)
+			*out = make(map[string]v1.Time, len(*in))
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}
