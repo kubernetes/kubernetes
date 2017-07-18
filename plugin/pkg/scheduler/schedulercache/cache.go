@@ -95,7 +95,7 @@ func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*
 func (cache *schedulerCache) List(selector labels.Selector) ([]*v1.Pod, error) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
-	var pods []*v1.Pod
+	pods := make([]*v1.Pod, 0, len(cache.podStates))
 	for _, info := range cache.nodes {
 		for _, pod := range info.pods {
 			if selector.Matches(labels.Set(pod.Labels)) {
