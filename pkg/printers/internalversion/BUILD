@@ -59,6 +59,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",

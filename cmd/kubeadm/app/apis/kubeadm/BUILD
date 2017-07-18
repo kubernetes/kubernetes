@@ -13,6 +13,7 @@ go_library(
         "doc.go",
         "register.go",
         "types.go",
+        "well_known_labels.go",
         "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
