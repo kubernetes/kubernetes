@@ -4613,6 +4613,14 @@ type SecurityContext struct {
 	// Default is false.
 	// +optional
 	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,6,opt,name=readOnlyRootFilesystem"`
+	// AllowPrivilegeEscalation controls whether a process can gain more
+	// privileges than it's parent process. This bool directly controls if
+	// the no_new_privs flag will be set on the container process.
+	// AllowPrivilegeEscalation is true always when the container is:
+	// 1) run as Privileged
+	// 2) has CAP_SYS_ADMIN
+	// +optional
+	AllowPrivilegeEscalation *bool `json:"allowPrivilegeEscalation,omitempty" protobuf:"varint,7,opt,name=allowPrivilegeEscalation"`
 }
 
 // SELinuxOptions are the labels to be applied to the container
