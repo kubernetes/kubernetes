@@ -94,7 +94,7 @@ type APIGroupVersion struct {
 }
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
-// It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
+// It is expected that the provided path root prefix will serve all operations. Root must not end
 // in a slash.
 func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	installer := g.newInstaller()
@@ -158,5 +158,3 @@ type staticLister struct {
 func (s staticLister) ListAPIResources() []metav1.APIResource {
 	return s.list
 }
-
-var _ discovery.APIResourceLister = &staticLister{}
