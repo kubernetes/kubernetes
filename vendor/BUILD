@@ -291,6 +291,7 @@ filegroup(
         "//vendor/github.com/robfig/cron:all-srcs",
         "//vendor/github.com/rubiojr/go-vhd/vhd:all-srcs",
         "//vendor/github.com/russross/blackfriday:all-srcs",
+        "//vendor/github.com/samuel/go-zookeeper/zk:all-srcs",
         "//vendor/github.com/satori/uuid:all-srcs",
         "//vendor/github.com/seccomp/libseccomp-golang:all-srcs",
         "//vendor/github.com/shurcooL/sanitized_anchor_name:all-srcs",

@@ -101,10 +101,6 @@
 			"Rev": "f533f7a102197536779ea3a8cb881d639e21ec5a"
 		},
 		{
-			"ImportPath": "github.com/NYTimes/gziphandler",
-			"Rev": "56545f4a5d46df9a6648819d1664c3a03a13ffdb"
-		},
-		{
 			"ImportPath": "github.com/PuerkitoBio/purell",
 			"Comment": "v1.0.0",
 			"Rev": "8a290539e2e8629dbc4e6bad948158f790ec31f4"
@@ -1692,18 +1688,18 @@
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/client/api/go-client",
-			"Comment": "v4.0.0-95-gaaf4061",
-			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
+			"Comment": "v4.0.0-22-g7a54b6f",
+			"Rev": "7a54b6fc903feab1e7cb6573177ca09b544eb1e2"
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/pkg/glusterfs/api",
-			"Comment": "v4.0.0-95-gaaf4061",
-			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
+			"Comment": "v4.0.0-22-g7a54b6f",
+			"Rev": "7a54b6fc903feab1e7cb6573177ca09b544eb1e2"
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/pkg/utils",
-			"Comment": "v4.0.0-95-gaaf4061",
-			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
+			"Comment": "v4.0.0-22-g7a54b6f",
+			"Rev": "7a54b6fc903feab1e7cb6573177ca09b544eb1e2"
 		},
 		{
 			"ImportPath": "github.com/howeyc/gopass",
@@ -2359,6 +2355,10 @@
 			"Rev": "300106c228d52c8941d4b3de6054a6062a86dda3"
 		},
 		{
+			"ImportPath": "github.com/samuel/go-zookeeper/zk",
+			"Rev": "177002e16a0061912f02377e2dd8951a8b3551bc"
+		},
+		{
 			"ImportPath": "github.com/satori/uuid",
 			"Comment": "v1.1.0-8-g5bf94b6",
 			"Rev": "5bf94b69c6b68ee1b541973bb8e1144db23a194b"
@@ -2788,10 +2788,6 @@
 		{
 			"ImportPath": "golang.org/x/tools/container/intsets",
 			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
-		},
-		{
-			"ImportPath": "google.golang.org/api/cloudkms/v1",
-			"Rev": "e3824ed33c72bf7e81da0286772c34b987520914"
 		},
 		{
 			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",
