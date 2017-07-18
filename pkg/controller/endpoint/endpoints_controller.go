@@ -254,7 +254,7 @@ func (e *EndpointController) deletePod(obj interface{}) {
 	}
 	pod, ok := tombstone.Obj.(*v1.Pod)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod: %#v", tombstone))
 		return
 	}
 	glog.V(4).Infof("Enqueuing services of deleted pod %s having final state unrecorded", pod.Name)
