@@ -32,8 +32,8 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/initialization"
 )
 
-// registerAllAdmissionPlugins registers all admission plugins
-func registerAllAdmissionPlugins(plugins *admission.Plugins) {
+// RegisterAllAdmissionPlugins registers all admission plugins
+func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	admit.Register(plugins)
 	deny.Register(plugins)
 	gc.Register(plugins)
