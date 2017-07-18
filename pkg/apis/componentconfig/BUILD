@@ -46,7 +46,6 @@ filegroup(
         "//pkg/apis/componentconfig/fuzzer:all-srcs",
         "//pkg/apis/componentconfig/install:all-srcs",
         "//pkg/apis/componentconfig/v1alpha1:all-srcs",
-        "//pkg/apis/componentconfig/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )
