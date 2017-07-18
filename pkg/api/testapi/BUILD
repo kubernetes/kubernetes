@@ -43,6 +43,8 @@ go_library(
         "//pkg/apis/policy/install:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
+        "//pkg/apis/scheduling:go_default_library",
+        "//pkg/apis/scheduling/install:go_default_library",
         "//pkg/apis/settings:go_default_library",
         "//pkg/apis/settings/install:go_default_library",
         "//pkg/apis/storage:go_default_library",
