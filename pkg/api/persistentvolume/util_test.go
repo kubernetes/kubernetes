@@ -35,6 +35,9 @@ func TestPVSecrets(t *testing.T) {
 			AzureFile: &api.AzureFileVolumeSource{
 				SecretName: "Spec.PersistentVolumeSource.AzureFile.SecretName"}}}},
 		{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{
+			NutanixVolume: &api.NutanixVolumeSource{
+				SecretName: "Spec.PersistentVolumeSource.NutanixVolume.SecretName"}}}},
+		{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{
 			CephFS: &api.CephFSVolumeSource{
 				SecretRef: &api.LocalObjectReference{
 					Name: "Spec.PersistentVolumeSource.CephFS.SecretRef"}}}}},
@@ -76,11 +79,13 @@ func TestPVSecrets(t *testing.T) {
 	// excludedSecretPaths holds struct paths to fields with "secret" in the name that are not actually references to secret API objects
 	excludedSecretPaths := sets.NewString(
 		"Spec.PersistentVolumeSource.CephFS.SecretFile",
+		"Spec.PersistentVolumeSource.NutanixVolume.SecretNamespace",
 	)
 	// expectedSecretPaths holds struct paths to fields with "secret" in the name that are references to secret API objects.
 	// every path here should be represented as an example in the PV stub above, with the secret name set to the path.
 	expectedSecretPaths := sets.NewString(
 		"Spec.PersistentVolumeSource.AzureFile.SecretName",
+		"Spec.PersistentVolumeSource.NutanixVolume.SecretName",
 		"Spec.PersistentVolumeSource.CephFS.SecretRef",
 		"Spec.PersistentVolumeSource.FlexVolume.SecretRef",
 		"Spec.PersistentVolumeSource.RBD.SecretRef",

@@ -38,6 +38,11 @@ func VisitPVSecretNames(pv *api.PersistentVolume, visitor func(string, string) b
 			return false
 		}
 		return true
+	case source.NutanixVolume != nil:
+		if len(source.NutanixVolume.SecretName) > 0 && !visitor(getClaimRefNamespace(pv), source.NutanixVolume.SecretName) {
+			return false
+		}
+		return true
 	case source.CephFS != nil:
 		if source.CephFS.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.CephFS.SecretRef.Name) {
 			return false

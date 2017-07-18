@@ -946,6 +946,7 @@ var (
 	Secret                FSType = "secret"
 	NFS                   FSType = "nfs"
 	ISCSI                 FSType = "iscsi"
+	NutanixVolume         FSType = "nutanixVolume"
 	Glusterfs             FSType = "glusterfs"
 	PersistentVolumeClaim FSType = "persistentVolumeClaim"
 	RBD                   FSType = "rbd"

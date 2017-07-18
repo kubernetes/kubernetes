@@ -445,6 +445,14 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 			allErrs = append(allErrs, validateISCSIVolumeSource(source.ISCSI, fldPath.Child("iscsi"))...)
 		}
 	}
+	if source.NutanixVolume != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("nutanixVolume"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateNutanixVolumeSource(source.NutanixVolume, fldPath.Child("nutanixVolume"))...)
+		}
+	}
 	if source.Glusterfs != nil {
 		if numVolumes > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("glusterfs"), "may not specify more than 1 volume type"))
@@ -642,6 +650,17 @@ func validateISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, fldPath *field.Path
 	}
 	if (iscsi.DiscoveryCHAPAuth || iscsi.SessionCHAPAuth) && iscsi.SecretRef == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretRef"), ""))
+	}
+	return allErrs
+}
+
+func validateNutanixVolumeSource(src *api.NutanixVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(src.PrismEndPoint) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("prismEndPoint"), ""))
+	}
+	if len(src.DataServiceEndPoint) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("dataServiceEndPoint"), ""))
 	}
 	return allErrs
 }
@@ -1285,6 +1304,14 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateISCSIVolumeSource(pv.Spec.ISCSI, specPath.Child("iscsi"))...)
+		}
+	}
+	if pv.Spec.NutanixVolume != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("nutanixVolume"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateNutanixVolumeSource(pv.Spec.NutanixVolume, specPath.Child("nutanixVolume"))...)
 		}
 	}
 	if pv.Spec.Cinder != nil {

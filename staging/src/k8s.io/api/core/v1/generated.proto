@@ -1783,6 +1783,54 @@ message NodeSystemInfo {
   optional string architecture = 10;
 }
 
+// Represents Nutanix volume.
+// NutanixVolume can be mounted as read/write once or read only.
+message NutanixVolumeSource {
+  // Prism user id for accessing nutanix cluster via rest API. Either User/Password
+  // OR SecretName/SecretNamespace should be provided.
+  // +optional
+  optional string user = 1;
+
+  // Prism password for accessing nutanix cluster via rest API.
+  // +optional
+  optional string password = 2;
+
+  // Secret namespace and Secret Name to retrieve credential for accessing nutanix
+  // cluster via rest. if SecretNamespace is not specified then default namespace is used.
+  // +optional
+  optional string secretNamespace = 3;
+
+  // Secret name for accessing nutanix cluster via rest.
+  // +optional
+  optional string secretName = 4;
+
+  // Prism service <IP:port>  for nutanix cluster.
+  optional string prismEndPoint = 5;
+
+  // Data service <IP:port> as configured in nutanix cluster.
+  optional string dataServiceEndPoint = 6;
+
+  // Volume Name.
+  optional string volumeName = 7;
+
+  // Volume UUID.
+  optional string volumeUUID = 8;
+
+  // ISCSI target for the nutanix volume group.
+  optional string iscsiTarget = 9;
+
+  // Filesystem type of the volume that you want to mount.
+  // Tip: Ensure that the filesystem type is supported by the host operating system.
+  // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
+  optional string fsType = 10;
+
+  // ReadOnly here will force the ReadOnly setting in VolumeMounts.
+  // Defaults to false.
+  // +optional
+  optional bool readOnly = 11;
+}
+
 // ObjectFieldSelector selects an APIVersioned field of an object.
 message ObjectFieldSelector {
   // Version of the schema the FieldPath is written in terms of, defaults to "v1".
@@ -2226,6 +2274,10 @@ message PersistentVolumeSource {
   // More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
   // +optional
   optional StorageOSPersistentVolumeSource storageos = 21;
+
+  // NutanixVolume represents a Nutanix persistent volume attached and mounted on Kubernetes nodes.
+  // +optional
+  optional NutanixVolumeSource nutanixVolume = 22;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -4099,6 +4151,10 @@ message VolumeSource {
   // StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
   // +optional
   optional StorageOSVolumeSource storageos = 27;
+
+  // NutanixVolume represents a Nutanix persistent volume attached and mounted on Kubernetes nodes.
+  // +optional
+  optional NutanixVolumeSource nutanixVolume = 28;
 }
 
 // Represents a vSphere volume resource.

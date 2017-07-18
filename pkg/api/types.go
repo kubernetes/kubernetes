@@ -254,6 +254,10 @@ type VolumeSource struct {
 	// kubelet's host machine and then exposed to the pod.
 	// +optional
 	ISCSI *ISCSIVolumeSource
+	// NutanixVolumeSource represents a Nutanix persistent volume attached and mounted
+	// on kubernetes node.
+	// +optional
+	NutanixVolume *NutanixVolumeSource
 	// Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime
 	// +optional
 	Glusterfs *GlusterfsVolumeSource
@@ -353,6 +357,9 @@ type PersistentVolumeSource struct {
 	ISCSI *ISCSIVolumeSource
 	// FlexVolume represents a generic volume resource that is
 	// provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.
+	// +optional
+	NutanixVolume *NutanixVolumeSource
+	// Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime
 	// +optional
 	FlexVolume *FlexVolumeSource
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
@@ -703,6 +710,44 @@ type ISCSIVolumeSource struct {
 	// The secret is used if either DiscoveryCHAPAuth or SessionCHAPAuth is true
 	// +optional
 	SecretRef *LocalObjectReference
+}
+
+// Represents Nutanix volume.
+// NutanixVolume can be mounted as read/write once or read only.
+type NutanixVolumeSource struct {
+	// Prism user id for accessing nutanix cluster via rest API. Either User/Password
+	// OR SecretName/SecretNamespace should be provided.
+	// +optional
+	User string
+	// Prism password for accessing nutanix cluster via rest API.
+	// +optional
+	Password string
+	// Secret namespace and Secret Name to retrieve credential for accessing nutanix
+	// cluster via rest. if SecretNamespace is not specified then default namespace is used.
+	// +optional
+	SecretNamespace string
+	// Secret name for accessing nutanix cluster via rest.
+	// +optional
+	SecretName string
+	// Prism service IP:port as configured in nutanix cluster.
+	PrismEndPoint string
+	// Data service <IP:port> as configured in nutanix cluster.
+	DataServiceEndPoint string
+	// Volume Name.
+	VolumeName string
+	// Volume UUID.
+	VolumeUUID string
+	// ISCSI target for the volume created.
+	IscsiTarget string
+	// Filesystem type of the volume that you want to mount.
+	// Tip: Ensure that the filesystem type is supported by the host operating system.
+	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string
+	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
+	// Defaults to false.
+	// +optional
+	ReadOnly bool
 }
 
 // Represents a Fibre Channel volume.
