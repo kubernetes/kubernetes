@@ -1,12 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-statefulset
+  labels:
+    run: nginx-statefulset
+spec:
+  ports:
+  - port: 80
+    name: web
+  clusterIP: None
+  selector:
+    run: nginx-statefulset
+---
 apiVersion: apps/v1beta1
 kind: StatefulSet
 metadata:
   name: nginx-statefulset
+  labels:
+    run: nginx-statefulset
 spec:
+  serviceName: "nginx"
   template:
     metadata:
       labels:
-        app: nginx
+        run: nginx-statefulset
     spec:
       terminationGracePeriodSeconds: 10
       containers:

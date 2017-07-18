@@ -1743,15 +1743,16 @@ metadata:
 				framework.Failf("Failed verifying deployment was deleted: %v", err)
 			}
 
-			By("verifying pods were deleted")
-			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(len(podList.Items)).To(Equal(0))
-
 			By("verifying replicasets were deleted")
 			rsList, err := c.ExtensionsV1beta1().ReplicaSets(ns).List(metav1.ListOptions{LabelSelector: label.String()})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(rsList.Items)).To(Equal(0))
+
+			// TODO: pods are not deleted!
+			By("verifying pods were deleted")
+			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(podList.Items)).To(Equal(0))
 		})
 
 		It("should delete replication controller and all of the resources managed by it", func() {
@@ -1789,6 +1790,7 @@ metadata:
 				framework.Failf("Failed verifying rc was deleted: %v", err)
 			}
 
+			// TODO: pods are not deleted!
 			By("verifying pods were deleted")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
 			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
@@ -1798,11 +1800,10 @@ metadata:
 
 		It("should delete replicaset and all of the resources managed by it", func() {
 			name = "nginx-replicaset"
-			labelFlag = fmt.Sprintf("--labels=run=%v", name)
 			controllerYaml := readTestFileOrDie(nginxReplicasetFilename)
 
 			By("creating the replicaset using a YAML file")
-			framework.RunKubectlOrDieInput(string(controllerYaml), "create", "-f", "-", nsFlag, labelFlag)
+			framework.RunKubectlOrDieInput(string(controllerYaml), "create", "-f", "-", nsFlag)
 
 			By("verifying the pod controlled by " + name + " gets created")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
@@ -1828,6 +1829,7 @@ metadata:
 				framework.Failf("Failed verifying replicaset was deleted: %v", err)
 			}
 
+			// TODO: pods are not deleted!
 			By("verifying pods were deleted")
 			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
 			Expect(err).NotTo(HaveOccurred())
@@ -1836,11 +1838,10 @@ metadata:
 
 		It("should delete daemonset and all of the resources managed by it", func() {
 			name = "nginx-daemonset"
-			labelFlag = fmt.Sprintf("--labels=run=%v", name)
 			controllerYaml := readTestFileOrDie(nginxDaemonsetFilename)
 
 			By("creating the daemonset using a YAML file")
-			framework.RunKubectlOrDieInput(string(controllerYaml), "create", "-f", "-", nsFlag, labelFlag)
+			framework.RunKubectlOrDieInput(string(controllerYaml), "create", "-f", "-", nsFlag)
 
 			By("verifying the pod controlled by " + name + " gets created")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
@@ -1866,6 +1867,7 @@ metadata:
 				framework.Failf("Failed verifying daemonset was deleted: %v", err)
 			}
 
+			// TODO: pods are not deleted!
 			By("verifying pods were deleted")
 			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
 			Expect(err).NotTo(HaveOccurred())
@@ -1909,7 +1911,7 @@ metadata:
 			labelFlag = fmt.Sprintf("--labels=run=%v", name)
 
 			By("running the image " + nginxImage)
-			framework.RunKubectlOrDie("run", name, "--image="+nginxImage, "--generator=job/v1", nsFlag, labelFlag)
+			framework.RunKubectlOrDie("run", name, "--image="+nginxImage, "--generator=job/v1", "--restart=OnFailure", nsFlag, labelFlag)
 
 			By("verifying the pod controlled by " + name + " gets created")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
@@ -1935,49 +1937,14 @@ metadata:
 				framework.Failf("Failed verifying job was deleted: %v", err)
 			}
 
+			// TODO: pods are not deleted!
 			By("verifying pods were deleted")
 			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(podList.Items)).To(Equal(0))
 		})
 
-		It("should delete statefulset and all of the resources managed by it", func() {
-			name = "nginx-statefulset"
-			labelFlag = fmt.Sprintf("--labels=run=%v", name)
-			controllerYaml := readTestFileOrDie(nginxStatefulsetFilename)
-
-			By("creating the statefulset using a YAML file")
-			framework.RunKubectlOrDieInput(string(controllerYaml), "create", "-f", "-", nsFlag, labelFlag)
-
-			By("verifying the pod controlled by " + name + " gets created")
-			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
-			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
-			if err != nil {
-				framework.Failf("Failed waiting for pod controlled by %s to be running: %v", name, err)
-			}
-
-			By("deleting the statefulset " + name)
-			framework.RunKubectlOrDie("delete", "statefulset", name, nsFlag, "--cascade=true")
-
-			By("verifying statefulset was deleted")
-			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-				_, err := c.AppsV1beta1().StatefulSets(ns).Get(name, metav1.GetOptions{})
-				if apierrs.IsNotFound(err) {
-					return true, nil
-				} else if err != nil {
-					return false, err
-				}
-				return false, nil
-			})
-			if err != nil {
-				framework.Failf("Failed verifying statefulset was deleted: %v", err)
-			}
-
-			By("verifying pods were deleted")
-			podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(len(podList.Items)).To(Equal(0))
-		})
+		// TODO: add statefulset test
 	})
 })
 
