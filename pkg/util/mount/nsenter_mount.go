@@ -201,8 +201,11 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 		// It's safer to assume that it's not a mount point.
 		return true, nil
 	}
-	mountTarget := strings.Split(string(out), " ")[0]
-	mountTarget = strings.TrimSuffix(mountTarget, "\n")
+	mountTarget, err := parseFindMnt(string(out))
+	if err != nil {
+		return false, err
+	}
+
 	glog.V(5).Infof("IsLikelyNotMountPoint findmnt output for path %s: %v:", file, mountTarget)
 
 	if mountTarget == file {
@@ -211,6 +214,18 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	}
 	glog.V(5).Infof("IsLikelyNotMountPoint: %s is not a mount point", file)
 	return true, nil
+}
+
+// parse output of "findmnt -o target,fstype" and return just the target
+func parseFindMnt(out string) (string, error) {
+	// cut trailing newline
+	out = strings.TrimSuffix(out, "\n")
+	// cut everything after the last space - it's the filesystem type
+	i := strings.LastIndex(out, " ")
+	if i == -1 {
+		return "", fmt.Errorf("error parsing findmnt output, expected at least one space: %q", out)
+	}
+	return out[:i], nil
 }
 
 // DeviceOpened checks if block device in use by calling Open with O_EXCL flag.

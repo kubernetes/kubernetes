@@ -29,6 +29,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "mount_linux_test.go",
+        "nsenter_mount_test.go",
         "safe_format_and_mount_test.go",
     ],
     library = ":go_default_library",
