@@ -544,9 +544,9 @@ func (rs *REST) allocateHealthCheckNodePort(service *api.Service) error {
 		err := rs.serviceNodePorts.Allocate(int(healthCheckNodePort))
 		if err != nil {
 			return fmt.Errorf("failed to allocate requested HealthCheck NodePort %v: %v",
-				service.Spec.HealthCheckNodePort, err)
+				healthCheckNodePort, err)
 		}
-		glog.Infof("Reserved user requested nodePort: %d", service.Spec.HealthCheckNodePort)
+		glog.Infof("Reserved user requested nodePort: %d", healthCheckNodePort)
 	} else {
 		// If the request has no health check nodePort specified, allocate any.
 		healthCheckNodePort, err := rs.serviceNodePorts.AllocateNext()
