@@ -105,6 +105,11 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 		return nil
 	}
 
+	// always allow deletion of other resources
+	if a.GetOperation() == admission.Delete {
+		return nil
+	}
+
 	// always allow access review checks.  Returning status about the namespace would be leaking information
 	if isAccessReview(a) {
 		return nil
