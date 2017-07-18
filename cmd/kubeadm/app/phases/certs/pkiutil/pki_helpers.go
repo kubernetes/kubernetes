@@ -27,9 +27,6 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 )
 
-// TODO: It should be able to generate different types of private keys, at least: RSA and ECDSA (and in the future maybe Ed25519 as well)
-// TODO: See if it makes sense to move this package directly to pkg/util/cert
-
 func NewCertificateAuthority() (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {

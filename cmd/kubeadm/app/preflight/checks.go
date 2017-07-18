@@ -144,7 +144,6 @@ type PortOpenCheck struct {
 
 func (poc PortOpenCheck) Check() (warnings, errors []error) {
 	errors = []error{}
-	// TODO: Get IP from KubeadmConfig
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", poc.port))
 	if err != nil {
 		errors = append(errors, fmt.Errorf("Port %d is in use", poc.port))

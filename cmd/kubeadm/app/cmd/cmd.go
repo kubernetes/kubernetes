@@ -63,17 +63,6 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 
 		`),
 	}
-	// TODO(phase2+) figure out how to avoid running as root
-	//
-	// TODO(phase2) detect interactive vs non-interactive use and adjust output accordingly
-	// i.e. make it automation friendly
-	//
-	// TODO(phase2) create an abstraction that defines files and the content that needs to
-	// be written to disc and write it all in one go at the end as we have a lot of
-	// crappy little files written from different parts of this code; this could also
-	// be useful for testing by having this model we can allow users to create some files before
-	// `kubeadm init` runs, e.g. PKI assets, we would then be able to look at files users has
-	// given an diff or validate if those are sane, we could also warn if any of the files had been deprecated
 
 	cmds.ResetFlags()
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
