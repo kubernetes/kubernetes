@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -744,6 +745,8 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printCephFSVolumeSource(volume.VolumeSource.CephFS, w)
 		case volume.VolumeSource.StorageOS != nil:
 			printStorageOSVolumeSource(volume.VolumeSource.StorageOS, w)
+		case volume.VolumeSource.FC != nil:
+			printFCVolumeSource(volume.VolumeSource.FC, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -960,6 +963,19 @@ func printStorageOSPersistentVolumeSource(storageos *api.StorageOSPersistentVolu
 		storageos.VolumeName, storageos.VolumeNamespace, storageos.FSType, storageos.ReadOnly)
 }
 
+func printFCVolumeSource(fc *api.FCVolumeSource, w PrefixWriter) {
+	lun := "<none>"
+	if fc.Lun != nil {
+		lun = strconv.Itoa(int(*fc.Lun))
+	}
+	w.Write(LEVEL_2, "Type:\tFC (a Fibre Channel disk)\n"+
+		"    TargetWWNs:\t%v\n"+
+		"    LUN:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		strings.Join(fc.TargetWWNs, ", "), lun, fc.FSType, fc.ReadOnly)
+}
+
 type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
@@ -1035,6 +1051,8 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 			printCephFSVolumeSource(pv.Spec.CephFS, w)
 		case pv.Spec.StorageOS != nil:
 			printStorageOSPersistentVolumeSource(pv.Spec.StorageOS, w)
+		case pv.Spec.FC != nil:
+			printFCVolumeSource(pv.Spec.FC, w)
 		}
 
 		if events != nil {
