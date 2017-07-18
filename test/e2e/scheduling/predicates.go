@@ -337,7 +337,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	// Keep the same steps with the test on NodeSelector,
-	// but specify Affinity in Pod.Annotations, instead of NodeSelector.
+	// but specify Affinity in Pod.Spec.Affinity, instead of NodeSelector.
 	It("validates that required NodeAffinity setting is respected if matching", func() {
 		nodeName := GetNodeThatCanRunPod(f)
 
@@ -387,7 +387,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	// labelSelector Operator is DoesNotExist but values are there in requiredDuringSchedulingIgnoredDuringExecution
-	// part of podAffinity,so validation fails.
+	// part of podAffinity, so validation fails.
 	It("validates that a pod with an invalid podAffinity is rejected because of the LabelSelectorRequirement is invalid", func() {
 		By("Trying to launch a pod with an invalid pod Affinity data.")
 		podName := "without-label-" + string(uuid.NewUUID())
@@ -628,30 +628,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to launch the pod, now with Pod affinity and anti affinity.")
 		pod := createPodWithPodAffinity(f, k)
 
-		// check that pod got scheduled. We intentionally DO NOT check that the
-		// pod is running because this will create a race condition with the
-		// kubelet and the scheduler: the scheduler might have scheduled a pod
-		// already when the kubelet does not know about its new label yet. The
-		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, pod.Name))
-		labelPod, err := cs.Core().Pods(ns).Get(pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
-	})
-
-	// Verify that an escaped JSON string of pod affinity and pod anti affinity in a YAML PodSpec works.
-	It("validates that embedding the JSON PodAffinity and PodAntiAffinity setting as a string in the annotation value work", func() {
-		nodeName, _ := runAndKeepPodWithLabelAndGetNodeName(f)
-
-		By("Trying to apply a label with fake az info on the found node.")
-		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
-		v := "e2e-az1"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
-
-		By("Trying to launch a pod that with PodAffinity & PodAntiAffinity setting as embedded JSON string in the annotation value.")
-		pod := createPodWithPodAffinity(f, "kubernetes.io/hostname")
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
