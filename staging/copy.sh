@@ -120,7 +120,6 @@ mkcp "pkg/client/informers/informers_generated/externalversions" "pkg/client/inf
 mkcp "pkg/client/listers" "pkg/client"
 # remove internalversion listers
 find "${CLIENT_REPO_TEMP}/pkg/client/listers/" -maxdepth 2 -mindepth 2 -name internalversion -exec rm -r {} \;
-mkcp "pkg/api/v1/ref" "pkg/api/v1"
 
 echo "rewriting imports"
 grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \

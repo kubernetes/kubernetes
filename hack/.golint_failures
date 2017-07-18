@@ -105,7 +105,6 @@ pkg/api/v1/endpoints
 pkg/api/v1/helper
 pkg/api/v1/helper/qos
 pkg/api/v1/pod
-pkg/api/v1/ref
 pkg/api/v1/resource
 pkg/api/v1/validation
 pkg/api/validation
@@ -759,6 +758,7 @@ staging/src/k8s.io/client-go/tools/leaderelection
 staging/src/k8s.io/client-go/tools/leaderelection/resourcelock
 staging/src/k8s.io/client-go/tools/portforward
 staging/src/k8s.io/client-go/tools/record
+staging/src/k8s.io/client-go/tools/reference
 staging/src/k8s.io/client-go/transport
 staging/src/k8s.io/client-go/util/cert/triple
 staging/src/k8s.io/client-go/util/exec

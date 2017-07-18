@@ -23,7 +23,6 @@ go_library(
         "//pkg/api/install:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/api/v1/ref:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/client/retry:go_default_library",
         "//pkg/serviceaccount:go_default_library",
@@ -57,6 +56,7 @@ go_library(
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
+        "//vendor/k8s.io/client-go/tools/reference:go_default_library",
         "//vendor/k8s.io/client-go/util/integer:go_default_library",
     ],
 )
