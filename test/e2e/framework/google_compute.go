@@ -162,13 +162,16 @@ func lookupClusterImageSources() (string, string, error) {
 	frags := strings.Split(nodeImg, "/")
 	nodeImg = frags[len(frags)-1]
 
-	masterName := TestContext.CloudConfig.MasterName
-	masterImg, err := host2image(masterName)
-	if err != nil {
-		return "", "", err
+	// For GKE clusters, MasterName will not be defined; we just leave masterImg blank.
+	masterImg := ""
+	if masterName := TestContext.CloudConfig.MasterName; masterName != "" {
+		img, err := host2image(masterName)
+		if err != nil {
+			return "", "", err
+		}
+		frags = strings.Split(img, "/")
+		masterImg = frags[len(frags)-1]
 	}
-	frags = strings.Split(masterImg, "/")
-	masterImg = frags[len(frags)-1]
 
 	return masterImg, nodeImg, nil
 }
