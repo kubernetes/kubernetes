@@ -98,7 +98,7 @@ var _ = SIGDescribe("Volumes", func() {
 	// NFS
 	////////////////////////////////////////////////////////////////////////
 
-	SIGDescribe("NFS", func() {
+	Describe("NFS", func() {
 		It("should be mountable", func() {
 			config, _, serverIP := framework.NewNFSServer(cs, namespace.Name, []string{})
 			defer func() {
@@ -129,7 +129,7 @@ var _ = SIGDescribe("Volumes", func() {
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
 
-	SIGDescribe("GlusterFS", func() {
+	Describe("GlusterFS", func() {
 		It("should be mountable", func() {
 			//TODO (copejon) GFS is not supported on debian image.
 			framework.SkipUnlessNodeOSDistroIs("gci")
@@ -172,7 +172,7 @@ var _ = SIGDescribe("Volumes", func() {
 	// are installed on all nodes!
 	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=iSCSI"
 
-	SIGDescribe("iSCSI [Feature:Volumes]", func() {
+	Describe("iSCSI [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			config, _, serverIP := framework.NewISCSIServer(cs, namespace.Name)
 			defer func() {
@@ -206,7 +206,7 @@ var _ = SIGDescribe("Volumes", func() {
 	// Ceph RBD
 	////////////////////////////////////////////////////////////////////////
 
-	SIGDescribe("Ceph RBD [Feature:Volumes]", func() {
+	Describe("Ceph RBD [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			config, _, serverIP := framework.NewRBDServer(cs, namespace.Name)
 			defer func() {
@@ -270,7 +270,7 @@ var _ = SIGDescribe("Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// Ceph
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("CephFS [Feature:Volumes]", func() {
+	Describe("CephFS [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
@@ -345,7 +345,7 @@ var _ = SIGDescribe("Volumes", func() {
 	// (/usr/bin/nova, /usr/bin/cinder and /usr/bin/keystone)
 	// and that the usual OpenStack authentication env. variables are set
 	// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
-	SIGDescribe("Cinder [Feature:Volumes]", func() {
+	Describe("Cinder [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("openstack")
 			config := framework.VolumeTestConfig{
@@ -420,7 +420,7 @@ var _ = SIGDescribe("Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// GCE PD
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("PD", func() {
+	Describe("PD", func() {
 		// Flaky issue: #43977
 		It("should be mountable [Flaky]", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
@@ -473,7 +473,7 @@ var _ = SIGDescribe("Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// ConfigMap
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("ConfigMap", func() {
+	Describe("ConfigMap", func() {
 		It("should be mountable", func() {
 			config := framework.VolumeTestConfig{
 				Namespace: namespace.Name,
@@ -550,7 +550,7 @@ var _ = SIGDescribe("Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// vSphere
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("vsphere [Feature:Volumes]", func() {
+	Describe("vsphere [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("vsphere")
 			var (
@@ -603,7 +603,7 @@ var _ = SIGDescribe("Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// Azure Disk
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("Azure Disk [Feature:Volumes]", func() {
+	Describe("Azure Disk [Feature:Volumes]", func() {
 		It("should be mountable [Slow]", func() {
 			framework.SkipUnlessProviderIs("azure")
 			config := framework.VolumeTestConfig{
