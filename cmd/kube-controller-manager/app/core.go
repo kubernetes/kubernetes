@@ -23,6 +23,7 @@ package app
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -74,14 +75,23 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 }
 
 func startNodeController(ctx ControllerContext) (bool, error) {
-	_, clusterCIDR, err := net.ParseCIDR(ctx.Options.ClusterCIDR)
-	if err != nil {
-		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
+	var clusterCIDR *net.IPNet
+	var err error
+	if len(strings.TrimSpace(ctx.Options.ClusterCIDR)) != 0 {
+		_, clusterCIDR, err = net.ParseCIDR(ctx.Options.ClusterCIDR)
+		if err != nil {
+			glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
+		}
 	}
-	_, serviceCIDR, err := net.ParseCIDR(ctx.Options.ServiceCIDR)
-	if err != nil {
-		glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.Options.ServiceCIDR, err)
+
+	var serviceCIDR *net.IPNet
+	if len(strings.TrimSpace(ctx.Options.ServiceCIDR)) != 0 {
+		_, serviceCIDR, err = net.ParseCIDR(ctx.Options.ServiceCIDR)
+		if err != nil {
+			glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.Options.ServiceCIDR, err)
+		}
 	}
+
 	nodeController, err := nodecontroller.NewNodeController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),

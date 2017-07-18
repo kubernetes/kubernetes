@@ -64,6 +64,11 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
+
+	if clusterCIDR == nil {
+		glog.Fatal("RouteController: Must specify clusterCIDR.")
+	}
+
 	rc := &RouteController{
 		routes:           routes,
 		kubeClient:       kubeClient,
