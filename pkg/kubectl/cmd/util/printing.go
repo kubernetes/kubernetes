@@ -160,8 +160,10 @@ func extractOutputOptions(cmd *cobra.Command) *printers.OutputOptions {
 	// templates are logically optional for specifying a format.
 	// TODO once https://github.com/kubernetes/kubernetes/issues/12668 is fixed, this should fall back to GetFlagString
 	var templateFile string
-	if flags.Lookup("template") != nil {
-		templateFile = GetFlagString(cmd, "template")
+	if flag := flags.Lookup("template"); flag != nil {
+		if flag.Value.Type() == "string" {
+			templateFile = GetFlagString(cmd, "template")
+		}
 	}
 	if len(outputFormat) == 0 && len(templateFile) != 0 {
 		outputFormat = "template"
