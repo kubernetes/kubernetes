@@ -22,6 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // JobTemplate describes a template for creating copies of a predefined pod.
 type JobTemplate struct {
 	metav1.TypeMeta `json:",inline"`
@@ -50,6 +52,7 @@ type JobTemplateSpec struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CronJob represents the configuration of a single cron job.
 type CronJob struct {
@@ -69,6 +72,8 @@ type CronJob struct {
 	// +optional
 	Status CronJobStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CronJobList is a collection of cron jobs.
 type CronJobList struct {

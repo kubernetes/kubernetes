@@ -23,6 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/authentication"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // AdmissionReview describes an admission request.
 type AdmissionReview struct {
 	metav1.TypeMeta

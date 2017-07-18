@@ -178,6 +178,13 @@ func Test_reasonForError(t *testing.T) {
 type TestType struct{}
 
 func (obj *TestType) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *TestType) DeepCopyObject() runtime.Object {
+	if obj == nil {
+		return nil
+	}
+	clone := *obj
+	return &clone
+}
 
 func TestFromObject(t *testing.T) {
 	table := []struct {

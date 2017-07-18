@@ -22,6 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // a list of values for a given metric for some set of objects
 type MetricValueList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -30,6 +32,8 @@ type MetricValueList struct {
 	// the value of the metric across the described objects
 	Items []MetricValue `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // a metric value for some object
 type MetricValue struct {

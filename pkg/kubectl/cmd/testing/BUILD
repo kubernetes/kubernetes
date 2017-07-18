@@ -7,7 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["fake.go"],
+    srcs = [
+        "fake.go",
+        "zz_generated.deepcopy.go",
+    ],
     tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS",
@@ -30,6 +33,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",

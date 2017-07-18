@@ -113,10 +113,7 @@ func (c *AvailableConditionController) sync(key string) error {
 		return err
 	}
 
-	apiService := &apiregistration.APIService{}
-	if err := apiregistration.DeepCopy_apiregistration_APIService(inAPIService, apiService, cloner); err != nil {
-		return err
-	}
+	apiService := inAPIService.DeepCopy()
 
 	availableCondition := apiregistration.APIServiceCondition{
 		Type:               apiregistration.Available,

@@ -467,6 +467,9 @@ func (s *SimpleStream) Close() error {
 }
 
 func (obj *SimpleStream) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *SimpleStream) DeepCopyObject() runtime.Object {
+	panic("SimpleStream does not support DeepCopy")
+}
 
 func (s *SimpleStream) InputStream(version, accept string) (io.ReadCloser, bool, string, error) {
 	s.version = version
@@ -3760,6 +3763,13 @@ type UnregisteredAPIObject struct {
 
 func (obj *UnregisteredAPIObject) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
+}
+func (obj *UnregisteredAPIObject) DeepCopyObject() runtime.Object {
+	if obj == nil {
+		return nil
+	}
+	clone := *obj
+	return &clone
 }
 
 func TestWriteJSONDecodeError(t *testing.T) {

@@ -18,6 +18,8 @@ package v1alpha1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // FlunderList is a list of Flunder objects.
 type FlunderList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -33,6 +35,7 @@ type FlunderStatus struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Flunder struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -44,6 +47,7 @@ type Flunder struct {
 
 // +genclient=true
 // +nonNamespaced=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Fischer struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -54,6 +58,7 @@ type Fischer struct {
 }
 
 // +nonNamespaced=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // FischerList is a list of Fischer objects.
 type FischerList struct {

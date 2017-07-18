@@ -22,6 +22,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // Scale represents a scaling request for a resource.
 type Scale struct {
 	metav1.TypeMeta
@@ -325,6 +327,7 @@ type ResourceMetricStatus struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // HorizontalPodAutoscaler is the configuration for a horizontal pod
 // autoscaler, which automatically manages the replica count of any resource
@@ -345,6 +348,8 @@ type HorizontalPodAutoscaler struct {
 	// +optional
 	Status HorizontalPodAutoscalerStatus
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {

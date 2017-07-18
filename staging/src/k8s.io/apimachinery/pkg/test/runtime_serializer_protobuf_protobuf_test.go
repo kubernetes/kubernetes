@@ -40,6 +40,9 @@ type testObject struct {
 func (d *testObject) GetObjectKind() schema.ObjectKind                { return d }
 func (d *testObject) SetGroupVersionKind(gvk schema.GroupVersionKind) { d.gvk = gvk }
 func (d *testObject) GroupVersionKind() schema.GroupVersionKind       { return d.gvk }
+func (d *testObject) DeepCopyObject() runtime.Object {
+	panic("testObject does not support DeepCopy")
+}
 
 type testMarshalable struct {
 	testObject
@@ -49,6 +52,10 @@ type testMarshalable struct {
 
 func (d *testMarshalable) Marshal() ([]byte, error) {
 	return d.data, d.err
+}
+
+func (d *testMarshalable) DeepCopyObject() runtime.Object {
+	panic("testMarshalable does not support DeepCopy")
 }
 
 type testBufferedMarshalable struct {
@@ -68,6 +75,10 @@ func (d *testBufferedMarshalable) MarshalTo(data []byte) (int, error) {
 
 func (d *testBufferedMarshalable) Size() int {
 	return len(d.data)
+}
+
+func (d *testBufferedMarshalable) DeepCopyObject() runtime.Object {
+	panic("testBufferedMarshalable does not support DeepCopy")
 }
 
 func TestRecognize(t *testing.T) {

@@ -78,6 +78,8 @@ type KubeProxyConntrackConfiguration struct {
 	TCPCloseWaitTimeout metav1.Duration
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // KubeProxyConfiguration contains everything necessary to configure the
 // Kubernetes proxy server.
 type KubeProxyConfiguration struct {
@@ -165,6 +167,8 @@ const (
 	// dropped by the container bridge.
 	HairpinNone = "none"
 )
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
 // - its value will never, or cannot safely be changed during the lifetime of a node
@@ -563,6 +567,8 @@ type KubeletAnonymousAuthentication struct {
 	Enabled bool
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta
 
@@ -649,6 +655,8 @@ type GroupResource struct {
 	// resource is the resource portion of the GroupResource.
 	Resource string
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type KubeControllerManagerConfiguration struct {
 	metav1.TypeMeta

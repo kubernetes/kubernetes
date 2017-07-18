@@ -49,6 +49,8 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 )
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type InternalType struct {
 	Kind       string
 	APIVersion string
@@ -56,6 +58,8 @@ type InternalType struct {
 	Name string
 }
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalType struct {
 	Kind       string `json:"kind"`
 	APIVersion string `json:"apiVersion"`
@@ -63,6 +67,8 @@ type ExternalType struct {
 	Name string `json:"name"`
 }
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalType2 struct {
 	Kind       string `json:"kind"`
 	APIVersion string `json:"apiVersion"`
@@ -99,6 +105,8 @@ func NewInternalType(kind, apiversion, name string) *InternalType {
 	return &item
 }
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type InternalNamespacedType struct {
 	Kind       string
 	APIVersion string
@@ -107,6 +115,8 @@ type InternalNamespacedType struct {
 	Namespace string
 }
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalNamespacedType struct {
 	Kind       string `json:"kind"`
 	APIVersion string `json:"apiVersion"`
@@ -115,6 +125,8 @@ type ExternalNamespacedType struct {
 	Namespace string `json:"namespace"`
 }
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalNamespacedType2 struct {
 	Kind       string `json:"kind"`
 	APIVersion string `json:"apiVersion"`

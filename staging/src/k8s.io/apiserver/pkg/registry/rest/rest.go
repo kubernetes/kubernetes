@@ -319,6 +319,8 @@ type StorageMetadata interface {
 	ProducesObject(verb string) interface{}
 }
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // ConnectRequest is an object passed to admission control for Connect operations
 type ConnectRequest struct {
 	// Name is the name of the object on which the connect request was made

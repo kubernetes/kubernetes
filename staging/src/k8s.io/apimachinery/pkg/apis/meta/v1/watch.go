@@ -26,6 +26,8 @@ import (
 // Event represents a single event to a watched resource.
 //
 // +protobuf=true
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type WatchEvent struct {
 	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
 
@@ -78,3 +80,10 @@ type InternalEvent watch.Event
 
 func (e *InternalEvent) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 func (e *WatchEvent) GetObjectKind() schema.ObjectKind    { return schema.EmptyObjectKind }
+func (e *InternalEvent) DeepCopyObject() runtime.Object {
+	if c := e.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
