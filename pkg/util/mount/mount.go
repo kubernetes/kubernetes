@@ -44,8 +44,21 @@ type Interface interface {
 	// it could change between chunked reads). This is guaranteed to be
 	// consistent.
 	List() ([]MountPoint, error)
-	// IsLikelyNotMountPoint determines if a directory is a mountpoint.
+	// IsMountPointMatch determines if the mountpoint matches the dir
+	IsMountPointMatch(mp MountPoint, dir string) bool
+	// IsNotMountPoint determines if a directory is a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
+	// IsNotMountPoint is more expensive than IsLikelyNotMountPoint.
+	// IsNotMountPoint detects bind mounts in linux.
+	// IsNotMountPoint enumerates all the mountpoints using List() and
+	// the list of mountpoints may be large, then it uses
+	// IsMountPointMatch to evaluate whether the directory is a mountpoint
+	IsNotMountPoint(file string) (bool, error)
+	// IsLikelyNotMountPoint uses heuristics to determine if a directory
+	// is a mountpoint.
+	// It should return ErrNotExist when the directory does not exist.
+	// IsLikelyNotMountPoint does NOT properly detect all mountpoint types
+	// most notably linux bind mounts.
 	IsLikelyNotMountPoint(file string) (bool, error)
 	// DeviceOpened determines if the device is in use elsewhere
 	// on the system, i.e. still mounted.
@@ -198,4 +211,35 @@ func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (str
 	}
 
 	return path.Base(mountPath), nil
+}
+
+// IsNotMountPoint determines if a directory is a mountpoint.
+// It should return ErrNotExist when the directory does not exist.
+// This method uses the List() of all mountpoints
+// It is more extensive than IsLikelyNotMountPoint
+// and it detects bind mounts in linux
+func IsNotMountPoint(mounter Interface, file string) (bool, error) {
+	// IsLikelyNotMountPoint provides a quick check
+	// to determine whether file IS A mountpoint
+	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)
+	if notMntErr != nil {
+		return notMnt, notMntErr
+	}
+	// identified as mountpoint, so return this fact
+	if notMnt == false {
+		return notMnt, nil
+	}
+	// check all mountpoints since IsLikelyNotMountPoint
+	// is not reliable for some mountpoint types
+	mountPoints, mountPointsErr := mounter.List()
+	if mountPointsErr != nil {
+		return notMnt, mountPointsErr
+	}
+	for _, mp := range mountPoints {
+		if mounter.IsMountPointMatch(mp, file) {
+			notMnt = false
+			break
+		}
+	}
+	return notMnt, nil
 }
