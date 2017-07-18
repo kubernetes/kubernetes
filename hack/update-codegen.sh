@@ -121,7 +121,7 @@ ${informergen} \
 # You may add additional calls of code generators like set-gen above.
 
 # call generation on sub-project for now
-vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
-vendor/k8s.io/sample-apiserver/hack/update-codegen.sh
-vendor/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
-vendor/k8s.io/metrics/hack/update-codegen.sh
+KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
+KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/sample-apiserver/hack/update-codegen.sh
+KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
+KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/metrics/hack/update-codegen.sh

@@ -18,11 +18,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=${GOPATH}/src/k8s.io/kubernetes
-BASE_PATH=k8s.io/kubernetes/staging/src/
-BASE_PKG=k8s.io/sample-apiserver
-
-source "${KUBE_ROOT}/hack/lib/init.sh"
+SCRIPT_PACKAGE=k8s.io/sample-apiserver
+SCRIPT_ROOT=$(dirname "${BASH_SOURCE}")/..
+SCRIPT_BASE=${SCRIPT_ROOT}/../..
+KUBEGEN_PKG=${KUBEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/kube-gen 2>/dev/null || echo k8s.io/kube-gen)}
 
 clientgen="${PWD}/client-gen-binary"
 listergen="${PWD}/lister-gen"
@@ -38,40 +37,39 @@ trap cleanup EXIT
 function generate_group() {
   local GROUP_NAME=$1
   local VERSION=$2
-  local SERVER_BASE=${GOPATH}/src/${BASE_PATH}
-  local CLIENT_PKG=${BASE_PKG}/pkg/client
+  local CLIENT_PKG=${SCRIPT_PACKAGE}/pkg/client
   local LISTERS_PKG=${CLIENT_PKG}/listers_generated
   local INFORMERS_PKG=${CLIENT_PKG}/informers_generated
-  local PREFIX=${BASE_PKG}/pkg/apis
+  local PREFIX=${SCRIPT_PACKAGE}/pkg/apis
   local INPUT_APIS=(
     ${GROUP_NAME}/
     ${GROUP_NAME}/${VERSION}
   )
 
   echo "Building client-gen"
-  go build -o "${clientgen}" k8s.io/kube-gen/cmd/client-gen
+  go build -o "${clientgen}" ${KUBEGEN_PKG}/cmd/client-gen
 
-  echo "generating clientset for group ${GROUP_NAME} and version ${VERSION} at ${GOPATH}/${BASE_PATH}${CLIENT_PKG}"
-  ${clientgen} --input-base ${PREFIX} --input ${INPUT_APIS[@]} --clientset-path ${CLIENT_PKG}/clientset_generated --output-base=${GOPATH}/src/${BASE_PATH}
-  ${clientgen} --clientset-name="clientset" --input-base ${PREFIX} --input ${GROUP_NAME}/${VERSION} --clientset-path ${CLIENT_PKG}/clientset_generated --output-base=${GOPATH}/src/${BASE_PATH}
+  echo "generating clientset for group ${GROUP_NAME} and version ${VERSION} at ${SCRIPT_BASE}/${CLIENT_PKG}"
+  ${clientgen} --input-base ${PREFIX} --input ${INPUT_APIS[@]} --clientset-path ${CLIENT_PKG}/clientset_generated --output-base=${SCRIPT_BASE}
+  ${clientgen} --clientset-name="clientset" --input-base ${PREFIX} --input ${GROUP_NAME}/${VERSION} --clientset-path ${CLIENT_PKG}/clientset_generated --output-base=${SCRIPT_BASE}
   
   echo "Building lister-gen"
-  go build -o "${listergen}" k8s.io/kube-gen/cmd/lister-gen
+  go build -o "${listergen}" ${KUBEGEN_PKG}/cmd/lister-gen
 
-  echo "generating listers for group ${GROUP_NAME} and version ${VERSION} at ${GOPATH}/${BASE_PATH}${LISTERS_PKG}"
-  ${listergen} --input-dirs ${BASE_PKG}/pkg/apis/wardle --input-dirs ${BASE_PKG}/pkg/apis/${GROUP_NAME}/${VERSION} --output-package ${LISTERS_PKG} --output-base ${SERVER_BASE}
+  echo "generating listers for group ${GROUP_NAME} and version ${VERSION} at ${SCRIPT_BASE}/${LISTERS_PKG}"
+  ${listergen} --input-dirs ${SCRIPT_PACKAGE}/pkg/apis/wardle --input-dirs ${SCRIPT_PACKAGE}/pkg/apis/${GROUP_NAME}/${VERSION} --output-package ${LISTERS_PKG} --output-base ${SCRIPT_BASE}
 
   echo "Building informer-gen"
-  go build -o "${informergen}" k8s.io/kube-gen/cmd/informer-gen
+  go build -o "${informergen}" ${KUBEGEN_PKG}/cmd/informer-gen
 
-  echo "generating informers for group ${GROUP_NAME} and version ${VERSION} at ${GOPATH}/${BASE_PATH}${INFORMERS_PKG}"
+  echo "generating informers for group ${GROUP_NAME} and version ${VERSION} at ${SCRIPT_BASE}/${INFORMERS_PKG}"
   ${informergen} \
-    --input-dirs ${BASE_PKG}/pkg/apis/${GROUP_NAME} --input-dirs ${BASE_PKG}/pkg/apis/${GROUP_NAME}/${VERSION} \
+    --input-dirs ${SCRIPT_PACKAGE}/pkg/apis/${GROUP_NAME} --input-dirs ${SCRIPT_PACKAGE}/pkg/apis/${GROUP_NAME}/${VERSION} \
     --versioned-clientset-package ${CLIENT_PKG}/clientset_generated/clientset \
     --internal-clientset-package ${CLIENT_PKG}/clientset_generated/internalclientset \
     --listers-package ${LISTERS_PKG} \
     --output-package ${INFORMERS_PKG} \
-    --output-base ${SERVER_BASE}
+    --output-base ${SCRIPT_BASE}
 }
 
 generate_group wardle v1alpha1
