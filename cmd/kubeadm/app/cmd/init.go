@@ -230,7 +230,7 @@ func (i *Init) Run(out io.Writer) error {
 	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
 
 	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddress, i.cfg.API.BindPort)
-	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, i.cfg.CertificatesDir, kubeadmapi.GlobalEnvParams.KubernetesDir, i.cfg.NodeName)
+	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, i.cfg.CertificatesDir, kubeadmconstants.KubernetesDir, i.cfg.NodeName)
 	if err != nil {
 		return err
 	}
@@ -240,7 +240,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	adminKubeConfigPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
+	adminKubeConfigPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
 	client, err := kubeadmutil.CreateClientAndWaitForAPI(adminKubeConfigPath)
 	if err != nil {
 		return err
@@ -297,7 +297,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	ctx := map[string]string{
-		"KubeConfigPath": filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName),
+		"KubeConfigPath": filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName),
 		"KubeConfigName": kubeadmconstants.AdminKubeConfigFileName,
 		"Token":          i.cfg.Token,
 		"MasterIP":       i.cfg.API.AdvertiseAddress,

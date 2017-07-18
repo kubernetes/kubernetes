@@ -37,7 +37,7 @@ type tlsKeyPair struct {
 func k8sSelfHostedVolumeMount() v1.VolumeMount {
 	return v1.VolumeMount{
 		Name:      "k8s",
-		MountPath: kubeadmapi.GlobalEnvParams.KubernetesDir,
+		MountPath: kubeadmconstants.KubernetesDir,
 		ReadOnly:  true,
 	}
 }
@@ -248,7 +248,7 @@ func createOpaqueSecrets(cfg *kubeadmapi.MasterConfiguration, client *clientset.
 	for _, file := range files {
 		secret, err := createOpaqueSecretFromFile(
 			file,
-			path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, file),
+			path.Join(kubeadmconstants.KubernetesDir, file),
 		)
 		if err != nil {
 			return err

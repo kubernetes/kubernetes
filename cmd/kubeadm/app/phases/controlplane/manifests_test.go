@@ -46,10 +46,8 @@ func TestWriteStaticPodManifests(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	// set up tmp GlobalEnvParams values for testing
-	oldEnv := kubeadmapi.GlobalEnvParams
-	kubeadmapi.GlobalEnvParams.KubernetesDir = fmt.Sprintf("%s/etc/kubernetes", tmpdir)
-	defer func() { kubeadmapi.GlobalEnvParams = oldEnv }()
+	// set up tmp KubernetesDir for testing
+	kubeadmconstants.KubernetesDir = fmt.Sprintf("%s/etc/kubernetes", tmpdir)
 
 	var tests = []struct {
 		cfg                  *kubeadmapi.MasterConfiguration
@@ -86,7 +84,7 @@ func TestWriteStaticPodManifests(t *testing.T) {
 
 		// Below is dead code.
 		if rt.expectedAPIProbePort != 0 {
-			manifest, err := os.Open(filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "kube-apiserver.yaml"))
+			manifest, err := os.Open(filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "kube-apiserver.yaml"))
 			if err != nil {
 				t.Errorf("WriteStaticPodManifests: %v", err)
 				continue
@@ -340,7 +338,7 @@ func TestK8sVolume(t *testing.T) {
 				Name: "k8s",
 				VolumeSource: v1.VolumeSource{
 					HostPath: &v1.HostPathVolumeSource{
-						Path: kubeadmapi.GlobalEnvParams.KubernetesDir},
+						Path: kubeadmconstants.KubernetesDir},
 				}},
 		},
 	}
@@ -371,7 +369,7 @@ func TestK8sVolumeMount(t *testing.T) {
 		{
 			expected: v1.VolumeMount{
 				Name:      "k8s",
-				MountPath: kubeadmapi.GlobalEnvParams.KubernetesDir,
+				MountPath: kubeadmconstants.KubernetesDir,
 				ReadOnly:  true,
 			},
 		},
@@ -688,7 +686,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"kube-controller-manager",
 				"--address=127.0.0.1",
 				"--leader-elect=true",
-				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
 				"--root-ca-file=" + testCertsDir + "/ca.crt",
 				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
 				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
@@ -707,7 +705,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"kube-controller-manager",
 				"--address=127.0.0.1",
 				"--leader-elect=true",
-				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
 				"--root-ca-file=" + testCertsDir + "/ca.crt",
 				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
 				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
@@ -727,7 +725,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"kube-controller-manager",
 				"--address=127.0.0.1",
 				"--leader-elect=true",
-				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/controller-manager.conf",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
 				"--root-ca-file=" + testCertsDir + "/ca.crt",
 				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
 				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
@@ -817,7 +815,7 @@ func TestGetSchedulerCommand(t *testing.T) {
 				"kube-scheduler",
 				"--address=127.0.0.1",
 				"--leader-elect=true",
-				"--kubeconfig=" + kubeadmapi.GlobalEnvParams.KubernetesDir + "/scheduler.conf",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/scheduler.conf",
 			},
 		},
 	}
