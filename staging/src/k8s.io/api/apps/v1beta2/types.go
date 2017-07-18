@@ -29,6 +29,7 @@ const (
 	StatefulSetRevisionLabel       = ControllerRevisionHashLabelKey
 )
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // ScaleSpec describes the attributes of a scale subresource
 type ScaleSpec struct {
 	// desired number of instances for the scaled object.
@@ -36,6 +37,7 @@ type ScaleSpec struct {
 	Replicas int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 }
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // ScaleStatus represents the current status of a scale subresource.
 type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
@@ -58,6 +60,7 @@ type ScaleStatus struct {
 // +genclient=true
 // +noMethods=true
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // Scale represents a scaling request for a resource.
 type Scale struct {
 	metav1.TypeMeta `json:",inline"`
@@ -76,6 +79,7 @@ type Scale struct {
 
 // +genclient=true
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
 //  - Network: A single stable DNS and hostname.
@@ -112,6 +116,7 @@ const (
 	ParallelPodManagement = "Parallel"
 )
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
 // controller will use to perform updates. It includes any additional parameters
 // necessary to perform the update for the indicated strategy.
@@ -141,6 +146,7 @@ const (
 	OnDeleteStatefulSetStrategyType = "OnDelete"
 )
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 type RollingUpdateStatefulSetStrategy struct {
 	// Partition indicates the ordinal at which the StatefulSet should be
@@ -148,6 +154,7 @@ type RollingUpdateStatefulSetStrategy struct {
 	Partition *int32 `json:"partition,omitempty" protobuf:"varint,1,opt,name=partition"`
 }
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // A StatefulSetSpec is the specification of a StatefulSet.
 type StatefulSetSpec struct {
 	// replicas is the desired number of replicas of the given Template.
@@ -210,6 +217,7 @@ type StatefulSetSpec struct {
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty" protobuf:"varint,8,opt,name=revisionHistoryLimit"`
 }
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // StatefulSetStatus represents the current state of a StatefulSet.
 type StatefulSetStatus struct {
 	// observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the
@@ -240,6 +248,7 @@ type StatefulSetStatus struct {
 	UpdateRevision string `json:"updateRevision,omitempty" protobuf:"bytes,7,opt,name=updateRevision"`
 }
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // StatefulSetList is a collection of StatefulSets.
 type StatefulSetList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -250,6 +259,7 @@ type StatefulSetList struct {
 
 // +genclient=true
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
@@ -266,6 +276,7 @@ type Deployment struct {
 	Status DeploymentStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentSpec is the specification of the desired behavior of the Deployment.
 type DeploymentSpec struct {
 	// Number of desired pods. This is a pointer to distinguish between explicit
@@ -315,6 +326,7 @@ type DeploymentSpec struct {
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
 }
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentRollback stores the information required to rollback a deployment.
 type DeploymentRollback struct {
 	metav1.TypeMeta `json:",inline"`
@@ -327,6 +339,7 @@ type DeploymentRollback struct {
 	RollbackTo RollbackConfig `json:"rollbackTo" protobuf:"bytes,3,opt,name=rollbackTo"`
 }
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 type RollbackConfig struct {
 	// The revision to rollback to. If set to 0, rollback to the last revision.
 	// +optional
@@ -340,6 +353,7 @@ const (
 	DefaultDeploymentUniqueLabelKey string = "pod-template-hash"
 )
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentStrategy describes how to replace existing pods with new ones.
 type DeploymentStrategy struct {
 	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
@@ -365,6 +379,7 @@ const (
 	RollingUpdateDeploymentStrategyType DeploymentStrategyType = "RollingUpdate"
 )
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // Spec to control the desired behavior of rolling update.
 type RollingUpdateDeployment struct {
 	// The maximum number of pods that can be unavailable during the update.
@@ -395,6 +410,7 @@ type RollingUpdateDeployment struct {
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
 }
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentStatus is the most recently observed status of the Deployment.
 type DeploymentStatus struct {
 	// The generation observed by the deployment controller.
@@ -450,6 +466,7 @@ const (
 	DeploymentReplicaFailure DeploymentConditionType = "ReplicaFailure"
 )
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentCondition describes the state of a deployment at a certain point.
 type DeploymentCondition struct {
 	// Type of deployment condition.
@@ -466,6 +483,7 @@ type DeploymentCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentList is a list of Deployments.
 type DeploymentList struct {
 	metav1.TypeMeta `json:",inline"`
