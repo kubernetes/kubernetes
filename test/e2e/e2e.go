@@ -122,6 +122,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		framework.Failf("Failed to setup provider config: %v", err)
 	}
 
+	switch framework.TestContext.Provider {
+	case "gce", "gke":
+		framework.LogClusterImageSources()
+	}
+
 	c, err := framework.LoadClientset()
 	if err != nil {
 		glog.Fatal("Error loading client: ", err)
