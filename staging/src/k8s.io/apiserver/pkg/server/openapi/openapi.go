@@ -155,7 +155,7 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 
 // buildDefinitionForType build a definition for a given type and return a referable name to it's definition.
 // This is the main function that keep track of definitions used in this spec and is depend on code generated
-// by k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen.
+// by k8s.io/kube-gen/cmd/openapi-gen.
 func (o *openAPI) buildDefinitionForType(sample interface{}) (string, error) {
 	t := reflect.TypeOf(sample)
 	if t.Kind() == reflect.Ptr {

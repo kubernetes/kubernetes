@@ -41,7 +41,7 @@ trap cleanup EXIT
 
 echo "Building client-gen"
 CLIENTGEN="${PWD}/client-gen-binary"
-go build -o "${CLIENTGEN}" ./cmd/libs/go2idl/client-gen
+go build -o "${CLIENTGEN}" k8s.io/kube-gen/cmd/client-gen
 
 PREFIX=k8s.io/kube-aggregator/pkg/apis
 INPUT_BASE="--input-base ${PREFIX}"
@@ -58,7 +58,7 @@ ${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input apiregistration/
 
 echo "Building lister-gen"
 listergen="${PWD}/lister-gen"
-go build -o "${listergen}" ./cmd/libs/go2idl/lister-gen
+go build -o "${listergen}" k8s.io/kube-gen/cmd/lister-gen
 
 LISTER_INPUT="--input-dirs k8s.io/kube-aggregator/pkg/apis/apiregistration --input-dirs k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 LISTER_PATH="--output-package k8s.io/kube-aggregator/pkg/client/listers"
@@ -67,7 +67,7 @@ ${listergen} ${LISTER_INPUT} ${LISTER_PATH} --output-base ${KUBE_ROOT}/vendor
 
 echo "Building informer-gen"
 informergen="${PWD}/informer-gen"
-go build -o "${informergen}" ./cmd/libs/go2idl/informer-gen
+go build -o "${informergen}" k8s.io/kube-gen/cmd/informer-gen
 
 ${informergen} \
   --output-base ${KUBE_ROOT}/vendor \

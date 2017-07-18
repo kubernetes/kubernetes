@@ -19,7 +19,7 @@ package fake
 import (
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
-	internalversion "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
+	internalversion "k8s.io/kube-gen/cmd/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
 )
 
 type FakeTestgroup struct {

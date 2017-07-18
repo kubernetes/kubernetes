@@ -22,14 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup"
+	"k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup/v1"
 )
-
-func init() {
-	Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
-}
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
@@ -37,7 +32,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  testgroup.SchemeGroupVersion.Group,
 			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup",
+			ImportPrefix:               "k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup",
 			AddInternalObjectsToScheme: testgroup.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

@@ -16,4 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package,register
 // +groupName=testgroup.k8s.io
-package testgroup // import "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
+package testgroup // import "k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup"

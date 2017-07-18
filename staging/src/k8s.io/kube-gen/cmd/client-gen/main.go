@@ -24,9 +24,9 @@ import (
 	"strings"
 
 	"k8s.io/gengo/args"
-	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
+	clientgenargs "k8s.io/kube-gen/cmd/client-gen/args"
+	"k8s.io/kube-gen/cmd/client-gen/generators"
+	"k8s.io/kube-gen/cmd/client-gen/types"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
@@ -172,15 +172,15 @@ func main() {
 
 	if *test {
 		arguments.InputDirs = append(dependencies, []string{
-			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup",
+			"k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup",
 		}...)
 		arguments.CustomArgs = clientgenargs.Args{
 			Groups: []types.GroupVersions{{Group: "testgroup", Versions: []types.Version{""}}},
 			GroupVersionToInputPath: map[types.GroupVersion]string{
-				{Group: "testgroup", Version: ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup",
+				{Group: "testgroup", Version: ""}: "k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup",
 			},
 			ClientsetName:       "test_internalclientset",
-			ClientsetOutputPath: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",
+			ClientsetOutputPath: "k8s.io/kube-gen/cmd/client-gen/testoutput/clientset_generated/",
 			ClientsetOnly:       false,
 			FakeClient:          true,
 			CmdArgs:             cmdArgs,

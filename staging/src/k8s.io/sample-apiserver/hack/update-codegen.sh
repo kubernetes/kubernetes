@@ -49,20 +49,20 @@ function generate_group() {
   )
 
   echo "Building client-gen"
-  go build -o "${clientgen}" k8s.io/kubernetes/cmd/libs/go2idl/client-gen
+  go build -o "${clientgen}" k8s.io/kube-gen/cmd/client-gen
 
   echo "generating clientset for group ${GROUP_NAME} and version ${VERSION} at ${GOPATH}/${BASE_PATH}${CLIENT_PKG}"
   ${clientgen} --input-base ${PREFIX} --input ${INPUT_APIS[@]} --clientset-path ${CLIENT_PKG}/clientset_generated --output-base=${GOPATH}/src/${BASE_PATH}
   ${clientgen} --clientset-name="clientset" --input-base ${PREFIX} --input ${GROUP_NAME}/${VERSION} --clientset-path ${CLIENT_PKG}/clientset_generated --output-base=${GOPATH}/src/${BASE_PATH}
   
   echo "Building lister-gen"
-  go build -o "${listergen}" k8s.io/kubernetes/cmd/libs/go2idl/lister-gen
+  go build -o "${listergen}" k8s.io/kube-gen/cmd/lister-gen
 
   echo "generating listers for group ${GROUP_NAME} and version ${VERSION} at ${GOPATH}/${BASE_PATH}${LISTERS_PKG}"
   ${listergen} --input-dirs ${BASE_PKG}/pkg/apis/wardle --input-dirs ${BASE_PKG}/pkg/apis/${GROUP_NAME}/${VERSION} --output-package ${LISTERS_PKG} --output-base ${SERVER_BASE}
 
   echo "Building informer-gen"
-  go build -o "${informergen}" k8s.io/kubernetes/cmd/libs/go2idl/informer-gen
+  go build -o "${informergen}" k8s.io/kube-gen/cmd/informer-gen
 
   echo "generating informers for group ${GROUP_NAME} and version ${VERSION} at ${GOPATH}/${BASE_PATH}${INFORMERS_PKG}"
   ${informergen} \

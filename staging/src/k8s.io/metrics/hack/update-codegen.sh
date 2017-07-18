@@ -30,7 +30,7 @@ trap cleanup EXIT
 
 echo "Building client-gen"
 CLIENTGEN="${PWD}/client-gen-binary"
-go build -o "${CLIENTGEN}" ./cmd/libs/go2idl/client-gen
+go build -o "${CLIENTGEN}" k8s.io/kube-gen/cmd/client-gen
 
 PREFIX=k8s.io/metrics/pkg/apis
 INPUT_BASE="--input-base ${PREFIX}"

@@ -24,6 +24,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 # call verify on sub-project for now
+#
+# Note: these must be before the main script call because the later calls the sub-project's
+#       update-codegen.sh scripts. We wouldn't see any error on changes then.
 vendor/k8s.io/kube-aggregator/hack/verify-codegen.sh
 vendor/k8s.io/sample-apiserver/hack/verify-codegen.sh
 vendor/k8s.io/apiextensions-apiserver/hack/verify-codegen.sh

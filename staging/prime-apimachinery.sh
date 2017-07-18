@@ -72,7 +72,7 @@ while read package; do
 done <${dir}/packages.txt
 
 # this file generates something or other, but we don't want to accidentally have it generate into an apimachinery package
-git checkout cmd/libs/go2idl/set-gen/main.go
+git checkout vendor/k8s.io/kube-gen/cmd/set-gen/main.go
 
 
 # now run gofmt to get the sorting right

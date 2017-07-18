@@ -24,9 +24,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 BUILD_TARGETS=(
-  cmd/libs/go2idl/client-gen
-  cmd/libs/go2idl/lister-gen
-  cmd/libs/go2idl/informer-gen
+  vendor/k8s.io/kube-gen/cmd/client-gen
+  vendor/k8s.io/kube-gen/cmd/lister-gen
+  vendor/k8s.io/kube-gen/cmd/informer-gen
 )
 make -C "${KUBE_ROOT}" WHAT="${BUILD_TARGETS[*]}"
 
@@ -60,7 +60,7 @@ GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
 # This can be called with one flag, --verify-only, so it works for both the
 # update- and verify- scripts.
 ${clientgen} "$@"
-${clientgen} -t "$@"
+${clientgen} -t "$@" --output-base "${KUBE_ROOT}/vendor"
 ${clientgen} --clientset-name="clientset" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" "$@"
 # Clientgen for federation clientset.
 ${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/","batch/","autoscaling/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,extensions/Deployment,extensions/DaemonSet,api/ConfigMap,api/Event,batch/Job,autoscaling/HorizontalPodAutoscaler"   "$@"

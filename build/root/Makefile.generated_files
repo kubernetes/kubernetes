@@ -69,7 +69,7 @@ verify_generated_files: verify_gen_deepcopy    \
 #     # expect one file to be regenerated
 #     make gen_deepcopy
 #     # expect nothing to be rebuilt, finish in O(seconds)
-#     touch cmd/libs/go2idl/deepcopy-gen/main.go
+#     touch vendor/k8s.io/kube-gen/cmd/deepcopy-gen/main.go
 #     make gen_deepcopy
 #     # expect deepcopy-gen is built exactly once
 #     # expect many files to be regenerated
@@ -88,7 +88,7 @@ verify_generated_files: verify_gen_deepcopy    \
 #     # expect one file to be regenerated
 #     make gen_conversion
 #     # expect nothing to be rebuilt, finish in O(seconds)
-#     touch cmd/libs/go2idl/conversion-gen/main.go
+#     touch vendor/k8s.io/kube-gen/cmd/conversion-gen/main.go
 #     make gen_conversion
 #     # expect conversion-gen is built exactly once
 #     # expect many files to be regenerated
@@ -274,7 +274,7 @@ $(META_DIR)/$(DEEPCOPY_GEN).mk:
 	(echo -n "$(DEEPCOPY_GEN): ";                                         \
 	 ./hack/run-in-gopath.sh go list                                      \
 	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
-	     ./cmd/libs/go2idl/deepcopy-gen                                   \
+	     ./vendor/k8s.io/kube-gen/cmd/deepcopy-gen                                   \
 	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
 	     | xargs ./hack/run-in-gopath.sh go list                          \
 	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
@@ -299,7 +299,7 @@ sinclude $(META_DIR)/$(DEEPCOPY_GEN).mk
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
 $(DEEPCOPY_GEN):
-	hack/make-rules/build.sh cmd/libs/go2idl/deepcopy-gen
+	hack/make-rules/build.sh ./vendor/k8s.io/kube-gen/cmd/deepcopy-gen
 	touch $@
 
 #
@@ -424,7 +424,7 @@ $(META_DIR)/$(DEFAULTER_GEN).mk:
 	(echo -n "$(DEFAULTER_GEN): ";                                        \
 	 ./hack/run-in-gopath.sh go list                                      \
 	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
-	     ./cmd/libs/go2idl/defaulter-gen                                  \
+	     ./vendor/k8s.io/kube-gen/cmd/defaulter-gen                                  \
 	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
 	     | xargs ./hack/run-in-gopath.sh go list                          \
 	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
@@ -449,7 +449,7 @@ sinclude $(META_DIR)/$(DEFAULTER_GEN).mk
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
 $(DEFAULTER_GEN):
-	hack/make-rules/build.sh cmd/libs/go2idl/defaulter-gen
+	hack/make-rules/build.sh ./vendor/k8s.io/kube-gen/cmd/defaulter-gen
 	touch $@
 
 #
@@ -522,7 +522,7 @@ $(META_DIR)/$(OPENAPI_GEN).mk:
 	(echo -n "$(OPENAPI_GEN): ";                                          \
 	 ./hack/run-in-gopath.sh go list                                      \
 	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
-	     ./cmd/libs/go2idl/openapi-gen                                    \
+	     ./vendor/k8s.io/kube-gen/cmd/openapi-gen                                    \
 	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
 	     | xargs ./hack/run-in-gopath.sh go list                          \
 	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
@@ -547,7 +547,7 @@ sinclude $(META_DIR)/$(OPENAPI_GEN).mk
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
 $(OPENAPI_GEN):
-	hack/make-rules/build.sh cmd/libs/go2idl/openapi-gen
+	hack/make-rules/build.sh ./vendor/k8s.io/kube-gen/cmd/openapi-gen
 	touch $@
 
 #
@@ -716,7 +716,7 @@ $(META_DIR)/$(CONVERSION_GEN).mk:
 	(echo -n "$(CONVERSION_GEN): ";                                       \
 	 ./hack/run-in-gopath.sh go list                                      \
 	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
-	     ./cmd/libs/go2idl/conversion-gen                                 \
+	     ./vendor/k8s.io/kube-gen/cmd/conversion-gen                                 \
 	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
 	     | xargs ./hack/run-in-gopath.sh go list                          \
 	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
@@ -741,5 +741,5 @@ sinclude $(META_DIR)/$(CONVERSION_GEN).mk
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
 $(CONVERSION_GEN):
-	hack/make-rules/build.sh cmd/libs/go2idl/conversion-gen
+	hack/make-rules/build.sh ./vendor/k8s.io/kube-gen/cmd/conversion-gen
 	touch $@
