@@ -49,6 +49,8 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+const schedulerCustomPolicy string = "scheduler-custom-policy" // Name of the ConfigMap object
+
 type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface)
 
 type nodeStateManager struct {
@@ -64,38 +66,32 @@ func PredicateTwo(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeIn
 	return true, nil, nil
 }
 
-func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	return []schedulerapi.HostPriority{}, nil
+func PriorityMapOne(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+	return schedulerapi.HostPriority{Host: "", Score: 0}, nil
 }
+func PriorityReduceOne(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error {
+	return nil
+}
+
+var PriorityMapTwo = PriorityMapOne
+var PriorityReduceTwo = PriorityReduceOne
 
 func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
-// TestSchedulerCreationFromConfigMap verifies that scheduler can be created
-// from configurations provided by a ConfigMap object and then verifies that the
-// configuration is applied correctly.
-func TestSchedulerCreationFromConfigMap(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
-
-	ns := framework.CreateTestingNamespace("configmap", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
-	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
-
+// CreateSchedulerFromConfigMap is a helper function that creates a scheduler
+// from a ConfigMap object.
+func CreateSchedulerFromConfigMap(cs *clientset.Clientset, informerFactory informers.SharedInformerFactory) (*scheduler.Scheduler, error) {
 	// Pre-register some predicate and priority functions
 	factory.RegisterFitPredicate("PredicateOne", PredicateOne)
 	factory.RegisterFitPredicate("PredicateTwo", PredicateTwo)
-	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
-	factory.RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
+	factory.RegisterPriorityFunction2("PriorityOne", PriorityMapOne, PriorityReduceOne, 1)
+	factory.RegisterPriorityFunction2("PriorityTwo", PriorityMapTwo, PriorityReduceTwo, 1)
 
 	// Add a ConfigMap object.
-	configPolicyName := "scheduler-custom-policy-config"
 	policyConfigMap := v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
+		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: schedulerCustomPolicy},
 		Data: map[string]string{
 			options.SchedulerPolicyConfigMapKey: `{
 			"kind" : "Policy",
@@ -113,25 +109,34 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	}
 
 	policyConfigMap.APIVersion = api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()
-	clientSet.Core().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
+	cs.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(cs.Core().RESTClient()).Events("")})
 	ss := options.NewSchedulerServer()
 	ss.HardPodAffinitySymmetricWeight = v1.DefaultHardPodAffinitySymmetricWeight
-	ss.PolicyConfigMapName = configPolicyName
-	sched, err := app.CreateScheduler(ss, clientSet,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}),
-	)
+	ss.PolicyConfigMapName = schedulerCustomPolicy
+	configMapInformer := factory.NewPolicyConfigMapInformer(cs, 0, schedulerCustomPolicy, metav1.NamespaceSystem)
+	sched, err := app.CreateScheduler(ss, cs, informerFactory, informerFactory.Core().V1().Pods(), configMapInformer, eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}))
+	go configMapInformer.Run(sched.Config().StopEverything)
+	return sched, err
+}
 
+// TestSchedulerCreationFromConfigMap verifies that scheduler can be created
+// from configurations provided by a ConfigMap object and then verifies that the
+// configuration is applied correctly.
+func TestSchedulerCreationFromConfigMap(t *testing.T) {
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
+
+	ns := framework.CreateTestingNamespace("configmap", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	defer clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+
+	sched, err := CreateSchedulerFromConfigMap(clientSet, informerFactory)
 	if err != nil {
 		t.Fatalf("Error creating scheduler: %v", err)
 	}
@@ -146,7 +151,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	if schedPredicates["PredicateTwo"] == nil {
 		t.Errorf("Expected to have a PodFitsHostPorts predicate.")
 	}
-	if schedPrioritizers[1].Function == nil || schedPrioritizers[1].Weight != 5 {
+	if schedPrioritizers[1].Map == nil || schedPrioritizers[1].Reduce == nil || schedPrioritizers[1].Weight != 5 {
 		t.Errorf("Unexpected prioritizer: func: %v, weight: %v", schedPrioritizers[1].Function, schedPrioritizers[1].Weight)
 	}
 
@@ -154,7 +159,8 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 }
 
 // TestSchedulerCreationFromNonExistentConfigMap ensures that creation of the
-// scheduler from a non-existent ConfigMap fails.
+// scheduler from a non-existent ConfigMap succeeds and scheduler monitors the
+// addition of the ConfigMap object.
 func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(nil)
 	defer closeFn()
@@ -163,30 +169,201 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
-
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
 
 	ss := options.NewSchedulerServer()
-	ss.PolicyConfigMapName = "non-existent-config"
+	ss.PolicyConfigMapName = "future-config"
+	ss.PolicyConfigMapNamespace = "custom-ns"
+	configMapInformer := factory.NewPolicyConfigMapInformer(clientSet, 0, ss.PolicyConfigMapName, ss.PolicyConfigMapNamespace)
+	sched, err := app.CreateScheduler(ss, clientSet, informerFactory, informerFactory.Core().V1().Pods(), configMapInformer, eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}))
+	if err != nil {
+		t.Fatalf("Creation of scheduler failed: %v", err)
+	}
 
-	_, err := app.CreateScheduler(ss, clientSet,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}),
-	)
+	informerFactory.Start(sched.Config().StopEverything)
+	go configMapInformer.Run(sched.Config().StopEverything)
+	defer close(sched.Config().StopEverything)
 
-	if err == nil {
-		t.Fatalf("Creation of scheduler didn't fail while the policy ConfigMap didn't exist.")
+	// Now, add a ConfigMap object with the same name given to the scheduler. We
+	// expect the scheduler to exit (in order to apply the config after restarting).
+	var schedulerGotKilledAfterConfigMapCreation bool = false
+	app.SchedulerKillFunc = func() {
+		t.Log("Scheduler killer function got called.")
+		schedulerGotKilledAfterConfigMapCreation = true
+	}
+	newPolicyConfigMap := v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Namespace: ss.PolicyConfigMapNamespace, Name: ss.PolicyConfigMapName},
+		Data: map[string]string{
+			options.SchedulerPolicyConfigMapKey: `{
+			"kind" : "Policy",
+			"apiVersion" : "v1",
+			"predicates" : [
+				{"name" : "PredicateOne"}
+			],
+			"priorities" : [
+				{"name" : "PriorityOne", "weight" : 2},
+				{"name" : "PriorityTwo", "weight" : 3}
+			]
+			}`,
+		},
+	}
+	schedulerGotKilledAfterConfigMapCreation = false
+	// Create the ConfigMap.
+	_, err = clientSet.CoreV1().ConfigMaps(ss.PolicyConfigMapNamespace).Create(&newPolicyConfigMap)
+	if err != nil {
+		t.Fatalf("Error creating the configmap: %v", err)
+	}
+	wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) { return schedulerGotKilledAfterConfigMapCreation, nil })
+	if !schedulerGotKilledAfterConfigMapCreation {
+		t.Error("Scheduler killer function is expected to be called upon creation of its policy ConfigMap.")
+	}
+}
+
+// TestUpdateSchedulerConfigMap verifies that the scheduler killer is called when scheduler's policy ConfigMap is updated.
+func TestUpdateSchedulerConfigMap(t *testing.T) {
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
+
+	ns := framework.CreateTestingNamespace("configmap", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	defer clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+
+	sched, err := CreateSchedulerFromConfigMap(clientSet, informerFactory)
+	if err != nil {
+		t.Fatalf("Error creating scheduler: %v", err)
+	}
+
+	var schedulerGotKilledAfterConfigMapUpdate bool = false
+	app.SchedulerKillFunc = func() {
+		t.Log("Scheduler killer function got called.")
+		schedulerGotKilledAfterConfigMapUpdate = true
+	}
+
+	informerFactory.Start(sched.Config().StopEverything)
+	defer close(sched.Config().StopEverything)
+
+	sched.Run()
+
+	newPolicyConfigMap := v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: schedulerCustomPolicy},
+		Data: map[string]string{
+			options.SchedulerPolicyConfigMapKey: `{
+			"kind" : "Policy",
+			"apiVersion" : "v1",
+			"predicates" : [
+				{"name" : "PredicateOne"}
+			],
+			"priorities" : [
+				{"name" : "PriorityOne", "weight" : 2},
+				{"name" : "PriorityTwo", "weight" : 3}
+			]
+			}`,
+		},
+	}
+	// Update the ConfigMap. Scheduler should be restarted when its policy ConfigMap is updated.
+	_, err = clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(&newPolicyConfigMap)
+	if err != nil {
+		t.Fatalf("Error updating scheduler policy configmap: %v", err)
+	}
+	wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) { return schedulerGotKilledAfterConfigMapUpdate, nil })
+	if !schedulerGotKilledAfterConfigMapUpdate {
+		t.Error("Scheduler killer function is expected to be called upon update to its policy ConfigMap.")
+	}
+
+	// Now, add and update a different ConfigMap object. This time, scheduler killer should not be called as this is not the scheduler's policy ConfigMap.
+	schedulerGotKilledAfterConfigMapUpdate = false
+	newPolicyConfigMap.ObjectMeta.Name = "random.name"
+	// Create the ConfigMap first.
+	_, err = clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&newPolicyConfigMap)
+	if err != nil {
+		t.Fatalf("Error creating a random configmap: %v", err)
+	}
+	// Update the ConfigMap.
+	_, err = clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(&newPolicyConfigMap)
+	if err != nil {
+		t.Fatalf("Error updating the random configmap: %v", err)
+	}
+	time.Sleep(2 * time.Second) // We don't use wait.Poll as the condition should never become true and we don't want to wait long.
+	if schedulerGotKilledAfterConfigMapUpdate {
+		t.Error("Scheduler killer function shouldn't have been called.")
+	}
+}
+
+// TestDeleteSchedulerConfigMap verifies that scheduler killer is called when scheduler's policy ConfigMap is deleted.
+func TestDeleteSchedulerConfigMap(t *testing.T) {
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
+
+	ns := framework.CreateTestingNamespace("configmap", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+
+	sched, err := CreateSchedulerFromConfigMap(clientSet, informerFactory)
+	if err != nil {
+		t.Fatalf("Error creating scheduler: %v", err)
+	}
+
+	var schedulerGotKilledAfterConfigMapUpdate bool = false
+	app.SchedulerKillFunc = func() {
+		t.Log("Scheduler killer function got called.")
+		schedulerGotKilledAfterConfigMapUpdate = true
+	}
+
+	informerFactory.Start(sched.Config().StopEverything)
+	defer close(sched.Config().StopEverything)
+
+	sched.Run()
+
+	// Scheduler should be killed when its policy ConfigMap is deleted.
+	err = clientSet.Core().ConfigMaps(metav1.NamespaceSystem).Delete(schedulerCustomPolicy, nil)
+	if err != nil {
+		t.Fatalf("Error deleting scheduler policy configmap: %v", err)
+	}
+	wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) { return schedulerGotKilledAfterConfigMapUpdate, nil })
+	if !schedulerGotKilledAfterConfigMapUpdate {
+		t.Error("Scheduler killer function is expected to be called upon deletion of its policy ConfigMap.")
+	}
+
+	// Now, add and then delete a different ConfigMap object. This time, scheduler killer should not be called as this is not the scheduler's policy ConfigMap.
+	newPolicyConfigMap := v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "random.cfg"},
+		Data: map[string]string{
+			options.SchedulerPolicyConfigMapKey: `{
+			"kind" : "Policy",
+			"apiVersion" : "v1",
+			"predicates" : [
+				{"name" : "PredicateOne"}
+			],
+			"priorities" : [
+				{"name" : "PriorityOne", "weight" : 2},
+				{"name" : "PriorityTwo", "weight" : 3}
+			]
+			}`,
+		},
+	}
+	schedulerGotKilledAfterConfigMapUpdate = false
+	// Create the ConfigMap first.
+	_, err = clientSet.Core().ConfigMaps(metav1.NamespaceSystem).Create(&newPolicyConfigMap)
+	if err != nil {
+		t.Fatalf("Error creating a random configmap: %v", err)
+	}
+	// Delete the ConfigMap.
+	err = clientSet.Core().ConfigMaps(metav1.NamespaceSystem).Delete(newPolicyConfigMap.ObjectMeta.Name, nil)
+	if err != nil {
+		t.Fatalf("Error deleting the random configmap: %v", err)
+	}
+	time.Sleep(2 * time.Second)
+	if schedulerGotKilledAfterConfigMapUpdate {
+		t.Error("Scheduler killer function shouldn't have been called.")
 	}
 }
 
@@ -211,17 +388,7 @@ func TestSchedulerCreationInLegacyMode(t *testing.T) {
 	ss.PolicyConfigMapName = "non-existent-configmap"
 	ss.UseLegacyPolicyConfig = true
 
-	sched, err := app.CreateScheduler(ss, clientSet,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}),
-	)
+	sched, err := app.CreateScheduler(ss, clientSet, informerFactory, informerFactory.Core().V1().Pods(), nil, eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}))
 
 	if err != nil {
 		t.Fatalf("Creation of scheduler in legacy mode failed: %v", err)

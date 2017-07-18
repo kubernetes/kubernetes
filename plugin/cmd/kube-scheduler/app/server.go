@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/apiserver/pkg/server/healthz"
 
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
@@ -76,17 +77,20 @@ func Run(s *options.SchedulerServer) error {
 	// cache only non-terminal pods
 	podInformer := factory.NewPodInformer(kubecli, 0)
 
+	var configMapInformer cache.SharedIndexInformer
+	if !s.UseLegacyPolicyConfig && len(s.PolicyConfigMapName) != 0 {
+		// cache only scheduler's policy ConfigMap
+		configMapInformer = factory.NewPolicyConfigMapInformer(kubecli, 0, s.PolicyConfigMapName, s.PolicyConfigMapNamespace)
+	} else {
+		configMapInformer = nil
+	}
+
 	sched, err := CreateScheduler(
 		s,
 		kubecli,
-		informerFactory.Core().V1().Nodes(),
+		informerFactory,
 		podInformer,
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
+		configMapInformer,
 		recorder,
 	)
 	if err != nil {
@@ -98,10 +102,16 @@ func Run(s *options.SchedulerServer) error {
 	stop := make(chan struct{})
 	defer close(stop)
 	go podInformer.Informer().Run(stop)
+	if configMapInformer != nil {
+		go configMapInformer.Run(stop)
+	}
 	informerFactory.Start(stop)
 	// Waiting for all cache to sync before scheduling.
 	informerFactory.WaitForCacheSync(stop)
 	controller.WaitForCacheSync("scheduler", stop, podInformer.Informer().HasSynced)
+	if configMapInformer != nil {
+		controller.WaitForCacheSync("scheduler", stop, configMapInformer.HasSynced)
+	}
 
 	run := func(_ <-chan struct{}) {
 		sched.Run()
