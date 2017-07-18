@@ -85,7 +85,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	}
 
 	tokenCmd.PersistentFlags().StringVar(&kubeConfigFile,
-		"kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster")
+		"kubeconfig", "", "The KubeConfig file to use for talking to the cluster")
 
 	var usages []string
 	var tokenDuration time.Duration
