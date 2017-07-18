@@ -68,7 +68,7 @@ spec:
     spec:
       containers:
       - name: kube-proxy
-        image: {{ .Image }}
+        image: {{ if .ImageOverride }}{{ .ImageOverride }}{{ else }}{{ .ImageRepository }}/kube-proxy-{{ .Arch }}:{{ .Version }}{{ end }}
         imagePullPolicy: IfNotPresent
         command:
         - /usr/local/bin/kube-proxy

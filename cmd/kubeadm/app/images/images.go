@@ -29,7 +29,6 @@ const (
 	KubeAPIServerImage         = "apiserver"
 	KubeControllerManagerImage = "controller-manager"
 	KubeSchedulerImage         = "scheduler"
-	KubeProxyImage             = "proxy"
 
 	etcdVersion = "3.0.17"
 )
@@ -45,6 +44,5 @@ func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideIma
 		KubeAPIServerImage:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-apiserver", runtime.GOARCH, kubernetesImageTag),
 		KubeControllerManagerImage: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-controller-manager", runtime.GOARCH, kubernetesImageTag),
 		KubeSchedulerImage:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-scheduler", runtime.GOARCH, kubernetesImageTag),
-		KubeProxyImage:             fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-proxy", runtime.GOARCH, kubernetesImageTag),
 	}[image]
 }
