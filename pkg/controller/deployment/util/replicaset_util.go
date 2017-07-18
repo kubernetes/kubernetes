@@ -24,9 +24,9 @@ import (
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
-	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
+	"k8s.io/client-go/kubernetes/scheme"
+	unversionedextensions "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -47,7 +47,7 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rsL
 		if err != nil {
 			return err
 		}
-		obj, deepCopyErr := api.Scheme.DeepCopy(rs)
+		obj, deepCopyErr := scheme.Scheme.DeepCopy(rs)
 		if deepCopyErr != nil {
 			return deepCopyErr
 		}
@@ -71,7 +71,7 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rsL
 
 // GetReplicaSetHash returns the pod template hash of a ReplicaSet's pod template space
 func GetReplicaSetHash(rs *extensions.ReplicaSet, uniquifier *int64) (string, error) {
-	template, err := api.Scheme.DeepCopy(rs.Spec.Template)
+	template, err := scheme.Scheme.DeepCopy(rs.Spec.Template)
 	if err != nil {
 		return "", err
 	}

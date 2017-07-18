@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	v1clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // Interface to delete a namespace with all resources in it.

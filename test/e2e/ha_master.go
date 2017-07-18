@@ -25,7 +25,7 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 

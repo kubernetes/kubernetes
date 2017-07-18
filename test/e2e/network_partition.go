@@ -31,8 +31,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/api/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	nodepkg "k8s.io/kubernetes/pkg/controller/node"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"

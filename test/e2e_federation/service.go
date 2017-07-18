@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/scheme"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/test/e2e/framework"
 	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 
@@ -184,7 +184,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				backendPods = createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
 
 				service = createLBServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
-				obj, err := api.Scheme.DeepCopy(service)
+				obj, err := scheme.Scheme.DeepCopy(service)
 				// Cloning shouldn't fail. On the off-chance it does, we
 				// should shallow copy service to serviceShard before
 				// failing. If we don't do this we will never really

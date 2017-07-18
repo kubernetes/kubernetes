@@ -38,15 +38,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
-	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
@@ -308,7 +308,7 @@ func (r *volumeReactor) checkVolumes(expectedVolumes []*v1.PersistentVolume) err
 	for _, v := range r.volumes {
 		// We must clone the volume because of golang race check - it was
 		// written by the controller without any locks on it.
-		clone, _ := api.Scheme.DeepCopy(v)
+		clone, _ := scheme.Scheme.DeepCopy(v)
 		v = clone.(*v1.PersistentVolume)
 		v.ResourceVersion = ""
 		if v.Spec.ClaimRef != nil {
@@ -339,7 +339,7 @@ func (r *volumeReactor) checkClaims(expectedClaims []*v1.PersistentVolumeClaim) 
 	for _, c := range r.claims {
 		// We must clone the claim because of golang race check - it was
 		// written by the controller without any locks on it.
-		clone, _ := api.Scheme.DeepCopy(c)
+		clone, _ := scheme.Scheme.DeepCopy(c)
 		c = clone.(*v1.PersistentVolumeClaim)
 		c.ResourceVersion = ""
 		gotMap[c.Name] = c
@@ -508,7 +508,7 @@ func (r *volumeReactor) deleteVolumeEvent(volume *v1.PersistentVolume) {
 	// Generate deletion event. Cloned volume is needed to prevent races (and we
 	// would get a clone from etcd too).
 	if r.fakeVolumeWatch != nil {
-		clone, _ := api.Scheme.DeepCopy(volume)
+		clone, _ := scheme.Scheme.DeepCopy(volume)
 		volumeClone := clone.(*v1.PersistentVolume)
 		r.fakeVolumeWatch.Delete(volumeClone)
 	}
@@ -526,7 +526,7 @@ func (r *volumeReactor) deleteClaimEvent(claim *v1.PersistentVolumeClaim) {
 	// Generate deletion event. Cloned volume is needed to prevent races (and we
 	// would get a clone from etcd too).
 	if r.fakeClaimWatch != nil {
-		clone, _ := api.Scheme.DeepCopy(claim)
+		clone, _ := scheme.Scheme.DeepCopy(claim)
 		claimClone := clone.(*v1.PersistentVolumeClaim)
 		r.fakeClaimWatch.Delete(claimClone)
 	}
@@ -556,7 +556,7 @@ func (r *volumeReactor) modifyVolumeEvent(volume *v1.PersistentVolume) {
 	// Generate deletion event. Cloned volume is needed to prevent races (and we
 	// would get a clone from etcd too).
 	if r.fakeVolumeWatch != nil {
-		clone, _ := api.Scheme.DeepCopy(volume)
+		clone, _ := scheme.Scheme.DeepCopy(volume)
 		volumeClone := clone.(*v1.PersistentVolume)
 		r.fakeVolumeWatch.Modify(volumeClone)
 	}
