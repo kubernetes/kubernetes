@@ -21,6 +21,7 @@ go_library(
         "//pkg/kubelet/apis:go_default_library",
         "//plugin/pkg/scheduler/factory:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
