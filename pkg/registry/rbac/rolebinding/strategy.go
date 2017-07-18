@@ -93,7 +93,3 @@ func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.O
 func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }
-
-func (s strategy) Export(ctx genericapirequest.Context, obj runtime.Object, exact bool) error {
-	return nil
-}

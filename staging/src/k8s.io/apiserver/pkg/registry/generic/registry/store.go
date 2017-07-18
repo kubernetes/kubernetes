@@ -52,6 +52,14 @@ import (
 // object.
 type ObjectFunc func(obj runtime.Object) error
 
+// GenericStore interface can be used for type assertions when we need to access the underlying strategies.
+type GenericStore interface {
+	GetCreateStrategy() rest.RESTCreateStrategy
+	GetUpdateStrategy() rest.RESTUpdateStrategy
+	GetDeleteStrategy() rest.RESTDeleteStrategy
+	GetExportStrategy() rest.RESTExportStrategy
+}
+
 // Store implements pkg/api/rest.StandardStorage. It's intended to be
 // embeddable and allows the consumer to implement any non-generic functions
 // that are required. This object is intended to be copyable so that it can be
@@ -177,6 +185,7 @@ type Store struct {
 var _ rest.StandardStorage = &Store{}
 var _ rest.Exporter = &Store{}
 var _ rest.TableConvertor = &Store{}
+var _ GenericStore = &Store{}
 
 const OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
 
@@ -231,6 +240,26 @@ func (e *Store) New() runtime.Object {
 // NewList implements rest.Lister.
 func (e *Store) NewList() runtime.Object {
 	return e.NewListFunc()
+}
+
+// GetCreateStrategy implements GenericStore.
+func (e *Store) GetCreateStrategy() rest.RESTCreateStrategy {
+	return e.CreateStrategy
+}
+
+// GetUpdateStrategy implements GenericStore.
+func (e *Store) GetUpdateStrategy() rest.RESTUpdateStrategy {
+	return e.UpdateStrategy
+}
+
+// GetDeleteStrategy implements GenericStore.
+func (e *Store) GetDeleteStrategy() rest.RESTDeleteStrategy {
+	return e.DeleteStrategy
+}
+
+// GetExportStrategy implements GenericStore.
+func (e *Store) GetExportStrategy() rest.RESTExportStrategy {
+	return e.ExportStrategy
 }
 
 // List returns a list of items matching labels and field according to the
