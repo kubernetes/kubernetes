@@ -79,11 +79,6 @@ function updateGodepManifest() {
 # move into staging and save the dependencies for everything in order
 mkdir -p "${TMP_GOPATH}/src/k8s.io"
 for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
-  # we skip metrics because it's synced to the real repo manually
-  if [ "${repo}" == "metrics" ]; then
-    continue
-  fi
-
   kube::util::ensure_clean_working_dir
 
   cp -a "${KUBE_ROOT}/staging/src/k8s.io/${repo}" "${TMP_GOPATH}/src/k8s.io/"
