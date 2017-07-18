@@ -90,11 +90,17 @@ func TestDeepCopyArraySeparate(t *testing.T) {
 }
 
 func TestDeepCopyMapSeparate(t *testing.T) {
-	x := map[string]int{"foo": 5}
-	y := copyOrDie(t, x).(map[string]int)
-	x["foo"] = 3
-	if y["foo"] == 3 {
-		t.Errorf("deep copy wasn't deep: %#q %#q", x, y)
+	i := 1
+	j := 1
+
+	x := map[*int]*int{&i: &j}
+	y := copyOrDie(t, x).(map[*int]*int)
+
+	i, j = 2, 2
+	for k, v := range y {
+		if *k != 1 || *v != 1 {
+			t.Errorf("deep copy wasn't deep: %#q %#q", x, y)
+		}
 	}
 }
 
