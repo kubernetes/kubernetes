@@ -463,8 +463,10 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	recorder := eventBroadcaster.NewRecorder(scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
 
 	var healthzServer *healthcheck.HealthzServer
+	var healthzUpdater healthcheck.HealthzUpdater
 	if len(config.HealthzBindAddress) > 0 {
 		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration)
+		healthzUpdater = healthzServer
 	}
 
 	var proxier proxy.ProxyProvider
@@ -498,7 +500,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 			hostname,
 			nodeIP,
 			recorder,
-			healthzServer,
+			healthzUpdater,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
