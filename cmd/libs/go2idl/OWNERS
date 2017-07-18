@@ -4,3 +4,5 @@ approvers:
 reviewers:
 - lavalamp
 - wojtek-t
+labels:
+ - sig/api-machinery

@@ -15,3 +15,5 @@ reviewers:
 - ncdc
 - tallclair
 - timothysc
+labels:
+ - sig/api-machinery
