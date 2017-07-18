@@ -38,7 +38,7 @@ func StatusViewerFor(kind schema.GroupKind, c internalclientset.Interface) (Stat
 	switch kind {
 	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
 		return &DeploymentStatusViewer{c.Extensions()}, nil
-	case extensions.Kind("DaemonSet"):
+	case extensions.Kind("DaemonSet"), apps.Kind("DaemonSet"):
 		return &DaemonSetStatusViewer{c.Extensions()}, nil
 	case apps.Kind("StatefulSet"):
 		return &StatefulSetStatusViewer{c.Apps()}, nil
