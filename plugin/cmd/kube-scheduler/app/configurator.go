@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -87,6 +86,7 @@ func CreateScheduler(
 	kubecli *clientset.Clientset,
 	sharedInformerFactory informers.SharedInformerFactory,
 	podInformer coreinformers.PodInformer,
+	configMapInformer cache.SharedIndexInformer,
 	recorder record.EventRecorder,
 ) (*scheduler.Scheduler, error) {
 	configurator := factory.NewConfigFactory(
@@ -120,8 +120,8 @@ func CreateScheduler(
 	})
 
 	// Install event handlers for changes to the scheduler's ConfigMap
-	if !s.UseLegacyPolicyConfig && len(s.PolicyConfigMapName) != 0 {
-		schedConfigurator.SetupPolicyConfigMapEventHandlers(kubecli, sharedInformerFactory)
+	if !s.UseLegacyPolicyConfig && configMapInformer != nil {
+		schedConfigurator.SetupPolicyConfigMapEventHandlers(configMapInformer)
 	}
 
 	return scheduler, err
@@ -211,21 +211,8 @@ func (sc schedulerConfigurator) Create() (*scheduler.Config, error) {
 	return sc.CreateFromConfig(*policy)
 }
 
-func (sc *schedulerConfigurator) SetupPolicyConfigMapEventHandlers(client clientset.Interface, informerFactory informers.SharedInformerFactory) {
-	// selector targets only the scheduler's policy ConfigMap.
-	selector := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), "configmaps", sc.policyConfigMapNamespace, fields.OneTermEqualSelector(api.ObjectNameField, string(sc.policyConfigMap)))
-
-	sharedIndexInformer := informerFactory.InformerFor(&clientv1.ConfigMap{}, func(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-		sharedIndexInformer := cache.NewSharedIndexInformer(
-			selector,
-			&clientv1.ConfigMap{},
-			resyncPeriod,
-			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-		)
-		return sharedIndexInformer
-	})
-
-	sharedIndexInformer.AddEventHandlerWithResyncPeriod(
+func (sc *schedulerConfigurator) SetupPolicyConfigMapEventHandlers(configMapInformer cache.SharedIndexInformer) {
+	configMapInformer.AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sc.addPolicyConfigMap,
 			UpdateFunc: sc.updatePolicyConfigMap,

@@ -116,8 +116,9 @@ func CreateSchedulerFromConfigMap(cs *clientset.Clientset, informerFactory infor
 	ss := options.NewSchedulerServer()
 	ss.HardPodAffinitySymmetricWeight = v1.DefaultHardPodAffinitySymmetricWeight
 	ss.PolicyConfigMapName = schedulerCustomPolicy
-	sched, err := app.CreateScheduler(ss, cs, informerFactory, informerFactory.Core().V1().Pods(), eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}))
-
+	configMapInformer := factory.NewPolicyConfigMapInformer(cs, 0, schedulerCustomPolicy, metav1.NamespaceSystem)
+	sched, err := app.CreateScheduler(ss, cs, informerFactory, informerFactory.Core().V1().Pods(), configMapInformer, eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}))
+	go configMapInformer.Run(sched.Config().StopEverything)
 	return sched, err
 }
 
@@ -176,13 +177,14 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	ss := options.NewSchedulerServer()
 	ss.PolicyConfigMapName = "future-config"
 	ss.PolicyConfigMapNamespace = "custom-ns"
-
-	sched, err := app.CreateScheduler(ss, clientSet, informerFactory, informerFactory.Core().V1().Pods(), eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}))
+	configMapInformer := factory.NewPolicyConfigMapInformer(clientSet, 0, ss.PolicyConfigMapName, ss.PolicyConfigMapNamespace)
+	sched, err := app.CreateScheduler(ss, clientSet, informerFactory, informerFactory.Core().V1().Pods(), configMapInformer, eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}))
 	if err != nil {
 		t.Fatalf("Creation of scheduler failed: %v", err)
 	}
 
 	informerFactory.Start(sched.Config().StopEverything)
+	go configMapInformer.Run(sched.Config().StopEverything)
 	defer close(sched.Config().StopEverything)
 
 	// Now, add a ConfigMap object with the same name given to the scheduler. We
@@ -386,7 +388,7 @@ func TestSchedulerCreationInLegacyMode(t *testing.T) {
 	ss.PolicyConfigMapName = "non-existent-configmap"
 	ss.UseLegacyPolicyConfig = true
 
-	sched, err := app.CreateScheduler(ss, clientSet, informerFactory, informerFactory.Core().V1().Pods(), eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}))
+	sched, err := app.CreateScheduler(ss, clientSet, informerFactory, informerFactory.Core().V1().Pods(), nil, eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName}))
 
 	if err != nil {
 		t.Fatalf("Creation of scheduler in legacy mode failed: %v", err)

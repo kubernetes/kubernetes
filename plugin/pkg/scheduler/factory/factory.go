@@ -33,8 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/api"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
 	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
@@ -646,6 +648,21 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 	return &podInformer{
 		informer: cache.NewSharedIndexInformer(lw, &v1.Pod{}, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
 	}
+}
+
+// NewPolicyConfigMapInformer creates a shared index informer that returns only the scheduler's policy ConfigMap.
+func NewPolicyConfigMapInformer(client clientset.Interface, resyncPeriod time.Duration, cmName string, cmNamespace string) cache.SharedIndexInformer {
+	// selector targets only the scheduler's policy ConfigMap.
+	selector := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), "configmaps", cmNamespace, fields.OneTermEqualSelector(api.ObjectNameField, string(cmName)))
+	informerFactory := informers.NewSharedInformerFactory(client, resyncPeriod)
+	return informerFactory.InformerFor(&v1.ConfigMap{}, func(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+		return cache.NewSharedIndexInformer(
+			selector,
+			&v1.ConfigMap{},
+			resyncPeriod,
+			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		)
+	})
 }
 
 func (factory *ConfigFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue *cache.FIFO) func(pod *v1.Pod, err error) {
