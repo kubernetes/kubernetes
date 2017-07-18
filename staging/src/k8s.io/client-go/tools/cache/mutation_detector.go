@@ -79,17 +79,15 @@ type cacheObj struct {
 
 func (d *defaultCacheMutationDetector) Run(stopCh <-chan struct{}) {
 	// we DON'T want protection from panics.  If we're running this code, we want to die
-	go func() {
-		for {
-			d.CompareObjects()
+	for {
+		d.CompareObjects()
 
-			select {
-			case <-stopCh:
-				return
-			case <-time.After(d.period):
-			}
+		select {
+		case <-stopCh:
+			return
+		case <-time.After(d.period):
 		}
-	}()
+	}
 }
 
 // AddObject makes a deep copy of the object for later comparison.  It only works on runtime.Object
