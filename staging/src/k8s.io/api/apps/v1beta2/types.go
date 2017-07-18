@@ -641,7 +641,7 @@ type DaemonSetStatus struct {
 	CollisionCount *int64 `json:"collisionCount,omitempty" protobuf:"varint,9,opt,name=collisionCount"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.

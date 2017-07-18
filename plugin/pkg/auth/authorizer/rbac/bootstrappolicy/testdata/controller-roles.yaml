@@ -150,6 +150,7 @@ items:
     name: system:controller:daemon-set-controller
   rules:
   - apiGroups:
+    - apps
     - extensions
     resources:
     - daemonsets
@@ -158,6 +159,7 @@ items:
     - list
     - watch
   - apiGroups:
+    - apps
     - extensions
     resources:
     - daemonsets/status
