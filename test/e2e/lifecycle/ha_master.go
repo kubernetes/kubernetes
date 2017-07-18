@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package lifecycle
 
 import (
 	"fmt"
@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -76,7 +77,7 @@ func verifyRCs(c clientset.Interface, ns string, names []string) {
 }
 
 func createNewRC(c clientset.Interface, ns string, name string) {
-	_, err := newRCByName(c, ns, name, 1, nil)
+	_, err := common.NewRCByName(c, ns, name, 1, nil)
 	framework.ExpectNoError(err)
 }
 
@@ -113,7 +114,7 @@ func removeZoneFromZones(zones []string, zone string) []string {
 	return zones
 }
 
-var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
+var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 	f := framework.NewDefaultFramework("ha-master")
 	var c clientset.Interface
 	var ns string

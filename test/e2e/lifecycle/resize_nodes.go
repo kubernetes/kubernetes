@@ -14,60 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package lifecycle
 
 import (
 	"fmt"
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-const (
-	resizeNodeReadyTimeout = 2 * time.Minute
-	nodeReadinessTimeout   = 3 * time.Minute
-	podNotReadyTimeout     = 1 * time.Minute
-	podReadyTimeout        = 2 * time.Minute
-	testPort               = 9376
-)
-
-func svcByName(name string, port int) *v1.Service {
-	return &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeNodePort,
-			Selector: map[string]string{
-				"name": name,
-			},
-			Ports: []v1.ServicePort{{
-				Port:       int32(port),
-				TargetPort: intstr.FromInt(port),
-			}},
-		},
-	}
-}
-
-func newSVCByName(c clientset.Interface, ns, name string) error {
-	_, err := c.Core().Services(ns).Create(svcByName(name, testPort))
-	return err
-}
-
-// newRCByName creates a replication controller with a selector by name of name.
-func newRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64) (*v1.ReplicationController, error) {
-	By(fmt.Sprintf("creating replication controller %s", name))
-	return c.Core().ReplicationControllers(ns).Create(framework.RcByNamePort(
-		name, replicas, framework.ServeHostnameImage, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
-}
+const resizeNodeReadyTimeout = 2 * time.Minute
 
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
 	rc, err := c.Core().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
@@ -79,7 +42,7 @@ func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
 	return err
 }
 
-var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
+var _ = SIGDescribe("Nodes [Disruptive]", func() {
 	f := framework.NewDefaultFramework("resize-nodes")
 	var systemPodsNo int32
 	var c clientset.Interface
@@ -101,7 +64,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 	})
 
 	// Slow issue #13323 (8 min)
-	framework.KubeDescribe("Resize [Slow]", func() {
+	SIGDescribe("Resize [Slow]", func() {
 		var skipped bool
 
 		BeforeEach(func() {
@@ -144,7 +107,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, ignoreLabels)
 			Expect(err).NotTo(HaveOccurred())
 			By("waiting for image prepulling pods to complete")
-			framework.WaitForPodsSuccess(c, metav1.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingTimeout)
+			framework.WaitForPodsSuccess(c, metav1.NamespaceSystem, framework.ImagePullerLabels, framework.ImagePrePullingTimeout)
 		})
 
 		It("should be able to delete nodes", func() {
@@ -152,7 +115,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
 			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-			newRCByName(c, ns, name, replicas, nil)
+			common.NewRCByName(c, ns, name, replicas, nil)
 			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -178,9 +141,9 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
-			newSVCByName(c, ns, name)
+			common.NewSVCByName(c, ns, name)
 			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-			newRCByName(c, ns, name, replicas, nil)
+			common.NewRCByName(c, ns, name, replicas, nil)
 			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
