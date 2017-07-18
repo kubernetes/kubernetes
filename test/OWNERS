@@ -20,6 +20,7 @@ reviewers:
   - pwittrock # for test/e2e/kubectl.go
   - rmmh
   - saad-ali
+  - shyamjvs
   - smarterclayton
   - soltysh
   - spiffxp
@@ -47,6 +48,7 @@ approvers:
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
+  - shyamjvs
   - smarterclayton
   - soltysh
   - spiffxp
