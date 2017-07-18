@@ -25,6 +25,8 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+
+	"k8s.io/kube-gen/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/kube-gen/cmd/client-gen/types"
 
 	"github.com/golang/glog"
@@ -69,8 +71,7 @@ func generatedBy() string {
 func objectMetaForPackage(p *types.Package) (*types.Type, bool, error) {
 	generatingForPackage := false
 	for _, t := range p.Types {
-		// filter out types which dont have genclient=true.
-		if extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == false {
+		if !util.MustParseClientGenTags(t.SecondClosestCommentLines).GenerateClient {
 			continue
 		}
 		generatingForPackage = true
@@ -170,12 +171,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		var typesToGenerate []*types.Type
 		for _, t := range p.Types {
-			// filter out types which dont have genclient=true.
-			if extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == false {
-				continue
-			}
-			// filter out types which have noMethods
-			if extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true {
+			tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
+			if !tags.GenerateClient || tags.NoVerbs {
 				continue
 			}
 
@@ -307,8 +304,7 @@ func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			// piggy-back on types that are tagged for client-gen
-			return extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == true
+			return util.MustParseClientGenTags(t.SecondClosestCommentLines).GenerateClient
 		},
 	}
 }
@@ -348,8 +344,7 @@ func versionPackage(basePackage string, gv clientgentypes.GroupVersion, boilerpl
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			// piggy-back on types that are tagged for client-gen
-			return extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == true
+			return util.MustParseClientGenTags(t.SecondClosestCommentLines).GenerateClient
 		},
 	}
 }

@@ -27,6 +27,7 @@ go_library(
         "//vendor/k8s.io/kube-gen/cmd/client-gen/args:go_default_library",
         "//vendor/k8s.io/kube-gen/cmd/client-gen/generators/fake:go_default_library",
         "//vendor/k8s.io/kube-gen/cmd/client-gen/generators/scheme:go_default_library",
+        "//vendor/k8s.io/kube-gen/cmd/client-gen/generators/util:go_default_library",
         "//vendor/k8s.io/kube-gen/cmd/client-gen/path:go_default_library",
         "//vendor/k8s.io/kube-gen/cmd/client-gen/types:go_default_library",
     ],

@@ -17,13 +17,14 @@ limitations under the License.
 package fake
 
 import (
-	"fmt"
 	"io"
 	"path/filepath"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+
+	"k8s.io/kube-gen/cmd/client-gen/generators/util"
 	"k8s.io/kube-gen/cmd/client-gen/path"
 )
 
@@ -66,12 +67,8 @@ func genStatus(t *types.Type) bool {
 		}
 	}
 
-	// Allow overriding via a comment on the type
-	genStatus, err := types.ExtractSingleBoolCommentTag("+", "genclientstatus", hasStatus, t.SecondClosestCommentLines)
-	if err != nil {
-		fmt.Printf("error looking up +genclientstatus: %v\n", err)
-	}
-	return genStatus
+	tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
+	return hasStatus && !tags.NoStatus
 }
 
 // hasObjectMeta returns true if the type has a ObjectMeta field.
@@ -88,7 +85,10 @@ func hasObjectMeta(t *types.Type) bool {
 func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
-	namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
+	tags, err := util.ParseClientGenTags(t.SecondClosestCommentLines)
+	if err != nil {
+		return err
+	}
 	canonicalGroup := g.group
 	if canonicalGroup == "core" {
 		canonicalGroup = ""
@@ -110,7 +110,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"type":                 t,
 		"package":              pkg,
 		"Package":              namer.IC(pkg),
-		"namespaced":           namespaced,
+		"namespaced":           !tags.NonNamespaced,
 		"Group":                namer.IC(g.group),
 		"GroupVersion":         namer.IC(g.group) + namer.IC(g.version),
 		"group":                canonicalGroup,
@@ -148,43 +148,48 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"ExtractFromListOptions":         c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "ExtractFromListOptions"}),
 	}
 
-	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
-
-	readonly := extractBoolTagOrDie("readonly", t.SecondClosestCommentLines) == true
-
-	if namespaced {
-		sw.Do(structNamespaced, m)
-	} else {
+	if tags.NonNamespaced {
 		sw.Do(structNonNamespaced, m)
+	} else {
+		sw.Do(structNamespaced, m)
 	}
 
-	if !noMethods {
-		sw.Do(resource, m)
-		sw.Do(kind, m)
+	if tags.NoVerbs {
+		return sw.Error()
 	}
+	sw.Do(resource, m)
+	sw.Do(kind, m)
 
-	if !noMethods && !readonly {
-		sw.Do(createTemplate, m)
-		sw.Do(updateTemplate, m)
-		// Generate the UpdateStatus method if the type has a status
-		if genStatus(t) {
-			sw.Do(updateStatusTemplate, m)
-		}
-		sw.Do(deleteTemplate, m)
-		sw.Do(deleteCollectionTemplate, m)
-	}
-
-	if !noMethods {
+	if tags.HasVerb("get") {
 		sw.Do(getTemplate, m)
+	}
+	if tags.HasVerb("list") {
 		if hasObjectMeta(t) {
 			sw.Do(listUsingOptionsTemplate, m)
 		} else {
 			sw.Do(listTemplate, m)
 		}
+	}
+	if tags.HasVerb("watch") {
 		sw.Do(watchTemplate, m)
 	}
 
-	if !noMethods && !readonly {
+	if tags.HasVerb("create") {
+		sw.Do(createTemplate, m)
+	}
+	if tags.HasVerb("update") {
+		sw.Do(updateTemplate, m)
+	}
+	if tags.HasVerb("updateStatus") && genStatus(t) {
+		sw.Do(updateStatusTemplate, m)
+	}
+	if tags.HasVerb("delete") {
+		sw.Do(deleteTemplate, m)
+	}
+	if tags.HasVerb("deleteCollection") {
+		sw.Do(deleteCollectionTemplate, m)
+	}
+	if tags.HasVerb("patch") {
 		sw.Do(patchTemplate, m)
 	}
 
@@ -217,6 +222,7 @@ var $.type|allLowercasePlural$Kind = $.GroupVersionKind|raw${Group: "$.groupName
 `
 
 var listTemplate = `
+// List takes label and field selectors, and returns the list of $.type|publicPlural$ that match those selectors.
 func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type|raw$List, err error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewListAction|raw$($.type|allLowercasePlural$Resource, $.type|allLowercasePlural$Kind, c.ns, opts), &$.type|raw$List{})
@@ -229,6 +235,7 @@ func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type
 `
 
 var listUsingOptionsTemplate = `
+// List takes label and field selectors, and returns the list of $.type|publicPlural$ that match those selectors.
 func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type|raw$List, err error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewListAction|raw$($.type|allLowercasePlural$Resource, $.type|allLowercasePlural$Kind, c.ns, opts), &$.type|raw$List{})
@@ -252,6 +259,7 @@ func (c *Fake$.type|publicPlural$) List(opts $.ListOptions|raw$) (result *$.type
 `
 
 var getTemplate = `
+// Get takes name of the $.type|private$, and returns the corresponding $.type|private$ object, and an error if there is any.
 func (c *Fake$.type|publicPlural$) Get(name string, options $.GetOptions|raw$) (result *$.type|raw$, err error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewGetAction|raw$($.type|allLowercasePlural$Resource, c.ns, name), &$.type|raw${})
@@ -264,6 +272,7 @@ func (c *Fake$.type|publicPlural$) Get(name string, options $.GetOptions|raw$) (
 `
 
 var deleteTemplate = `
+// Delete takes name of the $.type|private$ and deletes it. Returns an error if one occurs.
 func (c *Fake$.type|publicPlural$) Delete(name string, options *$.DeleteOptions|raw$) error {
 	_, err := c.Fake.
 		$if .namespaced$Invokes($.NewDeleteAction|raw$($.type|allLowercasePlural$Resource, c.ns, name), &$.type|raw${})
@@ -273,6 +282,7 @@ func (c *Fake$.type|publicPlural$) Delete(name string, options *$.DeleteOptions|
 `
 
 var deleteCollectionTemplate = `
+// DeleteCollection deletes a collection of objects.
 func (c *Fake$.type|publicPlural$) DeleteCollection(options *$.DeleteOptions|raw$, listOptions $.ListOptions|raw$) error {
 	$if .namespaced$action := $.NewDeleteCollectionAction|raw$($.type|allLowercasePlural$Resource, c.ns, listOptions)
 	$else$action := $.NewRootDeleteCollectionAction|raw$($.type|allLowercasePlural$Resource, listOptions)
@@ -283,6 +293,7 @@ func (c *Fake$.type|publicPlural$) DeleteCollection(options *$.DeleteOptions|raw
 `
 
 var createTemplate = `
+// Create takes the representation of a $.type|private$ and creates it.  Returns the server's representation of the $.type|private$, and an error, if there is any.
 func (c *Fake$.type|publicPlural$) Create($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewCreateAction|raw$($.type|allLowercasePlural$Resource, c.ns, $.type|private$), &$.type|raw${})
@@ -295,6 +306,7 @@ func (c *Fake$.type|publicPlural$) Create($.type|private$ *$.type|raw$) (result 
 `
 
 var updateTemplate = `
+// Update takes the representation of a $.type|private$ and updates it. Returns the server's representation of the $.type|private$, and an error, if there is any.
 func (c *Fake$.type|publicPlural$) Update($.type|private$ *$.type|raw$) (result *$.type|raw$, err error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewUpdateAction|raw$($.type|allLowercasePlural$Resource, c.ns, $.type|private$), &$.type|raw${})
@@ -307,6 +319,8 @@ func (c *Fake$.type|publicPlural$) Update($.type|private$ *$.type|raw$) (result 
 `
 
 var updateStatusTemplate = `
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *Fake$.type|publicPlural$) UpdateStatus($.type|private$ *$.type|raw$) (*$.type|raw$, error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewUpdateSubresourceAction|raw$($.type|allLowercasePlural$Resource, "status", c.ns, $.type|private$), &$.type|raw${})

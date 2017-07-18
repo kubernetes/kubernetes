@@ -24,6 +24,8 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+
+	"k8s.io/kube-gen/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/kube-gen/cmd/client-gen/types"
 
 	"github.com/golang/glog"
@@ -69,6 +71,11 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 	clientSetInterface := c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"})
 	informerFor := "InformerFor"
 
+	tags, err := util.ParseClientGenTags(t.SecondClosestCommentLines)
+	if err != nil {
+		return err
+	}
+
 	m := map[string]interface{}{
 		"apiScheme":                       c.Universe.Type(apiScheme),
 		"cacheIndexers":                   c.Universe.Type(cacheIndexers),
@@ -84,7 +91,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"listOptions":                     c.Universe.Type(listOptions),
 		"lister":                          c.Universe.Type(types.Name{Package: listerPackage, Name: t.Name.Name + "Lister"}),
 		"namespaceAll":                    c.Universe.Type(metav1NamespaceAll),
-		"namespaced":                      !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines),
+		"namespaced":                      !tags.NonNamespaced,
 		"newLister":                       c.Universe.Function(types.Name{Package: listerPackage, Name: "New" + t.Name.Name + "Lister"}),
 		"runtimeObject":                   c.Universe.Type(runtimeObject),
 		"timeDuration":                    c.Universe.Type(timeDuration),

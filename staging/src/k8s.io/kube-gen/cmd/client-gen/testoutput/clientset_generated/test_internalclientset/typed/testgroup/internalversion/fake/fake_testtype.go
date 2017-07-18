@@ -36,6 +36,44 @@ var testtypesResource = schema.GroupVersionResource{Group: "testgroup.k8s.io", V
 
 var testtypesKind = schema.GroupVersionKind{Group: "testgroup.k8s.io", Version: "", Kind: "TestType"}
 
+func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *testgroup.TestType, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), &testgroup.TestType{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*testgroup.TestType), err
+}
+
+func (c *FakeTestTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeList, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewListAction(testtypesResource, testtypesKind, c.ns, opts), &testgroup.TestTypeList{})
+
+	if obj == nil {
+		return nil, err
+	}
+
+	label, _, _ := testing.ExtractFromListOptions(opts)
+	if label == nil {
+		label = labels.Everything()
+	}
+	list := &testgroup.TestTypeList{}
+	for _, item := range obj.(*testgroup.TestTypeList).Items {
+		if label.Matches(labels.Set(item.Labels)) {
+			list.Items = append(list.Items, item)
+		}
+	}
+	return list, err
+}
+
+// Watch returns a watch.Interface that watches the requested testTypes.
+func (c *FakeTestTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	return c.Fake.
+		InvokesWatch(testing.NewWatchAction(testtypesResource, c.ns, opts))
+
+}
+
 func (c *FakeTestTypes) Create(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), &testgroup.TestType{})
@@ -78,44 +116,6 @@ func (c *FakeTestTypes) DeleteCollection(options *v1.DeleteOptions, listOptions 
 
 	_, err := c.Fake.Invokes(action, &testgroup.TestTypeList{})
 	return err
-}
-
-func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *testgroup.TestType, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), &testgroup.TestType{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*testgroup.TestType), err
-}
-
-func (c *FakeTestTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(testtypesResource, testtypesKind, c.ns, opts), &testgroup.TestTypeList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &testgroup.TestTypeList{}
-	for _, item := range obj.(*testgroup.TestTypeList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested testTypes.
-func (c *FakeTestTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(testtypesResource, c.ns, opts))
-
 }
 
 // Patch applies the patch and returns the patched testType.
