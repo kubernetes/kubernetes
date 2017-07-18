@@ -21,7 +21,6 @@ import (
 	"math"
 	"time"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation"
 
@@ -53,9 +52,10 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items
 		maxPodCount := 10
-		jobDuration := 1 * time.Hour
+		jobDuration := 30 * time.Minute
 		linesPerPodPerSecond := 100
-		testDuration := 21 * time.Hour
+		// TODO(crassirostris): Increase to 21 hrs
+		testDuration := 3 * time.Hour
 		ingestionTimeout := testDuration + 30*time.Minute
 		allowedRestarts := int(math.Ceil(float64(testDuration) /
 			float64(time.Hour) * maxAllowedRestartsPerHour))
@@ -64,20 +64,31 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 		podRunCount := maxPodCount*(int(testDuration/jobDuration)-1) + 1
 		linesPerPod := linesPerPodPerSecond * int(jobDuration.Seconds())
 
+		// pods is a flat array of all pods to be run and to expect in Stackdriver.
 		pods := []*loggingPod{}
+		// podsByRun is a two-dimensional array of pods, first dimension is the run
+		// index, the second dimension is the node index. Since we want to create
+		// an equal load on all nodes, for the same run we have one pod per node.
+		podsByRun := [][]*loggingPod{}
 		for runIdx := 0; runIdx < podRunCount; runIdx++ {
+			podsInRun := []*loggingPod{}
 			for nodeIdx, node := range nodes {
 				podName := fmt.Sprintf("job-logs-generator-%d-%d-%d-%d", maxPodCount, linesPerPod, runIdx, nodeIdx)
-				pods = append(pods, newLoggingPod(podName, node.Name, linesPerPod, jobDuration))
+				pod := newLoggingPod(podName, node.Name, linesPerPod, jobDuration)
+				pods = append(pods, pod)
+				podsInRun = append(podsInRun, pod)
 			}
+			podsByRun = append(podsByRun, podsInRun)
 		}
 
 		By("Running short-living pods")
 		go func() {
-			for _, pod := range pods {
-				pod.Start(f)
+			for runIdx := 0; runIdx < podRunCount; runIdx++ {
+				// Starting one pod on each node.
+				for _, pod := range podsByRun[runIdx] {
+					pod.Start(f)
+				}
 				time.Sleep(podRunDelay)
-				defer f.PodClient().Delete(pod.Name, &meta_v1.DeleteOptions{})
 			}
 			// Waiting until the last pod has completed
 			time.Sleep(jobDuration - podRunDelay + lastPodIngestionSlack)
