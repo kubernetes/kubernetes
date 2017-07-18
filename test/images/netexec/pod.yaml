@@ -7,7 +7,7 @@ metadata:
 spec:
   containers:
   - name: netexec
-    image: gcr.io/google_containers/netexec:1.7
+    image: gcr.io/kubernetes-e2e-test-images/netexec-amd64:1.0
     ports:
     - containerPort: 8080
       protocol: TCP
