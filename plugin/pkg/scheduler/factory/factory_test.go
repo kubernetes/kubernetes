@@ -249,7 +249,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	mux := http.NewServeMux()
 
 	// FakeHandler musn't be sent requests other than the one you want to test.
-	mux.Handle(util.Test.ResourcePath("pods", "bar", "foo"), &handler)
+	mux.Handle(util.Test.ResourcePath(string(v1.ResourcePods), "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
@@ -281,7 +281,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		if !exists {
 			continue
 		}
-		handler.ValidateRequest(t, util.Test.ResourcePath("pods", "bar", "foo"), "GET", nil)
+		handler.ValidateRequest(t, util.Test.ResourcePath(string(v1.ResourcePods), "bar", "foo"), "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
@@ -345,7 +345,7 @@ func TestBind(t *testing.T) {
 		}
 		expectedBody := runtime.EncodeOrDie(util.Test.Codec(), item.binding)
 		handler.ValidateRequest(t,
-			util.Test.SubResourcePath("pods", metav1.NamespaceDefault, "foo", "binding"),
+			util.Test.SubResourcePath(string(v1.ResourcePods), metav1.NamespaceDefault, "foo", "binding"),
 			"POST", &expectedBody)
 	}
 }
