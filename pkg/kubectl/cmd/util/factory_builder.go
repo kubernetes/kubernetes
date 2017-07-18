@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 type ring2Factory struct {
@@ -110,7 +109,6 @@ func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, isLocal bool, outpu
 		// extract out concrete HumanReadablePrinter from it. We are then able to attach
 		// handlers on it.
 		if humanReadablePrinter, ok := printer.(*printers.HumanReadablePrinter); ok {
-			printersinternal.AddHandlers(humanReadablePrinter)
 			printer = humanReadablePrinter
 		}
 	}
