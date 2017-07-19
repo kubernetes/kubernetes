@@ -41,15 +41,60 @@ func NameSystems() namer.NameSystems {
 		"Endpoints": "Endpoints",
 	}
 	lowercaseNamer := namer.NewAllLowercasePluralNamer(pluralExceptions)
+
+	publicNamer := &ExceptionNamer{
+		Exceptions: map[string]string{
+		// these exceptions are used to deconflict the generated code
+		// you can put your fully qualified package like
+		// to generate a name that doesn't conflict with your group.
+		// "k8s.io/apis/events/v1alpha1.Event": "EventResource"
+		},
+		KeyFunc: func(t *types.Type) string {
+			return t.Name.Package + "." + t.Name.Name
+		},
+		Delegate: namer.NewPublicNamer(0),
+	}
+	privateNamer := &ExceptionNamer{
+		Exceptions: map[string]string{
+		// these exceptions are used to deconflict the generated code
+		// you can put your fully qualified package like
+		// to generate a name that doesn't conflict with your group.
+		// "k8s.io/apis/events/v1alpha1.Event": "eventResource"
+		},
+		KeyFunc: func(t *types.Type) string {
+			return t.Name.Package + "." + t.Name.Name
+		},
+		Delegate: namer.NewPrivateNamer(0),
+	}
+
 	return namer.NameSystems{
-		"public":             namer.NewPublicNamer(0),
-		"private":            namer.NewPrivateNamer(0),
+		"singularKind":       namer.NewPublicNamer(0),
+		"public":             publicNamer,
+		"private":            privateNamer,
 		"raw":                namer.NewRawNamer("", nil),
 		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
 		"privatePlural":      namer.NewPrivatePluralNamer(pluralExceptions),
 		"allLowercasePlural": lowercaseNamer,
 		"resource":           NewTagOverrideNamer("resourceName", lowercaseNamer),
 	}
+}
+
+// ExceptionNamer allows you specify exceptional cases with exact names.  This allows you to have control
+// for handling various conflicts, like group and resource names for instance.
+type ExceptionNamer struct {
+	Exceptions map[string]string
+	KeyFunc    func(*types.Type) string
+
+	Delegate namer.Namer
+}
+
+// Name provides the requested name for a type.
+func (n *ExceptionNamer) Name(t *types.Type) string {
+	key := n.KeyFunc(t)
+	if exception, ok := n.Exceptions[key]; ok {
+		return exception
+	}
+	return n.Delegate.Name(t)
 }
 
 // DefaultNameSystem returns the default name system for ordering the types to be

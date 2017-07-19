@@ -213,7 +213,7 @@ var $.type|allLowercasePlural$Resource = $.GroupVersionResource|raw${Group: "$.g
 `
 
 var kind = `
-var $.type|allLowercasePlural$Kind = $.GroupVersionKind|raw${Group: "$.groupName$", Version: "$.version$", Kind: "$.type|public$"}
+var $.type|allLowercasePlural$Kind = $.GroupVersionKind|raw${Group: "$.groupName$", Version: "$.version$", Kind: "$.type|singularKind$"}
 `
 
 var listTemplate = `
