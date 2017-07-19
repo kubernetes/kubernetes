@@ -60,6 +60,7 @@ var _ = SIGDescribe("PersistentVolumes[Disruptive][Flaky]", func() {
 		volLabel                  labels.Set
 		selector                  *metav1.LabelSelector
 	)
+
 	BeforeEach(func() {
 		// To protect the NFS volume pod from the kubelet restart, we isolate it on its own node.
 		framework.SkipUnlessNodeCountIsAtLeast(MinNodes)
@@ -69,14 +70,8 @@ var _ = SIGDescribe("PersistentVolumes[Disruptive][Flaky]", func() {
 		ns = f.Namespace.Name
 		volLabel = labels.Set{framework.VolumeSelectorKey: ns}
 		selector = metav1.SetAsLabelSelector(volLabel)
-
 		// Start the NFS server pod.
-		framework.Logf("[BeforeEach] Creating NFS Server Pod")
-		nfsServerPod = initNFSserverPod(c, ns)
-		framework.Logf("NFS server Pod %q created on Node %q", nfsServerPod.Name, nfsServerPod.Spec.NodeName)
-		framework.Logf("[BeforeEach] Configuring PersistentVolume")
-		nfsServerIP = nfsServerPod.Status.PodIP
-		Expect(nfsServerIP).NotTo(BeEmpty())
+		_, nfsServerPod, nfsServerIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 		nfsPVconfig = framework.PersistentVolumeConfig{
 			NamePrefix: "nfs-",
 			Labels:     volLabel,
@@ -108,25 +103,29 @@ var _ = SIGDescribe("PersistentVolumes[Disruptive][Flaky]", func() {
 			Expect(clientNodeIP).NotTo(BeEmpty())
 		}
 	})
+
 	AfterEach(func() {
 		framework.DeletePodWithWait(f, c, nfsServerPod)
 	})
-	Context("when kubelet restarts", func() {
 
+	Context("when kubelet restarts", func() {
 		var (
 			clientPod *v1.Pod
 			pv        *v1.PersistentVolume
 			pvc       *v1.PersistentVolumeClaim
 		)
+
 		BeforeEach(func() {
 			framework.Logf("Initializing test spec")
 			clientPod, pv, pvc = initTestCase(f, c, nfsPVconfig, pvcConfig, ns, clientNode.Name)
 		})
+
 		AfterEach(func() {
 			framework.Logf("Tearing down test spec")
 			tearDownTestCase(c, f, ns, clientPod, pvc, pv)
 			pv, pvc, clientPod = nil, nil, nil
 		})
+
 		// Test table housing the It() title string and test spec.  runTest is type testBody, defined at
 		// the start of this file.  To add tests, define a function mirroring the testBody signature and assign
 		// to runTest.
@@ -140,6 +139,7 @@ var _ = SIGDescribe("PersistentVolumes[Disruptive][Flaky]", func() {
 				runTest:    testVolumeUnmountsFromDeletedPod,
 			},
 		}
+
 		// Test loop executes each disruptiveTest iteratively.
 		for _, test := range disruptiveTestTable {
 			func(t disruptiveTest) {
