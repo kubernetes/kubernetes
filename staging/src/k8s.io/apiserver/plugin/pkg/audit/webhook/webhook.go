@@ -22,8 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
-
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -260,11 +258,7 @@ func (b *batchBackend) ProcessEvents(ev ...*auditinternal.Event) {
 	for i, e := range ev {
 		// Per the audit.Backend interface these events are reused after being
 		// sent to the Sink. Deep copy and send the copy to the queue.
-		event := new(auditinternal.Event)
-		if err := auditinternal.DeepCopy_audit_Event(e, event, b.cloner); err != nil {
-			glog.Errorf("failed to clone audit event: %v: %#v", err, e)
-			return
-		}
+		event := e.DeepCopy()
 
 		select {
 		case b.buffer <- event:

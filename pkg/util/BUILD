@@ -2,36 +2,6 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
-
-go_library(
-    name = "go_default_library",
-    srcs = [
-        "doc.go",
-        "template.go",
-        "util.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = [
-        "template_test.go",
-        "util_test.go",
-    ],
-    library = ":go_default_library",
-    tags = ["automanaged"],
-    deps = [
-        "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-    ],
-)
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -51,6 +21,7 @@ filegroup(
         "//pkg/util/ebtables:all-srcs",
         "//pkg/util/env:all-srcs",
         "//pkg/util/exec:all-srcs",
+        "//pkg/util/file:all-srcs",
         "//pkg/util/flock:all-srcs",
         "//pkg/util/goroutinemap:all-srcs",
         "//pkg/util/hash:all-srcs",
@@ -72,6 +43,7 @@ filegroup(
         "//pkg/util/node:all-srcs",
         "//pkg/util/oom:all-srcs",
         "//pkg/util/parsers:all-srcs",
+        "//pkg/util/pointer:all-srcs",
         "//pkg/util/procfs:all-srcs",
         "//pkg/util/removeall:all-srcs",
         "//pkg/util/resourcecontainer:all-srcs",
@@ -83,6 +55,7 @@ filegroup(
         "//pkg/util/system:all-srcs",
         "//pkg/util/tail:all-srcs",
         "//pkg/util/taints:all-srcs",
+        "//pkg/util/template:all-srcs",
         "//pkg/util/term:all-srcs",
         "//pkg/util/threading:all-srcs",
         "//pkg/util/tolerations:all-srcs",

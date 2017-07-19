@@ -38,12 +38,6 @@ GINKGO_NO_COLOR=${GINKGO_NO_COLOR:-n}
 # If 'y', will rerun failed tests once to give them a second chance.
 GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
 
-# The number of tests that can run in parallel depends on what tests
-# are running and on the size of the cluster. Too many, and tests will
-# fail due to resource contention. 25 is a reasonable default for a
-# 3-node (n1-standard-1) cluster running all fast, non-disruptive tests.
-GINKGO_PARALLELISM=${GINKGO_PARALLELISM:-25}
-
 : ${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
@@ -76,8 +70,6 @@ fi
 
 if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
   NODE_INSTANCE_GROUP="${NODE_INSTANCE_PREFIX}-group"
-else
-  NODE_INSTANCE_GROUP=""
 fi
 
 if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
@@ -93,7 +85,10 @@ if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
   done
 fi
 
-if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+# TODO(kubernetes/test-infra#3330): Allow NODE_INSTANCE_GROUP to be
+# set before we get here, which eliminates any cluster/gke use if
+# KUBERNETES_CONFORMANCE_PROVIDER is set to "gke".
+if [[ -z "${NODE_INSTANCE_GROUP:-}" ]] && [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
   detect-node-instance-groups
   NODE_INSTANCE_GROUP=$(kube::util::join , "${NODE_INSTANCE_GROUPS[@]}")
 fi
@@ -157,9 +152,6 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \
   ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \
-  ${CLUSTER_IP_RANGE:+"--cluster-ip-range=${CLUSTER_IP_RANGE}"} \
-  ${E2E_CLEAN_START:+"--clean-start=true"} \
-  ${E2E_MIN_STARTUP_PODS:+"--minStartupPods=${E2E_MIN_STARTUP_PODS}"} \
   ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
   ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} \
   "${@:-}"

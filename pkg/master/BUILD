@@ -40,7 +40,6 @@ go_library(
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/apis/settings/install:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/tunneler:go_default_library",
@@ -95,6 +94,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
     ],
 )
 
@@ -118,7 +118,6 @@ go_test(
         "//pkg/apis/certificates:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/rbac:go_default_library",
-        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/kubelet/client:go_default_library",
@@ -149,6 +148,7 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
     ],

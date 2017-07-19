@@ -224,11 +224,17 @@ func (obj *MyAPIObject) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 func (obj *MyAPIObject) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.TypeMeta.APIVersion, obj.TypeMeta.Kind)
 }
+func (obj *MyAPIObject) DeepCopyObject() runtime.Object {
+	panic("MyAPIObject does not support DeepCopy")
+}
 
 type MyIncorrectlyMarkedAsAPIObject struct{}
 
 func (obj *MyIncorrectlyMarkedAsAPIObject) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
+}
+func (obj *MyIncorrectlyMarkedAsAPIObject) DeepCopyObject() runtime.Object {
+	panic("MyIncorrectlyMarkedAsAPIObject does not support DeepCopy")
 }
 
 func TestResourceVersionerOfAPI(t *testing.T) {

@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/util/system:go_default_library",
         "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//test/e2e/common:go_default_library",
@@ -38,6 +37,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )
 

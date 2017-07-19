@@ -55,7 +55,7 @@ func (fc fakePodConditionUpdater) Update(pod *v1.Pod, podCondition *v1.PodCondit
 
 func podWithID(id, desiredHost string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: util.Test.SelfLink("pods", id)},
+		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: util.Test.SelfLink(string(v1.ResourcePods), id)},
 		Spec: v1.PodSpec{
 			NodeName: desiredHost,
 		},
@@ -65,7 +65,7 @@ func podWithID(id, desiredHost string) *v1.Pod {
 func deletingPod(id string) *v1.Pod {
 	deletionTimestamp := metav1.Now()
 	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: util.Test.SelfLink("pods", id), DeletionTimestamp: &deletionTimestamp},
+		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: util.Test.SelfLink(string(v1.ResourcePods), id), DeletionTimestamp: &deletionTimestamp},
 		Spec: v1.PodSpec{
 			NodeName: "",
 		},

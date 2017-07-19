@@ -32,15 +32,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	appsinformers "k8s.io/client-go/informers/apps/v1beta1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
+	clientset "k8s.io/client-go/kubernetes"
+	appslisters "k8s.io/client-go/listers/apps/v1beta1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
-	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
-	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
-	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -624,7 +624,7 @@ func (l assignedPodNamespaceLister) Get(name string) (*v1.Pod, error) {
 	if len(pod.Spec.NodeName) > 0 {
 		return pod, nil
 	}
-	return nil, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, name)
+	return nil, errors.NewNotFound(schema.GroupResource{Resource: string(v1.ResourcePods)}, name)
 }
 
 type podInformer struct {
@@ -642,7 +642,7 @@ func (i *podInformer) Lister() corelisters.PodLister {
 // NewPodInformer creates a shared index informer that returns only non-terminal pods.
 func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) coreinformers.PodInformer {
 	selector := fields.ParseSelectorOrDie("status.phase!=" + string(v1.PodSucceeded) + ",status.phase!=" + string(v1.PodFailed))
-	lw := cache.NewListWatchFromClient(client.Core().RESTClient(), "pods", metav1.NamespaceAll, selector)
+	lw := cache.NewListWatchFromClient(client.Core().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector)
 	return &podInformer{
 		informer: cache.NewSharedIndexInformer(lw, &v1.Pod{}, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
 	}

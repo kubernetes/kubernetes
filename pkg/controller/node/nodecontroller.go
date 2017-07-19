@@ -33,20 +33,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	clientv1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/api"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
+	clientset "k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	v1node "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
-	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
-	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -218,7 +218,7 @@ func NewNodeController(
 	runTaintManager bool,
 	useTaintBasedEvictions bool) (*NodeController, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "controllermanager"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "controllermanager"})
 	eventBroadcaster.StartLogging(glog.Infof)
 	if kubeClient != nil {
 		glog.V(0).Infof("Sending events to api server.")
@@ -569,7 +569,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 		var gracePeriod time.Duration
 		var observedReadyCondition v1.NodeCondition
 		var currentReadyCondition *v1.NodeCondition
-		nodeCopy, err := api.Scheme.DeepCopy(nodes[i])
+		nodeCopy, err := scheme.Scheme.DeepCopy(nodes[i])
 		if err != nil {
 			utilruntime.HandleError(err)
 			continue
@@ -833,8 +833,8 @@ func (nc *NodeController) setLimiterInZone(zone string, zoneSize int, state zone
 	}
 }
 
-// For a given node checks its conditions and tries to update it. Returns grace period to which given node
-// is entitled, state of current and last observed Ready Condition, and an error if it occurred.
+// tryUpdateNodeStatus checks a given node's conditions and tries to update it. Returns grace period to
+// which given node is entitled, state of current and last observed Ready Condition, and an error if it occurred.
 func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.NodeCondition, *v1.NodeCondition, error) {
 	var err error
 	var gracePeriod time.Duration
@@ -910,7 +910,6 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 		// otherwise we leave it as it is.
 		if savedCondition.LastTransitionTime != observedCondition.LastTransitionTime {
 			glog.V(3).Infof("ReadyCondition for Node %s transitioned from %v to %v", node.Name, savedCondition.Status, observedCondition)
-
 			transitionTime = nc.now()
 		} else {
 			transitionTime = savedNodeStatus.readyTransitionTimestamp
@@ -955,7 +954,16 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 		}
 
 		// remaining node conditions should also be set to Unknown
-		remainingNodeConditionTypes := []v1.NodeConditionType{v1.NodeOutOfDisk, v1.NodeMemoryPressure, v1.NodeDiskPressure}
+		remainingNodeConditionTypes := []v1.NodeConditionType{
+			v1.NodeOutOfDisk,
+			v1.NodeMemoryPressure,
+			v1.NodeDiskPressure,
+			// We don't change 'NodeInodePressure' condition, as it'll be removed in future.
+			// v1.NodeInodePressure,
+			// We don't change 'NodeNetworkUnavailable' condition, as it's managed on a control plane level.
+			// v1.NodeNetworkUnavailable,
+		}
+
 		nowTimestamp := nc.now()
 		for _, nodeConditionType := range remainingNodeConditionTypes {
 			_, currentCondition := v1node.GetNodeCondition(&node.Status, nodeConditionType)
@@ -1091,7 +1099,7 @@ func (nc *NodeController) ReducedQPSFunc(nodeNum int) float32 {
 	return 0
 }
 
-// This function is expected to get a slice of NodeReadyConditions for all Nodes in a given zone.
+// ComputeZoneState returns a slice of NodeReadyConditions for all Nodes in a given zone.
 // The zone is considered:
 // - fullyDisrupted if there're no Ready Nodes,
 // - partiallyDisrupted if at least than nc.unhealthyZoneThreshold percent of Nodes are not Ready,

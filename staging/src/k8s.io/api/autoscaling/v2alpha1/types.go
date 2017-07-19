@@ -276,6 +276,7 @@ type ResourceMetricStatus struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // HorizontalPodAutoscaler is the configuration for a horizontal pod
 // autoscaler, which automatically manages the replica count of any resource
@@ -296,6 +297,8 @@ type HorizontalPodAutoscaler struct {
 	// +optional
 	Status HorizontalPodAutoscalerStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {

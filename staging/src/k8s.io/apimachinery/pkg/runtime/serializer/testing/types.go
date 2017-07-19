@@ -30,6 +30,7 @@ type MyWeirdCustomEmbeddedVersionKindField struct {
 	Y          uint64 `json:"Y,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TestType1 struct {
 	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
 	A                                     string               `json:"A,omitempty"`
@@ -50,16 +51,19 @@ type TestType1 struct {
 	P                                     []TestType2          `json:"Q,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TestType2 struct {
 	A string `json:"A,omitempty"`
 	B int    `json:"B,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalTestType2 struct {
 	A string `json:"A,omitempty"`
 	B int    `json:"B,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalTestType1 struct {
 	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
 	A                                     string                       `json:"A,omitempty"`
@@ -80,6 +84,7 @@ type ExternalTestType1 struct {
 	P                                     []ExternalTestType2          `json:"Q,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalInternalSame struct {
 	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
 	A                                     TestType2 `json:"A,omitempty"`

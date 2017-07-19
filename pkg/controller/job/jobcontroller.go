@@ -31,16 +31,16 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	batchinformers "k8s.io/client-go/informers/batch/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	batchv1listers "k8s.io/client-go/listers/batch/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	batchinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/batch/v1"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
-	batchv1listers "k8s.io/kubernetes/pkg/client/listers/batch/v1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 
@@ -93,11 +93,11 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 		kubeClient: kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "job-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "job-controller"}),
 		},
 		expectations: controller.NewControllerExpectations(),
 		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "job"),
-		recorder:     eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "job-controller"}),
+		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "job-controller"}),
 	}
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{

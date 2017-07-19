@@ -20,6 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type Simple struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -29,6 +31,8 @@ type Simple struct {
 	Labels map[string]string `json:"labels,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type SimpleRoot struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -37,6 +41,8 @@ type SimpleRoot struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type SimpleGetOptions struct {
 	metav1.TypeMeta `json:",inline"`
@@ -52,12 +58,16 @@ func (SimpleGetOptions) SwaggerDoc() map[string]string {
 	}
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type SimpleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,inline"`
 	// +optional
 	Items []Simple `json:"items,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // SimpleXGSubresource is a cross group subresource, i.e. the subresource does not belong to the
 // same group as its parent resource.

@@ -215,10 +215,24 @@ type TestPrintType struct {
 }
 
 func (obj *TestPrintType) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *TestPrintType) DeepCopyObject() runtime.Object {
+	if obj == nil {
+		return nil
+	}
+	clone := *obj
+	return &clone
+}
 
 type TestUnknownType struct{}
 
 func (obj *TestUnknownType) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *TestUnknownType) DeepCopyObject() runtime.Object {
+	if obj == nil {
+		return nil
+	}
+	clone := *obj
+	return &clone
+}
 
 func TestPrinter(t *testing.T) {
 	//test inputs

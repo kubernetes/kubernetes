@@ -62,11 +62,6 @@ func TestGetCoreImage(t *testing.T) {
 			c: &kubeadmapi.MasterConfiguration{ImageRepository: gcrPrefix, KubernetesVersion: testversion}},
 			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, expected),
 		},
-		{getCoreImageTest{
-			i: KubeProxyImage,
-			c: &kubeadmapi.MasterConfiguration{ImageRepository: gcrPrefix, KubernetesVersion: testversion}},
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, expected),
-		},
 	}
 	for _, it := range imageTest {
 		actual := GetCoreImage(it.t.i, it.t.c, it.t.o)

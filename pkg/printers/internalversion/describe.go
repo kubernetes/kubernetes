@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -45,6 +46,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
+	versionedclientset "k8s.io/client-go/kubernetes"
+	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	extensionsclientset "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
@@ -63,9 +67,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	versionedclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	extensionsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
@@ -744,6 +745,8 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printCephFSVolumeSource(volume.VolumeSource.CephFS, w)
 		case volume.VolumeSource.StorageOS != nil:
 			printStorageOSVolumeSource(volume.VolumeSource.StorageOS, w)
+		case volume.VolumeSource.FC != nil:
+			printFCVolumeSource(volume.VolumeSource.FC, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -960,6 +963,19 @@ func printStorageOSPersistentVolumeSource(storageos *api.StorageOSPersistentVolu
 		storageos.VolumeName, storageos.VolumeNamespace, storageos.FSType, storageos.ReadOnly)
 }
 
+func printFCVolumeSource(fc *api.FCVolumeSource, w PrefixWriter) {
+	lun := "<none>"
+	if fc.Lun != nil {
+		lun = strconv.Itoa(int(*fc.Lun))
+	}
+	w.Write(LEVEL_2, "Type:\tFC (a Fibre Channel disk)\n"+
+		"    TargetWWNs:\t%v\n"+
+		"    LUN:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		strings.Join(fc.TargetWWNs, ", "), lun, fc.FSType, fc.ReadOnly)
+}
+
 type PersistentVolumeDescriber struct {
 	clientset.Interface
 }
@@ -1035,6 +1051,8 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 			printCephFSVolumeSource(pv.Spec.CephFS, w)
 		case pv.Spec.StorageOS != nil:
 			printStorageOSPersistentVolumeSource(pv.Spec.StorageOS, w)
+		case pv.Spec.FC != nil:
+			printFCVolumeSource(pv.Spec.FC, w)
 		}
 
 		if events != nil {

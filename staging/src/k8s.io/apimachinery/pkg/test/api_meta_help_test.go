@@ -207,6 +207,9 @@ type fakePtrInterfaceList struct {
 func (obj fakePtrInterfaceList) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
 }
+func (obj fakePtrInterfaceList) DeepCopyObject() runtime.Object {
+	panic("fakePtrInterfaceList does not support DeepCopy")
+}
 
 func TestExtractListOfInterfacePtrs(t *testing.T) {
 	pl := &fakePtrInterfaceList{
@@ -227,6 +230,18 @@ type fakePtrValueList struct {
 
 func (obj fakePtrValueList) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
+}
+func (obj *fakePtrValueList) DeepCopyObject() runtime.Object {
+	if obj == nil {
+		return nil
+	}
+	clone := fakePtrValueList{
+		Items: make([]*testapigroup.Carp, len(obj.Items)),
+	}
+	for i, carp := range obj.Items {
+		clone.Items[i] = carp.DeepCopy()
+	}
+	return &clone
 }
 
 func TestSetList(t *testing.T) {

@@ -24,13 +24,16 @@ import (
 	"os"
 	goruntime "runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	clientv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -39,8 +42,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/cloud"
@@ -209,11 +210,6 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	versionedClient := client("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, resyncPeriod(s)())
 
-	_, clusterCIDR, err := net.ParseCIDR(s.ClusterCIDR)
-	if err != nil {
-		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", s.ClusterCIDR, err)
-	}
-
 	// Start the CloudNodeController
 	nodeController := nodecontroller.NewCloudNodeController(
 		sharedInformers.Core().V1().Nodes(),
@@ -244,6 +240,14 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
+			var clusterCIDR *net.IPNet
+			if len(strings.TrimSpace(s.ClusterCIDR)) != 0 {
+				_, clusterCIDR, err = net.ParseCIDR(s.ClusterCIDR)
+				if err != nil {
+					glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", s.ClusterCIDR, err)
+				}
+			}
+
 			routeController := routecontroller.New(routes, client("route-controller"), sharedInformers.Core().V1().Nodes(), s.ClusterName, clusterCIDR)
 			go routeController.Run(stop, s.RouteReconciliationPeriod.Duration)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))

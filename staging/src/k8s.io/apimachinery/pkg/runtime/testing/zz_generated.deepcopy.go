@@ -26,361 +26,735 @@ import (
 	reflect "reflect"
 )
 
-// GetGeneratedDeepCopyFuncs returns the generated funcs, since we aren't registering them.
+// Deprecated: GetGeneratedDeepCopyFuncs returns the generated funcs, since we aren't registering them.
 func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 	return []conversion.GeneratedDeepCopyFunc{
-		{Fn: DeepCopy_testing_EmbeddedTest, InType: reflect.TypeOf(&EmbeddedTest{})},
-		{Fn: DeepCopy_testing_EmbeddedTestExternal, InType: reflect.TypeOf(&EmbeddedTestExternal{})},
-		{Fn: DeepCopy_testing_ExtensionA, InType: reflect.TypeOf(&ExtensionA{})},
-		{Fn: DeepCopy_testing_ExtensionB, InType: reflect.TypeOf(&ExtensionB{})},
-		{Fn: DeepCopy_testing_ExternalComplex, InType: reflect.TypeOf(&ExternalComplex{})},
-		{Fn: DeepCopy_testing_ExternalExtensionType, InType: reflect.TypeOf(&ExternalExtensionType{})},
-		{Fn: DeepCopy_testing_ExternalInternalSame, InType: reflect.TypeOf(&ExternalInternalSame{})},
-		{Fn: DeepCopy_testing_ExternalOptionalExtensionType, InType: reflect.TypeOf(&ExternalOptionalExtensionType{})},
-		{Fn: DeepCopy_testing_ExternalSimple, InType: reflect.TypeOf(&ExternalSimple{})},
-		{Fn: DeepCopy_testing_ExternalTestType1, InType: reflect.TypeOf(&ExternalTestType1{})},
-		{Fn: DeepCopy_testing_ExternalTestType2, InType: reflect.TypeOf(&ExternalTestType2{})},
-		{Fn: DeepCopy_testing_InternalComplex, InType: reflect.TypeOf(&InternalComplex{})},
-		{Fn: DeepCopy_testing_InternalExtensionType, InType: reflect.TypeOf(&InternalExtensionType{})},
-		{Fn: DeepCopy_testing_InternalOptionalExtensionType, InType: reflect.TypeOf(&InternalOptionalExtensionType{})},
-		{Fn: DeepCopy_testing_InternalSimple, InType: reflect.TypeOf(&InternalSimple{})},
-		{Fn: DeepCopy_testing_ObjectTest, InType: reflect.TypeOf(&ObjectTest{})},
-		{Fn: DeepCopy_testing_ObjectTestExternal, InType: reflect.TypeOf(&ObjectTestExternal{})},
-		{Fn: DeepCopy_testing_TestType1, InType: reflect.TypeOf(&TestType1{})},
-		{Fn: DeepCopy_testing_TestType2, InType: reflect.TypeOf(&TestType2{})},
-		{Fn: DeepCopy_testing_UnknownType, InType: reflect.TypeOf(&UnknownType{})},
-		{Fn: DeepCopy_testing_UnversionedType, InType: reflect.TypeOf(&UnversionedType{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*EmbeddedTest).DeepCopyInto(out.(*EmbeddedTest))
+			return nil
+		}, InType: reflect.TypeOf(&EmbeddedTest{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*EmbeddedTestExternal).DeepCopyInto(out.(*EmbeddedTestExternal))
+			return nil
+		}, InType: reflect.TypeOf(&EmbeddedTestExternal{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ExtensionA).DeepCopyInto(out.(*ExtensionA))
+			return nil
+		}, InType: reflect.TypeOf(&ExtensionA{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ExtensionB).DeepCopyInto(out.(*ExtensionB))
+			return nil
+		}, InType: reflect.TypeOf(&ExtensionB{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ExternalComplex).DeepCopyInto(out.(*ExternalComplex))
+			return nil
+		}, InType: reflect.TypeOf(&ExternalComplex{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ExternalExtensionType).DeepCopyInto(out.(*ExternalExtensionType))
+			return nil
+		}, InType: reflect.TypeOf(&ExternalExtensionType{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ExternalInternalSame).DeepCopyInto(out.(*ExternalInternalSame))
+			return nil
+		}, InType: reflect.TypeOf(&ExternalInternalSame{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ExternalOptionalExtensionType).DeepCopyInto(out.(*ExternalOptionalExtensionType))
+			return nil
+		}, InType: reflect.TypeOf(&ExternalOptionalExtensionType{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ExternalSimple).DeepCopyInto(out.(*ExternalSimple))
+			return nil
+		}, InType: reflect.TypeOf(&ExternalSimple{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ExternalTestType1).DeepCopyInto(out.(*ExternalTestType1))
+			return nil
+		}, InType: reflect.TypeOf(&ExternalTestType1{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ExternalTestType2).DeepCopyInto(out.(*ExternalTestType2))
+			return nil
+		}, InType: reflect.TypeOf(&ExternalTestType2{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*InternalComplex).DeepCopyInto(out.(*InternalComplex))
+			return nil
+		}, InType: reflect.TypeOf(&InternalComplex{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*InternalExtensionType).DeepCopyInto(out.(*InternalExtensionType))
+			return nil
+		}, InType: reflect.TypeOf(&InternalExtensionType{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*InternalOptionalExtensionType).DeepCopyInto(out.(*InternalOptionalExtensionType))
+			return nil
+		}, InType: reflect.TypeOf(&InternalOptionalExtensionType{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*InternalSimple).DeepCopyInto(out.(*InternalSimple))
+			return nil
+		}, InType: reflect.TypeOf(&InternalSimple{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ObjectTest).DeepCopyInto(out.(*ObjectTest))
+			return nil
+		}, InType: reflect.TypeOf(&ObjectTest{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ObjectTestExternal).DeepCopyInto(out.(*ObjectTestExternal))
+			return nil
+		}, InType: reflect.TypeOf(&ObjectTestExternal{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*TestType1).DeepCopyInto(out.(*TestType1))
+			return nil
+		}, InType: reflect.TypeOf(&TestType1{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*TestType2).DeepCopyInto(out.(*TestType2))
+			return nil
+		}, InType: reflect.TypeOf(&TestType2{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*UnknownType).DeepCopyInto(out.(*UnknownType))
+			return nil
+		}, InType: reflect.TypeOf(&UnknownType{})},
+		{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*UnversionedType).DeepCopyInto(out.(*UnversionedType))
+			return nil
+		}, InType: reflect.TypeOf(&UnversionedType{})},
 	}
 }
 
-// DeepCopy_testing_EmbeddedTest is an autogenerated deepcopy function.
-func DeepCopy_testing_EmbeddedTest(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*EmbeddedTest)
-		out := out.(*EmbeddedTest)
-		*out = *in
-		// in.Object is kind 'Interface'
-		if in.Object != nil {
-			if newVal, err := c.DeepCopy(&in.Object); err != nil {
-				return err
-			} else {
-				out.Object = *newVal.(*runtime.Object)
-			}
-		}
-		// in.EmptyObject is kind 'Interface'
-		if in.EmptyObject != nil {
-			if newVal, err := c.DeepCopy(&in.EmptyObject); err != nil {
-				return err
-			} else {
-				out.EmptyObject = *newVal.(*runtime.Object)
-			}
-		}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *EmbeddedTest) DeepCopyInto(out *EmbeddedTest) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	if in.Object == nil {
+		out.Object = nil
+	} else {
+		out.Object = in.Object.DeepCopyObject()
+	}
+	if in.EmptyObject == nil {
+		out.EmptyObject = nil
+	} else {
+		out.EmptyObject = in.EmptyObject.DeepCopyObject()
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new EmbeddedTest.
+func (x *EmbeddedTest) DeepCopy() *EmbeddedTest {
+	if x == nil {
+		return nil
+	}
+	out := new(EmbeddedTest)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *EmbeddedTest) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_testing_EmbeddedTestExternal is an autogenerated deepcopy function.
-func DeepCopy_testing_EmbeddedTestExternal(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*EmbeddedTestExternal)
-		out := out.(*EmbeddedTestExternal)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.Object); err != nil {
-			return err
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *EmbeddedTestExternal) DeepCopyInto(out *EmbeddedTestExternal) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.Object.DeepCopyInto(&out.Object)
+	in.EmptyObject.DeepCopyInto(&out.EmptyObject)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new EmbeddedTestExternal.
+func (x *EmbeddedTestExternal) DeepCopy() *EmbeddedTestExternal {
+	if x == nil {
+		return nil
+	}
+	out := new(EmbeddedTestExternal)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *EmbeddedTestExternal) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ExtensionA) DeepCopyInto(out *ExtensionA) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ExtensionA.
+func (x *ExtensionA) DeepCopy() *ExtensionA {
+	if x == nil {
+		return nil
+	}
+	out := new(ExtensionA)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ExtensionA) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ExtensionB) DeepCopyInto(out *ExtensionB) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ExtensionB.
+func (x *ExtensionB) DeepCopy() *ExtensionB {
+	if x == nil {
+		return nil
+	}
+	out := new(ExtensionB)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ExtensionB) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ExternalComplex) DeepCopyInto(out *ExternalComplex) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ExternalComplex.
+func (x *ExternalComplex) DeepCopy() *ExternalComplex {
+	if x == nil {
+		return nil
+	}
+	out := new(ExternalComplex)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ExternalComplex) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ExternalExtensionType) DeepCopyInto(out *ExternalExtensionType) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.Extension.DeepCopyInto(&out.Extension)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ExternalExtensionType.
+func (x *ExternalExtensionType) DeepCopy() *ExternalExtensionType {
+	if x == nil {
+		return nil
+	}
+	out := new(ExternalExtensionType)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ExternalExtensionType) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ExternalInternalSame) DeepCopyInto(out *ExternalInternalSame) {
+	*out = *in
+	out.MyWeirdCustomEmbeddedVersionKindField = in.MyWeirdCustomEmbeddedVersionKindField
+	out.A = in.A
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ExternalInternalSame.
+func (x *ExternalInternalSame) DeepCopy() *ExternalInternalSame {
+	if x == nil {
+		return nil
+	}
+	out := new(ExternalInternalSame)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ExternalInternalSame) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ExternalOptionalExtensionType) DeepCopyInto(out *ExternalOptionalExtensionType) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.Extension.DeepCopyInto(&out.Extension)
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ExternalOptionalExtensionType.
+func (x *ExternalOptionalExtensionType) DeepCopy() *ExternalOptionalExtensionType {
+	if x == nil {
+		return nil
+	}
+	out := new(ExternalOptionalExtensionType)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ExternalOptionalExtensionType) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ExternalSimple) DeepCopyInto(out *ExternalSimple) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ExternalSimple.
+func (x *ExternalSimple) DeepCopy() *ExternalSimple {
+	if x == nil {
+		return nil
+	}
+	out := new(ExternalSimple)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ExternalSimple) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ExternalTestType1) DeepCopyInto(out *ExternalTestType1) {
+	*out = *in
+	out.MyWeirdCustomEmbeddedVersionKindField = in.MyWeirdCustomEmbeddedVersionKindField
+	if in.M != nil {
+		in, out := &in.M, &out.M
+		*out = make(map[string]int, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.N != nil {
+		in, out := &in.N, &out.N
+		*out = make(map[string]ExternalTestType2, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.O != nil {
+		in, out := &in.O, &out.O
+		if *in == nil {
+			*out = nil
 		} else {
-			out.Object = *newVal.(*runtime.RawExtension)
-		}
-		if newVal, err := c.DeepCopy(&in.EmptyObject); err != nil {
-			return err
-		} else {
-			out.EmptyObject = *newVal.(*runtime.RawExtension)
-		}
-		return nil
-	}
-}
-
-// DeepCopy_testing_ExtensionA is an autogenerated deepcopy function.
-func DeepCopy_testing_ExtensionA(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExtensionA)
-		out := out.(*ExtensionA)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_testing_ExtensionB is an autogenerated deepcopy function.
-func DeepCopy_testing_ExtensionB(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExtensionB)
-		out := out.(*ExtensionB)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_testing_ExternalComplex is an autogenerated deepcopy function.
-func DeepCopy_testing_ExternalComplex(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExternalComplex)
-		out := out.(*ExternalComplex)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_testing_ExternalExtensionType is an autogenerated deepcopy function.
-func DeepCopy_testing_ExternalExtensionType(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExternalExtensionType)
-		out := out.(*ExternalExtensionType)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.Extension); err != nil {
-			return err
-		} else {
-			out.Extension = *newVal.(*runtime.RawExtension)
-		}
-		return nil
-	}
-}
-
-// DeepCopy_testing_ExternalInternalSame is an autogenerated deepcopy function.
-func DeepCopy_testing_ExternalInternalSame(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExternalInternalSame)
-		out := out.(*ExternalInternalSame)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_testing_ExternalOptionalExtensionType is an autogenerated deepcopy function.
-func DeepCopy_testing_ExternalOptionalExtensionType(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExternalOptionalExtensionType)
-		out := out.(*ExternalOptionalExtensionType)
-		*out = *in
-		if newVal, err := c.DeepCopy(&in.Extension); err != nil {
-			return err
-		} else {
-			out.Extension = *newVal.(*runtime.RawExtension)
-		}
-		return nil
-	}
-}
-
-// DeepCopy_testing_ExternalSimple is an autogenerated deepcopy function.
-func DeepCopy_testing_ExternalSimple(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExternalSimple)
-		out := out.(*ExternalSimple)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_testing_ExternalTestType1 is an autogenerated deepcopy function.
-func DeepCopy_testing_ExternalTestType1(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExternalTestType1)
-		out := out.(*ExternalTestType1)
-		*out = *in
-		if in.M != nil {
-			in, out := &in.M, &out.M
-			*out = make(map[string]int)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.N != nil {
-			in, out := &in.N, &out.N
-			*out = make(map[string]ExternalTestType2)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.O != nil {
-			in, out := &in.O, &out.O
 			*out = new(ExternalTestType2)
 			**out = **in
 		}
-		if in.P != nil {
-			in, out := &in.P, &out.P
-			*out = make([]ExternalTestType2, len(*in))
-			copy(*out, *in)
-		}
+	}
+	if in.P != nil {
+		in, out := &in.P, &out.P
+		*out = make([]ExternalTestType2, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ExternalTestType1.
+func (x *ExternalTestType1) DeepCopy() *ExternalTestType1 {
+	if x == nil {
+		return nil
+	}
+	out := new(ExternalTestType1)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ExternalTestType1) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_testing_ExternalTestType2 is an autogenerated deepcopy function.
-func DeepCopy_testing_ExternalTestType2(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExternalTestType2)
-		out := out.(*ExternalTestType2)
-		*out = *in
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ExternalTestType2) DeepCopyInto(out *ExternalTestType2) {
+	*out = *in
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ExternalTestType2.
+func (x *ExternalTestType2) DeepCopy() *ExternalTestType2 {
+	if x == nil {
+		return nil
+	}
+	out := new(ExternalTestType2)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ExternalTestType2) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_testing_InternalComplex is an autogenerated deepcopy function.
-func DeepCopy_testing_InternalComplex(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*InternalComplex)
-		out := out.(*InternalComplex)
-		*out = *in
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *InternalComplex) DeepCopyInto(out *InternalComplex) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new InternalComplex.
+func (x *InternalComplex) DeepCopy() *InternalComplex {
+	if x == nil {
+		return nil
+	}
+	out := new(InternalComplex)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *InternalComplex) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_testing_InternalExtensionType is an autogenerated deepcopy function.
-func DeepCopy_testing_InternalExtensionType(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*InternalExtensionType)
-		out := out.(*InternalExtensionType)
-		*out = *in
-		// in.Extension is kind 'Interface'
-		if in.Extension != nil {
-			if newVal, err := c.DeepCopy(&in.Extension); err != nil {
-				return err
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *InternalExtensionType) DeepCopyInto(out *InternalExtensionType) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	if in.Extension == nil {
+		out.Extension = nil
+	} else {
+		out.Extension = in.Extension.DeepCopyObject()
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new InternalExtensionType.
+func (x *InternalExtensionType) DeepCopy() *InternalExtensionType {
+	if x == nil {
+		return nil
+	}
+	out := new(InternalExtensionType)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *InternalExtensionType) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *InternalOptionalExtensionType) DeepCopyInto(out *InternalOptionalExtensionType) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	if in.Extension == nil {
+		out.Extension = nil
+	} else {
+		out.Extension = in.Extension.DeepCopyObject()
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new InternalOptionalExtensionType.
+func (x *InternalOptionalExtensionType) DeepCopy() *InternalOptionalExtensionType {
+	if x == nil {
+		return nil
+	}
+	out := new(InternalOptionalExtensionType)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *InternalOptionalExtensionType) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *InternalSimple) DeepCopyInto(out *InternalSimple) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new InternalSimple.
+func (x *InternalSimple) DeepCopy() *InternalSimple {
+	if x == nil {
+		return nil
+	}
+	out := new(InternalSimple)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *InternalSimple) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ObjectTest) DeepCopyInto(out *ObjectTest) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]runtime.Object, len(*in))
+		for i := range *in {
+			if (*in)[i] == nil {
+				(*out)[i] = nil
 			} else {
-				out.Extension = *newVal.(*runtime.Object)
+				(*out)[i] = (*in)[i].DeepCopyObject()
 			}
 		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ObjectTest.
+func (x *ObjectTest) DeepCopy() *ObjectTest {
+	if x == nil {
+		return nil
+	}
+	out := new(ObjectTest)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ObjectTest) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_testing_InternalOptionalExtensionType is an autogenerated deepcopy function.
-func DeepCopy_testing_InternalOptionalExtensionType(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*InternalOptionalExtensionType)
-		out := out.(*InternalOptionalExtensionType)
-		*out = *in
-		// in.Extension is kind 'Interface'
-		if in.Extension != nil {
-			if newVal, err := c.DeepCopy(&in.Extension); err != nil {
-				return err
-			} else {
-				out.Extension = *newVal.(*runtime.Object)
-			}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ObjectTestExternal) DeepCopyInto(out *ObjectTestExternal) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]runtime.RawExtension, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new ObjectTestExternal.
+func (x *ObjectTestExternal) DeepCopy() *ObjectTestExternal {
+	if x == nil {
+		return nil
+	}
+	out := new(ObjectTestExternal)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *ObjectTestExternal) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_testing_InternalSimple is an autogenerated deepcopy function.
-func DeepCopy_testing_InternalSimple(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*InternalSimple)
-		out := out.(*InternalSimple)
-		*out = *in
-		return nil
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *TestType1) DeepCopyInto(out *TestType1) {
+	*out = *in
+	out.MyWeirdCustomEmbeddedVersionKindField = in.MyWeirdCustomEmbeddedVersionKindField
+	if in.M != nil {
+		in, out := &in.M, &out.M
+		*out = make(map[string]int, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
-}
-
-// DeepCopy_testing_ObjectTest is an autogenerated deepcopy function.
-func DeepCopy_testing_ObjectTest(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ObjectTest)
-		out := out.(*ObjectTest)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]runtime.Object, len(*in))
-			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
-					(*out)[i] = *newVal.(*runtime.Object)
-				}
-			}
+	if in.N != nil {
+		in, out := &in.N, &out.N
+		*out = make(map[string]TestType2, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
 		}
-		return nil
 	}
-}
-
-// DeepCopy_testing_ObjectTestExternal is an autogenerated deepcopy function.
-func DeepCopy_testing_ObjectTestExternal(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ObjectTestExternal)
-		out := out.(*ObjectTestExternal)
-		*out = *in
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]runtime.RawExtension, len(*in))
-			for i := range *in {
-				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
-					return err
-				} else {
-					(*out)[i] = *newVal.(*runtime.RawExtension)
-				}
-			}
-		}
-		return nil
-	}
-}
-
-// DeepCopy_testing_TestType1 is an autogenerated deepcopy function.
-func DeepCopy_testing_TestType1(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*TestType1)
-		out := out.(*TestType1)
-		*out = *in
-		if in.M != nil {
-			in, out := &in.M, &out.M
-			*out = make(map[string]int)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.N != nil {
-			in, out := &in.N, &out.N
-			*out = make(map[string]TestType2)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.O != nil {
-			in, out := &in.O, &out.O
+	if in.O != nil {
+		in, out := &in.O, &out.O
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(TestType2)
 			**out = **in
 		}
-		if in.P != nil {
-			in, out := &in.P, &out.P
-			*out = make([]TestType2, len(*in))
-			copy(*out, *in)
-		}
+	}
+	if in.P != nil {
+		in, out := &in.P, &out.P
+		*out = make([]TestType2, len(*in))
+		copy(*out, *in)
+	}
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new TestType1.
+func (x *TestType1) DeepCopy() *TestType1 {
+	if x == nil {
+		return nil
+	}
+	out := new(TestType1)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *TestType1) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_testing_TestType2 is an autogenerated deepcopy function.
-func DeepCopy_testing_TestType2(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*TestType2)
-		out := out.(*TestType2)
-		*out = *in
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *TestType2) DeepCopyInto(out *TestType2) {
+	*out = *in
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new TestType2.
+func (x *TestType2) DeepCopy() *TestType2 {
+	if x == nil {
+		return nil
+	}
+	out := new(TestType2)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *TestType2) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_testing_UnknownType is an autogenerated deepcopy function.
-func DeepCopy_testing_UnknownType(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*UnknownType)
-		out := out.(*UnknownType)
-		*out = *in
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *UnknownType) DeepCopyInto(out *UnknownType) {
+	*out = *in
+	out.MyWeirdCustomEmbeddedVersionKindField = in.MyWeirdCustomEmbeddedVersionKindField
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new UnknownType.
+func (x *UnknownType) DeepCopy() *UnknownType {
+	if x == nil {
+		return nil
+	}
+	out := new(UnknownType)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *UnknownType) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_testing_UnversionedType is an autogenerated deepcopy function.
-func DeepCopy_testing_UnversionedType(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*UnversionedType)
-		out := out.(*UnversionedType)
-		*out = *in
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *UnversionedType) DeepCopyInto(out *UnversionedType) {
+	*out = *in
+	out.MyWeirdCustomEmbeddedVersionKindField = in.MyWeirdCustomEmbeddedVersionKindField
+	return
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, creating a new UnversionedType.
+func (x *UnversionedType) DeepCopy() *UnversionedType {
+	if x == nil {
+		return nil
+	}
+	out := new(UnversionedType)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (x *UnversionedType) DeepCopyObject() runtime.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }

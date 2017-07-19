@@ -24,6 +24,7 @@ import (
 
 // +genclient=true
 // +nonNamespaced=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Describes a certificate signing request
 type CertificateSigningRequest struct {
@@ -111,6 +112,8 @@ type CertificateSigningRequestCondition struct {
 	// +optional
 	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty" protobuf:"bytes,4,opt,name=lastUpdateTime"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type CertificateSigningRequestList struct {
 	metav1.TypeMeta `json:",inline"`

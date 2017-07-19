@@ -33,6 +33,7 @@ go_library(
         "rest.go",
         "table.go",
         "update.go",
+        "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -44,6 +45,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1alpha1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package util implements various utility functions used in both testing and implementation
-// of Kubernetes. Package util may not depend on any other package in the Kubernetes
-// package tree.
-package util // import "k8s.io/kubernetes/pkg/util"
+// +k8s:deepcopy-gen=package,register
+
+// Package v1 contains scheduler plugin API objects.
+package v1 // import "k8s.io/kubernetes/plugin/pkg/scheduler/api/v1"

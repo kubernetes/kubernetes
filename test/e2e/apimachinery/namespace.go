@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -142,7 +142,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	}
 	go func() {
 		_, err = f.ClientSet.Core().Pods(namespace.Name).Create(podB)
-		// This error is ok, beacuse we will delete the pod before it completes initialization
+		// This error is ok, because we will delete the pod before it completes initialization
 		framework.Logf("error from create uninitialized namespace: %v", err)
 	}()
 	podB = waitForPodInNamespace(f.ClientSet, namespace.Name, podB.Name)

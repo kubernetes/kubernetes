@@ -42,7 +42,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/service:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
@@ -71,6 +70,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],

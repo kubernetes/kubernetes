@@ -40,7 +40,6 @@ go_library(
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/client/chaosclient:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/credentialprovider:go_default_library",

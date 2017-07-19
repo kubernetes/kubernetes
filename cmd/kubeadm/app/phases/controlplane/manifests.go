@@ -129,7 +129,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		staticPodSpecs[etcd] = etcdPod
 	}
 
-	manifestsPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
+	manifestsPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
 	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
 		return fmt.Errorf("failed to create directory %q [%v]", manifestsPath, err)
 	}
@@ -233,7 +233,7 @@ func k8sVolume() v1.Volume {
 	return v1.Volume{
 		Name: "k8s",
 		VolumeSource: v1.VolumeSource{
-			HostPath: &v1.HostPathVolumeSource{Path: kubeadmapi.GlobalEnvParams.KubernetesDir},
+			HostPath: &v1.HostPathVolumeSource{Path: kubeadmconstants.KubernetesDir},
 		},
 	}
 }
@@ -241,7 +241,7 @@ func k8sVolume() v1.Volume {
 func k8sVolumeMount() v1.VolumeMount {
 	return v1.VolumeMount{
 		Name:      "k8s",
-		MountPath: kubeadmapi.GlobalEnvParams.KubernetesDir,
+		MountPath: kubeadmconstants.KubernetesDir,
 		ReadOnly:  true,
 	}
 }
@@ -371,7 +371,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted
 	defaultArguments := map[string]string{
 		"address":                          "127.0.0.1",
 		"leader-elect":                     "true",
-		"kubeconfig":                       filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
+		"kubeconfig":                       filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
 		"root-ca-file":                     filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
 		"service-account-private-key-file": filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName),
 		"cluster-signing-cert-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
@@ -404,7 +404,7 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 	defaultArguments := map[string]string{
 		"address":      "127.0.0.1",
 		"leader-elect": "true",
-		"kubeconfig":   filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
+		"kubeconfig":   filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
 	}
 
 	command := []string{"kube-scheduler"}

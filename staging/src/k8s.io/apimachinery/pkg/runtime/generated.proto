@@ -89,7 +89,7 @@ message RawExtension {
 // TypeMeta is provided here for convenience. You may use it directly from this package or define
 // your own with the same fields.
 // 
-// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen=false
 // +protobuf=true
 // +k8s:openapi-gen=true
 message TypeMeta {
@@ -107,6 +107,7 @@ message TypeMeta {
 // metadata and field mutatation.
 // 
 // +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +protobuf=true
 // +k8s:openapi-gen=true
 message Unknown {

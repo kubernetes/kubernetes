@@ -28,8 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/client-go/kubernetes/fake"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -108,7 +108,7 @@ func TestDeleter(t *testing.T) {
 	if err := deleter.Delete(); err != nil {
 		t.Errorf("Mock Recycler expected to return nil but got %s", err)
 	}
-	if exists, _ := util.FileExists("foo"); exists {
+	if exists, _ := utilfile.FileExists("foo"); exists {
 		t.Errorf("Temp path expected to be deleted, but was found at %s", tempPath)
 	}
 }

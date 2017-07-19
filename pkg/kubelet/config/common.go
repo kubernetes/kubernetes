@@ -29,6 +29,10 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
+	// TODO: remove this import if
+	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
+	// to "v1"?
+	_ "k8s.io/kubernetes/pkg/api/install"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"

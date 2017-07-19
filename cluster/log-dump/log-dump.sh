@@ -205,7 +205,7 @@ function dump_masters() {
 
 function dump_nodes() {
   local node_names
-  if [[ -n "$1" ]]; then
+  if [[ -n "${1:-}" ]]; then
     echo "Dumping logs for nodes provided as args to dump_nodes() function"
     node_names=( "$@" )
   elif [[ -n "${use_custom_instance_list}" ]]; then

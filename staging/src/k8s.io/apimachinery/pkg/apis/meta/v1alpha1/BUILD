@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "deepcopy.go",
         "doc.go",
         "generated.pb.go",
         "register.go",

@@ -28,6 +28,7 @@ import (
 // Table is a tabular representation of a set of API resources. The server transforms the
 // object into a set of preferred columns for quickly reviewing the objects.
 // +protobuf=false
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type Table struct {
 	v1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -129,6 +130,7 @@ const (
 )
 
 // TableOptions are used when a Table is requested by the caller.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TableOptions struct {
 	v1.TypeMeta `json:",inline"`
 	// includeObject decides whether to include each object along with its columnar information.
@@ -140,6 +142,7 @@ type TableOptions struct {
 
 // PartialObjectMetadata is a generic representation of any object with ObjectMeta. It allows clients
 // to get access to a particular ObjectMeta schema without knowing the details of the version.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PartialObjectMetadata struct {
 	v1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -149,6 +152,7 @@ type PartialObjectMetadata struct {
 }
 
 // PartialObjectMetadataList contains a list of objects containing only their metadata
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PartialObjectMetadataList struct {
 	v1.TypeMeta `json:",inline"`
 

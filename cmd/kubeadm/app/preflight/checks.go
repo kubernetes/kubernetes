@@ -144,7 +144,6 @@ type PortOpenCheck struct {
 
 func (poc PortOpenCheck) Check() (warnings, errors []error) {
 	errors = []error{}
-	// TODO: Get IP from KubeadmConfig
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", poc.port))
 	if err != nil {
 		errors = append(errors, fmt.Errorf("Port %d is in use", poc.port))
@@ -546,7 +545,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
 		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress, Port: int(cfg.API.BindPort)},
-		DirAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
+		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		InPathCheck{executable: "ip", mandatory: true},
@@ -604,10 +603,10 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		PortOpenCheck{port: 10250},
-		DirAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
+		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: cfg.CACertPath},
-		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
+		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},

@@ -18,9 +18,9 @@ package framework
 
 import (
 	. "github.com/onsi/ginkgo"
+	kubeclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes/crudtester"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 

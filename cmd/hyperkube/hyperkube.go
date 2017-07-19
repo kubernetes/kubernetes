@@ -27,7 +27,7 @@ import (
 
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
-	"k8s.io/kubernetes/pkg/util"
+	utiltemplate "k8s.io/kubernetes/pkg/util/template"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -205,7 +205,7 @@ Servers
 Call '{{.Name}} --make-symlinks' to create symlinks for each server in the local directory.
 Call '{{.Name}} <server> --help' for help on a specific server.
 `
-	util.ExecuteTemplate(hk.Out(), tt, hk)
+	utiltemplate.ExecuteTemplate(hk.Out(), tt, hk)
 }
 
 // MakeSymlinks will create a symlink for each registered hyperkube server in the local directory.

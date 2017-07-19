@@ -58,6 +58,7 @@ type ScaleStatus struct {
 
 // +genclient=true
 // +noMethods=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Scale represents a scaling request for a resource.
 type Scale struct {
@@ -76,6 +77,7 @@ type Scale struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
@@ -241,6 +243,8 @@ type StatefulSetStatus struct {
 	UpdateRevision string `json:"updateRevision,omitempty" protobuf:"bytes,7,opt,name=updateRevision"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // StatefulSetList is a collection of StatefulSets.
 type StatefulSetList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -250,6 +254,7 @@ type StatefulSetList struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type Deployment struct {
@@ -315,6 +320,8 @@ type DeploymentSpec struct {
 	// deployment is paused. Defaults to 600s.
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeploymentRollback stores the information required to rollback a deployment.
 type DeploymentRollback struct {
@@ -467,6 +474,8 @@ type DeploymentCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // DeploymentList is a list of Deployments.
 type DeploymentList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -479,6 +488,7 @@ type DeploymentList struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ControllerRevision implements an immutable snapshot of state data. Clients
 // are responsible for serializing and deserializing the objects that contain
@@ -502,6 +512,8 @@ type ControllerRevision struct {
 	// Revision indicates the revision of the state represented by Data.
 	Revision int64 `json:"revision" protobuf:"varint,3,opt,name=revision"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ControllerRevisionList is a resource containing a list of ControllerRevision objects.
 type ControllerRevisionList struct {

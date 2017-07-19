@@ -20,14 +20,14 @@ go_test(
         "integration",
     ],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//plugin/pkg/admission/defaulttolerationseconds:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )

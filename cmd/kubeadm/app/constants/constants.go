@@ -24,10 +24,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-const (
-	// KubernetesDir is the directory kubernetes owns for storing various configuration files
-	KubernetesDir = "/etc/kubernetes"
+// KubernetesDir is the directory kubernetes owns for storing various configuration files
+// This semi-constant MUST NOT be modified during runtime. It's a variable solely for use in unit testing.
+var KubernetesDir = "/etc/kubernetes"
 
+const (
 	ManifestsSubDirName = "manifests"
 
 	CACertAndKeyBaseName = "ca"
@@ -78,6 +79,8 @@ const (
 	APICallRetryInterval = 500 * time.Millisecond
 	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the master when doing discovery
 	DiscoveryRetryInterval = 5 * time.Second
+	// MarkMasterTimeout specifies how long kubeadm should wait for applying the label and taint on the master before timing out
+	MarkMasterTimeout = 2 * time.Minute
 
 	// Minimum amount of nodes the Service subnet should allow.
 	// We need at least ten, because the DNS service is always at the tenth cluster clusterIP
@@ -96,6 +99,12 @@ const (
 )
 
 var (
+
+	// MasterTaint is the taint to apply on the PodSpec for being able to run that Pod on the master
+	MasterTaint = v1.Taint{
+		Key:    LabelNodeRoleMaster,
+		Effect: v1.TaintEffectNoSchedule,
+	}
 
 	// MasterToleration is the toleration to apply on the PodSpec for being able to run that Pod on the master
 	MasterToleration = v1.Toleration{

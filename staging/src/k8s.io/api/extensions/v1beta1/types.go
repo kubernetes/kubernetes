@@ -52,6 +52,7 @@ type ScaleStatus struct {
 
 // +genclient=true
 // +noMethods=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // represents a scaling request for a resource.
 type Scale struct {
@@ -68,6 +69,8 @@ type Scale struct {
 	// +optional
 	Status ScaleStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Dummy definition
 type ReplicationControllerDummy struct {
@@ -99,6 +102,7 @@ type CustomMetricCurrentStatusList struct {
 
 // +genclient=true
 // +nonNamespaced=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
@@ -117,6 +121,8 @@ type ThirdPartyResource struct {
 	// +optional
 	Versions []APIVersion `json:"versions,omitempty" protobuf:"bytes,3,rep,name=versions"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ThirdPartyResourceList is a list of ThirdPartyResources.
 type ThirdPartyResourceList struct {
@@ -137,6 +143,8 @@ type APIVersion struct {
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // An internal object, used for versioned storage in etcd.  Not exposed to the end user.
 type ThirdPartyResourceData struct {
 	metav1.TypeMeta `json:",inline"`
@@ -150,6 +158,7 @@ type ThirdPartyResourceData struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type Deployment struct {
@@ -215,6 +224,8 @@ type DeploymentSpec struct {
 	// deployment is paused. This is not set by default.
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeploymentRollback stores the information required to rollback a deployment.
 type DeploymentRollback struct {
@@ -367,6 +378,8 @@ type DeploymentCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // DeploymentList is a list of Deployments.
 type DeploymentList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -512,6 +525,7 @@ type DaemonSetStatus struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
@@ -548,6 +562,8 @@ const (
 	DefaultDaemonSetUniqueLabelKey = appsv1beta1.ControllerRevisionHashLabelKey
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // DaemonSetList is a collection of daemon sets.
 type DaemonSetList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -559,6 +575,8 @@ type DaemonSetList struct {
 	// A list of daemon sets.
 	Items []DaemonSet `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ThirdPartyResrouceDataList is a list of ThirdPartyResourceData.
 type ThirdPartyResourceDataList struct {
@@ -573,6 +591,7 @@ type ThirdPartyResourceDataList struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Ingress is a collection of rules that allow inbound connections to reach the
 // endpoints defined by a backend. An Ingress can be configured to give services
@@ -595,6 +614,8 @@ type Ingress struct {
 	// +optional
 	Status IngressStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // IngressList is a collection of Ingress.
 type IngressList struct {
@@ -739,6 +760,7 @@ type IngressBackend struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicaSet represents the configuration of a ReplicaSet.
 type ReplicaSet struct {
@@ -763,6 +785,8 @@ type ReplicaSet struct {
 	// +optional
 	Status ReplicaSetStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicaSetList is a collection of ReplicaSets.
 type ReplicaSetList struct {
@@ -864,6 +888,7 @@ type ReplicaSetCondition struct {
 
 // +genclient=true
 // +nonNamespaced=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Pod Security Policy governs the ability to make requests that affect the Security Context
 // that will be applied to a pod and container.
@@ -1063,6 +1088,8 @@ const (
 	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // Pod Security Policy List is a list of PodSecurityPolicy objects.
 type PodSecurityPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -1074,6 +1101,8 @@ type PodSecurityPolicyList struct {
 	// Items is a list of schema objects.
 	Items []PodSecurityPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 type NetworkPolicy struct {
@@ -1157,6 +1186,8 @@ type NetworkPolicyPeer struct {
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,2,opt,name=namespaceSelector"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Network Policy List is a list of NetworkPolicy objects.
 type NetworkPolicyList struct {

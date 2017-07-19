@@ -30,16 +30,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/pkg/api"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -107,7 +107,7 @@ func New(
 ) (*ServiceController, error) {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
-	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "service-controller"})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "service-controller"})
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", kubeClient.Core().RESTClient().GetRateLimiter())
@@ -299,7 +299,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 	// TODO: Be careful here ... what if there were other changes to the service?
 	if !v1helper.LoadBalancerStatusEqual(previousState, newState) {
 		// Make a copy so we don't mutate the shared informer cache
-		copy, err := api.Scheme.DeepCopy(service)
+		copy, err := scheme.Scheme.DeepCopy(service)
 		if err != nil {
 			return err, retryable
 		}

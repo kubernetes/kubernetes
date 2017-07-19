@@ -35,6 +35,10 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
+	// TODO: remove this import if
+	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
+	// to "v1"?
+	_ "k8s.io/kubernetes/pkg/api/install"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"

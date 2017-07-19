@@ -119,6 +119,18 @@ func (o *AuditOptions) Validate() []error {
 			allErrors = append(allErrors, fmt.Errorf("invalid audit log format %s, allowed formats are %q", o.LogOptions.Format, strings.Join(pluginlog.AllowedFormats, ",")))
 		}
 	}
+
+	// Check validities of MaxAge, MaxBackups and MaxSize of log options
+	if o.LogOptions.MaxAge < 0 {
+		allErrors = append(allErrors, fmt.Errorf("--audit-log-maxage %v can't be a negative number", o.LogOptions.MaxAge))
+	}
+	if o.LogOptions.MaxBackups < 0 {
+		allErrors = append(allErrors, fmt.Errorf("--audit-log-maxbackup %v can't be a negative number", o.LogOptions.MaxBackups))
+	}
+	if o.LogOptions.MaxSize < 0 {
+		allErrors = append(allErrors, fmt.Errorf("--audit-log-maxsize %v can't be a negative number", o.LogOptions.MaxSize))
+	}
+
 	return allErrors
 }
 

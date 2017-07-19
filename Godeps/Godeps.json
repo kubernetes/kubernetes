@@ -2231,7 +2231,6 @@
 		},
 		{
 			"ImportPath": "github.com/pelletier/go-buffruneio",
-			"Comment": "v0.1.0",
 			"Rev": "df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d"
 		},
 		{
@@ -2985,43 +2984,43 @@
 		},
 		{
 			"ImportPath": "k8s.io/gengo/args",
-			"Rev": "c79c13d131b0a8f42d05faa6491c12e94ccc6f30"
+			"Rev": "712a17394a0980fabbcf3d968972e185d80c0fa4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/deepcopy-gen/generators",
-			"Rev": "c79c13d131b0a8f42d05faa6491c12e94ccc6f30"
+			"Rev": "712a17394a0980fabbcf3d968972e185d80c0fa4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/defaulter-gen/generators",
-			"Rev": "c79c13d131b0a8f42d05faa6491c12e94ccc6f30"
+			"Rev": "712a17394a0980fabbcf3d968972e185d80c0fa4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/import-boss/generators",
-			"Rev": "c79c13d131b0a8f42d05faa6491c12e94ccc6f30"
+			"Rev": "712a17394a0980fabbcf3d968972e185d80c0fa4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/generators",
-			"Rev": "c79c13d131b0a8f42d05faa6491c12e94ccc6f30"
+			"Rev": "712a17394a0980fabbcf3d968972e185d80c0fa4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/sets",
-			"Rev": "c79c13d131b0a8f42d05faa6491c12e94ccc6f30"
+			"Rev": "712a17394a0980fabbcf3d968972e185d80c0fa4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/generator",
-			"Rev": "c79c13d131b0a8f42d05faa6491c12e94ccc6f30"
+			"Rev": "712a17394a0980fabbcf3d968972e185d80c0fa4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/namer",
-			"Rev": "c79c13d131b0a8f42d05faa6491c12e94ccc6f30"
+			"Rev": "712a17394a0980fabbcf3d968972e185d80c0fa4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/parser",
-			"Rev": "c79c13d131b0a8f42d05faa6491c12e94ccc6f30"
+			"Rev": "712a17394a0980fabbcf3d968972e185d80c0fa4"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/types",
-			"Rev": "c79c13d131b0a8f42d05faa6491c12e94ccc6f30"
+			"Rev": "712a17394a0980fabbcf3d968972e185d80c0fa4"
 		},
 		{
 			"ImportPath": "k8s.io/heapster/metrics/api/v1/types",

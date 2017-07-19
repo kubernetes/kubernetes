@@ -31,22 +31,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/integer"
-	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/api/install"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/ref"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	clientretry "k8s.io/kubernetes/pkg/client/retry"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 
@@ -464,7 +464,7 @@ func getPodsAnnotationSet(template *v1.PodTemplateSpec, object runtime.Object) (
 	for k, v := range template.Annotations {
 		desiredAnnotations[k] = v
 	}
-	createdByRef, err := ref.GetReference(api.Scheme, object)
+	createdByRef, err := ref.GetReference(scheme.Scheme, object)
 	if err != nil {
 		return desiredAnnotations, fmt.Errorf("unable to get controller reference: %v", err)
 	}
@@ -472,7 +472,7 @@ func getPodsAnnotationSet(template *v1.PodTemplateSpec, object runtime.Object) (
 	// TODO: this code was not safe previously - as soon as new code came along that switched to v2, old clients
 	//   would be broken upon reading it. This is explicitly hardcoded to v1 to guarantee predictable deployment.
 	//   We need to consistently handle this case of annotation versioning.
-	codec := api.Codecs.LegacyCodec(schema.GroupVersion{Group: v1.GroupName, Version: "v1"})
+	codec := scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 
 	createdByRefJson, err := runtime.Encode(codec, &v1.SerializedReference{
 		Reference: *createdByRef,
@@ -559,7 +559,7 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	if controllerRef != nil {
 		pod.OwnerReferences = append(pod.OwnerReferences, *controllerRef)
 	}
-	clone, err := api.Scheme.DeepCopy(&template.Spec)
+	clone, err := scheme.Scheme.DeepCopy(&template.Spec)
 	if err != nil {
 		return nil, err
 	}
@@ -964,7 +964,7 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 	}
 
 	newTaints := newNode.Spec.Taints
-	objCopy, err := api.Scheme.DeepCopy(oldNode)
+	objCopy, err := scheme.Scheme.DeepCopy(oldNode)
 	if err != nil {
 		return fmt.Errorf("failed to copy node object %#v: %v", oldNode, err)
 	}

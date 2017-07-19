@@ -41,10 +41,10 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
+	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	clienttypedv1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration"
@@ -510,7 +510,7 @@ func TestMasterService(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer closeFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
 
 	err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
 		svcList, err := client.Core().Services(metav1.NamespaceDefault).List(metav1.ListOptions{})
@@ -552,7 +552,7 @@ func TestServiceAlloc(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(cfg)
 	defer closeFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
 
 	svc := func(i int) *api.Service {
 		return &api.Service{

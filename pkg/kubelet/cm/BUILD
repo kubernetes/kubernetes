@@ -33,7 +33,7 @@ go_library(
         "//pkg/kubelet/eviction/api:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
-        "//pkg/util:go_default_library",
+        "//pkg/util/file:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/oom:go_default_library",
         "//pkg/util/procfs:go_default_library",

@@ -13,6 +13,7 @@ go_library(
     srcs = [
         "certs.go",
         "kubeconfig.go",
+        "markmaster.go",
         "phase.go",
         "preflight.go",
         "selfhosting.go",
@@ -26,6 +27,7 @@ go_library(
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/phases/markmaster:go_default_library",
         "//cmd/kubeadm/app/phases/selfhosting:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",

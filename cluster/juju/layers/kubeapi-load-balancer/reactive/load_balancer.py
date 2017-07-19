@@ -54,6 +54,8 @@ def request_server_certificates(tls):
 def close_old_port():
     config = hookenv.config()
     old_port = config.previous('port')
+    if not old_port:
+        return
     try:
         hookenv.close_port(old_port)
     except CalledProcessError:

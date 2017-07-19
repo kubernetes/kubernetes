@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	versionedfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/fake"
 	"k8s.io/kubernetes/pkg/api"
@@ -38,11 +39,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	versionedfake "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 type describeClient struct {
@@ -700,6 +700,14 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 				},
 			},
 		},
+		"fc": {
+			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+			Spec: api.PersistentVolumeSpec{
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					FC: &api.FCVolumeSource{},
+				},
+			},
+		},
 	}
 
 	for name, pv := range tests {
@@ -723,7 +731,7 @@ func TestDescribeDeployment(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: v1beta1.DeploymentSpec{
-			Replicas: util.Int32Ptr(1),
+			Replicas: utilpointer.Int32Ptr(1),
 			Selector: &metav1.LabelSelector{},
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
@@ -1221,7 +1229,7 @@ func TestDescribeEvents(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: v1beta1.DeploymentSpec{
-					Replicas: util.Int32Ptr(1),
+					Replicas: utilpointer.Int32Ptr(1),
 					Selector: &metav1.LabelSelector{},
 				},
 			}),

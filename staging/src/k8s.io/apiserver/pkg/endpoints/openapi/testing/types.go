@@ -21,6 +21,7 @@ import (
 )
 
 // +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TestType struct {
 }
 

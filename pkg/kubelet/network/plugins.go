@@ -28,8 +28,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
@@ -77,6 +77,8 @@ type NetworkPlugin interface {
 	// Status returns error if the network plugin is in error state
 	Status() error
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodNetworkStatus stores the network status of a pod (currently just the primary IP address)
 // This struct represents version "v1beta1"

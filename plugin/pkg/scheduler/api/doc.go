@@ -14,30 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubeadm
+// +k8s:deepcopy-gen=package,register
 
-import (
-	"fmt"
-	"os"
-	"path"
-	"strings"
-)
-
-var GlobalEnvParams = SetEnvParams()
-
-func SetEnvParams() *EnvParams {
-
-	envParams := map[string]string{
-		"kubernetes_dir": "/etc/kubernetes",
-	}
-
-	for k := range envParams {
-		if v := strings.TrimSpace(os.Getenv(fmt.Sprintf("KUBE_%s", strings.ToUpper(k)))); v != "" {
-			envParams[k] = v
-		}
-	}
-
-	return &EnvParams{
-		KubernetesDir: path.Clean(envParams["kubernetes_dir"]),
-	}
-}
+// Package api contains scheduler plugin API objects.
+package api // import "k8s.io/kubernetes/plugin/pkg/scheduler/api"

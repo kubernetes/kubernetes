@@ -61,7 +61,10 @@ func init() {
 	}
 	if err := scheme.AddGeneratedDeepCopyFuncs(
 		conversion.GeneratedDeepCopyFunc{
-			Fn:     metav1.DeepCopy_v1_Time,
+			Fn: func(in, out interface{}, c *conversion.Cloner) error {
+				in.(*metav1.Time).DeepCopyInto(out.(*metav1.Time))
+				return nil
+			},
 			InType: reflect.TypeOf(&metav1.Time{}),
 		},
 	); err != nil {

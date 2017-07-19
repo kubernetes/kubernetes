@@ -126,6 +126,7 @@ type ImpersonationConfig struct {
 	Extra map[string][]string
 }
 
+// +k8s:deepcopy-gen=true
 // TLSClientConfig contains settings to enable transport layer security
 type TLSClientConfig struct {
 	// Server should be accessed without verifying the TLS certificate. For testing only.

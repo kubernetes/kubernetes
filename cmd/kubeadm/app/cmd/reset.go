@@ -25,7 +25,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -118,7 +117,7 @@ func (r *Reset) Run(out io.Writer) error {
 
 	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
 	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd
-	etcdManifestPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
+	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 	if _, err := os.Stat(etcdManifestPath); err == nil {
 		dirsToClean = append(dirsToClean, "/var/lib/etcd")
 	} else {
@@ -132,7 +131,7 @@ func (r *Reset) Run(out io.Writer) error {
 	}
 
 	// Remove contents from the config and pki directories
-	resetConfigDir(kubeadmapi.GlobalEnvParams.KubernetesDir, r.certsDir)
+	resetConfigDir(kubeadmconstants.KubernetesDir, r.certsDir)
 
 	return nil
 }

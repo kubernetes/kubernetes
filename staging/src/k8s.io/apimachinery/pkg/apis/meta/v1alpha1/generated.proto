@@ -31,6 +31,7 @@ option go_package = "v1alpha1";
 
 // PartialObjectMetadata is a generic representation of any object with ObjectMeta. It allows clients
 // to get access to a particular ObjectMeta schema without knowing the details of the version.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 message PartialObjectMetadata {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
@@ -39,12 +40,14 @@ message PartialObjectMetadata {
 }
 
 // PartialObjectMetadataList contains a list of objects containing only their metadata
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 message PartialObjectMetadataList {
   // items contains each of the included items.
   repeated PartialObjectMetadata items = 1;
 }
 
 // TableOptions are used when a Table is requested by the caller.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 message TableOptions {
   // includeObject decides whether to include each object along with its columnar information.
   // Specifying "None" will return no object, specifying "Object" will return the full object contents, and

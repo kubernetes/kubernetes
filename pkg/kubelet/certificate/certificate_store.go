@@ -29,7 +29,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/util"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 )
 
 const (
@@ -86,7 +86,7 @@ func NewFileStore(
 func (s *fileStore) recover() error {
 	// If the 'current' file doesn't exist, continue on with the recovery process.
 	currentPath := filepath.Join(s.certDirectory, s.filename(currentPair))
-	if exists, err := util.FileExists(currentPath); err != nil {
+	if exists, err := utilfile.FileExists(currentPath); err != nil {
 		return err
 	} else if exists {
 		return nil
@@ -113,18 +113,18 @@ func (s *fileStore) recover() error {
 
 func (s *fileStore) Current() (*tls.Certificate, error) {
 	pairFile := filepath.Join(s.certDirectory, s.filename(currentPair))
-	if pairFileExists, err := util.FileExists(pairFile); err != nil {
+	if pairFileExists, err := utilfile.FileExists(pairFile); err != nil {
 		return nil, err
 	} else if pairFileExists {
 		glog.Infof("Loading cert/key pair from %q.", pairFile)
 		return loadFile(pairFile)
 	}
 
-	certFileExists, err := util.FileExists(s.certFile)
+	certFileExists, err := utilfile.FileExists(s.certFile)
 	if err != nil {
 		return nil, err
 	}
-	keyFileExists, err := util.FileExists(s.keyFile)
+	keyFileExists, err := utilfile.FileExists(s.keyFile)
 	if err != nil {
 		return nil, err
 	}
@@ -135,11 +135,11 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 
 	c := filepath.Join(s.certDirectory, s.pairNamePrefix+certExtension)
 	k := filepath.Join(s.keyDirectory, s.pairNamePrefix+keyExtension)
-	certFileExists, err = util.FileExists(c)
+	certFileExists, err = utilfile.FileExists(c)
 	if err != nil {
 		return nil, err
 	}
-	keyFileExists, err = util.FileExists(k)
+	keyFileExists, err = utilfile.FileExists(k)
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +262,7 @@ func (s *fileStore) updateSymlink(filename string) error {
 
 	// Check that the new cert/key pair file exists to avoid rotating to an
 	// invalid cert/key.
-	if filenameExists, err := util.FileExists(filename); err != nil {
+	if filenameExists, err := utilfile.FileExists(filename); err != nil {
 		return err
 	} else if !filenameExists {
 		return fmt.Errorf("file %q does not exist so it can not be used as the currently selected cert/key", filename)

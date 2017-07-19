@@ -41,7 +41,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/apis/admission/install:go_default_library",
         "//pkg/apis/admission/v1alpha1:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubeapiserver/admission/configuration:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -54,6 +53,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
