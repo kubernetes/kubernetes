@@ -367,11 +367,7 @@ func TestProcessServiceUpdate(t *testing.T) {
 					t.Fatalf("get service key error, expected: %s, got: %s", keyExpected, keyGot.(string))
 				}
 
-				copy, err := scheme.Scheme.DeepCopy(svc)
-				if err != nil {
-					t.Fatalf("copy service error: %v", err)
-				}
-				newService := copy.(*v1.Service)
+				newService := svc.DeepCopy()
 
 				newService.Spec.LoadBalancerIP = newLBIP
 				return newService

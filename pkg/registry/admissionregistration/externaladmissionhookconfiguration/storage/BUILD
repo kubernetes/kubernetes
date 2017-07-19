@@ -12,7 +12,6 @@ go_library(
     srcs = ["storage.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/admissionregistration:go_default_library",
         "//pkg/registry/admissionregistration/externaladmissionhookconfiguration:go_default_library",
         "//pkg/registry/cachesize:go_default_library",

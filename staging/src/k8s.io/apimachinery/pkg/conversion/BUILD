@@ -27,7 +27,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "cloner.go",
         "converter.go",
         "deep_equal.go",
         "doc.go",

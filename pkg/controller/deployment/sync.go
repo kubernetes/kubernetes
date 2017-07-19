@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -250,11 +249,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 	// and maxReplicas) and also update the revision annotation in the deployment with the
 	// latest revision.
 	if existingNewRS != nil {
-		objCopy, err := scheme.Scheme.Copy(existingNewRS)
-		if err != nil {
-			return nil, err
-		}
-		rsCopy := objCopy.(*extensions.ReplicaSet)
+		rsCopy := existingNewRS.DeepCopy()
 
 		// Set existing new replica set's annotation
 		annotationsUpdated := deploymentutil.SetNewReplicaSetAnnotations(d, rsCopy, newRevision, true)
@@ -290,11 +285,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 	}
 
 	// new ReplicaSet does not exist, create one.
-	templateCopy, err := scheme.Scheme.DeepCopy(d.Spec.Template)
-	if err != nil {
-		return nil, err
-	}
-	newRSTemplate := templateCopy.(v1.PodTemplateSpec)
+	newRSTemplate := *d.Spec.Template.DeepCopy()
 	podTemplateSpecHash := fmt.Sprintf("%d", controller.ComputeHash(&newRSTemplate, d.Status.CollisionCount))
 	newRSTemplate.Labels = labelsutil.CloneAndAddLabel(d.Spec.Template.Labels, extensions.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
 	// Add podTemplateHash label to selector.
@@ -513,11 +504,7 @@ func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *extensions.Rep
 }
 
 func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newScale int32, deployment *extensions.Deployment, scalingOperation string) (bool, *extensions.ReplicaSet, error) {
-	objCopy, err := scheme.Scheme.Copy(rs)
-	if err != nil {
-		return false, nil, err
-	}
-	rsCopy := objCopy.(*extensions.ReplicaSet)
+	rsCopy := rs.DeepCopy()
 
 	sizeNeedsUpdate := *(rsCopy.Spec.Replicas) != newScale
 	// TODO: Do not mutate the replica set here, instead simply compare the annotation and if they mismatch
@@ -526,6 +513,7 @@ func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newSc
 	annotationsNeedUpdate := deploymentutil.SetReplicasAnnotations(rsCopy, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
 
 	scaled := false
+	var err error
 	if sizeNeedsUpdate || annotationsNeedUpdate {
 		*(rsCopy.Spec.Replicas) = newScale
 		rs, err = dc.client.Extensions().ReplicaSets(rsCopy.Namespace).Update(rsCopy)

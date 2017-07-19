@@ -131,11 +131,7 @@ var benchmarkPod api.Pod = api.Pod{
 func BenchmarkPodCopy(b *testing.B) {
 	var result *api.Pod
 	for i := 0; i < b.N; i++ {
-		obj, err := api.Scheme.DeepCopy(&benchmarkPod)
-		if err != nil {
-			b.Fatalf("Unexpected error copying pod: %v", err)
-		}
-		result = obj.(*api.Pod)
+		result = benchmarkPod.DeepCopy()
 	}
 	if !apiequality.Semantic.DeepEqual(benchmarkPod, *result) {
 		b.Fatalf("Incorrect copy: expected %v, got %v", benchmarkPod, *result)
@@ -154,11 +150,7 @@ func BenchmarkNodeCopy(b *testing.B) {
 
 	var result *api.Node
 	for i := 0; i < b.N; i++ {
-		obj, err := api.Scheme.DeepCopy(&node)
-		if err != nil {
-			b.Fatalf("Unexpected error copying node: %v", err)
-		}
-		result = obj.(*api.Node)
+		result = node.DeepCopy()
 	}
 	if !apiequality.Semantic.DeepEqual(node, *result) {
 		b.Fatalf("Incorrect copy: expected %v, got %v", node, *result)
@@ -177,11 +169,7 @@ func BenchmarkReplicationControllerCopy(b *testing.B) {
 
 	var result *api.ReplicationController
 	for i := 0; i < b.N; i++ {
-		obj, err := api.Scheme.DeepCopy(&replicationController)
-		if err != nil {
-			b.Fatalf("Unexpected error copying replication controller: %v", err)
-		}
-		result = obj.(*api.ReplicationController)
+		result = replicationController.DeepCopy()
 	}
 	if !apiequality.Semantic.DeepEqual(replicationController, *result) {
 		b.Fatalf("Incorrect copy: expected %v, got %v", replicationController, *result)

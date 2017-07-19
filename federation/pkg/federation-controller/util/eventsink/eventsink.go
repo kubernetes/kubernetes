@@ -17,12 +17,9 @@ limitations under the License.
 package eventsink
 
 import (
-	"reflect"
-
 	clientv1 "k8s.io/api/core/v1"
 	kubev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -56,17 +53,6 @@ func init() {
 
 	if err := scheme.AddConversionFuncs(
 		metav1.Convert_unversioned_Time_To_unversioned_Time,
-	); err != nil {
-		panic(err)
-	}
-	if err := scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{
-			Fn: func(in, out interface{}, c *conversion.Cloner) error {
-				in.(*metav1.Time).DeepCopyInto(out.(*metav1.Time))
-				return nil
-			},
-			InType: reflect.TypeOf(&metav1.Time{}),
-		},
 	); err != nil {
 		panic(err)
 	}

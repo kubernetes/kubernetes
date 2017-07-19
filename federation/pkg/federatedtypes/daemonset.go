@@ -65,7 +65,7 @@ func (a *DaemonSetAdapter) Copy(obj pkgruntime.Object) pkgruntime.Object {
 	daemonset := obj.(*extensionsv1.DaemonSet)
 	return &extensionsv1.DaemonSet{
 		ObjectMeta: util.DeepCopyRelevantObjectMeta(daemonset.ObjectMeta),
-		Spec:       *(util.DeepCopyApiTypeOrPanic(&daemonset.Spec).(*extensionsv1.DaemonSetSpec)),
+		Spec:       *daemonset.Spec.DeepCopy(),
 	}
 }
 

@@ -61,7 +61,7 @@ func (s *storage) CreateNode(ctx genericapirequest.Context, node *api.Node) erro
 }
 
 func (s *storage) UpdateNode(ctx genericapirequest.Context, node *api.Node) error {
-	_, _, err := s.Update(ctx, node.Name, rest.DefaultUpdatedObjectInfo(node, api.Scheme))
+	_, _, err := s.Update(ctx, node.Name, rest.DefaultUpdatedObjectInfo(node))
 	return err
 }
 

@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/client-go/kubernetes/scheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
@@ -93,12 +92,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *extensions.DaemonSet) (cur
 		// Add the unique label if it's not already added to the history
 		// We use history name instead of computing hash, so that we don't need to worry about hash collision
 		if _, ok := history.Labels[extensions.DefaultDaemonSetUniqueLabelKey]; !ok {
-			var clone interface{}
-			clone, err = scheme.Scheme.DeepCopy(history)
-			if err != nil {
-				return nil, nil, err
-			}
-			toUpdate := clone.(*apps.ControllerRevision)
+			toUpdate := history.DeepCopy()
 			toUpdate.Labels[extensions.DefaultDaemonSetUniqueLabelKey] = toUpdate.Name
 			history, err = dsc.kubeClient.AppsV1beta1().ControllerRevisions(ds.Namespace).Update(toUpdate)
 			if err != nil {
@@ -133,12 +127,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *extensions.DaemonSet) (cur
 		}
 		// Update revision number if necessary
 		if cur.Revision < currRevision {
-			var clone interface{}
-			clone, err = scheme.Scheme.DeepCopy(cur)
-			if err != nil {
-				return nil, nil, err
-			}
-			toUpdate := clone.(*apps.ControllerRevision)
+			toUpdate := cur.DeepCopy()
 			toUpdate.Revision = currRevision
 			_, err = dsc.kubeClient.AppsV1beta1().ControllerRevisions(ds.Namespace).Update(toUpdate)
 			if err != nil {
@@ -233,11 +222,7 @@ func (dsc *DaemonSetsController) dedupCurHistories(ds *extensions.DaemonSet, cur
 		}
 		for _, pod := range pods {
 			if pod.Labels[extensions.DefaultDaemonSetUniqueLabelKey] != keepCur.Labels[extensions.DefaultDaemonSetUniqueLabelKey] {
-				clone, err := scheme.Scheme.DeepCopy(pod)
-				if err != nil {
-					return nil, err
-				}
-				toUpdate := clone.(*v1.Pod)
+				toUpdate := pod.DeepCopy()
 				if toUpdate.Labels == nil {
 					toUpdate.Labels = make(map[string]string)
 				}

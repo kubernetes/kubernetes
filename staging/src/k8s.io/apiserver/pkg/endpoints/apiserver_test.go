@@ -283,7 +283,6 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 		Creater:   scheme,
 		Convertor: scheme,
-		Copier:    scheme,
 		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
@@ -490,11 +489,7 @@ func (storage *SimpleRESTStorage) Get(ctx request.Context, id string, options *m
 	if id == "binary" {
 		return storage.stream, storage.errors["get"]
 	}
-	copied, err := scheme.Copy(&storage.item)
-	if err != nil {
-		panic(err)
-	}
-	return copied, storage.errors["get"]
+	return storage.item.DeepCopy(), storage.errors["get"]
 }
 
 func (storage *SimpleRESTStorage) checkContext(ctx request.Context) {
@@ -748,11 +743,7 @@ func (storage *SimpleTypedStorage) New() runtime.Object {
 
 func (storage *SimpleTypedStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
-	copied, err := scheme.Copy(storage.item)
-	if err != nil {
-		panic(err)
-	}
-	return copied, storage.errors["get"]
+	return storage.item.DeepCopyObject(), storage.errors["get"]
 }
 
 func (storage *SimpleTypedStorage) checkContext(ctx request.Context) {
@@ -3237,7 +3228,6 @@ func TestUpdateREST(t *testing.T) {
 			Root:      "/" + prefix,
 			Creater:   scheme,
 			Convertor: scheme,
-			Copier:    scheme,
 			Defaulter: scheme,
 			Typer:     scheme,
 			Linker:    selfLinker,
@@ -3325,7 +3315,6 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Root:      "/" + prefix,
 		Creater:   scheme,
 		Convertor: scheme,
-		Copier:    scheme,
 		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
@@ -3357,7 +3346,6 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Root:      "/" + prefix,
 		Creater:   scheme,
 		Convertor: scheme,
-		Copier:    scheme,
 		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
@@ -3945,11 +3933,7 @@ func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 }
 
 func (storage *SimpleXGSubresourceRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
-	copied, err := scheme.Copy(&storage.item)
-	if err != nil {
-		panic(err)
-	}
-	return copied, nil
+	return storage.item.DeepCopyObject(), nil
 }
 
 func TestXGSubresource(t *testing.T) {
@@ -3973,7 +3957,6 @@ func TestXGSubresource(t *testing.T) {
 
 		Creater:   scheme,
 		Convertor: scheme,
-		Copier:    scheme,
 		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
