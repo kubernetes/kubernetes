@@ -70,7 +70,6 @@ go_library(
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/ssh:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//pkg/util/file:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//pkg/util/system:go_default_library",
@@ -136,6 +135,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 

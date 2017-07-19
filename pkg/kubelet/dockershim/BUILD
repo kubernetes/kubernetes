@@ -51,7 +51,6 @@ go_library(
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/security/apparmor:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//pkg/util/term:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
@@ -68,6 +67,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 

@@ -23,7 +23,6 @@ go_library(
         "//pkg/util/bandwidth:go_default_library",
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/ebtables:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//vendor/github.com/containernetworking/cni/libcni:go_default_library",
@@ -35,6 +34,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 
@@ -51,11 +51,12 @@ go_test(
         "//pkg/kubelet/network/hostport/testing:go_default_library",
         "//pkg/kubelet/network/testing:go_default_library",
         "//pkg/util/bandwidth:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",
         "//pkg/util/sysctl/testing:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/mock:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ],
 )
 

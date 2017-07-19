@@ -31,7 +31,6 @@ go_library(
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/iptables:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -49,6 +48,7 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 
