@@ -222,7 +222,8 @@ func checkOpenStackOpts(openstackOpts *OpenStack) error {
 
 	// subnet-id is required
 	if len(lbOpts.SubnetId) == 0 {
-		return fmt.Errorf("subnet-id not set in cloud provider config")
+		glog.Warningf("subnet-id not set in cloud provider config. " +
+			"OpenStack Load balancer will not work.")
 	}
 
 	// if need to create health monitor for Neutron LB,
