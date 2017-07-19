@@ -60340,6 +60340,37 @@
      }
     ]
    },
+   "io.k8s.api.core.v1.PersistentVolumeClaimCondition": {
+    "description": "PersistentVolumeClaimCondition contails details about state of pvc",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "description": "Last time we probed the condition.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "lastTransitionTime": {
+      "description": "Last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "message": {
+      "description": "Human-readable message indicating details about last transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "Unique, one-word, CamelCase reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.PersistentVolumeClaimList": {
     "description": "PersistentVolumeClaimList is a list of PersistentVolumeClaim items.",
     "required": [
@@ -60418,6 +60449,15 @@
       "additionalProperties": {
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
+     },
+     "conditions": {
+      "description": "Current service state of PVC",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaimCondition"
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "phase": {
       "description": "Phase represents the current phase of PersistentVolumeClaim.",
