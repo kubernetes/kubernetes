@@ -43,12 +43,12 @@ func setup(t *testing.T) volume.VolumePlugin {
 
 func TestHugePagesPlugin_CanSupport(t *testing.T) {
 	plug := setup(t)
-	testCases := []struct {
+	testCases := map[string]struct {
 		shouldDetectHugePages bool
 		volumeSpec            *v1.Volume
 		expectedResult        bool
 	}{
-		{
+		"No hugepages on host": {
 			shouldDetectHugePages: false,
 			volumeSpec: &v1.Volume{
 				Name:         "test",
@@ -56,12 +56,12 @@ func TestHugePagesPlugin_CanSupport(t *testing.T) {
 			},
 			expectedResult: false,
 		},
-		{
+		"No volume specified": {
 			shouldDetectHugePages: true,
 			volumeSpec:            nil,
 			expectedResult:        false,
 		},
-		{
+		"No hugepages voluem plugin specified": {
 			shouldDetectHugePages: true,
 			volumeSpec: &v1.Volume{
 				Name:         "test",
@@ -69,7 +69,7 @@ func TestHugePagesPlugin_CanSupport(t *testing.T) {
 			},
 			expectedResult: false,
 		},
-		{
+		"Works fine": {
 			shouldDetectHugePages: true,
 			volumeSpec: &v1.Volume{
 				Name: "test",
@@ -83,7 +83,7 @@ func TestHugePagesPlugin_CanSupport(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testCases {
+	for name, testCase := range testCases {
 		readFile = func(string) ([]byte, error) {
 			if testCase.shouldDetectHugePages {
 				return []byte("HugePages_Total: 10 \nHugePages_Free: 10 \nHugepagesize: 2048"), nil
@@ -92,76 +92,83 @@ func TestHugePagesPlugin_CanSupport(t *testing.T) {
 
 		}
 		canSupport := plug.CanSupport(&volume.Spec{Volume: testCase.volumeSpec})
-		assert.Equal(t, testCase.expectedResult, canSupport)
+		if testCase.expectedResult != canSupport {
+			t.Errorf("Expected %v got %v in %s\n", testCase.expectedResult, canSupport, name)
+		}
 	}
 }
 
 func TestGetNumHugePages(t *testing.T) {
-	testCases := []struct {
+	testCases := map[string]struct {
 		expectedHugePagesTotal int64
 		expectedHugePagesFree  int64
 		shouldFail             bool
 		input                  string
 		isInputReadable        bool
 	}{
-		{
+		"empty input": {
 			shouldFail:             true,
 			input:                  "",
 			isInputReadable:        false,
 			expectedHugePagesFree:  0,
 			expectedHugePagesTotal: 0,
 		},
-		{
+		"no hugepages": {
 			shouldFail:             true,
 			input:                  "HugePages_Total",
 			isInputReadable:        true,
 			expectedHugePagesFree:  0,
 			expectedHugePagesTotal: 0,
 		},
-		{
+		"wrong format of HugePages_Total": {
 			shouldFail:             true,
 			input:                  "HugePages_Total: xyz",
 			isInputReadable:        true,
 			expectedHugePagesFree:  0,
 			expectedHugePagesTotal: 0,
 		},
-		{
-			shouldFail:             true,
-			input:                  "",
-			isInputReadable:        true,
-			expectedHugePagesFree:  0,
-			expectedHugePagesTotal: 0,
-		},
-		{
+		"Correct input": {
 			shouldFail:             false,
-			input:                  "HugePages_Total: 512 \nHugepagesize: 2048",
+			input:                  "HugePages_Total: 512 \nHugepagesize: 2048 kB",
 			isInputReadable:        true,
 			expectedHugePagesFree:  0,
 			expectedHugePagesTotal: 512 * 2048,
 		},
-		{
+		"Correct input with other values": {
 			shouldFail:             false,
-			input:                  "HugePages_Free: 400 \nHugepagesize: 1000",
+			input:                  "HugePages_Free: 400 \nHugepagesize:       1000 kB",
 			isInputReadable:        true,
 			expectedHugePagesFree:  400 * 1000,
 			expectedHugePagesTotal: 0,
 		},
+		"Too many columns": {
+			shouldFail:             true,
+			input:                  "HugePages_Free: 400 \nHugepagesize: 1000 kB Fail",
+			isInputReadable:        true,
+			expectedHugePagesFree:  0,
+			expectedHugePagesTotal: 0,
+		},
 	}
-	for _, testCase := range testCases {
+	for name, testCase := range testCases {
 		readFile = func(string) ([]byte, error) {
 			if !testCase.isInputReadable {
-				return []byte(""), fmt.Errorf("error has occurred")
+				return []byte(""), fmt.Errorf("error has occurred in %s", name)
 			}
 			return []byte(testCase.input), nil
 		}
 		hugePagesTotal, hugePagesFree, err := getNumHugepages()
-		if testCase.shouldFail == true {
-			assert.Nil(t, err)
-		} else if testCase.shouldFail == false {
-			assert.NotNil(t, err)
+		if testCase.shouldFail == true && err == nil {
+			t.Errorf("Expected error got nil instead in %s", name)
+		} else if testCase.shouldFail == false && err != nil {
+			t.Errorf("Expected error to be nil in %s", name)
 		}
-		assert.Equal(t, testCase.expectedHugePagesFree, hugePagesFree)
-		assert.Equal(t, testCase.expectedHugePagesTotal, hugePagesTotal)
+		if testCase.expectedHugePagesFree != hugePagesFree {
+			t.Errorf("Expected hugePagesFree to equal %v got %v instead in %s", testCase.expectedHugePagesFree, hugePagesFree, name)
+		}
+		if testCase.expectedHugePagesTotal != hugePagesTotal {
+			t.Errorf("Expected hugePagesTotal to equal %v got %v instead in %s", testCase.expectedHugePagesTotal, hugePagesTotal, name)
+		}
+
 	}
 }
 

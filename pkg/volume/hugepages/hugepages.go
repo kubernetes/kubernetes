@@ -53,9 +53,9 @@ var _ volume.VolumePlugin = &hugePagesPlugin{}
 
 const (
 	hugePagesPluginName  = "kubernetes.io/hugepages"
-	hugePagesTotalString = "HugePages_Total"
-	hugePagesFreeString  = "HugePages_Free"
-	hugePagesSizeString  = "Hugepagesize"
+	hugePagesTotalString = "HugePages_Total:"
+	hugePagesFreeString  = "HugePages_Free:"
+	hugePagesSizeString  = "Hugepagesize:"
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -81,20 +81,32 @@ func (plugin *hugePagesPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 
 var readFile = ioutil.ReadFile
 
-func parseMeminfoLine(fieldName string, line string) (int64, error) {
-	// line is representing key-value data in following form 'key: value'
-	lineSplitted := strings.Split(line, ":")
-	if len(lineSplitted) != 2 {
-		return 0, fmt.Errorf("Cannot parse /proc/meminfo")
+// /proc/meminfo sometimes return with kB sometimes without
+// Example:
+// HugePages_Surp:        0
+// Hugepagesize:       2048 kB
+func isMeminfoColumnCountCorrect(lineSplitted []string) bool {
+	return len(lineSplitted) == 2 || len(lineSplitted) == 3
+}
+
+func parseMeminfoLine(line string) (string, int64, error) {
+	// last line of /proc/meminfo
+	if line == "" {
+		return "", 0, nil
 	}
-	value, err := strconv.Atoi(strings.TrimSpace(lineSplitted[1]))
+	// line is representing key-value data in following form 'key: value' and sometimes 'key: value kB'
+	lineSplitted := strings.Fields(line)
+	if !isMeminfoColumnCountCorrect(lineSplitted) {
+		return "", 0, fmt.Errorf("Incorrect number of colums expected 2 or 3 got %v", len(lineSplitted))
+	}
+	value, err := strconv.Atoi(lineSplitted[1])
 	if err != nil {
-		return 0, fmt.Errorf("Cannot parse %s value", fieldName)
+		return "", 0, fmt.Errorf("Cannot parse value")
 	}
-	if value <= 0 {
-		return 0, fmt.Errorf("No %s was detected", fieldName)
+	if value < 0 {
+		return "", 0, fmt.Errorf("No value was detected")
 	}
-	return int64(value), nil
+	return lineSplitted[0], int64(value), nil
 }
 
 func getNumHugepages() (int64, int64, error) {
@@ -105,22 +117,18 @@ func getNumHugepages() (int64, int64, error) {
 	var hugePagesTotal, hugePagesFree, hugePagesSize int64
 
 	for _, line := range strings.Split(string(data), "\n") {
-		if strings.HasPrefix(line, hugePagesTotalString) {
-			if hugePagesTotal, err = parseMeminfoLine(hugePagesTotalString, line); err != nil {
-				return 0, 0, err
-			}
+		fieldName, value, err := parseMeminfoLine(line)
+		if err != nil {
+			return 0, 0, err
 		}
-		if strings.HasPrefix(line, hugePagesFreeString) {
-			if hugePagesFree, err = parseMeminfoLine(hugePagesFreeString, line); err != nil {
-				return 0, 0, err
-			}
-		}
-		// Hugepagesize is always in kB https://github.com/torvalds/linux/blob/master/mm/hugetlb.c#L2999
-		if strings.HasPrefix(line, hugePagesSizeString) {
-			hugePagesSize, err = parseMeminfoLine(hugePagesSizeString, line)
-			if err != nil {
-				return 0, 0, err
-			}
+		switch fieldName {
+		case hugePagesTotalString:
+			hugePagesTotal = value
+		case hugePagesFreeString:
+			hugePagesFree = value
+			// Hugepagesize is always in kB https://github.com/torvalds/linux/blob/master/mm/hugetlb.c#L2999
+		case hugePagesSizeString:
+			hugePagesSize = value
 		}
 	}
 
