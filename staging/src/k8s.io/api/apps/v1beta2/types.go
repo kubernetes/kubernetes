@@ -59,6 +59,7 @@ type ScaleStatus struct {
 
 // +genclient=true
 // +noMethods=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
 // Scale represents a scaling request for a resource.
@@ -78,6 +79,7 @@ type Scale struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
 // StatefulSet represents a set of pods with consistent identities.
@@ -248,6 +250,8 @@ type StatefulSetStatus struct {
 	UpdateRevision string `json:"updateRevision,omitempty" protobuf:"bytes,7,opt,name=updateRevision"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
 // StatefulSetList is a collection of StatefulSets.
 type StatefulSetList struct {
@@ -258,6 +262,7 @@ type StatefulSetList struct {
 }
 
 // +genclient=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
 // Deployment enables declarative updates for Pods and ReplicaSets.
@@ -325,6 +330,8 @@ type DeploymentSpec struct {
 	// deployment is paused. Defaults to 600s.
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentRollback stores the information required to rollback a deployment.
@@ -482,6 +489,8 @@ type DeploymentCondition struct {
 	// A human readable message indicating details about the transition.
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentList is a list of Deployments.
