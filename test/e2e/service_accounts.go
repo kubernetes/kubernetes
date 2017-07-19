@@ -356,7 +356,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: tc.PodName},
 				Spec: v1.PodSpec{
-					Containers:                   []v1.Container{{Name: "token-test", Image: "gcr.io/google_containers/mounttest:0.7"}},
+					Containers:                   []v1.Container{{Name: "token-test", Image: "gcr.io/google_containers/mounttest:0.8"}},
 					RestartPolicy:                v1.RestartPolicyNever,
 					ServiceAccountName:           tc.ServiceAccountName,
 					AutomountServiceAccountToken: tc.AutomountPodSpec,
