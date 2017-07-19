@@ -292,12 +292,12 @@ func TestFakePodWorkers(t *testing.T) {
 			&v1.Pod{},
 		},
 		{
-			podWithUidNameNs("12345678", "foo", "new"),
-			podWithUidNameNs("12345678", "fooMirror", "new"),
+			podWithUIDNameNs("12345678", "foo", "new"),
+			podWithUIDNameNs("12345678", "fooMirror", "new"),
 		},
 		{
-			podWithUidNameNs("98765", "bar", "new"),
-			podWithUidNameNs("98765", "barMirror", "new"),
+			podWithUIDNameNs("98765", "bar", "new"),
+			podWithUIDNameNs("98765", "barMirror", "new"),
 		},
 	}
 

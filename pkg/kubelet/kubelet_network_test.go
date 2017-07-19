@@ -118,7 +118,7 @@ func TestComposeDNSSearch(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	kubelet.recorder = recorder
 
-	pod := podWithUidNameNs("", "test_pod", "testNS")
+	pod := podWithUIDNameNs("", "test_pod", "testNS")
 	kubelet.clusterDomain = "TEST"
 
 	testCases := []struct {

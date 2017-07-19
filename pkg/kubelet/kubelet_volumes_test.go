@@ -36,7 +36,7 @@ func TestListVolumesForPod(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
-	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+	pod := podWithUIDNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -163,7 +163,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
-	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+	pod := podWithUIDNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -209,7 +209,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
-	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+	pod := podWithUIDNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -298,7 +298,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
 
-	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+	pod := podWithUIDNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -367,7 +367,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
 
-	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+	pod := podWithUIDNameNsSpec("12345678", "foo", "test", v1.PodSpec{
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",

@@ -51,9 +51,9 @@ func TestReasonCache(t *testing.T) {
 
 func assertReasonInfo(t *testing.T, cache *ReasonCache, uid types.UID, result *kubecontainer.SyncResult, found bool) {
 	name := result.Target.(string)
-	actualReason, actualMessage, ok := cache.Get(uid, name)
+	actualReason, ok := cache.Get(uid, name)
 	if ok && !found {
-		t.Fatalf("unexpected cache hit: %v, %q", actualReason, actualMessage)
+		t.Fatalf("unexpected cache hit: %v, %q", actualReason.Err, actualReason.Message)
 	}
 	if !ok && found {
 		t.Fatalf("corresponding reason info not found")
@@ -63,7 +63,7 @@ func assertReasonInfo(t *testing.T, cache *ReasonCache, uid types.UID, result *k
 	}
 	reason := result.Error
 	message := result.Message
-	if actualReason != reason || actualMessage != message {
-		t.Errorf("expected %v %q, got %v %q", reason, message, actualReason, actualMessage)
+	if actualReason.Err != reason || actualReason.Message != message {
+		t.Errorf("expected %v %q, got %v %q", reason, message, actualReason.Err, actualReason.Message)
 	}
 }

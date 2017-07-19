@@ -26,14 +26,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 )
 
-// defaultPodLimitsForDownwardApi copies the input pod, and optional container,
+// defaultPodLimitsForDownwardAPI copies the input pod, and optional container,
 // and applies default resource limits. it returns a copy of the input pod,
 // and a copy of the input container (if specified) with default limits
 // applied. if a container has no limit specified, it will default the limit to
 // the node allocatable.
 // TODO: if/when we have pod level resources, we need to update this function
 // to use those limits instead of node allocatable.
-func (kl *Kubelet) defaultPodLimitsForDownwardApi(pod *v1.Pod, container *v1.Container) (*v1.Pod, *v1.Container, error) {
+func (kl *Kubelet) defaultPodLimitsForDownwardAPI(pod *v1.Pod, container *v1.Container) (*v1.Pod, *v1.Container, error) {
 	if pod == nil {
 		return nil, nil, fmt.Errorf("invalid input, pod cannot be nil")
 	}

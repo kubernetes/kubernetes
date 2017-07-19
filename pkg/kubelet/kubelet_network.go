@@ -31,17 +31,17 @@ import (
 )
 
 const (
-	// the mark-for-masquerade chain
+	// KubeMarkMasqChain is the mark-for-masquerade chain
 	// TODO: clean up this logic in kube-proxy
 	KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
 
-	// the mark-for-drop chain
+	// KubeMarkDropChain is the mark-for-drop chain
 	KubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
 
-	// kubernetes postrouting rules
+	// KubePostroutingChain is kubernetes postrouting rules
 	KubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
 
-	// kubernetes firewall rules
+	// KubeFirewallChain is kubernetes firewall rules
 	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 )
 

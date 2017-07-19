@@ -58,10 +58,10 @@ const (
 	maxNamesPerImageInNodeStatus = 5
 )
 
-// registerWithApiServer registers the node with the cluster master. It is safe
+// registerWithAPIServer registers the node with the cluster master. It is safe
 // to call multiple times, but not concurrently (kl.registrationCompleted is
 // not locked).
-func (kl *Kubelet) registerWithApiServer() {
+func (kl *Kubelet) registerWithAPIServer() {
 	if kl.registrationCompleted {
 		return
 	}
@@ -81,7 +81,7 @@ func (kl *Kubelet) registerWithApiServer() {
 		}
 
 		glog.Infof("Attempting to register node %s", node.Name)
-		registered := kl.tryRegisterWithApiServer(node)
+		registered := kl.tryRegisterWithAPIServer(node)
 		if registered {
 			glog.Infof("Successfully registered node %s", node.Name)
 			kl.registrationCompleted = true
@@ -90,14 +90,14 @@ func (kl *Kubelet) registerWithApiServer() {
 	}
 }
 
-// tryRegisterWithApiServer makes an attempt to register the given node with
+// tryRegisterWithAPIServer makes an attempt to register the given node with
 // the API server, returning a boolean indicating whether the attempt was
 // successful.  If a node with the same name already exists, it reconciles the
 // value of the annotation for controller-managed attach-detach of attachable
 // persistent volumes for the node.  If a node of the same name exists but has
 // a different externalID value, it attempts to delete that node so that a
 // later attempt can recreate it.
-func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
+func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	_, err := kl.kubeClient.Core().Nodes().Create(node)
 	if err == nil {
 		return true
@@ -344,7 +344,7 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 	if kl.registerNode {
 		// This will exit immediately if it doesn't need to do anything.
-		kl.registerWithApiServer()
+		kl.registerWithAPIServer()
 	}
 	if err := kl.updateNodeStatus(); err != nil {
 		glog.Errorf("Unable to update node status: %v", err)
@@ -499,11 +499,10 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 		if ipAddr == nil {
 			// We tried everything we could, but the IP address wasn't fetchable; error out
 			return fmt.Errorf("can't get ip address of node %s. error: %v", node.Name, err)
-		} else {
-			node.Status.Addresses = []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: ipAddr.String()},
-				{Type: v1.NodeHostName, Address: kl.GetHostname()},
-			}
+		}
+		node.Status.Addresses = []v1.NodeAddress{
+			{Type: v1.NodeInternalIP, Address: ipAddr.String()},
+			{Type: v1.NodeHostName, Address: kl.GetHostname()},
 		}
 	}
 	return nil
