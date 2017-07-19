@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server"
@@ -47,6 +48,12 @@ type EtcdOptions struct {
 	DefaultWatchCacheSize int
 }
 
+var storageTypes = sets.NewString(
+	storagebackend.StorageTypeUnset,
+	storagebackend.StorageTypeETCD2,
+	storagebackend.StorageTypeETCD3,
+)
+
 func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 	return &EtcdOptions{
 		StorageConfig:           *backendConfig,
@@ -62,6 +69,10 @@ func (s *EtcdOptions) Validate() []error {
 	allErrors := []error{}
 	if len(s.StorageConfig.ServerList) == 0 {
 		allErrors = append(allErrors, fmt.Errorf("--etcd-servers must be specified"))
+	}
+
+	if !storageTypes.Has(s.StorageConfig.Type) {
+		allErrors = append(allErrors, fmt.Errorf("--storage-backend invalid, must be 'etcd3' or 'etcd2'. If not specified, it will default to 'etcd3'"))
 	}
 
 	return allErrors
