@@ -166,6 +166,7 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 func (rm *ReplicationManager) getPodControllers(pod *v1.Pod) []*v1.ReplicationController {
 	rcs, err := rm.rcLister.GetPodControllers(pod)
 	if err != nil {
+		utilruntime.HandleError(err)
 		return nil
 	}
 	if len(rcs) > 1 {
@@ -178,7 +179,7 @@ func (rm *ReplicationManager) getPodControllers(pod *v1.Pod) []*v1.ReplicationCo
 
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
-// of the corrrect Kind.
+// of the correct Kind.
 func (rm *ReplicationManager) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *v1.ReplicationController {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
@@ -187,6 +188,7 @@ func (rm *ReplicationManager) resolveControllerRef(namespace string, controllerR
 	}
 	rc, err := rm.rcLister.ReplicationControllers(namespace).Get(controllerRef.Name)
 	if err != nil {
+		utilruntime.HandleError(err)
 		return nil
 	}
 	if rc.UID != controllerRef.UID {
@@ -239,6 +241,7 @@ func (rm *ReplicationManager) addPod(obj interface{}) {
 		}
 		rsKey, err := controller.KeyFunc(rc)
 		if err != nil {
+			utilruntime.HandleError(err)
 			return
 		}
 		glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
@@ -369,6 +372,7 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 	}
 	rsKey, err := controller.KeyFunc(rc)
 	if err != nil {
+		utilruntime.HandleError(err)
 		return
 	}
 	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
