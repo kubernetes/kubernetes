@@ -138,10 +138,13 @@ var _ = SIGDescribe("Volumes", func() {
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
 
-	SIGDescribe("GlusterFS [Feature:Volumes]", func() {
+	framework.KubeDescribe("GlusterFS", func() {
 		It("should be mountable", func() {
-			//TODO (copejon) GFS is not supported on debian image.
-			framework.SkipUnlessNodeOSDistroIs("gci")
+			framework.SkipUnlessProviderIs("gke", "gce")
+			if framework.TestContext.Provider == "gce" {
+				// GKE Node Distro registers as debian (underlying VM) but nodes are GCI images.
+				framework.SkipUnlessNodeOSDistroIs("gci")
+			}
 
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
