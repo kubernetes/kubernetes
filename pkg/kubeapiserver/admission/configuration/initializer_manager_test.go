@@ -22,7 +22,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
 )
 
@@ -162,5 +164,19 @@ func TestMergeInitializerConfigurations(t *testing.T) {
 	got := mergeInitializerConfigurations(&configurationsList)
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("expected: %#v, got: %#v", expected, got)
+	}
+}
+
+type disabledInitializerConfigLister struct{}
+
+func (l *disabledInitializerConfigLister) List(options metav1.ListOptions) (*v1alpha1.InitializerConfigurationList, error) {
+	return nil, errors.NewNotFound(schema.GroupResource{Group: "admissionregistration", Resource: "initializerConfigurations"}, "")
+}
+func TestInitializerConfigDisabled(t *testing.T) {
+	manager := NewInitializerConfigurationManager(&disabledInitializerConfigLister{})
+	manager.sync()
+	_, err := manager.Initializers()
+	if err.Error() != ErrDisabled.Error() {
+		t.Errorf("expected %v, got %v", ErrDisabled, err)
 	}
 }

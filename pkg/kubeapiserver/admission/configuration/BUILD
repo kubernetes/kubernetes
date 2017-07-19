@@ -12,14 +12,17 @@ go_test(
     name = "go_default_test",
     srcs = [
         "configuration_manager_test.go",
+        "external_admission_hook_manager_test.go",
         "initializer_manager_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/admissionregistration/v1alpha1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
     ],
 )
