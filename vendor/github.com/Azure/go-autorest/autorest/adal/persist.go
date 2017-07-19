@@ -1,4 +1,4 @@
-package azure
+package adal
 
 import (
 	"encoding/json"

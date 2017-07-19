@@ -1,4 +1,4 @@
-package azure
+package adal
 
 /*
   This file is largely based on rjw57/oauth2device's code, with the follow differences:
@@ -10,16 +10,17 @@ package azure
 */
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
-
-	"github.com/Azure/go-autorest/autorest"
 )
 
 const (
-	logPrefix = "autorest/azure/devicetoken:"
+	logPrefix = "autorest/adal/devicetoken:"
 )
 
 var (
@@ -38,10 +39,17 @@ var (
 	// ErrDeviceSlowDown represents the service telling us we're polling too often during device flow
 	ErrDeviceSlowDown = fmt.Errorf("%s Error while retrieving OAuth token: Slow Down", logPrefix)
 
+	// ErrDeviceCodeEmpty represents an empty device code from the device endpoint while using device flow
+	ErrDeviceCodeEmpty = fmt.Errorf("%s Error while retrieving device code: Device Code Empty", logPrefix)
+
+	// ErrOAuthTokenEmpty represents an empty OAuth token from the token endpoint when using device flow
+	ErrOAuthTokenEmpty = fmt.Errorf("%s Error while retrieving OAuth token: Token Empty", logPrefix)
+
 	errCodeSendingFails   = "Error occurred while sending request for Device Authorization Code"
 	errCodeHandlingFails  = "Error occurred while handling response from the Device Endpoint"
 	errTokenSendingFails  = "Error occurred while sending request with device code for a token"
 	errTokenHandlingFails = "Error occurred while handling response from the Token Endpoint (during device flow)"
+	errStatusNotOK        = "Error HTTP status != 200"
 )
 
 // DeviceCode is the object returned by the device auth endpoint
@@ -79,31 +87,45 @@ type deviceToken struct {
 
 // InitiateDeviceAuth initiates a device auth flow. It returns a DeviceCode
 // that can be used with CheckForUserCompletion or WaitForUserCompletion.
-func InitiateDeviceAuth(client *autorest.Client, oauthConfig OAuthConfig, clientID, resource string) (*DeviceCode, error) {
-	req, _ := autorest.Prepare(
-		&http.Request{},
-		autorest.AsPost(),
-		autorest.AsFormURLEncoded(),
-		autorest.WithBaseURL(oauthConfig.DeviceCodeEndpoint.String()),
-		autorest.WithFormData(url.Values{
-			"client_id": []string{clientID},
-			"resource":  []string{resource},
-		}),
-	)
+func InitiateDeviceAuth(sender Sender, oauthConfig OAuthConfig, clientID, resource string) (*DeviceCode, error) {
+	v := url.Values{
+		"client_id": []string{clientID},
+		"resource":  []string{resource},
+	}
 
-	resp, err := autorest.SendWithSender(client, req)
+	s := v.Encode()
+	body := ioutil.NopCloser(strings.NewReader(s))
+
+	req, err := http.NewRequest(http.MethodPost, oauthConfig.DeviceCodeEndpoint.String(), body)
 	if err != nil {
-		return nil, fmt.Errorf("%s %s: %s", logPrefix, errCodeSendingFails, err)
+		return nil, fmt.Errorf("%s %s: %s", logPrefix, errCodeSendingFails, err.Error())
+	}
+
+	req.ContentLength = int64(len(s))
+	req.Header.Set(contentType, mimeTypeFormPost)
+	resp, err := sender.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: %s", logPrefix, errCodeSendingFails, err.Error())
+	}
+	defer resp.Body.Close()
+
+	rb, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: %s", logPrefix, errCodeHandlingFails, err.Error())
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s %s: %s", logPrefix, errCodeHandlingFails, errStatusNotOK)
+	}
+
+	if len(strings.Trim(string(rb), " ")) == 0 {
+		return nil, ErrDeviceCodeEmpty
 	}
 
 	var code DeviceCode
-	err = autorest.Respond(
-		resp,
-		autorest.WithErrorUnlessStatusCode(http.StatusOK),
-		autorest.ByUnmarshallingJSON(&code),
-		autorest.ByClosing())
+	err = json.Unmarshal(rb, &code)
 	if err != nil {
-		return nil, fmt.Errorf("%s %s: %s", logPrefix, errCodeHandlingFails, err)
+		return nil, fmt.Errorf("%s %s: %s", logPrefix, errCodeHandlingFails, err.Error())
 	}
 
 	code.ClientID = clientID
@@ -115,33 +137,46 @@ func InitiateDeviceAuth(client *autorest.Client, oauthConfig OAuthConfig, client
 
 // CheckForUserCompletion takes a DeviceCode and checks with the Azure AD OAuth endpoint
 // to see if the device flow has: been completed, timed out, or otherwise failed
-func CheckForUserCompletion(client *autorest.Client, code *DeviceCode) (*Token, error) {
-	req, _ := autorest.Prepare(
-		&http.Request{},
-		autorest.AsPost(),
-		autorest.AsFormURLEncoded(),
-		autorest.WithBaseURL(code.OAuthConfig.TokenEndpoint.String()),
-		autorest.WithFormData(url.Values{
-			"client_id":  []string{code.ClientID},
-			"code":       []string{*code.DeviceCode},
-			"grant_type": []string{OAuthGrantTypeDeviceCode},
-			"resource":   []string{code.Resource},
-		}),
-	)
+func CheckForUserCompletion(sender Sender, code *DeviceCode) (*Token, error) {
+	v := url.Values{
+		"client_id":  []string{code.ClientID},
+		"code":       []string{*code.DeviceCode},
+		"grant_type": []string{OAuthGrantTypeDeviceCode},
+		"resource":   []string{code.Resource},
+	}
 
-	resp, err := autorest.SendWithSender(client, req)
+	s := v.Encode()
+	body := ioutil.NopCloser(strings.NewReader(s))
+
+	req, err := http.NewRequest(http.MethodPost, code.OAuthConfig.TokenEndpoint.String(), body)
 	if err != nil {
-		return nil, fmt.Errorf("%s %s: %s", logPrefix, errTokenSendingFails, err)
+		return nil, fmt.Errorf("%s %s: %s", logPrefix, errTokenSendingFails, err.Error())
+	}
+
+	req.ContentLength = int64(len(s))
+	req.Header.Set(contentType, mimeTypeFormPost)
+	resp, err := sender.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: %s", logPrefix, errTokenSendingFails, err.Error())
+	}
+	defer resp.Body.Close()
+
+	rb, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: %s", logPrefix, errTokenHandlingFails, err.Error())
+	}
+
+	if resp.StatusCode != http.StatusOK && len(strings.Trim(string(rb), " ")) == 0 {
+		return nil, fmt.Errorf("%s %s: %s", logPrefix, errTokenHandlingFails, errStatusNotOK)
+	}
+	if len(strings.Trim(string(rb), " ")) == 0 {
+		return nil, ErrOAuthTokenEmpty
 	}
 
 	var token deviceToken
-	err = autorest.Respond(
-		resp,
-		autorest.WithErrorUnlessStatusCode(http.StatusOK, http.StatusBadRequest),
-		autorest.ByUnmarshallingJSON(&token),
-		autorest.ByClosing())
+	err = json.Unmarshal(rb, &token)
 	if err != nil {
-		return nil, fmt.Errorf("%s %s: %s", logPrefix, errTokenHandlingFails, err)
+		return nil, fmt.Errorf("%s %s: %s", logPrefix, errTokenHandlingFails, err.Error())
 	}
 
 	if token.Error == nil {
@@ -164,12 +199,12 @@ func CheckForUserCompletion(client *autorest.Client, code *DeviceCode) (*Token, 
 
 // WaitForUserCompletion calls CheckForUserCompletion repeatedly until a token is granted or an error state occurs.
 // This prevents the user from looping and checking against 'ErrDeviceAuthorizationPending'.
-func WaitForUserCompletion(client *autorest.Client, code *DeviceCode) (*Token, error) {
+func WaitForUserCompletion(sender Sender, code *DeviceCode) (*Token, error) {
 	intervalDuration := time.Duration(*code.Interval) * time.Second
 	waitDuration := intervalDuration
 
 	for {
-		token, err := CheckForUserCompletion(client, code)
+		token, err := CheckForUserCompletion(sender, code)
 
 		if err == nil {
 			return token, nil

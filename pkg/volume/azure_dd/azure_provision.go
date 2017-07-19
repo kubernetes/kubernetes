@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,147 +20,182 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
-var _ volume.DeletableVolumePlugin = &azureDataDiskPlugin{}
-var _ volume.ProvisionableVolumePlugin = &azureDataDiskPlugin{}
+type azureDiskProvisioner struct {
+	plugin  *azureDataDiskPlugin
+	options volume.VolumeOptions
+}
 
 type azureDiskDeleter struct {
-	*azureDisk
-	azureProvider azureCloudProvider
-}
-
-func (plugin *azureDataDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
-	if err != nil {
-		glog.V(4).Infof("failed to get azure provider")
-		return nil, err
-	}
-
-	return plugin.newDeleterInternal(spec, azure)
-}
-
-func (plugin *azureDataDiskPlugin) newDeleterInternal(spec *volume.Spec, azure azureCloudProvider) (volume.Deleter, error) {
-	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AzureDisk == nil {
-		return nil, fmt.Errorf("invalid PV spec")
-	}
-	diskName := spec.PersistentVolume.Spec.AzureDisk.DiskName
-	diskUri := spec.PersistentVolume.Spec.AzureDisk.DataDiskURI
-	return &azureDiskDeleter{
-		azureDisk: &azureDisk{
-			volName:  spec.Name(),
-			diskName: diskName,
-			diskUri:  diskUri,
-			plugin:   plugin,
-		},
-		azureProvider: azure,
-	}, nil
-}
-
-func (plugin *azureDataDiskPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
-	if err != nil {
-		glog.V(4).Infof("failed to get azure provider")
-		return nil, err
-	}
-	if len(options.PVC.Spec.AccessModes) == 0 {
-		options.PVC.Spec.AccessModes = plugin.GetAccessModes()
-	}
-	return plugin.newProvisionerInternal(options, azure)
-}
-
-func (plugin *azureDataDiskPlugin) newProvisionerInternal(options volume.VolumeOptions, azure azureCloudProvider) (volume.Provisioner, error) {
-	return &azureDiskProvisioner{
-		azureDisk: &azureDisk{
-			plugin: plugin,
-		},
-		azureProvider: azure,
-		options:       options,
-	}, nil
-}
-
-var _ volume.Deleter = &azureDiskDeleter{}
-
-func (d *azureDiskDeleter) GetPath() string {
-	name := azureDataDiskPluginName
-	return d.plugin.host.GetPodVolumeDir(d.podUID, utilstrings.EscapeQualifiedNameForDisk(name), d.volName)
-}
-
-func (d *azureDiskDeleter) Delete() error {
-	glog.V(4).Infof("deleting volume %s", d.diskUri)
-	return d.azureProvider.DeleteVolume(d.diskName, d.diskUri)
-}
-
-type azureDiskProvisioner struct {
-	*azureDisk
-	azureProvider azureCloudProvider
-	options       volume.VolumeOptions
+	*dataDisk
+	spec   *volume.Spec
+	plugin *azureDataDiskPlugin
 }
 
 var _ volume.Provisioner = &azureDiskProvisioner{}
+var _ volume.Deleter = &azureDiskDeleter{}
 
-func (a *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
-	if !volume.AccessModesContainedInAll(a.plugin.GetAccessModes(), a.options.PVC.Spec.AccessModes) {
-		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", a.options.PVC.Spec.AccessModes, a.plugin.GetAccessModes())
+func (d *azureDiskDeleter) GetPath() string {
+	return getPath(d.podUID, d.dataDisk.diskName, d.plugin.host)
+}
+
+func (d *azureDiskDeleter) Delete() error {
+	volumeSource, err := getVolumeSource(d.spec)
+	if err != nil {
+		return err
 	}
 
-	var sku, location, account string
+	diskController, err := getDiskController(d.plugin.host)
+	if err != nil {
+		return err
+	}
 
+	wasStandAlone := (*volumeSource.Kind != v1.AzureSharedBlobDisk)
+	managed := (*volumeSource.Kind == v1.AzureManagedDisk)
+
+	if managed {
+		return diskController.DeleteManagedDisk(volumeSource.DataDiskURI)
+	}
+
+	return diskController.DeleteBlobDisk(volumeSource.DataDiskURI, wasStandAlone)
+}
+
+func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
+	if !volume.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
+	}
+	supportedModes := p.plugin.GetAccessModes()
+
+	// perform static validation first
+	if p.options.PVC.Spec.Selector != nil {
+		return nil, fmt.Errorf("azureDisk - claim.Spec.Selector is not supported for dynamic provisioning on Azure disk")
+	}
+
+	if len(p.options.PVC.Spec.AccessModes) > 1 {
+		return nil, fmt.Errorf("AzureDisk - multiple access modes are not supported on AzureDisk plugin")
+	}
+
+	if len(p.options.PVC.Spec.AccessModes) == 1 {
+		if p.options.PVC.Spec.AccessModes[0] != supportedModes[0] {
+			return nil, fmt.Errorf("AzureDisk - mode %s is not supporetd by AzureDisk plugin supported mode is %s", p.options.PVC.Spec.AccessModes[0], supportedModes)
+		}
+	}
+
+	var (
+		location, account          string
+		storageAccountType, fsType string
+		cachingMode                v1.AzureDataDiskCachingMode
+		strKind                    string
+		err                        error
+	)
 	// maxLength = 79 - (4 for ".vhd") = 75
-	name := volume.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 75)
-	capacity := a.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	name := volume.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
+	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
 	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
 
-	// Apply ProvisionerParameters (case-insensitive). We leave validation of
-	// the values to the cloud provider.
-	for k, v := range a.options.Parameters {
+	for k, v := range p.options.Parameters {
 		switch strings.ToLower(k) {
 		case "skuname":
-			sku = v
+			storageAccountType = v
 		case "location":
 			location = v
 		case "storageaccount":
 			account = v
+		case "storageaccounttype":
+			storageAccountType = v
+		case "kind":
+			strKind = v
+		case "cachingmode":
+			cachingMode = v1.AzureDataDiskCachingMode(v)
+		case "fstype":
+			fsType = strings.ToLower(v)
 		default:
-			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, a.plugin.GetPluginName())
+			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)
 		}
 	}
-	// TODO: implement c.options.ProvisionerSelector parsing
-	if a.options.PVC.Spec.Selector != nil {
-		return nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Azure disk")
-	}
 
-	diskName, diskUri, sizeGB, err := a.azureProvider.CreateVolume(name, account, sku, location, requestGB)
+	// normalize values
+	fsType = normalizeFsType(fsType)
+	skuName, err := normalizeStorageAccountType(storageAccountType)
 	if err != nil {
 		return nil, err
 	}
 
+	kind, err := normalizeKind(strFirstLetterToUpper(strKind))
+	if err != nil {
+		return nil, err
+	}
+
+	if cachingMode, err = normalizeCachingMode(cachingMode); err != nil {
+		return nil, err
+	}
+
+	diskController, err := getDiskController(p.plugin.host)
+	if err != nil {
+		return nil, err
+	}
+
+	// create disk
+	diskURI := ""
+	if kind == v1.AzureManagedDisk {
+		diskURI, err = diskController.CreateManagedDisk(name, skuName, requestGB, *(p.options.CloudTags))
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		forceStandAlone := (kind == v1.AzureDedicatedBlobDisk)
+		if kind == v1.AzureDedicatedBlobDisk {
+			if location != "" && account != "" {
+				// use dedicated kind (by default) for compatibility
+				_, diskURI, _, err = diskController.CreateVolume(name, account, skuName, location, requestGB)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				if location != "" || account != "" {
+					return nil, fmt.Errorf("AzureDisk - location(%s) and account(%s) must be both empty or specified for dedicated kind, only one value specified is not allowed",
+						location, account)
+				}
+				diskURI, err = diskController.CreateBlobDisk(name, skuName, requestGB, forceStandAlone)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else {
+			diskURI, err = diskController.CreateBlobDisk(name, skuName, requestGB, forceStandAlone)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   a.options.PVName,
+			Name:   p.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "azure-disk-dynamic-provisioner",
+				"volumehelper.VolumeDynamicallyCreatedByKey": "azure-disk-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: a.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   a.options.PVC.Spec.AccessModes,
+			PersistentVolumeReclaimPolicy: p.options.PersistentVolumeReclaimPolicy,
+			AccessModes:                   supportedModes,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", requestGB)),
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				AzureDisk: &v1.AzureDiskVolumeSource{
-					DiskName:    diskName,
-					DataDiskURI: diskUri,
+					CachingMode: &cachingMode,
+					DiskName:    name,
+					DataDiskURI: diskURI,
+					Kind:        &kind,
+					FSType:      &fsType,
 				},
 			},
 		},

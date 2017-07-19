@@ -30,9 +30,11 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
+	"github.com/Azure/azure-sdk-for-go/arm/disk"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/azure-sdk-for-go/arm/storage"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
@@ -118,8 +120,13 @@ type Cloud struct {
 	SecurityGroupsClient     network.SecurityGroupsClient
 	VirtualMachinesClient    compute.VirtualMachinesClient
 	StorageAccountClient     storage.AccountsClient
+	DisksClient              disk.DisksClient
 	operationPollRateLimiter flowcontrol.RateLimiter
 	resourceRequestBackoff   wait.Backoff
+
+	*BlobDiskController
+	*ManagedDiskController
+	*controllerCommon
 }
 
 func init() {
@@ -142,14 +149,14 @@ func decodePkcs12(pkcs []byte, password string) (*x509.Certificate, *rsa.Private
 }
 
 // newServicePrincipalToken creates a new service principal token based on the configuration
-func newServicePrincipalToken(az *Cloud) (*azure.ServicePrincipalToken, error) {
-	oauthConfig, err := az.Environment.OAuthConfigForTenant(az.TenantID)
+func newServicePrincipalToken(az *Cloud) (*adal.ServicePrincipalToken, error) {
+	oauthConfig, err := adal.NewOAuthConfig(az.Environment.ActiveDirectoryEndpoint, az.TenantID)
 	if err != nil {
 		return nil, fmt.Errorf("creating the OAuth config: %v", err)
 	}
 
 	if len(az.AADClientSecret) > 0 {
-		return azure.NewServicePrincipalToken(
+		return adal.NewServicePrincipalToken(
 			*oauthConfig,
 			az.AADClientID,
 			az.AADClientSecret,
@@ -163,7 +170,7 @@ func newServicePrincipalToken(az *Cloud) (*azure.ServicePrincipalToken, error) {
 		if err != nil {
 			return nil, fmt.Errorf("decoding the client certificate: %v", err)
 		}
-		return azure.NewServicePrincipalTokenFromCertificate(
+		return adal.NewServicePrincipalTokenFromCertificate(
 			*oauthConfig,
 			az.AADClientID,
 			certificate,
@@ -203,54 +210,59 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 
 	az.SubnetsClient = network.NewSubnetsClient(az.SubscriptionID)
 	az.SubnetsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.SubnetsClient.Authorizer = servicePrincipalToken
+	az.SubnetsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	az.SubnetsClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.SubnetsClient.Client)
 
 	az.RouteTablesClient = network.NewRouteTablesClient(az.SubscriptionID)
 	az.RouteTablesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.RouteTablesClient.Authorizer = servicePrincipalToken
+	az.RouteTablesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	az.RouteTablesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.RouteTablesClient.Client)
 
 	az.RoutesClient = network.NewRoutesClient(az.SubscriptionID)
 	az.RoutesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.RoutesClient.Authorizer = servicePrincipalToken
+	az.RoutesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	az.RoutesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.RoutesClient.Client)
 
 	az.InterfacesClient = network.NewInterfacesClient(az.SubscriptionID)
 	az.InterfacesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.InterfacesClient.Authorizer = servicePrincipalToken
+	az.InterfacesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	az.InterfacesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.InterfacesClient.Client)
 
 	az.LoadBalancerClient = network.NewLoadBalancersClient(az.SubscriptionID)
 	az.LoadBalancerClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.LoadBalancerClient.Authorizer = servicePrincipalToken
+	az.LoadBalancerClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	az.LoadBalancerClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.LoadBalancerClient.Client)
 
 	az.VirtualMachinesClient = compute.NewVirtualMachinesClient(az.SubscriptionID)
 	az.VirtualMachinesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.VirtualMachinesClient.Authorizer = servicePrincipalToken
+	az.VirtualMachinesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	az.VirtualMachinesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.VirtualMachinesClient.Client)
 
 	az.PublicIPAddressesClient = network.NewPublicIPAddressesClient(az.SubscriptionID)
 	az.PublicIPAddressesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.PublicIPAddressesClient.Authorizer = servicePrincipalToken
+	az.PublicIPAddressesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	az.PublicIPAddressesClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.PublicIPAddressesClient.Client)
 
 	az.SecurityGroupsClient = network.NewSecurityGroupsClient(az.SubscriptionID)
 	az.SecurityGroupsClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.SecurityGroupsClient.Authorizer = servicePrincipalToken
+	az.SecurityGroupsClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	az.SecurityGroupsClient.PollingDelay = 5 * time.Second
 	configureUserAgent(&az.SecurityGroupsClient.Client)
 
 	az.StorageAccountClient = storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
-	az.StorageAccountClient.Authorizer = servicePrincipalToken
+	az.StorageAccountClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	configureUserAgent(&az.StorageAccountClient.Client)
+
+	az.DisksClient = disk.NewDisksClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
+	az.DisksClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
+	configureUserAgent(&az.DisksClient.Client)
 
 	// Conditionally configure rate limits
 	if az.CloudProviderRateLimit {
@@ -300,6 +312,9 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			az.CloudProviderBackoffJitter)
 	}
 
+	if err := initDiskControllers(&az); err != nil {
+		return nil, err
+	}
 	return &az, nil
 }
 
@@ -348,4 +363,43 @@ func (az *Cloud) ProviderName() string {
 func configureUserAgent(client *autorest.Client) {
 	k8sVersion := version.Get().GitVersion
 	client.UserAgent = fmt.Sprintf("%s; kubernetes-cloudprovider/%s", client.UserAgent, k8sVersion)
+}
+
+func initDiskControllers(az *Cloud) error {
+	// Common controller contains the function
+	// needed by both blob disk and managed disk controllers
+
+	common := &controllerCommon{
+		aadResourceEndPoint:   az.Environment.ServiceManagementEndpoint,
+		clientID:              az.AADClientID,
+		clientSecret:          az.AADClientSecret,
+		location:              az.Location,
+		storageEndpointSuffix: az.Environment.StorageEndpointSuffix,
+		managementEndpoint:    az.Environment.ResourceManagerEndpoint,
+		resourceGroup:         az.ResourceGroup,
+		tenantID:              az.TenantID,
+		tokenEndPoint:         az.Environment.ActiveDirectoryEndpoint,
+		subscriptionID:        az.SubscriptionID,
+		cloud:                 az,
+	}
+
+	// BlobDiskController: contains the function needed to
+	// create/attach/detach/delete blob based (unmanaged disks)
+	blobController, err := newBlobDiskController(common)
+	if err != nil {
+		return fmt.Errorf("AzureDisk -  failed to init Blob Disk Controller with error (%s)", err.Error())
+	}
+
+	// ManagedDiskController: contains the functions needed to
+	// create/attach/detach/delete managed disks
+	managedController, err := newManagedDiskController(common)
+	if err != nil {
+		return fmt.Errorf("AzureDisk -  failed to init Managed  Disk Controller with error (%s)", err.Error())
+	}
+
+	az.BlobDiskController = blobController
+	az.ManagedDiskController = managedController
+	az.controllerCommon = common
+
+	return nil
 }

@@ -12,17 +12,12 @@ go_library(
     srcs = [
         "async.go",
         "azure.go",
-        "config.go",
-        "devicetoken.go",
         "environments.go",
-        "persist.go",
-        "token.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/date:go_default_library",
-        "//vendor/github.com/dgrijalva/jwt-go:go_default_library",
     ],
 )
 
