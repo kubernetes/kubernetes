@@ -101,7 +101,7 @@ func (b BaseDeploymentGenerator) structuredGenerate() (
 		Limits:   limits,
 		Requests: requests,
 	}
-	podSpec = buildPodSpec(b.Images, resourceRequirements, b.Command, b.Args)
+	podSpec = b.buildPodSpec(resourceRequirements)
 
 	labels = map[string]string{"app": b.Name}
 	selector = metav1.LabelSelector{MatchLabels: labels}
@@ -109,28 +109,34 @@ func (b BaseDeploymentGenerator) structuredGenerate() (
 	return
 }
 
+func getContainerName(imageString string) string {
+	// Retain just the container name
+	imageSplit := strings.Split(imageString, "/")
+	imageName := imageSplit[len(imageSplit)-1]
+	// Remove any tag or hash
+	if strings.Contains(imageName, ":") {
+		imageName = strings.Split(imageName, ":")[0]
+	} else if strings.Contains(imageName, "@") {
+		imageName = strings.Split(imageName, "@")[0]
+	}
+	return imageName
+}
+
 // buildPodSpec: parse the image strings and assemble them into the Containers
 // of a PodSpec. This is all you need to create the PodSpec for a deployment.
-func buildPodSpec(images []string, resourceRequirements v1.ResourceRequirements,
-	command []string, args []string) v1.PodSpec {
+func (b BaseDeploymentGenerator) buildPodSpec(
+	resourceRequirements v1.ResourceRequirements,
+) v1.PodSpec {
 
 	podSpec := v1.PodSpec{Containers: []v1.Container{}}
-	for _, imageString := range images {
-		// Retain just the image name
-		imageSplit := strings.Split(imageString, "/")
-		name := imageSplit[len(imageSplit)-1]
-		// Remove any tag or hash
-		if strings.Contains(name, ":") {
-			name = strings.Split(name, ":")[0]
-		} else if strings.Contains(name, "@") {
-			name = strings.Split(name, "@")[0]
-		}
+	for _, imageString := range b.Images {
+		containerName := getContainerName(imageString)
 		podSpec.Containers = append(podSpec.Containers, v1.Container{
-			Name:      name,
+			Name:      containerName,
 			Image:     imageString,
 			Resources: resourceRequirements,
-			Command:   command,
-			Args:      args,
+			Command:   b.Command,
+			Args:      b.Args,
 		})
 	}
 	return podSpec
