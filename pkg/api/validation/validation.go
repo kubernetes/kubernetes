@@ -976,6 +976,7 @@ func validateProjectedVolumeSource(projection *api.ProjectedVolumeSource, fldPat
 }
 
 var supportedHostPathTypes = sets.NewString(
+	string(api.HostPathUnset),
 	string(api.HostPathDirectoryOrCreate),
 	string(api.HostPathDirectory),
 	string(api.HostPathFileOrCreate),

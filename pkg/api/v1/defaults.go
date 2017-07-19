@@ -371,7 +371,7 @@ func SetDefaults_ScaleIOVolumeSource(obj *v1.ScaleIOVolumeSource) {
 }
 
 func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
-	typeVol := v1.HostPathDirectoryOrCreate
+	typeVol := v1.HostPathUnset
 	if obj.Type == nil {
 		obj.Type = &typeVol
 	}

@@ -600,6 +600,8 @@ const (
 type HostPathType string
 
 const (
+	// For backwards compatible, leave it empty if unset
+	HostPathUnset HostPathType = ""
 	// If nothing exists at the given path, an empty directory will be created there
 	// as needed with file mode 0755, having the same group and ownership with Kubelet.
 	HostPathDirectoryOrCreate HostPathType = "DirectoryOrCreate"
@@ -623,7 +625,7 @@ const (
 type HostPathVolumeSource struct {
 	// If the path is a symlink, it will follow the link to the real path.
 	Path string
-	// Defaults to DirectoryOrCreate
+	// Defaults to ""
 	Type *HostPathType
 }
 

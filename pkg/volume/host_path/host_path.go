@@ -214,6 +214,9 @@ func (b *hostPathMounter) SetUp(fsGroup *int64) error {
 		return fmt.Errorf("invalid HostPath `%s`: %v", b.GetPath(), err)
 	}
 
+	if *b.pathType == v1.HostPathUnset {
+		return nil
+	}
 	return checkType(b.GetPath(), b.pathType)
 }
 

@@ -554,7 +554,7 @@ func TestHostPathTypeCheckerInternal(t *testing.T) {
 			isFile:        false,
 			exists:        false,
 			validpathType: newHostPathTypeList(string(v1.HostPathFileOrCreate)),
-			invalidpathType: newHostPathTypeList(string(v1.HostPathFile), string(v1.HostPathDirectory),
+			invalidpathType: newHostPathTypeList(string(v1.HostPathDirectory),
 				string(v1.HostPathSocket), string(v1.HostPathCharDev), string(v1.HostPathBlockDev)),
 		},
 		{
