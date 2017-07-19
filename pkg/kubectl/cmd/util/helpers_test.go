@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	uexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/utils/exec"
 )
 
 func TestMerge(t *testing.T) {
@@ -266,7 +266,7 @@ func TestCheckNoResourceMatchError(t *testing.T) {
 func TestCheckExitError(t *testing.T) {
 	testCheckError(t, []checkErrTestCase{
 		{
-			uexec.CodeExitError{Err: fmt.Errorf("pod foo/bar terminated"), Code: 42},
+			exec.CodeExitError{Err: fmt.Errorf("pod foo/bar terminated"), Code: 42},
 			"pod foo/bar terminated",
 			42,
 		},

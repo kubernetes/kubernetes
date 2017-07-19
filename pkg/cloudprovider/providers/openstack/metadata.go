@@ -28,8 +28,8 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/exec"
 )
 
 // metadataUrl is URL to OpenStack metadata server. It's hardcoded IPv4

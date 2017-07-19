@@ -32,9 +32,10 @@ import (
 	hostporttest "k8s.io/kubernetes/pkg/kubelet/network/hostport/testing"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
-	"k8s.io/kubernetes/pkg/util/exec"
 	ipttest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	sysctltest "k8s.io/kubernetes/pkg/util/sysctl/testing"
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 // test it fulfills the NetworkPlugin interface
@@ -79,11 +80,11 @@ func TestGetPodNetworkStatus(t *testing.T) {
 		//TODO: add test cases for retrieving ip inside container network namespace
 	}
 
-	fakeCmds := make([]exec.FakeCommandAction, 0)
+	fakeCmds := make([]fakeexec.FakeCommandAction, 0)
 	for _, t := range testCases {
 		// the fake commands return the IP from the given index, or an error
-		fCmd := exec.FakeCmd{
-			CombinedOutputScript: []exec.FakeCombinedOutputAction{
+		fCmd := fakeexec.FakeCmd{
+			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 				func() ([]byte, error) {
 					ip, ok := podIPMap[kubecontainer.ContainerID{ID: t.id}]
 					if !ok {
@@ -94,10 +95,10 @@ func TestGetPodNetworkStatus(t *testing.T) {
 			},
 		}
 		fakeCmds = append(fakeCmds, func(cmd string, args ...string) exec.Cmd {
-			return exec.InitFakeCmd(&fCmd, cmd, args...)
+			return fakeexec.InitFakeCmd(&fCmd, cmd, args...)
 		})
 	}
-	fexec := exec.FakeExec{
+	fexec := fakeexec.FakeExec{
 		CommandScript: fakeCmds,
 		LookPathFunc: func(file string) (string, error) {
 			return fmt.Sprintf("/fake-bin/%s", file), nil
@@ -128,8 +129,8 @@ func TestGetPodNetworkStatus(t *testing.T) {
 // TestTeardownCallsShaper tests that a `TearDown` call does call
 // `shaper.Reset`
 func TestTeardownCallsShaper(t *testing.T) {
-	fexec := &exec.FakeExec{
-		CommandScript: []exec.FakeCommandAction{},
+	fexec := &fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{},
 		LookPathFunc: func(file string) (string, error) {
 			return fmt.Sprintf("/fake-bin/%s", file), nil
 		},
@@ -162,22 +163,22 @@ func TestTeardownCallsShaper(t *testing.T) {
 
 // TestInit tests that a `Init` call with an MTU sets the MTU
 func TestInit_MTU(t *testing.T) {
-	var fakeCmds []exec.FakeCommandAction
+	var fakeCmds []fakeexec.FakeCommandAction
 	{
 		// modprobe br-netfilter
-		fCmd := exec.FakeCmd{
-			CombinedOutputScript: []exec.FakeCombinedOutputAction{
+		fCmd := fakeexec.FakeCmd{
+			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 				func() ([]byte, error) {
 					return make([]byte, 0), nil
 				},
 			},
 		}
 		fakeCmds = append(fakeCmds, func(cmd string, args ...string) exec.Cmd {
-			return exec.InitFakeCmd(&fCmd, cmd, args...)
+			return fakeexec.InitFakeCmd(&fCmd, cmd, args...)
 		})
 	}
 
-	fexec := &exec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: fakeCmds,
 		LookPathFunc: func(file string) (string, error) {
 			return fmt.Sprintf("/fake-bin/%s", file), nil
@@ -254,8 +255,8 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 		fhost.Runtime = nil
 		mockcni := &mock_cni.MockCNI{}
 
-		fexec := &exec.FakeExec{
-			CommandScript: []exec.FakeCommandAction{},
+		fexec := &fakeexec.FakeExec{
+			CommandScript: []fakeexec.FakeCommandAction{},
 			LookPathFunc: func(file string) (string, error) {
 				return fmt.Sprintf("/fake-bin/%s", file), nil
 			},

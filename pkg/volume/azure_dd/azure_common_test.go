@@ -22,7 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 type fakeFileInfo struct {
@@ -107,9 +108,9 @@ func (handler *fakeIOHandler) Readlink(name string) (string, error) {
 }
 
 func TestIoHandler(t *testing.T) {
-	var fcmd exec.FakeCmd
-	fcmd = exec.FakeCmd{
-		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+	var fcmd fakeexec.FakeCmd
+	fcmd = fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// cat
 			func() ([]byte, error) {
 				return []byte("Msft    \nVirtual Disk \n"), nil
@@ -120,10 +121,10 @@ func TestIoHandler(t *testing.T) {
 			},
 		},
 	}
-	fake := exec.FakeExec{
-		CommandScript: []exec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+	fake := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
 	disk, err := findDiskByLun(lun, &fakeIOHandler{}, &fake)

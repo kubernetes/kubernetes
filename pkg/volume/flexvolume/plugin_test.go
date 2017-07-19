@@ -19,7 +19,7 @@ package flexvolume
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/exec"
+	exec "k8s.io/utils/exec/testing"
 )
 
 func TestInit(t *testing.T) {
