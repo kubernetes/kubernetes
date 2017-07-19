@@ -34,7 +34,6 @@ import (
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/keystone"
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile"
 	"k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth"
-	"k8s.io/apiserver/plugin/pkg/authenticator/token/anytoken"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	certutil "k8s.io/client-go/util/cert"
@@ -47,7 +46,6 @@ import (
 
 type AuthenticatorConfig struct {
 	Anonymous                   bool
-	AnyToken                    bool
 	BasicAuthFile               string
 	BootstrapToken              bool
 	ClientCAFile                string
@@ -165,12 +163,6 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 			return nil, nil, err
 		}
 		authenticators = append(authenticators, bearertoken.New(webhookTokenAuth), websocket.NewProtocolAuthenticator(webhookTokenAuth))
-		hasTokenAuth = true
-	}
-
-	// always add anytoken last, so that every other token authenticator gets to try first
-	if config.AnyToken {
-		authenticators = append(authenticators, bearertoken.New(anytoken.AnyTokenAuthenticator{}), websocket.NewProtocolAuthenticator(anytoken.AnyTokenAuthenticator{}))
 		hasTokenAuth = true
 	}
 

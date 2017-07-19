@@ -27,6 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
+	"k8s.io/apiserver/pkg/authentication/user"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
@@ -46,9 +49,24 @@ func TestNodeAuthorizer(t *testing.T) {
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
+	const (
+		// Define credentials
+		tokenMaster      = "master-token"
+		tokenNodeUnknown = "unknown-token"
+		tokenNode1       = "node1-token"
+		tokenNode2       = "node2-token"
+	)
+
+	authenticator := bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+		tokenMaster:      {Name: "admin", Groups: []string{"system:masters"}},
+		tokenNodeUnknown: {Name: "unknown", Groups: []string{"system:nodes"}},
+		tokenNode1:       {Name: "system:node:node1", Groups: []string{"system:nodes"}},
+		tokenNode2:       {Name: "system:node:node2", Groups: []string{"system:nodes"}},
+	}))
+
 	// Build client config, clientset, and informers
 	clientConfig := &restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
-	superuserClient := clientsetForUser("admin/system:masters", clientConfig)
+	superuserClient := clientsetForToken(tokenMaster, clientConfig)
 	informerFactory := informers.NewSharedInformerFactory(superuserClient, time.Minute)
 
 	// Set up Node+RBAC authorizer
@@ -71,7 +89,8 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// Start the server
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
+	masterConfig.GenericConfig.Authenticator = authenticator
+
 	masterConfig.GenericConfig.Authorizer = nodeRBACAuthorizer
 	masterConfig.GenericConfig.AdmissionControl = nodeRestrictionAdmission
 	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, apiServer, h)
@@ -206,9 +225,9 @@ func TestNodeAuthorizer(t *testing.T) {
 		return client.Core().Nodes().Delete("node2", nil)
 	}
 
-	nodeanonClient := clientsetForUser("unknown/system:nodes", clientConfig)
-	node1Client := clientsetForUser("system:node:node1/system:nodes", clientConfig)
-	node2Client := clientsetForUser("system:node:node2/system:nodes", clientConfig)
+	nodeanonClient := clientsetForToken(tokenNodeUnknown, clientConfig)
+	node1Client := clientsetForToken(tokenNode1, clientConfig)
+	node2Client := clientsetForToken(tokenNode2, clientConfig)
 
 	// all node requests from node1 and unknown node fail
 	expectForbidden(t, getSecret(nodeanonClient))
