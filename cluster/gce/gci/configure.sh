@@ -121,7 +121,7 @@ function install-gci-mounter-tools {
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
   local -r mounter_tar_sha="8003b798cf33c7f91320cd6ee5cec4fa22244571"
   download-or-bust "${mounter_tar_sha}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
-  cp "${dst_dir}/kubernetes/gci-trusty/gci-mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
+  cp "${KUBE_HOME}/kube-manifests/gci-trusty/gci-mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   mv "${KUBE_HOME}/mounter.tar" /tmp/mounter.tar
   tar xvf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
@@ -167,8 +167,8 @@ function install-kube-binary-config {
   download-or-bust "${server_binary_tar_hash}" "${server_binary_tar_urls[@]}"
   tar xzf "${KUBE_HOME}/${server_binary_tar}" -C "${KUBE_HOME}" --overwrite
   # Copy docker_tag and image files to ${KUBE_HOME}/kube-docker-files.
-  src_dir="${KUBE_HOME}/kubernetes/server/bin"
-  dst_dir="${KUBE_HOME}/kube-docker-files"
+  local -r src_dir="${KUBE_HOME}/kubernetes/server/bin"
+  local dst_dir="${KUBE_HOME}/kube-docker-files"
   mkdir -p "${dst_dir}"
   cp "${src_dir}/"*.docker_tag "${dst_dir}"
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
@@ -204,7 +204,7 @@ function install-kube-binary-config {
   mv "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
 
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
-  dst_dir="${KUBE_HOME}/kube-manifests"
+  local dst_dir="${KUBE_HOME}/kube-manifests"
   mkdir -p "${dst_dir}"
   local -r manifests_tar_urls=( $(split-commas "${KUBE_MANIFESTS_TAR_URL}") )
   local -r manifests_tar="${manifests_tar_urls[0]##*/}"
@@ -231,7 +231,7 @@ function install-kube-binary-config {
 
   # Install gci mounter related artifacts to allow mounting storage volumes in GCI
   install-gci-mounter-tools
-  
+
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"
   rm -f "${KUBE_HOME}/${server_binary_tar}"
