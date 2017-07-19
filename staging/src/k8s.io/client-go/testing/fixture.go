@@ -280,10 +280,7 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 	// To avoid the object from being accidentally modified by caller
 	// after it's been added to the tracker, we always store the deep
 	// copy.
-	obj, err := t.scheme.Copy(obj)
-	if err != nil {
-		return err
-	}
+	obj = obj.DeepCopyObject()
 
 	newMeta, err := meta.Accessor(obj)
 	if err != nil {

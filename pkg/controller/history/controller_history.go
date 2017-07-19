@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/client/retry"
 )
@@ -239,11 +238,7 @@ func (rh *realHistory) CreateControllerRevision(parent metav1.Object, revision *
 	probe := uint32(0)
 
 	// Clone the input
-	any, err := scheme.Scheme.DeepCopy(revision)
-	if err != nil {
-		return nil, err
-	}
-	clone := any.(*apps.ControllerRevision)
+	clone := revision.DeepCopy()
 
 	// Continue to attempt to create the revision updating the name with a new hash on each iteration
 	for {
@@ -266,12 +261,8 @@ func (rh *realHistory) CreateControllerRevision(parent metav1.Object, revision *
 }
 
 func (rh *realHistory) UpdateControllerRevision(revision *apps.ControllerRevision, newRevision int64) (*apps.ControllerRevision, error) {
-	obj, err := scheme.Scheme.DeepCopy(revision)
-	if err != nil {
-		return nil, err
-	}
-	clone := obj.(*apps.ControllerRevision)
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	clone := revision.DeepCopy()
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if clone.Revision == newRevision {
 			return nil
 		}
@@ -285,11 +276,7 @@ func (rh *realHistory) UpdateControllerRevision(revision *apps.ControllerRevisio
 		}
 		if updated, err := rh.lister.ControllerRevisions(clone.Namespace).Get(clone.Name); err == nil {
 			// make a copy so we don't mutate the shared cache
-			obj, err := scheme.Scheme.DeepCopy(updated)
-			if err != nil {
-				return err
-			}
-			clone = obj.(*apps.ControllerRevision)
+			clone = updated.DeepCopy()
 		}
 		return updateErr
 	})
@@ -376,11 +363,7 @@ func (fh *fakeHistory) CreateControllerRevision(parent metav1.Object, revision *
 	probe := uint32(0)
 
 	// Clone the input
-	any, err := scheme.Scheme.DeepCopy(revision)
-	if err != nil {
-		return nil, err
-	}
-	clone := any.(*apps.ControllerRevision)
+	clone := revision.DeepCopy()
 	clone.Namespace = parent.GetNamespace()
 
 	// Continue to attempt to create the revision updating the name with a new hash on each iteration
@@ -419,11 +402,7 @@ func (fh *fakeHistory) DeleteControllerRevision(revision *apps.ControllerRevisio
 }
 
 func (fh *fakeHistory) UpdateControllerRevision(revision *apps.ControllerRevision, newRevision int64) (*apps.ControllerRevision, error) {
-	obj, err := scheme.Scheme.DeepCopy(revision)
-	if err != nil {
-		return nil, err
-	}
-	clone := obj.(*apps.ControllerRevision)
+	clone := revision.DeepCopy()
 	clone.Revision = newRevision
 	return clone, fh.indexer.Update(clone)
 }
@@ -445,11 +424,7 @@ func (fh *fakeHistory) AdoptControllerRevision(parent metav1.Object, parentKind 
 	if !found {
 		return nil, errors.NewNotFound(apps.Resource("controllerrevisions"), revision.Name)
 	}
-	obj2, err := scheme.Scheme.DeepCopy(revision)
-	if err != nil {
-		return nil, err
-	}
-	clone := obj2.(*apps.ControllerRevision)
+	clone := revision.DeepCopy()
 	clone.OwnerReferences = append(clone.OwnerReferences, metav1.OwnerReference{
 		APIVersion:         parentKind.GroupVersion().String(),
 		Kind:               parentKind.Kind,
@@ -474,11 +449,7 @@ func (fh *fakeHistory) ReleaseControllerRevision(parent metav1.Object, revision 
 	if !found {
 		return nil, nil
 	}
-	obj2, err := scheme.Scheme.DeepCopy(revision)
-	if err != nil {
-		return nil, err
-	}
-	clone := obj2.(*apps.ControllerRevision)
+	clone := revision.DeepCopy()
 	refs := clone.OwnerReferences
 	clone.OwnerReferences = nil
 	for i := range refs {

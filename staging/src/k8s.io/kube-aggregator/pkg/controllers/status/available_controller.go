@@ -43,8 +43,6 @@ import (
 	"k8s.io/kube-aggregator/pkg/controllers"
 )
 
-var cloner = conversion.NewCloner()
-
 type AvailableConditionController struct {
 	apiServiceClient apiregistrationclient.APIServicesGetter
 

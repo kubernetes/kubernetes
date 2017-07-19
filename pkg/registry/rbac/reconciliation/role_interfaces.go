@@ -25,6 +25,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 )
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/kubernetes/pkg/registry/rbac/reconciliation.RuleOwner
+// +k8s:deepcopy-gen:nonpointer-interfaces=true
 type RoleRuleOwner struct {
 	Role *rbac.Role
 }

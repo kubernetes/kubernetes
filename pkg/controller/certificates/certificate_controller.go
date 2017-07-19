@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
@@ -179,11 +178,7 @@ func (cc *CertificateController) syncFunc(key string) error {
 	}
 
 	// need to operate on a copy so we don't mutate the csr in the shared cache
-	copy, err := scheme.Scheme.DeepCopy(csr)
-	if err != nil {
-		return err
-	}
-	csr = copy.(*certificates.CertificateSigningRequest)
+	csr = csr.DeepCopy()
 
 	return cc.handler(csr)
 }

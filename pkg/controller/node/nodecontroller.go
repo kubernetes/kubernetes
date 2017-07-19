@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,8 +56,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/system"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-
-	"github.com/golang/glog"
 )
 
 func init() {
@@ -569,12 +569,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 		var gracePeriod time.Duration
 		var observedReadyCondition v1.NodeCondition
 		var currentReadyCondition *v1.NodeCondition
-		nodeCopy, err := scheme.Scheme.DeepCopy(nodes[i])
-		if err != nil {
-			utilruntime.HandleError(err)
-			continue
-		}
-		node := nodeCopy.(*v1.Node)
+		node := nodes[i].DeepCopy()
 		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*nodeStatusUpdateRetry, func() (bool, error) {
 			gracePeriod, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeStatus(node)
 			if err == nil {

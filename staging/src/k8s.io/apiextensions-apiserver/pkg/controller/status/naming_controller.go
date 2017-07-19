@@ -41,8 +41,6 @@ import (
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 )
 
-var cloner = conversion.NewCloner()
-
 // This controller is reserving names. To avoid conflicts, be sure to run only one instance of the worker at a time.
 // This could eventually be lifted, but starting simple.
 type NamingConditionController struct {

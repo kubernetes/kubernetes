@@ -21,7 +21,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // Copies cluster-independent, user provided data from the given ObjectMeta struct. If in
@@ -83,12 +82,4 @@ func ObjectMetaAndSpecEquivalent(a, b runtime.Object) bool {
 	specA := reflect.ValueOf(a).Elem().FieldByName("Spec").Interface()
 	specB := reflect.ValueOf(b).Elem().FieldByName("Spec").Interface()
 	return ObjectMetaEquivalent(objectMetaA, objectMetaB) && reflect.DeepEqual(specA, specB)
-}
-
-func DeepCopyApiTypeOrPanic(item interface{}) interface{} {
-	result, err := api.Scheme.DeepCopy(item)
-	if err != nil {
-		panic(err)
-	}
-	return result
 }

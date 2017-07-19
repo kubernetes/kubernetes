@@ -431,14 +431,7 @@ func TestPodAddedByDswp(t *testing.T) {
 
 	// let's stop pod events from getting triggered
 	close(podStopCh)
-	podObj, err := api.Scheme.DeepCopy(pod)
-	if err != nil {
-		t.Fatalf("Error copying pod : %v", err)
-	}
-	podNew, ok := podObj.(*v1.Pod)
-	if !ok {
-		t.Fatalf("Error converting pod : %v", err)
-	}
+	podNew := pod.DeepCopy()
 	newPodName := "newFakepod"
 	podNew.SetName(newPodName)
 	err = podInformer.GetStore().Add(podNew)

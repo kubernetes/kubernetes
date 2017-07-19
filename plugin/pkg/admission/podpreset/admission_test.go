@@ -679,12 +679,8 @@ func TestExclusionNoAdmit(t *testing.T) {
 			},
 		},
 	}
-	originalPod, err := api.Scheme.Copy(pod)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = admitPod(pod, pip)
+	originalPod := pod.DeepCopy()
+	err := admitPod(pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}

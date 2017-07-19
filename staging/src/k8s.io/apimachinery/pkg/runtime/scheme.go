@@ -420,20 +420,6 @@ func (s *Scheme) Default(src Object) {
 	}
 }
 
-// Copy does a deep copy of an API object.
-func (s *Scheme) Copy(src Object) (Object, error) {
-	dst, err := s.DeepCopy(src)
-	if err != nil {
-		return nil, err
-	}
-	return dst.(Object), nil
-}
-
-// Performs a deep copy of the given object.
-func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
-	return s.cloner.DeepCopy(src)
-}
-
 // Convert will attempt to convert in into out. Both must be pointers. For easy
 // testing of conversion functions. Returns an error if the conversion isn't
 // possible. You can call this with types that haven't been registered (for example,
@@ -530,11 +516,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	}
 
 	if copy {
-		copied, err := s.Copy(in)
-		if err != nil {
-			return nil, err
-		}
-		in = copied
+		in = in.DeepCopyObject()
 	}
 
 	flags, meta := s.generateConvertMeta(in)

@@ -30,8 +30,6 @@ const (
 	DEFINITION_PREFIX = "#/definitions/"
 )
 
-var cloner = conversion.NewCloner()
-
 // Run a walkRefCallback method on all references of an OpenAPI spec
 type walkAllRefs struct {
 	// walkRefCallback will be called on each reference and the return value
