@@ -162,3 +162,46 @@ func TestZones(t *testing.T) {
 		t.Fatalf("GetZone() returned wrong region (%s)", zone.Region)
 	}
 }
+
+func TestInstanceIDFromProviderID(t *testing.T) {
+	testCases := []struct {
+		providerID string
+		instanceID string
+		fail       bool
+	}{
+		{
+			providerID: ProviderName + "://7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "7b9cf879-7146-417c-abfd-cb4272f0c935",
+			fail:       false,
+		},
+		{
+			providerID: "7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "",
+			fail:       true,
+		},
+		{
+			providerID: "other-provider://7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "",
+			fail:       true,
+		},
+		{
+			providerID: "",
+			instanceID: "",
+			fail:       true,
+		},
+	}
+
+	for _, test := range testCases {
+		instanceID, err := instanceIDFromProviderID(test.providerID)
+		if (err != nil) != test.fail {
+			t.Errorf("%s yielded `err != nil` as %t. expected %t", test.providerID, (err != nil), test.fail)
+		}
+
+		if test.fail {
+			continue
+		}
+		if instanceID != test.instanceID {
+			t.Errorf("%s yielded %s. expected %s", test.providerID, instanceID, test.instanceID)
+		}
+	}
+}
