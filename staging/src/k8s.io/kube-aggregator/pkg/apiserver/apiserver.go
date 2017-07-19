@@ -116,6 +116,8 @@ type APIAggregator struct {
 
 	// Information needed to determine routing for the aggregator
 	serviceResolver ServiceResolver
+
+	openAPIAggregator *openAPIAggregator
 }
 
 type completedConfig struct {
@@ -142,6 +144,11 @@ func (c *Config) SkipComplete() completedConfig {
 
 // New returns a new instance of APIAggregator from the given config.
 func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
+	// Prevent generic API server to install OpenAPI handler. Aggregator server
+	// has its own customized OpenAPI handler.
+	openApiConfig := c.Config.GenericConfig.OpenAPIConfig
+	c.Config.GenericConfig.OpenAPIConfig = nil
+
 	genericServer, err := c.Config.GenericConfig.SkipComplete().New("kube-aggregator", delegationTarget) // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
@@ -212,17 +219,29 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil
 	})
 
+	if openApiConfig != nil {
+		s.openAPIAggregator, err = buildAndRegisterOpenAPIAggregator(
+			s.delegateHandler,
+			s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices(),
+			openApiConfig,
+			s.GenericAPIServer.Handler.NonGoRestfulMux,
+			s.contextMapper)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return s, nil
 }
 
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.
 // It's a slow moving API, so its ok to run the controller on a single thread
-func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
+func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) error {
 	// if the proxyHandler already exists, it needs to be updated. The aggregation bits do not
 	// since they are wired against listers because they require multiple resources to respond
 	if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
 		proxyHandler.updateAPIService(apiService)
-		return
+		return s.openAPIAggregator.loadApiServiceSpec(proxyHandler, apiService)
 	}
 
 	proxyPath := "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
@@ -241,18 +260,21 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
 		serviceResolver: s.serviceResolver,
 	}
 	proxyHandler.updateAPIService(apiService)
+	if err := s.openAPIAggregator.loadApiServiceSpec(proxyHandler, apiService); err != nil {
+		return err
+	}
 	s.proxyHandlers[apiService.Name] = proxyHandler
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandler)
 
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {
-		return
+		return nil
 	}
 
 	// if we've already registered the path with the handler, we don't want to do it again.
 	if s.handledGroups.Has(apiService.Spec.Group) {
-		return
+		return nil
 	}
 
 	// it's time to register the group aggregation endpoint
@@ -268,6 +290,7 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) {
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(groupPath, groupDiscoveryHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle(groupPath+"/", groupDiscoveryHandler)
 	s.handledGroups.Insert(apiService.Spec.Group)
+	return nil
 }
 
 // RemoveAPIService removes the APIService from being handled.  It is not thread-safe, so only call it on one thread at a time please.
