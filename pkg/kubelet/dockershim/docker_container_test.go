@@ -218,9 +218,10 @@ func TestContainerLogPath(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify container log symlink deletion
+	// symlink is also tentatively deleted at startup
 	err = ds.RemoveContainer(id)
 	assert.NoError(t, err)
-	assert.Equal(t, fakeOS.Removes, []string{kubeletContainerLogPath})
+	assert.Equal(t, []string{kubeletContainerLogPath, kubeletContainerLogPath}, fakeOS.Removes)
 }
 
 // TestContainerCreationConflict tests the logic to work around docker container
