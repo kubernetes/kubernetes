@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	testhelper "k8s.io/apiserver/pkg/registry"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
@@ -87,6 +88,7 @@ func TestStatusUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
 	key := "/poddisruptionbudgets/" + metav1.NamespaceDefault + "/foo"
 	validPodDisruptionBudget := validNewPodDisruptionBudget()
 	if err := storage.Storage.Create(ctx, key, validPodDisruptionBudget, nil, 0); err != nil {

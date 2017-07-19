@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	testhelper "k8s.io/apiserver/pkg/registry"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
@@ -55,6 +56,7 @@ func newStorage(t *testing.T) (ControllerStorage, *etcdtesting.EtcdTestServer) {
 // createController is a helper function that returns a controller with the updated resource version.
 func createController(storage *REST, rc api.ReplicationController, t *testing.T) (api.ReplicationController, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), rc.Namespace)
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
 	obj, err := storage.Create(ctx, &rc, false)
 	if err != nil {
 		t.Errorf("Failed to create controller, %v", err)
@@ -159,6 +161,7 @@ func TestGenerationNumber(t *testing.T) {
 	modifiedSno.Generation = 100
 	modifiedSno.Status.ObservedGeneration = 10
 	ctx := genericapirequest.NewDefaultContext()
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
 	rc, err := createController(storage.Controller, modifiedSno, t)
 	ctrl, err := storage.Controller.Get(ctx, rc.Name, &metav1.GetOptions{})
 	if err != nil {
@@ -259,6 +262,7 @@ func TestScaleGet(t *testing.T) {
 	defer storage.Controller.Store.DestroyFunc()
 
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
 	rc, err := createController(storage.Controller, *validController, t)
 	if err != nil {
 		t.Fatalf("error setting new replication controller %v: %v", *validController, err)
@@ -296,6 +300,7 @@ func TestScaleUpdate(t *testing.T) {
 	defer storage.Controller.Store.DestroyFunc()
 
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
 	rc, err := createController(storage.Controller, *validController, t)
 	if err != nil {
 		t.Fatalf("error setting new replication controller %v: %v", *validController, err)
