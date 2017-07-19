@@ -40,7 +40,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",
         "//pkg/util/mount:go_default_library",
