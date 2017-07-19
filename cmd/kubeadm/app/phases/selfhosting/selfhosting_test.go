@@ -67,7 +67,7 @@ spec:
     - --authorization-mode=Node,RBAC
     - --advertise-address=192.168.200.101
     - --etcd-servers=http://127.0.0.1:2379
-    image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.0
+    image: gcr.io/google-containers/kube-apiserver-amd64:v1.7.0
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -182,7 +182,7 @@ spec:
         - --authorization-mode=Node,RBAC
         - --advertise-address=192.168.200.101
         - --etcd-servers=http://127.0.0.1:2379
-        image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.0
+        image: gcr.io/google-containers/kube-apiserver-amd64:v1.7.0
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -294,7 +294,7 @@ spec:
     - --root-ca-file=/etc/kubernetes/pki/ca.crt
     - --address=127.0.0.1
     - --use-service-account-credentials=true
-    image: gcr.io/google_containers/kube-controller-manager-amd64:v1.7.0
+    image: gcr.io/google-containers/kube-controller-manager-amd64:v1.7.0
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -369,7 +369,7 @@ spec:
         - --root-ca-file=/etc/kubernetes/pki/ca.crt
         - --address=127.0.0.1
         - --use-service-account-credentials=true
-        image: gcr.io/google_containers/kube-controller-manager-amd64:v1.7.0
+        image: gcr.io/google-containers/kube-controller-manager-amd64:v1.7.0
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -449,7 +449,7 @@ spec:
     - --address=127.0.0.1
     - --leader-elect=true
     - --kubeconfig=/etc/kubernetes/scheduler.conf
-    image: gcr.io/google_containers/kube-scheduler-amd64:v1.7.0
+    image: gcr.io/google-containers/kube-scheduler-amd64:v1.7.0
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -496,7 +496,7 @@ spec:
         - --address=127.0.0.1
         - --leader-elect=true
         - --kubeconfig=/etc/kubernetes/scheduler.conf
-        image: gcr.io/google_containers/kube-scheduler-amd64:v1.7.0
+        image: gcr.io/google-containers/kube-scheduler-amd64:v1.7.0
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -595,7 +595,7 @@ metadata:
   name: testpod
 spec:
   containers:
-    - image: gcr.io/google_containers/busybox
+    - image: gcr.io/google-containers/busybox
 `,
 			expectError: false,
 		},
@@ -611,7 +611,7 @@ spec:
   "spec": {
     "containers": [
       {
-        "image": "gcr.io/google_containers/busybox"
+        "image": "gcr.io/google-containers/busybox"
       }
     ]
   }
@@ -626,7 +626,7 @@ kind: Pod
 metadata:
   name: testpod
 spec:
-  - image: gcr.io/google_containers/busybox
+  - image: gcr.io/google-containers/busybox
 `,
 			expectError: true,
 		},

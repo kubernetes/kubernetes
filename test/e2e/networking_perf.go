@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:
 				return v1.PodSpec{
 					Containers: []v1.Container{{
 						Name:  "iperf-server",
-						Image: "gcr.io/google_containers/iperf:e2e",
+						Image: "gcr.io/google-containers/iperf:e2e",
 						Args: []string{
 							"/bin/sh",
 							"-c",
@@ -91,7 +91,7 @@ var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:
 					Containers: []v1.Container{
 						{
 							Name:  "iperf-client",
-							Image: "gcr.io/google_containers/iperf:e2e",
+							Image: "gcr.io/google-containers/iperf:e2e",
 							Args: []string{
 								"/bin/sh",
 								"-c",

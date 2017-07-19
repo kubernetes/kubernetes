@@ -29,8 +29,8 @@ import (
 )
 
 const (
-	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
-	defaultEtcdImage   = "gcr.io/google_containers/etcd:3.0.17"
+	hyperkubeImageName = "gcr.io/google-containers/hyperkube-amd64"
+	defaultEtcdImage   = "gcr.io/google-containers/etcd:3.0.17"
 )
 
 func Run() error {

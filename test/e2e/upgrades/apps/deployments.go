@@ -64,7 +64,7 @@ var _ upgrades.Skippable = DeploymentUpgradeTest{}
 func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	deploymentName := "deployment-hash-test"
 	c := f.ClientSet
-	nginxImage := "gcr.io/google_containers/nginx-slim:0.8"
+	nginxImage := "gcr.io/google-containers/nginx-slim:0.8"
 
 	ns := f.Namespace.Name
 

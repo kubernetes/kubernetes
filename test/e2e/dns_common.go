@@ -179,7 +179,7 @@ func (t *dnsTestCommon) createUtilPod() {
 			Containers: []v1.Container{
 				{
 					Name:    "util",
-					Image:   "gcr.io/google_containers/dnsutils:e2e",
+					Image:   "gcr.io/google-containers/dnsutils:e2e",
 					Command: []string{"sleep", "10000"},
 					Ports: []v1.ContainerPort{
 						{ContainerPort: servicePort, Protocol: "TCP"},
@@ -241,7 +241,7 @@ func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
 			Containers: []v1.Container{
 				{
 					Name:  "dns",
-					Image: "gcr.io/google_containers/k8s-dns-dnsmasq-amd64:1.13.0",
+					Image: "gcr.io/google-containers/k8s-dns-dnsmasq-amd64:1.13.0",
 					Command: []string{
 						"/usr/sbin/dnsmasq",
 						"-u", "root",

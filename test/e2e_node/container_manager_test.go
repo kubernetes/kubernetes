@@ -168,7 +168,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					Spec: v1.PodSpec{
 						Containers: []v1.Container{
 							{
-								Image: "gcr.io/google_containers/nginx-slim:0.7",
+								Image: "gcr.io/google-containers/nginx-slim:0.7",
 								Name:  podName,
 								Resources: v1.ResourceRequirements{
 									Limits: v1.ResourceList{
@@ -209,7 +209,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					Spec: v1.PodSpec{
 						Containers: []v1.Container{
 							{
-								Image: "gcr.io/google_containers/test-webserver:e2e",
+								Image: "gcr.io/google-containers/test-webserver:e2e",
 								Name:  podName,
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{

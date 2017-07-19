@@ -182,7 +182,7 @@ func createPodWithAppArmor(f *framework.Framework, profile string) *v1.Pod {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
 				Name:    "test",
-				Image:   "gcr.io/google_containers/busybox:1.24",
+				Image:   "gcr.io/google-containers/busybox:1.24",
 				Command: []string{"touch", "foo"},
 			}},
 			RestartPolicy: v1.RestartPolicyNever,

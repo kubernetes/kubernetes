@@ -796,7 +796,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Containers: []v1.Container{
 						{
 							Name:  "nginx",
-							Image: "gcr.io/google_containers/nginx-slim:0.7",
+							Image: "gcr.io/google-containers/nginx-slim:0.7",
 							Ports: []v1.ContainerPort{conflictingPort},
 						},
 					},

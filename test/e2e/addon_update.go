@@ -56,7 +56,7 @@ spec:
         k8s-app: addon-reconcile-test
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:v1.4
+      - image: gcr.io/google-containers/serve_hostname:v1.4
         name: addon-reconcile-test
         ports:
         - containerPort: 9376
@@ -85,7 +85,7 @@ spec:
         k8s-app: addon-reconcile-test
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:v1.4
+      - image: gcr.io/google-containers/serve_hostname:v1.4
         name: addon-reconcile-test
         ports:
         - containerPort: 9376
@@ -188,7 +188,7 @@ spec:
         k8s-app: invalid-addon-test
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:v1.4
+      - image: gcr.io/google-containers/serve_hostname:v1.4
         name: invalid-addon-test
         ports:
         - containerPort: 9376

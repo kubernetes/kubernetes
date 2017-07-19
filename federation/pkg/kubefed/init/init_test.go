@@ -199,7 +199,7 @@ func TestInitFederation(t *testing.T) {
 			apiserverServiceType: v1.ServiceTypeNodePort,
 			advertiseAddress:     nodeIP,
 			serverImage:          "example.test/foo:bar",
-			etcdImage:            "gcr.io/google_containers/etcd:latest",
+			etcdImage:            "gcr.io/google-containers/etcd:latest",
 			etcdPVCapacity:       "5Gi",
 			etcdPVStorageClass:   "fast",
 			etcdPersistence:      "true",
@@ -211,7 +211,7 @@ func TestInitFederation(t *testing.T) {
 		},
 	}
 
-	defaultEtcdImage := "gcr.io/google_containers/etcd:3.0.17"
+	defaultEtcdImage := "gcr.io/google-containers/etcd:3.0.17"
 
 	//TODO: implement a negative case for dry run
 

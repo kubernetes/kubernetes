@@ -84,7 +84,7 @@ done`, testCmd)
 		Spec: api.PodSpec{
 			Containers: []api.Container{{
 				Name:    "test",
-				Image:   "gcr.io/google_containers/busybox:1.24",
+				Image:   "gcr.io/google-containers/busybox:1.24",
 				Command: []string{"sh", "-c", testCmd},
 			}},
 			RestartPolicy: api.RestartPolicyNever,
@@ -144,7 +144,7 @@ func createAppArmorProfileLoader(f *framework.Framework) (*extensions.DaemonSet,
 				Spec: api.PodSpec{
 					Containers: []api.Container{{
 						Name:  "apparmor-loader",
-						Image: "gcr.io/google_containers/apparmor-loader:0.1",
+						Image: "gcr.io/google-containers/apparmor-loader:0.1",
 						Args:  []string{"-poll", "10s", "/profiles"},
 						SecurityContext: &api.SecurityContext{
 							Privileged: &True,

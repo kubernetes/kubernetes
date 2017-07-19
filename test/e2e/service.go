@@ -1130,7 +1130,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		}()
 
 		t.Name = "slow-terminating-unready-pod"
-		t.Image = "gcr.io/google_containers/netexec:1.7"
+		t.Image = "gcr.io/google-containers/netexec:1.7"
 		port := 80
 		terminateSeconds := int64(600)
 

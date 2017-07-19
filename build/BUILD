@@ -62,7 +62,7 @@ DOCKERIZED_BINARIES = {
 
 [docker_bundle(
     name = binary,
-    images = {"gcr.io/google_containers/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal"},
+    images = {"gcr.io/google-containers/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal"},
     stamp = True,
 ) for binary in DOCKERIZED_BINARIES.keys()]
 

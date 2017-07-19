@@ -570,7 +570,7 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationControll
 					Containers: []v1.Container{
 						{
 							Name:  "netexec",
-							Image: "gcr.io/google_containers/netexec:1.7",
+							Image: "gcr.io/google-containers/netexec:1.7",
 							Args:  []string{"--http-port=80", "--udp-port=80"},
 							ReadinessProbe: &v1.Probe{
 								PeriodSeconds: 3,
@@ -774,7 +774,7 @@ func newEchoServerPodSpec(podName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "echoserver",
-					Image: "gcr.io/google_containers/echoserver:1.6",
+					Image: "gcr.io/google-containers/echoserver:1.6",
 					Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
 				},
 			},
@@ -917,7 +917,7 @@ func NewServerTest(client clientset.Interface, namespace string, serviceName str
 	t.services = make(map[string]bool)
 
 	t.Name = "webserver"
-	t.Image = "gcr.io/google_containers/test-webserver:e2e"
+	t.Image = "gcr.io/google-containers/test-webserver:e2e"
 
 	return t
 }

@@ -325,7 +325,7 @@ func discoverService(f *fedframework.Framework, name string, exists bool, podNam
 			Containers: []v1.Container{
 				{
 					Name:    "federated-service-discovery-container",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.io/google-containers/busybox:1.24",
 					Command: command,
 				},
 			},
@@ -371,7 +371,7 @@ func createBackendPodsOrFail(clusters fedframework.ClusterSlice, namespace strin
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: "gcr.io/google_containers/echoserver:1.6",
+					Image: "gcr.io/google-containers/echoserver:1.6",
 				},
 			},
 			RestartPolicy: v1.RestartPolicyAlways,

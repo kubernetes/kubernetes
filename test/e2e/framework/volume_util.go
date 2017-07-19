@@ -56,12 +56,12 @@ import (
 
 // Current supported images for e2e volume testing to be assigned to VolumeTestConfig.serverImage
 const (
-	NfsServerImage       string = "gcr.io/google_containers/volume-nfs:0.8"
-	IscsiServerImage     string = "gcr.io/google_containers/volume-iscsi:0.1"
-	GlusterfsServerImage string = "gcr.io/google_containers/volume-gluster:0.2"
-	CephServerImage      string = "gcr.io/google_containers/volume-ceph:0.1"
-	RbdServerImage       string = "gcr.io/google_containers/volume-rbd:0.1"
-	BusyBoxImage         string = "gcr.io/google_containers/busybox:1.24"
+	NfsServerImage       string = "gcr.io/google-containers/volume-nfs:0.8"
+	IscsiServerImage     string = "gcr.io/google-containers/volume-iscsi:0.1"
+	GlusterfsServerImage string = "gcr.io/google-containers/volume-gluster:0.2"
+	CephServerImage      string = "gcr.io/google-containers/volume-ceph:0.1"
+	RbdServerImage       string = "gcr.io/google-containers/volume-rbd:0.1"
+	BusyBoxImage         string = "gcr.io/google-containers/busybox:1.24"
 )
 
 // Configuration of one tests. The test consist of:
@@ -339,7 +339,7 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 			Containers: []v1.Container{
 				{
 					Name:    config.Prefix + "-injector",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.io/google-containers/busybox:1.24",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "echo '" + content + "' > /mnt/index.html && chmod o+rX /mnt /mnt/index.html"},
 					VolumeMounts: []v1.VolumeMount{

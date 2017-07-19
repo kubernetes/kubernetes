@@ -10,20 +10,20 @@ For other architectures, `etcd` is cross-compiled from source. Arch-specific `bu
 ```console
 # Build for linux/amd64 (default)
 $ make push ARCH=amd64
-# ---> gcr.io/google_containers/etcd-amd64:TAG
-# ---> gcr.io/google_containers/etcd:TAG
+# ---> gcr.io/google-containers/etcd-amd64:TAG
+# ---> gcr.io/google-containers/etcd:TAG
 
 $ make push ARCH=arm
-# ---> gcr.io/google_containers/etcd-arm:TAG
+# ---> gcr.io/google-containers/etcd-arm:TAG
 
 $ make push ARCH=arm64
-# ---> gcr.io/google_containers/etcd-arm64:TAG
+# ---> gcr.io/google-containers/etcd-arm64:TAG
 
 $ make push ARCH=ppc64le
-# ---> gcr.io/google_containers/etcd-ppc64le:TAG
+# ---> gcr.io/google-containers/etcd-ppc64le:TAG
 
 $ make push ARCH=s390x
-# ---> gcr.io/google_containers/etcd-s390x:TAG
+# ---> gcr.io/google-containers/etcd-s390x:TAG
 ```
 
 If you don't want to push the images, run `make` or `make build` instead

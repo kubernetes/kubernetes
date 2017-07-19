@@ -89,7 +89,7 @@ func createTerminatingPod(f *framework.Framework) (*v1.Pod, error) {
 			Containers: []v1.Container{
 				{
 					Name:  string(uuid),
-					Image: "gcr.io/google_containers/busybox:1.24",
+					Image: "gcr.io/google-containers/busybox:1.24",
 				},
 			},
 			SchedulerName: "please don't schedule my pods",

@@ -303,7 +303,7 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batchv2alpha1.Concu
 							Containers: []v1.Container{
 								{
 									Name:  "c",
-									Image: "gcr.io/google_containers/busybox:1.24",
+									Image: "gcr.io/google-containers/busybox:1.24",
 									VolumeMounts: []v1.VolumeMount{
 										{
 											MountPath: "/data",

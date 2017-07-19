@@ -46,7 +46,7 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 				restartCountVolumeName := "restart-count"
 				restartCountVolumePath := "/restart-count"
 				testContainer := v1.Container{
-					Image: "gcr.io/google_containers/busybox:1.24",
+					Image: "gcr.io/google-containers/busybox:1.24",
 					VolumeMounts: []v1.VolumeMount{
 						{
 							MountPath: restartCountVolumePath,
@@ -140,7 +140,7 @@ while true; do sleep 1; done
 				{
 					name: "if TerminationMessagePath is set [Conformance]",
 					container: v1.Container{
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.io/google-containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c"},
 						Args:    []string{"/bin/echo -n DONE > /dev/termination-log"},
 						TerminationMessagePath: "/dev/termination-log",
@@ -155,7 +155,7 @@ while true; do sleep 1; done
 				{
 					name: "if TerminationMessagePath is set as non-root user and at a non-default path [Conformance]",
 					container: v1.Container{
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.io/google-containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c"},
 						Args:    []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
 						TerminationMessagePath: "/dev/termination-custom-log",
@@ -170,7 +170,7 @@ while true; do sleep 1; done
 				{
 					name: "from log output if TerminationMessagePolicy FallbackToLogOnError is set [Conformance]",
 					container: v1.Container{
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.io/google-containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c"},
 						Args:    []string{"/bin/echo -n DONE; /bin/false"},
 						TerminationMessagePath:   "/dev/termination-log",
@@ -183,7 +183,7 @@ while true; do sleep 1; done
 				{
 					name: "as empty when pod succeeds and TerminationMessagePolicy FallbackToLogOnError is set",
 					container: v1.Container{
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.io/google-containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c"},
 						Args:    []string{"/bin/echo DONE; /bin/true"},
 						TerminationMessagePath:   "/dev/termination-log",
@@ -196,7 +196,7 @@ while true; do sleep 1; done
 				{
 					name: "from file when pod succeeds and TerminationMessagePolicy FallbackToLogOnError is set [Conformance]",
 					container: v1.Container{
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   "gcr.io/google-containers/busybox:1.24",
 						Command: []string{"/bin/sh", "-c"},
 						Args:    []string{"/bin/echo -n OK > /dev/termination-log; /bin/echo DONE; /bin/true"},
 						TerminationMessagePath:   "/dev/termination-log",
@@ -270,13 +270,13 @@ while true; do sleep 1; done
 				},
 				{
 					description: "should not be able to pull non-existing image from gcr.io",
-					image:       "gcr.io/google_containers/invalid-image:invalid-tag",
+					image:       "gcr.io/google-containers/invalid-image:invalid-tag",
 					phase:       v1.PodPending,
 					waiting:     true,
 				},
 				{
 					description: "should be able to pull image from gcr.io",
-					image:       "gcr.io/google_containers/alpine-with-bash:1.0",
+					image:       "gcr.io/google-containers/alpine-with-bash:1.0",
 					phase:       v1.PodRunning,
 					waiting:     false,
 				},

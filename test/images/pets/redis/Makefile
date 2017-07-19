@@ -15,7 +15,7 @@
 all: push
 
 TAG = e2e
-PREFIX = gcr.io/google_containers/redis-install-3.2.0
+PREFIX = gcr.io/google-containers/redis-install-3.2.0
 
 container:
 	docker build --pull -t $(PREFIX):$(TAG) .

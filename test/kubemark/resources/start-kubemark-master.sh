@@ -486,7 +486,7 @@ fi
 
 # Setup docker flags and load images of the master components.
 assemble-docker-flags
-DOCKER_REGISTRY="gcr.io/google_containers"
+DOCKER_REGISTRY="gcr.io/google-containers"
 load-docker-images
 
 # Start kubelet as a supervisord process and master components as pods.

@@ -182,7 +182,7 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 			Containers: []v1.Container{
 				{
 					Name:    "pod-nfs-vol",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.io/google-containers/busybox:1.24",
 					Command: []string{"/bin/sh"},
 					Args:    cmdLine,
 					VolumeMounts: []v1.VolumeMount{

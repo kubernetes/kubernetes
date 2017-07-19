@@ -170,7 +170,7 @@ func makePod(gpus int64, name string) *v1.Pod {
 			RestartPolicy: v1.RestartPolicyAlways,
 			Containers: []v1.Container{
 				{
-					Image:     "gcr.io/google_containers/busybox:1.24",
+					Image:     "gcr.io/google-containers/busybox:1.24",
 					Name:      name,
 					Command:   []string{"sh", "-c", gpuverificationCmd},
 					Resources: resources,

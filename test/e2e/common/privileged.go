@@ -81,7 +81,7 @@ func (c *PrivilegedPodTestConfig) createPodsSpec() *v1.Pod {
 	isPrivileged := true
 	notPrivileged := false
 
-	const image = "gcr.io/google_containers/busybox:1.24"
+	const image = "gcr.io/google-containers/busybox:1.24"
 
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

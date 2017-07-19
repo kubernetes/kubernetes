@@ -100,7 +100,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 			return v1.PodSpec{
 				Containers: []v1.Container{{
 					Name:  "logging-soak",
-					Image: "gcr.io/google_containers/busybox:1.24",
+					Image: "gcr.io/google-containers/busybox:1.24",
 					Args: []string{
 						"/bin/sh",
 						"-c",

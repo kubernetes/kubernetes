@@ -710,9 +710,9 @@ run_pod_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'changed-with-yaml:'
   ## Patch pod from JSON can change image
   # Command
-  kubectl patch "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "gcr.io/google_containers/pause-amd64:3.0"}]}}'
-  # Post-condition: valid-pod POD has image gcr.io/google_containers/pause-amd64:3.0
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.io/google_containers/pause-amd64:3.0:'
+  kubectl patch "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "gcr.io/google-containers/pause-amd64:3.0"}]}}'
+  # Post-condition: valid-pod POD has image gcr.io/google-containers/pause-amd64:3.0
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.io/google-containers/pause-amd64:3.0:'
 
   ## If resourceVersion is specified in the patch, it will be treated as a precondition, i.e., if the resourceVersion is different from that is stored in the server, the Patch should be rejected
   ERROR_FILE="${KUBE_TEMP}/conflict-error"
@@ -793,13 +793,13 @@ __EOF__
   kubectl delete node node-v1-test "${kube_flags[@]}"
 
   ## kubectl edit can update the image field of a POD. tmp-editor.sh is a fake editor
-  echo -e "#!/bin/bash\n$SED -i \"s/nginx/gcr.io\/google_containers\/serve_hostname/g\" \$1" > /tmp/tmp-editor.sh
+  echo -e "#!/bin/bash\n$SED -i \"s/nginx/gcr.io\/google-containers\/serve_hostname/g\" \$1" > /tmp/tmp-editor.sh
   chmod +x /tmp/tmp-editor.sh
   # Pre-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
   [[ "$(EDITOR=/tmp/tmp-editor.sh kubectl edit "${kube_flags[@]}" pods/valid-pod --output-patch=true | grep Patch:)" ]]
-  # Post-condition: valid-pod POD has image gcr.io/google_containers/serve_hostname
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.io/google_containers/serve_hostname:'
+  # Post-condition: valid-pod POD has image gcr.io/google-containers/serve_hostname
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'gcr.io/google-containers/serve_hostname:'
   # cleaning
   rm /tmp/tmp-editor.sh
 

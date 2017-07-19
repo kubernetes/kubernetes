@@ -155,7 +155,7 @@ if [ "${ETCD_API}" == "etcd2" ]; then
   echo "Starting etcd ${ETCD_VERSION} to restore data"
   image=$(docker run -d -v ${BACKUP_DIR}:/var/etcd/data \
     --net=host -p ${etcd_port}:${etcd_port} \
-    "gcr.io/google_containers/etcd:${ETCD_VERSION}" /bin/sh -c \
+    "gcr.io/google-containers/etcd:${ETCD_VERSION}" /bin/sh -c \
     "/usr/local/bin/etcd --data-dir /var/etcd/data --force-new-cluster")
   if [ "$?" -ne "0" ]; then
     echo "Docker container didn't started correctly"
@@ -187,7 +187,7 @@ elif [ "${ETCD_API}" == "etcd3" ]; then
   # setting with --name in the etcd manifest file and then it seems to work.
   # TODO(jsz): This command may not work in case of HA.
   image=$(docker run -d -v ${BACKUP_DIR}:/var/tmp/backup --env ETCDCTL_API=3 \
-    "gcr.io/google_containers/etcd:${ETCD_VERSION}" /bin/sh -c \
+    "gcr.io/google-containers/etcd:${ETCD_VERSION}" /bin/sh -c \
     "/usr/local/bin/etcdctl snapshot restore ${BACKUP_DIR}/${snapshot} --name ${NAME} --initial-cluster ${NAME}=http://localhost:2380; mv /${NAME}.etcd/member /var/tmp/backup/")
   if [ "$?" -ne "0" ]; then
     echo "Docker container didn't started correctly"

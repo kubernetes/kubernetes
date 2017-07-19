@@ -200,14 +200,14 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "token-test",
-						Image: "gcr.io/google_containers/mounttest:0.8",
+						Image: "gcr.io/google-containers/mounttest:0.8",
 						Args: []string{
 							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey),
 						},
 					},
 					{
 						Name:  "root-ca-test",
-						Image: "gcr.io/google_containers/mounttest:0.8",
+						Image: "gcr.io/google-containers/mounttest:0.8",
 						Args: []string{
 							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountRootCAKey),
 						},
@@ -221,7 +221,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 		if supportsTokenNamespace {
 			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
 				Name:  "namespace-test",
-				Image: "gcr.io/google_containers/mounttest:0.8",
+				Image: "gcr.io/google-containers/mounttest:0.8",
 				Args: []string{
 					fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey),
 				},
@@ -356,7 +356,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: tc.PodName},
 				Spec: v1.PodSpec{
-					Containers:                   []v1.Container{{Name: "token-test", Image: "gcr.io/google_containers/mounttest:0.7"}},
+					Containers:                   []v1.Container{{Name: "token-test", Image: "gcr.io/google-containers/mounttest:0.7"}},
 					RestartPolicy:                v1.RestartPolicyNever,
 					ServiceAccountName:           tc.ServiceAccountName,
 					AutomountServiceAccountToken: tc.AutomountPodSpec,

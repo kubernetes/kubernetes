@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
     - name: test-container
-      image: gcr.io/google_containers/busybox
+      image: gcr.io/google-containers/busybox
       command: [ "/bin/sh", "-c", "env" ]
       env:
         - name: KUBE_CONFIG_1

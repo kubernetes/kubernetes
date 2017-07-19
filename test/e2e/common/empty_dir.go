@@ -29,8 +29,8 @@ import (
 )
 
 const (
-	testImageRootUid    = "gcr.io/google_containers/mounttest:0.8"
-	testImageNonRootUid = "gcr.io/google_containers/mounttest-user:0.5"
+	testImageRootUid    = "gcr.io/google-containers/mounttest:0.8"
+	testImageNonRootUid = "gcr.io/google-containers/mounttest-user:0.5"
 	volumePath          = "/test-volume"
 )
 

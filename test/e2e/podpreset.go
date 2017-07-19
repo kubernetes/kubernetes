@@ -91,7 +91,7 @@ var _ = framework.KubeDescribe("PodPreset", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: "gcr.io/google-containers/nginx-slim:0.7",
 					},
 				},
 			},
@@ -196,7 +196,7 @@ var _ = framework.KubeDescribe("PodPreset", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: "gcr.io/google-containers/nginx-slim:0.7",
 						Env:   []v1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value"}},
 					},
 				},

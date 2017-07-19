@@ -101,7 +101,7 @@ func (t *ConfigMapUpgradeTest) testPod(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.7",
+					Image: "gcr.io/google-containers/mounttest:0.7",
 					Args: []string{
 						fmt.Sprintf("--file_content=%s/data", volumeMountPath),
 						fmt.Sprintf("--file_mode=%s/data", volumeMountPath),
@@ -115,7 +115,7 @@ func (t *ConfigMapUpgradeTest) testPod(f *framework.Framework) {
 				},
 				{
 					Name:    "configmap-env-test",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   "gcr.io/google-containers/busybox:1.24",
 					Command: []string{"sh", "-c", "env"},
 					Env: []v1.EnvVar{
 						{

@@ -33,7 +33,7 @@ const (
 	DefaultCACertPath         = "/etc/kubernetes/pki/ca.crt"
 	DefaultCertificatesDir    = "/etc/kubernetes/pki"
 	DefaultEtcdDataDir        = "/var/lib/etcd"
-	DefaultImageRepository    = "gcr.io/google_containers"
+	DefaultImageRepository    = "gcr.io/google-containers"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {

@@ -38,7 +38,7 @@ import (
 
 const (
 	testPodNamePrefix = "nvidia-gpu-"
-	testCUDAImage     = "gcr.io/google_containers/cuda-vector-add:v0.1"
+	testCUDAImage     = "gcr.io/google-containers/cuda-vector-add:v0.1"
 	cosOSImage        = "Container-Optimized OS from Google"
 	// Nvidia driver installation can take upwards of 5 minutes.
 	driverInstallTimeout = 10 * time.Minute
