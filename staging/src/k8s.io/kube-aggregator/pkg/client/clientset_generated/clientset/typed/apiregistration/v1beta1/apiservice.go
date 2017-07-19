@@ -81,7 +81,7 @@ func (c *aPIServices) Update(aPIService *v1beta1.APIService) (result *v1beta1.AP
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *aPIServices) UpdateStatus(aPIService *v1beta1.APIService) (result *v1beta1.APIService, err error) {
 	result = &v1beta1.APIService{}

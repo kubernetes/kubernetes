@@ -85,7 +85,7 @@ func (c *flunders) Update(flunder *v1alpha1.Flunder) (result *v1alpha1.Flunder, 
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *flunders) UpdateStatus(flunder *v1alpha1.Flunder) (result *v1alpha1.Flunder, err error) {
 	result = &v1alpha1.Flunder{}

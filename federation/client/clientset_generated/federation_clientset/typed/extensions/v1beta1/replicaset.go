@@ -85,7 +85,7 @@ func (c *replicaSets) Update(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.Re
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *replicaSets) UpdateStatus(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.ReplicaSet, err error) {
 	result = &v1beta1.ReplicaSet{}

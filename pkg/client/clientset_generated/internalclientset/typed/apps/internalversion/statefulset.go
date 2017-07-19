@@ -85,7 +85,7 @@ func (c *statefulSets) Update(statefulSet *apps.StatefulSet) (result *apps.State
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *statefulSets) UpdateStatus(statefulSet *apps.StatefulSet) (result *apps.StatefulSet, err error) {
 	result = &apps.StatefulSet{}

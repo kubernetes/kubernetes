@@ -58,7 +58,7 @@ type ScaleStatus struct {
 }
 
 // +genclient
-// +noMethods=true
+// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
