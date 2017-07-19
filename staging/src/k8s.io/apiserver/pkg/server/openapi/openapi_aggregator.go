@@ -17,6 +17,7 @@ limitations under the License.
 package openapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -474,9 +475,17 @@ func MergeSpecs(dest, source *spec.Swagger) error {
 
 // Clone OpenAPI spec
 func CloneSpec(source *spec.Swagger) (*spec.Swagger, error) {
-	if ret, err := cloner.DeepCopy(source); err != nil {
+	// TODO: implement reflection based spec cloner
+	// Until then, use json serialization to clone. This should not be on the critical path,
+	// i.e. the swagger spec is recreated only on-demand when APIServices change.
+	bs, err := json.Marshal(source)
+	if err != nil {
 		return nil, err
-	} else {
-		return ret.(*spec.Swagger), nil
 	}
+	clone := new(spec.Swagger)
+	err = json.Unmarshal(bs, clone)
+	if err != nil {
+		return nil, err
+	}
+	return clone, nil
 }

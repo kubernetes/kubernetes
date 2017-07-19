@@ -299,11 +299,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 	// TODO: Be careful here ... what if there were other changes to the service?
 	if !v1helper.LoadBalancerStatusEqual(previousState, newState) {
 		// Make a copy so we don't mutate the shared informer cache
-		copy, err := scheme.Scheme.DeepCopy(service)
-		if err != nil {
-			return err, retryable
-		}
-		service = copy.(*v1.Service)
+		service = service.DeepCopy()
 
 		// Update the status on the copy
 		service.Status.LoadBalancer = *newState

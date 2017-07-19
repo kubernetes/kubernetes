@@ -84,7 +84,7 @@ func (a *ReplicaSetAdapter) Copy(obj pkgruntime.Object) pkgruntime.Object {
 	rs := obj.(*extensionsv1.ReplicaSet)
 	return &extensionsv1.ReplicaSet{
 		ObjectMeta: fedutil.DeepCopyRelevantObjectMeta(rs.ObjectMeta),
-		Spec:       *fedutil.DeepCopyApiTypeOrPanic(&rs.Spec).(*extensionsv1.ReplicaSetSpec),
+		Spec:       *rs.Spec.DeepCopy(),
 	}
 }
 

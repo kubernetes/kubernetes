@@ -443,11 +443,7 @@ func (e *EndpointController) syncService(key string) error {
 		glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 		return nil
 	}
-	copy, err := scheme.Scheme.DeepCopy(currentEndpoints)
-	if err != nil {
-		return err
-	}
-	newEndpoints := copy.(*v1.Endpoints)
+	newEndpoints := currentEndpoints.DeepCopy()
 	newEndpoints.Subsets = subsets
 	newEndpoints.Labels = service.Labels
 	if newEndpoints.Annotations == nil {
