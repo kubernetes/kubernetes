@@ -915,6 +915,7 @@ func TestISCSIDiskConflicts(t *testing.T) {
 	}
 }
 
+// TODO: Add test case for RequiredDuringSchedulingRequiredDuringExecution after it's implemented.
 func TestPodFitsSelector(t *testing.T) {
 	tests := []struct {
 		pod    *v1.Pod
@@ -1303,42 +1304,6 @@ func TestPodFitsSelector(t *testing.T) {
 			fits: true,
 			test: "Pod with multiple NodeSelectorTerms ORed in affinity, matches the node's labels and will schedule onto the node",
 		},
-		// TODO: Uncomment this test when implement RequiredDuringSchedulingRequiredDuringExecution
-		//		{
-		//			pod: &v1.Pod{
-		//				ObjectMeta: metav1.ObjectMeta{
-		//					Annotations: map[string]string{
-		//						v1.AffinityAnnotationKey: `
-		//						{"nodeAffinity": {
-		//							"requiredDuringSchedulingRequiredDuringExecution": {
-		//								"nodeSelectorTerms": [{
-		//									"matchExpressions": [{
-		//										"key": "foo",
-		//										"operator": "In",
-		//										"values": ["bar", "value2"]
-		//									}]
-		//								}]
-		//							},
-		//							"requiredDuringSchedulingIgnoredDuringExecution": {
-		//								"nodeSelectorTerms": [{
-		//									"matchExpressions": [{
-		//										"key": "foo",
-		//										"operator": "NotIn",
-		//										"values": ["bar", "value2"]
-		//									}]
-		//								}]
-		//							}
-		//						}}`,
-		//					},
-		//				},
-		//			},
-		//			labels: map[string]string{
-		//				"foo": "bar",
-		//			},
-		//			fits: false,
-		//			test: "Pod with an Affinity both requiredDuringSchedulingRequiredDuringExecution and " +
-		//				"requiredDuringSchedulingIgnoredDuringExecution indicated that don't match node's labels and won't schedule onto the node",
-		//		},
 		{
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
@@ -2058,6 +2023,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 	}
 }
 
+// TODO: Add test case for RequiredDuringSchedulingRequiredDuringExecution after it's implemented.
 func TestInterPodAffinity(t *testing.T) {
 	podLabel := map[string]string{"service": "securityscan"}
 	labels1 := map[string]string{
@@ -2345,50 +2311,6 @@ func TestInterPodAffinity(t *testing.T) {
 			fits: true,
 			test: "satisfies the PodAffinity and PodAntiAffinity with the existing pod",
 		},
-		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//{
-		//	 pod: &v1.Pod{
-		//		ObjectMeta: metav1.ObjectMeta{
-		//			Labels: podLabel2,
-		//			Annotations: map[string]string{
-		//				v1.AffinityAnnotationKey: `
-		//				{"podAffinity": {
-		//					"requiredDuringSchedulingRequiredDuringExecution": [
-		//						{
-		//							"labelSelector": {
-		//								"matchExpressions": [{
-		//									"key": "service",
-		//									"operator": "Exists"
-		//								}, {
-		//									"key": "wrongkey",
-		//									"operator": "DoesNotExist"
-		//								}]
-		//							},
-		//							"topologyKey": "region"
-		//						}, {
-		//							"labelSelector": {
-		//								"matchExpressions": [{
-		//									"key": "service",
-		//									"operator": "In",
-		//									"values": ["securityscan"]
-		//								}, {
-		//									"key": "service",
-		//									"operator": "NotIn",
-		//									"values": ["WrongValue"]
-		//								}]
-		//							},
-		//							"topologyKey": "region"
-		//						}
-		//					]
-		//				}}`,
-		//			},
-		//		},
-		//	},
-		//	pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podlabel}}},
-		//	node: &node1,
-		//	fits: true,
-		//	test: "satisfies the PodAffinity with different Label Operators in multiple RequiredDuringSchedulingRequiredDuringExecution ",
-		//},
 		{
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
