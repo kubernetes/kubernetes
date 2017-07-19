@@ -22,6 +22,7 @@ import shutil
 import socket
 import string
 import json
+import ipaddress
 
 import charms.leadership
 
@@ -783,18 +784,18 @@ def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
 
 def get_dns_ip():
     '''Get an IP address for the DNS server on the provided cidr.'''
-    # Remove the range from the cidr.
-    ip = service_cidr().split('/')[0]
-    # Take the last octet off the IP address and replace it with 10.
-    return '.'.join(ip.split('.')[0:-1]) + '.10'
+    interface = ipaddress.IPv4Interface(service_cidr())
+    # Add .10 at the end of the network
+    ip = interface.network.network_address + 10
+    return ip.exploded
 
 
 def get_kubernetes_service_ip():
     '''Get the IP address for the kubernetes service based on the cidr.'''
-    # Remove the range from the cidr.
-    ip = service_cidr().split('/')[0]
-    # Remove the last octet and replace it with 1.
-    return '.'.join(ip.split('.')[0:-1]) + '.1'
+    interface = ipaddress.IPv4Interface(service_cidr())
+    # Add .1 at the end of the network
+    ip = interface.network.network_address + 1
+    return ip.exploded
 
 
 def handle_etcd_relation(reldata):
