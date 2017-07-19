@@ -33,9 +33,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/iptables"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 type fakeNodeInterface struct {
@@ -342,13 +342,13 @@ udpTimeoutMilliseconds: 123ms
 			HostnameOverride:   "foo",
 			IPTables: componentconfig.KubeProxyIPTablesConfiguration{
 				MasqueradeAll: true,
-				MasqueradeBit: util.Int32Ptr(17),
+				MasqueradeBit: utilpointer.Int32Ptr(17),
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
 			},
 			MetricsBindAddress: tc.metricsBindAddress,
 			Mode:               "iptables",
-			OOMScoreAdj:        util.Int32Ptr(17),
+			OOMScoreAdj:        utilpointer.Int32Ptr(17),
 			PortRange:          "2-7",
 			ResourceContainer:  "/foo",
 			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},

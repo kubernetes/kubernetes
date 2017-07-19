@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -220,7 +220,7 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot get node: %v", err)
 	}
-	return nodeutil.GetNodeHostIP(node)
+	return utilnode.GetNodeHostIP(node)
 }
 
 // getHostIPAnyway attempts to return the host IP from kubelet's nodeInfo, or
@@ -230,7 +230,7 @@ func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
 	if err != nil {
 		return nil, err
 	}
-	return nodeutil.GetNodeHostIP(node)
+	return utilnode.GetNodeHostIP(node)
 }
 
 // GetExtraSupplementalGroupsForPod returns a list of the extra
@@ -261,7 +261,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	for _, volumePluginDir := range volumePluginDirs {
 		volumePluginName := volumePluginDir.Name()
 		volumePluginPath := filepath.Join(podVolDir, volumePluginName)
-		volumeDirs, err := util.ReadDirNoStat(volumePluginPath)
+		volumeDirs, err := utilfile.ReadDirNoStat(volumePluginPath)
 		if err != nil {
 			return volumes, fmt.Errorf("Could not read directory %s: %v", volumePluginPath, err)
 		}

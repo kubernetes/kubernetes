@@ -431,7 +431,6 @@ pkg/security/podsecuritypolicy/user
 pkg/security/podsecuritypolicy/util
 pkg/securitycontext
 pkg/ssh
-pkg/util
 pkg/util/bandwidth
 pkg/util/config
 pkg/util/configz
@@ -439,6 +438,7 @@ pkg/util/dbus
 pkg/util/ebtables
 pkg/util/env
 pkg/util/exec
+pkg/util/file
 pkg/util/goroutinemap/exponentialbackoff
 pkg/util/initsystem
 pkg/util/ipconfig
