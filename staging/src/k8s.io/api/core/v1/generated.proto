@@ -2133,6 +2133,31 @@ message PersistentVolumeClaim {
   optional PersistentVolumeClaimStatus status = 3;
 }
 
+// PersistentVolumeClaimCondition contails details about state of pvc
+message PersistentVolumeClaimCondition {
+  optional string type = 1;
+
+  optional string status = 2;
+
+  // Last time we probed the condition.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
+
+  // Last time the condition transitioned from one status to another.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+
+  // Unique, this should be a short, machine understandable string that gives the reason
+  // for condition's last transition. If it reports "ResizeStarted" that means the underlying
+  // persistent volume is being resized.
+  // +optional
+  optional string reason = 5;
+
+  // Human-readable message indicating details about last transition.
+  // +optional
+  optional string message = 6;
+}
+
 // PersistentVolumeClaimList is a list of PersistentVolumeClaim items.
 message PersistentVolumeClaimList {
   // Standard list metadata.
@@ -2186,6 +2211,13 @@ message PersistentVolumeClaimStatus {
   // Represents the actual resources of the underlying volume.
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
+
+  // Current Condition of persistent volume claim. If underlying persistent volume is being
+  // resized then the Condition will be set to 'ResizeStarted'.
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated PersistentVolumeClaimCondition conditions = 4;
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.

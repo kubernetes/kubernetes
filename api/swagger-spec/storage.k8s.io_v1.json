@@ -727,6 +727,10 @@
        "type": "string"
       },
       "description": "Dynamically provisioned PersistentVolumes of this storage class are created with these mountOptions, e.g. [\"ro\", \"soft\"]. Not validated - mount of the PVs will simply fail if one is invalid."
+     },
+     "allowVolumeExpand": {
+      "type": "boolean",
+      "description": "AllowVolumeExpand shows whether the storage class allow volume expand"
      }
     }
    },

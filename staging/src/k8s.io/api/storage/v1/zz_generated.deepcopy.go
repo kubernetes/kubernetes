@@ -74,6 +74,15 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.AllowVolumeExpand != nil {
+		in, out := &in.AllowVolumeExpand, &out.AllowVolumeExpand
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	return
 }
 
