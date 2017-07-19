@@ -996,8 +996,10 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 	port := service.GetServiceHealthCheckNodePort(created_service)
 	if port == 0 {
 		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
+	} else {
+		// Release the node port at the end of the test case.
+		storage.serviceNodePorts.Release(int(port))
 	}
-
 }
 
 // Validate allocation of a nodePort when ExternalTraffic beta annotation is set to OnlyLocal
@@ -1034,8 +1036,10 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocationBeta(t *test
 	port := service.GetServiceHealthCheckNodePort(created_service)
 	if port == 0 {
 		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
+	} else {
+		// Release the node port at the end of the test case.
+		storage.serviceNodePorts.Release(int(port))
 	}
-
 }
 
 // Validate using the user specified nodePort when ExternalTrafficPolicy is set to Local
@@ -1073,6 +1077,11 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 	}
 	if port != randomNodePort {
 		t.Errorf("Failed to allocate requested nodePort expected %d, got %d", randomNodePort, port)
+	}
+
+	if port != 0 {
+		// Release the node port at the end of the test case.
+		storage.serviceNodePorts.Release(int(port))
 	}
 }
 
@@ -1115,6 +1124,11 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocationBeta(t *
 	}
 	if port != randomNodePort {
 		t.Errorf("Failed to allocate requested nodePort expected %d, got %d", randomNodePort, port)
+	}
+
+	if port != 0 {
+		// Release the node port at the end of the test case.
+		storage.serviceNodePorts.Release(int(port))
 	}
 }
 
@@ -1203,6 +1217,8 @@ func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 	// Make sure the service does not have the health check node port allocated
 	port := service.GetServiceHealthCheckNodePort(created_service)
 	if port != 0 {
+		// Release the node port at the end of the test case.
+		storage.serviceNodePorts.Release(int(port))
 		t.Errorf("Unexpected allocation of health check node port: %v", port)
 	}
 }
@@ -1240,6 +1256,8 @@ func TestServiceRegistryExternalTrafficGlobalBeta(t *testing.T) {
 	// Make sure the service does not have the health check node port allocated
 	port := service.GetServiceHealthCheckNodePort(created_service)
 	if port != 0 {
+		// Release the node port at the end of the test case.
+		storage.serviceNodePorts.Release(int(port))
 		t.Errorf("Unexpected allocation of health check node port: %v", port)
 	}
 }
@@ -1273,6 +1291,8 @@ func TestServiceRegistryExternalTrafficAnnotationClusterIP(t *testing.T) {
 	// Make sure that ClusterIP services do not have the health check node port allocated
 	port := service.GetServiceHealthCheckNodePort(created_service)
 	if port != 0 {
+		// Release the node port at the end of the test case.
+		storage.serviceNodePorts.Release(int(port))
 		t.Errorf("Unexpected allocation of health check node port annotation %s", api.BetaAnnotationHealthCheckNodePort)
 	}
 }
