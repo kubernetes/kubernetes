@@ -30,12 +30,11 @@ aliases:
     - ericchiang
     - fabianofranz
     - ghodss
-    - pwittrock
+    - mengqiy
     - rootfs
     - smarterclayton
     - soltysh
     - sttts
-    - ymqytw
   test-infra-maintainers:
     - fejta
     - ixdy
