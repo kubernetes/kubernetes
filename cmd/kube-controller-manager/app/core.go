@@ -56,6 +56,7 @@ import (
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/features"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 func startServiceController(ctx ControllerContext) (bool, error) {
@@ -230,7 +231,7 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 		api.Kind("ConfigMap"),
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		KubeClient:                resourceQuotaControllerClient,
+		QuotaClient:               resourceQuotaControllerClient.Core(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.Options.ResourceQuotaSyncPeriod.Duration),
 		Registry:                  resourceQuotaRegistry,
@@ -238,6 +239,10 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 		ReplenishmentResyncPeriod: ResyncPeriod(&ctx.Options),
 		GroupKindsToReplenish:     groupKindsToReplenish,
 	}
+	if resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter())
+	}
+
 	go resourcequotacontroller.NewResourceQuotaController(
 		resourceQuotaControllerOptions,
 	).Run(int(ctx.Options.ConcurrentResourceQuotaSyncs), ctx.Stop)

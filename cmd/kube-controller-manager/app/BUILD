@@ -68,6 +68,7 @@ go_library(
         "//pkg/quota/install:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/configz:go_default_library",
+        "//pkg/util/metrics:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/aws_ebs:go_default_library",

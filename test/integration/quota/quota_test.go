@@ -106,7 +106,7 @@ func TestQuota(t *testing.T) {
 		api.Kind("Pod"),
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		KubeClient:                clientset,
+		QuotaClient:               clientset.Core(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		Registry:                  resourceQuotaRegistry,
@@ -291,7 +291,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		api.Kind("Pod"),
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		KubeClient:                clientset,
+		QuotaClient:               clientset.Core(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		Registry:                  resourceQuotaRegistry,
