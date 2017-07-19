@@ -77,6 +77,16 @@ func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipall
 	}
 }
 
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (rs *REST) ShortNames() []string {
+	return []string{"svc"}
+}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (rs *REST) Categories() []string {
+	return []string{"all"}
+}
+
 // TODO: implement includeUninitialized by refactoring this to move to store
 func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	service := obj.(*api.Service)
