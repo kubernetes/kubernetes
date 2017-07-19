@@ -30,14 +30,23 @@ import (
 // NodeAddresses returns the addresses of the specified instance.
 func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	if az.UseInstanceMetadata {
-		text, err := az.metadata.QueryMetadataText("instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress")
+		ipAddress := IPAddress{}
+		err := az.metadata.Object("instance/network/interface/0/ipv4/ipAddress/0", &ipAddress)
 		if err != nil {
 			return nil, err
 		}
-		return []v1.NodeAddress{
-			{Type: v1.NodeInternalIP, Address: text},
+		addresses := []v1.NodeAddress{
+			{Type: v1.NodeInternalIP, Address: ipAddress.PrivateIP},
 			{Type: v1.NodeHostName, Address: string(name)},
-		}, nil
+		}
+		if len(ipAddress.PublicIP) > 0 {
+			addr := v1.NodeAddress{
+				Type:    v1.NodeExternalIP,
+				Address: ipAddress.PublicIP,
+			}
+			addresses = append(addresses, addr)
+		}
+		return addresses, nil
 	}
 	ip, err := az.getIPForMachine(name)
 	if err != nil {
@@ -77,9 +86,27 @@ func (az *Cloud) ExternalID(name types.NodeName) (string, error) {
 	return az.InstanceID(name)
 }
 
+func (az *Cloud) isCurrentInstance(name types.NodeName) (bool, error) {
+	nodeName := mapNodeNameToVMName(name)
+	metadataName, err := az.metadata.Text("instance/compute/name")
+	return (metadataName == nodeName), err
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 // Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (az *Cloud) InstanceID(name types.NodeName) (string, error) {
+	if az.UseInstanceMetadata {
+		isLocalInstance, err := az.isCurrentInstance(name)
+		if err != nil {
+			return "", err
+		}
+		if isLocalInstance {
+			externalInstanceID, err := az.metadata.Text("instance/compute/vmId")
+			if err == nil {
+				return externalInstanceID, nil
+			}
+		}
+	}
 	var machine compute.VirtualMachine
 	var exists bool
 	var err error
@@ -119,6 +146,18 @@ func (az *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
 // (Implementer Note): This is used by kubelet. Kubelet will label the node. Real log from kubelet:
 //       Adding node label from cloud provider: beta.kubernetes.io/instance-type=[value]
 func (az *Cloud) InstanceType(name types.NodeName) (string, error) {
+	if az.UseInstanceMetadata {
+		isLocalInstance, err := az.isCurrentInstance(name)
+		if err != nil {
+			return "", err
+		}
+		if isLocalInstance {
+			machineType, err := az.metadata.Text("instance/compute/vmSize")
+			if err == nil {
+				return machineType, nil
+			}
+		}
+	}
 	machine, exists, err := az.getVirtualMachine(name)
 	if err != nil {
 		glog.Errorf("error: az.InstanceType(%s), az.getVirtualMachine(%s) err=%v", name, name, err)
