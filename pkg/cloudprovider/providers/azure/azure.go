@@ -129,6 +129,7 @@ type Cloud struct {
 	DisksClient              disk.DisksClient
 	operationPollRateLimiter flowcontrol.RateLimiter
 	resourceRequestBackoff   wait.Backoff
+	metadata                 *InstanceMetadata
 
 	*BlobDiskController
 	*ManagedDiskController
@@ -317,6 +318,8 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			az.CloudProviderBackoffDuration,
 			az.CloudProviderBackoffJitter)
 	}
+
+	az.metadata = NewInstanceMetadata()
 
 	if err := initDiskControllers(&az); err != nil {
 		return nil, err
