@@ -5,7 +5,7 @@ enable by default. The source code is in [cmd/kube-dns][kube-dns].
 
 The [Kubernetes DNS Admin Guide][dns-admin] provides further details on this plugin.
 
-[kube-dns]: https://github.com/kubernetes/kubernetes/tree/master/cmd/kube-dns
+[kube-dns]: https://github.com/kubernetes/dns/tree/master/cmd/kube-dns
 [dns-admin]: http://kubernetes.io/docs/admin/dns/
 
 ## Making Changes
