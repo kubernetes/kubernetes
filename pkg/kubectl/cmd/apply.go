@@ -313,6 +313,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				decoder:       decoder,
 				mapping:       info.Mapping,
 				helper:        helper,
+				clientFunc:    f.UnstructuredClientForMapping,
 				clientsetFunc: f.ClientSet,
 				overwrite:     overwrite,
 				backOff:       clockwork.NewRealClock(),
@@ -496,7 +497,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput 
 			return err
 		}
 		if !p.dryRun {
-			if err := p.delete(namespace, name, mapping, c); err != nil {
+			if err := p.delete(namespace, name, mapping); err != nil {
 				return err
 			}
 		}
@@ -505,7 +506,12 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput 
 	return nil
 }
 
-func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping, c resource.RESTClient) error {
+func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error {
+	c, err := p.clientFunc(mapping)
+	if err != nil {
+		return err
+	}
+
 	return runDelete(namespace, name, mapping, c, nil, p.cascade, p.gracePeriod, p.clientsetFunc)
 }
 
@@ -538,7 +544,11 @@ func runDelete(namespace, name string, mapping *meta.RESTMapping, c resource.RES
 }
 
 func (p *patcher) delete(namespace, name string) error {
-	return runDelete(namespace, name, p.mapping, nil, p.helper, p.cascade, p.gracePeriod, p.clientsetFunc)
+	c, err := p.clientFunc(p.mapping)
+	if err != nil {
+		return err
+	}
+	return runDelete(namespace, name, p.mapping, c, p.helper, p.cascade, p.gracePeriod, p.clientsetFunc)
 }
 
 type patcher struct {
@@ -547,6 +557,7 @@ type patcher struct {
 
 	mapping       *meta.RESTMapping
 	helper        *resource.Helper
+	clientFunc    resource.ClientMapperFunc
 	clientsetFunc func() (internalclientset.Interface, error)
 
 	overwrite bool
