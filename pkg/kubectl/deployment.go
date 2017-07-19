@@ -27,24 +27,42 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// DeploymentBasicGeneratorV1 supports stable generation of a deployment
-type DeploymentBasicGeneratorV1 struct {
+// BaseDeploymentGenerator: implement the common functionality of
+// DeploymentBasicGeneratorV1 and DeploymentBasicAppsGeneratorV1. To reduce
+// confusion, it's best to keep this struct in the same file as those
+// generators.
+type BaseDeploymentGenerator struct {
 	Name   string
 	Images []string
 }
 
-// Ensure it supports the generator pattern that uses parameters specified during construction
-var _ StructuredGenerator = &DeploymentBasicGeneratorV1{}
-
-func (DeploymentBasicGeneratorV1) ParamNames() []GeneratorParam {
+// ParamNames: return the parameters expected by the BaseDeploymentGenerator.
+// This method is here to aid in validation. When given a Generator, you can
+// learn what it expects by calling this method.
+func (BaseDeploymentGenerator) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
 		{"image", true},
 	}
 }
 
-func (s DeploymentBasicGeneratorV1) Generate(params map[string]interface{}) (runtime.Object, error) {
-	err := ValidateParams(s.ParamNames(), params)
+// validate: check if the caller has forgotten to set one of our fields.
+func (b BaseDeploymentGenerator) validate() error {
+	if len(b.Name) == 0 {
+		return fmt.Errorf("name must be specified")
+	}
+	if len(b.Images) == 0 {
+		return fmt.Errorf("at least one image must be specified")
+	}
+	return nil
+}
+
+// baseDeploymentGeneratorFromParams: return a new BaseDeploymentGenerator with
+// the fields set from params. The returned BaseDeploymentGenerator should have
+// all required fields set and will pass validate() with no errors.
+func baseDeploymentGeneratorFromParams(params map[string]interface{}) (*BaseDeploymentGenerator, error) {
+	paramNames := (BaseDeploymentGenerator{}).ParamNames()
+	err := ValidateParams(paramNames, params)
 	if err != nil {
 		return nil, err
 	}
@@ -56,18 +74,37 @@ func (s DeploymentBasicGeneratorV1) Generate(params map[string]interface{}) (run
 	if !isArray {
 		return nil, fmt.Errorf("expected []string, found :%v", imageStrings)
 	}
-	delegate := &DeploymentBasicGeneratorV1{Name: name, Images: imageStrings}
-	return delegate.StructuredGenerate()
+	return &BaseDeploymentGenerator{
+		Name:   name,
+		Images: imageStrings,
+	}, nil
 }
 
-// StructuredGenerate outputs a deployment object using the configured fields
-func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error) {
-	if err := s.validate(); err != nil {
-		return nil, err
+// structuredGenerate: determine the fields of a deployment. The struct that
+// embeds BaseDeploymentGenerator should assemble these pieces into a
+// runtime.Object.
+func (b BaseDeploymentGenerator) structuredGenerate() (
+	podSpec v1.PodSpec,
+	labels map[string]string,
+	selector metav1.LabelSelector,
+	err error,
+) {
+	err = b.validate()
+	if err != nil {
+		return
 	}
+	podSpec = buildPodSpec(b.Images)
+	labels = map[string]string{}
+	labels["app"] = b.Name
+	selector = metav1.LabelSelector{MatchLabels: labels}
+	return
+}
 
+// buildPodSpec: parse the image strings and assemble them into the Containers
+// of a PodSpec. This is all you need to create the PodSpec for a deployment.
+func buildPodSpec(images []string) v1.PodSpec {
 	podSpec := v1.PodSpec{Containers: []v1.Container{}}
-	for _, imageString := range s.Images {
+	for _, imageString := range images {
 		// Retain just the image name
 		imageSplit := strings.Split(imageString, "/")
 		name := imageSplit[len(imageSplit)-1]
@@ -79,13 +116,30 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 		}
 		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
 	}
+	return podSpec
+}
 
-	// setup default label and selector
-	labels := map[string]string{}
-	labels["app"] = s.Name
+// DeploymentBasicGeneratorV1 supports stable generation of a deployment
+type DeploymentBasicGeneratorV1 struct {
+	BaseDeploymentGenerator
+}
+
+// Ensure it supports the generator pattern that uses parameters specified during construction
+var _ StructuredGenerator = &DeploymentBasicGeneratorV1{}
+
+func (s DeploymentBasicGeneratorV1) Generate(params map[string]interface{}) (runtime.Object, error) {
+	base, err := baseDeploymentGeneratorFromParams(params)
+	if err != nil {
+		return nil, err
+	}
+	return (&DeploymentBasicGeneratorV1{*base}).StructuredGenerate()
+}
+
+// StructuredGenerate outputs a deployment object using the configured fields
+func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error) {
+	podSpec, labels, selector, err := s.structuredGenerate()
 	one := int32(1)
-	selector := metav1.LabelSelector{MatchLabels: labels}
-	deployment := extensionsv1beta1.Deployment{
+	return &extensionsv1beta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
@@ -100,80 +154,30 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 				Spec: podSpec,
 			},
 		},
-	}
-	return &deployment, nil
-}
-
-// validate validates required fields are set to support structured generation
-func (s *DeploymentBasicGeneratorV1) validate() error {
-	if len(s.Name) == 0 {
-		return fmt.Errorf("name must be specified")
-	}
-	if len(s.Images) == 0 {
-		return fmt.Errorf("at least one image must be specified")
-	}
-	return nil
+	}, err
 }
 
 // DeploymentBasicAppsGeneratorV1 supports stable generation of a deployment under apps/v1beta1 endpoint
 type DeploymentBasicAppsGeneratorV1 struct {
-	Name   string
-	Images []string
+	BaseDeploymentGenerator
 }
 
 // Ensure it supports the generator pattern that uses parameters specified during construction
 var _ StructuredGenerator = &DeploymentBasicAppsGeneratorV1{}
 
-func (DeploymentBasicAppsGeneratorV1) ParamNames() []GeneratorParam {
-	return []GeneratorParam{
-		{"name", true},
-		{"image", true},
-	}
-}
-
 func (s DeploymentBasicAppsGeneratorV1) Generate(params map[string]interface{}) (runtime.Object, error) {
-	err := ValidateParams(s.ParamNames(), params)
+	base, err := baseDeploymentGeneratorFromParams(params)
 	if err != nil {
 		return nil, err
 	}
-	name, isString := params["name"].(string)
-	if !isString {
-		return nil, fmt.Errorf("expected string, saw %v for 'name'", name)
-	}
-	imageStrings, isArray := params["image"].([]string)
-	if !isArray {
-		return nil, fmt.Errorf("expected []string, found :%v", imageStrings)
-	}
-	delegate := &DeploymentBasicAppsGeneratorV1{Name: name, Images: imageStrings}
-	return delegate.StructuredGenerate()
+	return (&DeploymentBasicAppsGeneratorV1{*base}).StructuredGenerate()
 }
 
 // StructuredGenerate outputs a deployment object using the configured fields
 func (s *DeploymentBasicAppsGeneratorV1) StructuredGenerate() (runtime.Object, error) {
-	if err := s.validate(); err != nil {
-		return nil, err
-	}
-
-	podSpec := v1.PodSpec{Containers: []v1.Container{}}
-	for _, imageString := range s.Images {
-		// Retain just the image name
-		imageSplit := strings.Split(imageString, "/")
-		name := imageSplit[len(imageSplit)-1]
-		// Remove any tag or hash
-		if strings.Contains(name, ":") {
-			name = strings.Split(name, ":")[0]
-		} else if strings.Contains(name, "@") {
-			name = strings.Split(name, "@")[0]
-		}
-		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
-	}
-
-	// setup default label and selector
-	labels := map[string]string{}
-	labels["app"] = s.Name
+	podSpec, labels, selector, err := s.structuredGenerate()
 	one := int32(1)
-	selector := metav1.LabelSelector{MatchLabels: labels}
-	deployment := appsv1beta1.Deployment{
+	return &appsv1beta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
@@ -188,17 +192,5 @@ func (s *DeploymentBasicAppsGeneratorV1) StructuredGenerate() (runtime.Object, e
 				Spec: podSpec,
 			},
 		},
-	}
-	return &deployment, nil
-}
-
-// validate validates required fields are set to support structured generation
-func (s *DeploymentBasicAppsGeneratorV1) validate() error {
-	if len(s.Name) == 0 {
-		return fmt.Errorf("name must be specified")
-	}
-	if len(s.Images) == 0 {
-		return fmt.Errorf("at least one image must be specified")
-	}
-	return nil
+	}, err
 }
