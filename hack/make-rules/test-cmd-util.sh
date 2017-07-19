@@ -71,6 +71,7 @@ statefulsets="statefulsets"
 static="static"
 storageclass="storageclass"
 subjectaccessreviews="subjectaccessreviews"
+selfsubjectaccessreviews="selfsubjectaccessreviews"
 thirdpartyresources="thirdpartyresources"
 customresourcedefinitions="customresourcedefinitions"
 daemonsets="daemonsets"
@@ -4492,6 +4493,27 @@ runTests() {
     record_command run_authorization_tests
   fi
 
+  # kubectl auth can-i
+  # kube-apiserver is started with authorization mode AlwaysAllow, so kubectl can-i always returns yes
+  if kube::test::if_supports_resource "${subjectaccessreviews}" ; then
+    output_message=$(kubectl auth can-i '*' '*' 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "yes"
+
+    output_message=$(kubectl auth can-i get pods --subresource=log 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "yes"
+
+    output_message=$(kubectl auth can-i get invalid_resource 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "the server doesn't have a resource type"
+
+    output_message=$(kubectl auth can-i get /logs/ 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "yes"
+
+    output_message=$(! kubectl auth can-i get /logs/ --subresource=log 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "subresource can not be used with nonResourceURL"
+
+    output_message=$(kubectl auth can-i list jobs.batch/bar -n foo --quiet 2>&1 "${kube_flags[@]}")
+    kube::test::if_empty_string "${output_message}"
+  fi
 
   #####################
   # Retrieve multiple #
