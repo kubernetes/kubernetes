@@ -18,22 +18,19 @@ package cmd
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 
-	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	apijson "k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/diff"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/util/i18n"
@@ -200,46 +197,13 @@ func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.
 			cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
 
 		} else {
-			err := o.formatPrinter(o.Output, patch.Patch, o.Out)
+			out, err := diff.FormatConvert(patch.Patch, o.Output)
 			if err != nil {
 				return err
 			}
+			fmt.Fprintf(o.Out, string(out))
 			cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
 		}
 	}
 	return nil
-}
-
-func (o *SetLastAppliedOptions) formatPrinter(output string, buf []byte, w io.Writer) error {
-	yamlOutput, err := yaml.JSONToYAML(buf)
-	if err != nil {
-		return err
-	}
-	switch output {
-	case "json":
-		jsonBuffer := &bytes.Buffer{}
-		err = json.Indent(jsonBuffer, buf, "", "  ")
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(w, string(jsonBuffer.Bytes()))
-	case "yaml":
-		fmt.Fprintf(w, string(yamlOutput))
-	}
-	return nil
-}
-
-func (o *SetLastAppliedOptions) getPatch(info *resource.Info) ([]byte, []byte, error) {
-	objMap := map[string]map[string]map[string]string{}
-	metadataMap := map[string]map[string]string{}
-	annotationsMap := map[string]string{}
-	localFile, err := runtime.Encode(o.Codec, info.VersionedObject)
-	if err != nil {
-		return nil, localFile, err
-	}
-	annotationsMap[api.LastAppliedConfigAnnotation] = string(localFile)
-	metadataMap["annotations"] = annotationsMap
-	objMap["metadata"] = metadataMap
-	jsonString, err := apijson.Marshal(objMap)
-	return jsonString, localFile, err
 }

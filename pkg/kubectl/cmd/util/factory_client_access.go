@@ -583,6 +583,10 @@ func (f *ring0Factory) EditorEnvs() []string {
 	return []string{"KUBE_EDITOR", "EDITOR"}
 }
 
+func (f *ring0Factory) DiffEnvs() []string {
+	return []string{"KUBECTL_EXTERNAL_DIFF"}
+}
+
 func (f *ring0Factory) PrintObjectSpecificMessage(obj runtime.Object, out io.Writer) {
 	switch obj := obj.(type) {
 	case *api.Service:

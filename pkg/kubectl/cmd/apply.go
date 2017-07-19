@@ -136,6 +136,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 	cmd.AddCommand(NewCmdApplyViewLastApplied(f, out, errOut))
 	cmd.AddCommand(NewCmdApplySetLastApplied(f, out, errOut))
 	cmd.AddCommand(NewCmdApplyEditLastApplied(f, out, errOut))
+	cmd.AddCommand(NewCmdApplyDiffLastApplied(f, out, errOut))
 
 	return cmd
 }
