@@ -231,20 +231,6 @@ function mount-master-pd {
   chgrp -R etcd "${mount_point}/var/etcd"
 }
 
-# append_or_replace_prefixed_line ensures:
-# 1. the specified file exists
-# 2. existing lines with the specified ${prefix} are removed
-# 3. a new line with the specified ${prefix}${suffix} is appended
-function append_or_replace_prefixed_line {
-  local -r file="${1:-}"
-  local -r prefix="${2:-}"
-  local -r suffix="${3:-}"
-
-  touch "${file}"
-  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${file}.filtered"  && mv "${file}.filtered" "${file}"
-  echo "${prefix}${suffix}" >> "${file}"
-}
-
 function create-node-pki {
   echo "Creating node pki files"
 
@@ -350,34 +336,26 @@ function create-master-auth {
   local -r auth_dir="/etc/srv/kubernetes"
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
-    if [[ -e "${basic_auth_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
-      # If METADATA_CLOBBERS_CONFIG is true, we want to rewrite the file
-      # completely, because if we're changing KUBE_USER and KUBE_PASSWORD, we
-      # have nothing to match on.  The file is replaced just below with
-      # append_or_replace_prefixed_line.
-      rm "${basic_auth_csv}"
-    fi
-    append_or_replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER},"      "admin,system:masters"
+    echo "${KUBE_PASSWORD},${KUBE_USER},admin,system:masters" > "${basic_auth_csv}.tmp"
+    mv "${basic_auth_csv}.tmp" "${basic_auth_csv}"
   fi
+
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
+  cat <<EOF > "${known_tokens_csv}.tmp"
+${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager
+${KUBE_SCHEDULER_TOKEN},system:kube-scheduler,uid:system:kube-scheduler
+${KUBELET_TOKEN},kubelet,uid:kubelet,system:nodes
+${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy
+EOF
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
-  fi
-  if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
-  fi
-  if [[ -n "${KUBE_SCHEDULER_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
-  fi
-  if [[ -n "${KUBELET_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "kubelet,uid:kubelet,system:nodes"
-  fi
-  if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
+    echo "${KUBE_BEARER_TOKEN},admin,admin,system:masters" >> "${known_tokens_csv}.tmp"
   fi
   if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
+    echo "${NODE_PROBLEM_DETECTOR_TOKEN},system:node-problem-detector,uid:node-problem-detector" >> "${known_tokens_csv}.tmp"
   fi
+
+  mv "${known_tokens_csv}.tmp" "${known_tokens_csv}"
+
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
