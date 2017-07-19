@@ -287,7 +287,7 @@ function kube::release::create_docker_images_for_server() {
         local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
         local docker_file_path="${docker_build_path}/Dockerfile"
         local binary_file_path="${binary_dir}/${binary_name}"
-        local docker_image_tag="${KUBE_DOCKER_REGISTRY:-gcr.io/google_containers}"
+        local docker_image_tag="gcr.io/google_containers"
 
         rm -rf ${docker_build_path}
         mkdir -p ${docker_build_path}
