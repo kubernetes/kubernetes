@@ -54,6 +54,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_extensions_DeploymentStrategy_To_v1beta2_DeploymentStrategy,
 		Convert_v1beta2_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		Convert_extensions_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment,
+		Convert_extensions_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec,
+		Convert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
 	)
 	if err != nil {
 		return err
@@ -79,6 +81,18 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label %q not supported for appsv1beta2.Deployment", label)
+			}
+		})
+	if err != nil {
+		return err
+	}
+	err = scheme.AddFieldLabelConversionFunc("apps/v1beta2", "ReplicaSet",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name", "metadata.namespace":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label %q not supported for appsv1beta2.ReplicaSet", label)
 			}
 		})
 	if err != nil {
@@ -357,6 +371,29 @@ func Convert_extensions_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployme
 		out.MaxSurge = &intstr.IntOrString{}
 	}
 	if err := s.Convert(&in.MaxSurge, out.MaxSurge, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in *extensions.ReplicaSetSpec, out *appsv1beta2.ReplicaSetSpec, s conversion.Scope) error {
+	out.Replicas = new(int32)
+	*out.Replicas = int32(in.Replicas)
+	out.MinReadySeconds = in.MinReadySeconds
+	out.Selector = in.Selector
+	if err := k8s_api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *appsv1beta2.ReplicaSetSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
+	if in.Replicas != nil {
+		out.Replicas = *in.Replicas
+	}
+	out.MinReadySeconds = in.MinReadySeconds
+	out.Selector = in.Selector
+	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
