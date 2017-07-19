@@ -2096,6 +2096,12 @@ message PersistentVolumeClaimStatus {
   // Represents the actual resources of the underlying volume.
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
+
+  // Current service state of PVC
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated PvcCondition conditions = 4;
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -3017,6 +3023,29 @@ message ProjectedVolumeSource {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 defaultMode = 2;
+}
+
+// PvcCondition contails details about state of pvc
+message PvcCondition {
+  optional string type = 1;
+
+  optional string status = 2;
+
+  // Last time we probed the condition.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
+
+  // Last time the condition transitioned from one status to another.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+
+  // Unique, one-word, CamelCase reason for the condition's last transition.
+  // +optional
+  optional string reason = 5;
+
+  // Human-readable message indicating details about last transition.
+  // +optional
+  optional string message = 6;
 }
 
 // Represents a Quobyte mount that lasts the lifetime of a pod.
