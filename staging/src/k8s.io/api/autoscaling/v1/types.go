@@ -264,7 +264,7 @@ var (
 	// ScalingActive indicates that the HPA controller is able to scale if necessary:
 	// it's correctly configured, can fetch the desired metrics, and isn't disabled.
 	ScalingActive HorizontalPodAutoscalerConditionType = "ScalingActive"
-	// AbleToScale indicates a lack of transient issues which prevent scaling from occuring,
+	// AbleToScale indicates a lack of transient issues which prevent scaling from occurring,
 	// such as being in a backoff window, or being unable to access/update the target scale.
 	AbleToScale HorizontalPodAutoscalerConditionType = "AbleToScale"
 	// ScalingLimited indicates that the calculated scale based on metrics would be above or
