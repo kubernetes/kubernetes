@@ -8650,6 +8650,45 @@
      "capacity": {
       "type": "object",
       "description": "Represents the actual resources of the underlying volume."
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PersistentVolumeClaimCondition"
+      },
+      "description": "Current service state of PVC"
+     }
+    }
+   },
+   "v1.PersistentVolumeClaimCondition": {
+    "id": "v1.PersistentVolumeClaimCondition",
+    "description": "PersistentVolumeClaimCondition contails details about state of pvc",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "lastProbeTime": {
+      "type": "string",
+      "description": "Last time we probed the condition."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "description": "Last time the condition transitioned from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "Unique, one-word, CamelCase reason for the condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "Human-readable message indicating details about last transition."
      }
     }
    },
