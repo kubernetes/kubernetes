@@ -50,7 +50,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1/ref"
+	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 

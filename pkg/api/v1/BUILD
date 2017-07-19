@@ -77,7 +77,6 @@ filegroup(
         "//pkg/api/v1/helper:all-srcs",
         "//pkg/api/v1/node:all-srcs",
         "//pkg/api/v1/pod:all-srcs",
-        "//pkg/api/v1/ref:all-srcs",
         "//pkg/api/v1/resource:all-srcs",
         "//pkg/api/v1/service:all-srcs",
         "//pkg/api/v1/validation:all-srcs",
