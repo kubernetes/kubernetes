@@ -46,6 +46,7 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 const (
@@ -107,6 +108,7 @@ func NewNodeControllerFromClient(
 		nodeCIDRMaskSize,
 		allocateNodeCIDRs,
 		ipam.RangeAllocatorType,
+		useTaints,
 		useTaints,
 		useTaints,
 	)
@@ -2056,6 +2058,186 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	if updatedTaint != nil {
 		if !taintutils.TaintExists(node0.Spec.Taints, updatedTaint) {
 			t.Errorf("Can't find taint %v in %v", updatedTaint, node0.Spec.Taints)
+		}
+	}
+}
+
+func TestTaintsNodeByCondition(t *testing.T) {
+	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
+	evictionTimeout := 10 * time.Minute
+
+	fakeNodeHandler := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+		},
+		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+	}
+
+	nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler, evictionTimeout,
+		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, true)
+	nodeController.now = func() metav1.Time { return fakeNow }
+	nodeController.recorder = testutil.NewFakeRecorder()
+
+	outOfDiskTaint := &v1.Taint{
+		Key:    algorithm.TaintNodeOutOfDisk,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+	networkUnavailableTaint := &v1.Taint{
+		Key:    algorithm.TaintNodeNetworkUnavailable,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+
+	tests := []struct {
+		Name           string
+		Node           *v1.Node
+		ExpectedTaints []*v1.Taint
+	}{
+		{
+			Name: "NetworkUnavailable is true",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+						{
+							Type:               v1.NodeNetworkUnavailable,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			ExpectedTaints: []*v1.Taint{networkUnavailableTaint},
+		},
+		{
+			Name: "NetworkUnavailable and OutOfDisk are true",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+						{
+							Type:               v1.NodeNetworkUnavailable,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+						{
+							Type:               v1.NodeOutOfDisk,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			ExpectedTaints: []*v1.Taint{networkUnavailableTaint, outOfDiskTaint},
+		},
+		{
+			Name: "NetworkUnavailable is true, OutOfDisk is unknown",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+						{
+							Type:               v1.NodeNetworkUnavailable,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+						{
+							Type:               v1.NodeOutOfDisk,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			ExpectedTaints: []*v1.Taint{networkUnavailableTaint},
+		},
+	}
+
+	for _, test := range tests {
+		fakeNodeHandler.Update(test.Node)
+		if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		nodeController.doNoScheduleTaintingPass(test.Node)
+		if err := syncNodeStore(nodeController, fakeNodeHandler); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		node0, err := nodeController.nodeLister.Get("node0")
+		if err != nil {
+			t.Errorf("Can't get current node0...")
+			return
+		}
+		if len(node0.Spec.Taints) != len(test.ExpectedTaints) {
+			t.Errorf("%s: Unexpected number of taints: expected %d, got %d",
+				test.Name, len(test.ExpectedTaints), len(node0.Spec.Taints))
+		}
+		for _, taint := range test.ExpectedTaints {
+			if !taintutils.TaintExists(node0.Spec.Taints, taint) {
+				t.Errorf("%s: Can't find taint %v in %v", test.Name, taint, node0.Spec.Taints)
+			}
 		}
 	}
 }

@@ -19,11 +19,11 @@ package taints
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
@@ -298,4 +298,34 @@ func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 		}
 	}
 	return false
+}
+
+func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []*v1.Taint) {
+	for _, taint := range t1 {
+		if !TaintExists(t2, &taint) {
+			t := taint
+			taintsToAdd = append(taintsToAdd, &t)
+		}
+	}
+
+	for _, taint := range t2 {
+		if !TaintExists(t1, &taint) {
+			t := taint
+			taintsToRemove = append(taintsToRemove, &t)
+		}
+	}
+
+	return
+}
+
+func TaintSetFilter(taints []v1.Taint, fn func(*v1.Taint) bool) []v1.Taint {
+	res := []v1.Taint{}
+
+	for _, taint := range taints {
+		if fn(&taint) {
+			res = append(res, taint)
+		}
+	}
+
+	return res
 }
