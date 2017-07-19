@@ -35,12 +35,12 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against services.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &api.Service{} },
-		NewListFunc:       func() runtime.Object { return &api.ServiceList{} },
-		PredicateFunc:     service.MatchServices,
-		QualifiedResource: api.Resource("services"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("services"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &api.Service{} },
+		NewListFunc:              func() runtime.Object { return &api.ServiceList{} },
+		PredicateFunc:            service.MatchServices,
+		DefaultQualifiedResource: api.Resource("services"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("services"),
 
 		CreateStrategy: service.Strategy,
 		UpdateStrategy: service.Strategy,
