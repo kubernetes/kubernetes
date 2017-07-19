@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "equivalence_cache_predicates.go",
         "events.go",
         "framework.go",
         "nvidia-gpus.go",

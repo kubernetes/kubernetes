@@ -37,6 +37,8 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 )
 
+const enableEquivalenceCache = true
+
 func TestCompatibility_v1_Scheduler(t *testing.T) {
 	// Add serialized versions of scheduler config that exercise available options to ensure compatibility between releases
 	schedulerFiles := map[string]struct {
@@ -432,6 +434,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			informerFactory.Apps().V1beta1().StatefulSets(),
 			informerFactory.Core().V1().Services(),
 			v1.DefaultHardPodAffinitySymmetricWeight,
+			enableEquivalenceCache,
 		).CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue
