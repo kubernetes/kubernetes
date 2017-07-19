@@ -12,12 +12,12 @@ openapi_library(
         "federation/apis/federation/v1beta1",
         "pkg/apis/abac/v0",
         "pkg/apis/abac/v1beta1",
-        "pkg/apis/admission/v1alpha1",
         "pkg/apis/componentconfig/v1alpha1",
         "pkg/version",
     ],
     tags = ["automanaged"],
     vendor_targets = [
+        "k8s.io/api/admission/v1alpha1",
         "k8s.io/api/admissionregistration/v1alpha1",
         "k8s.io/api/apps/v1beta1",
         "k8s.io/api/authentication/v1",
