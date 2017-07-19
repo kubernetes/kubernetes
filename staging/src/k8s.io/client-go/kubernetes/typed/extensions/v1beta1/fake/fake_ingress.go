@@ -36,6 +36,44 @@ var ingressesResource = schema.GroupVersionResource{Group: "extensions", Version
 
 var ingressesKind = schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}
 
+func (c *FakeIngresses) Get(name string, options v1.GetOptions) (result *v1beta1.Ingress, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetAction(ingressesResource, c.ns, name), &v1beta1.Ingress{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.Ingress), err
+}
+
+func (c *FakeIngresses) List(opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewListAction(ingressesResource, ingressesKind, c.ns, opts), &v1beta1.IngressList{})
+
+	if obj == nil {
+		return nil, err
+	}
+
+	label, _, _ := testing.ExtractFromListOptions(opts)
+	if label == nil {
+		label = labels.Everything()
+	}
+	list := &v1beta1.IngressList{}
+	for _, item := range obj.(*v1beta1.IngressList).Items {
+		if label.Matches(labels.Set(item.Labels)) {
+			list.Items = append(list.Items, item)
+		}
+	}
+	return list, err
+}
+
+// Watch returns a watch.Interface that watches the requested ingresses.
+func (c *FakeIngresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	return c.Fake.
+		InvokesWatch(testing.NewWatchAction(ingressesResource, c.ns, opts))
+
+}
+
 func (c *FakeIngresses) Create(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(ingressesResource, c.ns, ingress), &v1beta1.Ingress{})
@@ -78,44 +116,6 @@ func (c *FakeIngresses) DeleteCollection(options *v1.DeleteOptions, listOptions 
 
 	_, err := c.Fake.Invokes(action, &v1beta1.IngressList{})
 	return err
-}
-
-func (c *FakeIngresses) Get(name string, options v1.GetOptions) (result *v1beta1.Ingress, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(ingressesResource, c.ns, name), &v1beta1.Ingress{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.Ingress), err
-}
-
-func (c *FakeIngresses) List(opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(ingressesResource, ingressesKind, c.ns, opts), &v1beta1.IngressList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1beta1.IngressList{}
-	for _, item := range obj.(*v1beta1.IngressList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested ingresses.
-func (c *FakeIngresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(ingressesResource, c.ns, opts))
-
 }
 
 // Patch applies the patch and returns the patched ingress.

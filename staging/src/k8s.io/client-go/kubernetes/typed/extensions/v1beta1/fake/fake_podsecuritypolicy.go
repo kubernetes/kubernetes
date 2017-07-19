@@ -35,37 +35,6 @@ var podsecuritypoliciesResource = schema.GroupVersionResource{Group: "extensions
 
 var podsecuritypoliciesKind = schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "PodSecurityPolicy"}
 
-func (c *FakePodSecurityPolicies) Create(podSecurityPolicy *v1beta1.PodSecurityPolicy) (result *v1beta1.PodSecurityPolicy, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(podsecuritypoliciesResource, podSecurityPolicy), &v1beta1.PodSecurityPolicy{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.PodSecurityPolicy), err
-}
-
-func (c *FakePodSecurityPolicies) Update(podSecurityPolicy *v1beta1.PodSecurityPolicy) (result *v1beta1.PodSecurityPolicy, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(podsecuritypoliciesResource, podSecurityPolicy), &v1beta1.PodSecurityPolicy{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.PodSecurityPolicy), err
-}
-
-func (c *FakePodSecurityPolicies) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(podsecuritypoliciesResource, name), &v1beta1.PodSecurityPolicy{})
-	return err
-}
-
-func (c *FakePodSecurityPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(podsecuritypoliciesResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1beta1.PodSecurityPolicyList{})
-	return err
-}
-
 func (c *FakePodSecurityPolicies) Get(name string, options v1.GetOptions) (result *v1beta1.PodSecurityPolicy, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(podsecuritypoliciesResource, name), &v1beta1.PodSecurityPolicy{})
@@ -99,6 +68,37 @@ func (c *FakePodSecurityPolicies) List(opts v1.ListOptions) (result *v1beta1.Pod
 func (c *FakePodSecurityPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(podsecuritypoliciesResource, opts))
+}
+
+func (c *FakePodSecurityPolicies) Create(podSecurityPolicy *v1beta1.PodSecurityPolicy) (result *v1beta1.PodSecurityPolicy, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(podsecuritypoliciesResource, podSecurityPolicy), &v1beta1.PodSecurityPolicy{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.PodSecurityPolicy), err
+}
+
+func (c *FakePodSecurityPolicies) Update(podSecurityPolicy *v1beta1.PodSecurityPolicy) (result *v1beta1.PodSecurityPolicy, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(podsecuritypoliciesResource, podSecurityPolicy), &v1beta1.PodSecurityPolicy{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.PodSecurityPolicy), err
+}
+
+func (c *FakePodSecurityPolicies) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(podsecuritypoliciesResource, name), &v1beta1.PodSecurityPolicy{})
+	return err
+}
+
+func (c *FakePodSecurityPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(podsecuritypoliciesResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &v1beta1.PodSecurityPolicyList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched podSecurityPolicy.

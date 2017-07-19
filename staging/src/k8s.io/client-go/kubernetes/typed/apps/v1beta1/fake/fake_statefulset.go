@@ -36,6 +36,44 @@ var statefulsetsResource = schema.GroupVersionResource{Group: "apps", Version: "
 
 var statefulsetsKind = schema.GroupVersionKind{Group: "apps", Version: "v1beta1", Kind: "StatefulSet"}
 
+func (c *FakeStatefulSets) Get(name string, options v1.GetOptions) (result *v1beta1.StatefulSet, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetAction(statefulsetsResource, c.ns, name), &v1beta1.StatefulSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.StatefulSet), err
+}
+
+func (c *FakeStatefulSets) List(opts v1.ListOptions) (result *v1beta1.StatefulSetList, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewListAction(statefulsetsResource, statefulsetsKind, c.ns, opts), &v1beta1.StatefulSetList{})
+
+	if obj == nil {
+		return nil, err
+	}
+
+	label, _, _ := testing.ExtractFromListOptions(opts)
+	if label == nil {
+		label = labels.Everything()
+	}
+	list := &v1beta1.StatefulSetList{}
+	for _, item := range obj.(*v1beta1.StatefulSetList).Items {
+		if label.Matches(labels.Set(item.Labels)) {
+			list.Items = append(list.Items, item)
+		}
+	}
+	return list, err
+}
+
+// Watch returns a watch.Interface that watches the requested statefulSets.
+func (c *FakeStatefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	return c.Fake.
+		InvokesWatch(testing.NewWatchAction(statefulsetsResource, c.ns, opts))
+
+}
+
 func (c *FakeStatefulSets) Create(statefulSet *v1beta1.StatefulSet) (result *v1beta1.StatefulSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(statefulsetsResource, c.ns, statefulSet), &v1beta1.StatefulSet{})
@@ -78,44 +116,6 @@ func (c *FakeStatefulSets) DeleteCollection(options *v1.DeleteOptions, listOptio
 
 	_, err := c.Fake.Invokes(action, &v1beta1.StatefulSetList{})
 	return err
-}
-
-func (c *FakeStatefulSets) Get(name string, options v1.GetOptions) (result *v1beta1.StatefulSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(statefulsetsResource, c.ns, name), &v1beta1.StatefulSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.StatefulSet), err
-}
-
-func (c *FakeStatefulSets) List(opts v1.ListOptions) (result *v1beta1.StatefulSetList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(statefulsetsResource, statefulsetsKind, c.ns, opts), &v1beta1.StatefulSetList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1beta1.StatefulSetList{}
-	for _, item := range obj.(*v1beta1.StatefulSetList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested statefulSets.
-func (c *FakeStatefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(statefulsetsResource, c.ns, opts))
-
 }
 
 // Patch applies the patch and returns the patched statefulSet.

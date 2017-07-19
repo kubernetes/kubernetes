@@ -35,37 +35,6 @@ var initializerconfigurationsResource = schema.GroupVersionResource{Group: "admi
 
 var initializerconfigurationsKind = schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfiguration"}
 
-func (c *FakeInitializerConfigurations) Create(initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(initializerconfigurationsResource, initializerConfiguration), &v1alpha1.InitializerConfiguration{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.InitializerConfiguration), err
-}
-
-func (c *FakeInitializerConfigurations) Update(initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(initializerconfigurationsResource, initializerConfiguration), &v1alpha1.InitializerConfiguration{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.InitializerConfiguration), err
-}
-
-func (c *FakeInitializerConfigurations) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(initializerconfigurationsResource, name), &v1alpha1.InitializerConfiguration{})
-	return err
-}
-
-func (c *FakeInitializerConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(initializerconfigurationsResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.InitializerConfigurationList{})
-	return err
-}
-
 func (c *FakeInitializerConfigurations) Get(name string, options v1.GetOptions) (result *v1alpha1.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(initializerconfigurationsResource, name), &v1alpha1.InitializerConfiguration{})
@@ -99,6 +68,37 @@ func (c *FakeInitializerConfigurations) List(opts v1.ListOptions) (result *v1alp
 func (c *FakeInitializerConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(initializerconfigurationsResource, opts))
+}
+
+func (c *FakeInitializerConfigurations) Create(initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(initializerconfigurationsResource, initializerConfiguration), &v1alpha1.InitializerConfiguration{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.InitializerConfiguration), err
+}
+
+func (c *FakeInitializerConfigurations) Update(initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(initializerconfigurationsResource, initializerConfiguration), &v1alpha1.InitializerConfiguration{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.InitializerConfiguration), err
+}
+
+func (c *FakeInitializerConfigurations) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(initializerconfigurationsResource, name), &v1alpha1.InitializerConfiguration{})
+	return err
+}
+
+func (c *FakeInitializerConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(initializerconfigurationsResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &v1alpha1.InitializerConfigurationList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched initializerConfiguration.

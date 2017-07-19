@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
-	v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	core_v1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,63 +36,19 @@ var persistentvolumeclaimsResource = schema.GroupVersionResource{Group: "", Vers
 
 var persistentvolumeclaimsKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "PersistentVolumeClaim"}
 
-func (c *FakePersistentVolumeClaims) Create(persistentVolumeClaim *v1.PersistentVolumeClaim) (result *v1.PersistentVolumeClaim, err error) {
+func (c *FakePersistentVolumeClaims) Get(name string, options v1.GetOptions) (result *core_v1.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &v1.PersistentVolumeClaim{})
+		Invokes(testing.NewGetAction(persistentvolumeclaimsResource, c.ns, name), &core_v1.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1.PersistentVolumeClaim), err
+	return obj.(*core_v1.PersistentVolumeClaim), err
 }
 
-func (c *FakePersistentVolumeClaims) Update(persistentVolumeClaim *v1.PersistentVolumeClaim) (result *v1.PersistentVolumeClaim, err error) {
+func (c *FakePersistentVolumeClaims) List(opts v1.ListOptions) (result *core_v1.PersistentVolumeClaimList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &v1.PersistentVolumeClaim{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.PersistentVolumeClaim), err
-}
-
-func (c *FakePersistentVolumeClaims) UpdateStatus(persistentVolumeClaim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(persistentvolumeclaimsResource, "status", c.ns, persistentVolumeClaim), &v1.PersistentVolumeClaim{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.PersistentVolumeClaim), err
-}
-
-func (c *FakePersistentVolumeClaims) Delete(name string, options *meta_v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(persistentvolumeclaimsResource, c.ns, name), &v1.PersistentVolumeClaim{})
-
-	return err
-}
-
-func (c *FakePersistentVolumeClaims) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(persistentvolumeclaimsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1.PersistentVolumeClaimList{})
-	return err
-}
-
-func (c *FakePersistentVolumeClaims) Get(name string, options meta_v1.GetOptions) (result *v1.PersistentVolumeClaim, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(persistentvolumeclaimsResource, c.ns, name), &v1.PersistentVolumeClaim{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.PersistentVolumeClaim), err
-}
-
-func (c *FakePersistentVolumeClaims) List(opts meta_v1.ListOptions) (result *v1.PersistentVolumeClaimList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(persistentvolumeclaimsResource, persistentvolumeclaimsKind, c.ns, opts), &v1.PersistentVolumeClaimList{})
+		Invokes(testing.NewListAction(persistentvolumeclaimsResource, persistentvolumeclaimsKind, c.ns, opts), &core_v1.PersistentVolumeClaimList{})
 
 	if obj == nil {
 		return nil, err
@@ -102,8 +58,8 @@ func (c *FakePersistentVolumeClaims) List(opts meta_v1.ListOptions) (result *v1.
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1.PersistentVolumeClaimList{}
-	for _, item := range obj.(*v1.PersistentVolumeClaimList).Items {
+	list := &core_v1.PersistentVolumeClaimList{}
+	for _, item := range obj.(*core_v1.PersistentVolumeClaimList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -112,19 +68,63 @@ func (c *FakePersistentVolumeClaims) List(opts meta_v1.ListOptions) (result *v1.
 }
 
 // Watch returns a watch.Interface that watches the requested persistentVolumeClaims.
-func (c *FakePersistentVolumeClaims) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *FakePersistentVolumeClaims) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(persistentvolumeclaimsResource, c.ns, opts))
 
 }
 
-// Patch applies the patch and returns the patched persistentVolumeClaim.
-func (c *FakePersistentVolumeClaims) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolumeClaim, err error) {
+func (c *FakePersistentVolumeClaims) Create(persistentVolumeClaim *core_v1.PersistentVolumeClaim) (result *core_v1.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, data, subresources...), &v1.PersistentVolumeClaim{})
+		Invokes(testing.NewCreateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &core_v1.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1.PersistentVolumeClaim), err
+	return obj.(*core_v1.PersistentVolumeClaim), err
+}
+
+func (c *FakePersistentVolumeClaims) Update(persistentVolumeClaim *core_v1.PersistentVolumeClaim) (result *core_v1.PersistentVolumeClaim, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &core_v1.PersistentVolumeClaim{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*core_v1.PersistentVolumeClaim), err
+}
+
+func (c *FakePersistentVolumeClaims) UpdateStatus(persistentVolumeClaim *core_v1.PersistentVolumeClaim) (*core_v1.PersistentVolumeClaim, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(persistentvolumeclaimsResource, "status", c.ns, persistentVolumeClaim), &core_v1.PersistentVolumeClaim{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*core_v1.PersistentVolumeClaim), err
+}
+
+func (c *FakePersistentVolumeClaims) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(persistentvolumeclaimsResource, c.ns, name), &core_v1.PersistentVolumeClaim{})
+
+	return err
+}
+
+func (c *FakePersistentVolumeClaims) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(persistentvolumeclaimsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &core_v1.PersistentVolumeClaimList{})
+	return err
+}
+
+// Patch applies the patch and returns the patched persistentVolumeClaim.
+func (c *FakePersistentVolumeClaims) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core_v1.PersistentVolumeClaim, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, data, subresources...), &core_v1.PersistentVolumeClaim{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*core_v1.PersistentVolumeClaim), err
 }

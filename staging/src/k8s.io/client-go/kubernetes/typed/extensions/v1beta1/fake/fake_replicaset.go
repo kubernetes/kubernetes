@@ -36,6 +36,44 @@ var replicasetsResource = schema.GroupVersionResource{Group: "extensions", Versi
 
 var replicasetsKind = schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}
 
+func (c *FakeReplicaSets) Get(name string, options v1.GetOptions) (result *v1beta1.ReplicaSet, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetAction(replicasetsResource, c.ns, name), &v1beta1.ReplicaSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.ReplicaSet), err
+}
+
+func (c *FakeReplicaSets) List(opts v1.ListOptions) (result *v1beta1.ReplicaSetList, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewListAction(replicasetsResource, replicasetsKind, c.ns, opts), &v1beta1.ReplicaSetList{})
+
+	if obj == nil {
+		return nil, err
+	}
+
+	label, _, _ := testing.ExtractFromListOptions(opts)
+	if label == nil {
+		label = labels.Everything()
+	}
+	list := &v1beta1.ReplicaSetList{}
+	for _, item := range obj.(*v1beta1.ReplicaSetList).Items {
+		if label.Matches(labels.Set(item.Labels)) {
+			list.Items = append(list.Items, item)
+		}
+	}
+	return list, err
+}
+
+// Watch returns a watch.Interface that watches the requested replicaSets.
+func (c *FakeReplicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	return c.Fake.
+		InvokesWatch(testing.NewWatchAction(replicasetsResource, c.ns, opts))
+
+}
+
 func (c *FakeReplicaSets) Create(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.ReplicaSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(replicasetsResource, c.ns, replicaSet), &v1beta1.ReplicaSet{})
@@ -78,44 +116,6 @@ func (c *FakeReplicaSets) DeleteCollection(options *v1.DeleteOptions, listOption
 
 	_, err := c.Fake.Invokes(action, &v1beta1.ReplicaSetList{})
 	return err
-}
-
-func (c *FakeReplicaSets) Get(name string, options v1.GetOptions) (result *v1beta1.ReplicaSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(replicasetsResource, c.ns, name), &v1beta1.ReplicaSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.ReplicaSet), err
-}
-
-func (c *FakeReplicaSets) List(opts v1.ListOptions) (result *v1beta1.ReplicaSetList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(replicasetsResource, replicasetsKind, c.ns, opts), &v1beta1.ReplicaSetList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1beta1.ReplicaSetList{}
-	for _, item := range obj.(*v1beta1.ReplicaSetList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested replicaSets.
-func (c *FakeReplicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(replicasetsResource, c.ns, opts))
-
 }
 
 // Patch applies the patch and returns the patched replicaSet.

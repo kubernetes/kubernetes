@@ -35,37 +35,6 @@ var clusterrolesResource = schema.GroupVersionResource{Group: "rbac.authorizatio
 
 var clusterrolesKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "ClusterRole"}
 
-func (c *FakeClusterRoles) Create(clusterRole *v1beta1.ClusterRole) (result *v1beta1.ClusterRole, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), &v1beta1.ClusterRole{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.ClusterRole), err
-}
-
-func (c *FakeClusterRoles) Update(clusterRole *v1beta1.ClusterRole) (result *v1beta1.ClusterRole, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), &v1beta1.ClusterRole{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.ClusterRole), err
-}
-
-func (c *FakeClusterRoles) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clusterrolesResource, name), &v1beta1.ClusterRole{})
-	return err
-}
-
-func (c *FakeClusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(clusterrolesResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1beta1.ClusterRoleList{})
-	return err
-}
-
 func (c *FakeClusterRoles) Get(name string, options v1.GetOptions) (result *v1beta1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(clusterrolesResource, name), &v1beta1.ClusterRole{})
@@ -99,6 +68,37 @@ func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *v1beta1.ClusterRol
 func (c *FakeClusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(clusterrolesResource, opts))
+}
+
+func (c *FakeClusterRoles) Create(clusterRole *v1beta1.ClusterRole) (result *v1beta1.ClusterRole, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), &v1beta1.ClusterRole{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.ClusterRole), err
+}
+
+func (c *FakeClusterRoles) Update(clusterRole *v1beta1.ClusterRole) (result *v1beta1.ClusterRole, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), &v1beta1.ClusterRole{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.ClusterRole), err
+}
+
+func (c *FakeClusterRoles) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(clusterrolesResource, name), &v1beta1.ClusterRole{})
+	return err
+}
+
+func (c *FakeClusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(clusterrolesResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &v1beta1.ClusterRoleList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched clusterRole.

@@ -35,37 +35,6 @@ var storageclassesResource = schema.GroupVersionResource{Group: "storage.k8s.io"
 
 var storageclassesKind = schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"}
 
-func (c *FakeStorageClasses) Create(storageClass *v1beta1.StorageClass) (result *v1beta1.StorageClass, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(storageclassesResource, storageClass), &v1beta1.StorageClass{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.StorageClass), err
-}
-
-func (c *FakeStorageClasses) Update(storageClass *v1beta1.StorageClass) (result *v1beta1.StorageClass, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(storageclassesResource, storageClass), &v1beta1.StorageClass{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.StorageClass), err
-}
-
-func (c *FakeStorageClasses) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(storageclassesResource, name), &v1beta1.StorageClass{})
-	return err
-}
-
-func (c *FakeStorageClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(storageclassesResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1beta1.StorageClassList{})
-	return err
-}
-
 func (c *FakeStorageClasses) Get(name string, options v1.GetOptions) (result *v1beta1.StorageClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(storageclassesResource, name), &v1beta1.StorageClass{})
@@ -99,6 +68,37 @@ func (c *FakeStorageClasses) List(opts v1.ListOptions) (result *v1beta1.StorageC
 func (c *FakeStorageClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(storageclassesResource, opts))
+}
+
+func (c *FakeStorageClasses) Create(storageClass *v1beta1.StorageClass) (result *v1beta1.StorageClass, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(storageclassesResource, storageClass), &v1beta1.StorageClass{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.StorageClass), err
+}
+
+func (c *FakeStorageClasses) Update(storageClass *v1beta1.StorageClass) (result *v1beta1.StorageClass, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(storageclassesResource, storageClass), &v1beta1.StorageClass{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.StorageClass), err
+}
+
+func (c *FakeStorageClasses) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(storageclassesResource, name), &v1beta1.StorageClass{})
+	return err
+}
+
+func (c *FakeStorageClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(storageclassesResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &v1beta1.StorageClassList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched storageClass.

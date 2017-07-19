@@ -36,6 +36,44 @@ var poddisruptionbudgetsResource = schema.GroupVersionResource{Group: "policy", 
 
 var poddisruptionbudgetsKind = schema.GroupVersionKind{Group: "policy", Version: "v1beta1", Kind: "PodDisruptionBudget"}
 
+func (c *FakePodDisruptionBudgets) Get(name string, options v1.GetOptions) (result *v1beta1.PodDisruptionBudget, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetAction(poddisruptionbudgetsResource, c.ns, name), &v1beta1.PodDisruptionBudget{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.PodDisruptionBudget), err
+}
+
+func (c *FakePodDisruptionBudgets) List(opts v1.ListOptions) (result *v1beta1.PodDisruptionBudgetList, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewListAction(poddisruptionbudgetsResource, poddisruptionbudgetsKind, c.ns, opts), &v1beta1.PodDisruptionBudgetList{})
+
+	if obj == nil {
+		return nil, err
+	}
+
+	label, _, _ := testing.ExtractFromListOptions(opts)
+	if label == nil {
+		label = labels.Everything()
+	}
+	list := &v1beta1.PodDisruptionBudgetList{}
+	for _, item := range obj.(*v1beta1.PodDisruptionBudgetList).Items {
+		if label.Matches(labels.Set(item.Labels)) {
+			list.Items = append(list.Items, item)
+		}
+	}
+	return list, err
+}
+
+// Watch returns a watch.Interface that watches the requested podDisruptionBudgets.
+func (c *FakePodDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	return c.Fake.
+		InvokesWatch(testing.NewWatchAction(poddisruptionbudgetsResource, c.ns, opts))
+
+}
+
 func (c *FakePodDisruptionBudgets) Create(podDisruptionBudget *v1beta1.PodDisruptionBudget) (result *v1beta1.PodDisruptionBudget, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(poddisruptionbudgetsResource, c.ns, podDisruptionBudget), &v1beta1.PodDisruptionBudget{})
@@ -78,44 +116,6 @@ func (c *FakePodDisruptionBudgets) DeleteCollection(options *v1.DeleteOptions, l
 
 	_, err := c.Fake.Invokes(action, &v1beta1.PodDisruptionBudgetList{})
 	return err
-}
-
-func (c *FakePodDisruptionBudgets) Get(name string, options v1.GetOptions) (result *v1beta1.PodDisruptionBudget, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(poddisruptionbudgetsResource, c.ns, name), &v1beta1.PodDisruptionBudget{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.PodDisruptionBudget), err
-}
-
-func (c *FakePodDisruptionBudgets) List(opts v1.ListOptions) (result *v1beta1.PodDisruptionBudgetList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(poddisruptionbudgetsResource, poddisruptionbudgetsKind, c.ns, opts), &v1beta1.PodDisruptionBudgetList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1beta1.PodDisruptionBudgetList{}
-	for _, item := range obj.(*v1beta1.PodDisruptionBudgetList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested podDisruptionBudgets.
-func (c *FakePodDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(poddisruptionbudgetsResource, c.ns, opts))
-
 }
 
 // Patch applies the patch and returns the patched podDisruptionBudget.

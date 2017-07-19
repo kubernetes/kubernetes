@@ -36,40 +36,6 @@ var rolesResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.i
 
 var rolesKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "Role"}
 
-func (c *FakeRoles) Create(role *v1alpha1.Role) (result *v1alpha1.Role, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(rolesResource, c.ns, role), &v1alpha1.Role{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.Role), err
-}
-
-func (c *FakeRoles) Update(role *v1alpha1.Role) (result *v1alpha1.Role, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(rolesResource, c.ns, role), &v1alpha1.Role{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.Role), err
-}
-
-func (c *FakeRoles) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(rolesResource, c.ns, name), &v1alpha1.Role{})
-
-	return err
-}
-
-func (c *FakeRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(rolesResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.RoleList{})
-	return err
-}
-
 func (c *FakeRoles) Get(name string, options v1.GetOptions) (result *v1alpha1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(rolesResource, c.ns, name), &v1alpha1.Role{})
@@ -106,6 +72,40 @@ func (c *FakeRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(rolesResource, c.ns, opts))
 
+}
+
+func (c *FakeRoles) Create(role *v1alpha1.Role) (result *v1alpha1.Role, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(rolesResource, c.ns, role), &v1alpha1.Role{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.Role), err
+}
+
+func (c *FakeRoles) Update(role *v1alpha1.Role) (result *v1alpha1.Role, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(rolesResource, c.ns, role), &v1alpha1.Role{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.Role), err
+}
+
+func (c *FakeRoles) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(rolesResource, c.ns, name), &v1alpha1.Role{})
+
+	return err
+}
+
+func (c *FakeRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(rolesResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &v1alpha1.RoleList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched role.

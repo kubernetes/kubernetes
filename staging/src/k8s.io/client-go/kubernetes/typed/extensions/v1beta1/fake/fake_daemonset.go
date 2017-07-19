@@ -36,6 +36,44 @@ var daemonsetsResource = schema.GroupVersionResource{Group: "extensions", Versio
 
 var daemonsetsKind = schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "DaemonSet"}
 
+func (c *FakeDaemonSets) Get(name string, options v1.GetOptions) (result *v1beta1.DaemonSet, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetAction(daemonsetsResource, c.ns, name), &v1beta1.DaemonSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.DaemonSet), err
+}
+
+func (c *FakeDaemonSets) List(opts v1.ListOptions) (result *v1beta1.DaemonSetList, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewListAction(daemonsetsResource, daemonsetsKind, c.ns, opts), &v1beta1.DaemonSetList{})
+
+	if obj == nil {
+		return nil, err
+	}
+
+	label, _, _ := testing.ExtractFromListOptions(opts)
+	if label == nil {
+		label = labels.Everything()
+	}
+	list := &v1beta1.DaemonSetList{}
+	for _, item := range obj.(*v1beta1.DaemonSetList).Items {
+		if label.Matches(labels.Set(item.Labels)) {
+			list.Items = append(list.Items, item)
+		}
+	}
+	return list, err
+}
+
+// Watch returns a watch.Interface that watches the requested daemonSets.
+func (c *FakeDaemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	return c.Fake.
+		InvokesWatch(testing.NewWatchAction(daemonsetsResource, c.ns, opts))
+
+}
+
 func (c *FakeDaemonSets) Create(daemonSet *v1beta1.DaemonSet) (result *v1beta1.DaemonSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(daemonsetsResource, c.ns, daemonSet), &v1beta1.DaemonSet{})
@@ -78,44 +116,6 @@ func (c *FakeDaemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions
 
 	_, err := c.Fake.Invokes(action, &v1beta1.DaemonSetList{})
 	return err
-}
-
-func (c *FakeDaemonSets) Get(name string, options v1.GetOptions) (result *v1beta1.DaemonSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(daemonsetsResource, c.ns, name), &v1beta1.DaemonSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.DaemonSet), err
-}
-
-func (c *FakeDaemonSets) List(opts v1.ListOptions) (result *v1beta1.DaemonSetList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(daemonsetsResource, daemonsetsKind, c.ns, opts), &v1beta1.DaemonSetList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1beta1.DaemonSetList{}
-	for _, item := range obj.(*v1beta1.DaemonSetList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested daemonSets.
-func (c *FakeDaemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(daemonsetsResource, c.ns, opts))
-
 }
 
 // Patch applies the patch and returns the patched daemonSet.

@@ -36,6 +36,44 @@ var cronjobsResource = schema.GroupVersionResource{Group: "batch", Version: "v2a
 
 var cronjobsKind = schema.GroupVersionKind{Group: "batch", Version: "v2alpha1", Kind: "CronJob"}
 
+func (c *FakeCronJobs) Get(name string, options v1.GetOptions) (result *v2alpha1.CronJob, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetAction(cronjobsResource, c.ns, name), &v2alpha1.CronJob{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2alpha1.CronJob), err
+}
+
+func (c *FakeCronJobs) List(opts v1.ListOptions) (result *v2alpha1.CronJobList, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewListAction(cronjobsResource, cronjobsKind, c.ns, opts), &v2alpha1.CronJobList{})
+
+	if obj == nil {
+		return nil, err
+	}
+
+	label, _, _ := testing.ExtractFromListOptions(opts)
+	if label == nil {
+		label = labels.Everything()
+	}
+	list := &v2alpha1.CronJobList{}
+	for _, item := range obj.(*v2alpha1.CronJobList).Items {
+		if label.Matches(labels.Set(item.Labels)) {
+			list.Items = append(list.Items, item)
+		}
+	}
+	return list, err
+}
+
+// Watch returns a watch.Interface that watches the requested cronJobs.
+func (c *FakeCronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	return c.Fake.
+		InvokesWatch(testing.NewWatchAction(cronjobsResource, c.ns, opts))
+
+}
+
 func (c *FakeCronJobs) Create(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(cronjobsResource, c.ns, cronJob), &v2alpha1.CronJob{})
@@ -78,44 +116,6 @@ func (c *FakeCronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v
 
 	_, err := c.Fake.Invokes(action, &v2alpha1.CronJobList{})
 	return err
-}
-
-func (c *FakeCronJobs) Get(name string, options v1.GetOptions) (result *v2alpha1.CronJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(cronjobsResource, c.ns, name), &v2alpha1.CronJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2alpha1.CronJob), err
-}
-
-func (c *FakeCronJobs) List(opts v1.ListOptions) (result *v2alpha1.CronJobList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(cronjobsResource, cronjobsKind, c.ns, opts), &v2alpha1.CronJobList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v2alpha1.CronJobList{}
-	for _, item := range obj.(*v2alpha1.CronJobList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested cronJobs.
-func (c *FakeCronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(cronjobsResource, c.ns, opts))
-
 }
 
 // Patch applies the patch and returns the patched cronJob.

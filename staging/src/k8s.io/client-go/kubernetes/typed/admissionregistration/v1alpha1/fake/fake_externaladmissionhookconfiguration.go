@@ -35,37 +35,6 @@ var externaladmissionhookconfigurationsResource = schema.GroupVersionResource{Gr
 
 var externaladmissionhookconfigurationsKind = schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfiguration"}
 
-func (c *FakeExternalAdmissionHookConfigurations) Create(externalAdmissionHookConfiguration *v1alpha1.ExternalAdmissionHookConfiguration) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(externaladmissionhookconfigurationsResource, externalAdmissionHookConfiguration), &v1alpha1.ExternalAdmissionHookConfiguration{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ExternalAdmissionHookConfiguration), err
-}
-
-func (c *FakeExternalAdmissionHookConfigurations) Update(externalAdmissionHookConfiguration *v1alpha1.ExternalAdmissionHookConfiguration) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(externaladmissionhookconfigurationsResource, externalAdmissionHookConfiguration), &v1alpha1.ExternalAdmissionHookConfiguration{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ExternalAdmissionHookConfiguration), err
-}
-
-func (c *FakeExternalAdmissionHookConfigurations) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(externaladmissionhookconfigurationsResource, name), &v1alpha1.ExternalAdmissionHookConfiguration{})
-	return err
-}
-
-func (c *FakeExternalAdmissionHookConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(externaladmissionhookconfigurationsResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.ExternalAdmissionHookConfigurationList{})
-	return err
-}
-
 func (c *FakeExternalAdmissionHookConfigurations) Get(name string, options v1.GetOptions) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(externaladmissionhookconfigurationsResource, name), &v1alpha1.ExternalAdmissionHookConfiguration{})
@@ -99,6 +68,37 @@ func (c *FakeExternalAdmissionHookConfigurations) List(opts v1.ListOptions) (res
 func (c *FakeExternalAdmissionHookConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(externaladmissionhookconfigurationsResource, opts))
+}
+
+func (c *FakeExternalAdmissionHookConfigurations) Create(externalAdmissionHookConfiguration *v1alpha1.ExternalAdmissionHookConfiguration) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(externaladmissionhookconfigurationsResource, externalAdmissionHookConfiguration), &v1alpha1.ExternalAdmissionHookConfiguration{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ExternalAdmissionHookConfiguration), err
+}
+
+func (c *FakeExternalAdmissionHookConfigurations) Update(externalAdmissionHookConfiguration *v1alpha1.ExternalAdmissionHookConfiguration) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(externaladmissionhookconfigurationsResource, externalAdmissionHookConfiguration), &v1alpha1.ExternalAdmissionHookConfiguration{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ExternalAdmissionHookConfiguration), err
+}
+
+func (c *FakeExternalAdmissionHookConfigurations) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(externaladmissionhookconfigurationsResource, name), &v1alpha1.ExternalAdmissionHookConfiguration{})
+	return err
+}
+
+func (c *FakeExternalAdmissionHookConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(externaladmissionhookconfigurationsResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &v1alpha1.ExternalAdmissionHookConfigurationList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched externalAdmissionHookConfiguration.

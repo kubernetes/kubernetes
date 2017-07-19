@@ -36,6 +36,44 @@ var horizontalpodautoscalersResource = schema.GroupVersionResource{Group: "autos
 
 var horizontalpodautoscalersKind = schema.GroupVersionKind{Group: "autoscaling", Version: "v2alpha1", Kind: "HorizontalPodAutoscaler"}
 
+func (c *FakeHorizontalPodAutoscalers) Get(name string, options v1.GetOptions) (result *v2alpha1.HorizontalPodAutoscaler, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetAction(horizontalpodautoscalersResource, c.ns, name), &v2alpha1.HorizontalPodAutoscaler{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2alpha1.HorizontalPodAutoscaler), err
+}
+
+func (c *FakeHorizontalPodAutoscalers) List(opts v1.ListOptions) (result *v2alpha1.HorizontalPodAutoscalerList, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewListAction(horizontalpodautoscalersResource, horizontalpodautoscalersKind, c.ns, opts), &v2alpha1.HorizontalPodAutoscalerList{})
+
+	if obj == nil {
+		return nil, err
+	}
+
+	label, _, _ := testing.ExtractFromListOptions(opts)
+	if label == nil {
+		label = labels.Everything()
+	}
+	list := &v2alpha1.HorizontalPodAutoscalerList{}
+	for _, item := range obj.(*v2alpha1.HorizontalPodAutoscalerList).Items {
+		if label.Matches(labels.Set(item.Labels)) {
+			list.Items = append(list.Items, item)
+		}
+	}
+	return list, err
+}
+
+// Watch returns a watch.Interface that watches the requested horizontalPodAutoscalers.
+func (c *FakeHorizontalPodAutoscalers) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	return c.Fake.
+		InvokesWatch(testing.NewWatchAction(horizontalpodautoscalersResource, c.ns, opts))
+
+}
+
 func (c *FakeHorizontalPodAutoscalers) Create(horizontalPodAutoscaler *v2alpha1.HorizontalPodAutoscaler) (result *v2alpha1.HorizontalPodAutoscaler, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(horizontalpodautoscalersResource, c.ns, horizontalPodAutoscaler), &v2alpha1.HorizontalPodAutoscaler{})
@@ -78,44 +116,6 @@ func (c *FakeHorizontalPodAutoscalers) DeleteCollection(options *v1.DeleteOption
 
 	_, err := c.Fake.Invokes(action, &v2alpha1.HorizontalPodAutoscalerList{})
 	return err
-}
-
-func (c *FakeHorizontalPodAutoscalers) Get(name string, options v1.GetOptions) (result *v2alpha1.HorizontalPodAutoscaler, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(horizontalpodautoscalersResource, c.ns, name), &v2alpha1.HorizontalPodAutoscaler{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2alpha1.HorizontalPodAutoscaler), err
-}
-
-func (c *FakeHorizontalPodAutoscalers) List(opts v1.ListOptions) (result *v2alpha1.HorizontalPodAutoscalerList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(horizontalpodautoscalersResource, horizontalpodautoscalersKind, c.ns, opts), &v2alpha1.HorizontalPodAutoscalerList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v2alpha1.HorizontalPodAutoscalerList{}
-	for _, item := range obj.(*v2alpha1.HorizontalPodAutoscalerList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested horizontalPodAutoscalers.
-func (c *FakeHorizontalPodAutoscalers) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(horizontalpodautoscalersResource, c.ns, opts))
-
 }
 
 // Patch applies the patch and returns the patched horizontalPodAutoscaler.

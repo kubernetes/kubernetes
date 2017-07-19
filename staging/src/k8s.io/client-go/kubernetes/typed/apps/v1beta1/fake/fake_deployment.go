@@ -36,6 +36,44 @@ var deploymentsResource = schema.GroupVersionResource{Group: "apps", Version: "v
 
 var deploymentsKind = schema.GroupVersionKind{Group: "apps", Version: "v1beta1", Kind: "Deployment"}
 
+func (c *FakeDeployments) Get(name string, options v1.GetOptions) (result *v1beta1.Deployment, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetAction(deploymentsResource, c.ns, name), &v1beta1.Deployment{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.Deployment), err
+}
+
+func (c *FakeDeployments) List(opts v1.ListOptions) (result *v1beta1.DeploymentList, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewListAction(deploymentsResource, deploymentsKind, c.ns, opts), &v1beta1.DeploymentList{})
+
+	if obj == nil {
+		return nil, err
+	}
+
+	label, _, _ := testing.ExtractFromListOptions(opts)
+	if label == nil {
+		label = labels.Everything()
+	}
+	list := &v1beta1.DeploymentList{}
+	for _, item := range obj.(*v1beta1.DeploymentList).Items {
+		if label.Matches(labels.Set(item.Labels)) {
+			list.Items = append(list.Items, item)
+		}
+	}
+	return list, err
+}
+
+// Watch returns a watch.Interface that watches the requested deployments.
+func (c *FakeDeployments) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	return c.Fake.
+		InvokesWatch(testing.NewWatchAction(deploymentsResource, c.ns, opts))
+
+}
+
 func (c *FakeDeployments) Create(deployment *v1beta1.Deployment) (result *v1beta1.Deployment, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(deploymentsResource, c.ns, deployment), &v1beta1.Deployment{})
@@ -78,44 +116,6 @@ func (c *FakeDeployments) DeleteCollection(options *v1.DeleteOptions, listOption
 
 	_, err := c.Fake.Invokes(action, &v1beta1.DeploymentList{})
 	return err
-}
-
-func (c *FakeDeployments) Get(name string, options v1.GetOptions) (result *v1beta1.Deployment, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(deploymentsResource, c.ns, name), &v1beta1.Deployment{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.Deployment), err
-}
-
-func (c *FakeDeployments) List(opts v1.ListOptions) (result *v1beta1.DeploymentList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(deploymentsResource, deploymentsKind, c.ns, opts), &v1beta1.DeploymentList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1beta1.DeploymentList{}
-	for _, item := range obj.(*v1beta1.DeploymentList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested deployments.
-func (c *FakeDeployments) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(deploymentsResource, c.ns, opts))
-
 }
 
 // Patch applies the patch and returns the patched deployment.
