@@ -28,8 +28,6 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
-	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
 	// install the componentconfig api so we get its defaulting and conversion functions
 	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
 
@@ -92,5 +90,10 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.FailureDomains, "failure-domains", kubeletapis.DefaultFailureDomains, "Indicate the \"all topologies\" set for an empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.")
 	fs.MarkDeprecated("failure-domains", "Doesn't have any effect. Will be removed in future version.")
 	leaderelectionconfig.BindFlags(&s.LeaderElection, fs)
+
+	// add binary-specific feature flags to global state
+	utilfeature.DefaultFeatureGate.Add(featureGates)
+
+	// add features to FlagSet struct
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }

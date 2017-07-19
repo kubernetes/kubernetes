@@ -32,9 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/master/ports"
 
-	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
-
 	"github.com/cloudflare/cfssl/helpers"
 	"github.com/spf13/pflag"
 )
@@ -229,6 +226,10 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 
 	leaderelectionconfig.BindFlags(&s.LeaderElection, fs)
 
+	// add binary-specific feature flags to global state
+	utilfeature.DefaultFeatureGate.Add(featureGates)
+
+	// add features to FlagSet struct
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
 

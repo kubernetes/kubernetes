@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "container_runtime.go",
+        "features.go",
         "options.go",
     ],
     tags = ["automanaged"],
@@ -19,6 +20,7 @@ go_library(
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/install:go_default_library",
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
