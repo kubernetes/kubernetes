@@ -21,99 +21,9 @@ limitations under the License.
 package componentconfig
 
 import (
-	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
-	reflect "reflect"
 )
-
-// Deprecated: register deep-copy functions.
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
-}
-
-// Deprecated: RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*ClientConnectionConfiguration).DeepCopyInto(out.(*ClientConnectionConfiguration))
-			return nil
-		}, InType: reflect.TypeOf(&ClientConnectionConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*GroupResource).DeepCopyInto(out.(*GroupResource))
-			return nil
-		}, InType: reflect.TypeOf(&GroupResource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*IPVar).DeepCopyInto(out.(*IPVar))
-			return nil
-		}, InType: reflect.TypeOf(&IPVar{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*KubeControllerManagerConfiguration).DeepCopyInto(out.(*KubeControllerManagerConfiguration))
-			return nil
-		}, InType: reflect.TypeOf(&KubeControllerManagerConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*KubeProxyConfiguration).DeepCopyInto(out.(*KubeProxyConfiguration))
-			return nil
-		}, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*KubeProxyConntrackConfiguration).DeepCopyInto(out.(*KubeProxyConntrackConfiguration))
-			return nil
-		}, InType: reflect.TypeOf(&KubeProxyConntrackConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*KubeProxyIPTablesConfiguration).DeepCopyInto(out.(*KubeProxyIPTablesConfiguration))
-			return nil
-		}, InType: reflect.TypeOf(&KubeProxyIPTablesConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*KubeSchedulerConfiguration).DeepCopyInto(out.(*KubeSchedulerConfiguration))
-			return nil
-		}, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*KubeletAnonymousAuthentication).DeepCopyInto(out.(*KubeletAnonymousAuthentication))
-			return nil
-		}, InType: reflect.TypeOf(&KubeletAnonymousAuthentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*KubeletAuthentication).DeepCopyInto(out.(*KubeletAuthentication))
-			return nil
-		}, InType: reflect.TypeOf(&KubeletAuthentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*KubeletAuthorization).DeepCopyInto(out.(*KubeletAuthorization))
-			return nil
-		}, InType: reflect.TypeOf(&KubeletAuthorization{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*KubeletConfiguration).DeepCopyInto(out.(*KubeletConfiguration))
-			return nil
-		}, InType: reflect.TypeOf(&KubeletConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*KubeletWebhookAuthentication).DeepCopyInto(out.(*KubeletWebhookAuthentication))
-			return nil
-		}, InType: reflect.TypeOf(&KubeletWebhookAuthentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*KubeletWebhookAuthorization).DeepCopyInto(out.(*KubeletWebhookAuthorization))
-			return nil
-		}, InType: reflect.TypeOf(&KubeletWebhookAuthorization{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*KubeletX509Authentication).DeepCopyInto(out.(*KubeletX509Authentication))
-			return nil
-		}, InType: reflect.TypeOf(&KubeletX509Authentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*LeaderElectionConfiguration).DeepCopyInto(out.(*LeaderElectionConfiguration))
-			return nil
-		}, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*PersistentVolumeRecyclerConfiguration).DeepCopyInto(out.(*PersistentVolumeRecyclerConfiguration))
-			return nil
-		}, InType: reflect.TypeOf(&PersistentVolumeRecyclerConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*PortRangeVar).DeepCopyInto(out.(*PortRangeVar))
-			return nil
-		}, InType: reflect.TypeOf(&PortRangeVar{})},
-		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
-			in.(*VolumeConfiguration).DeepCopyInto(out.(*VolumeConfiguration))
-			return nil
-		}, InType: reflect.TypeOf(&VolumeConfiguration{})},
-	)
-}
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *ClientConnectionConfiguration) DeepCopyInto(out *ClientConnectionConfiguration) {

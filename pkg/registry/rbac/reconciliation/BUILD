@@ -32,6 +32,7 @@ go_library(
         "reconcile_rolebindings.go",
         "role_interfaces.go",
         "rolebinding_interfaces.go",
+        "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
     deps = [

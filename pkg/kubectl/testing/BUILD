@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "types.generated.go",
         "types.go",
         "zz_generated.deepcopy.go",
@@ -19,7 +20,6 @@ go_library(
     deps = [
         "//vendor/github.com/ugorji/go/codec:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
