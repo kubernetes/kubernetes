@@ -103,7 +103,7 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 		return nil
 	}
 
-	list, err := c.lister.PodPresets(pod.GetNamespace()).List(labels.Everything())
+	list, err := c.lister.PodPresets(a.GetNamespace()).List(labels.Everything())
 
 	// Ignore if exclusion annotation is present
 	if podAnnotations := pod.GetAnnotations(); podAnnotations != nil {
