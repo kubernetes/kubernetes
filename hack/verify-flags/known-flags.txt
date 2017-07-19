@@ -448,6 +448,7 @@ load-balancer-ip
 lock-file
 log-flush-frequency
 log-lines-total
+logexporter-gcs-path
 long-running-request-regexp
 low-diskspace-threshold-mb
 make-iptables-util-chains
