@@ -29,7 +29,7 @@ import (
 func TestKubeletDirs(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	root := kubelet.rootDirectory
 
 	var exp, got string
@@ -74,7 +74,7 @@ func TestKubeletDirs(t *testing.T) {
 func TestKubeletDirsCompat(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
+	kubelet := testKubelet.kubelet[0]
 	root := kubelet.rootDirectory
 	require.NoError(t, os.MkdirAll(root, 0750), "can't mkdir(%q)", root)
 

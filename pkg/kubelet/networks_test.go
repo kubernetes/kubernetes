@@ -23,7 +23,7 @@ import (
 func TestNetworkHostGetsPodNotFound(t *testing.T) {
 	testKubelet := newTestKubelet(t, true)
 	defer testKubelet.Cleanup()
-	nh := networkHost{testKubelet.kubelet}
+	nh := networkHost{testKubelet.kubelet[0]}
 
 	actualPod, _ := nh.GetPodByName("", "")
 	if actualPod != nil {
@@ -34,7 +34,7 @@ func TestNetworkHostGetsPodNotFound(t *testing.T) {
 func TestNetworkHostGetsKubeClient(t *testing.T) {
 	testKubelet := newTestKubelet(t, true)
 	defer testKubelet.Cleanup()
-	nh := networkHost{testKubelet.kubelet}
+	nh := networkHost{testKubelet.kubelet[0]}
 
 	if nh.GetKubeClient() != testKubelet.fakeKubeClient {
 		t.Fatalf("NetworkHost client does not match testKubelet's client")
@@ -44,7 +44,7 @@ func TestNetworkHostGetsKubeClient(t *testing.T) {
 func TestNetworkHostGetsRuntime(t *testing.T) {
 	testKubelet := newTestKubelet(t, true)
 	defer testKubelet.Cleanup()
-	nh := networkHost{testKubelet.kubelet}
+	nh := networkHost{testKubelet.kubelet[0]}
 
 	if nh.GetRuntime() != testKubelet.fakeRuntime {
 		t.Fatalf("NetworkHost runtime does not match testKubelet's runtime")
@@ -54,7 +54,7 @@ func TestNetworkHostGetsRuntime(t *testing.T) {
 func TestNetworkHostSupportsLegacyFeatures(t *testing.T) {
 	testKubelet := newTestKubelet(t, true)
 	defer testKubelet.Cleanup()
-	nh := networkHost{testKubelet.kubelet}
+	nh := networkHost{testKubelet.kubelet[0]}
 
 	if nh.SupportsLegacyFeatures() == false {
 		t.Fatalf("SupportsLegacyFeatures should not be false")
