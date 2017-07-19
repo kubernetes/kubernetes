@@ -20,6 +20,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestBaseDeploymentGenerator_validate(t *testing.T) {
@@ -46,4 +49,27 @@ func TestBaseDeploymentGenerator_validate(t *testing.T) {
 		Images: []string{"nginx", "alpine"},
 	}
 	assert.NoError(t, b.validate())
+}
+
+func TestBaseDeploymentGenerator_structuredGenerator(t *testing.T) {
+	baseGenerator := BaseDeploymentGenerator{
+		Name:     "hello-world",
+		Images:   []string{"nginx@v1"},
+		Replicas: 9,
+	}
+
+	podSpec, labels, selector, replicas, err := baseGenerator.structuredGenerate()
+	assert.NoError(t, err)
+	assert.Equal(t, v1.PodSpec{
+		Containers: []v1.Container{{
+			Name:  "nginx",
+			Image: "nginx@v1",
+		}},
+	}, podSpec)
+	expectedLabels := map[string]string{
+		"app": "hello-world",
+	}
+	assert.Equal(t, expectedLabels, labels)
+	assert.Equal(t, metav1.LabelSelector{MatchLabels: expectedLabels}, selector)
+	assert.Equal(t, int32(9), replicas)
 }

@@ -128,7 +128,7 @@ func (b BaseDeploymentGenerator) buildPodSpec(
 	resourceRequirements v1.ResourceRequirements,
 ) v1.PodSpec {
 
-	podSpec := v1.PodSpec{Containers: []v1.Container{}}
+	podSpec := v1.PodSpec{}
 	for _, imageString := range b.Images {
 		containerName := getContainerName(imageString)
 		podSpec.Containers = append(podSpec.Containers, v1.Container{

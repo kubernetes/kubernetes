@@ -857,6 +857,10 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 
 // parseEnvs converts string into EnvVar objects.
 func parseEnvs(envArray []string) ([]v1.EnvVar, error) {
+	if envArray == nil {
+		// nil in, nil out
+		return nil, nil
+	}
 	envs := make([]v1.EnvVar, 0, len(envArray))
 	for _, env := range envArray {
 		pos := strings.Index(env, "=")
