@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -262,16 +263,20 @@ func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.Selection
 	}
 	p.IncludeUninitialized = options.IncludeUninitialized
 	list := e.NewListFunc()
+	qualifiedResource, err := qualifiedResourceFromContext(ctx)
+	if err != nil {
+		return list, err
+	}
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			err := e.Storage.GetToList(ctx, key, options.ResourceVersion, p, list)
-			return list, storeerr.InterpretListError(err, e.QualifiedResource)
+			return list, storeerr.InterpretListError(err, qualifiedResource)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, p, list)
-	return list, storeerr.InterpretListError(err, e.QualifiedResource)
+	err = e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, p, list)
+	return list, storeerr.InterpretListError(err, qualifiedResource)
 }
 
 // Create inserts a new item according to the unique key from the object.
@@ -287,13 +292,17 @@ func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object, includ
 	if err != nil {
 		return nil, err
 	}
+	qualifiedResource, err := qualifiedResourceFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	ttl, err := e.calculateTTL(obj, 0, false)
 	if err != nil {
 		return nil, err
 	}
 	out := e.NewFunc()
 	if err := e.Storage.Create(ctx, key, obj, out, ttl); err != nil {
-		err = storeerr.InterpretCreateError(err, e.QualifiedResource, name)
+		err = storeerr.InterpretCreateError(err, qualifiedResource, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		if !kubeerr.IsAlreadyExists(err) {
 			return nil, err
@@ -322,12 +331,12 @@ func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object, includ
 		}
 	}
 	if !includeUninitialized {
-		return e.WaitForInitialized(ctx, out)
+		return e.waitForInitialized(ctx, out, qualifiedResource)
 	}
 	return out, nil
 }
 
-func (e *Store) WaitForInitialized(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+func (e *Store) waitForInitialized(ctx genericapirequest.Context, obj runtime.Object, qualifiedResource schema.GroupResource) (runtime.Object, error) {
 	// return early if we don't have initializers, or if they've completed already
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
@@ -363,7 +372,7 @@ func (e *Store) WaitForInitialized(ctx genericapirequest.Context, obj runtime.Ob
 		case event, ok := <-ch:
 			if !ok {
 				// TODO: should we just expose the partially initialized object?
-				return nil, kubeerr.NewServerTimeout(e.QualifiedResource, "create", 0)
+				return nil, kubeerr.NewServerTimeout(qualifiedResource, "create", 0)
 			}
 			switch event.Type {
 			case watch.Deleted:
@@ -439,7 +448,7 @@ func (e *Store) shouldDeleteForFailedInitialization(ctx genericapirequest.Contex
 
 // deleteWithoutFinalizers handles deleting an object ignoring its finalizer list.
 // Used for objects that are either been finalized or have never initialized.
-func (e *Store) deleteWithoutFinalizers(ctx genericapirequest.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions) (runtime.Object, bool, error) {
+func (e *Store) deleteWithoutFinalizers(ctx genericapirequest.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions, qualifiedResource schema.GroupResource) (runtime.Object, bool, error) {
 	out := e.NewFunc()
 	glog.V(6).Infof("going to delete %s from registry, triggered by update", name)
 	if err := e.Storage.Delete(ctx, key, out, preconditions); err != nil {
@@ -447,15 +456,15 @@ func (e *Store) deleteWithoutFinalizers(ctx genericapirequest.Context, name, key
 		// requests to remove all finalizers from the object, so we
 		// ignore the NotFound error.
 		if storage.IsNotFound(err) {
-			_, err := e.finalizeDelete(obj, true)
+			_, err := e.finalizeDelete(obj, true, qualifiedResource)
 			// clients are expecting an updated object if a PUT succeeded,
 			// but finalizeDelete returns a metav1.Status, so return
 			// the object in the request instead.
 			return obj, false, err
 		}
-		return nil, false, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
+		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
-	_, err := e.finalizeDelete(out, true)
+	_, err := e.finalizeDelete(out, true, qualifiedResource)
 	// clients are expecting an updated object if a PUT succeeded, but
 	// finalizeDelete returns a metav1.Status, so return the object in
 	// the request instead.
@@ -475,6 +484,11 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		creatingObj runtime.Object
 		creating    = false
 	)
+
+	qualifiedResource, err := qualifiedResourceFromContext(ctx)
+	if err != nil {
+		return nil, false, err
+	}
 
 	storagePreconditions := &storage.Preconditions{}
 	if preconditions := objInfo.Preconditions(); preconditions != nil {
@@ -507,7 +521,7 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		}
 		if version == 0 {
 			if !e.UpdateStrategy.AllowCreateOnUpdate() {
-				return nil, nil, kubeerr.NewNotFound(e.QualifiedResource, name)
+				return nil, nil, kubeerr.NewNotFound(qualifiedResource, name)
 			}
 			creating = true
 			creatingObj = obj
@@ -541,12 +555,12 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 				// TODO: The Invalid error should have a field for Resource.
 				// After that field is added, we should fill the Resource and
 				// leave the Kind field empty. See the discussion in #18526.
-				qualifiedKind := schema.GroupKind{Group: e.QualifiedResource.Group, Kind: e.QualifiedResource.Resource}
+				qualifiedKind := schema.GroupKind{Group: qualifiedResource.Group, Kind: qualifiedResource.Resource}
 				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), newVersion, "must be specified for an update")}
 				return nil, nil, kubeerr.NewInvalid(qualifiedKind, name, fieldErrList)
 			}
 			if newVersion != version {
-				return nil, nil, kubeerr.NewConflict(e.QualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
+				return nil, nil, kubeerr.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
 			}
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
@@ -569,19 +583,19 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 	if err != nil {
 		// delete the object
 		if err == errEmptiedFinalizers {
-			return e.deleteWithoutFinalizers(ctx, name, key, deleteObj, storagePreconditions)
+			return e.deleteWithoutFinalizers(ctx, name, key, deleteObj, storagePreconditions, qualifiedResource)
 		}
 		if creating {
-			err = storeerr.InterpretCreateError(err, e.QualifiedResource, name)
+			err = storeerr.InterpretCreateError(err, qualifiedResource, name)
 			err = rest.CheckGeneratedNameError(e.CreateStrategy, err, creatingObj)
 		} else {
-			err = storeerr.InterpretUpdateError(err, e.QualifiedResource, name)
+			err = storeerr.InterpretUpdateError(err, qualifiedResource, name)
 		}
 		return nil, false, err
 	}
 
 	if e.shouldDeleteForFailedInitialization(ctx, out) {
-		return e.deleteWithoutFinalizers(ctx, name, key, out, storagePreconditions)
+		return e.deleteWithoutFinalizers(ctx, name, key, out, storagePreconditions, qualifiedResource)
 	}
 
 	if creating {
@@ -612,8 +626,13 @@ func (e *Store) Get(ctx genericapirequest.Context, name string, options *metav1.
 	if err != nil {
 		return nil, err
 	}
+	qualifiedResource, err := qualifiedResourceFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if err := e.Storage.Get(ctx, key, options.ResourceVersion, obj, false); err != nil {
-		return nil, storeerr.InterpretGetError(err, e.QualifiedResource, name)
+
+		return nil, storeerr.InterpretGetError(err, qualifiedResource, name)
 	}
 	if e.Decorator != nil {
 		if err := e.Decorator(obj); err != nil {
@@ -621,6 +640,15 @@ func (e *Store) Get(ctx genericapirequest.Context, name string, options *metav1.
 		}
 	}
 	return obj, nil
+}
+
+// qualifiedResourceFromContext retrieves GroupResource from Context per request, if not found, return default GroupResource
+func qualifiedResourceFromContext(ctx genericapirequest.Context) (schema.GroupResource, error) {
+	info, ok := request.RequestInfoFrom(ctx)
+	if !ok {
+		return schema.GroupResource{}, fmt.Errorf("missing requestInfo")
+	}
+	return schema.GroupResource{Group: info.APIGroup, Resource: info.Resource}, nil
 }
 
 var (
@@ -783,7 +811,7 @@ func markAsDeleting(obj runtime.Object) (err error) {
 //    should be deleted immediately
 // 4. a new output object with the state that was updated
 // 5. a copy of the last existing state of the object
-func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
+func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, in runtime.Object, qualifiedResource schema.GroupResource) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	out = e.NewFunc()
 	err = e.Storage.GuaranteedUpdate(
@@ -826,10 +854,10 @@ func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, k
 		// we should fall through and truly delete the object.
 		return nil, false, true, out, lastExisting
 	case errAlreadyDeleting:
-		out, err = e.finalizeDelete(in, true)
+		out, err = e.finalizeDelete(in, true, qualifiedResource)
 		return err, false, false, out, lastExisting
 	default:
-		return storeerr.InterpretUpdateError(err, e.QualifiedResource, name), false, false, out, lastExisting
+		return storeerr.InterpretUpdateError(err, qualifiedResource, name), false, false, out, lastExisting
 	}
 }
 
@@ -845,7 +873,7 @@ func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, k
 //    should be deleted immediately
 // 4. a new output object with the state that was updated
 // 5. a copy of the last existing state of the object
-func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
+func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, in runtime.Object, qualifiedResource schema.GroupResource) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	var pendingFinalizers bool
 	out = e.NewFunc()
@@ -917,10 +945,10 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Con
 		// we should fall through and truly delete the object.
 		return nil, false, true, out, lastExisting
 	case errAlreadyDeleting:
-		out, err = e.finalizeDelete(in, true)
+		out, err = e.finalizeDelete(in, true, qualifiedResource)
 		return err, false, false, out, lastExisting
 	default:
-		return storeerr.InterpretUpdateError(err, e.QualifiedResource, name), false, false, out, lastExisting
+		return storeerr.InterpretUpdateError(err, qualifiedResource, name), false, false, out, lastExisting
 	}
 }
 
@@ -930,10 +958,13 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	if err != nil {
 		return nil, false, err
 	}
-
 	obj := e.NewFunc()
+	qualifiedResource, err := qualifiedResourceFromContext(ctx)
+	if err != nil {
+		return nil, false, err
+	}
 	if err := e.Storage.Get(ctx, key, "", obj, false); err != nil {
-		return nil, false, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
+		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
 	// support older consumers of delete by treating "nil" as delete immediately
 	if options == nil {
@@ -949,7 +980,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	}
 	// this means finalizers cannot be updated via DeleteOptions if a deletion is already pending
 	if pendingGraceful {
-		out, err := e.finalizeDelete(obj, false)
+		out, err := e.finalizeDelete(obj, false, qualifiedResource)
 		return out, false, err
 	}
 	// check if obj has pending finalizers
@@ -968,12 +999,12 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 		shouldUpdateFinalizers, _ := deletionFinalizers(e, accessor, options)
 		// TODO: remove the check, because we support no-op updates now.
 		if graceful || pendingFinalizers || shouldUpdateFinalizers {
-			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, obj)
+			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, obj, qualifiedResource)
 		}
 	} else {
 		// TODO: remove the check on graceful, because we support no-op updates now.
 		if graceful {
-			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletion(ctx, name, key, options, preconditions, obj)
+			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletion(ctx, name, key, options, preconditions, obj, qualifiedResource)
 		}
 	}
 	// !deleteImmediately covers all cases where err != nil. We keep both to be future-proof.
@@ -985,17 +1016,18 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	glog.V(6).Infof("going to delete %s from registry: ", name)
 	out = e.NewFunc()
 	if err := e.Storage.Delete(ctx, key, out, &preconditions); err != nil {
+
 		// Please refer to the place where we set ignoreNotFound for the reason
 		// why we ignore the NotFound error .
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
 			// The lastExisting object may not be the last state of the object
 			// before its deletion, but it's the best approximation.
-			out, err := e.finalizeDelete(lastExisting, true)
+			out, err := e.finalizeDelete(lastExisting, true, qualifiedResource)
 			return out, true, err
 		}
-		return nil, false, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
+		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
-	out, err = e.finalizeDelete(out, true)
+	out, err = e.finalizeDelete(out, true, qualifiedResource)
 	return out, true, err
 }
 
@@ -1097,7 +1129,7 @@ func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *metav1.
 
 // finalizeDelete runs the Store's AfterDelete hook if runHooks is set and
 // returns the decorated deleted object if appropriate.
-func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object, error) {
+func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool, qualifiedResource schema.GroupResource) (runtime.Object, error) {
 	if runHooks && e.AfterDelete != nil {
 		if err := e.AfterDelete(obj); err != nil {
 			return nil, err
@@ -1119,8 +1151,8 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 	}
 	details := &metav1.StatusDetails{
 		Name:  accessor.GetName(),
-		Group: e.QualifiedResource.Group,
-		Kind:  e.QualifiedResource.Resource, // Yes we set Kind field to resource.
+		Group: qualifiedResource.Group,
+		Kind:  qualifiedResource.Resource, // Yes we set Kind field to resource.
 		UID:   accessor.GetUID(),
 	}
 	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
@@ -1358,8 +1390,12 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 }
 
 func (e *Store) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error) {
+	qualifiedResource, err := qualifiedResourceFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if e.TableConvertor != nil {
 		return e.TableConvertor.ConvertToTable(ctx, object, tableOptions)
 	}
-	return rest.NewDefaultTableConvertor(e.QualifiedResource).ConvertToTable(ctx, object, tableOptions)
+	return rest.NewDefaultTableConvertor(qualifiedResource).ConvertToTable(ctx, object, tableOptions)
 }

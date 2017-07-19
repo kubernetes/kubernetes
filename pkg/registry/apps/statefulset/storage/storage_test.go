@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	testhelper "k8s.io/apiserver/pkg/registry"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
@@ -42,6 +43,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 // createStatefulSet is a helper function that returns a StatefulSet with the updated resource version.
 func createStatefulSet(storage *REST, ps apps.StatefulSet, t *testing.T) (apps.StatefulSet, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), ps.Namespace)
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
 	obj, err := storage.Create(ctx, &ps, false)
 	if err != nil {
 		t.Errorf("Failed to create StatefulSet, %v", err)
@@ -104,6 +106,7 @@ func TestStatusUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
 	key := "/statefulsets/" + metav1.NamespaceDefault + "/foo"
 	validStatefulSet := validNewStatefulSet()
 	if err := storage.Storage.Create(ctx, key, validStatefulSet, nil, 0); err != nil {
