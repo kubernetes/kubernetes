@@ -61,6 +61,6 @@ func BindFlags(l *componentconfig.LeaderElectionConfiguration, fs *pflag.FlagSet
 		"The duration the clients should wait between attempting acquisition and renewal "+
 		"of a leadership. This is only applicable if leader election is enabled.")
 	fs.StringVar(&l.ResourceLock, "leader-elect-resource-lock", l.ResourceLock, ""+
-		"The type of resource resource object that is used for locking during"+
+		"The type of resource object that is used for locking during "+
 		"leader election. Supported options are `endpoints` (default) and `configmap`.")
 }
