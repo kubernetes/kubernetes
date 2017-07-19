@@ -144,7 +144,7 @@ func (p *pvcEvaluator) GroupKind() schema.GroupKind {
 // Handles returns true if the evaluator should handle the specified operation.
 func (p *pvcEvaluator) Handles(a admission.Attributes) bool {
 	op := a.GetOperation()
-	if op == admission.Create {
+	if op == admission.Create || op == admission.Update {
 		return true
 	}
 	updateUninitialized, err := util.IsUpdatingUninitializedObject(a)
