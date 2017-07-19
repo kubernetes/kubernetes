@@ -16,6 +16,11 @@ go_library(
         "import_known_versions.go",
     ],
     tags = ["automanaged"],
+    visibility = [
+        "//cmd/kube-controller-manager/app:__pkg__",
+        "//pkg/client/clientset_generated/clientset:__subpackages__",
+        "//pkg/client/informers:__subpackages__",
+    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
