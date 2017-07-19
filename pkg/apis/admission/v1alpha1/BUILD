@@ -14,6 +14,7 @@ go_library(
         "helpers.go",
         "register.go",
         "zz_generated.conversion.go",
+        "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],
     tags = ["automanaged"],
