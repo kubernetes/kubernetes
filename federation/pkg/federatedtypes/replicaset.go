@@ -47,15 +47,16 @@ type ReplicaSetAdapter struct {
 func NewReplicaSetAdapter(client federationclientset.Interface, config *restclient.Config) FederatedTypeAdapter {
 	schedulingAdapter := schedulingAdapter{
 		preferencesAnnotationName: FedReplicaSetPreferencesAnnotation,
-		updateStatusFunc: func(obj pkgruntime.Object, status SchedulingStatus) error {
+		updateStatusFunc: func(obj pkgruntime.Object, status interface{}) error {
 			rs := obj.(*extensionsv1.ReplicaSet)
-			if status.Replicas != rs.Status.Replicas || status.FullyLabeledReplicas != rs.Status.FullyLabeledReplicas ||
-				status.ReadyReplicas != rs.Status.ReadyReplicas || status.AvailableReplicas != rs.Status.AvailableReplicas {
+			typedStatus := status.(ReplicaSchedulingStatus)
+			if typedStatus.Replicas != rs.Status.Replicas || typedStatus.FullyLabeledReplicas != rs.Status.FullyLabeledReplicas ||
+				typedStatus.ReadyReplicas != rs.Status.ReadyReplicas || typedStatus.AvailableReplicas != rs.Status.AvailableReplicas {
 				rs.Status = extensionsv1.ReplicaSetStatus{
-					Replicas:             status.Replicas,
-					FullyLabeledReplicas: status.Replicas,
-					ReadyReplicas:        status.ReadyReplicas,
-					AvailableReplicas:    status.AvailableReplicas,
+					Replicas:             typedStatus.Replicas,
+					FullyLabeledReplicas: typedStatus.Replicas,
+					ReadyReplicas:        typedStatus.ReadyReplicas,
+					AvailableReplicas:    typedStatus.AvailableReplicas,
 				}
 				_, err := client.Extensions().ReplicaSets(rs.Namespace).UpdateStatus(rs)
 				return err
