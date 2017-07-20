@@ -270,16 +270,16 @@ function dump_nodes_with_logexporter() {
   fi
 
   # Obtain parameters required by logexporter.
-  local -r service_account_credentials="$(cat ${GOOGLE_APPLICATION_CREDENTIALS} | base64)"
+  local -r service_account_credentials="$(cat ${GOOGLE_APPLICATION_CREDENTIALS} | base64 | tr -d '\n')"
   local -r cloud_provider="${KUBERNETES_PROVIDER}"
   local -r enable_hollow_node_logs="${ENABLE_HOLLOW_NODE_LOGS:-false}"
   local -r logexport_timeout_seconds="$(( 30 + NUM_NODES / 10 ))"
 
   # Fill in the parameters in the logexporter daemonset template.
-  sed -i'' -e "s/{{.ServiceAccountCredentials}}/${service_account_credentials}/g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s/{{.CloudProvider}}/${cloud_provider}/g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s/{{.GCSPath}}/${gcs_artifacts_dir}/g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s/{{.EnableHollowNodeLogs}}/${enable_hollow_node_logs}/g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
+  sed -i'' -e "s@{{.ServiceAccountCredentials}}@${service_account_credentials}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
+  sed -i'' -e "s@{{.CloudProvider}}@${cloud_provider}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
+  sed -i'' -e "s@{{.GCSPath}}@${gcs_artifacts_dir}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
+  sed -i'' -e "s@{{.EnableHollowNodeLogs}}@${enable_hollow_node_logs}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
 
   # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
   KUBECTL="${KUBECTL:-${KUBE_ROOT}/cluster/kubectl.sh}"
