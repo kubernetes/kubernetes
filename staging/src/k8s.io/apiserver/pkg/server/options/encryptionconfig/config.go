@@ -57,9 +57,10 @@ func GetTransformerOverrides(filepath string) (map[schema.GroupResource]value.Tr
 
 // ParseEncryptionConfiguration parses configuration data and returns the transformer overrides
 func ParseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.Transformer, error) {
-	configFileContents, err := ioutil.ReadAll(f)
+	// Upper limit of 100 KB on file size.
+	configFileContents, err := readUptoLength(f, 102400)
 	if err != nil {
-		return nil, fmt.Errorf("could not read contents: %v", err)
+		return nil, fmt.Errorf("error while reading encryption provider configuration: %v", err)
 	}
 
 	var config EncryptionConfig
@@ -257,4 +258,19 @@ func GetSecretboxPrefixTransformer(config *SecretboxConfig) (value.PrefixTransfo
 		Prefix:      []byte(secretboxTransformerPrefixV1),
 	}
 	return result, nil
+}
+
+func readUptoLength(f io.Reader, len int64) ([]byte, error) {
+	contents, err := ioutil.ReadAll(io.LimitReader(f, len))
+	if err != nil {
+		return nil, err
+	}
+	_, err = io.ReadAtLeast(f, []byte{0}, 1)
+	if err == nil {
+		return nil, fmt.Errorf("file larger than %d bytes", len)
+	}
+	if err != io.EOF {
+		return nil, fmt.Errorf("unexpected error: %v", err)
+	}
+	return contents, nil
 }
