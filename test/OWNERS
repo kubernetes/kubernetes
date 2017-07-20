@@ -9,7 +9,6 @@ reviewers:
   - gmarek
   - ixdy
   - janetkuo
-  - kargakis
   - kow3ns # for test/e2e/statefulset.go
   - krousey
   - liggitt
@@ -37,7 +36,6 @@ approvers:
   - gmarek
   - ixdy
   - janetkuo
-  - kargakis
   - kow3ns # for test/e2e/statefulset.go
   - krousey
   - liggitt
