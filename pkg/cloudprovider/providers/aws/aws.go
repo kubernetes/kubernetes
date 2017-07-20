@@ -480,6 +480,20 @@ func (p *awsSDKProvider) addHandlers(regionName string, h *request.Handlers) {
 			Fn:   delayer.AfterRetry,
 		})
 	}
+
+	p.addAPILoggingHandlers(h)
+}
+
+func (p *awsSDKProvider) addAPILoggingHandlers(h *request.Handlers) {
+	h.Send.PushBackNamed(request.NamedHandler{
+		Name: "k8s/api-request",
+		Fn:   awsSendHandlerLogger,
+	})
+
+	h.ValidateResponse.PushFrontNamed(request.NamedHandler{
+		Name: "k8s/api-validate-response",
+		Fn:   awsValidateResponseHandlerLogger,
+	})
 }
 
 // Get a CrossRequestRetryDelay, scoped to the region, not to the request.
@@ -550,6 +564,7 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 
 func (p *awsSDKProvider) Metadata() (EC2Metadata, error) {
 	client := ec2metadata.New(session.New(&aws.Config{}))
+	p.addAPILoggingHandlers(&client.Handlers)
 	return client, nil
 }
 
