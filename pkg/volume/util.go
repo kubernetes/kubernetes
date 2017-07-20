@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 
 	"hash/fnv"
 	"math/rand"
@@ -414,8 +415,8 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 	return allMountOptions.UnsortedList()
 }
 
-// ZonesToSet converts a string containing a comma separated list of zones to set
-func ZonesToSet(zonesString string) (sets.String, error) {
+// zonesToSet converts a string containing a comma separated list of zones to set
+func zonesToSet(zonesString string) (sets.String, error) {
 	zonesSlice := strings.Split(zonesString, ",")
 	zonesSet := make(sets.String)
 	for _, zone := range zonesSlice {
@@ -428,10 +429,10 @@ func ZonesToSet(zonesString string) (sets.String, error) {
 	return zonesSet, nil
 }
 
-// ValidateZone returns:
+// validateZone returns:
 // - an error in case zone is an empty string or contains only any combination of spaces and tab characters
 // - nil otherwise
-func ValidateZone(zone string) error {
+func validateZone(zone string) error {
 	if strings.TrimSpace(zone) == "" {
 		return fmt.Errorf("the provided %q zone is not valid, it's an empty string or contains only spaces and tab characters", zone)
 	}
@@ -456,4 +457,291 @@ func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, req
 		}
 	}
 	return true
+}
+
+// validatePVCSelector validates Selector part of a PVC:
+// - in case there is no Selector the PVC is valid
+// - makes sure that only allowedKeys are present in the Selector matchLabels part
+// - makes sure that only allowedKeys and allowedOperators are present in the Selector matchExpressions part
+// Return value:
+// - (true, nil) means PVC is valid (error == nil) and there is NO Selector OR (NO matchLabels AND NO matchExpressions) (bool == true)
+// - (false, nil) means PVC is valid (error == nil) and there is at least a value in matchLabels or matchExpressions specified (bool == false)
+// - (false, error) means PVC is not valid
+// - (true, error) shall never happen
+func validatePVCSelector(pvc *v1.PersistentVolumeClaim) (bool, error) {
+	allowedKeys := map[string]bool{kubeletapis.LabelZoneFailureDomain: true, kubeletapis.LabelZoneRegion: true}
+	allowedOperators := map[metav1.LabelSelectorOperator]bool{metav1.LabelSelectorOpIn: true, metav1.LabelSelectorOpNotIn: true}
+	if pvc.Spec.Selector == nil {
+		return true, nil
+	}
+	if len(pvc.Spec.Selector.MatchExpressions) < 1 && len(pvc.Spec.Selector.MatchLabels) < 1 {
+		return true, nil
+	}
+	if len(pvc.Spec.Selector.MatchLabels) > 0 {
+		for label := range pvc.Spec.Selector.MatchLabels {
+			if !allowedKeys[label] {
+				return false, fmt.Errorf("key %q is not permitted in selector.matchLabels", label)
+			}
+		}
+	}
+	for _, expr := range pvc.Spec.Selector.MatchExpressions {
+		if !allowedKeys[expr.Key] {
+			return false, fmt.Errorf("key %q is not permitted in selector.matchExpressions", expr.Key)
+		}
+		if !allowedOperators[expr.Operator] {
+			return false, fmt.Errorf("operator %q is not permitted in selector.matchExpressions", expr.Operator)
+		}
+		if len(expr.Values) < 1 {
+			return false, fmt.Errorf("key %q, operator %q pair does not contain any value(s) in selector.matchExpressions", expr.Key, expr.Operator)
+		}
+	}
+	return false, nil
+}
+
+// getPVCMatchLabel returns:
+// - either (value, nil) for the key from the matchLabels Selector part of the PVC
+// - or ("", error) in case the key is missing in the matchLabels Selector part of the PVC
+func getPVCMatchLabel(pvc *v1.PersistentVolumeClaim, key string) (string, error) {
+	if pvc.Spec.Selector == nil {
+		return "", fmt.Errorf("missing selector.matchLabels")
+	}
+	if value, ok := pvc.Spec.Selector.MatchLabels[key]; ok {
+		return value, nil
+	}
+	return "", fmt.Errorf("key %q not found in selector.matchLabels", key)
+}
+
+// getPVCMatchExpression returns:
+// - either ([]setOfValues, nil) for all matching (key, operator) from the matchExpressions Selector part of the PVC
+// - or ([]emptySet, error) in case the operator or the key is missing in the matchExpressions Selector part of the PVC
+// Example:
+// selector:
+//     matchExpressions:
+//       - key: failure-domain.beta.kubernetes.io/zone
+//         operator: In
+//         values:
+//           - us-east-1a
+//           - us-east-2a
+//           - us-east-3a
+//       - key: failure-domain.beta.kubernetes.io/zone
+//             operator: In
+//             values:
+//               - us-east-3a
+//               - us-east-4a
+// Returns ({sets.String{"us-east-1a": sets.Empty{}, "us-east-2a": sets.Empty{}, "us-east-3a": sets.Empty{}}, sets.String{"us-east-3a": sets.Empty{}, "us-east-4a": sets.Empty{}}}, nil)
+func getPVCMatchExpression(pvc *v1.PersistentVolumeClaim, key string, operator metav1.LabelSelectorOperator) ([]sets.String, error) {
+	if pvc.Spec.Selector == nil {
+		return make([]sets.String, 0), fmt.Errorf("missing selector.matchExpressions")
+	}
+	if len(pvc.Spec.Selector.MatchExpressions) < 1 {
+		return make([]sets.String, 0), fmt.Errorf("key(s), operator(s) and value(s) are missing in selector.matchExpressions")
+	}
+	capacity := 0
+	for _, item := range pvc.Spec.Selector.MatchExpressions {
+		if item.Key == key && item.Operator == operator && len(item.Values) > 0 {
+			capacity++
+		}
+	}
+	if capacity == 0 {
+		return make([]sets.String, 0), fmt.Errorf("operator %q for key %q not found in selector.matchExpressions", key, operator)
+	}
+
+	ret := make([]sets.String, 0, capacity)
+	index := 0
+	for _, item := range pvc.Spec.Selector.MatchExpressions {
+		if item.Key == key && item.Operator == operator && len(item.Values) > 0 {
+			ret = append(ret, make(sets.String))
+			for _, value := range item.Values {
+				ret[index].Insert(value)
+			}
+			index++
+		}
+	}
+	return ret, nil
+}
+
+// ZonesConf is a class for calculation of a set of zones that satisfy both admin configured zones and user configured regions and zones
+type ZonesConf struct {
+	// PVC data structure containing the user configured regions and zones
+	PVC *v1.PersistentVolumeClaim
+	// a func that returns a set of all available zones
+	GetAllZones func() (sets.String, error)
+	// a func that converts a zone to a region
+	ZoneToRegion func(string) (string, error)
+	// is the parameter zone specified in the Storage Class by an admin?
+	isSCZoneConfigured bool
+	// is the parameter zones specified in the Storage Class by an admin?
+	isSCZonesConfigured bool
+	// true if the func GetAllZones was already called
+	gotAllAvailableZones bool
+	// contains the return value of the func GetAllZones call
+	allAvailableZones sets.String
+	// the set of zones that satisfy both admin configured zones and user configured regions and zones is calculated in the resultingZones
+	resultingZones sets.String
+	// is the regionToZones map already calculated
+	isRegionToZonesMapValid bool
+	// maps a single region to a set of all zones that are available in the region
+	regionToZonesMap map[string]sets.String
+}
+
+// SetZone sets the zone StorageClass parameter configured by an admin and returns:
+// - error in case the zones StorageClass parameter was also configured
+// - nil the zone StorageClass parameter was successfully set
+func (z *ZonesConf) SetZone(zone string) error {
+	if z.isSCZonesConfigured {
+		return fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
+	}
+	if err := validateZone(zone); err != nil {
+		return err
+	}
+	z.resultingZones = make(sets.String)
+	z.resultingZones.Insert(zone)
+	z.isSCZoneConfigured = true
+	return nil
+}
+
+// SetZones sets the zones StorageClass parameter configured by an admin and returns:
+// - error in case the zone StorageClass parameter was also configured
+// - error in case the zones StorageClass parameter does not contain a comma separated list of zones
+// - nil the zones StorageClass parameter was successfully parsed and set
+func (z *ZonesConf) SetZones(zones string) error {
+	if z.isSCZoneConfigured {
+		return fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
+	}
+	var err error
+	if z.resultingZones, err = zonesToSet(zones); err != nil {
+		return fmt.Errorf("corresponding storage class error: %v", err.Error())
+	}
+	z.isSCZonesConfigured = true
+	return nil
+}
+
+// getAllAvailableZones caches the result of the func GetAllZones call so it returns:
+// - cached result stored in z.allAvailableZones
+// - error in case the func GetAllZones returned and error
+// - the return value of the func GetAllZones call
+func (z *ZonesConf) getAllAvailableZones() (sets.String, error) {
+	if z.gotAllAvailableZones {
+		return z.allAvailableZones, nil
+	}
+	var err error
+	if z.allAvailableZones, err = z.GetAllZones(); err != nil {
+		return nil, err
+	}
+	z.gotAllAvailableZones = true
+	return z.allAvailableZones, nil
+}
+
+// regionToZones converts a single region into a set of zones
+func (z *ZonesConf) regionToZones(region string) (sets.String, error) {
+	if !z.isRegionToZonesMapValid {
+		if err := z.calculateRegionToZonesMap(); err != nil {
+			return nil, err
+		}
+	}
+	return z.regionToZonesMap[region], nil
+}
+
+// calculateRegionToZonesMap returns:
+// - nil if the z.regionToZonesMap was successfully calculated
+// - error if the func GetAllZones or func ZoneToRegion failed
+// Currently cloud providers do not provide a func RegionToZone that will return all zones that are available in a given region.
+// Thats why the func calculateRegionToZonesMap goes through allAvailableZones and creates a map region -> set of zones that are available in the region.
+func (z *ZonesConf) calculateRegionToZonesMap() error {
+	if z.isRegionToZonesMapValid {
+		return nil
+	}
+	z.regionToZonesMap = make(map[string]sets.String)
+	var err error
+	if !z.gotAllAvailableZones {
+		if z.allAvailableZones, err = z.getAllAvailableZones(); err != nil {
+			return err
+		}
+	}
+	var region string
+	for zone := range z.allAvailableZones {
+		if region, err = z.ZoneToRegion(zone); err != nil {
+			return fmt.Errorf("failed to convert zone (%v) to a region: %v", zone, err)
+		}
+		if _, ok := z.regionToZonesMap[region]; !ok {
+			z.regionToZonesMap[region] = make(sets.String)
+		}
+		z.regionToZonesMap[region].Insert(zone)
+	}
+	z.isRegionToZonesMapValid = true
+	return nil
+}
+
+// GetConfZones returns:
+// - either a set of zones resulting from currently available zones, allowed zone(s) by an admin in the corresponding storage class and zones preferred by the user in the selector part of the PVC
+// - or an error in case the resulting set of zones is empty or another error occurred
+func (z *ZonesConf) GetConfZones() (sets.String, error) {
+	var err error
+	if !z.isSCZoneConfigured && !z.isSCZonesConfigured {
+		if z.resultingZones, err = z.getAllAvailableZones(); err != nil {
+			return nil, err
+		}
+	} // else z.resultingZones were already set either in z.SetZone() or z.SetZones()
+	if emptySelector, err := validatePVCSelector(z.PVC); err != nil {
+		return nil, err
+	} else if emptySelector {
+		return z.resultingZones, nil
+	}
+	if matchLabelZone, err := getPVCMatchLabel(z.PVC, kubeletapis.LabelZoneFailureDomain); err == nil {
+		matchLabelZoneSet := make(sets.String)
+		matchLabelZoneSet.Insert(matchLabelZone)
+		z.resultingZones = z.resultingZones.Intersection(matchLabelZoneSet)
+	}
+	if matchLabelRegion, err := getPVCMatchLabel(z.PVC, kubeletapis.LabelZoneRegion); err == nil {
+		var zones sets.String
+		if zones, err = z.regionToZones(matchLabelRegion); err != nil {
+			return nil, err
+		}
+		z.resultingZones = z.resultingZones.Intersection(zones)
+	}
+	if matchExpressionZoneSets, err := getPVCMatchExpression(z.PVC, kubeletapis.LabelZoneFailureDomain, metav1.LabelSelectorOpIn); err == nil {
+		for _, matchExpressionZoneSet := range matchExpressionZoneSets {
+			z.resultingZones = z.resultingZones.Intersection(matchExpressionZoneSet)
+		}
+	}
+	if matchExpressionRegionSets, err := getPVCMatchExpression(z.PVC, kubeletapis.LabelZoneRegion, metav1.LabelSelectorOpIn); err == nil {
+		if !z.isRegionToZonesMapValid {
+			if err = z.calculateRegionToZonesMap(); err != nil {
+				return nil, err
+			}
+		}
+		var summedZonesForASetOfRegions sets.String
+		for _, matchExpressionRegionSet := range matchExpressionRegionSets {
+			summedZonesForASetOfRegions = make(sets.String)
+			for region := range matchExpressionRegionSet {
+				summedZonesForASetOfRegions = summedZonesForASetOfRegions.Union(z.regionToZonesMap[region])
+			}
+			z.resultingZones = z.resultingZones.Intersection(summedZonesForASetOfRegions)
+		}
+	}
+	if matchExpressionZoneSets, err := getPVCMatchExpression(z.PVC, kubeletapis.LabelZoneFailureDomain, metav1.LabelSelectorOpNotIn); err == nil {
+		for _, matchExpressionZoneSet := range matchExpressionZoneSets {
+			z.resultingZones = z.resultingZones.Difference(matchExpressionZoneSet)
+		}
+	}
+	if matchExpressionRegionSets, err := getPVCMatchExpression(z.PVC, kubeletapis.LabelZoneRegion, metav1.LabelSelectorOpNotIn); err == nil {
+		if !z.isRegionToZonesMapValid {
+			if err = z.calculateRegionToZonesMap(); err != nil {
+				return nil, err
+			}
+		}
+		var summedZonesForASetOfRegions sets.String
+		for _, matchExpressionRegionSet := range matchExpressionRegionSets {
+			summedZonesForASetOfRegions = make(sets.String)
+			for region := range matchExpressionRegionSet {
+				summedZonesForASetOfRegions = summedZonesForASetOfRegions.Union(z.regionToZonesMap[region])
+			}
+			z.resultingZones = z.resultingZones.Difference(summedZonesForASetOfRegions)
+		}
+	}
+	if len(z.resultingZones) < 1 {
+		return nil, fmt.Errorf("Could not find availability zone: combination of StorageClass parameters and selector of this claim cannot be satisfied by this cluster")
+	}
+
+	return z.resultingZones, nil
 }

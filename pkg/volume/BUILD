@@ -25,6 +25,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -54,6 +55,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

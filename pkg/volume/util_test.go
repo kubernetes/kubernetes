@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/slice"
 )
 
@@ -525,11 +526,11 @@ func TestChooseZoneForVolume(t *testing.T) {
 }
 
 func TestZonesToSet(t *testing.T) {
-	functionUnderTest := "ZonesToSet"
+	functionUnderTest := "zonesToSet"
 	// First part: want an error
 	sliceOfZones := []string{"", ",", "us-east-1a, , us-east-1d", ", us-west-1b", "us-west-2b,"}
 	for _, zones := range sliceOfZones {
-		if got, err := ZonesToSet(zones); err == nil {
+		if got, err := zonesToSet(zones); err == nil {
 			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, zones, got, "an error")
 		}
 	}
@@ -552,19 +553,19 @@ func TestZonesToSet(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		if got, err := ZonesToSet(tt.zones); err != nil || !got.Equal(tt.want) {
+		if got, err := zonesToSet(tt.zones); err != nil || !got.Equal(tt.want) {
 			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, tt.zones, got, tt.want)
 		}
 	}
 }
 
 func TestValidateZone(t *testing.T) {
-	functionUnderTest := "ValidateZone"
+	functionUnderTest := "validateZone"
 
 	// First part: want an error
 	errCases := []string{"", " 	 	 "}
 	for _, errCase := range errCases {
-		if got := ValidateZone(errCase); got == nil {
+		if got := validateZone(errCase); got == nil {
 			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, errCase, got, "an error")
 		}
 	}
@@ -572,8 +573,711 @@ func TestValidateZone(t *testing.T) {
 	// Second part: want no error
 	succCases := []string{" us-east-1a	"}
 	for _, succCase := range succCases {
-		if got := ValidateZone(succCase); got != nil {
+		if got := validateZone(succCase); got != nil {
 			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, succCase, got, nil)
 		}
+	}
+}
+
+func TestValidatePVCSelector(t *testing.T) {
+	functionUnderTest := "validatePVCSelector"
+	// First part: want no error
+	succTests := []struct {
+		pvc       v1.PersistentVolumeClaim
+		wantEmpty bool
+	}{
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			},
+			wantEmpty: true,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: nil,
+				},
+			},
+			wantEmpty: true,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+				},
+			},
+			wantEmpty: true,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{},
+					},
+				},
+			},
+			wantEmpty: true,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      kubeletapis.LabelZoneFailureDomain,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			wantEmpty: false,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      kubeletapis.LabelZoneRegion,
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			wantEmpty: false,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-east-1a"},
+					},
+				},
+			},
+			wantEmpty: false,
+		},
+	}
+	for _, succTest := range succTests {
+		if empty, err := validatePVCSelector(&succTest.pvc); err != nil {
+			t.Errorf("%v(%v) returned (%v, %v), want (%v, %v)", functionUnderTest, succTest.pvc, empty, err.Error(), succTest.wantEmpty, nil)
+		} else if empty != succTest.wantEmpty {
+			t.Errorf("%v(%v) returned (%v, %v), want (%v, %v)", functionUnderTest, succTest.pvc, empty, err, succTest.wantEmpty, nil)
+		}
+	}
+
+	// Second part: want an error
+	errCases := []v1.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: "In",
+							Values:   []string{"value1", "value2"},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      kubeletapis.LabelZoneFailureDomain,
+							Operator: metav1.LabelSelectorOpExists,
+							Values:   []string{"value1", "value2"},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"foo": "bar"},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      kubeletapis.LabelZoneFailureDomain,
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, errCase := range errCases {
+		if empty, err := validatePVCSelector(&errCase); err == nil {
+			t.Errorf("%v(%v) returned (%v, %v), want (%v, %v)", functionUnderTest, errCase, empty, err, false, "an error")
+		} else if empty != false {
+			t.Errorf("%v(%v) returned (%v, %v), want (%v, %v)", functionUnderTest, errCase, empty, err.Error(), false, "an error")
+		}
+	}
+}
+
+func TestGetPVCMatchLabel(t *testing.T) {
+	functionUnderTest := "getPVCMatchLabel"
+	// First part: want no error
+	succTests := []struct {
+		pvc  v1.PersistentVolumeClaim
+		key  string
+		want string
+	}{
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-east-1a"},
+					},
+				},
+			},
+			key:  kubeletapis.LabelZoneFailureDomain,
+			want: "us-east-1a",
+		},
+	}
+	for _, succTest := range succTests {
+		if zone, err := getPVCMatchLabel(&succTest.pvc, succTest.key); err != nil {
+			t.Errorf("%v(%v, %v) returned (%v, %v), want (%v, %v)", functionUnderTest, succTest.pvc, succTest.key, zone, err.Error(), succTest.want, nil)
+		}
+	}
+
+	// Second part: want an error
+	errCases := []struct {
+		pvc v1.PersistentVolumeClaim
+		key string
+	}{
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			},
+			key: kubeletapis.LabelZoneFailureDomain,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{},
+					},
+				},
+			},
+			key: kubeletapis.LabelZoneFailureDomain,
+		},
+	}
+	for _, errCase := range errCases {
+		if zone, err := getPVCMatchLabel(&errCase.pvc, errCase.key); err == nil {
+			t.Errorf("%v(%v, %v) returned (%v, %v), want (%v, %v)", functionUnderTest, errCase.pvc, errCase.key, zone, err, "", "an error")
+		}
+	}
+}
+
+func isEqualSliceOfSets(s1, s2 []sets.String) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	for i := 0; i < len(s1); i++ {
+		if !s1[i].Equal(s2[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func TestGetPVCMatchExpression(t *testing.T) {
+	functionUnderTest := "getPVCMatchExpression"
+	emptySet := make(sets.String)
+	// First part: want no error
+	succTests := []struct {
+		pvc      v1.PersistentVolumeClaim
+		key      string
+		operator metav1.LabelSelectorOperator
+		want     []sets.String
+	}{
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      kubeletapis.LabelZoneFailureDomain,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			key:      kubeletapis.LabelZoneFailureDomain,
+			operator: metav1.LabelSelectorOpIn,
+			want:     []sets.String{{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}}},
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      kubeletapis.LabelZoneFailureDomain,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"us-east-1a", "us-east-2a", "us-east-3a"},
+							},
+							{
+								Key:      kubeletapis.LabelZoneFailureDomain,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"us-east-3a", "us-east-4a"},
+							},
+						},
+					},
+				},
+			},
+			key:      kubeletapis.LabelZoneFailureDomain,
+			operator: metav1.LabelSelectorOpIn,
+			want:     []sets.String{{"us-east-1a": sets.Empty{}, "us-east-2a": sets.Empty{}, "us-east-3a": sets.Empty{}}, {"us-east-3a": sets.Empty{}, "us-east-4a": sets.Empty{}}},
+		},
+	}
+	for _, succTest := range succTests {
+		if zones, err := getPVCMatchExpression(&succTest.pvc, succTest.key, succTest.operator); err != nil {
+			t.Errorf("%v(%v, %v, %v) returned (%v, %v), want (%v, %v)", functionUnderTest, succTest.pvc, succTest.key, succTest.operator, zones, err.Error(), succTest.want, nil)
+		} else if !isEqualSliceOfSets(zones, succTest.want) {
+			t.Errorf("%v(%v, %v, %v) returned (%v, %v), want (%v, %v)", functionUnderTest, succTest.pvc, succTest.key, succTest.operator, zones, err, succTest.want, nil)
+		}
+	}
+
+	// Second part: want an error
+	errCases := []struct {
+		pvc      v1.PersistentVolumeClaim
+		key      string
+		operator metav1.LabelSelectorOperator
+	}{
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			},
+			key:      kubeletapis.LabelZoneFailureDomain,
+			operator: metav1.LabelSelectorOpIn,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+				},
+			},
+			key:      kubeletapis.LabelZoneRegion,
+			operator: metav1.LabelSelectorOpNotIn,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			key:      kubeletapis.LabelZoneRegion,
+			operator: metav1.LabelSelectorOpIn,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      kubeletapis.LabelZoneFailureDomain,
+								Operator: "foo",
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			key:      kubeletapis.LabelZoneFailureDomain,
+			operator: metav1.LabelSelectorOpIn,
+		},
+		{
+			pvc: v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      kubeletapis.LabelZoneFailureDomain,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{},
+							},
+						},
+					},
+				},
+			},
+			key:      kubeletapis.LabelZoneFailureDomain,
+			operator: metav1.LabelSelectorOpIn,
+		},
+	}
+	for _, errCase := range errCases {
+		if zones, err := getPVCMatchExpression(&errCase.pvc, errCase.key, errCase.operator); err == nil {
+			t.Errorf("%v(%v, %v, %v) returned (%v, %v), want (%v, %v)", functionUnderTest, errCase.pvc, errCase.key, errCase.operator, zones, err, emptySet, "an error")
+		}
+	}
+}
+
+func mockZoneToRegion(zone string) (string, error) {
+	if len(zone) < 1 {
+		return "", fmt.Errorf("Zone must not be an empty string")
+	}
+	return zone[:len(zone)-1], nil
+}
+
+func mockGetAllZones() (sets.String, error) {
+	ret := sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}, "us-east-1c": sets.Empty{}, "us-east-2a": sets.Empty{}, "us-east-2b": sets.Empty{}, "us-east-3a": sets.Empty{}, "us-east-3b": sets.Empty{}}
+	return ret, nil
+}
+
+func TestVolumeZoneConf(t *testing.T) {
+	functionUnderTest := "GetConfZones"
+	emptySet := make(sets.String)
+	// First part: want no error
+	succTests := map[string]struct {
+		PVC                 *v1.PersistentVolumeClaim
+		IsSCZoneConfigured  bool
+		SCZone              string
+		IsSCZonesConfigured bool
+		SCZones             string
+		GetAllZones         func() (sets.String, error)
+		ZoneToRegion        func(string) (string, error)
+		want                sets.String
+	}{
+		"Test case 1:": {
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			},
+			IsSCZoneConfigured:  false,
+			SCZone:              "",
+			IsSCZonesConfigured: false,
+			SCZones:             "",
+			GetAllZones:         mockGetAllZones,
+			ZoneToRegion:        mockZoneToRegion,
+			want:                sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}, "us-east-1c": sets.Empty{}, "us-east-2a": sets.Empty{}, "us-east-2b": sets.Empty{}, "us-east-3a": sets.Empty{}, "us-east-3b": sets.Empty{}},
+		},
+		"Test case 2:": {
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			},
+			IsSCZoneConfigured:  true,
+			SCZone:              "us-east-1a",
+			IsSCZonesConfigured: false,
+			SCZones:             "",
+			GetAllZones:         mockGetAllZones,
+			ZoneToRegion:        mockZoneToRegion,
+			want:                sets.String{"us-east-1a": sets.Empty{}},
+		},
+		"Test case 3:": {
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+			},
+			IsSCZoneConfigured:  false,
+			SCZone:              "",
+			IsSCZonesConfigured: true,
+			SCZones:             "us-east-1a, us-east-1b, us-east-2a",
+			GetAllZones:         mockGetAllZones,
+			ZoneToRegion:        mockZoneToRegion,
+			want:                sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}, "us-east-2a": sets.Empty{}},
+		},
+		"Test case 4:": {
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-east-1a"},
+					},
+				},
+			},
+			IsSCZoneConfigured:  false,
+			SCZone:              "",
+			IsSCZonesConfigured: true,
+			SCZones:             "us-east-1a, us-east-1b, us-east-2a",
+			GetAllZones:         mockGetAllZones,
+			ZoneToRegion:        mockZoneToRegion,
+			want:                sets.String{"us-east-1a": sets.Empty{}},
+		},
+		"Test case 5:": {
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{kubeletapis.LabelZoneRegion: "us-east-1"},
+					},
+				},
+			},
+			IsSCZoneConfigured:  false,
+			SCZone:              "",
+			IsSCZonesConfigured: true,
+			SCZones:             "us-east-1a, us-east-1b, us-east-2a",
+			GetAllZones:         mockGetAllZones,
+			ZoneToRegion:        mockZoneToRegion,
+			want:                sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}},
+		},
+		"Test case 6:": {
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      kubeletapis.LabelZoneFailureDomain,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			IsSCZoneConfigured:  false,
+			SCZone:              "",
+			IsSCZonesConfigured: true,
+			SCZones:             "us-east-1a, us-east-1b, us-east-2a",
+			GetAllZones:         mockGetAllZones,
+			ZoneToRegion:        mockZoneToRegion,
+			want:                sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}},
+		},
+		"Test case 7:": {
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      kubeletapis.LabelZoneRegion,
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"us-east-1", "us-east-3"},
+							},
+						},
+					},
+				},
+			},
+			IsSCZoneConfigured:  false,
+			SCZone:              "",
+			IsSCZonesConfigured: true,
+			SCZones:             "us-east-1a, us-east-1b, us-east-2a, us-east-3b",
+			GetAllZones:         mockGetAllZones,
+			ZoneToRegion:        mockZoneToRegion,
+			want:                sets.String{"us-east-1a": sets.Empty{}, "us-east-1b": sets.Empty{}, "us-east-3b": sets.Empty{}},
+		},
+		"Test case 8:": {
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      kubeletapis.LabelZoneFailureDomain,
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"us-east-1a", "us-east-1b"},
+							},
+						},
+					},
+				},
+			},
+			IsSCZoneConfigured:  false,
+			SCZone:              "",
+			IsSCZonesConfigured: true,
+			SCZones:             "us-east-1a, us-east-1b, us-east-2a",
+			GetAllZones:         mockGetAllZones,
+			ZoneToRegion:        mockZoneToRegion,
+			want:                sets.String{"us-east-2a": sets.Empty{}},
+		},
+		"Test case 9:": {
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      kubeletapis.LabelZoneRegion,
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"us-east-1", "us-east-3"},
+							},
+						},
+					},
+				},
+			},
+			IsSCZoneConfigured:  false,
+			SCZone:              "",
+			IsSCZonesConfigured: true,
+			SCZones:             "us-east-1a, us-east-1b, us-east-2a, us-east-3b",
+			GetAllZones:         mockGetAllZones,
+			ZoneToRegion:        mockZoneToRegion,
+			want:                sets.String{"us-east-2a": sets.Empty{}},
+		},
+	}
+	for key, succTest := range succTests {
+		zonesConf := new(ZonesConf)
+		zonesConf.PVC = succTest.PVC
+		if succTest.IsSCZoneConfigured {
+			if err := zonesConf.SetZone(succTest.SCZone); err != nil {
+				t.Errorf("%v %v() returned (%v), want (%v)", key, "SetZone", err, nil)
+				continue
+			}
+		}
+		if succTest.IsSCZonesConfigured {
+			if err := zonesConf.SetZones(succTest.SCZones); err != nil {
+				t.Errorf("%v %v() returned (%v), want (%v)", key, "SetZones", err, nil)
+				continue
+			}
+		}
+		zonesConf.GetAllZones = succTest.GetAllZones
+		zonesConf.ZoneToRegion = succTest.ZoneToRegion
+		if got, err := zonesConf.GetConfZones(); err != nil {
+			t.Errorf("%v %v() returned (%v, %v), want (%v, %v)", key, functionUnderTest, got, err.Error(), succTest.want, nil)
+		} else if !succTest.want.Equal(got) {
+			t.Errorf("%v %v() returned (%v, %v), want (%v, %v)", key, functionUnderTest, got, err, succTest.want, nil)
+		}
+	}
+
+	// Second part: want an error
+	errCases := []struct {
+		PVC                 *v1.PersistentVolumeClaim
+		IsSCZoneConfigured  bool
+		SCZone              string
+		IsSCZonesConfigured bool
+		SCZones             string
+		GetAllZones         func() (sets.String, error)
+		ZoneToRegion        func(string) (string, error)
+	}{
+		{
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"foo": "bar"},
+					},
+				},
+			},
+			IsSCZoneConfigured:  false,
+			SCZone:              "",
+			IsSCZonesConfigured: false,
+			SCZones:             "",
+			GetAllZones:         mockGetAllZones,
+			ZoneToRegion:        mockZoneToRegion,
+		},
+		{
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      kubeletapis.LabelZoneRegion,
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"us-east-1", "us-east-2", "us-east-3"},
+							},
+						},
+					},
+				},
+			},
+			IsSCZoneConfigured:  false,
+			SCZone:              "",
+			IsSCZonesConfigured: true,
+			SCZones:             "us-east-1a, us-east-1b, us-east-2a, us-east-3b",
+			GetAllZones:         mockGetAllZones,
+			ZoneToRegion:        mockZoneToRegion,
+		},
+		{ // user configured region is not among the GetAllZones zones
+			PVC: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{kubeletapis.LabelZoneRegion: "us-east-4"},
+					},
+				},
+			},
+			IsSCZoneConfigured:  false,
+			SCZone:              "",
+			IsSCZonesConfigured: true,
+			SCZones:             "us-east-1a, us-east-1b, us-east-2a",
+			GetAllZones:         mockGetAllZones,
+			ZoneToRegion:        mockZoneToRegion,
+		},
+	}
+	for _, errCase := range errCases {
+		zonesConf := new(ZonesConf)
+		zonesConf.PVC = errCase.PVC
+		if errCase.IsSCZoneConfigured {
+			if err := zonesConf.SetZone(errCase.SCZone); err != nil {
+				t.Errorf("%v() returned (%v), want (%v)", "SetZone", err, nil)
+				continue
+			}
+		}
+		if errCase.IsSCZonesConfigured {
+			if err := zonesConf.SetZones(errCase.SCZones); err != nil {
+				t.Errorf("%v() returned (%v), want (%v)", "SetZones", err, nil)
+				continue
+			}
+		}
+		zonesConf.GetAllZones = errCase.GetAllZones
+		zonesConf.ZoneToRegion = errCase.ZoneToRegion
+		if got, err := zonesConf.GetConfZones(); err == nil {
+			t.Errorf("%v() returned (%v, %v), want (%v, %v)", functionUnderTest, got, err, emptySet, "an error")
+		}
+	}
+}
+
+func TestVolumeZoneConfBothZoneAndZonesAreConfigured(t *testing.T) {
+	zonesConf := new(ZonesConf)
+	if err := zonesConf.SetZone("us-east-1a"); err != nil {
+		t.Errorf("%v() returned (%v), want (%v)", "SetZone", err, nil)
+	}
+	if err := zonesConf.SetZones("us-east-1a, us-east-1b, us-east-1c"); err == nil {
+		t.Errorf("%v() returned (%v), want (%v)", "SetZones", err, "an error")
+	}
+}
+
+func TestVolumeZoneConfInvalidZonesInStorageClass(t *testing.T) {
+	zonesConf := new(ZonesConf)
+	if err := zonesConf.SetZones("us-east-1a, , us-east-2a"); err == nil {
+		t.Errorf("%v() returned (%v), want (%v)", "SetZones", err, "an error")
+	}
+}
+
+func TestVolumeZoneConfInvalidZoneInStorageClass(t *testing.T) {
+	zonesConf := new(ZonesConf)
+	if err := zonesConf.SetZone(" 	 "); err == nil {
+		t.Errorf("%v() returned (%v), want (%v)", "SetZone", err, "an error")
 	}
 }
