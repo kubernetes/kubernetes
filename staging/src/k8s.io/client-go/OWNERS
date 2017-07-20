@@ -42,3 +42,5 @@ reviewers:
 - soltysh
 - piosz
 - jsafrane
+labels:
+ - sig/api-machinery
