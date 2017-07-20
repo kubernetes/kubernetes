@@ -150,7 +150,6 @@ pkg/auth/authorizer/abac
 pkg/auth/user
 pkg/capabilities
 pkg/client/chaosclient
-pkg/client/informers/informers_generated/externalversions/internalinterfaces
 pkg/client/informers/informers_generated/internalversion/internalinterfaces
 pkg/client/leaderelectionconfig
 pkg/client/retry
