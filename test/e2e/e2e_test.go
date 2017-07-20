@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
+	_ "k8s.io/kubernetes/test/e2e/apps"
 	_ "k8s.io/kubernetes/test/e2e/autoscaling"
 	"k8s.io/kubernetes/test/e2e/framework"
 	_ "k8s.io/kubernetes/test/e2e/instrumentation/logging"
@@ -30,7 +31,6 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/scalability"
 	_ "k8s.io/kubernetes/test/e2e/scheduling"
 	_ "k8s.io/kubernetes/test/e2e/storage"
-	_ "k8s.io/kubernetes/test/e2e/workload"
 )
 
 func init() {

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,38 +14,64 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package workload
+package apps
 
 import (
 	"fmt"
 	"time"
 
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/controller/replicaset"
+	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
+var _ = SIGDescribe("ReplicationController", func() {
+	f := framework.NewDefaultFramework("replication-controller")
+
+	It("should serve a basic image on each replica with a public image [Conformance]", func() {
+		TestReplicationControllerServeImageOrFail(f, "basic", framework.ServeHostnameImage)
+	})
+
+	It("should serve a basic image on each replica with a private image", func() {
+		// requires private images
+		framework.SkipUnlessProviderIs("gce", "gke")
+
+		TestReplicationControllerServeImageOrFail(f, "private", "gcr.io/k8s-authenticated-test/serve_hostname:v1.4")
+	})
+
+	It("should surface a failure condition on a common issue like exceeded quota", func() {
+		testReplicationControllerConditionCheck(f)
+	})
+
+	It("should adopt matching pods on creation", func() {
+		testRCAdoptMatchingOrphans(f)
+	})
+
+	It("should release no longer matching pods", func() {
+		testRCReleaseControlledNotMatching(f)
+	})
+})
+
+func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageName string, image string) *v1.ReplicationController {
 	zero := int64(0)
-	return &extensions.ReplicaSet{
+	return &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: rsName,
 		},
-		Spec: extensions.ReplicaSetSpec{
-			Replicas: &replicas,
-			Template: v1.PodTemplateSpec{
+		Spec: v1.ReplicationControllerSpec{
+			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: rsPodLabels,
+					Labels: rcPodLabels,
 				},
 				Spec: v1.PodSpec{
 					TerminationGracePeriodSeconds: &zero,
@@ -61,69 +87,31 @@ func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageNa
 	}
 }
 
-func newPodQuota(name, number string) *v1.ResourceQuota {
-	return &v1.ResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.ResourceQuotaSpec{
-			Hard: v1.ResourceList{
-				v1.ResourcePods: resource.MustParse(number),
-			},
-		},
-	}
-}
-
-var _ = SIGDescribe("ReplicaSet", func() {
-	f := framework.NewDefaultFramework("replicaset")
-
-	It("should serve a basic image on each replica with a public image [Conformance]", func() {
-		testReplicaSetServeImageOrFail(f, "basic", framework.ServeHostnameImage)
-	})
-
-	It("should serve a basic image on each replica with a private image", func() {
-		// requires private images
-		framework.SkipUnlessProviderIs("gce", "gke")
-
-		testReplicaSetServeImageOrFail(f, "private", "gcr.io/k8s-authenticated-test/serve_hostname:v1.4")
-	})
-
-	It("should surface a failure condition on a common issue like exceeded quota", func() {
-		testReplicaSetConditionCheck(f)
-	})
-
-	It("should adopt matching pods on creation", func() {
-		testRSAdoptMatchingOrphans(f)
-	})
-
-	It("should release no longer matching pods", func() {
-		testRSReleaseControlledNotMatching(f)
-	})
-})
-
-// A basic test to check the deployment of an image using a ReplicaSet. The
-// image serves its hostname which is checked for each replica.
-func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image string) {
+// A basic test to check the deployment of an image using
+// a replication controller. The image serves its hostname
+// which is checked for each replica.
+func TestReplicationControllerServeImageOrFail(f *framework.Framework, test string, image string) {
 	name := "my-hostname-" + test + "-" + string(uuid.NewUUID())
 	replicas := int32(1)
 
-	// Create a ReplicaSet for a service that serves its hostname.
+	// Create a replication controller for a service
+	// that serves its hostname.
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
-	framework.Logf("Creating ReplicaSet %s", name)
-	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image)
-	newRS.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
-	_, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(newRS)
+	By(fmt.Sprintf("Creating replication controller %s", name))
+	newRC := newRC(name, replicas, map[string]string{"name": name}, name, image)
+	newRC.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
+	_, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(newRC)
 	Expect(err).NotTo(HaveOccurred())
 
-	// Check that pods for the new RS were created.
+	// Check that pods for the new RC were created.
 	// TODO: Maybe switch PodsCreated to just check owner references.
 	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicas)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
-	framework.Logf("Ensuring a pod for ReplicaSet %q is running", name)
+	framework.Logf("Ensuring all pods for ReplicationController %q are running", name)
 	running := int32(0)
 	for _, pod := range pods.Items {
 		if pod.DeletionTimestamp != nil {
@@ -160,15 +148,15 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 }
 
 // 1. Create a quota restricting pods in the current namespace to 2.
-// 2. Create a replica set that wants to run 3 pods.
-// 3. Check replica set conditions for a ReplicaFailure condition.
-// 4. Scale down the replica set and observe the condition is gone.
-func testReplicaSetConditionCheck(f *framework.Framework) {
+// 2. Create a replication controller that wants to run 3 pods.
+// 3. Check replication controller conditions for a ReplicaFailure condition.
+// 4. Relax quota or scale down the controller and observe the condition is gone.
+func testReplicationControllerConditionCheck(f *framework.Framework) {
 	c := f.ClientSet
 	namespace := f.Namespace.Name
 	name := "condition-test"
 
-	By(fmt.Sprintf("Creating quota %q that allows only two pods to run in the current namespace", name))
+	framework.Logf("Creating quota %q that allows only two pods to run in the current namespace", name)
 	quota := newPodQuota(name, "2")
 	_, err := c.Core().ResourceQuotas(namespace).Create(quota)
 	Expect(err).NotTo(HaveOccurred())
@@ -178,8 +166,8 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 		if err != nil {
 			return false, err
 		}
-		quantity := resource.MustParse("2")
 		podQuota := quota.Status.Hard[v1.ResourcePods]
+		quantity := resource.MustParse("2")
 		return (&podQuota).Cmp(quantity) == 0, nil
 	})
 	if err == wait.ErrWaitTimeout {
@@ -187,65 +175,64 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 	}
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", name))
-	rs := newRS(name, 3, map[string]string{"name": name}, NginxImageName, NginxImage)
-	rs, err = c.Extensions().ReplicaSets(namespace).Create(rs)
+	By(fmt.Sprintf("Creating rc %q that asks for more than the allowed pod quota", name))
+	rc := newRC(name, 3, map[string]string{"name": name}, NginxImageName, NginxImage)
+	rc, err = c.Core().ReplicationControllers(namespace).Create(rc)
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Checking replica set %q has the desired failure condition set", name))
-	generation := rs.Generation
-	conditions := rs.Status.Conditions
+	By(fmt.Sprintf("Checking rc %q has the desired failure condition set", name))
+	generation := rc.Generation
+	conditions := rc.Status.Conditions
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err = c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{})
+		rc, err = c.Core().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 
-		if generation > rs.Status.ObservedGeneration {
+		if generation > rc.Status.ObservedGeneration {
 			return false, nil
 		}
-		conditions = rs.Status.Conditions
+		conditions = rc.Status.Conditions
 
-		cond := replicaset.GetCondition(rs.Status, extensions.ReplicaSetReplicaFailure)
+		cond := replication.GetCondition(rc.Status, v1.ReplicationControllerReplicaFailure)
 		return cond != nil, nil
-
 	})
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("rs controller never added the failure condition for replica set %q: %#v", name, conditions)
+		err = fmt.Errorf("rc manager never added the failure condition for rc %q: %#v", name, conditions)
 	}
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Scaling down replica set %q to satisfy pod quota", name))
-	rs, err = framework.UpdateReplicaSetWithRetries(c, namespace, name, func(update *extensions.ReplicaSet) {
+	By(fmt.Sprintf("Scaling down rc %q to satisfy pod quota", name))
+	rc, err = framework.UpdateReplicationControllerWithRetries(c, namespace, name, func(update *v1.ReplicationController) {
 		x := int32(2)
 		update.Spec.Replicas = &x
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Checking replica set %q has no failure condition set", name))
-	generation = rs.Generation
-	conditions = rs.Status.Conditions
+	By(fmt.Sprintf("Checking rc %q has no failure condition set", name))
+	generation = rc.Generation
+	conditions = rc.Status.Conditions
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err = c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{})
+		rc, err = c.Core().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 
-		if generation > rs.Status.ObservedGeneration {
+		if generation > rc.Status.ObservedGeneration {
 			return false, nil
 		}
-		conditions = rs.Status.Conditions
+		conditions = rc.Status.Conditions
 
-		cond := replicaset.GetCondition(rs.Status, extensions.ReplicaSetReplicaFailure)
+		cond := replication.GetCondition(rc.Status, v1.ReplicationControllerReplicaFailure)
 		return cond == nil, nil
 	})
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("rs controller never removed the failure condition for rs %q: %#v", name, conditions)
+		err = fmt.Errorf("rc manager never removed the failure condition for rc %q: %#v", name, conditions)
 	}
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func testRSAdoptMatchingOrphans(f *framework.Framework) {
+func testRCAdoptMatchingOrphans(f *framework.Framework) {
 	name := "pod-adoption"
 	By(fmt.Sprintf("Given a Pod with a 'name' label %s is created", name))
 	p := f.PodClient().CreateSync(&v1.Pod{
@@ -265,23 +252,23 @@ func testRSAdoptMatchingOrphans(f *framework.Framework) {
 		},
 	})
 
-	By("When a replicaset with a matching selector is created")
+	By("When a replication controller with a matching selector is created")
 	replicas := int32(1)
-	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, NginxImageName)
-	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
-	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(rsSt)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImageName)
+	rcSt.Spec.Selector = map[string]string{"name": name}
+	rc, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Then the orphan pod is adopted")
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
-		// The Pod p should either be adopted or deleted by the ReplicaSet
+		// The Pod p should either be adopted or deleted by the RC
 		if errors.IsNotFound(err) {
 			return true, nil
 		}
 		Expect(err).NotTo(HaveOccurred())
 		for _, owner := range p2.OwnerReferences {
-			if *owner.Controller && owner.UID == rs.UID {
+			if *owner.Controller && owner.UID == rc.UID {
 				// pod adopted
 				return true, nil
 			}
@@ -292,17 +279,17 @@ func testRSAdoptMatchingOrphans(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func testRSReleaseControlledNotMatching(f *framework.Framework) {
+func testRCReleaseControlledNotMatching(f *framework.Framework) {
 	name := "pod-release"
-	By("Given a ReplicaSet is created")
+	By("Given a ReplicationController is created")
 	replicas := int32(1)
-	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, NginxImageName)
-	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
-	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(rsSt)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImageName)
+	rcSt.Spec.Selector = map[string]string{"name": name}
+	rc, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("When the matched label of one of its pods change")
-	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, rs.Name, replicas)
+	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, rc.Name, replicas)
 	Expect(err).NotTo(HaveOccurred())
 
 	p := pods.Items[0]
@@ -327,8 +314,8 @@ func testRSReleaseControlledNotMatching(f *framework.Framework) {
 		p2, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		for _, owner := range p2.OwnerReferences {
-			if *owner.Controller && owner.UID == rs.UID {
-				// pod still belonging to the replicaset
+			if *owner.Controller && owner.UID == rc.UID {
+				// pod still belonging to the replication controller
 				return false, nil
 			}
 		}
