@@ -486,7 +486,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		gatherMetrics(f)
 	})
 
-	It("[Feature:GarbageCollector] should keep the rc around until all its pods are deleted if the deleteOptions says so", func() {
+	It("should keep the rc around until all its pods are deleted if the deleteOptions says so", func() {
 		clientSet := f.ClientSet
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
@@ -564,7 +564,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	// TODO: this should be an integration test
-	It("[Feature:GarbageCollector] should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted", func() {
+	It("should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted", func() {
 		clientSet := f.ClientSet
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
@@ -672,7 +672,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	// TODO: should be an integration test
-	It("[Feature:GarbageCollector] should not be blocked by dependency circle", func() {
+	It("should not be blocked by dependency circle", func() {
 		clientSet := f.ClientSet
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		pod1 := newGCPod("pod1")
