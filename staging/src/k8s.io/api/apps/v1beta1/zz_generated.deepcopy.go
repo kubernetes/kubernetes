@@ -127,6 +127,7 @@ func (in *ControllerRevision) DeepCopyInto(out *ControllerRevision) {
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Data.DeepCopyInto(&out.Data)
+	in.RevisionTime.DeepCopyInto(&out.RevisionTime)
 	return
 }
 

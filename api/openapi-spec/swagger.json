@@ -46407,6 +46407,10 @@
       "description": "Revision indicates the revision of the state represented by Data.",
       "type": "integer",
       "format": "int64"
+     },
+     "revisionTime": {
+      "description": "RevisionTime records the time when revision happens.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
      }
     },
     "x-kubernetes-group-version-kind": [
