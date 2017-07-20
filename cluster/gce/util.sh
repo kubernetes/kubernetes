@@ -951,9 +951,11 @@ function delete-subnetworks() {
 #   MASTER_ROOT_DISK_SIZE
 function get-master-root-disk-size() {
   if [[ "${NUM_NODES}" -le "1000" ]]; then
-    export MASTER_ROOT_DISK_SIZE="20"
+    export MASTER_ROOT_DISK_SIZE="${MASTER_ROOT_DISK_SIZE:-20}"
+  elif [[ "${NUM_NODES}" -le "2000" ]]; then
+    export MASTER_ROOT_DISK_SIZE="${MASTER_ROOT_DISK_SIZE:-50}"
   else
-    export MASTER_ROOT_DISK_SIZE="50"
+    export MASTER_ROOT_DISK_SIZE="${MASTER_ROOT_DISK_SIZE:-100}"
   fi
 }
 
@@ -963,9 +965,11 @@ function get-master-root-disk-size() {
 #   MASTER_DISK_SIZE
 function get-master-disk-size() {
   if [[ "${NUM_NODES}" -le "1000" ]]; then
-    export MASTER_DISK_SIZE="20GB"
+    export MASTER_DISK_SIZE="${MASTER_DISK_SIZE:-20GB}"
+  elif [[ "${NUM_NODES}" -le "2000" ]]; then
+    export MASTER_DISK_SIZE="${MASTER_DISK_SIZE:-100GB}"
   else
-    export MASTER_DISK_SIZE="100GB"
+    export MASTER_DISK_SIZE="${MASTER_DISK_SIZE:-200GB}"
   fi
 }
 
