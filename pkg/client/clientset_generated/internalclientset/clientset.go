@@ -33,6 +33,7 @@ import (
 	networkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion"
 	policyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
+	schedulinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion"
 	settingsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/settings/internalversion"
 	storageinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion"
 )
@@ -51,6 +52,7 @@ type Interface interface {
 	Networking() networkinginternalversion.NetworkingInterface
 	Policy() policyinternalversion.PolicyInterface
 	Rbac() rbacinternalversion.RbacInterface
+	Scheduling() schedulinginternalversion.SchedulingInterface
 	Settings() settingsinternalversion.SettingsInterface
 	Storage() storageinternalversion.StorageInterface
 }
@@ -71,6 +73,7 @@ type Clientset struct {
 	*networkinginternalversion.NetworkingClient
 	*policyinternalversion.PolicyClient
 	*rbacinternalversion.RbacClient
+	*schedulinginternalversion.SchedulingClient
 	*settingsinternalversion.SettingsClient
 	*storageinternalversion.StorageClient
 }
@@ -171,6 +174,14 @@ func (c *Clientset) Rbac() rbacinternalversion.RbacInterface {
 	return c.RbacClient
 }
 
+// Scheduling retrieves the SchedulingClient
+func (c *Clientset) Scheduling() schedulinginternalversion.SchedulingInterface {
+	if c == nil {
+		return nil
+	}
+	return c.SchedulingClient
+}
+
 // Settings retrieves the SettingsClient
 func (c *Clientset) Settings() settingsinternalversion.SettingsInterface {
 	if c == nil {
@@ -251,6 +262,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.SchedulingClient, err = schedulinginternalversion.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.SettingsClient, err = settingsinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -284,6 +299,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.NetworkingClient = networkinginternalversion.NewForConfigOrDie(c)
 	cs.PolicyClient = policyinternalversion.NewForConfigOrDie(c)
 	cs.RbacClient = rbacinternalversion.NewForConfigOrDie(c)
+	cs.SchedulingClient = schedulinginternalversion.NewForConfigOrDie(c)
 	cs.SettingsClient = settingsinternalversion.NewForConfigOrDie(c)
 	cs.StorageClient = storageinternalversion.NewForConfigOrDie(c)
 
@@ -306,6 +322,7 @@ func New(c rest.Interface) *Clientset {
 	cs.NetworkingClient = networkinginternalversion.New(c)
 	cs.PolicyClient = policyinternalversion.New(c)
 	cs.RbacClient = rbacinternalversion.New(c)
+	cs.SchedulingClient = schedulinginternalversion.New(c)
 	cs.SettingsClient = settingsinternalversion.New(c)
 	cs.StorageClient = storageinternalversion.New(c)
 

@@ -13326,6 +13326,11 @@
       "kind": "DeleteOptions"
      },
      {
+      "group": "scheduling.k8s.io",
+      "version": "v1alpha1",
+      "kind": "DeleteOptions"
+     },
+     {
       "group": "settings.k8s.io",
       "version": "v1alpha1",
       "kind": "DeleteOptions"
@@ -13811,6 +13816,11 @@
      {
       "group": "rbac.authorization.k8s.io",
       "version": "v1beta1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "scheduling.k8s.io",
+      "version": "v1alpha1",
       "kind": "WatchEvent"
      },
      {

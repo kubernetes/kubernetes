@@ -303,6 +303,14 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		stub:             `{"metadata":{"name":"hook1","creationTimestamp":null},"externalAdmissionHooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"","name":""},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,
 		expectedEtcdPath: "/registry/externaladmissionhookconfigurations/hook1",
 	},
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1
+	gvr("scheduling.k8s.io", "v1alpha1", "priorityclasses"): {
+		stub:             `{"metadata":{"name":"pc1"},"Value":1000}`,
+		expectedEtcdPath: "/registry/priorityclasses/pc1",
+	},
+	// --
 }
 
 // Be very careful when whitelisting an object as ephemeral.

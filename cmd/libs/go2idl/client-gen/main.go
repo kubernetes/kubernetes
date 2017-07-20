@@ -47,6 +47,7 @@ var (
 		"storage/",
 		"apps/",
 		"policy/",
+		"scheduling/",
 		"settings/",
 		"networking/",
 	}, "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\".")

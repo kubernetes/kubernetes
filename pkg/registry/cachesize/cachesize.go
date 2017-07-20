@@ -51,6 +51,7 @@ const (
 	Pods                       Resource = "pods"
 	PodSecurityPolicies        Resource = "podsecuritypolicies"
 	PodTemplates               Resource = "podtemplates"
+	PriorityClasses            Resource = "priorityclasses"
 	Replicasets                Resource = "replicasets"
 	ResourceQuotas             Resource = "resourcequotas"
 	CronJobs                   Resource = "cronjobs"

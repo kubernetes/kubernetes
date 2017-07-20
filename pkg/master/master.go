@@ -38,6 +38,7 @@ import (
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	schedulingapiv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	settingv1alpha1 "k8s.io/api/settings/v1alpha1"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
@@ -73,6 +74,7 @@ import (
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+	schedulingrest "k8s.io/kubernetes/pkg/registry/scheduling/rest"
 	settingsrest "k8s.io/kubernetes/pkg/registry/settings/rest"
 	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
 )
@@ -260,6 +262,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		networkingrest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
+		schedulingrest.RESTStorageProvider{},
 		settingsrest.RESTStorageProvider{},
 		storagerest.RESTStorageProvider{},
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
@@ -394,6 +397,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		// TODO: disable rbac/v1alpha1 and settings/v1alpha1 by default in 1.8
 		rbacv1alpha1.SchemeGroupVersion,
 		settingv1alpha1.SchemeGroupVersion,
+		schedulingapiv1alpha1.SchemeGroupVersion,
 		storageapiv1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1beta1.SchemeGroupVersion,

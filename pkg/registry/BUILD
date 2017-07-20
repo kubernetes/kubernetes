@@ -77,6 +77,8 @@ filegroup(
         "//pkg/registry/policy/rest:all-srcs",
         "//pkg/registry/rbac:all-srcs",
         "//pkg/registry/registrytest:all-srcs",
+        "//pkg/registry/scheduling/priorityclass:all-srcs",
+        "//pkg/registry/scheduling/rest:all-srcs",
         "//pkg/registry/settings/podpreset:all-srcs",
         "//pkg/registry/settings/rest:all-srcs",
         "//pkg/registry/storage/rest:all-srcs",

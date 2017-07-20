@@ -148,6 +148,8 @@ pkg/apis/policy/validation
 pkg/apis/rbac
 pkg/apis/rbac/v1beta1
 pkg/apis/rbac/validation
+pkg/apis/scheduling
+pkg/apis/scheduling/v1alpha1
 pkg/apis/settings
 pkg/apis/settings/v1alpha1
 pkg/apis/storage
@@ -414,6 +416,8 @@ pkg/registry/rbac/rolebinding
 pkg/registry/rbac/rolebinding/policybased
 pkg/registry/rbac/validation
 pkg/registry/registrytest
+pkg/registry/scheduling/priorityclass/storage
+pkg/registry/scheduling/rest
 pkg/registry/settings/podpreset
 pkg/registry/settings/podpreset/storage
 pkg/registry/settings/rest
@@ -546,6 +550,7 @@ staging/src/k8s.io/api/networking/v1
 staging/src/k8s.io/api/policy/v1beta1
 staging/src/k8s.io/api/rbac/v1alpha1
 staging/src/k8s.io/api/rbac/v1beta1
+staging/src/k8s.io/api/scheduling/v1alpha1
 staging/src/k8s.io/api/settings/v1alpha1
 staging/src/k8s.io/api/storage/v1
 staging/src/k8s.io/api/storage/v1beta1
@@ -738,6 +743,8 @@ staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1alpha1
 staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1alpha1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1beta1
 staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1beta1/fake
+staging/src/k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1
+staging/src/k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/settings/v1alpha1
 staging/src/k8s.io/client-go/kubernetes/typed/settings/v1alpha1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/storage/v1
