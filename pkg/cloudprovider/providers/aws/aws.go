@@ -151,6 +151,10 @@ const (
 	createTagInitialDelay = 1 * time.Second
 	createTagFactor       = 2.0
 	createTagSteps        = 9
+
+	// Number of node names that can be added to a filter. The AWS limit is 200
+	// but we are using a lower limit on purpose
+	filterNodeLimit = 150
 )
 
 // awsTagNameMasterRoles is a set of well-known AWS tag names that indicate the instance is a master
@@ -2531,7 +2535,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for AWS ELB")
 	}
 
-	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes))
+	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes), "running")
 	if err != nil {
 		return nil, err
 	}
@@ -3095,7 +3099,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
 func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes))
+	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes), "running")
 	if err != nil {
 		return err
 	}
@@ -3167,10 +3171,11 @@ func (c *Cloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Instan
 	return instancesByID, nil
 }
 
-// Fetches and caches instances by node names; returns an error if any cannot be found.
+// Fetches and caches instances in the given state, by node names; returns an error if any cannot be found. If no states
+// are given, no state filter is used and instances of all states are fetched.
 // This is implemented with a multi value filter on the node names, fetching the desired instances with a single query.
 // TODO(therc): make all the caching more rational during the 1.4 timeframe
-func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Instance, error) {
+func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String, states ...string) ([]*ec2.Instance, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if nodeNames.Equal(c.lastNodeNames) {
@@ -3181,7 +3186,7 @@ func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Ins
 			return c.lastInstancesByNodeNames, nil
 		}
 	}
-	instances, err := c.getInstancesByNodeNames(nodeNames.List())
+	instances, err := c.getInstancesByNodeNames(nodeNames.List(), states...)
 
 	if err != nil {
 		return nil, err
@@ -3197,30 +3202,41 @@ func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Ins
 	return instances, nil
 }
 
-func (c *Cloud) getInstancesByNodeNames(nodeNames []string) ([]*ec2.Instance, error) {
+func (c *Cloud) getInstancesByNodeNames(nodeNames []string, states ...string) ([]*ec2.Instance, error) {
 	names := aws.StringSlice(nodeNames)
+	ec2Instances := []*ec2.Instance{}
 
-	nodeNameFilter := &ec2.Filter{
-		Name:   aws.String("private-dns-name"),
-		Values: names,
+	for i := 0; i < len(names); i += filterNodeLimit {
+		end := i + filterNodeLimit
+		if end > len(names) {
+			end = len(names)
+		}
+
+		nameSlice := names[i:end]
+
+		nodeNameFilter := &ec2.Filter{
+			Name:   aws.String("private-dns-name"),
+			Values: nameSlice,
+		}
+
+		filters := []*ec2.Filter{nodeNameFilter}
+		if len(states) > 0 {
+			filters = append(filters, newEc2Filter("instance-state-name", states...))
+		}
+
+		instances, err := c.describeInstances(filters)
+		if err != nil {
+			glog.V(2).Infof("Failed to describe instances %v", nodeNames)
+			return nil, err
+		}
+		ec2Instances = append(ec2Instances, instances...)
 	}
 
-	filters := []*ec2.Filter{
-		nodeNameFilter,
-		newEc2Filter("instance-state-name", "running"),
-	}
-
-	instances, err := c.describeInstances(filters)
-	if err != nil {
-		glog.V(2).Infof("Failed to describe instances %v", nodeNames)
-		return nil, err
-	}
-
-	if len(instances) == 0 {
+	if len(ec2Instances) == 0 {
 		glog.V(3).Infof("Failed to find any instances %v", nodeNames)
 		return nil, nil
 	}
-	return instances, nil
+	return ec2Instances, nil
 }
 
 func (c *Cloud) describeInstances(filters []*ec2.Filter) ([]*ec2.Instance, error) {
