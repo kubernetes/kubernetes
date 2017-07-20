@@ -28,7 +28,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/util/version"
@@ -48,6 +47,7 @@ func TestWriteStaticPodManifests(t *testing.T) {
 
 	// set up tmp KubernetesDir for testing
 	kubeadmconstants.KubernetesDir = fmt.Sprintf("%s/etc/kubernetes", tmpdir)
+	defer func() { kubeadmconstants.KubernetesDir = "/etc/kubernetes" }()
 
 	var tests = []struct {
 		cfg                  *kubeadmapi.MasterConfiguration
@@ -125,282 +125,6 @@ func TestWriteStaticPodManifests(t *testing.T) {
 	}
 }
 
-func TestNewVolume(t *testing.T) {
-	var tests = []struct {
-		name     string
-		path     string
-		expected v1.Volume
-	}{
-		{
-			name: "foo",
-			path: "/etc/foo",
-			expected: v1.Volume{
-				Name: "foo",
-				VolumeSource: v1.VolumeSource{
-					HostPath: &v1.HostPathVolumeSource{Path: "/etc/foo"},
-				}},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := newVolume(rt.name, rt.path)
-		if actual.Name != rt.expected.Name {
-			t.Errorf(
-				"failed newVolume:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.Name,
-				actual.Name,
-			)
-		}
-		if actual.VolumeSource.HostPath.Path != rt.expected.VolumeSource.HostPath.Path {
-			t.Errorf(
-				"failed newVolume:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.VolumeSource.HostPath.Path,
-				actual.VolumeSource.HostPath.Path,
-			)
-		}
-	}
-}
-
-func TestNewVolumeMount(t *testing.T) {
-	var tests = []struct {
-		name     string
-		path     string
-		expected v1.VolumeMount
-	}{
-		{
-			name: "foo",
-			path: "/etc/foo",
-			expected: v1.VolumeMount{
-				Name:      "foo",
-				MountPath: "/etc/foo",
-			},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := newVolumeMount(rt.name, rt.path)
-		if actual.Name != rt.expected.Name {
-			t.Errorf(
-				"failed newVolumeMount:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.Name,
-				actual.Name,
-			)
-		}
-		if actual.MountPath != rt.expected.MountPath {
-			t.Errorf(
-				"failed newVolumeMount:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.MountPath,
-				actual.MountPath,
-			)
-		}
-	}
-}
-
-func TestEtcdVolume(t *testing.T) {
-	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
-		expected v1.Volume
-	}{
-		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{DataDir: etcdDataDir},
-			},
-			expected: v1.Volume{
-				Name: "etcd",
-				VolumeSource: v1.VolumeSource{
-					HostPath: &v1.HostPathVolumeSource{Path: etcdDataDir},
-				}},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := etcdVolume(rt.cfg)
-		if actual.Name != rt.expected.Name {
-			t.Errorf(
-				"failed etcdVolume:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.Name,
-				actual.Name,
-			)
-		}
-		if actual.VolumeSource.HostPath.Path != rt.expected.VolumeSource.HostPath.Path {
-			t.Errorf(
-				"failed etcdVolume:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.VolumeSource.HostPath.Path,
-				actual.VolumeSource.HostPath.Path,
-			)
-		}
-	}
-}
-
-func TestEtcdVolumeMount(t *testing.T) {
-	var tests = []struct {
-		expected v1.VolumeMount
-	}{
-		{
-			expected: v1.VolumeMount{
-				Name:      "etcd",
-				MountPath: etcdDataDir,
-			},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := etcdVolumeMount(etcdDataDir)
-		if actual.Name != rt.expected.Name {
-			t.Errorf(
-				"failed etcdVolumeMount:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.Name,
-				actual.Name,
-			)
-		}
-		if actual.MountPath != rt.expected.MountPath {
-			t.Errorf(
-				"failed etcdVolumeMount:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.MountPath,
-				actual.MountPath,
-			)
-		}
-	}
-}
-
-func TestCertsVolume(t *testing.T) {
-	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
-		expected v1.Volume
-	}{
-		{
-			cfg: &kubeadmapi.MasterConfiguration{},
-			expected: v1.Volume{
-				Name: "certs",
-				VolumeSource: v1.VolumeSource{
-					HostPath: &v1.HostPathVolumeSource{
-						Path: "/etc/ssl/certs"},
-				}},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := certsVolume(rt.cfg)
-		if actual.Name != rt.expected.Name {
-			t.Errorf(
-				"failed certsVolume:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.Name,
-				actual.Name,
-			)
-		}
-		if actual.VolumeSource.HostPath.Path != rt.expected.VolumeSource.HostPath.Path {
-			t.Errorf(
-				"failed certsVolume:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.VolumeSource.HostPath.Path,
-				actual.VolumeSource.HostPath.Path,
-			)
-		}
-	}
-}
-
-func TestCertsVolumeMount(t *testing.T) {
-	var tests = []struct {
-		expected v1.VolumeMount
-	}{
-		{
-			expected: v1.VolumeMount{
-				Name:      "certs",
-				MountPath: "/etc/ssl/certs",
-			},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := certsVolumeMount()
-		if actual.Name != rt.expected.Name {
-			t.Errorf(
-				"failed certsVolumeMount:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.Name,
-				actual.Name,
-			)
-		}
-		if actual.MountPath != rt.expected.MountPath {
-			t.Errorf(
-				"failed certsVolumeMount:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.MountPath,
-				actual.MountPath,
-			)
-		}
-	}
-}
-
-func TestK8sVolume(t *testing.T) {
-	var tests = []struct {
-		expected v1.Volume
-	}{
-		{
-			expected: v1.Volume{
-				Name: "k8s",
-				VolumeSource: v1.VolumeSource{
-					HostPath: &v1.HostPathVolumeSource{
-						Path: kubeadmconstants.KubernetesDir},
-				}},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := k8sVolume()
-		if actual.Name != rt.expected.Name {
-			t.Errorf(
-				"failed k8sVolume:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.Name,
-				actual.Name,
-			)
-		}
-		if actual.VolumeSource.HostPath.Path != rt.expected.VolumeSource.HostPath.Path {
-			t.Errorf(
-				"failed k8sVolume:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.VolumeSource.HostPath.Path,
-				actual.VolumeSource.HostPath.Path,
-			)
-		}
-	}
-}
-
-func TestK8sVolumeMount(t *testing.T) {
-	var tests = []struct {
-		expected v1.VolumeMount
-	}{
-		{
-			expected: v1.VolumeMount{
-				Name:      "k8s",
-				MountPath: kubeadmconstants.KubernetesDir,
-				ReadOnly:  true,
-			},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := k8sVolumeMount()
-		if actual.Name != rt.expected.Name {
-			t.Errorf(
-				"failed k8sVolumeMount:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.Name,
-				actual.Name,
-			)
-		}
-		if actual.MountPath != rt.expected.MountPath {
-			t.Errorf(
-				"failed k8sVolumeMount:\n\texpected: %s\n\t  actual: %s",
-				rt.expected.MountPath,
-				actual.MountPath,
-			)
-		}
-		if actual.ReadOnly != rt.expected.ReadOnly {
-			t.Errorf(
-				"failed k8sVolumeMount:\n\texpected: %t\n\t  actual: %t",
-				rt.expected.ReadOnly,
-				actual.ReadOnly,
-			)
-		}
-	}
-}
-
 func TestComponentResources(t *testing.T) {
 	a := componentResources("250m")
 	if a.Requests == nil {
@@ -464,7 +188,7 @@ func TestComponentPod(t *testing.T) {
 
 	for _, rt := range tests {
 		c := v1.Container{Name: rt.n}
-		v := v1.Volume{}
+		v := []v1.Volume{}
 		actual := componentPod(c, v)
 		if actual.ObjectMeta.Name != rt.n {
 			t.Errorf(
@@ -483,8 +207,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 	}{
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:               kubeadm.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-				Networking:        kubeadm.Networking{ServiceSubnet: "bar"},
+				API:               kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
+				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.0",
 			},
@@ -517,8 +241,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:               kubeadm.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
-				Networking:        kubeadm.Networking{ServiceSubnet: "bar"},
+				API:               kubeadmapi.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
+				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.1",
 			},
@@ -551,9 +275,9 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:               kubeadm.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
-				Networking:        kubeadm.Networking{ServiceSubnet: "bar"},
-				Etcd:              kubeadm.Etcd{CertFile: "fiz", KeyFile: "faz"},
+				API:               kubeadmapi.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
+				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Etcd:              kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.2",
 			},
@@ -588,9 +312,9 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:               kubeadm.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
-				Networking:        kubeadm.Networking{ServiceSubnet: "bar"},
-				Etcd:              kubeadm.Etcd{CertFile: "fiz", KeyFile: "faz"},
+				API:               kubeadmapi.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
+				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Etcd:              kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.3",
 			},
@@ -625,9 +349,9 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:               kubeadm.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
-				Networking:        kubeadm.Networking{ServiceSubnet: "bar"},
-				Etcd:              kubeadm.Etcd{CertFile: "fiz", KeyFile: "faz"},
+				API:               kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
+				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Etcd:              kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.0",
 			},
@@ -663,7 +387,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getAPIServerCommand(rt.cfg, false, version.MustParseSemantic(rt.cfg.KubernetesVersion))
+		actual := getAPIServerCommand(rt.cfg, version.MustParseSemantic(rt.cfg.KubernetesVersion))
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
@@ -717,7 +441,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				Networking:        kubeadm.Networking{PodSubnet: "bar"},
+				Networking:        kubeadmapi.Networking{PodSubnet: "bar"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.0",
 			},
@@ -739,7 +463,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getControllerManagerCommand(rt.cfg, false, version.MustParseSemantic(rt.cfg.KubernetesVersion))
+		actual := getControllerManagerCommand(rt.cfg, version.MustParseSemantic(rt.cfg.KubernetesVersion))
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
@@ -821,7 +545,7 @@ func TestGetSchedulerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getSchedulerCommand(rt.cfg, false)
+		actual := getSchedulerCommand(rt.cfg)
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
