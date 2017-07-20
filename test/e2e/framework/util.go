@@ -183,6 +183,12 @@ const (
 	ServeHostnameImage = "gcr.io/google_containers/serve_hostname:v1.4"
 	// ssh port
 	sshPort = "22"
+
+	// ImagePrePullingTimeout is the time we wait for the e2e-image-puller
+	// static pods to pull the list of seeded images. If they don't pull
+	// images within this time we simply log their output and carry on
+	// with the tests.
+	ImagePrePullingTimeout = 5 * time.Minute
 )
 
 var (

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package lifecycle
 
 import (
 	"encoding/xml"
@@ -58,13 +58,16 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 	// Create the frameworks here because we can only create them
 	// in a "Describe".
 	testFrameworks := createUpgradeFrameworks()
-	framework.KubeDescribe("master upgrade", func() {
+	SIGDescribe("master upgrade", func() {
 		It("should maintain a functioning cluster [Feature:MasterUpgrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Master upgrade"}
-			masterUpgradeTest := &junit.TestCase{Name: "master-upgrade", Classname: "upgrade_tests"}
+			masterUpgradeTest := &junit.TestCase{
+				Name:      "[sig-cluster-lifecycle] master-upgrade",
+				Classname: "upgrade_tests",
+			}
 			testSuite.TestCases = append(testSuite.TestCases, masterUpgradeTest)
 
 			upgradeFunc := func() {
@@ -78,13 +81,16 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 		})
 	})
 
-	framework.KubeDescribe("node upgrade", func() {
+	SIGDescribe("node upgrade", func() {
 		It("should maintain a functioning cluster [Feature:NodeUpgrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Node upgrade"}
-			nodeUpgradeTest := &junit.TestCase{Name: "node-upgrade", Classname: "upgrade_tests"}
+			nodeUpgradeTest := &junit.TestCase{
+				Name:      "node-upgrade",
+				Classname: "upgrade_tests",
+			}
 
 			upgradeFunc := func() {
 				start := time.Now()
@@ -97,13 +103,13 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 		})
 	})
 
-	framework.KubeDescribe("cluster upgrade", func() {
+	SIGDescribe("cluster upgrade", func() {
 		It("should maintain a functioning cluster [Feature:ClusterUpgrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster upgrade"}
-			clusterUpgradeTest := &junit.TestCase{Name: "cluster-upgrade", Classname: "upgrade_tests"}
+			clusterUpgradeTest := &junit.TestCase{Name: "[sig-cluster-lifecycle] cluster-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, clusterUpgradeTest)
 			upgradeFunc := func() {
 				start := time.Now()
@@ -119,20 +125,20 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 	})
 })
 
-var _ = framework.KubeDescribe("Downgrade [Feature:Downgrade]", func() {
+var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-downgrade")
 
 	// Create the frameworks here because we can only create them
 	// in a "Describe".
 	testFrameworks := createUpgradeFrameworks()
 
-	framework.KubeDescribe("cluster downgrade", func() {
+	SIGDescribe("cluster downgrade", func() {
 		It("should maintain a functioning cluster [Feature:ClusterDowngrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster downgrade"}
-			clusterDowngradeTest := &junit.TestCase{Name: "cluster-downgrade", Classname: "upgrade_tests"}
+			clusterDowngradeTest := &junit.TestCase{Name: "[sig-cluster-lifecycle] cluster-downgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, clusterDowngradeTest)
 
 			upgradeFunc := func() {
@@ -150,19 +156,19 @@ var _ = framework.KubeDescribe("Downgrade [Feature:Downgrade]", func() {
 	})
 })
 
-var _ = framework.KubeDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
+var _ = SIGDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 	f := framework.NewDefaultFramework("etc-upgrade")
 
 	// Create the frameworks here because we can only create them
 	// in a "Describe".
 	testFrameworks := createUpgradeFrameworks()
-	framework.KubeDescribe("etcd upgrade", func() {
+	SIGDescribe("etcd upgrade", func() {
 		It("should maintain a functioning cluster", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), "")
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Etcd upgrade"}
-			etcdTest := &junit.TestCase{Name: "etcd-upgrade", Classname: "upgrade_tests"}
+			etcdTest := &junit.TestCase{Name: "[sig-cluster-lifecycle] etcd-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, etcdTest)
 
 			upgradeFunc := func() {

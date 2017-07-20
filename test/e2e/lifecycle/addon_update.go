@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package lifecycle
 
 import (
 	"bytes"
@@ -205,7 +205,7 @@ type stringPair struct {
 	data, fileName string
 }
 
-var _ = framework.KubeDescribe("Addon update", func() {
+var _ = SIGDescribe("Addon update", func() {
 
 	var dir string
 	var sshClient *ssh.Client

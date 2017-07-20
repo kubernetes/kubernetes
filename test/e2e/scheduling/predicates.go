@@ -40,7 +40,6 @@ import (
 
 const maxNumberOfPods int64 = 10
 const minPodCPURequest int64 = 500
-const imagePrePullingTimeout = 5 * time.Minute
 
 // variable set in BeforeEach, never modified afterwards
 var masterNodes sets.String
@@ -101,7 +100,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, ignoreLabels)
 		Expect(err).NotTo(HaveOccurred())
 
-		err = framework.WaitForPodsSuccess(cs, metav1.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingTimeout)
+		err = framework.WaitForPodsSuccess(cs, metav1.NamespaceSystem, framework.ImagePullerLabels, framework.ImagePrePullingTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {

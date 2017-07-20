@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package lifecycle
 
 import (
 	"fmt"
@@ -55,7 +55,7 @@ func filterIrrelevantPods(pods []*v1.Pod) []*v1.Pod {
 	return results
 }
 
-var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
+var _ = SIGDescribe("Restart [Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart")
 	var ps *testutils.PodStore
 	var originalNodeNames []string

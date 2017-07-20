@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package lifecycle
 
 import (
 	"fmt"
@@ -50,7 +50,7 @@ const (
 	rebootPodReadyAgainTimeout = 5 * time.Minute
 )
 
-var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
+var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	var f *framework.Framework
 
 	BeforeEach(func() {

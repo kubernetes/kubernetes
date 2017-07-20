@@ -810,6 +810,7 @@ test/e2e/instrumentation
 test/e2e/instrumentation/logging
 test/e2e/instrumentation/monitoring
 test/e2e/kubectl
+test/e2e/lifecycle
 test/e2e/metrics
 test/e2e/scalability
 test/e2e/scheduling
