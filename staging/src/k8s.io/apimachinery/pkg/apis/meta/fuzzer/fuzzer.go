@@ -83,7 +83,6 @@ func genericFuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			bytes, err := runtime.Encode(codec, obj)
 			if err != nil {
 				panic(fmt.Sprintf("Failed to encode object: %v", err))
-				return
 			}
 
 			// strip trailing newlines which do not survive roundtrips

@@ -58,7 +58,6 @@ func overrideMetaFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			bytes, err := runtime.Encode(apitesting.TestCodec(codecs, v1.SchemeGroupVersion), obj)
 			if err != nil {
 				panic(fmt.Sprintf("Failed to encode object: %v", err))
-				return
 			}
 
 			// Set the bytes field on the RawExtension
