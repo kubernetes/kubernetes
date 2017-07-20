@@ -505,7 +505,10 @@ func WaitForPodsSuccess(c clientset.Interface, ns string, successPodLabels map[s
 		podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: successPodSelector.String()})
 		if err != nil {
 			Logf("Error getting pods in namespace %q: %v", ns, err)
-			return false, nil
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
 		}
 		if len(podList.Items) == 0 {
 			Logf("Waiting for pods to enter Success, but no pods in %q match label %v", ns, successPodLabels)
@@ -564,7 +567,10 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		rcList, err := c.Core().ReplicationControllers(ns).List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
-			return false, nil
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
 		}
 		for _, rc := range rcList.Items {
 			replicas += *rc.Spec.Replicas
@@ -574,7 +580,10 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		rsList, err := c.Extensions().ReplicaSets(ns).List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error getting replication sets in namespace %q: %v", ns, err)
-			return false, nil
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
 		}
 		for _, rs := range rsList.Items {
 			replicas += *rs.Spec.Replicas
@@ -584,7 +593,10 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		podList, err := c.Core().Pods(ns).List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error getting pods in namespace '%s': %v", ns, err)
-			return false, nil
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
 		}
 		nOk := int32(0)
 		notReady := int32(0)
@@ -1435,6 +1447,9 @@ func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labe
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := c.Core().Pods(ns).List(options)
 		if err != nil {
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
 			return false, err
 		}
 		found := false
@@ -1464,6 +1479,9 @@ func WaitForService(c clientset.Interface, namespace, name string, exist bool, i
 		case apierrs.IsNotFound(err):
 			Logf("Service %s in namespace %s disappeared.", name, namespace)
 			return !exist, nil
+		case !IsRetryableAPIError(err):
+			Logf("Non-retryable failure while getting service.")
+			return false, err
 		default:
 			Logf("Get service %s in namespace %s failed: %v", name, namespace, err)
 			return false, nil
@@ -1488,6 +1506,9 @@ func WaitForServiceWithSelector(c clientset.Interface, namespace string, selecto
 		case len(services.Items) == 0:
 			Logf("Service with %s in namespace %s disappeared.", selector.String(), namespace)
 			return !exist, nil
+		case !IsRetryableAPIError(err):
+			Logf("Non-retryable failure while listing service.")
+			return false, err
 		default:
 			Logf("List service with %s in namespace %s failed: %v", selector.String(), namespace, err)
 			return false, nil
@@ -2315,9 +2336,15 @@ func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
 		nodes, err = c.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
-		return err == nil, nil
+		if err != nil {
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
 	}) != nil {
-		ExpectNoError(err, "Timed out while listing nodes for e2e cluster.")
+		ExpectNoError(err, "Non-retryable failure or timed out while listing nodes for e2e cluster.")
 	}
 	return nodes
 }
@@ -2392,8 +2419,10 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		nodes, err := c.Core().Nodes().List(opts)
 		if err != nil {
 			Logf("Unexpected error listing nodes: %v", err)
-			// Ignore the error here - it will be retried.
-			return false, nil
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
@@ -2538,7 +2567,12 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 func AddOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods v1.AvoidPods) {
 	err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
 		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		ExpectNoError(err)
+		if err != nil {
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
 
 		taintsData, err := json.Marshal(avoidPods)
 		ExpectNoError(err)
@@ -2564,7 +2598,12 @@ func AddOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods
 func RemoveAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 	err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
 		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		ExpectNoError(err)
+		if err != nil {
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
 
 		if node.Annotations == nil {
 			return true, nil
@@ -2668,7 +2707,12 @@ func WaitForPodsWithLabel(c clientset.Interface, ns string, label labels.Selecto
 	for t := time.Now(); time.Since(t) < PodListTimeout; time.Sleep(Poll) {
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err = c.Core().Pods(ns).List(options)
-		Expect(err).NotTo(HaveOccurred())
+		if err != nil {
+			if IsRetryableAPIError(err) {
+				continue
+			}
+			return
+		}
 		if len(pods.Items) > 0 {
 			break
 		}
@@ -2688,7 +2732,10 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 			pods, err := WaitForPodsWithLabel(c, ns, label)
 			if err != nil {
 				Logf("Failed to list pods: %v", err)
-				return false, nil
+				if IsRetryableAPIError(err) {
+					return false, nil
+				}
+				return false, err
 			}
 			current = 0
 			for _, pod := range pods.Items {
@@ -3012,6 +3059,9 @@ func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, a
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		if ds, err = daemonsets.Get(name, metav1.GetOptions{}); err != nil {
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
@@ -3240,7 +3290,10 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 	err = wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
 		retrievedPod, err := client.Core().Pods(execPod.Namespace).Get(created.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, nil
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
 		}
 		return retrievedPod.Status.Phase == v1.PodRunning, nil
 	})
@@ -3509,6 +3562,9 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 		if err != nil {
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
 			return false, err
 		}
 		for i := range nodes.Items {
@@ -3555,6 +3611,9 @@ func WaitForAllNodesHealthy(c clientset.Interface, timeout time.Duration) error 
 		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.Core().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
 		if err != nil {
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
 			return false, err
 		}
 		for _, node := range nodes.Items {
@@ -3897,7 +3956,10 @@ func WaitForIngressAddress(c clientset.Interface, ns, ingName string, timeout ti
 		ipOrNameList, err := getIngressAddress(c, ns, ingName)
 		if err != nil || len(ipOrNameList) == 0 {
 			Logf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
-			return false, nil
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
 		}
 		address = ipOrNameList[0]
 		return true, nil
@@ -3974,7 +4036,13 @@ func GetNodePortURL(client clientset.Interface, ns, name string, svcPort int) (s
 		nodes, err = client.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
-		return err == nil, nil
+		if err != nil {
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
 	}) != nil {
 		return "", err
 	}
@@ -4791,4 +4859,8 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 		l, _ := RunKubectl("logs", s.Name, fmt.Sprintf("--namespace=%v", ns), "--tail=100")
 		Logf("\nLast 100 log lines of %v:\n%v", s.Name, l)
 	}
+}
+
+func IsRetryableAPIError(err error) bool {
+	return apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) || apierrs.IsTooManyRequests(err) || apierrs.IsInternalError(err)
 }
