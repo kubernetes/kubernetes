@@ -282,7 +282,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		createPausePod(f, pausePodConfig{
 			Name: labelPodName,
 			NodeSelector: map[string]string{
-				"kubernetes.io/hostname": nodeName,
 				k: v,
 			},
 		})
@@ -362,10 +361,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 							{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      "kubernetes.io/hostname",
-										Operator: v1.NodeSelectorOpIn,
-										Values:   []string{nodeName},
-									}, {
 										Key:      k,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{v},
