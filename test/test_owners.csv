@@ -336,7 +336,6 @@ NoExecuteTaintManager doesn't evict pod with tolerations from tainted nodes,free
 NoExecuteTaintManager eventually evict pod with finite tolerations from tainted nodes,freehan,0,scheduling
 NoExecuteTaintManager evicts pods from tainted nodes,freehan,0,scheduling
 NoExecuteTaintManager removing taint cancels eviction,freehan,0,scheduling
-NodeOutOfDisk runs out of disk space,vishh,0,node
 NodeProblemDetector KernelMonitor should generate node condition and events for corresponding errors,Random-Liu,0,node
 Nodes Resize should be able to add nodes,piosz,1,cluster-lifecycle
 Nodes Resize should be able to delete nodes,zmerlynn,1,cluster-lifecycle

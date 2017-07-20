@@ -83,7 +83,6 @@
   "Logging", 
   "MemoryEviction", 
   "MirrorPod", 
-  "NodeOutOfDisk", 
   "NodeProblemDetector", 
   "Opaque", 
   "Pod garbage", 

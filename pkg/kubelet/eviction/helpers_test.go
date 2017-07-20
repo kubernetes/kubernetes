@@ -1363,12 +1363,12 @@ func TestHasNodeConditions(t *testing.T) {
 		result bool
 	}{
 		"has-condition": {
-			inputs: []v1.NodeConditionType{v1.NodeReady, v1.NodeOutOfDisk, v1.NodeMemoryPressure},
+			inputs: []v1.NodeConditionType{v1.NodeReady, v1.NodeDiskPressure, v1.NodeMemoryPressure},
 			item:   v1.NodeMemoryPressure,
 			result: true,
 		},
 		"does-not-have-condition": {
-			inputs: []v1.NodeConditionType{v1.NodeReady, v1.NodeOutOfDisk},
+			inputs: []v1.NodeConditionType{v1.NodeReady, v1.NodeDiskPressure},
 			item:   v1.NodeMemoryPressure,
 			result: false,
 		},
