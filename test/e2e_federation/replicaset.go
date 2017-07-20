@@ -317,7 +317,8 @@ func waitForReplicaSet(c *fedclientset.Clientset, namespace string, replicaSetNa
 		}
 		specReplicas, statusReplicas := int32(0), int32(0)
 		for _, cluster := range clusters {
-			rs, err := cluster.ReplicaSets(namespace).Get(replicaSetName, metav1.GetOptions{})
+			// TODO: switch to use AppsV1beta2 ReplicaSet when apps/v1beta2 is enabled by default
+			rs, err := cluster.ExtensionsV1beta1().ReplicaSets(namespace).Get(replicaSetName, metav1.GetOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				framework.Logf("Failed getting replicaset: \"%s/%s/%s\", err: %v", cluster.Name, namespace, replicaSetName, err)
 				return false, err
