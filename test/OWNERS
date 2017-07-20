@@ -25,6 +25,7 @@ reviewers:
   - spiffxp
   - spxtr
   - sttts
+  - zmerlynn
 approvers:
   - bowei # for test/e2e/{dns*,network}.go
   - deads2k
@@ -52,3 +53,4 @@ approvers:
   - spiffxp
   - spxtr
   - sttts
+  - zmerlynn

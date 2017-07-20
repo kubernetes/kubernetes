@@ -954,7 +954,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		kubelet.registerWithApiServer()
+		kubelet.registerWithAPIServer()
 		done <- struct{}{}
 	}()
 	select {
@@ -1113,7 +1113,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			return notImplemented(action)
 		})
 
-		result := kubelet.tryRegisterWithApiServer(tc.newNode)
+		result := kubelet.tryRegisterWithAPIServer(tc.newNode)
 		require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
 
 		actions := kubeClient.Actions()

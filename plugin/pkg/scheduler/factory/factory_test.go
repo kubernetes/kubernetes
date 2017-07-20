@@ -40,6 +40,8 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
+const enableEquivalenceCache = true
+
 func TestCreate(t *testing.T) {
 	handler := utiltesting.FakeHandler{
 		StatusCode:   500,
@@ -62,6 +64,7 @@ func TestCreate(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 	factory.Create()
 }
@@ -93,6 +96,7 @@ func TestCreateFromConfig(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 
 	// Pre-register some predicate and priority functions
@@ -151,6 +155,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 
 	// Pre-register some predicate and priority functions
@@ -210,6 +215,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 
 	configData = []byte(`{}`)
@@ -266,6 +272,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
@@ -378,6 +385,7 @@ func TestResponsibleForPod(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 	// factory of "foo-scheduler"
 	factoryFooScheduler := NewConfigFactory(
@@ -392,6 +400,7 @@ func TestResponsibleForPod(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 	// scheduler annotations to be tested
 	schedulerFitsDefault := "default-scheduler"
@@ -461,6 +470,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		-1,
+		enableEquivalenceCache,
 	)
 	_, err := factory.Create()
 	if err == nil {
@@ -506,6 +516,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 			informerFactory.Apps().V1beta1().StatefulSets(),
 			informerFactory.Core().V1().Services(),
 			test.hardPodAffinitySymmetricWeight,
+			enableEquivalenceCache,
 		)
 		_, err := factory.Create()
 		if err == nil {

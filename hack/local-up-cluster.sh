@@ -59,7 +59,7 @@ ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
 DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
 KUBECTL=${KUBECTL:-cluster/kubectl.sh}
-WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-10}
+WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-20}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
 HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
@@ -76,7 +76,6 @@ ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
 ENABLE_APISERVER_BASIC_AUDIT=${ENABLE_APISERVER_BASIC_AUDIT:-false}
 
 # RBAC Mode options
-ALLOW_ANY_TOKEN=${ALLOW_ANY_TOKEN:-false}
 ENABLE_RBAC=${ENABLE_RBAC:-false}
 AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-""}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
@@ -434,11 +433,6 @@ function start_apiserver {
       swagger_arg="--enable-swagger-ui=true "
     fi
 
-    anytoken_arg=""
-    if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
-      anytoken_arg="--insecure-allow-any-token "
-      KUBECONFIG_TOKEN="${KUBECONFIG_TOKEN:-system:admin/system:masters}"
-    fi
     authorizer_arg=""
     if [[ "${ENABLE_RBAC}" = true ]]; then
       authorizer_arg="--authorization-mode=RBAC "
@@ -498,7 +492,7 @@ function start_apiserver {
 
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --vmodule="${LOG_SPEC}" \
@@ -536,7 +530,7 @@ function start_apiserver {
     # this uses the API port because if you don't have any authenticator, you can't seem to use the secure port at all.
     # this matches what happened with the combination in 1.4.
     # TODO change this conditionally based on whether API_PORT is on or off
-    kube::util::wait_for_url "http://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} \
+    kube::util::wait_for_url "https://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} \
         || { echo "check apiserver logs: ${APISERVER_LOG}" ; exit 1 ; }
 
     # Create kubeconfigs for all components, using client certs
@@ -548,17 +542,7 @@ function start_apiserver {
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" scheduler
 
     if [[ -z "${AUTH_ARGS}" ]]; then
-        if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
-            # use token authentication
-            if [[ -n "${KUBECONFIG_TOKEN}" ]]; then
-                AUTH_ARGS="--token=${KUBECONFIG_TOKEN}"
-            else
-                AUTH_ARGS="--token=system:admin/system:masters"
-            fi
-        else
-            # default to the admin client cert/key
-            AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
-        fi
+        AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
     fi
 
     ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"

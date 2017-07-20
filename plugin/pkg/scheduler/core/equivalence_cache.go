@@ -158,7 +158,8 @@ func (ec *EquivalenceCache) InvalidateAllCachedPredicateItemOfNode(nodeName stri
 	glog.V(5).Infof("Done invalidating all cached predicates on node: %s", nodeName)
 }
 
-// InvalidateCachedPredicateItemForPod marks item of given predicateKeys, of given pod, on the given node as invalid
+// InvalidateCachedPredicateItemForPod marks item of given predicateKeys, of given pod (i.e. equivalenceHash),
+// on the given node as invalid
 func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPod(nodeName string, predicateKeys sets.String, pod *v1.Pod) {
 	if len(predicateKeys) == 0 {
 		return

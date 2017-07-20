@@ -126,9 +126,9 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 	return cmd
 }
 
-// UnsecuredKubeletDeps returns a KubeletDeps suitable for being run, or an error if the server setup
+// UnsecuredDependencies returns a Dependencies suitable for being run, or an error if the server setup
 // is not valid.  It will not start any background processes, and does not include authentication/authorization
-func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error) {
+func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, error) {
 	// Initialize the TLS Options
 	tlsOptions, err := InitializeTLS(&s.KubeletFlags, &s.KubeletConfiguration)
 	if err != nil {
@@ -151,7 +151,7 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 		dockerClient = nil
 	}
 
-	return &kubelet.KubeletDeps{
+	return &kubelet.Dependencies{
 		Auth:               nil, // default does not enforce auth[nz]
 		CAdvisorInterface:  nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
 		Cloud:              nil, // cloud provider might start background processes
@@ -182,7 +182,7 @@ func getKubeClient(s *options.KubeletServer) (*clientset.Clientset, error) {
 }
 
 // Tries to download the kubelet-<node-name> configmap from "kube-system" namespace via the API server and returns a JSON string or error
-func getRemoteKubeletConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (string, error) {
+func getRemoteKubeletConfig(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (string, error) {
 	// TODO(mtaufen): should probably cache clientset and pass into this function rather than regenerate on every request
 	kubeClient, err := getKubeClient(s)
 	if err != nil {
@@ -281,11 +281,11 @@ func initKubeletConfigSync(s *options.KubeletServer) (*componentconfig.KubeletCo
 	}
 }
 
-// Run runs the specified KubeletServer with the given KubeletDeps.  This should never exit.
+// Run runs the specified KubeletServer with the given Dependencies.  This should never exit.
 // The kubeDeps argument may be nil - if so, it is initialized from the settings on KubeletServer.
-// Otherwise, the caller is assumed to have set up the KubeletDeps object and a default one will
+// Otherwise, the caller is assumed to have set up the Dependencies object and a default one will
 // not be generated.
-func Run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) error {
+func Run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) error {
 	if err := run(s, kubeDeps); err != nil {
 		return fmt.Errorf("failed to run Kubelet: %v", err)
 	}
@@ -339,7 +339,7 @@ func validateConfig(s *options.KubeletServer) error {
 }
 
 // makeEventRecorder sets up kubeDeps.Recorder if its nil. Its a no-op otherwise.
-func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, nodeName types.NodeName) {
+func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubelet.Dependencies, nodeName types.NodeName) {
 	if kubeDeps.Recorder != nil {
 		return
 	}
@@ -354,7 +354,7 @@ func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubele
 	}
 }
 
-func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
+func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	// TODO: this should be replaced by a --standalone flag
 	standaloneMode := (len(s.APIServerList) == 0 && !s.RequireKubeConfig)
 
@@ -417,7 +417,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps == nil {
-		kubeDeps, err = UnsecuredKubeletDeps(s)
+		kubeDeps, err = UnsecuredDependencies(s)
 		if err != nil {
 			return err
 		}
@@ -817,7 +817,7 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, runOnce bool, standaloneMode bool) error {
+func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.Dependencies, runOnce bool, standaloneMode bool) error {
 	hostname := nodeutil.GetHostname(kubeFlags.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname if kcfg.Cloud == nil
 	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
@@ -891,7 +891,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.Kubele
 	return nil
 }
 
-func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps) {
+func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.Dependencies) {
 	// start the kubelet
 	go wait.Until(func() { k.Run(podCfg.Updates()) }, 0, wait.NeverStop)
 
@@ -908,7 +908,7 @@ func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg 
 	}
 }
 
-func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, crOptions *options.ContainerRuntimeOptions, standaloneMode bool, hostnameOverride, nodeIP, providerID string) (k kubelet.KubeletBootstrap, err error) {
+func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.Dependencies, crOptions *options.ContainerRuntimeOptions, standaloneMode bool, hostnameOverride, nodeIP, providerID string) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 

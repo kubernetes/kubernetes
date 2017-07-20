@@ -51,8 +51,8 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/webhook"
 )
 
-// registerAllAdmissionPlugins registers all admission plugins
-func registerAllAdmissionPlugins(plugins *admission.Plugins) {
+// RegisterAllAdmissionPlugins registers all admission plugins
+func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	admit.Register(plugins)
 	alwayspullimages.Register(plugins)
 	antiaffinity.Register(plugins)

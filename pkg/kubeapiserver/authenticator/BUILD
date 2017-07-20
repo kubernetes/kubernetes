@@ -27,7 +27,6 @@ go_library(
         "//vendor/k8s.io/apiserver/plugin/pkg/authenticator/password/keystone:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth:go_default_library",
-        "//vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/anytoken:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook:go_default_library",
         "//vendor/k8s.io/client-go/plugin/pkg/client/auth/gcp:go_default_library",

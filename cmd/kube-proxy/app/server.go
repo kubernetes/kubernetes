@@ -302,7 +302,7 @@ func (o *Options) loadConfig(data []byte) (*componentconfig.KubeProxyConfigurati
 	return config, nil
 }
 
-func (o *Options) applyDefaults(in *componentconfig.KubeProxyConfiguration) (*componentconfig.KubeProxyConfiguration, error) {
+func (o *Options) ApplyDefaults(in *componentconfig.KubeProxyConfiguration) (*componentconfig.KubeProxyConfiguration, error) {
 	external, err := o.scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
@@ -344,7 +344,7 @@ with the apiserver API to configure the proxy.`,
 		},
 	}
 
-	opts.config, err = opts.applyDefaults(opts.config)
+	opts.config, err = opts.ApplyDefaults(opts.config)
 	if err != nil {
 		glog.Fatalf("unable to create flag defaults: %v", err)
 	}
@@ -463,8 +463,10 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	recorder := eventBroadcaster.NewRecorder(scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
 
 	var healthzServer *healthcheck.HealthzServer
+	var healthzUpdater healthcheck.HealthzUpdater
 	if len(config.HealthzBindAddress) > 0 {
 		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration)
+		healthzUpdater = healthzServer
 	}
 
 	var proxier proxy.ProxyProvider
@@ -498,7 +500,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 			hostname,
 			nodeIP,
 			recorder,
-			healthzServer,
+			healthzUpdater,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)

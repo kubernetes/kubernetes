@@ -200,6 +200,12 @@ message LinuxSandboxSecurityContext {
     // This allows a sandbox to take additional security precautions if no
     // privileged containers are expected to be run.
     bool privileged = 6;
+    // Seccomp profile for the sandbox, candidate values are:
+    // * runtime/default: the default profile for the container runtime
+    // * unconfined: unconfined profile, ie, no seccomp sandboxing
+    // * localhost/<full-path-to-profile>: the profile installed on the node.
+    //   <full-path-to-profile> is the full path of the profile.
+    string seccomp_profile_path = 7;
 }
 
 // LinuxPodSandboxConfig holds platform-specific configurations for Linux

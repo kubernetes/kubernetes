@@ -324,17 +324,20 @@ function create-master-pki {
   ln -sf "${APISERVER_SERVER_KEY_PATH}" /etc/srv/kubernetes/server.key
   ln -sf "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.cert
 
-  AGGREGATOR_CA_KEY_PATH="${pki_dir}/aggr_ca.key"
-  echo "${AGGREGATOR_CA_KEY:-}" | base64 --decode > "${AGGREGATOR_CA_KEY_PATH}"
 
-  REQUESTHEADER_CA_CERT_PATH="${pki_dir}/aggr_ca.crt"
-  echo "${REQUESTHEADER_CA_CERT:-}" | base64 --decode > "${REQUESTHEADER_CA_CERT_PATH}"
+  if [[ ! -z "${REQUESTHEADER_CA_CERT:-}" ]]; then
+    AGGREGATOR_CA_KEY_PATH="${pki_dir}/aggr_ca.key"
+    echo "${AGGREGATOR_CA_KEY}" | base64 --decode > "${AGGREGATOR_CA_KEY_PATH}"
 
-  PROXY_CLIENT_KEY_PATH="${pki_dir}/proxy_client.key"
-  echo "${PROXY_CLIENT_KEY:-}" | base64 --decode > "${PROXY_CLIENT_KEY_PATH}"
+    REQUESTHEADER_CA_CERT_PATH="${pki_dir}/aggr_ca.crt"
+    echo "${REQUESTHEADER_CA_CERT}" | base64 --decode > "${REQUESTHEADER_CA_CERT_PATH}"
 
-  PROXY_CLIENT_CERT_PATH="${pki_dir}/proxy_client.crt"
-  echo "${PROXY_CLIENT_CERT:-}" | base64 --decode > "${PROXY_CLIENT_CERT_PATH}"
+    PROXY_CLIENT_KEY_PATH="${pki_dir}/proxy_client.key"
+    echo "${PROXY_CLIENT_KEY}" | base64 --decode > "${PROXY_CLIENT_KEY_PATH}"
+
+    PROXY_CLIENT_CERT_PATH="${pki_dir}/proxy_client.crt"
+    echo "${PROXY_CLIENT_CERT}" | base64 --decode > "${PROXY_CLIENT_CERT_PATH}"
+  fi
 }
 
 # After the first boot and on upgrade, these files exist on the master-pd
@@ -365,9 +368,6 @@ function create-master-auth {
   fi
   if [[ -n "${KUBE_SCHEDULER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
-  fi
-  if [[ -n "${KUBELET_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "kubelet,uid:kubelet,system:nodes"
   fi
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
@@ -1235,7 +1235,7 @@ function start-kube-apiserver {
   params+=" --secure-port=443"
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
-  if [[ ! -z "${REQUESTHEADER_CA_CERT:-}" ]]; then
+  if [[ -s "${REQUESTHEADER_CA_CERT_PATH:-}" ]]; then
     params+=" --requestheader-client-ca-file=${REQUESTHEADER_CA_CERT_PATH}"
     params+=" --requestheader-allowed-names=aggregator"
     params+=" --requestheader-extra-headers-prefix=X-Remote-Extra-"

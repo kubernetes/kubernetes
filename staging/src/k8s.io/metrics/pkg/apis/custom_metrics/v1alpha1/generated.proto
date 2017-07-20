@@ -46,7 +46,7 @@ message MetricValue {
   // which these metrics were calculated, when returning rate
   // metrics calculated from cumulative metrics (or zero for
   // non-calculated instantaneous metrics).
-  optional int64 windowSeconds = 4;
+  optional int64 window = 4;
 
   // the value of the metric for this
   optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 5;

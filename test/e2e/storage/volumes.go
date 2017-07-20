@@ -85,7 +85,7 @@ var _ = SIGDescribe("Volumes", func() {
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
 	// note that namespace deletion is handled by delete-namespace flag
 	clean := true
-	// filled in BeforeEach
+	// filled inside BeforeEach
 	var cs clientset.Interface
 	var namespace *v1.Namespace
 
@@ -100,21 +100,12 @@ var _ = SIGDescribe("Volumes", func() {
 
 	SIGDescribe("NFS", func() {
 		It("should be mountable", func() {
-			config := framework.VolumeTestConfig{
-				Namespace:   namespace.Name,
-				Prefix:      "nfs",
-				ServerImage: framework.NfsServerImage,
-				ServerPorts: []int{2049},
-			}
-
+			config, _, serverIP := framework.NewNFSServer(cs, namespace.Name, []string{})
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-			pod := framework.StartVolumeServer(cs, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("NFS server IP address: %v", serverIP)
 
 			tests := []framework.VolumeTest{
 				{
@@ -138,71 +129,26 @@ var _ = SIGDescribe("Volumes", func() {
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
 
-	SIGDescribe("GlusterFS [Feature:Volumes]", func() {
+	SIGDescribe("GlusterFS", func() {
 		It("should be mountable", func() {
 			//TODO (copejon) GFS is not supported on debian image.
 			framework.SkipUnlessNodeOSDistroIs("gci")
-
-			config := framework.VolumeTestConfig{
-				Namespace:   namespace.Name,
-				Prefix:      "gluster",
-				ServerImage: framework.GlusterfsServerImage,
-				ServerPorts: []int{24007, 24008, 49152},
-			}
-
+			// create gluster server and endpoints
+			config, _, _ := framework.NewGlusterfsServer(cs, namespace.Name)
+			name := config.Prefix + "-server"
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
+					err := cs.Core().Endpoints(namespace.Name).Delete(name, nil)
+					Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
 				}
 			}()
-			pod := framework.StartVolumeServer(cs, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("Gluster server IP address: %v", serverIP)
-
-			// create Endpoints for the server
-			endpoints := v1.Endpoints{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Endpoints",
-					APIVersion: "v1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: config.Prefix + "-server",
-				},
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP: serverIP,
-							},
-						},
-						Ports: []v1.EndpointPort{
-							{
-								Name:     "gluster",
-								Port:     24007,
-								Protocol: v1.ProtocolTCP,
-							},
-						},
-					},
-				},
-			}
-
-			endClient := cs.Core().Endpoints(config.Namespace)
-
-			defer func() {
-				if clean {
-					endClient.Delete(config.Prefix+"-server", nil)
-				}
-			}()
-
-			if _, err := endClient.Create(&endpoints); err != nil {
-				framework.Failf("Failed to create endpoints for Gluster server: %v", err)
-			}
 
 			tests := []framework.VolumeTest{
 				{
 					Volume: v1.VolumeSource{
 						Glusterfs: &v1.GlusterfsVolumeSource{
-							EndpointsName: config.Prefix + "-server",
+							EndpointsName: name,
 							// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
 							Path:     "test_vol",
 							ReadOnly: true,
@@ -228,25 +174,12 @@ var _ = SIGDescribe("Volumes", func() {
 
 	SIGDescribe("iSCSI [Feature:Volumes]", func() {
 		It("should be mountable", func() {
-			config := framework.VolumeTestConfig{
-				Namespace:   namespace.Name,
-				Prefix:      "iscsi",
-				ServerImage: framework.IscsiServerImage,
-				ServerPorts: []int{3260},
-				ServerVolumes: map[string]string{
-					// iSCSI container needs to insert modules from the host
-					"/lib/modules": "/lib/modules",
-				},
-			}
-
+			config, _, serverIP := framework.NewISCSIServer(cs, namespace.Name)
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-			pod := framework.StartVolumeServer(cs, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("iSCSI server IP address: %v", serverIP)
 
 			tests := []framework.VolumeTest{
 				{
@@ -275,26 +208,12 @@ var _ = SIGDescribe("Volumes", func() {
 
 	SIGDescribe("Ceph RBD [Feature:Volumes]", func() {
 		It("should be mountable", func() {
-			config := framework.VolumeTestConfig{
-				Namespace:   namespace.Name,
-				Prefix:      "rbd",
-				ServerImage: framework.RbdServerImage,
-				ServerPorts: []int{6789},
-				ServerVolumes: map[string]string{
-					// iSCSI container needs to insert modules from the host
-					"/lib/modules": "/lib/modules",
-					"/sys":         "/sys",
-				},
-			}
-
+			config, _, serverIP := framework.NewRBDServer(cs, namespace.Name)
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-			pod := framework.StartVolumeServer(cs, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("Ceph server IP address: %v", serverIP)
 
 			// create secrets for the server
 			secret := v1.Secret{
@@ -347,10 +266,10 @@ var _ = SIGDescribe("Volumes", func() {
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
+
 	////////////////////////////////////////////////////////////////////////
 	// Ceph
 	////////////////////////////////////////////////////////////////////////
-
 	SIGDescribe("CephFS [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			config := framework.VolumeTestConfig{
@@ -365,9 +284,7 @@ var _ = SIGDescribe("Volumes", func() {
 					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-			pod := framework.StartVolumeServer(cs, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("Ceph server IP address: %v", serverIP)
+			_, serverIP := framework.CreateStorageServer(cs, config)
 			By("sleeping a bit to give ceph server time to initialize")
 			time.Sleep(20 * time.Second)
 
@@ -428,7 +345,6 @@ var _ = SIGDescribe("Volumes", func() {
 	// (/usr/bin/nova, /usr/bin/cinder and /usr/bin/keystone)
 	// and that the usual OpenStack authentication env. variables are set
 	// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
-
 	SIGDescribe("Cinder [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("openstack")
@@ -504,7 +420,6 @@ var _ = SIGDescribe("Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// GCE PD
 	////////////////////////////////////////////////////////////////////////
-
 	SIGDescribe("PD", func() {
 		// Flaky issue: #43977
 		It("should be mountable [Flaky]", func() {
@@ -558,7 +473,6 @@ var _ = SIGDescribe("Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// ConfigMap
 	////////////////////////////////////////////////////////////////////////
-
 	SIGDescribe("ConfigMap", func() {
 		It("should be mountable", func() {
 			config := framework.VolumeTestConfig{
@@ -636,7 +550,6 @@ var _ = SIGDescribe("Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// vSphere
 	////////////////////////////////////////////////////////////////////////
-
 	SIGDescribe("vsphere [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("vsphere")
@@ -686,6 +599,7 @@ var _ = SIGDescribe("Volumes", func() {
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
+
 	////////////////////////////////////////////////////////////////////////
 	// Azure Disk
 	////////////////////////////////////////////////////////////////////////

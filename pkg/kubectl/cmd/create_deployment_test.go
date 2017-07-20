@@ -47,17 +47,29 @@ func Test_generatorFromName(t *testing.T) {
 
 	generator, ok = generatorFromName(basicName, imageNames, deploymentName)
 	assert.True(t, ok)
-	assert.Equal(t, &kubectl.DeploymentBasicGeneratorV1{
-		Name:   deploymentName,
-		Images: imageNames,
-	}, generator)
+
+	{
+		expectedGenerator := &kubectl.DeploymentBasicGeneratorV1{
+			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+				Name:   deploymentName,
+				Images: imageNames,
+			},
+		}
+		assert.Equal(t, expectedGenerator, generator)
+	}
 
 	generator, ok = generatorFromName(basicAppsName, imageNames, deploymentName)
 	assert.True(t, ok)
-	assert.Equal(t, &kubectl.DeploymentBasicAppsGeneratorV1{
-		Name:   deploymentName,
-		Images: imageNames,
-	}, generator)
+
+	{
+		expectedGenerator := &kubectl.DeploymentBasicAppsGeneratorV1{
+			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+				Name:   deploymentName,
+				Images: imageNames,
+			},
+		}
+		assert.Equal(t, expectedGenerator, generator)
+	}
 }
 
 func TestCreateDeployment(t *testing.T) {

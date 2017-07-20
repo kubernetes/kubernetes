@@ -75,7 +75,7 @@ func TestSyncToClusters(t *testing.T) {
 					}
 					return nil, nil
 				},
-				func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, []*federationapi.Cluster, pkgruntime.Object, *federatedtypes.SchedulingInfo) ([]util.FederatedOperation, error) {
+				func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, []*federationapi.Cluster, pkgruntime.Object, interface{}) ([]util.FederatedOperation, error) {
 					if testCase.operationsError {
 						return nil, awfulError
 					}

@@ -29,6 +29,7 @@ go_library(
         "//pkg/apis/networking/install:go_default_library",
         "//pkg/apis/policy/install:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
+        "//pkg/apis/scheduling/install:go_default_library",
         "//pkg/apis/settings/install:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",

@@ -183,6 +183,12 @@ const (
 	ServeHostnameImage = "gcr.io/google_containers/serve_hostname:v1.4"
 	// ssh port
 	sshPort = "22"
+
+	// ImagePrePullingTimeout is the time we wait for the e2e-image-puller
+	// static pods to pull the list of seeded images. If they don't pull
+	// images within this time we simply log their output and carry on
+	// with the tests.
+	ImagePrePullingTimeout = 5 * time.Minute
 )
 
 var (
@@ -2462,6 +2468,15 @@ func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, la
 	ExpectNoError(testutil.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
 }
 
+func AddOrUpdateLabelOnNodeAndReturnOldValue(c clientset.Interface, nodeName string, labelKey, labelValue string) string {
+	var oldValue string
+	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+	ExpectNoError(err)
+	oldValue = node.Labels[labelKey]
+	ExpectNoError(testutil.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
+	return oldValue
+}
+
 func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string, labelValue string) {
 	By("verifying the node has the label " + labelKey + " " + labelValue)
 	node, err := c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
@@ -4294,7 +4309,14 @@ func CoreDump(dir string) {
 		Logf("Skipping dumping logs from cluster")
 		return
 	}
-	cmd := exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
+	var cmd *exec.Cmd
+	if TestContext.LogexporterGCSPath != "" {
+		Logf("Dumping logs from nodes to GCS directly at path: %s", TestContext.LogexporterGCSPath)
+		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir, TestContext.LogexporterGCSPath)
+	} else {
+		Logf("Dumping logs locally to: %s", dir)
+		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
+	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {

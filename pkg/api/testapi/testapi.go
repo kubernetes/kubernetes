@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/apis/storage"
 
@@ -67,6 +68,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
 	_ "k8s.io/kubernetes/pkg/apis/policy/install"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
+	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
 	_ "k8s.io/kubernetes/pkg/apis/settings/install"
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 )
@@ -83,6 +85,7 @@ var (
 	Federation    TestGroup
 	Rbac          TestGroup
 	Certificates  TestGroup
+	Scheduling    TestGroup
 	Settings      TestGroup
 	Storage       TestGroup
 	ImagePolicy   TestGroup
@@ -241,6 +244,15 @@ func init() {
 			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}
+	if _, ok := Groups[scheduling.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: scheduling.GroupName, Version: api.Registry.GroupOrDie(scheduling.GroupName).GroupVersion.Version}
+		Groups[scheduling.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+			internalGroupVersion: scheduling.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(scheduling.SchemeGroupVersion),
+			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
+		}
+	}
 	if _, ok := Groups[settings.GroupName]; !ok {
 		externalGroupVersion := schema.GroupVersion{Group: settings.GroupName, Version: api.Registry.GroupOrDie(settings.GroupName).GroupVersion.Version}
 		Groups[settings.GroupName] = TestGroup{
@@ -323,6 +335,7 @@ func init() {
 	Extensions = Groups[extensions.GroupName]
 	Federation = Groups[federation.GroupName]
 	Rbac = Groups[rbac.GroupName]
+	Scheduling = Groups[scheduling.GroupName]
 	Settings = Groups[settings.GroupName]
 	Storage = Groups[storage.GroupName]
 	ImagePolicy = Groups[imagepolicy.GroupName]

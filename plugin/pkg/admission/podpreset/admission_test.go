@@ -695,6 +695,74 @@ func TestExclusionNoAdmit(t *testing.T) {
 	}
 }
 
+func TestAdmitEmptyPodNamespace(t *testing.T) {
+	containerName := "container"
+
+	pod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mypod",
+			Labels: map[string]string{
+				"security": "S2",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: containerName,
+					Env:  []api.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABCD", Value: "value3"}},
+				},
+			},
+		},
+	}
+
+	pip := &settings.PodPreset{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "hello",
+			Namespace: "different", // (pod will be submitted to namespace 'namespace')
+		},
+		Spec: settings.PodPresetSpec{
+			Selector: v1.LabelSelector{
+				MatchExpressions: []v1.LabelSelectorRequirement{
+					{
+						Key:      "security",
+						Operator: v1.LabelSelectorOpIn,
+						Values:   []string{"S2"},
+					},
+				},
+			},
+			Volumes: []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Env:     []api.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
+			EnvFrom: []api.EnvFromSource{
+				{
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					},
+				},
+				{
+					Prefix: "pre_",
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+					},
+				},
+			},
+		},
+	}
+	originalPod, err := api.Scheme.Copy(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admitPod(pod, pip)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify PodSpec has not been mutated
+	if !reflect.DeepEqual(pod, originalPod) {
+		t.Fatalf("Expected pod spec of '%v' to be unchanged", pod.Name)
+	}
+}
+
 func admitPod(pod *api.Pod, pip *settings.PodPreset) error {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	store := informerFactory.Settings().InternalVersion().PodPresets().Informer().GetStore()

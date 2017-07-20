@@ -16,11 +16,6 @@ limitations under the License.
 
 package events
 
-import (
-	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
-)
-
 const (
 	// Container event reason list
 	CreatedContainer        = "Created"
@@ -86,19 +81,3 @@ const (
 	FailedPreStopHook     = "FailedPreStopHook"
 	UnfinishedPreStopHook = "UnfinishedPreStopHook"
 )
-
-// ToObjectReference takes an old style object reference and converts it to a client-go one
-func ToObjectReference(ref *v1.ObjectReference) *clientv1.ObjectReference {
-	if ref == nil {
-		return nil
-	}
-	return &clientv1.ObjectReference{
-		Kind:            ref.Kind,
-		Namespace:       ref.Namespace,
-		Name:            ref.Name,
-		UID:             ref.UID,
-		APIVersion:      ref.APIVersion,
-		ResourceVersion: ref.ResourceVersion,
-		FieldPath:       ref.FieldPath,
-	}
-}

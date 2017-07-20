@@ -105,7 +105,6 @@ pkg/api/v1/endpoints
 pkg/api/v1/helper
 pkg/api/v1/helper/qos
 pkg/api/v1/pod
-pkg/api/v1/ref
 pkg/api/v1/resource
 pkg/api/v1/validation
 pkg/api/validation
@@ -149,6 +148,8 @@ pkg/apis/policy/validation
 pkg/apis/rbac
 pkg/apis/rbac/v1beta1
 pkg/apis/rbac/validation
+pkg/apis/scheduling
+pkg/apis/scheduling/v1alpha1
 pkg/apis/settings
 pkg/apis/settings/v1alpha1
 pkg/apis/storage
@@ -415,6 +416,8 @@ pkg/registry/rbac/rolebinding
 pkg/registry/rbac/rolebinding/policybased
 pkg/registry/rbac/validation
 pkg/registry/registrytest
+pkg/registry/scheduling/priorityclass/storage
+pkg/registry/scheduling/rest
 pkg/registry/settings/podpreset
 pkg/registry/settings/podpreset/storage
 pkg/registry/settings/rest
@@ -528,6 +531,7 @@ plugin/pkg/scheduler/schedulercache
 plugin/pkg/scheduler/testing
 plugin/pkg/scheduler/util
 staging
+staging/src/k8s.io/api/admission/v1alpha1
 staging/src/k8s.io/api/admissionregistration/v1alpha1
 staging/src/k8s.io/api/apps/v1beta1
 staging/src/k8s.io/api/authentication/v1
@@ -546,6 +550,7 @@ staging/src/k8s.io/api/networking/v1
 staging/src/k8s.io/api/policy/v1beta1
 staging/src/k8s.io/api/rbac/v1alpha1
 staging/src/k8s.io/api/rbac/v1beta1
+staging/src/k8s.io/api/scheduling/v1alpha1
 staging/src/k8s.io/api/settings/v1alpha1
 staging/src/k8s.io/api/storage/v1
 staging/src/k8s.io/api/storage/v1beta1
@@ -691,7 +696,6 @@ staging/src/k8s.io/apiserver/plugin/pkg/audit
 staging/src/k8s.io/apiserver/plugin/pkg/audit/log
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/keystone
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile
-staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/anytoken
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/testing
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest
@@ -739,6 +743,8 @@ staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1alpha1
 staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1alpha1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1beta1
 staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1beta1/fake
+staging/src/k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1
+staging/src/k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/settings/v1alpha1
 staging/src/k8s.io/client-go/kubernetes/typed/settings/v1alpha1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/storage/v1
@@ -760,6 +766,7 @@ staging/src/k8s.io/client-go/tools/leaderelection
 staging/src/k8s.io/client-go/tools/leaderelection/resourcelock
 staging/src/k8s.io/client-go/tools/portforward
 staging/src/k8s.io/client-go/tools/record
+staging/src/k8s.io/client-go/tools/reference
 staging/src/k8s.io/client-go/transport
 staging/src/k8s.io/client-go/util/cert/triple
 staging/src/k8s.io/client-go/util/exec
@@ -803,6 +810,7 @@ test/e2e/instrumentation
 test/e2e/instrumentation/logging
 test/e2e/instrumentation/monitoring
 test/e2e/kubectl
+test/e2e/lifecycle
 test/e2e/metrics
 test/e2e/scalability
 test/e2e/scheduling

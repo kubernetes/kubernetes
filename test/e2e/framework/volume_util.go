@@ -64,6 +64,17 @@ const (
 	BusyBoxImage         string = "gcr.io/google_containers/busybox:1.24"
 )
 
+const (
+	Kb  int64 = 1000
+	Mb  int64 = 1000 * Kb
+	Gb  int64 = 1000 * Mb
+	Tb  int64 = 1000 * Gb
+	KiB int64 = 1024
+	MiB int64 = 1024 * KiB
+	GiB int64 = 1024 * MiB
+	TiB int64 = 1024 * GiB
+)
+
 // Configuration of one tests. The test consist of:
 // - server pod - runs serverImage, exports ports[]
 // - client pod - does not need any special configuration
@@ -95,6 +106,106 @@ type VolumeTest struct {
 	Volume          v1.VolumeSource
 	File            string
 	ExpectedContent string
+}
+
+// NFS-specific wrapper for CreateStorageServer.
+func NewNFSServer(cs clientset.Interface, namespace string, args []string) (config VolumeTestConfig, pod *v1.Pod, ip string) {
+	config = VolumeTestConfig{
+		Namespace:   namespace,
+		Prefix:      "nfs",
+		ServerImage: NfsServerImage,
+		ServerPorts: []int{2049},
+	}
+	if len(args) > 0 {
+		config.ServerArgs = args
+	}
+	pod, ip = CreateStorageServer(cs, config)
+	return config, pod, ip
+}
+
+// GlusterFS-specific wrapper for CreateStorageServer. Also creates the gluster endpoints object.
+func NewGlusterfsServer(cs clientset.Interface, namespace string) (config VolumeTestConfig, pod *v1.Pod, ip string) {
+	config = VolumeTestConfig{
+		Namespace:   namespace,
+		Prefix:      "gluster",
+		ServerImage: GlusterfsServerImage,
+		ServerPorts: []int{24007, 24008, 49152},
+	}
+	pod, ip = CreateStorageServer(cs, config)
+
+	By("creating Gluster endpoints")
+	endpoints := &v1.Endpoints{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Endpoints",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Prefix + "-server",
+		},
+		Subsets: []v1.EndpointSubset{
+			{
+				Addresses: []v1.EndpointAddress{
+					{
+						IP: ip,
+					},
+				},
+				Ports: []v1.EndpointPort{
+					{
+						Name:     "gluster",
+						Port:     24007,
+						Protocol: v1.ProtocolTCP,
+					},
+				},
+			},
+		},
+	}
+	endpoints, err := cs.Core().Endpoints(namespace).Create(endpoints)
+	Expect(err).NotTo(HaveOccurred(), "failed to create endpoints for Gluster server")
+
+	return config, pod, ip
+}
+
+// iSCSI-specific wrapper for CreateStorageServer.
+func NewISCSIServer(cs clientset.Interface, namespace string) (config VolumeTestConfig, pod *v1.Pod, ip string) {
+	config = VolumeTestConfig{
+		Namespace:   namespace,
+		Prefix:      "iscsi",
+		ServerImage: IscsiServerImage,
+		ServerPorts: []int{3260},
+		ServerVolumes: map[string]string{
+			// iSCSI container needs to insert modules from the host
+			"/lib/modules": "/lib/modules",
+		},
+	}
+	pod, ip = CreateStorageServer(cs, config)
+	return config, pod, ip
+}
+
+// CephRBD-specific wrapper for CreateStorageServer.
+func NewRBDServer(cs clientset.Interface, namespace string) (config VolumeTestConfig, pod *v1.Pod, ip string) {
+	config = VolumeTestConfig{
+		Namespace:   namespace,
+		Prefix:      "rbd",
+		ServerImage: RbdServerImage,
+		ServerPorts: []int{6789},
+		ServerVolumes: map[string]string{
+			"/lib/modules": "/lib/modules",
+		},
+	}
+	pod, ip = CreateStorageServer(cs, config)
+	return config, pod, ip
+}
+
+// Wrapper for StartVolumeServer(). A storage server config is passed in, and a pod pointer
+// and ip address string are returned.
+// Note: Expect() is called so no error is returned.
+func CreateStorageServer(cs clientset.Interface, config VolumeTestConfig) (pod *v1.Pod, ip string) {
+	pod = StartVolumeServer(cs, config)
+	Expect(pod).NotTo(BeNil(), "storage server pod should not be nil")
+	ip = pod.Status.PodIP
+	Expect(len(ip)).NotTo(BeZero(), fmt.Sprintf("pod %s's IP should not be empty", pod.Name))
+	Logf("%s server pod IP address: %s", config.Prefix, ip)
+	return pod, ip
 }
 
 // Starts a container specified by config.serverImage and exports all

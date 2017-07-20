@@ -28,7 +28,7 @@ import (
 type diskManager interface {
 	MakeGlobalPDName(disk fcDisk) string
 	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(b fcDiskMounter) error
+	AttachDisk(b fcDiskMounter) (string, error)
 	// Detaches the disk from the kubelet's host machine.
 	DetachDisk(disk fcDiskUnmounter, mntPath string) error
 }
@@ -46,11 +46,6 @@ func diskSetUp(manager diskManager, b fcDiskMounter, volPath string, mounter mou
 	if !noMnt {
 		return nil
 	}
-	if err := manager.AttachDisk(b); err != nil {
-		glog.Errorf("failed to attach disk")
-		return err
-	}
-
 	if err := os.MkdirAll(volPath, 0750); err != nil {
 		glog.Errorf("failed to mkdir:%s", volPath)
 		return err

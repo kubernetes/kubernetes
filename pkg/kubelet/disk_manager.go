@@ -38,6 +38,7 @@ type diskSpaceManager interface {
 	IsRuntimeDiskSpaceAvailable() (bool, error)
 }
 
+// DiskSpacePolicy defines the free disk for Docker and Root.
 type DiskSpacePolicy struct {
 	// free disk space threshold for filesystem holding docker images.
 	DockerFreeDiskMB int
@@ -112,10 +113,10 @@ func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f
 
 func validatePolicy(policy DiskSpacePolicy) error {
 	if policy.DockerFreeDiskMB < 0 {
-		return fmt.Errorf("free disk space should be non-negative. Invalid value %d for docker disk space threshold.", policy.DockerFreeDiskMB)
+		return fmt.Errorf("free disk space should be non-negative; invalid value %d for docker disk space threshold", policy.DockerFreeDiskMB)
 	}
 	if policy.RootFreeDiskMB < 0 {
-		return fmt.Errorf("free disk space should be non-negative. Invalid value %d for root disk space threshold.", policy.RootFreeDiskMB)
+		return fmt.Errorf("free disk space should be non-negative; invalid value %d for root disk space threshold", policy.RootFreeDiskMB)
 	}
 	return nil
 }

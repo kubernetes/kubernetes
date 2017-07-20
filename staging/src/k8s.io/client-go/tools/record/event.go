@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/api/v1/ref"
 	restclient "k8s.io/client-go/rest"
+	ref "k8s.io/client-go/tools/reference"
 
 	"net/http"
 

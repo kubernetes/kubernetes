@@ -77,6 +77,16 @@ func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipall
 	}
 }
 
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (rs *REST) ShortNames() []string {
+	return []string{"svc"}
+}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (rs *REST) Categories() []string {
+	return []string{"all"}
+}
+
 // TODO: implement includeUninitialized by refactoring this to move to store
 func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	service := obj.(*api.Service)
@@ -544,9 +554,9 @@ func (rs *REST) allocateHealthCheckNodePort(service *api.Service) error {
 		err := rs.serviceNodePorts.Allocate(int(healthCheckNodePort))
 		if err != nil {
 			return fmt.Errorf("failed to allocate requested HealthCheck NodePort %v: %v",
-				service.Spec.HealthCheckNodePort, err)
+				healthCheckNodePort, err)
 		}
-		glog.Infof("Reserved user requested nodePort: %d", service.Spec.HealthCheckNodePort)
+		glog.Infof("Reserved user requested nodePort: %d", healthCheckNodePort)
 	} else {
 		// If the request has no health check nodePort specified, allocate any.
 		healthCheckNodePort, err := rs.serviceNodePorts.AllocateNext()

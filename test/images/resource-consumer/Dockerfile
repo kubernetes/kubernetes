@@ -16,8 +16,7 @@ FROM BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-RUN apt-get update && apt-get install -y --no-install-recommends stress && \
-    rm -rf /var/lib/apt/lists/*
+RUN clean-install stress
 
 ADD consumer /consumer
 ADD consume-cpu /consume-cpu
