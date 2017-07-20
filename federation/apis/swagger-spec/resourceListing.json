@@ -2,10 +2,6 @@
   "swaggerVersion": "1.2",
   "apis": [
    {
-    "path": "/version",
-    "description": "git code version from which this is built"
-   },
-   {
     "path": "/apis",
     "description": "get available API versions"
    },

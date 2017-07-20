@@ -9638,35 +9638,6 @@
       "required": true
      }
     ]
-   },
-   "/version/": {
-    "get": {
-     "description": "get the code version",
-     "consumes": [
-      "application/json"
-     ],
-     "produces": [
-      "application/json"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "version"
-     ],
-     "operationId": "getCodeVersion",
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.version.Info"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    }
    }
   },
   "definitions": {
@@ -13857,49 +13828,6 @@
     "type": "string",
     "format": "int-or-string"
    },
-   "io.k8s.apimachinery.pkg.version.Info": {
-    "description": "Info contains versioning information. how we'll want to distribute that information.",
-    "required": [
-     "major",
-     "minor",
-     "gitVersion",
-     "gitCommit",
-     "gitTreeState",
-     "buildDate",
-     "goVersion",
-     "compiler",
-     "platform"
-    ],
-    "properties": {
-     "buildDate": {
-      "type": "string"
-     },
-     "compiler": {
-      "type": "string"
-     },
-     "gitCommit": {
-      "type": "string"
-     },
-     "gitTreeState": {
-      "type": "string"
-     },
-     "gitVersion": {
-      "type": "string"
-     },
-     "goVersion": {
-      "type": "string"
-     },
-     "major": {
-      "type": "string"
-     },
-     "minor": {
-      "type": "string"
-     },
-     "platform": {
-      "type": "string"
-     }
-    }
-   },
    "io.k8s.kubernetes.federation.apis.federation.v1beta1.Cluster": {
     "description": "Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.",
     "properties": {
@@ -14171,10 +14099,6 @@
    "v1beta1.ServerAddressByClientCIDR": {
     "description": "Deprecated. Please use io.k8s.kubernetes.federation.apis.federation.v1beta1.ServerAddressByClientCIDR instead.",
     "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.ServerAddressByClientCIDR"
-   },
-   "version.Info": {
-    "description": "Deprecated. Please use io.k8s.apimachinery.pkg.version.Info instead.",
-    "$ref": "#/definitions/io.k8s.apimachinery.pkg.version.Info"
    }
   },
   "securityDefinitions": {

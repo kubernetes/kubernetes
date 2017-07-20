@@ -46070,35 +46070,6 @@
       "required": true
      }
     ]
-   },
-   "/version/": {
-    "get": {
-     "description": "get the code version",
-     "consumes": [
-      "application/json"
-     ],
-     "produces": [
-      "application/json"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "version"
-     ],
-     "operationId": "getCodeVersion",
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.version.Info"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     }
-    }
    }
   },
   "definitions": {
@@ -56265,49 +56236,6 @@
    "io.k8s.apimachinery.pkg.util.intstr.IntOrString": {
     "type": "string",
     "format": "int-or-string"
-   },
-   "io.k8s.apimachinery.pkg.version.Info": {
-    "description": "Info contains versioning information. how we'll want to distribute that information.",
-    "required": [
-     "major",
-     "minor",
-     "gitVersion",
-     "gitCommit",
-     "gitTreeState",
-     "buildDate",
-     "goVersion",
-     "compiler",
-     "platform"
-    ],
-    "properties": {
-     "buildDate": {
-      "type": "string"
-     },
-     "compiler": {
-      "type": "string"
-     },
-     "gitCommit": {
-      "type": "string"
-     },
-     "gitTreeState": {
-      "type": "string"
-     },
-     "gitVersion": {
-      "type": "string"
-     },
-     "goVersion": {
-      "type": "string"
-     },
-     "major": {
-      "type": "string"
-     },
-     "minor": {
-      "type": "string"
-     },
-     "platform": {
-      "type": "string"
-     }
-    }
    },
    "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService": {
     "description": "APIService represents a server for a particular GroupVersion. Name must be \"version.group\".",
