@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -146,6 +147,7 @@ type initFederationOptions struct {
 	apiServerOverrides               map[string]string
 	controllerManagerOverridesString string
 	controllerManagerOverrides       map[string]string
+	controllerOptionalSecrets        util.MapValue
 	apiServerServiceTypeString       string
 	apiServerServiceType             v1.ServiceType
 	apiServerAdvertiseAddress        string
@@ -169,6 +171,10 @@ func (o *initFederationOptions) Bind(flags *pflag.FlagSet, defaultServerImage, d
 	flags.StringVar(&o.apiServerAdvertiseAddress, apiserverAdvertiseAddressFlag, "", "Preferred address to advertise api server nodeport service. Valid only if '"+apiserverServiceTypeFlag+"=NodePort'.")
 	flags.BoolVar(&o.apiServerEnableHTTPBasicAuth, "apiserver-enable-basic-auth", false, "Enables HTTP Basic authentication for the federation-apiserver. Defaults to false.")
 	flags.BoolVar(&o.apiServerEnableTokenAuth, "apiserver-enable-token-auth", false, "Enables token authentication for the federation-apiserver. Defaults to false.")
+	if o.controllerOptionalSecrets == nil {
+		o.controllerOptionalSecrets = make(util.MapValue)
+	}
+	flags.Var(&o.controllerOptionalSecrets, "controller-secrets", "Provide additional optional secrets to be mounted for controller manager pod.")
 }
 
 // NewCmdInit defines the `init` command that bootstraps a federation
@@ -288,7 +294,9 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	fmt.Fprintf(cmdOut, "Creating a namespace %s for federation system components...", i.commonOptions.FederationSystemNamespace)
 	glog.V(4).Infof("Creating a namespace %s for federation system components", i.commonOptions.FederationSystemNamespace)
 	_, err = createNamespace(hostClientset, i.commonOptions.Name, i.commonOptions.FederationSystemNamespace, i.options.dryRun)
-	if err != nil {
+	if errors.IsAlreadyExists(err) {
+		fmt.Fprintf(cmdOut, "Namespace %s already exists.\n", i.commonOptions.FederationSystemNamespace)
+	} else if err != nil {
 		return err
 	}
 
@@ -380,7 +388,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 
 	glog.V(4).Info("Creating federation controller manager deployment")
 
-	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.serverImage, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, i.options.dnsProviderConfig, sa.Name, dnsProviderSecret, i.options.controllerManagerOverrides, i.options.dryRun)
+	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.serverImage, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, i.options.dnsProviderConfig, sa.Name, dnsProviderSecret, i.options.controllerManagerOverrides, map[string]string(i.options.controllerOptionalSecrets), i.options.dryRun)
 	if err != nil {
 		return err
 	}
@@ -855,7 +863,7 @@ func createRoleBindings(clientset client.Interface, namespace, saName, federatio
 	return newRole, newRolebinding, err
 }
 
-func createControllerManager(clientset client.Interface, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, dnsProviderConfig, saName string, dnsProviderSecret *api.Secret, argOverrides map[string]string, dryRun bool) (*extensions.Deployment, error) {
+func createControllerManager(clientset client.Interface, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, dnsProviderConfig, saName string, dnsProviderSecret *api.Secret, argOverrides map[string]string, optionalSecrets map[string]string, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-controller-manager",
@@ -871,7 +879,7 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 
 	args := argMapsToArgStrings(argsMap, argOverrides)
 	command = append(command, args...)
-
+	controllerManagerContainer := "controller-manager"
 	dep := &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
@@ -902,7 +910,7 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
-							Name:    "controller-manager",
+							Name:    controllerManagerContainer,
 							Image:   image,
 							Command: command,
 							VolumeMounts: []api.VolumeMount{
@@ -938,6 +946,10 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 			},
 		},
 	}
+	if len(optionalSecrets) != 0 {
+		glog.V(4).Infof("Adding secrets %+v to controller manager pod", optionalSecrets)
+		addOptionalSecretsToContanerWithName(dep, controllerManagerContainer, optionalSecrets)
+	}
 
 	if saName != "" {
 		dep.Spec.Template.Spec.ServiceAccountName = saName
@@ -959,6 +971,31 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 	}
 
 	return clientset.Extensions().Deployments(namespace).Create(dep)
+}
+
+func addOptionalSecretsToContanerWithName(deployment *extensions.Deployment, containerName string, secrets map[string]string) {
+	optional := true
+	for name, mountPath := range secrets {
+		deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, api.Volume{
+			Name: name,
+			VolumeSource: api.VolumeSource{
+				Secret: &api.SecretVolumeSource{
+					SecretName: name,
+					Optional:   &optional,
+				},
+			},
+		})
+		for i := range deployment.Spec.Template.Spec.Containers {
+			if deployment.Spec.Template.Spec.Containers[i].Name != containerName {
+				continue
+			}
+			deployment.Spec.Template.Spec.Containers[i].VolumeMounts = append(
+				deployment.Spec.Template.Spec.Containers[i].VolumeMounts, api.VolumeMount{
+					Name:      name,
+					MountPath: mountPath,
+					ReadOnly:  true})
+		}
+	}
 }
 
 func marshallOverrides(overrideArgString string) (map[string]string, error) {

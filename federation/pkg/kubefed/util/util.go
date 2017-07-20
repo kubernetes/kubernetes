@@ -35,6 +35,8 @@ import (
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -128,6 +130,25 @@ func (a *adminConfig) getClientConfig(context, kubeconfigPath string) clientcmd.
 	}
 
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(&loadingRules, overrides)
+}
+
+type MapValue map[string]string
+
+func (m *MapValue) String() string {
+	return fmt.Sprintf("%+v", *m)
+}
+
+func (m *MapValue) Set(val string) error {
+	parts := strings.Split(val, "=")
+	if len(parts) != 2 {
+		return fmt.Errorf("Value %s doesn't match pattern <key>=<value>", val)
+	}
+	(*m)[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+	return nil
+}
+
+func (m *MapValue) Type() string {
+	return "string"
 }
 
 // SubcommandOptions holds the configuration required by the subcommands of

@@ -143,6 +143,7 @@ contain-pod-resources
 contention-profiling
 controllermanager-arg-overrides
 controller-start-interval
+controller-secrets
 core-kubeconfig
 cors-allowed-origins
 cpu-cfs-quota
