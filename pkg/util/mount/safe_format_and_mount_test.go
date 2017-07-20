@@ -180,40 +180,16 @@ func TestSafeFormatAndMount(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		commandScripts := []exec.FakeCommandAction{}
+		fake := exec.NewFakeExec(t, nil)
 		for _, expected := range test.execScripts {
-			ecmd := expected.command
-			eargs := expected.args
-			output := expected.output
-			err := expected.err
-			commandScript := func(cmd string, args ...string) exec.Cmd {
-				if cmd != ecmd {
-					t.Errorf("Unexpected command %s. Expecting %s", cmd, ecmd)
-				}
-
-				for j := range args {
-					if args[j] != eargs[j] {
-						t.Errorf("Unexpected args %v. Expecting %v", args, eargs)
-					}
-				}
-				fake := exec.FakeCmd{
-					CombinedOutputScript: []exec.FakeCombinedOutputAction{
-						func() ([]byte, error) { return []byte(output), err },
-					},
-				}
-				return exec.InitFakeCmd(&fake, cmd, args...)
-			}
-			commandScripts = append(commandScripts, commandScript)
-		}
-
-		fake := exec.FakeExec{
-			CommandScript: commandScripts,
+			fake.AddCommand(expected.command, expected.args...).
+				SetCombinedOutput(expected.output, expected.err)
 		}
 
 		fakeMounter := ErrorMounter{&FakeMounter{}, 0, test.mountErrs}
 		mounter := SafeFormatAndMount{
 			Interface: &fakeMounter,
-			Runner:    &fake,
+			Runner:    fake,
 		}
 
 		device := "/dev/foo"
@@ -240,5 +216,6 @@ func TestSafeFormatAndMount(t *testing.T) {
 				t.Errorf("test \"%s\" unexpected error: \n          [%v]. \nExpecting [%v]", test.description, err, test.expectedError)
 			}
 		}
+		fake.AssertExpectedCommands()
 	}
 }

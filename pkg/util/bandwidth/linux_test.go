@@ -21,7 +21,6 @@ package bandwidth
 import (
 	"errors"
 	"reflect"
-	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -63,19 +62,10 @@ func TestNextClassID(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		fcmd := exec.FakeCmd{
-			CombinedOutputScript: []exec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(test.output), test.err },
-			},
-		}
-		fexec := exec.FakeExec{
-			CommandScript: []exec.FakeCommandAction{
-				func(cmd string, args ...string) exec.Cmd {
-					return exec.InitFakeCmd(&fcmd, cmd, args...)
-				},
-			},
-		}
-		shaper := &tcShaper{e: &fexec}
+		fexec := exec.NewFakeExec(t, nil)
+		fexec.AddCommand("tc", "class", "show", "dev", "cbr0").
+			SetCombinedOutput(test.output, test.err)
+		shaper := &tcShaper{e: fexec, iface: "cbr0"}
 		class, err := shaper.nextClassID()
 		if test.expectErr {
 			if err == nil {
@@ -89,6 +79,7 @@ func TestNextClassID(t *testing.T) {
 				t.Errorf("expected: %d, found %d", test.expected, class)
 			}
 		}
+		fexec.AssertExpectedCommands()
 	}
 }
 
@@ -245,19 +236,10 @@ func TestFindCIDRClass(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		fcmd := exec.FakeCmd{
-			CombinedOutputScript: []exec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(test.output), test.err },
-			},
-		}
-		fexec := exec.FakeExec{
-			CommandScript: []exec.FakeCommandAction{
-				func(cmd string, args ...string) exec.Cmd {
-					return exec.InitFakeCmd(&fcmd, cmd, args...)
-				},
-			},
-		}
-		shaper := &tcShaper{e: &fexec}
+		fexec := exec.NewFakeExec(t, nil)
+		fexec.AddCommand("tc", "filter", "show", "dev", "cbr0").
+			SetCombinedOutput(test.output, test.err)
+		shaper := &tcShaper{e: fexec, iface: "cbr0"}
 		class, handle, found, err := shaper.findCIDRClass(test.cidr)
 		if test.expectErr {
 			if err == nil {
@@ -280,23 +262,15 @@ func TestFindCIDRClass(t *testing.T) {
 				}
 			}
 		}
+		fexec.AssertExpectedCommands()
 	}
 }
 
 func TestGetCIDRs(t *testing.T) {
-	fcmd := exec.FakeCmd{
-		CombinedOutputScript: []exec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte(tcFilterOutput), nil },
-		},
-	}
-	fexec := exec.FakeExec{
-		CommandScript: []exec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd {
-				return exec.InitFakeCmd(&fcmd, cmd, args...)
-			},
-		},
-	}
-	shaper := &tcShaper{e: &fexec}
+	fexec := exec.NewFakeExec(t, nil)
+	fexec.AddCommand("tc", "filter", "show", "dev", "cbr0").
+		SetCombinedOutput(tcFilterOutput, nil)
+	shaper := &tcShaper{e: fexec, iface: "cbr0"}
 	cidrs, err := shaper.GetCIDRs()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -305,40 +279,36 @@ func TestGetCIDRs(t *testing.T) {
 	if !reflect.DeepEqual(cidrs, expectedCidrs) {
 		t.Errorf("expected: %v, saw: %v", expectedCidrs, cidrs)
 	}
+	fexec.AssertExpectedCommands()
 }
 
 func TestLimit(t *testing.T) {
 	tests := []struct {
-		cidr          string
-		ingress       *resource.Quantity
-		egress        *resource.Quantity
-		expectErr     bool
-		expectedCalls int
-		err           error
+		cidr      string
+		ingress   *resource.Quantity
+		egress    *resource.Quantity
+		expectErr bool
+		err       error
 	}{
 		{
-			cidr:          "1.2.3.4/32",
-			ingress:       resource.NewQuantity(10, resource.DecimalSI),
-			egress:        resource.NewQuantity(20, resource.DecimalSI),
-			expectedCalls: 6,
+			cidr:    "1.2.3.4/32",
+			ingress: resource.NewQuantity(10, resource.DecimalSI),
+			egress:  resource.NewQuantity(20, resource.DecimalSI),
 		},
 		{
-			cidr:          "1.2.3.4/32",
-			ingress:       resource.NewQuantity(10, resource.DecimalSI),
-			egress:        nil,
-			expectedCalls: 3,
+			cidr:    "1.2.3.4/32",
+			ingress: resource.NewQuantity(10, resource.DecimalSI),
+			egress:  nil,
 		},
 		{
-			cidr:          "1.2.3.4/32",
-			ingress:       nil,
-			egress:        resource.NewQuantity(20, resource.DecimalSI),
-			expectedCalls: 3,
+			cidr:    "1.2.3.4/32",
+			ingress: nil,
+			egress:  resource.NewQuantity(20, resource.DecimalSI),
 		},
 		{
-			cidr:          "1.2.3.4/32",
-			ingress:       nil,
-			egress:        nil,
-			expectedCalls: 0,
+			cidr:    "1.2.3.4/32",
+			ingress: nil,
+			egress:  nil,
 		},
 		{
 			err:       errors.New("test error"),
@@ -349,29 +319,34 @@ func TestLimit(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fcmd := exec.FakeCmd{
-			CombinedOutputScript: []exec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(tcClassOutput), test.err },
-				func() ([]byte, error) { return []byte{}, test.err },
-				func() ([]byte, error) { return []byte{}, test.err },
-				func() ([]byte, error) { return []byte(tcClassOutput2), test.err },
-				func() ([]byte, error) { return []byte{}, test.err },
-				func() ([]byte, error) { return []byte{}, test.err },
-			},
-		}
+		fexec := exec.NewFakeExec(t, nil)
+		if test.err != nil {
+			fexec.AddCommand("tc", "class", "show", "dev", "cbr0").
+				SetCombinedOutput("", test.err)
+		} else {
+			nextClassShowOutput := tcClassOutput
+			nextClassID := "1:5"
+			if test.egress != nil {
+				fexec.AddCommand("tc", "class", "show", "dev", "cbr0").
+					SetCombinedOutput(nextClassShowOutput, nil)
+				fexec.AddCommand("tc", "class", "add", "dev", "cbr0", "parent", "1:", "classid", nextClassID, "htb", "rate", makeKBitString(test.egress)).
+					SetCombinedOutput("", nil)
+				fexec.AddCommand("tc", "filter", "add", "dev", "cbr0", "protocol", "ip", "parent", "1:0", "prio", "1", "u32", "match", "ip", "dst", test.cidr, "flowid", nextClassID).
+					SetCombinedOutput("", nil)
 
-		fexec := exec.FakeExec{
-			CommandScript: []exec.FakeCommandAction{
-				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			},
+				nextClassShowOutput = tcClassOutput2
+				nextClassID = "1:6"
+			}
+			if test.ingress != nil {
+				fexec.AddCommand("tc", "class", "show", "dev", "cbr0").
+					SetCombinedOutput(nextClassShowOutput, nil)
+				fexec.AddCommand("tc", "class", "add", "dev", "cbr0", "parent", "1:", "classid", nextClassID, "htb", "rate", makeKBitString(test.ingress)).
+					SetCombinedOutput("", nil)
+				fexec.AddCommand("tc", "filter", "add", "dev", "cbr0", "protocol", "ip", "parent", "1:0", "prio", "1", "u32", "match", "ip", "src", test.cidr, "flowid", nextClassID).
+					SetCombinedOutput("", nil)
+			}
 		}
-		iface := "cbr0"
-		shaper := &tcShaper{e: &fexec, iface: iface}
+		shaper := &tcShaper{e: fexec, iface: "cbr0"}
 		if err := shaper.Limit(test.cidr, test.ingress, test.egress); err != nil && !test.expectErr {
 			t.Errorf("unexpected error: %v", err)
 			return
@@ -379,65 +354,7 @@ func TestLimit(t *testing.T) {
 			t.Error("unexpected non-error")
 			return
 		}
-		// No more testing in the error case
-		if test.expectErr {
-			if fcmd.CombinedOutputCalls != 1 {
-				t.Errorf("unexpected number of calls: %d, expected: 1", fcmd.CombinedOutputCalls)
-			}
-			return
-		}
-
-		if fcmd.CombinedOutputCalls != test.expectedCalls {
-			t.Errorf("unexpected number of calls: %d, expected: %d", fcmd.CombinedOutputCalls, test.expectedCalls)
-		}
-
-		for ix := range fcmd.CombinedOutputLog {
-			output := fcmd.CombinedOutputLog[ix]
-			if output[0] != "tc" {
-				t.Errorf("unexpected command: %s, expected tc", output[0])
-			}
-			if output[4] != iface {
-				t.Errorf("unexpected interface: %s, expected %s (%v)", output[4], iface, output)
-			}
-			if ix == 1 {
-				var expectedRate string
-				if test.ingress != nil {
-					expectedRate = makeKBitString(test.ingress)
-				} else {
-					expectedRate = makeKBitString(test.egress)
-				}
-				if output[11] != expectedRate {
-					t.Errorf("unexpected ingress: %s, expected: %s", output[11], expectedRate)
-				}
-				if output[8] != "1:5" {
-					t.Errorf("unexpected class: %s, expected: %s", output[8], "1:5")
-				}
-			}
-			if ix == 2 {
-				if output[15] != test.cidr {
-					t.Errorf("unexpected cidr: %s, expected: %s", output[15], test.cidr)
-				}
-				if output[17] != "1:5" {
-					t.Errorf("unexpected class: %s, expected: %s", output[17], "1:5")
-				}
-			}
-			if ix == 4 {
-				if output[11] != makeKBitString(test.egress) {
-					t.Errorf("unexpected egress: %s, expected: %s", output[11], makeKBitString(test.egress))
-				}
-				if output[8] != "1:6" {
-					t.Errorf("unexpected class: %s, expected: %s", output[8], "1:6")
-				}
-			}
-			if ix == 5 {
-				if output[15] != test.cidr {
-					t.Errorf("unexpected cidr: %s, expected: %s", output[15], test.cidr)
-				}
-				if output[17] != "1:6" {
-					t.Errorf("unexpected class: %s, expected: %s", output[17], "1:5")
-				}
-			}
-		}
+		fexec.AssertExpectedCommands()
 	}
 }
 
@@ -465,23 +382,19 @@ func TestReset(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		fcmd := exec.FakeCmd{
-			CombinedOutputScript: []exec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(tcFilterOutput), test.err },
-				func() ([]byte, error) { return []byte{}, test.err },
-				func() ([]byte, error) { return []byte{}, test.err },
-			},
+		fexec := exec.NewFakeExec(t, nil)
+		if test.err != nil {
+			fexec.AddCommand("tc", "filter", "show", "dev", "cbr0").
+				SetCombinedOutput("", test.err)
+		} else {
+			fexec.AddCommand("tc", "filter", "show", "dev", "cbr0").
+				SetCombinedOutput(tcFilterOutput, nil)
+			fexec.AddCommand("tc", "filter", "del", "dev", "cbr0", "parent", "1:", "proto", "ip", "prio", "1", "handle", test.expectedHandle, "u32").
+				SetCombinedOutput("", test.err)
+			fexec.AddCommand("tc", "class", "del", "dev", "cbr0", "parent", "1:", "classid", test.expectedClass).
+				SetCombinedOutput("", test.err)
 		}
-
-		fexec := exec.FakeExec{
-			CommandScript: []exec.FakeCommandAction{
-				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			},
-		}
-		iface := "cbr0"
-		shaper := &tcShaper{e: &fexec, iface: iface}
+		shaper := &tcShaper{e: fexec, iface: "cbr0"}
 
 		if err := shaper.Reset(test.cidr); err != nil && !test.expectErr {
 			t.Errorf("unexpected error: %v", err)
@@ -490,132 +403,36 @@ func TestReset(t *testing.T) {
 			t.Error("unexpected non-error")
 			return
 		}
-
-		// No more testing in the error case
-		if test.expectErr {
-			if fcmd.CombinedOutputCalls != 1 {
-				t.Errorf("unexpected number of calls: %d, expected: 1", fcmd.CombinedOutputCalls)
-			}
-			return
-		}
-
-		if fcmd.CombinedOutputCalls != 3 {
-			t.Errorf("unexpected number of calls: %d, expected: 3", fcmd.CombinedOutputCalls)
-		}
-
-		for ix := range fcmd.CombinedOutputLog {
-			output := fcmd.CombinedOutputLog[ix]
-			if output[0] != "tc" {
-				t.Errorf("unexpected command: %s, expected tc", output[0])
-			}
-			if output[4] != iface {
-				t.Errorf("unexpected interface: %s, expected %s (%v)", output[4], iface, output)
-			}
-			if ix == 1 && output[12] != test.expectedHandle {
-				t.Errorf("unexpected handle: %s, expected: %s", output[12], test.expectedHandle)
-			}
-			if ix == 2 && output[8] != test.expectedClass {
-				t.Errorf("unexpected class: %s, expected: %s", output[8], test.expectedClass)
-			}
-		}
+		fexec.AssertExpectedCommands()
 	}
 }
 
 var tcQdisc = "qdisc htb 1: root refcnt 2 r2q 10 default 30 direct_packets_stat 0\n"
 
 func TestReconcileInterfaceExists(t *testing.T) {
-	fcmd := exec.FakeCmd{
-		CombinedOutputScript: []exec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte(tcQdisc), nil },
-		},
-	}
-
-	fexec := exec.FakeExec{
-		CommandScript: []exec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	iface := "cbr0"
-	shaper := &tcShaper{e: &fexec, iface: iface}
+	fexec := exec.NewFakeExec(t, nil)
+	fexec.AddCommand("tc", "qdisc", "show", "dev", "cbr0").
+		SetCombinedOutput(tcQdisc, nil)
+	shaper := &tcShaper{e: fexec, iface: "cbr0"}
 	err := shaper.ReconcileInterface()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("unexpected number of calls: %d", fcmd.CombinedOutputCalls)
-	}
-
-	output := fcmd.CombinedOutputLog[0]
-	if len(output) != 5 {
-		t.Errorf("unexpected command: %v", output)
-	}
-	if output[0] != "tc" {
-		t.Errorf("unexpected command: %s", output[0])
-	}
-	if output[4] != iface {
-		t.Errorf("unexpected interface: %s, expected %s", output[4], iface)
-	}
-	if output[2] != "show" {
-		t.Errorf("unexpected action: %s", output[2])
-	}
+	fexec.AssertExpectedCommands()
 }
 
 func testReconcileInterfaceHasNoData(t *testing.T, output string) {
-	fcmd := exec.FakeCmd{
-		CombinedOutputScript: []exec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte(output), nil },
-			func() ([]byte, error) { return []byte(output), nil },
-		},
-	}
-
-	fexec := exec.FakeExec{
-		CommandScript: []exec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	iface := "cbr0"
-	shaper := &tcShaper{e: &fexec, iface: iface}
+	fexec := exec.NewFakeExec(t, nil)
+	fexec.AddCommand("tc", "qdisc", "show", "dev", "cbr0").
+		SetCombinedOutput(output, nil)
+	fexec.AddCommand("tc", "qdisc", "add", "dev", "cbr0", "root", "handle", "1:", "htb", "default", "30").
+		SetCombinedOutput("", nil)
+	shaper := &tcShaper{e: fexec, iface: "cbr0"}
 	err := shaper.ReconcileInterface()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
-	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("unexpected number of calls: %d", fcmd.CombinedOutputCalls)
-	}
-
-	for ix, output := range fcmd.CombinedOutputLog {
-		if output[0] != "tc" {
-			t.Errorf("unexpected command: %s", output[0])
-		}
-		if output[4] != iface {
-			t.Errorf("unexpected interface: %s, expected %s", output[4], iface)
-		}
-		if ix == 0 {
-			if len(output) != 5 {
-				t.Errorf("unexpected command: %v", output)
-			}
-			if output[2] != "show" {
-				t.Errorf("unexpected action: %s", output[2])
-			}
-		}
-		if ix == 1 {
-			if len(output) != 11 {
-				t.Errorf("unexpected command: %v", output)
-			}
-			if output[2] != "add" {
-				t.Errorf("unexpected action: %s", output[2])
-			}
-			if output[7] != "1:" {
-				t.Errorf("unexpected root class: %s", output[7])
-			}
-			if output[8] != "htb" {
-				t.Errorf("unexpected qdisc algo: %s", output[8])
-			}
-		}
-	}
+	fexec.AssertExpectedCommands()
 }
 
 func TestReconcileInterfaceDoesntExist(t *testing.T) {
@@ -628,76 +445,32 @@ func TestReconcileInterfaceExistsWithNoqueue(t *testing.T) {
 	testReconcileInterfaceHasNoData(t, tcQdiscNoqueue)
 }
 
-var tcQdiscWrong = []string{
-	"qdisc htb 2: root refcnt 2 r2q 10 default 30 direct_packets_stat 0\n",
-	"qdisc foo 1: root refcnt 2 r2q 10 default 30 direct_packets_stat 0\n",
-}
-
 func TestReconcileInterfaceIsWrong(t *testing.T) {
-	for _, test := range tcQdiscWrong {
-		fcmd := exec.FakeCmd{
-			CombinedOutputScript: []exec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(test), nil },
-				func() ([]byte, error) { return []byte("\n"), nil },
-				func() ([]byte, error) { return []byte("\n"), nil },
-			},
-		}
-
-		fexec := exec.FakeExec{
-			CommandScript: []exec.FakeCommandAction{
-				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-				func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			},
-		}
-		iface := "cbr0"
-		shaper := &tcShaper{e: &fexec, iface: iface}
-		err := shaper.ReconcileInterface()
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
-		if fcmd.CombinedOutputCalls != 3 {
-			t.Errorf("unexpected number of calls: %d", fcmd.CombinedOutputCalls)
-		}
-
-		for ix, output := range fcmd.CombinedOutputLog {
-			if output[0] != "tc" {
-				t.Errorf("unexpected command: %s", output[0])
-			}
-			if output[4] != iface {
-				t.Errorf("unexpected interface: %s, expected %s", output[4], iface)
-			}
-			if ix == 0 {
-				if len(output) != 5 {
-					t.Errorf("unexpected command: %v", output)
-				}
-				if output[2] != "show" {
-					t.Errorf("unexpected action: %s", output[2])
-				}
-			}
-			if ix == 1 {
-				if len(output) != 8 {
-					t.Errorf("unexpected command: %v", output)
-				}
-				if output[2] != "delete" {
-					t.Errorf("unexpected action: %s", output[2])
-				}
-				if output[7] != strings.Split(test, " ")[2] {
-					t.Errorf("unexpected class: %s, expected: %s", output[7], strings.Split(test, " ")[2])
-				}
-			}
-			if ix == 2 {
-				if len(output) != 11 {
-					t.Errorf("unexpected command: %v", output)
-				}
-				if output[7] != "1:" {
-					t.Errorf("unexpected root class: %s", output[7])
-				}
-				if output[8] != "htb" {
-					t.Errorf("unexpected qdisc algo: %s", output[8])
-				}
-			}
-		}
+	fexec := exec.NewFakeExec(t, nil)
+	fexec.AddCommand("tc", "qdisc", "show", "dev", "cbr0").
+		SetCombinedOutput("qdisc htb 2: root refcnt 2 r2q 10 default 30 direct_packets_stat 0\n", nil)
+	fexec.AddCommand("tc", "qdisc", "delete", "dev", "cbr0", "root", "handle", "2:").
+		SetCombinedOutput("", nil)
+	fexec.AddCommand("tc", "qdisc", "add", "dev", "cbr0", "root", "handle", "1:", "htb", "default", "30").
+		SetCombinedOutput("", nil)
+	shaper := &tcShaper{e: fexec, iface: "cbr0"}
+	err := shaper.ReconcileInterface()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
+	fexec.AssertExpectedCommands()
+
+	fexec = exec.NewFakeExec(t, nil)
+	fexec.AddCommand("tc", "qdisc", "show", "dev", "cbr0").
+		SetCombinedOutput("qdisc foo 1: root refcnt 2 r2q 10 default 30 direct_packets_stat 0\n", nil)
+	fexec.AddCommand("tc", "qdisc", "delete", "dev", "cbr0", "root", "handle", "1:").
+		SetCombinedOutput("", nil)
+	fexec.AddCommand("tc", "qdisc", "add", "dev", "cbr0", "root", "handle", "1:", "htb", "default", "30").
+		SetCombinedOutput("", nil)
+	shaper = &tcShaper{e: fexec, iface: "cbr0"}
+	err = shaper.ReconcileInterface()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	fexec.AssertExpectedCommands()
 }
