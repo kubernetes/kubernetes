@@ -119,13 +119,6 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			LivenessProbe: componentProbe(2379, "/health", v1.URISchemeHTTP),
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume())
 
-		etcdPod.Spec.SecurityContext = &v1.PodSecurityContext{
-			SELinuxOptions: &v1.SELinuxOptions{
-				// Unconfine the etcd container so it can write to the data dir with SELinux enforcing:
-				Type: "spc_t",
-			},
-		}
-
 		staticPodSpecs[etcd] = etcdPod
 	}
 
