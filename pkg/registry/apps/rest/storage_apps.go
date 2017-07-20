@@ -63,9 +63,10 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 		storage["deployments/scale"] = deploymentStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("statefulsets")) {
-		statefulsetStorage, statefulsetStatusStorage := statefulsetstore.NewREST(restOptionsGetter)
-		storage["statefulsets"] = statefulsetStorage
-		storage["statefulsets/status"] = statefulsetStatusStorage
+		statefulSetStorage := statefulsetstore.NewStorage(restOptionsGetter)
+		storage["statefulsets"] = statefulSetStorage.StatefulSet
+		storage["statefulsets/status"] = statefulSetStorage.Status
+		storage["statefulsets/scale"] = statefulSetStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("controllerrevisions")) {
 		historyStorage := controllerrevisionsstore.NewREST(restOptionsGetter)
@@ -86,9 +87,10 @@ func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorag
 		storage["deployments/scale"] = deploymentStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("statefulsets")) {
-		statefulsetStorage, statefulsetStatusStorage := statefulsetstore.NewREST(restOptionsGetter)
-		storage["statefulsets"] = statefulsetStorage
-		storage["statefulsets/status"] = statefulsetStatusStorage
+		statefulSetStorage := statefulsetstore.NewStorage(restOptionsGetter)
+		storage["statefulsets"] = statefulSetStorage.StatefulSet
+		storage["statefulsets/status"] = statefulSetStorage.Status
+		storage["statefulsets/scale"] = statefulSetStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
 		daemonSetStorage, daemonSetStatusStorage := daemonsetstore.NewREST(restOptionsGetter)
