@@ -24,16 +24,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ghodss/yaml"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
-
-	"github.com/ghodss/yaml"
 )
 
 func readPod(filename string) ([]byte, error) {
@@ -146,7 +146,7 @@ func TestValidateOk(t *testing.T) {
 	}
 
 	seed := rand.Int63()
-	apiObjectFuzzer := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t, api.Codecs), rand.NewSource(seed))
+	apiObjectFuzzer := fuzzer.FuzzerFor(kapitesting.FuzzerFuncs, rand.NewSource(seed), api.Codecs)
 	for i := 0; i < 5; i++ {
 		for _, test := range tests {
 			testObj := test.obj

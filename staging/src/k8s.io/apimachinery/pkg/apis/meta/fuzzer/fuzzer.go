@@ -14,24 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testing
+package fuzzer
 
 import (
-	"math/rand"
-	"reflect"
+	"fmt"
 	"strconv"
-	"testing"
 
 	"github.com/google/gofuzz"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func GenericFuzzerFuncs(t TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
+func genericFuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		func(q *resource.Quantity, c fuzz.Continue) {
 			*q = *resource.NewQuantity(c.Int63n(1000), resource.DecimalExponent)
@@ -52,28 +53,6 @@ func GenericFuzzerFuncs(t TestingCommon, codecs runtimeserializer.CodecFactory) 
 			// APIVersion and Kind must remain blank in memory.
 			j.APIVersion = ""
 			j.Kind = ""
-		},
-		func(j *metav1.TypeMeta, c fuzz.Continue) {
-			// We have to customize the randomization of TypeMetas because their
-			// APIVersion and Kind must remain blank in memory.
-			j.APIVersion = ""
-			j.Kind = ""
-		},
-		func(j *metav1.ObjectMeta, c fuzz.Continue) {
-			j.Name = c.RandString()
-			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.SelfLink = c.RandString()
-			j.UID = types.UID(c.RandString())
-			j.GenerateName = c.RandString()
-
-			var sec, nsec int64
-			c.Fuzz(&sec)
-			c.Fuzz(&nsec)
-			j.CreationTimestamp = metav1.Unix(sec, nsec).Rfc3339Copy()
-		},
-		func(j *metav1.ListMeta, c fuzz.Continue) {
-			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.SelfLink = c.RandString()
 		},
 		func(j *runtime.Object, c fuzz.Continue) {
 			// TODO: uncomment when round trip starts from a versioned object
@@ -98,13 +77,18 @@ func GenericFuzzerFuncs(t TestingCommon, codecs runtimeserializer.CodecFactory) 
 
 			// Find a codec for converting the object to raw bytes.  This is necessary for the
 			// api version and kind to be correctly set be serialization.
-			var codec = TestCodec(codecs, metav1.SchemeGroupVersion)
+			var codec = apitesting.TestCodec(codecs, metav1.SchemeGroupVersion)
 
 			// Convert the object to raw bytes
 			bytes, err := runtime.Encode(codec, obj)
 			if err != nil {
-				t.Errorf("Failed to encode object: %v", err)
+				panic(fmt.Sprintf("Failed to encode object: %v", err))
 				return
+			}
+
+			// strip trailing newlines which do not survive roundtrips
+			for len(bytes) >= 1 && bytes[len(bytes)-1] == 10 {
+				bytes = bytes[:len(bytes)-1]
 			}
 
 			// Set the bytes field on the RawExtension
@@ -113,62 +97,80 @@ func GenericFuzzerFuncs(t TestingCommon, codecs runtimeserializer.CodecFactory) 
 	}
 }
 
-// TestingCommon abstracts testing.T and testing.B
-type TestingCommon interface {
-	Log(args ...interface{})
-	Logf(format string, args ...interface{})
-	Error(args ...interface{})
-	Errorf(format string, args ...interface{})
-	Fatal(args ...interface{})
-	Fatalf(format string, args ...interface{})
-}
+func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
+	return []interface{}{
+		func(j *metav1.TypeMeta, c fuzz.Continue) {
+			// We have to customize the randomization of TypeMetas because their
+			// APIVersion and Kind must remain blank in memory.
+			j.APIVersion = ""
+			j.Kind = ""
+		},
+		func(j *metav1.ObjectMeta, c fuzz.Continue) {
+			j.Name = c.RandString()
+			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
+			j.SelfLink = c.RandString()
+			j.UID = types.UID(c.RandString())
+			j.GenerateName = c.RandString()
 
-var (
-	_ TestingCommon = &testing.T{}
-	_ TestingCommon = &testing.B{}
-)
-
-// FuzzerFor can randomly populate api objects that are destined for version.
-func FuzzerFor(funcs []interface{}, src rand.Source) *fuzz.Fuzzer {
-	f := fuzz.New().NilChance(.5).NumElements(0, 1)
-	if src != nil {
-		f.RandSource(src)
+			var sec, nsec int64
+			c.Fuzz(&sec)
+			c.Fuzz(&nsec)
+			j.CreationTimestamp = metav1.Unix(sec, nsec).Rfc3339Copy()
+		},
+		func(j *metav1.ListMeta, c fuzz.Continue) {
+			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
+			j.SelfLink = c.RandString()
+		},
 	}
-	f.Funcs(funcs...)
-	return f
 }
 
-// MergeFuzzerFuncs will merge the given funcLists, overriding early funcs with later ones if there first
-// argument has the same type.
-func MergeFuzzerFuncs(t TestingCommon, funcLists ...[]interface{}) []interface{} {
-	funcMap := map[string]interface{}{}
-	for _, list := range funcLists {
-		for _, f := range list {
-			fT := reflect.TypeOf(f)
-			if fT.Kind() != reflect.Func || fT.NumIn() != 2 {
-				t.Errorf("Fuzzer func with invalid type: %v", fT)
-				continue
+func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
+	return []interface{}{
+		func(r *metav1alpha1.TableRow, c fuzz.Continue) {
+			c.Fuzz(&r.Object)
+			c.Fuzz(&r.Conditions)
+			if len(r.Conditions) == 0 {
+				r.Conditions = nil
 			}
-			funcMap[fT.In(0).String()] = f
-		}
+			n := c.Intn(10)
+			if n > 0 {
+				r.Cells = make([]interface{}, n)
+			}
+			for i := range r.Cells {
+				t := c.Intn(6)
+				switch t {
+				case 0:
+					r.Cells[i] = c.RandString()
+				case 1:
+					r.Cells[i] = c.Uint64()
+				case 2:
+					r.Cells[i] = c.RandBool()
+				case 3:
+					// maps roundtrip as map[interface{}]interface{}, but the json codec cannot encode that
+					// TODO: get maps to roundtrip properly
+					/*
+						x := map[string]interface{}{}
+						for j := c.Intn(10) + 1; j >= 0; j-- {
+							x[c.RandString()] = c.RandString()
+						}
+						r.Cells[i] = x
+					*/
+				case 4:
+					x := make([]interface{}, c.Intn(10))
+					for i := range x {
+						x[i] = c.Uint64()
+					}
+					r.Cells[i] = x
+				default:
+					r.Cells[i] = nil
+				}
+			}
+		},
 	}
-
-	result := []interface{}{}
-	for _, f := range funcMap {
-		result = append(result, f)
-	}
-	return result
 }
 
-func DefaultFuzzers(t TestingCommon, codecFactory runtimeserializer.CodecFactory, fuzzerFuncs []interface{}) *fuzz.Fuzzer {
-	seed := rand.Int63()
-
-	return FuzzerFor(
-		MergeFuzzerFuncs(t,
-			GenericFuzzerFuncs(t, codecFactory),
-			fuzzerFuncs,
-		),
-		rand.NewSource(seed),
-	)
-
-}
+var Funcs = fuzzer.MergeFuzzerFuncs(
+	genericFuzzerFuncs,
+	v1FuzzerFuncs,
+	v1alpha1FuzzerFuncs,
+)

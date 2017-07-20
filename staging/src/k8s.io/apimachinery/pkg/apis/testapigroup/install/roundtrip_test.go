@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package install
 
 import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	testapigroupfuzzer "k8s.io/apimachinery/pkg/apis/testapigroup/fuzzer"
 )
 
-func TestRoundTripTypes(t *testing.T) {
-	roundtrip.RoundTripTestForScheme(t, Scheme, nil)
+func TestRoundTrip(t *testing.T) {
+	roundtrip.RoundTripTestForAPIGroup(t, Install, testapigroupfuzzer.Funcs)
 }

@@ -41,7 +41,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	fuzzer "k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -4104,7 +4104,7 @@ func newTestRequestInfoResolver() *request.RequestInfoFactory {
 const benchmarkSeed = 100
 
 func benchmarkItems(b *testing.B) []example.Pod {
-	clientapiObjectFuzzer := apitesting.FuzzerFor(examplefuzzer.Funcs(b, codecs), rand.NewSource(benchmarkSeed))
+	clientapiObjectFuzzer := fuzzer.FuzzerFor(examplefuzzer.Funcs, rand.NewSource(benchmarkSeed), codecs)
 	items := make([]example.Pod, 3)
 	for i := range items {
 		clientapiObjectFuzzer.Fuzz(&items[i])

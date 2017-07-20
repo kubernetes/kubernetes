@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testing
+package roundtrip
 
 import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
@@ -28,16 +29,19 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/meta"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -46,7 +50,7 @@ type InstallFunc func(groupFactoryRegistry announced.APIGroupFactoryRegistry, re
 
 // RoundTripTestForAPIGroup is convenient to call from your install package to make sure that a "bare" install of your group provides
 // enough information to round trip
-func RoundTripTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs []interface{}) {
+func RoundTripTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs fuzzer.FuzzerFuncs) {
 	groupFactoryRegistry := make(announced.APIGroupFactoryRegistry)
 	registry := registered.NewOrDie("")
 	scheme := runtime.NewScheme()
@@ -56,15 +60,19 @@ func RoundTripTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs 
 }
 
 // RoundTripTestForScheme is convenient to call if you already have a scheme and want to make sure that its well-formed
-func RoundTripTestForScheme(t *testing.T, scheme *runtime.Scheme, fuzzingFuncs []interface{}) {
+func RoundTripTestForScheme(t *testing.T, scheme *runtime.Scheme, fuzzingFuncs fuzzer.FuzzerFuncs) {
 	codecFactory := runtimeserializer.NewCodecFactory(scheme)
-	fuzzer := DefaultFuzzers(t, codecFactory, fuzzingFuncs)
-	RoundTripTypesWithoutProtobuf(t, scheme, codecFactory, fuzzer, nil)
+	f := fuzzer.FuzzerFor(
+		fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, fuzzingFuncs),
+		rand.NewSource(rand.Int63()),
+		codecFactory,
+	)
+	RoundTripTypesWithoutProtobuf(t, scheme, codecFactory, f, nil)
 }
 
 // RoundTripProtobufTestForAPIGroup is convenient to call from your install package to make sure that a "bare" install of your group provides
 // enough information to round trip
-func RoundTripProtobufTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs []interface{}) {
+func RoundTripProtobufTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs fuzzer.FuzzerFuncs) {
 	groupFactoryRegistry := make(announced.APIGroupFactoryRegistry)
 	registry := registered.NewOrDie("")
 	scheme := runtime.NewScheme()
@@ -74,9 +82,13 @@ func RoundTripProtobufTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzi
 }
 
 // RoundTripProtobufTestForScheme is convenient to call if you already have a scheme and want to make sure that its well-formed
-func RoundTripProtobufTestForScheme(t *testing.T, scheme *runtime.Scheme, fuzzingFuncs []interface{}) {
+func RoundTripProtobufTestForScheme(t *testing.T, scheme *runtime.Scheme, fuzzingFuncs fuzzer.FuzzerFuncs) {
 	codecFactory := runtimeserializer.NewCodecFactory(scheme)
-	fuzzer := DefaultFuzzers(t, codecFactory, fuzzingFuncs)
+	fuzzer := fuzzer.FuzzerFor(
+		fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, fuzzingFuncs),
+		rand.NewSource(rand.Int63()),
+		codecFactory,
+	)
 	RoundTripTypes(t, scheme, codecFactory, fuzzer, nil)
 }
 
@@ -160,7 +172,7 @@ func roundTripSpecificKind(t *testing.T, gvk schema.GroupVersionKind, scheme *ru
 func fuzzInternalObject(t *testing.T, fuzzer *fuzz.Fuzzer, object runtime.Object) runtime.Object {
 	fuzzer.Fuzz(object)
 
-	j, err := meta.TypeAccessor(object)
+	j, err := apimeta.TypeAccessor(object)
 	if err != nil {
 		t.Fatalf("Unexpected error %v for %#v", err, object)
 	}
@@ -183,7 +195,7 @@ func roundTripToAllExternalVersions(t *testing.T, scheme *runtime.Scheme, codecF
 	if err != nil {
 		t.Fatalf("Couldn't make a %v? %v", internalGVK, err)
 	}
-	if _, err := meta.TypeAccessor(object); err != nil {
+	if _, err := apimeta.TypeAccessor(object); err != nil {
 		t.Fatalf("%q is not a TypeMeta and cannot be tested - add it to nonRoundTrippableInternalTypes: %v", internalGVK, err)
 	}
 
@@ -204,7 +216,7 @@ func roundTripToAllExternalVersions(t *testing.T, scheme *runtime.Scheme, codecF
 		}
 		t.Logf("\tround tripping to %v %v", externalGVK, externalGoType)
 
-		roundTrip(t, scheme, TestCodec(codecFactory, externalGVK.GroupVersion()), object)
+		roundTrip(t, scheme, apitesting.TestCodec(codecFactory, externalGVK.GroupVersion()), object)
 
 		// TODO remove this hack after we're past the intermediate steps
 		if !skipProtobuf && externalGVK.Group != "kubeadm.k8s.io" {
@@ -220,7 +232,7 @@ func roundTripOfExternalType(t *testing.T, scheme *runtime.Scheme, codecFactory 
 	if err != nil {
 		t.Fatalf("Couldn't make a %v? %v", externalGVK, err)
 	}
-	typeAcc, err := meta.TypeAccessor(object)
+	typeAcc, err := apimeta.TypeAccessor(object)
 	if err != nil {
 		t.Fatalf("%q is not a TypeMeta and cannot be tested - add it to nonRoundTrippableInternalTypes: %v", externalGVK, err)
 	}
@@ -279,7 +291,7 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 	// copy or conversion should alter the object
 	// TODO eliminate this global
 	if !apiequality.Semantic.DeepEqual(original, object) {
-		t.Errorf("0: %v: encode altered the object, diff: %v", name, diff.ObjectReflectDiff(original, object))
+		t.Errorf("%v: encode altered the object, diff: %v", name, diff.ObjectReflectDiff(original, object))
 		return
 	}
 
@@ -303,14 +315,14 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 	// decode (deserialize) the encoded data back into an object
 	obj2, err := runtime.Decode(codec, data)
 	if err != nil {
-		t.Errorf("0: %v: %v\nCodec: %#v\nData: %s\nSource: %#v", name, err, codec, dataAsString(data), printer.Sprintf("%#v", object))
+		t.Errorf("%v: %v\nCodec: %#v\nData: %s\nSource: %#v", name, err, codec, dataAsString(data), printer.Sprintf("%#v", object))
 		panic("failed")
 	}
 
 	// ensure that the object produced from decoding the encoded data is equal
 	// to the original object
 	if !apiequality.Semantic.DeepEqual(original, obj2) {
-		t.Errorf("1: %v: diff: %v\nCodec: %#v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectReflectDiff(object, obj2), codec, printer.Sprintf("%#v", object), dataAsString(data), printer.Sprintf("%#v", obj2))
+		t.Errorf("%v: diff: %v\nCodec: %#v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectReflectDiff(object, obj2), codec, printer.Sprintf("%#v", object), dataAsString(data), printer.Sprintf("%#v", obj2))
 		return
 	}
 
@@ -318,25 +330,64 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 	// create a new object)
 	obj3 := reflect.New(reflect.TypeOf(object).Elem()).Interface().(runtime.Object)
 	if err := runtime.DecodeInto(codec, data, obj3); err != nil {
-		t.Errorf("2: %v: %v", name, err)
+		t.Errorf("%v: %v", name, err)
 		return
+	}
+
+	// special case for kinds which are internal and external at the same time (many in meta.k8s.io are). For those
+	// runtime.DecodeInto above will return the external variant and set the APIVersion and kind, while the input
+	// object might be internal. Hence, we clear those values for obj3 for that case to correctly compare.
+	intAndExt, err := internalAndExternalKind(scheme, object)
+	if err != nil {
+		t.Errorf("%v: %v", name, err)
+		return
+	}
+	if intAndExt {
+		typeAcc, err := apimeta.TypeAccessor(object)
+		if err != nil {
+			t.Fatalf("%v: error accessing TypeMeta: %v", name, err)
+		}
+		if len(typeAcc.GetAPIVersion()) == 0 {
+			typeAcc, err := apimeta.TypeAccessor(obj3)
+			if err != nil {
+				t.Fatalf("%v: error accessing TypeMeta: %v", name, err)
+			}
+			typeAcc.SetAPIVersion("")
+			typeAcc.SetKind("")
+		}
 	}
 
 	// ensure that the new runtime object is equal to the original after being
 	// decoded into
 	if !apiequality.Semantic.DeepEqual(object, obj3) {
-		t.Errorf("3: %v: diff: %v\nCodec: %#v", name, diff.ObjectReflectDiff(object, obj3), codec)
+		t.Errorf("%v: diff: %v\nCodec: %#v", name, diff.ObjectReflectDiff(object, obj3), codec)
 		return
 	}
 
 	// do structure-preserving fuzzing of the deep-copied object. If it shares anything with the original,
 	// the deep-copy was actually only a shallow copy. Then original and obj3 will be different after fuzzing.
 	// NOTE: we use the encoding+decoding here as an alternative, guaranteed deep-copy to compare against.
-	ValueFuzz(object)
+	fuzzer.ValueFuzz(object)
 	if !apiequality.Semantic.DeepEqual(original, obj3) {
-		t.Errorf("0: %v: fuzzing a copy altered the original, diff: %v", name, diff.ObjectReflectDiff(original, object))
+		t.Errorf("%v: fuzzing a copy altered the original, diff: %v", name, diff.ObjectReflectDiff(original, object))
 		return
 	}
+}
+
+func internalAndExternalKind(scheme *runtime.Scheme, object runtime.Object) (bool, error) {
+	kinds, _, err := scheme.ObjectKinds(object)
+	if err != nil {
+		return false, err
+	}
+	internal, external := false, false
+	for _, k := range kinds {
+		if k.Version == runtime.APIVersionInternal {
+			internal = true
+		} else {
+			external = true
+		}
+	}
+	return internal && external, nil
 }
 
 // dataAsString returns the given byte array as a string; handles detecting

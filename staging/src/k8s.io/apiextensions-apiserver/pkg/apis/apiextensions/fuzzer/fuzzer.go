@@ -14,25 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package install
+package fuzzer
 
 import (
 	"strings"
-	"testing"
 
 	"github.com/google/gofuzz"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
-func TestRoundTripTypes(t *testing.T) {
-	apitesting.RoundTripTestForAPIGroup(t, Install, apitesting.MergeFuzzerFuncs(t,
-		fuzzerFuncs(),
-	))
-}
-
-func fuzzerFuncs() []interface{} {
+// Funcs returns the fuzzer functions for the apiextensions apis.
+func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		func(obj *apiextensions.CustomResourceDefinitionSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)

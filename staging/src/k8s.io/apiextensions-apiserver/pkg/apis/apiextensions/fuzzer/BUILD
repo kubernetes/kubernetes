@@ -13,11 +13,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/testing:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/testing/fuzzer:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/testapigroup:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/testapigroup/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
     ],
 )
