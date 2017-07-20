@@ -14,6 +14,9 @@ go_library(
         "generic.go",
     ],
     tags = ["automanaged"],
+    visibility = [
+        "//pkg/client/informers/informers_generated/externalversions:__subpackages__",
+    ],
     deps = [
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated/externalversions/admissionregistration:go_default_library",
