@@ -54,32 +54,16 @@ func nametomib(name string) (mib []_C_int, err error) {
 	return buf[0 : n/siz], nil
 }
 
-// ParseDirent parses up to max directory entries in buf,
-// appending the names to names.  It returns the number
-// bytes consumed from buf, the number of entries added
-// to names, and the new names slice.
-func ParseDirent(buf []byte, max int, names []string) (consumed int, count int, newnames []string) {
-	origlen := len(buf)
-	for max != 0 && len(buf) > 0 {
-		dirent := (*Dirent)(unsafe.Pointer(&buf[0]))
-		if dirent.Reclen == 0 {
-			buf = nil
-			break
-		}
-		buf = buf[dirent.Reclen:]
-		if dirent.Fileno == 0 { // File absent in directory.
-			continue
-		}
-		bytes := (*[10000]byte)(unsafe.Pointer(&dirent.Name[0]))
-		var name = string(bytes[0:dirent.Namlen])
-		if name == "." || name == ".." { // Useless names
-			continue
-		}
-		max--
-		count++
-		names = append(names, name)
-	}
-	return origlen - len(buf), count, names
+func direntIno(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Fileno), unsafe.Sizeof(Dirent{}.Fileno))
+}
+
+func direntReclen(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Reclen), unsafe.Sizeof(Dirent{}.Reclen))
+}
+
+func direntNamlen(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Namlen), unsafe.Sizeof(Dirent{}.Namlen))
 }
 
 //sysnb pipe() (r int, w int, err error)
@@ -129,7 +113,6 @@ func Getfsstat(buf []Statfs_t, flags int) (n int, err error) {
 		bufsize = unsafe.Sizeof(Statfs_t{}) * uintptr(len(buf))
 	}
 	r0, _, e1 := Syscall(SYS_GETFSSTAT, uintptr(_p0), bufsize, uintptr(flags))
-	use(unsafe.Pointer(_p0))
 	n = int(r0)
 	if e1 != 0 {
 		err = e1
@@ -374,6 +357,9 @@ func Llistxattr(link string, dest []byte) (sz int, err error) {
  */
 //sys	Access(path string, mode uint32) (err error)
 //sys	Adjtime(delta *Timeval, olddelta *Timeval) (err error)
+//sys	CapEnter() (err error)
+//sys	capRightsGet(version int, fd int, rightsp *CapRights) (err error) = SYS___CAP_RIGHTS_GET
+//sys	capRightsLimit(fd int, rightsp *CapRights) (err error)
 //sys	Chdir(path string) (err error)
 //sys	Chflags(path string, flags int) (err error)
 //sys	Chmod(path string, mode uint32) (err error)
@@ -438,6 +424,7 @@ func Llistxattr(link string, dest []byte) (sz int, err error) {
 //sys	Munlockall() (err error)
 //sys	Nanosleep(time *Timespec, leftover *Timespec) (err error)
 //sys	Open(path string, mode int, perm uint32) (fd int, err error)
+//sys	Openat(fdat int, path string, mode int, perm uint32) (fd int, err error)
 //sys	Pathconf(path string, name int) (val int, err error)
 //sys	Pread(fd int, p []byte, offset int64) (n int, err error)
 //sys	Pwrite(fd int, p []byte, offset int64) (n int, err error)

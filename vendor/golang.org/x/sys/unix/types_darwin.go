@@ -5,7 +5,7 @@
 // +build ignore
 
 /*
-Input to cgo -godefs.  See also mkerrors.sh and mkall.sh
+Input to cgo -godefs.  See README.md
 */
 
 // +godefs map struct_in_addr [4]byte /* in_addr */

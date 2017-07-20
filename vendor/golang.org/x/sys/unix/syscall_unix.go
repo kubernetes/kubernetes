@@ -23,6 +23,7 @@ const (
 	darwin64Bit    = runtime.GOOS == "darwin" && sizeofPtr == 8
 	dragonfly64Bit = runtime.GOOS == "dragonfly" && sizeofPtr == 8
 	netbsd32Bit    = runtime.GOOS == "netbsd" && sizeofPtr == 4
+	solaris64Bit   = runtime.GOOS == "solaris" && sizeofPtr == 8
 )
 
 // Do the interface allocations only once for common
@@ -48,11 +49,6 @@ func errnoErr(e syscall.Errno) error {
 	}
 	return e
 }
-
-func Syscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err syscall.Errno)
-func Syscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err syscall.Errno)
-func RawSyscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err syscall.Errno)
-func RawSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err syscall.Errno)
 
 // Mmap manager, for use by operating system-specific implementations.
 
