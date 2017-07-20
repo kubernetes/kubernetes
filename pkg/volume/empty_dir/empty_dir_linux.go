@@ -20,9 +20,9 @@ package empty_dir
 
 import (
 	"fmt"
-	"syscall"
 
 	"github.com/golang/glog"
+	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -40,8 +40,8 @@ func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, er
 	if err != nil {
 		return 0, false, fmt.Errorf("IsLikelyNotMountPoint(%q): %v", path, err)
 	}
-	buf := syscall.Statfs_t{}
-	if err := syscall.Statfs(path, &buf); err != nil {
+	buf := unix.Statfs_t{}
+	if err := unix.Statfs(path, &buf); err != nil {
 		return 0, false, fmt.Errorf("statfs(%q): %v", path, err)
 	}
 

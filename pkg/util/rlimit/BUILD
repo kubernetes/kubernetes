@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = ["rlimit_linux.go"],
     tags = ["automanaged"],
+    deps = ["//vendor/golang.org/x/sys/unix:go_default_library"],
 )
 
 filegroup(

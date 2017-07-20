@@ -75,6 +75,7 @@ go_test(
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
+        "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/k8s.io/client-go/util/testing:go_default_library",
     ],
 )

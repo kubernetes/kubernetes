@@ -30,6 +30,7 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
+	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
@@ -220,14 +221,14 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 		glog.Errorf("Path %q is not refering to a device.", pathname)
 		return false, nil
 	}
-	fd, errno := syscall.Open(pathname, syscall.O_RDONLY|syscall.O_EXCL, 0)
+	fd, errno := unix.Open(pathname, unix.O_RDONLY|unix.O_EXCL, 0)
 	// If the device is in use, open will return an invalid fd.
 	// When this happens, it is expected that Close will fail and throw an error.
-	defer syscall.Close(fd)
+	defer unix.Close(fd)
 	if errno == nil {
 		// device not in use
 		return false, nil
-	} else if errno == syscall.EBUSY {
+	} else if errno == unix.EBUSY {
 		// device is in use
 		return true, nil
 	}

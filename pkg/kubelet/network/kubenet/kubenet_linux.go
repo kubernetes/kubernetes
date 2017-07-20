@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/containernetworking/cni/libcni"
@@ -34,6 +33,7 @@ import (
 	cnitypes020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -286,7 +286,7 @@ func (plugin *kubenetNetworkPlugin) clearBridgeAddressesExcept(keep *net.IPNet) 
 		return
 	}
 
-	addrs, err := netlink.AddrList(bridge, syscall.AF_INET)
+	addrs, err := netlink.AddrList(bridge, unix.AF_INET)
 	if err != nil {
 		return
 	}

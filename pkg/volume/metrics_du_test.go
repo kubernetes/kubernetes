@@ -22,17 +22,17 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"syscall"
 	"testing"
 
+	"golang.org/x/sys/unix"
 	utiltesting "k8s.io/client-go/util/testing"
 	. "k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func getExpectedBlockSize(path string) int64 {
-	statfs := &syscall.Statfs_t{}
-	err := syscall.Statfs(path, statfs)
+	statfs := &unix.Statfs_t{}
+	err := unix.Statfs(path, statfs)
 	if err != nil {
 		return 0
 	}
