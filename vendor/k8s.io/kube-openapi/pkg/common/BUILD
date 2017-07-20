@@ -9,12 +9,14 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["time.go"],
+    srcs = [
+        "common.go",
+        "doc.go",
+    ],
     tags = ["automanaged"],
     deps = [
+        "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
-        "//vendor/github.com/google/gofuzz:go_default_library",
-        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 

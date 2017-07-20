@@ -9,11 +9,14 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["time.go"],
+    srcs = ["openapi.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor/github.com/go-openapi/spec:go_default_library",
-        "//vendor/github.com/google/gofuzz:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/gengo/args:go_default_library",
+        "//vendor/k8s.io/gengo/generator:go_default_library",
+        "//vendor/k8s.io/gengo/namer:go_default_library",
+        "//vendor/k8s.io/gengo/types:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
