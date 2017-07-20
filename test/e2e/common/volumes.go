@@ -53,7 +53,7 @@ import (
 
 // These tests need privileged containers, which are disabled by default.  Run
 // the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
-var _ = framework.KubeDescribe("GCP Volumes", func() {
+var _ = framework.KubeDescribe("[sig-storage] GCP Volumes", func() {
 	f := framework.NewDefaultFramework("gcp-volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
@@ -64,7 +64,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	var c clientset.Interface
 
 	BeforeEach(func() {
-		framework.SkipUnlessNodeOSDistroIs("gci")
+		framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
 
 		namespace = f.Namespace
 		c = f.ClientSet
@@ -74,7 +74,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	// NFS
 	////////////////////////////////////////////////////////////////////////
 	framework.KubeDescribe("NFSv4", func() {
-		It("should be mountable for NFSv4 [sig-storage]", func() {
+		It("should be mountable for NFSv4", func() {
 			config, _, serverIP := framework.NewNFSServer(c, namespace.Name, []string{})
 			defer func() {
 				if clean {
@@ -102,7 +102,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	})
 
 	framework.KubeDescribe("NFSv3", func() {
-		It("should be mountable for NFSv3 [sig-storage]", func() {
+		It("should be mountable for NFSv3", func() {
 			config, _, serverIP := framework.NewNFSServer(c, namespace.Name, []string{})
 			defer func() {
 				if clean {
@@ -132,7 +132,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
 	framework.KubeDescribe("GlusterFS", func() {
-		It("should be mountable [sig-storage]", func() {
+		It("should be mountable", func() {
 			// create gluster server and endpoints
 			config, _, _ := framework.NewGlusterfsServer(c, namespace.Name)
 			name := config.Prefix + "-server"
