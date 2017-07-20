@@ -369,6 +369,15 @@ func (d *partialArray) add(key string, val *lazyNode) error {
 
 	cur := *d
 
+	if idx < 0 {
+		idx *= -1
+
+		if idx > len(ary) {
+			return fmt.Errorf("Unable to access invalid index: %d", idx)
+		}
+		idx = len(ary) - idx
+	}
+
 	copy(ary[0:idx], cur[0:idx])
 	ary[idx] = val
 	copy(ary[idx+1:], cur[idx:])
@@ -446,6 +455,11 @@ func (p Patch) replace(doc *container, op operation) error {
 		return fmt.Errorf("jsonpatch replace operation does not apply: doc is missing path: %s", path)
 	}
 
+	val, ok := con.get(key)
+	if val == nil || ok != nil {
+		return fmt.Errorf("jsonpatch replace operation does not apply: doc is missing key: %s", path)
+	}
+
 	return con.set(key, op.value())
 }
 
@@ -506,6 +520,31 @@ func (p Patch) test(doc *container, op operation) error {
 	}
 
 	return fmt.Errorf("Testing value %s failed", path)
+}
+
+func (p Patch) copy(doc *container, op operation) error {
+	from := op.from()
+
+	con, key := findObject(doc, from)
+
+	if con == nil {
+		return fmt.Errorf("jsonpatch copy operation does not apply: doc is missing from path: %s", from)
+	}
+
+	val, err := con.get(key)
+	if err != nil {
+		return err
+	}
+
+	path := op.path()
+
+	con, key = findObject(doc, path)
+
+	if con == nil {
+		return fmt.Errorf("jsonpatch copy operation does not apply: doc is missing destination path: %s", path)
+	}
+
+	return con.set(key, val)
 }
 
 // Equal indicates if 2 JSON documents have the same structural equality.
@@ -570,6 +609,8 @@ func (p Patch) ApplyIndent(doc []byte, indent string) ([]byte, error) {
 			err = p.move(&pd, op)
 		case "test":
 			err = p.test(&pd, op)
+		case "copy":
+			err = p.copy(&pd, op)
 		default:
 			err = fmt.Errorf("Unexpected kind: %s", op.kind())
 		}
@@ -584,4 +625,19 @@ func (p Patch) ApplyIndent(doc []byte, indent string) ([]byte, error) {
 	}
 
 	return json.Marshal(pd)
+}
+
+// From http://tools.ietf.org/html/rfc6901#section-4 :
+//
+// Evaluation of each reference token begins by decoding any escaped
+// character sequence.  This is performed by first transforming any
+// occurrence of the sequence '~1' to '/', and then transforming any
+// occurrence of the sequence '~0' to '~'.
+
+var (
+	rfc6901Decoder = strings.NewReplacer("~1", "/", "~0", "~")
+)
+
+func decodePatchKey(k string) string {
+	return rfc6901Decoder.Replace(k)
 }
