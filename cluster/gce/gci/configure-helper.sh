@@ -997,6 +997,8 @@ function start-node-problem-detector {
   flags+=" --logtostderr"
   flags+=" --system-log-monitors=${km_config},${dm_config}"
   flags+=" --apiserver-override=https://${KUBERNETES_MASTER_NAME}?inClusterConfig=false&auth=/var/lib/node-problem-detector/kubeconfig"
+  local -r npd_port=${NODE_PROBLEM_DETECTOR_PORT:-20256}
+  flags+=" --port=${npd_port}"
 
   # Write the systemd service file for node problem detector.
   cat <<EOF >/etc/systemd/system/node-problem-detector.service
