@@ -140,6 +140,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *extensions.DaemonSet) (cur
 			}
 			toUpdate := clone.(*apps.ControllerRevision)
 			toUpdate.Revision = currRevision
+			toUpdate.RevisionTime = metav1.Now()
 			_, err = dsc.kubeClient.AppsV1beta1().ControllerRevisions(ds.Namespace).Update(toUpdate)
 			if err != nil {
 				return nil, nil, err
@@ -341,8 +342,9 @@ func (dsc *DaemonSetsController) snapshot(ds *extensions.DaemonSet, revision int
 			Annotations:     ds.Annotations,
 			OwnerReferences: []metav1.OwnerReference{*newControllerRef(ds)},
 		},
-		Data:     runtime.RawExtension{Raw: patch},
-		Revision: revision,
+		Data:         runtime.RawExtension{Raw: patch},
+		Revision:     revision,
+		RevisionTime: metav1.Now(),
 	}
 
 	history, err = dsc.kubeClient.AppsV1beta1().ControllerRevisions(ds.Namespace).Create(history)

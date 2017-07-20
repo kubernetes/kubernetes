@@ -511,6 +511,9 @@ type ControllerRevision struct {
 
 	// Revision indicates the revision of the state represented by Data.
 	Revision int64 `json:"revision" protobuf:"varint,3,opt,name=revision"`
+
+	// RevisionTime records the time when revision happens.
+	RevisionTime metav1.Time `json:"revisionTime,omitempty" protobuf:"bytes,4,opt,name=revisionTime"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
