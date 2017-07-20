@@ -18,13 +18,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../../../..
-METRICS_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+SCRIPT_ROOT=$(dirname "${BASH_SOURCE}")/..
+SCRIPT_BASE=${SCRIPT_ROOT}/../..
 
-DIFFROOT="${METRICS_ROOT}/pkg"
-TMP_DIFFROOT="${METRICS_ROOT}/_tmp/pkg"
-_tmp="${METRICS_ROOT}/_tmp"
+DIFFROOT="${SCRIPT_ROOT}/pkg"
+TMP_DIFFROOT="${SCRIPT_ROOT}/_tmp/pkg"
+_tmp="${SCRIPT_ROOT}/_tmp"
 
 cleanup() {
   rm -rf "${_tmp}"
@@ -36,7 +35,7 @@ cleanup
 mkdir -p "${TMP_DIFFROOT}"
 cp -a "${DIFFROOT}"/* "${TMP_DIFFROOT}"
 
-"${METRICS_ROOT}/hack/update-codegen.sh"
+"${SCRIPT_ROOT}/hack/update-codegen.sh"
 echo "diffing ${DIFFROOT} against freshly generated codegen"
 ret=0
 diff -Naupr "${DIFFROOT}" "${TMP_DIFFROOT}" || ret=$?
@@ -48,4 +47,3 @@ else
   echo "${DIFFROOT} is out of date. Please run hack/update-codegen.sh"
   exit 1
 fi
-
