@@ -657,8 +657,10 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 		if autodetectedVersion := doBsApiVersionAutodetect(availableApiVersions); autodetectedVersion != "" {
 			return os.volumeService(autodetectedVersion)
 		} else {
-			// Nothing suitable found, failed autodetection
-			return nil, errors.New("BS API version autodetection failed.")
+			// Nothing suitable found, failed autodetection, just exit with appropriate message
+			err_txt := "BlockStorage API version autodetection failed. " +
+				"Please set it explicitly in cloud.conf in section [BlockStorage] with key `bs-version`"
+			return nil, errors.New(err_txt)
 		}
 
 	default:
