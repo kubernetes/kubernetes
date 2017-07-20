@@ -31,6 +31,7 @@ func main() {
 		VersionedClientSetPackage: "k8s.io/kubernetes/pkg/client/clientset_generated/clientset",
 		InternalClientSetPackage:  "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset",
 		ListersPackage:            "k8s.io/kubernetes/pkg/client/listers",
+		SingleDirectory:           false,
 	}
 	arguments := &args.GeneratorArgs{
 		OutputBase:        args.DefaultSourceTree(),
