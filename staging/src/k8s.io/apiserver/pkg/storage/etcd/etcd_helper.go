@@ -33,6 +33,7 @@ import (
 	utilcache "k8s.io/apimachinery/pkg/util/cache"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/apiserver/pkg/storage/etcd/util"
@@ -587,6 +588,9 @@ func (h *etcdHelper) GuaranteedUpdate(
 		return toStorageErr(err, key, int64(index))
 	}
 }
+
+// Implements storage.Interface.
+func (*etcdHelper) BeginStaleWatch(func() runtime.Object, func(genericapirequest.Context) string) {}
 
 // etcdCache defines interface used for caching objects stored in etcd. Objects are keyed by
 // their Node.ModifiedIndex, which is unique across all types.

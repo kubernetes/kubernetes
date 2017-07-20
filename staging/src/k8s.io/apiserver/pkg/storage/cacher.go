@@ -37,6 +37,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/client-go/tools/cache"
 )
@@ -533,6 +534,9 @@ func (c *Cacher) GuaranteedUpdate(
 	// If we couldn't get the object, fallback to no-suggestion.
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
 }
+
+// Implements storage.Interface.
+func (*Cacher) BeginStaleWatch(func() runtime.Object, func(genericapirequest.Context) string) {}
 
 func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
 	// TODO: Currently we assume that in a given Cacher object, its <c.triggerFunc>
