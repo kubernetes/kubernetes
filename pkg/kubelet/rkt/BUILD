@@ -35,7 +35,6 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/securitycontext:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//pkg/util/selinux:go_default_library",
         "//pkg/util/strings:go_default_library",
@@ -59,6 +58,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 
@@ -78,7 +78,6 @@ go_test(
         "//pkg/kubelet/network/kubenet:go_default_library",
         "//pkg/kubelet/network/testing:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//vendor/github.com/appc/spec/schema:go_default_library",
         "//vendor/github.com/appc/spec/schema/types:go_default_library",
         "//vendor/github.com/coreos/go-systemd/dbus:go_default_library",
@@ -94,6 +93,8 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/client-go/util/testing:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ],
 )
 

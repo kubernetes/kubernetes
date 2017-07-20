@@ -14,8 +14,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/probe:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 

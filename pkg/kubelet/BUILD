@@ -93,7 +93,6 @@ go_library(
         "//pkg/security/apparmor:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//pkg/util/dbus:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//pkg/util/file:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/iptables:go_default_library",
@@ -141,6 +140,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//vendor/k8s.io/client-go/util/integer:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 

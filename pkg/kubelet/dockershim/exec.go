@@ -28,8 +28,8 @@ import (
 
 	"k8s.io/client-go/tools/remotecommand"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/term"
+	utilexec "k8s.io/utils/exec"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )

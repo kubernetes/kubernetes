@@ -428,7 +428,6 @@ pkg/util/configz
 pkg/util/dbus
 pkg/util/ebtables
 pkg/util/env
-pkg/util/exec
 pkg/util/file
 pkg/util/goroutinemap/exponentialbackoff
 pkg/util/initsystem

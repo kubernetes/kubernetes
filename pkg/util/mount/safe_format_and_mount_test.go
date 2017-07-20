@@ -21,7 +21,8 @@ import (
 	"runtime"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 type ErrorMounter struct {
@@ -74,7 +75,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			description: "Test 'fsck' fails with exit status 4",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"fsck", []string{"-a", "/dev/foo"}, "", &exec.FakeExitError{Status: 4}},
+				{"fsck", []string{"-a", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 4}},
 			},
 			expectedError: fmt.Errorf("'fsck' found errors on device /dev/foo but could not correct them: ."),
 		},
@@ -82,14 +83,14 @@ func TestSafeFormatAndMount(t *testing.T) {
 			description: "Test 'fsck' fails with exit status 1 (errors found and corrected)",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"fsck", []string{"-a", "/dev/foo"}, "", &exec.FakeExitError{Status: 1}},
+				{"fsck", []string{"-a", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 1}},
 			},
 		},
 		{
 			description: "Test 'fsck' fails with exit status other than 1 and 4 (likely unformatted device)",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"fsck", []string{"-a", "/dev/foo"}, "", &exec.FakeExitError{Status: 8}},
+				{"fsck", []string{"-a", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 8}},
 			},
 		},
 		{
@@ -180,7 +181,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		commandScripts := []exec.FakeCommandAction{}
+		commandScripts := []fakeexec.FakeCommandAction{}
 		for _, expected := range test.execScripts {
 			ecmd := expected.command
 			eargs := expected.args
@@ -196,17 +197,17 @@ func TestSafeFormatAndMount(t *testing.T) {
 						t.Errorf("Unexpected args %v. Expecting %v", args, eargs)
 					}
 				}
-				fake := exec.FakeCmd{
-					CombinedOutputScript: []exec.FakeCombinedOutputAction{
+				fake := fakeexec.FakeCmd{
+					CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 						func() ([]byte, error) { return []byte(output), err },
 					},
 				}
-				return exec.InitFakeCmd(&fake, cmd, args...)
+				return fakeexec.InitFakeCmd(&fake, cmd, args...)
 			}
 			commandScripts = append(commandScripts, commandScript)
 		}
 
-		fake := exec.FakeExec{
+		fake := fakeexec.FakeExec{
 			CommandScript: commandScripts,
 		}
 
