@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// TODO: This file can potentially be moved to a common place used by both e2e and integration tests.
+
 package framework
 
 import (

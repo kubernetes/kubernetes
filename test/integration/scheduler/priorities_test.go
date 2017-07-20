@@ -32,7 +32,7 @@ func TestNodeAffinity(t *testing.T) {
 	context := initTest(t, "node-affinity")
 	defer cleanupTest(t, context)
 	// Add a few nodes.
-	nodes, err := createNodes(context.clientSet, "testnode", 5)
+	nodes, err := createNodes(context.clientSet, "testnode", nil, 5)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestPodAffinity(t *testing.T) {
 	context := initTest(t, "pod-affinity")
 	defer cleanupTest(t, context)
 	// Add a few nodes.
-	nodesInTopology, err := createNodes(context.clientSet, "in-topology", 5)
+	nodesInTopology, err := createNodes(context.clientSet, "in-topology", nil, 5)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestPodAffinity(t *testing.T) {
 		t.Fatalf("Error running the attractor pod: %v", err)
 	}
 	// Add a few more nodes without the topology label.
-	_, err = createNodes(context.clientSet, "other-node", 5)
+	_, err = createNodes(context.clientSet, "other-node", nil, 5)
 	if err != nil {
 		t.Fatalf("Cannot create the second set of nodes: %v", err)
 	}

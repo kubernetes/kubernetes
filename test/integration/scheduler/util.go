@@ -162,9 +162,16 @@ func waitForNodeLabels(cs clientset.Interface, nodeName string, labels map[strin
 	return wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, nodeHasLabels(cs, nodeName, labels))
 }
 
-// createNodeWithResource creates a node with the given resource list and
-// returns a pointer and error status.
-func createNodeWithResource(cs clientset.Interface, name string, res *v1.ResourceList) (*v1.Node, error) {
+// createNode creates a node with the given resource list and
+// returns a pointer and error status. If 'res' is nil, a predefined amount of
+// resource will be used.
+func createNode(cs clientset.Interface, name string, res *v1.ResourceList) (*v1.Node, error) {
+	// if resource is nil, we use a default amount of resources for the node.
+	if res == nil {
+		res = &v1.ResourceList{
+			v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+		}
+	}
 	n := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       v1.NodeSpec{Unschedulable: false},
@@ -175,22 +182,13 @@ func createNodeWithResource(cs clientset.Interface, name string, res *v1.Resourc
 	return cs.CoreV1().Nodes().Create(n)
 }
 
-// createNode creates a node with predefined resources and returns a pointer and
-// error status.
-func createNode(cs clientset.Interface, name string) (*v1.Node, error) {
-	res := v1.ResourceList{
-		v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
-	}
-	return createNodeWithResource(cs, name, &res)
-}
-
 // createNodes creates `numNodes` nodes. The created node names will be in the
 // form of "`prefix`-X" where X is an ordinal.
-func createNodes(cs clientset.Interface, prefix string, numNodes int) ([]*v1.Node, error) {
+func createNodes(cs clientset.Interface, prefix string, res *v1.ResourceList, numNodes int) ([]*v1.Node, error) {
 	nodes := make([]*v1.Node, numNodes)
 	for i := 0; i < numNodes; i++ {
 		nodeName := fmt.Sprintf("%v-%d", prefix, i)
-		node, err := createNode(cs, nodeName)
+		node, err := createNode(cs, nodeName, res)
 		if err != nil {
 			return nodes[:], err
 		}
@@ -247,24 +245,23 @@ func createPausePod(cs clientset.Interface, conf *pausePodConfig) (*v1.Pod, erro
 }
 
 // createPausePodWithResource creates a pod with "Pause" image and the given
-// resources and returns its pointer and error status.
+// resources and returns its pointer and error status. The resource list can be
+// nil.
 func createPausePodWithResource(cs clientset.Interface, podName string, nsName string, res *v1.ResourceList) (*v1.Pod, error) {
-	conf := pausePodConfig{
-		Name:      podName,
-		Namespace: nsName,
-		Resources: &v1.ResourceRequirements{
-			Requests: *res,
-		},
-	}
-	return createPausePod(cs, &conf)
-}
-
-// createDefaultPausePod creates a pod with "Pause" image and returns its pointer
-// and error status.
-func createDefaultPausePod(cs clientset.Interface, podName string, nsName string) (*v1.Pod, error) {
-	conf := pausePodConfig{
-		Name:      podName,
-		Namespace: nsName,
+	var conf pausePodConfig
+	if res == nil {
+		conf = pausePodConfig{
+			Name:      podName,
+			Namespace: nsName,
+		}
+	} else {
+		conf = pausePodConfig{
+			Name:      podName,
+			Namespace: nsName,
+			Resources: &v1.ResourceRequirements{
+				Requests: *res,
+			},
+		}
 	}
 	return createPausePod(cs, &conf)
 }

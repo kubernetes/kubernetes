@@ -228,11 +228,11 @@ func TestSchedulerCreationInLegacyMode(t *testing.T) {
 	defer close(sched.Config().StopEverything)
 	sched.Run()
 
-	_, err = createNode(clientSet, "test-node")
+	_, err = createNode(clientSet, "test-node", nil)
 	if err != nil {
 		t.Fatalf("Failed to create node: %v", err)
 	}
-	pod, err := createDefaultPausePod(clientSet, "test-pod", "configmap")
+	pod, err := createPausePodWithResource(clientSet, "test-pod", "configmap", nil)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
@@ -373,7 +373,7 @@ func TestUnschedulableNodes(t *testing.T) {
 
 		// Create the new pod, note that this needs to happen post unschedulable
 		// modification or we have a race in the test.
-		myPod, err := createDefaultPausePod(context.clientSet, "node-scheduling-test-pod", context.ns.Name)
+		myPod, err := createPausePodWithResource(context.clientSet, "node-scheduling-test-pod", context.ns.Name, nil)
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}
@@ -451,7 +451,7 @@ func TestMultiScheduler(t *testing.T) {
 	context.clientSet.Core().Nodes().Create(node)
 
 	// 3. create 3 pods for testing
-	testPod, err := createDefaultPausePod(context.clientSet, "pod-without-scheduler-name", context.ns.Name)
+	testPod, err := createPausePodWithResource(context.clientSet, "pod-without-scheduler-name", context.ns.Name, nil)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
@@ -587,7 +587,7 @@ func TestAllocatable(t *testing.T) {
 		v1.ResourceCPU:    *resource.NewMilliQuantity(30, resource.DecimalSI),
 		v1.ResourceMemory: *resource.NewQuantity(30, resource.BinarySI),
 	}
-	allocNode, err := createNodeWithResource(context.clientSet, "node-allocatable-scheduler-test-node", nodeRes)
+	allocNode, err := createNode(context.clientSet, "node-allocatable-scheduler-test-node", nodeRes)
 	if err != nil {
 		t.Fatalf("Failed to create node: %v", err)
 	}
