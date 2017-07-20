@@ -582,7 +582,6 @@ staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1
 staging/src/k8s.io/apimachinery/pkg/conversion
 staging/src/k8s.io/apimachinery/pkg/conversion/unstructured
 staging/src/k8s.io/apimachinery/pkg/labels
-staging/src/k8s.io/apimachinery/pkg/openapi
 staging/src/k8s.io/apimachinery/pkg/runtime/schema
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/protobuf
@@ -654,7 +653,6 @@ staging/src/k8s.io/apiserver/pkg/registry/rest/resttest
 staging/src/k8s.io/apiserver/pkg/server
 staging/src/k8s.io/apiserver/pkg/server/healthz
 staging/src/k8s.io/apiserver/pkg/server/httplog
-staging/src/k8s.io/apiserver/pkg/server/openapi
 staging/src/k8s.io/apiserver/pkg/server/options
 staging/src/k8s.io/apiserver/pkg/server/routes/data/swagger
 staging/src/k8s.io/apiserver/pkg/server/storage
@@ -674,7 +672,6 @@ staging/src/k8s.io/apiserver/pkg/util/feature
 staging/src/k8s.io/apiserver/pkg/util/flag
 staging/src/k8s.io/apiserver/pkg/util/proxy
 staging/src/k8s.io/apiserver/pkg/util/trace
-staging/src/k8s.io/apiserver/pkg/util/trie
 staging/src/k8s.io/apiserver/pkg/util/webhook
 staging/src/k8s.io/apiserver/pkg/util/wsstream
 staging/src/k8s.io/apiserver/plugin/pkg/audit/log
@@ -782,7 +779,6 @@ staging/src/k8s.io/kube-gen/cmd/conversion-gen/generators
 staging/src/k8s.io/kube-gen/cmd/go-to-protobuf/protobuf
 staging/src/k8s.io/kube-gen/cmd/informer-gen/generators
 staging/src/k8s.io/kube-gen/cmd/lister-gen/generators
-staging/src/k8s.io/kube-gen/cmd/openapi-gen/generators
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1
 staging/src/k8s.io/metrics/pkg/apis/metrics
