@@ -680,7 +680,6 @@ staging/src/k8s.io/apiserver/pkg/util/trace
 staging/src/k8s.io/apiserver/pkg/util/trie
 staging/src/k8s.io/apiserver/pkg/util/webhook
 staging/src/k8s.io/apiserver/pkg/util/wsstream
-staging/src/k8s.io/apiserver/plugin/pkg/audit
 staging/src/k8s.io/apiserver/plugin/pkg/audit/log
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/keystone
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile
