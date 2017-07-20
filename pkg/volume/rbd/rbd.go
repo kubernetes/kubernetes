@@ -56,10 +56,14 @@ var _ volume.DeletableVolumePlugin = &rbdPlugin{}
 var _ volume.ProvisionableVolumePlugin = &rbdPlugin{}
 
 const (
-	rbdPluginName   = "kubernetes.io/rbd"
-	secretKeyName   = "key" // key name used in secret
-	rbdImageFormat1 = "1"
-	rbdImageFormat2 = "2"
+	rbdPluginName                  = "kubernetes.io/rbd"
+	secretKeyName                  = "key" // key name used in secret
+	rbdImageFormat1                = "1"
+	rbdImageFormat2                = "2"
+	rbdDefaultAdminId              = "admin"
+	rbdDefaultAdminSecretNamespace = "default"
+	rbdDefaultPool                 = "rbd"
+	rbdDefaultUserId               = rbdDefaultAdminId
 )
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
@@ -203,7 +207,7 @@ func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 		return nil, err
 	}
 	adminSecretName := ""
-	adminSecretNamespace := "default"
+	adminSecretNamespace := rbdDefaultAdminSecretNamespace
 	admin := ""
 
 	for k, v := range class.Parameters {
@@ -271,7 +275,7 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	}
 	var err error
 	adminSecretName := ""
-	adminSecretNamespace := "default"
+	adminSecretNamespace := rbdDefaultAdminSecretNamespace
 	secretName := ""
 	secret := ""
 	imageFormat := rbdImageFormat1
@@ -330,10 +334,10 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, fmt.Errorf("missing user secret name")
 	}
 	if r.adminId == "" {
-		r.adminId = "admin"
+		r.adminId = rbdDefaultAdminId
 	}
 	if r.Pool == "" {
-		r.Pool = "rbd"
+		r.Pool = rbdDefaultPool
 	}
 	if r.Id == "" {
 		r.Id = r.adminId
