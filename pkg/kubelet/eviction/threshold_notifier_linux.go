@@ -1,5 +1,3 @@
-// +build cgo
-
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -17,11 +15,6 @@ limitations under the License.
 */
 
 package eviction
-
-/*
-#include <sys/eventfd.h>
-*/
-import "C"
 
 import (
 	"fmt"
@@ -61,11 +54,10 @@ func NewMemCGThresholdNotifier(path, attribute, threshold, description string, h
 			unix.Close(controlfd)
 		}
 	}()
-	efd, err := C.eventfd(0, C.EFD_CLOEXEC)
+	eventfd, err := unix.Eventfd(0, unix.EFD_CLOEXEC)
 	if err != nil {
 		return nil, err
 	}
-	eventfd := int(efd)
 	if eventfd < 0 {
 		err = fmt.Errorf("eventfd call failed")
 		return nil, err
