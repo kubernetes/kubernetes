@@ -27,7 +27,7 @@ import (
 
 func TestServiceEvaluatorMatchesResources(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
-	evaluator := NewServiceEvaluator(kubeClient)
+	evaluator := NewServiceEvaluator(kubeClient, nil)
 	// we give a lot of resources
 	input := []api.ResourceName{
 		api.ResourceConfigMaps,
@@ -50,7 +50,7 @@ func TestServiceEvaluatorMatchesResources(t *testing.T) {
 
 func TestServiceEvaluatorUsage(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
-	evaluator := NewServiceEvaluator(kubeClient)
+	evaluator := NewServiceEvaluator(kubeClient, nil)
 	testCases := map[string]struct {
 		service *api.Service
 		usage   api.ResourceList
@@ -199,7 +199,7 @@ func TestServiceConstraintsFunc(t *testing.T) {
 	}
 
 	kubeClient := fake.NewSimpleClientset()
-	evaluator := NewServiceEvaluator(kubeClient)
+	evaluator := NewServiceEvaluator(kubeClient, nil)
 	for testName, test := range testCases {
 		err := evaluator.Constraints(test.required, test.service)
 		switch {
