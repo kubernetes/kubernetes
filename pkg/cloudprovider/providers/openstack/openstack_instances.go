@@ -188,19 +188,17 @@ func (i *Instances) InstanceType(name types.NodeName) (string, error) {
 }
 
 func srvInstanceType(srv *servers.Server) (string, error) {
-	val, ok := srv.Flavor["name"]
-
-	if !ok {
-		return "", fmt.Errorf("flavor name not present in server info")
+	keys := []string{"name", "id", "original_name"}
+	for _, key := range keys {
+		val, found := srv.Flavor[key]
+		if found {
+			flavor, ok := val.(string)
+			if ok {
+				return flavor, nil
+			}
+		}
 	}
-
-	flavor, ok := val.(string)
-
-	if !ok {
-		return "", fmt.Errorf("flavor name is not a string")
-	}
-
-	return flavor, nil
+	return "", fmt.Errorf("flavor name/id not found")
 }
 
 func instanceIDFromProviderID(providerID string) (instanceID string, err error) {
