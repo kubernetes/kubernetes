@@ -53,7 +53,12 @@ readonly KUBE_NODE_TARGETS=($(kube::golang::node_targets))
 readonly KUBE_NODE_BINARIES=("${KUBE_NODE_TARGETS[@]##*/}")
 readonly KUBE_NODE_BINARIES_WIN=("${KUBE_NODE_BINARIES[@]/%/.exe}")
 
-if [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
+if [[ -n "${KUBE_BUILD_PLATFORMS:-}" ]]; then
+  readonly KUBE_SERVER_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
+  readonly KUBE_NODE_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
+  readonly KUBE_TEST_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
+  readonly KUBE_CLIENT_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
+elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
   readonly KUBE_SERVER_PLATFORMS=(linux/amd64)
   readonly KUBE_NODE_PLATFORMS=(linux/amd64)
   if [[ "${KUBE_BUILDER_OS:-}" == "darwin"* ]]; then
