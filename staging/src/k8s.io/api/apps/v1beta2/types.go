@@ -315,10 +315,6 @@ type DeploymentSpec struct {
 	// +optional
 	Paused bool `json:"paused,omitempty" protobuf:"varint,7,opt,name=paused"`
 
-	// The config this deployment is rolling back to. Will be cleared after rollback is done.
-	// +optional
-	RollbackTo *RollbackConfig `json:"rollbackTo,omitempty" protobuf:"bytes,8,opt,name=rollbackTo"`
-
 	// The maximum time in seconds for a deployment to make progress before it
 	// is considered to be failed. The deployment controller will continue to
 	// process failed deployments and a condition with a ProgressDeadlineExceeded
@@ -327,28 +323,6 @@ type DeploymentSpec struct {
 	// deployments. Note that progress will not be estimated during the time a
 	// deployment is paused. Defaults to 600s.
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
-// DeploymentRollback stores the information required to rollback a deployment.
-type DeploymentRollback struct {
-	metav1.TypeMeta `json:",inline"`
-	// Required: This must match the Name of a deployment.
-	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-	// The annotations to be updated to a deployment
-	// +optional
-	UpdatedAnnotations map[string]string `json:"updatedAnnotations,omitempty" protobuf:"bytes,2,rep,name=updatedAnnotations"`
-	// The config of this deployment rollback.
-	RollbackTo RollbackConfig `json:"rollbackTo" protobuf:"bytes,3,opt,name=rollbackTo"`
-}
-
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
-type RollbackConfig struct {
-	// The revision to rollback to. If set to 0, rollback to the last revision.
-	// +optional
-	Revision int64 `json:"revision,omitempty" protobuf:"varint,1,opt,name=revision"`
 }
 
 const (
