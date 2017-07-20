@@ -73,7 +73,6 @@ BASH_TARGETS="
 	update-federation-swagger-spec
 	update-federation-generated-swagger-docs
 	update-federation-api-reference-docs
-	update-staging-client-go
 	update-staging-godeps
 	update-bazel"
 
