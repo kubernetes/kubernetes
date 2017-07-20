@@ -30,6 +30,7 @@ from shlex import split
 from subprocess import check_call
 from subprocess import check_output
 from subprocess import CalledProcessError
+from time import sleep
 
 from charms import layer
 from charms.layer import snap
@@ -323,7 +324,36 @@ def idle_status(kube_api, kube_control):
         msg = 'WARN: cannot change service-cidr, still using ' + service_cidr()
         hookenv.status_set('active', msg)
     else:
-        hookenv.status_set('active', 'Kubernetes master running.')
+        # All services should be up and running at this point. Double-check...
+        failing_services = master_services_down()
+        if len(failing_services) == 0:
+            hookenv.status_set('active', 'Kubernetes master running.')
+        else:
+            msg = 'Stopped services: {}'.format(','.join(failing_services))
+            hookenv.status_set('waiting', msg)
+
+
+def master_services_down():
+    """Ensure master services are up and running.
+    Try to restart any failing services once.
+
+    Return: list of failing services"""
+    services = ['kube-apiserver',
+                'kube-controller-manager',
+                'kube-scheduler']
+    for service in services:
+        daemon = 'snap.{}.daemon'.format(service)
+        if not host.service_running(daemon):
+            hookenv.log("Service {} was down. Starting it.".format(daemon))
+            host.service_start(daemon)
+            sleep(10)
+
+    failing_services = []
+    for service in services:
+        daemon = 'snap.{}.daemon'.format(service)
+        if not host.service_running(daemon):
+            failing_services.append(service)
+    return failing_services
 
 
 @when('etcd.available', 'tls_client.server.certificate.saved',
