@@ -188,7 +188,7 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					NodeSecurityGroupID:  "b41d28c2-d02f-4e1e-8ffb-23b8e4f5c144",
 				},
 			},
-			expectedError: fmt.Errorf("subnet-id not set in cloud provider config"),
+			expectedError: nil,
 		},
 		{
 			name: "test3",

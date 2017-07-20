@@ -589,6 +589,10 @@ func nodeAddressForLB(node *v1.Node) (string, error) {
 func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
 
+	if len(lbaas.opts.SubnetId) == 0 {
+		return nil, fmt.Errorf("subnet-id not set in cloud provider config")
+	}
+
 	ports := apiService.Spec.Ports
 	if len(ports) == 0 {
 		return nil, fmt.Errorf("no ports provided to openstack load balancer")
@@ -950,6 +954,10 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
+	if len(lbaas.opts.SubnetId) == 0 {
+		return fmt.Errorf("subnet-id not set in cloud provider config")
+	}
+
 	ports := service.Spec.Ports
 	if len(ports) == 0 {
 		return fmt.Errorf("no ports provided to openstack load balancer")
@@ -1224,6 +1232,10 @@ func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *v1.Service) (*v1
 
 func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
+
+	if len(lb.opts.SubnetId) == 0 {
+		return nil, fmt.Errorf("subnet-id not set in cloud provider config")
+	}
 
 	ports := apiService.Spec.Ports
 	if len(ports) > 1 {
