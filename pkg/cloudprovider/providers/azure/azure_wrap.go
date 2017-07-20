@@ -132,9 +132,12 @@ func (az *Cloud) getPublicIPAddress(name string) (pip network.PublicIPAddress, e
 
 func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet network.Subnet, exists bool, err error) {
 	var realErr error
-
+	resourceGroup := az.ResourceGroup
+	if len(az.VnetResourceGroup) > 0 {
+		resourceGroup = az.VnetResourceGroup
+	}
 	az.operationPollRateLimiter.Accept()
-	subnet, err = az.SubnetsClient.Get(az.ResourceGroup, virtualNetworkName, subnetName, "")
+	subnet, err = az.SubnetsClient.Get(resourceGroup, virtualNetworkName, subnetName, "")
 
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
