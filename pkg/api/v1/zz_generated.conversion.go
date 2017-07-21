@@ -5101,7 +5101,7 @@ func autoConvert_v1_Taint_To_api_Taint(in *v1.Taint, out *api.Taint, s conversio
 	out.Key = in.Key
 	out.Value = in.Value
 	out.Effect = api.TaintEffect(in.Effect)
-	out.TimeAdded = in.TimeAdded
+	out.TimeAdded = (*meta_v1.Time)(unsafe.Pointer(in.TimeAdded))
 	return nil
 }
 
@@ -5114,7 +5114,7 @@ func autoConvert_api_Taint_To_v1_Taint(in *api.Taint, out *v1.Taint, s conversio
 	out.Key = in.Key
 	out.Value = in.Value
 	out.Effect = v1.TaintEffect(in.Effect)
-	out.TimeAdded = in.TimeAdded
+	out.TimeAdded = (*meta_v1.Time)(unsafe.Pointer(in.TimeAdded))
 	return nil
 }
 
