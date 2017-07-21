@@ -21,6 +21,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"reflect"
+	"sort"
 	"strings"
 	"syscall"
 	"testing"
@@ -317,5 +319,47 @@ func TestDumpReaderToFile(t *testing.T) {
 	stringData := string(data)
 	if stringData != testString {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
+	}
+}
+
+func TestValidArgumentsAndAliases(t *testing.T) {
+	factory := NewFactory(nil)
+	expectedValidArguments := []string{
+		"status", "service", "horizontalpodautoscaler", "daemonset",
+		"configmap", "componentstatus", "endpoints",
+		"serviceaccount", "persistentvolume", "rolebinding", "controllerrevision",
+		"clusterrolebinding", "replicationcontroller", "pod", "persistentvolumeclaim",
+		"thirdpartyresource", "certificatesigningrequest", "statefulset", "node",
+		"networkpolicy", "storageclass", "event", "poddisruptionbudget",
+		"namespace", "job", "podtemplate", "cluster",
+		"cronjob", "ingress", "secret", "deployment",
+		"podsecuritypolicy", "replicaset",
+	}
+	expectedArgumentAliases := []string{
+		"statuses", "services", "horizontalpodautoscalers", "daemonsets",
+		"configmaps", "networkpolicies", "componentstatuses", "endpoints",
+		"serviceaccounts", "persistentvolumes", "rolebindings", "controllerrevisions",
+		"clusterrolebindings", "replicationcontrollers", "pods", "persistentvolumeclaims",
+		"thirdpartyresources", "certificatesigningrequests", "statefulsets", "nodes",
+		"storageclasses", "events", "poddisruptionbudgets",
+		"namespaces", "jobs", "podtemplates", "clusters",
+		"cronjobs", "ingresses", "secrets", "deployments",
+		"podsecuritypolicies", "replicasets",
+		"cm", "cs", "ep", "ev", "no", "ns", "po", "pvc", "pv", "rc", "rs",
+		"sa", "svc", "hpa", "csr", "pdb", "deploy", "ds", "hpa", "ing", "netpol",
+	}
+
+	validArguments, argumentAliases := ValidArgumentsAndAliases(factory)
+
+	sort.Strings(expectedValidArguments)
+	sort.Strings(validArguments)
+	if !(reflect.DeepEqual(expectedValidArguments, validArguments)) {
+		t.Errorf("unexpected valid arguments.\nexpected:\n%v\ngot:\n%v\n", expectedValidArguments, validArguments)
+	}
+
+	sort.Strings(expectedArgumentAliases)
+	sort.Strings(argumentAliases)
+	if !(reflect.DeepEqual(expectedArgumentAliases, argumentAliases)) {
+		t.Errorf("unexpected valid arguments.\nexpected:\n%v\ngot:\n%v\n", expectedArgumentAliases, argumentAliases)
 	}
 }

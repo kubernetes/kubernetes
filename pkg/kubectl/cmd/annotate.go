@@ -36,7 +36,6 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // AnnotateOptions have the data required to perform the annotate operation
@@ -98,17 +97,7 @@ var (
 
 func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &AnnotateOptions{}
-
-	// retrieve a list of handled resources from printer as valid args
-	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, printers.PrintOptions{
-		ColumnLabels: []string{},
-	})
-	cmdutil.CheckErr(err)
-	if p != nil {
-		validArgs = p.HandledResources()
-		argAliases = kubectl.ResourceAliases(validArgs)
-	}
+	validArguments, argumentAliases := cmdutil.ValidArgumentsAndAliases(f)
 
 	cmd := &cobra.Command{
 		Use:     "annotate [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
@@ -124,8 +113,8 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			}
 			cmdutil.CheckErr(options.RunAnnotate(f, cmd))
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: argAliases,
+		ValidArgs:  validArguments,
+		ArgAliases: argumentAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().Bool("overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")

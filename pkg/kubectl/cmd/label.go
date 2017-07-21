@@ -34,12 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // LabelOptions have the data required to perform the label operation
@@ -96,17 +94,7 @@ var (
 
 func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &LabelOptions{}
-
-	// retrieve a list of handled resources from printer as valid args
-	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, printers.PrintOptions{
-		ColumnLabels: []string{},
-	})
-	cmdutil.CheckErr(err)
-	if p != nil {
-		validArgs = p.HandledResources()
-		argAliases = kubectl.ResourceAliases(validArgs)
-	}
+	validArguments, argumentAliases := cmdutil.ValidArgumentsAndAliases(f)
 
 	cmd := &cobra.Command{
 		Use:     "label [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
@@ -122,8 +110,8 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			}
 			cmdutil.CheckErr(options.RunLabel(f, cmd))
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: argAliases,
+		ValidArgs:  validArguments,
+		ArgAliases: argumentAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().Bool("overwrite", false, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
