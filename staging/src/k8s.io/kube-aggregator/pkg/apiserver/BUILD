@@ -17,6 +17,7 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//vendor/golang.org/x/net/websocket:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
