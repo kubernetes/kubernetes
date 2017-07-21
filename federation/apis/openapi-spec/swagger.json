@@ -13246,6 +13246,11 @@
       "kind": "DeleteOptions"
      },
      {
+      "group": "apps",
+      "version": "v1beta2",
+      "kind": "DeleteOptions"
+     },
+     {
       "group": "authentication.k8s.io",
       "version": "v1",
       "kind": "DeleteOptions"
@@ -13736,6 +13741,11 @@
      {
       "group": "apps",
       "version": "v1beta1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "apps",
+      "version": "v1beta2",
       "kind": "WatchEvent"
      },
      {

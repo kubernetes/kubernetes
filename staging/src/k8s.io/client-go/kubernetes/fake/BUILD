@@ -18,6 +18,7 @@ go_library(
     deps = [
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/apps/v1beta2:go_default_library",
         "//vendor/k8s.io/api/authentication/v1:go_default_library",
         "//vendor/k8s.io/api/authentication/v1beta1:go_default_library",
         "//vendor/k8s.io/api/authorization/v1:go_default_library",
@@ -49,6 +50,8 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1/fake:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/apps/v1beta1/fake:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/typed/apps/v1beta2:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/typed/apps/v1beta2/fake:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1/fake:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1beta1:go_default_library",

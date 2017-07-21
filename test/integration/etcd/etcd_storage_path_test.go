@@ -147,6 +147,19 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	},
 	// --
 
+	// k8s.io/kubernetes/pkg/apis/apps/v1beta2
+	gvr("apps", "v1beta2", "statefulsets"): {
+		stub:             `{"metadata": {"name": "ss2"}, "spec": {"template": {"metadata": {"labels": {"a": "b"}}}}}`,
+		expectedEtcdPath: "/registry/statefulsets/etcdstoragepathtestnamespace/ss2",
+		expectedGVK:      gvkP("apps", "v1beta1", "StatefulSet"),
+	},
+	gvr("apps", "v1beta2", "deployments"): {
+		stub:             `{"metadata": {"name": "deployment3"}, "spec": {"selector": {"matchLabels": {"f": "z"}}, "template": {"metadata": {"labels": {"f": "z"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container6"}]}}}}`,
+		expectedEtcdPath: "/registry/deployments/etcdstoragepathtestnamespace/deployment3",
+		expectedGVK:      gvkP("extensions", "v1beta1", "Deployment"),
+	},
+	// --
+
 	// k8s.io/kubernetes/pkg/apis/autoscaling/v1
 	gvr("autoscaling", "v1", "horizontalpodautoscalers"): {
 		stub:             `{"metadata": {"name": "hpa2"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
@@ -359,6 +372,11 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	// k8s.io/kubernetes/pkg/apis/apps/v1beta1
 	gvr("apps", "v1beta1", "scales"),              // not stored in etcd, part of kapiv1.ReplicationController
 	gvr("apps", "v1beta1", "deploymentrollbacks"), // used to rollback deployment, not stored in etcd
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/apps/v1beta2
+	gvr("apps", "v1beta2", "scales"),              // not stored in etcd, part of kapiv1.ReplicationController
+	gvr("apps", "v1beta2", "deploymentrollbacks"), // used to rollback deployment, not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/batch/v2alpha1

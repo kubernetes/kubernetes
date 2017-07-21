@@ -94,7 +94,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			*(ss.Spec.Replicas) = 3
 			framework.SetStatefulSetInitializedAnnotation(ss, "false")
 
-			_, err := c.Apps().StatefulSets(ns).Create(ss)
+			_, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			sst := framework.NewStatefulSetTester(c)
@@ -135,7 +135,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Replace ss with the one returned from Create() so it has the UID.
 			// Save Kind since it won't be populated in the returned ss.
 			kind := ss.Kind
-			ss, err := c.Apps().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			ss.Kind = kind
 
@@ -216,7 +216,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			*(ss.Spec.Replicas) = 2
 			framework.SetStatefulSetInitializedAnnotation(ss, "false")
 
-			_, err := c.Apps().StatefulSets(ns).Create(ss)
+			_, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			sst := framework.NewStatefulSetTester(c)
@@ -253,7 +253,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Port: intstr.IntOrString{IntVal: 80}}}}
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
-			ss, err := c.Apps().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst := framework.NewStatefulSetTester(c)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
@@ -381,7 +381,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						}()}
 				}(),
 			}
-			ss, err := c.Apps().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst := framework.NewStatefulSetTester(c)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
@@ -586,7 +586,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 				Type: apps.OnDeleteStatefulSetStrategyType,
 			}
-			ss, err := c.Apps().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			sst := framework.NewStatefulSetTester(c)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
@@ -673,7 +673,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Port: intstr.IntOrString{IntVal: 80}}}}
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
-			ss, err = c.Apps().StatefulSets(ns).Create(ss)
+			ss, err = c.AppsV1beta1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -748,7 +748,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			ss.Spec.PodManagementPolicy = apps.ParallelPodManagement
 			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
-			ss, err := c.Apps().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
@@ -811,7 +811,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			statefulPodContainer := &ss.Spec.Template.Spec.Containers[0]
 			statefulPodContainer.Ports = append(statefulPodContainer.Ports, conflictingPort)
 			ss.Spec.Template.Spec.NodeName = node.Name
-			_, err = f.ClientSet.Apps().StatefulSets(f.Namespace.Name).Create(ss)
+			_, err = f.ClientSet.AppsV1beta1().StatefulSets(f.Namespace.Name).Create(ss)
 			framework.ExpectNoError(err)
 
 			By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)

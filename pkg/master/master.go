@@ -389,6 +389,8 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		authenticationv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
 		appsv1beta1.SchemeGroupVersion,
+		// TODO: enable apps/v1beta2 by default before 1.8 release, after the API changes are done
+		// appsv1beta2.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,
 		// Don't copy this pattern. We enable rbac/v1alpha1 and settings/v1laph1

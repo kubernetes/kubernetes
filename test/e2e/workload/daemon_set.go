@@ -870,7 +870,7 @@ func checkDaemonSetPodsLabels(podList *v1.PodList, hash, templateGeneration stri
 func listDaemonHistories(c clientset.Interface, ns string, label map[string]string) *apps.ControllerRevisionList {
 	selector := labels.Set(label).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	historyList, err := c.Apps().ControllerRevisions(ns).List(options)
+	historyList, err := c.AppsV1beta1().ControllerRevisions(ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(historyList.Items)).To(BeNumerically(">", 0))
 	return historyList
