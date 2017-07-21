@@ -81,7 +81,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
 	framework.ExpectNoError(framework.WaitForDeploymentStatusValid(c, deployment))
 
-	rs, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	rs, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	framework.ExpectNoError(err)
 	if rs == nil {
 		framework.ExpectNoError(fmt.Errorf("expected a new replica set for deployment %q, found none", deployment.Name))
@@ -108,7 +108,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
 	framework.ExpectNoError(framework.WaitForDeploymentStatus(c, deployment))
 
-	rs, err = deploymentutil.GetNewReplicaSet(deployment, c)
+	rs, err = deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	framework.ExpectNoError(err)
 	if rs == nil {
 		framework.ExpectNoError(fmt.Errorf("expected a new replica set for deployment %q", deployment.Name))
