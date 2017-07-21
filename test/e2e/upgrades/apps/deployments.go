@@ -141,7 +141,7 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	framework.ExpectNoError(framework.WaitForDeploymentStatus(c, deployment))
 
 	By(fmt.Sprintf("Checking that replica sets for deployment %q are the same as prior to the upgrade", t.updatedD.Name))
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(t.updatedD, c)
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(t.updatedD, c.ExtensionsV1beta1())
 	framework.ExpectNoError(err)
 	if newRS == nil {
 		By(t.spewDeploymentAndReplicaSets(newRS, allOldRSs))

@@ -132,7 +132,7 @@ func failureTrap(c clientset.Interface, ns string) {
 		d := deployments.Items[i]
 
 		framework.Logf(spew.Sprintf("Deployment %q:\n%+v\n", d.Name, d))
-		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(&d, c)
+		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(&d, c.ExtensionsV1beta1())
 		if err != nil {
 			framework.Logf("Could not list ReplicaSets for Deployment %q: %v", d.Name, err)
 			return
@@ -887,7 +887,7 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	// There should be no old RSs (overlapping RS)
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
-	oldRSs, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c)
+	oldRSs, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(oldRSs)).Should(Equal(0))
 	Expect(len(allOldRSs)).Should(Equal(0))
@@ -1035,7 +1035,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	framework.Logf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment))
 	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
 
-	oldRSs, _, rs, err := deploymentutil.GetAllReplicaSets(deployment, c)
+	oldRSs, _, rs, err := deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 
 	for _, rs := range append(oldRSs, rs) {
@@ -1095,7 +1095,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	framework.Logf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment))
 	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
 
-	oldRSs, _, rs, err = deploymentutil.GetAllReplicaSets(deployment, c)
+	oldRSs, _, rs, err = deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 
 	for _, rs := range append(oldRSs, rs) {
