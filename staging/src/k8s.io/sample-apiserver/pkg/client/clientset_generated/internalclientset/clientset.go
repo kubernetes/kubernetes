@@ -33,12 +33,12 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*wardleinternalversion.WardleClient
+	wardle *wardleinternalversion.WardleClient
 }
 
 // Wardle retrieves the WardleClient
 func (c *Clientset) Wardle() wardleinternalversion.WardleInterface {
-	return c.WardleClient
+	return c.wardle
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -57,7 +57,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.WardleClient, err = wardleinternalversion.NewForConfig(&configShallowCopy)
+	cs.wardle, err = wardleinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.WardleClient = wardleinternalversion.NewForConfigOrDie(c)
+	cs.wardle = wardleinternalversion.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -83,7 +83,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.WardleClient = wardleinternalversion.New(c)
+	cs.wardle = wardleinternalversion.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
