@@ -37,8 +37,8 @@ var (
 )
 
 func init() {
-	if v, err := utilversion.ParseGeneric("1.7.0"); err != nil {
-		panic(err)
+	if v, err := utilversion.ParseGeneric("1.7.2"); err != nil {
+		glog.Fatalf("Failed to parse version for minNodesHealthCheckVersion: %v", err)
 	} else {
 		minNodesHealthCheckVersion = v
 	}
