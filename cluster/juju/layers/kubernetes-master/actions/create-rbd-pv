@@ -23,6 +23,7 @@ from subprocess import check_call
 from subprocess import check_output
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
+import json
 import re
 import os
 import sys
@@ -179,14 +180,13 @@ def get_monitors():
 def get_available_space():
     ''' Determine the space available in the RBD pool. Throw an exception if
     the RBD pool ('rbd') isn't found. '''
-    command = ['ceph', 'df']
+    command = 'ceph df -f json'.split()
     debug_command(command)
     out = check_output(command).decode('utf-8')
-    for line in out.splitlines():
-        stripped = line.strip()
-        if stripped.startswith('rbd'):
-            M = stripped.split()[-2].replace('M', '')
-            return int(M)
+    data = json.loads(out)
+    for pool in data['pools']:
+        if pool['name'] == 'rbd':
+            return int(pool['stats']['max_avail'] / (1024 * 1024))
     raise UnknownAvailableSpaceException('Unable to determine available space.')  # noqa
 
 
