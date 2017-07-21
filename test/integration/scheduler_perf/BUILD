@@ -53,6 +53,7 @@ go_test(
         "//test/utils:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
     ],

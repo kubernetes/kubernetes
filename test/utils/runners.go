@@ -1003,7 +1003,7 @@ func makeCreatePod(client clientset.Interface, namespace string, podTemplate *v1
 	return fmt.Errorf("Terminal error while creating pod, won't retry: %v", err)
 }
 
-func createPod(client clientset.Interface, namespace string, podCount int, podTemplate *v1.Pod) error {
+func CreatePod(client clientset.Interface, namespace string, podCount int, podTemplate *v1.Pod) error {
 	var createError error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
@@ -1050,7 +1050,7 @@ func createController(client clientset.Interface, controllerName, namespace stri
 
 func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
 	return func(client clientset.Interface, namespace string, podCount int) error {
-		return createPod(client, namespace, podCount, podTemplate)
+		return CreatePod(client, namespace, podCount, podTemplate)
 	}
 }
 
@@ -1076,7 +1076,7 @@ func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCrea
 		if err := createController(client, controllerName, namespace, podCount, basePod); err != nil {
 			return err
 		}
-		return createPod(client, namespace, podCount, basePod)
+		return CreatePod(client, namespace, podCount, basePod)
 	}
 }
 
