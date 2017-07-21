@@ -576,9 +576,13 @@ function create-node-template() {
 
   local local_ssds=""
   if [[ ! -z ${NODE_LOCAL_SSDS+x} ]]; then
+    # The NODE_LOCAL_SSDS check below fixes issue #49171
+    # Some versions of seq will count down from 1 if "seq 0" is specified
+    if [[ ${NODE_LOCAL_SSDS} -ge 1 ]]; then
       for i in $(seq ${NODE_LOCAL_SSDS}); do
-          local_ssds="$local_ssds--local-ssd=interface=SCSI "
+        local_ssds="$local_ssds--local-ssd=interface=SCSI "
       done
+    fi
   fi
 
   local network=$(make-gcloud-network-argument \
