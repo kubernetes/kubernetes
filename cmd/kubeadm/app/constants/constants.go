@@ -148,7 +148,7 @@ const (
 	MinExternalEtcdVersion = "3.0.14"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.0.17"
+	DefaultEtcdVersion = "3.1.10"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
