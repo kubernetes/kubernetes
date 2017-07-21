@@ -3813,7 +3813,7 @@
    },
    "/api/v1/namespaces/{namespace}/pods/{name}/binding": {
     "post": {
-     "description": "create binding of a Binding",
+     "description": "create binding of a Pod",
      "consumes": [
       "*/*"
      ],
@@ -3828,7 +3828,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedBindingBinding",
+     "operationId": "createCoreV1NamespacedPodBinding",
      "parameters": [
       {
        "name": "body",
@@ -3885,7 +3885,7 @@
    },
    "/api/v1/namespaces/{namespace}/pods/{name}/eviction": {
     "post": {
-     "description": "create eviction of an Eviction",
+     "description": "create eviction of a Pod",
      "consumes": [
       "*/*"
      ],
@@ -3900,7 +3900,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedEvictionEviction",
+     "operationId": "createCoreV1NamespacedPodEviction",
      "parameters": [
       {
        "name": "body",
@@ -5888,7 +5888,7 @@
    },
    "/api/v1/namespaces/{namespace}/replicationcontrollers/{name}/scale": {
     "get": {
-     "description": "read scale of the specified Scale",
+     "description": "read scale of the specified ReplicationController",
      "consumes": [
       "*/*"
      ],
@@ -5903,7 +5903,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedScaleScale",
+     "operationId": "readCoreV1NamespacedReplicationControllerScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -5923,7 +5923,7 @@
      }
     },
     "put": {
-     "description": "replace scale of the specified Scale",
+     "description": "replace scale of the specified ReplicationController",
      "consumes": [
       "*/*"
      ],
@@ -5938,7 +5938,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedScaleScale",
+     "operationId": "replaceCoreV1NamespacedReplicationControllerScale",
      "parameters": [
       {
        "name": "body",
@@ -5968,7 +5968,7 @@
      }
     },
     "patch": {
-     "description": "partially update scale of the specified Scale",
+     "description": "partially update scale of the specified ReplicationController",
      "consumes": [
       "application/json-patch+json",
       "application/merge-patch+json",
@@ -5985,7 +5985,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedScaleScale",
+     "operationId": "patchCoreV1NamespacedReplicationControllerScale",
      "parameters": [
       {
        "name": "body",
@@ -20501,7 +20501,7 @@
    },
    "/apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/rollback": {
     "post": {
-     "description": "create rollback of a DeploymentRollback",
+     "description": "create rollback of a Deployment",
      "consumes": [
       "*/*"
      ],
@@ -20516,7 +20516,7 @@
      "tags": [
       "apps_v1beta1"
      ],
-     "operationId": "createAppsV1beta1NamespacedDeploymentRollbackRollback",
+     "operationId": "createAppsV1beta1NamespacedDeploymentRollback",
      "parameters": [
       {
        "name": "body",
@@ -20573,7 +20573,7 @@
    },
    "/apis/apps/v1beta1/namespaces/{namespace}/deployments/{name}/scale": {
     "get": {
-     "description": "read scale of the specified Scale",
+     "description": "read scale of the specified Deployment",
      "consumes": [
       "*/*"
      ],
@@ -20588,7 +20588,7 @@
      "tags": [
       "apps_v1beta1"
      ],
-     "operationId": "readAppsV1beta1NamespacedScaleScale",
+     "operationId": "readAppsV1beta1NamespacedDeploymentScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -20608,7 +20608,7 @@
      }
     },
     "put": {
-     "description": "replace scale of the specified Scale",
+     "description": "replace scale of the specified Deployment",
      "consumes": [
       "*/*"
      ],
@@ -20623,7 +20623,7 @@
      "tags": [
       "apps_v1beta1"
      ],
-     "operationId": "replaceAppsV1beta1NamespacedScaleScale",
+     "operationId": "replaceAppsV1beta1NamespacedDeploymentScale",
      "parameters": [
       {
        "name": "body",
@@ -20653,7 +20653,7 @@
      }
     },
     "patch": {
-     "description": "partially update scale of the specified Scale",
+     "description": "partially update scale of the specified Deployment",
      "consumes": [
       "application/json-patch+json",
       "application/merge-patch+json",
@@ -20670,7 +20670,7 @@
      "tags": [
       "apps_v1beta1"
      ],
-     "operationId": "patchAppsV1beta1NamespacedScaleScale",
+     "operationId": "patchAppsV1beta1NamespacedDeploymentScale",
      "parameters": [
       {
        "name": "body",
@@ -30553,7 +30553,7 @@
    },
    "/apis/extensions/v1beta1/namespaces/{namespace}/deployments/{name}/rollback": {
     "post": {
-     "description": "create rollback of a DeploymentRollback",
+     "description": "create rollback of a Deployment",
      "consumes": [
       "*/*"
      ],
@@ -30568,7 +30568,7 @@
      "tags": [
       "extensions_v1beta1"
      ],
-     "operationId": "createExtensionsV1beta1NamespacedDeploymentRollbackRollback",
+     "operationId": "createExtensionsV1beta1NamespacedDeploymentRollback",
      "parameters": [
       {
        "name": "body",
@@ -30625,7 +30625,7 @@
    },
    "/apis/extensions/v1beta1/namespaces/{namespace}/deployments/{name}/scale": {
     "get": {
-     "description": "read scale of the specified Scale",
+     "description": "read scale of the specified Deployment",
      "consumes": [
       "*/*"
      ],
@@ -30640,7 +30640,7 @@
      "tags": [
       "extensions_v1beta1"
      ],
-     "operationId": "readExtensionsV1beta1NamespacedDeploymentsScale",
+     "operationId": "readExtensionsV1beta1NamespacedDeploymentScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -30660,7 +30660,7 @@
      }
     },
     "put": {
-     "description": "replace scale of the specified Scale",
+     "description": "replace scale of the specified Deployment",
      "consumes": [
       "*/*"
      ],
@@ -30675,7 +30675,7 @@
      "tags": [
       "extensions_v1beta1"
      ],
-     "operationId": "replaceExtensionsV1beta1NamespacedDeploymentsScale",
+     "operationId": "replaceExtensionsV1beta1NamespacedDeploymentScale",
      "parameters": [
       {
        "name": "body",
@@ -30705,7 +30705,7 @@
      }
     },
     "patch": {
-     "description": "partially update scale of the specified Scale",
+     "description": "partially update scale of the specified Deployment",
      "consumes": [
       "application/json-patch+json",
       "application/merge-patch+json",
@@ -30722,7 +30722,7 @@
      "tags": [
       "extensions_v1beta1"
      ],
-     "operationId": "patchExtensionsV1beta1NamespacedDeploymentsScale",
+     "operationId": "patchExtensionsV1beta1NamespacedDeploymentScale",
      "parameters": [
       {
        "name": "body",
@@ -32467,7 +32467,7 @@
    },
    "/apis/extensions/v1beta1/namespaces/{namespace}/replicasets/{name}/scale": {
     "get": {
-     "description": "read scale of the specified Scale",
+     "description": "read scale of the specified ReplicaSet",
      "consumes": [
       "*/*"
      ],
@@ -32482,7 +32482,7 @@
      "tags": [
       "extensions_v1beta1"
      ],
-     "operationId": "readExtensionsV1beta1NamespacedReplicasetsScale",
+     "operationId": "readExtensionsV1beta1NamespacedReplicaSetScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -32502,7 +32502,7 @@
      }
     },
     "put": {
-     "description": "replace scale of the specified Scale",
+     "description": "replace scale of the specified ReplicaSet",
      "consumes": [
       "*/*"
      ],
@@ -32517,7 +32517,7 @@
      "tags": [
       "extensions_v1beta1"
      ],
-     "operationId": "replaceExtensionsV1beta1NamespacedReplicasetsScale",
+     "operationId": "replaceExtensionsV1beta1NamespacedReplicaSetScale",
      "parameters": [
       {
        "name": "body",
@@ -32547,7 +32547,7 @@
      }
     },
     "patch": {
-     "description": "partially update scale of the specified Scale",
+     "description": "partially update scale of the specified ReplicaSet",
      "consumes": [
       "application/json-patch+json",
       "application/merge-patch+json",
@@ -32564,7 +32564,7 @@
      "tags": [
       "extensions_v1beta1"
      ],
-     "operationId": "patchExtensionsV1beta1NamespacedReplicasetsScale",
+     "operationId": "patchExtensionsV1beta1NamespacedReplicaSetScale",
      "parameters": [
       {
        "name": "body",
@@ -32775,7 +32775,7 @@
    },
    "/apis/extensions/v1beta1/namespaces/{namespace}/replicationcontrollers/{name}/scale": {
     "get": {
-     "description": "read scale of the specified Scale",
+     "description": "read scale of the specified ReplicationControllerDummy",
      "consumes": [
       "*/*"
      ],
@@ -32790,7 +32790,7 @@
      "tags": [
       "extensions_v1beta1"
      ],
-     "operationId": "readExtensionsV1beta1NamespacedReplicationcontrollersScale",
+     "operationId": "readExtensionsV1beta1NamespacedReplicationControllerDummyScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -32810,7 +32810,7 @@
      }
     },
     "put": {
-     "description": "replace scale of the specified Scale",
+     "description": "replace scale of the specified ReplicationControllerDummy",
      "consumes": [
       "*/*"
      ],
@@ -32825,7 +32825,7 @@
      "tags": [
       "extensions_v1beta1"
      ],
-     "operationId": "replaceExtensionsV1beta1NamespacedReplicationcontrollersScale",
+     "operationId": "replaceExtensionsV1beta1NamespacedReplicationControllerDummyScale",
      "parameters": [
       {
        "name": "body",
@@ -32855,7 +32855,7 @@
      }
     },
     "patch": {
-     "description": "partially update scale of the specified Scale",
+     "description": "partially update scale of the specified ReplicationControllerDummy",
      "consumes": [
       "application/json-patch+json",
       "application/merge-patch+json",
@@ -32872,7 +32872,7 @@
      "tags": [
       "extensions_v1beta1"
      ],
-     "operationId": "patchExtensionsV1beta1NamespacedReplicationcontrollersScale",
+     "operationId": "patchExtensionsV1beta1NamespacedReplicationControllerDummyScale",
      "parameters": [
       {
        "name": "body",
