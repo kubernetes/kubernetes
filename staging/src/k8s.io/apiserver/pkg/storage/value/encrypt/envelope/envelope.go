@@ -71,10 +71,12 @@ func NewEnvelopeTransformer(envelopeService Service, cacheSize int) (value.Trans
 
 // TransformFromStorage decrypts data encrypted by this transformer using envelope encryption.
 func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Context) ([]byte, bool, error) {
-	// Read the 16 bit length-of-DEK encoded at the start of the encrypted DEK.
+	// Read the 16 bit length-of-DEK encoded at the start of the encrypted DEK. 16 bits can
+	// represent a maximum key length of 65536 bytes. We are using a 256 bit key, whose
+	// length cannot fit in 8 bits (1 byte). Thus, we use 16 bits (2 bytes) to store the length.
 	keyLen := int(binary.BigEndian.Uint16(data[:2]))
 	if keyLen+2 > len(data) {
-		return []byte{}, false, fmt.Errorf("invalid data encountered by genvelope transformer, length longer than available bytes: %q", data)
+		return nil, false, fmt.Errorf("invalid data encountered by genvelope transformer, length longer than available bytes: %q", data)
 	}
 	encKey := string(data[2 : keyLen+2])
 	encData := data[2+keyLen:]
@@ -87,11 +89,11 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 	} else {
 		key, err := t.envelopeService.Decrypt(encKey)
 		if err != nil {
-			return []byte{}, false, fmt.Errorf("error while decrypting key: %q", err)
+			return nil, false, fmt.Errorf("error while decrypting key: %q", err)
 		}
 		transformer, err = t.addTransformer(encKey, key)
 		if err != nil {
-			return []byte{}, false, err
+			return nil, false, err
 		}
 	}
 	return transformer.TransformFromStorage(encData, context)
@@ -101,17 +103,17 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 func (t *envelopeTransformer) TransformToStorage(data []byte, context value.Context) ([]byte, error) {
 	newKey, err := generateKey(32)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	encKey, err := t.envelopeService.Encrypt(newKey)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	transformer, err := t.addTransformer(encKey, newKey)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	// Append the length of the encrypted DEK as the first 2 bytes.
@@ -139,7 +141,6 @@ func (t *envelopeTransformer) addTransformer(encKey string, key []byte) (value.T
 	if err != nil {
 		return nil, err
 	}
-
 	transformer := aestransformer.NewCBCTransformer(block)
 	t.transformers.Add(encKey, transformer)
 	return transformer, nil
@@ -150,7 +151,7 @@ func generateKey(length int) ([]byte, error) {
 	key := make([]byte, length)
 	_, err := rand.Read(key)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	return key, nil
