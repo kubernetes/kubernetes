@@ -114,7 +114,7 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 	// Do not log the output here, let the caller deal with the test output.
 	if err != nil {
 		aggErrs = append(aggErrs, err)
-		collectSystemLog(host, workspace)
+		collectSystemLog(host)
 	}
 
 	glog.V(2).Infof("Copying test artifacts from %q", host)
@@ -160,7 +160,7 @@ func getTestArtifacts(host, testDir string) error {
 
 // collectSystemLog is a temporary hack to collect system log when encountered on
 // unexpected error.
-func collectSystemLog(host, workspace string) {
+func collectSystemLog(host string) {
 	// Encountered an unexpected error. The remote test harness may not
 	// have finished retrieved and stored all the logs in this case. Try
 	// to get some logs for debugging purposes.
@@ -171,7 +171,7 @@ func collectSystemLog(host, workspace string) {
 		logPath  = fmt.Sprintf("/tmp/%s-%s", getTimestamp(), logName)
 		destPath = fmt.Sprintf("%s/%s-%s", *resultsDir, host, logName)
 	)
-	glog.V(2).Infof("Test failed unexpectedly. Attempting to retreiving system logs (only works for nodes with journald)")
+	glog.V(2).Infof("Test failed unexpectedly. Attempting to retrieving system logs (only works for nodes with journald)")
 	// Try getting the system logs from journald and store it to a file.
 	// Don't reuse the original test directory on the remote host because
 	// it could've be been removed if the node was rebooted.
