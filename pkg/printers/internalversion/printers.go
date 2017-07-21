@@ -60,8 +60,6 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	serviceColumns                = []string{"NAME", "TYPE", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
-	serviceWideColumns            = []string{"SELECTOR"}
 	ingressColumns                = []string{"NAME", "HOSTS", "ADDRESS", "PORTS", "AGE"}
 	statefulSetColumns            = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 	endpointColumns               = []string{"NAME", "ENDPOINTS", "AGE"}
@@ -196,8 +194,19 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(cronJobColumnDefinitions, printCronJob)
 	h.TableHandler(cronJobColumnDefinitions, printCronJobList)
 
-	h.Handler(serviceColumns, serviceWideColumns, printService)
-	h.Handler(serviceColumns, serviceWideColumns, printServiceList)
+	serviceColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Type", Type: "string", Description: apiv1.ServiceSpec{}.SwaggerDoc()["type"]},
+		{Name: "Cluster-IP", Type: "string", Description: apiv1.ServiceSpec{}.SwaggerDoc()["clusterIP"]},
+		{Name: "External-IP", Type: "string", Description: apiv1.ServiceSpec{}.SwaggerDoc()["externalIPs"]},
+		{Name: "Port(s)", Type: "string", Description: apiv1.ServiceSpec{}.SwaggerDoc()["ports"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Selector", Type: "string", Priority: 1, Description: apiv1.ServiceSpec{}.SwaggerDoc()["selector"]},
+	}
+
+	h.TableHandler(serviceColumnDefinitions, printService)
+	h.TableHandler(serviceColumnDefinitions, printServiceList)
+
 	h.Handler(ingressColumns, nil, printIngress)
 	h.Handler(ingressColumns, nil, printIngressList)
 	h.Handler(statefulSetColumns, nil, printStatefulSet)
@@ -719,54 +728,39 @@ func makePortString(ports []api.ServicePort) string {
 	return strings.Join(pieces, ",")
 }
 
-func printService(svc *api.Service, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, svc.Name, options.WithKind)
-	namespace := svc.Namespace
-	svcType := svc.Spec.Type
-	internalIP := svc.Spec.ClusterIP
+func printService(obj *api.Service, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	svcType := obj.Spec.Type
+	internalIP := obj.Spec.ClusterIP
 	if len(internalIP) == 0 {
 		internalIP = "<none>"
 	}
-	externalIP := getServiceExternalIP(svc, options.Wide)
-	svcPorts := makePortString(svc.Spec.Ports)
+	externalIP := getServiceExternalIP(obj, options.Wide)
+	svcPorts := makePortString(obj.Spec.Ports)
 	if len(svcPorts) == 0 {
 		svcPorts = "<none>"
 	}
 
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
-	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s",
-		name,
-		string(svcType),
-		internalIP,
-		externalIP,
-		svcPorts,
-		translateTimestamp(svc.CreationTimestamp),
-	); err != nil {
-		return err
-	}
+	row.Cells = append(row.Cells, obj.Name, string(svcType), internalIP, externalIP, svcPorts, translateTimestamp(obj.CreationTimestamp))
 	if options.Wide {
-		if _, err := fmt.Fprintf(w, "\t%s", labels.FormatLabels(svc.Spec.Selector)); err != nil {
-			return err
-		}
+		row.Cells = append(row.Cells, labels.FormatLabels(obj.Spec.Selector))
 	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(svc.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, svc.Labels))
-	return err
+
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printServiceList(list *api.ServiceList, w io.Writer, options printers.PrintOptions) error {
-	for _, svc := range list.Items {
-		if err := printService(&svc, w, options); err != nil {
-			return err
+func printServiceList(list *api.ServiceList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printService(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 // backendStringer behaves just like a string interface and converts the given backend to a string.
