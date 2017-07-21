@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"golang.org/x/net/websocket"
@@ -301,16 +302,16 @@ func TestProxyUpgrade(t *testing.T) {
 	for k, tc := range testcases {
 		tcName := k
 		path := "/apis/" + tc.APIService.Spec.Group + "/" + tc.APIService.Spec.Version + "/foo"
-		called := false
+		timesCalled := int32(0)
 
 		func() { // Cleanup after each test case.
 			backendHandler := http.NewServeMux()
 			backendHandler.Handle(path, websocket.Handler(func(ws *websocket.Conn) {
+				atomic.AddInt32(&timesCalled, 1)
 				defer ws.Close()
 				body := make([]byte, 5)
 				ws.Read(body)
 				ws.Write([]byte("hello " + string(body)))
-				called = true
 			}))
 
 			backendServer := httptest.NewUnstartedServer(backendHandler)
@@ -324,7 +325,7 @@ func TestProxyUpgrade(t *testing.T) {
 			defer backendServer.Close()
 
 			defer func() {
-				if called != tc.ExpectCalled {
+				if called := atomic.LoadInt32(&timesCalled) > 0; called != tc.ExpectCalled {
 					t.Errorf("%s: expected called=%v, got %v", tcName, tc.ExpectCalled, called)
 				}
 			}()
