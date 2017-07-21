@@ -1000,7 +1000,11 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	err = dsc.manage(ds, hash)
 	if err != nil {
 		return err
+	} else {
+		dsc.enqueue(ds)
+		return dsc.updateDaemonSetStatus(ds, hash)
 	}
+
 
 	// Process rolling updates if we're ready.
 	if dsc.expectations.SatisfiedExpectations(dsKey) {
@@ -1012,6 +1016,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		if err != nil {
 			return err
 		}
+
 	}
 
 	err = dsc.cleanupHistory(ds, old)
@@ -1021,6 +1026,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 
 	return dsc.updateDaemonSetStatus(ds, hash)
 }
+
 
 func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *extensions.DaemonSet) ([]algorithm.PredicateFailureReason, *schedulercache.NodeInfo, error) {
 	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
