@@ -84,7 +84,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		Admission:            genericoptions.NewAdmissionOptions(),
 		Authentication:       kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
 		Authorization:        kubeoptions.NewBuiltInAuthorizationOptions(),
-		CloudProvider:        kubeoptions.NewCloudProviderOptions(),
 		StorageSerialization: kubeoptions.NewStorageSerializationOptions(),
 		APIEnablement:        kubeoptions.NewAPIEnablementOptions(),
 
@@ -131,7 +130,6 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	s.Features.AddFlags(fs)
 	s.Authentication.AddFlags(fs)
 	s.Authorization.AddFlags(fs)
-	s.CloudProvider.AddFlags(fs)
 	s.StorageSerialization.AddFlags(fs)
 	s.APIEnablement.AddFlags(fs)
 	s.Admission.AddFlags(fs)
