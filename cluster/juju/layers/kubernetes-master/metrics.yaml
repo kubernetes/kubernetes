@@ -23,7 +23,7 @@ metrics:
   persistentvolume:
     type: gauge
     description: number of pv
-    command: /snap/bin/kubectl get pv --all-namespaces | tail -n+2 | wc -l
+    command: /snap/bin/kubectl get pv | tail -n+2 | wc -l
   persistentvolumeclaims:
     type: gauge
     description: number of claims
