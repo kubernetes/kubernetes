@@ -274,11 +274,21 @@ func (hp *hugePages) setupHugePages(dir string) error {
 
 // prepare mount options for hugetlbfs
 func (hp *hugePages) prepareMountOptions() []string {
-	return []string{
-		fmt.Sprintf("size=%s", hp.size),
-		fmt.Sprintf("pagesize=%s", hp.pageSize),
-		fmt.Sprintf("min_size=%s", hp.minSize),
+	mountOptions := []string{}
+
+	if hp.size != "" {
+		mountOptions = append(mountOptions, fmt.Sprintf("size=%s", hp.size))
 	}
+
+	if hp.pageSize != "" {
+		mountOptions = append(mountOptions, fmt.Sprintf("pagesize=%s", hp.pageSize))
+	}
+
+	if hp.minSize != "" {
+		mountOptions = append(mountOptions, fmt.Sprintf("min_size=%s", hp.minSize))
+	}
+
+	return mountOptions
 }
 
 // setupDir creates the directory with param constant

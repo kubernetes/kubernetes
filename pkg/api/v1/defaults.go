@@ -372,15 +372,3 @@ func SetDefaults_ScaleIOVolumeSource(obj *v1.ScaleIOVolumeSource) {
 		obj.FSType = "xfs"
 	}
 }
-
-func SetDefaults_HugePagesVolumeSource(obj *HugePagesVolumeSource) {
-	if obj.PageSize == "" {
-		obj.PageSize = "2M"
-	}
-	if obj.MaxSize == "" {
-		obj.MaxSize = obj.PageSize
-	}
-	if obj.MinSize == "" {
-		obj.MinSize = obj.PageSize
-	}
-}
