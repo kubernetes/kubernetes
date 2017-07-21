@@ -140,6 +140,12 @@ const ServiceAnnotationLoadBalancerBEProtocol = "service.beta.kubernetes.io/aws-
 // For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2"
 const ServiceAnnotationLoadBalancerAdditionalTags = "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags"
 
+// VolumeClaimAnnotationBlockStorageAdditionalTags is the annotation used on the volume
+// claim to specify a comma-separated list of key-value pairs which will be recorded as
+// additional tags in the EBS.
+// For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2"
+const VolumeClaimAnnotationBlockStorageAdditionalTags = "volume.beta.kubernetes.io/aws-block-storage-additional-resource-tags"
+
 const (
 	// volumeAttachmentConsecutiveErrorLimit is the number of consecutive errors we will ignore when waiting for a volume to attach/detach
 	volumeAttachmentStatusConsecutiveErrorLimit = 10
@@ -3442,4 +3448,32 @@ func recordAwsMetric(actionName string, timeTaken float64, err error) {
 		awsApiMetric.With(prometheus.Labels{"request": actionName}).Observe(timeTaken)
 	}
 
+}
+
+// GetAdditionalTagsFromAnnotation converts the comma separated list of key-value
+// pairs in the "AdditionalTags" annotation and returns it as a map.
+func GetAdditionalTagsFromAnnotation(annotations map[string]string, annotationName string) map[string]string {
+	additionalTags := make(map[string]string)
+	if additionalTagsList, ok := annotations[annotationName]; ok {
+		additionalTagsList = strings.TrimSpace(additionalTagsList)
+
+		// Break up list of "Key1=Val,Key2=Val2"
+		tagList := strings.Split(additionalTagsList, ",")
+
+		// Break up "Key=Val"
+		for _, tagSet := range tagList {
+			tag := strings.Split(strings.TrimSpace(tagSet), "=")
+
+			// Accept "Key=val" or "Key=" or just "Key"
+			if len(tag) >= 2 && len(tag[0]) != 0 {
+				// There is a key and a value, so save it
+				additionalTags[tag[0]] = tag[1]
+			} else if len(tag) == 1 && len(tag[0]) != 0 {
+				// Just "Key"
+				additionalTags[tag[0]] = ""
+			}
+		}
+	}
+
+	return additionalTags
 }

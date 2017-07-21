@@ -1283,7 +1283,7 @@ func TestProxyProtocolEnabled(t *testing.T) {
 	assert.False(t, result, "did not expect to find %s in %s", ProxyProtocolPolicyName, policies)
 }
 
-func TestGetLoadBalancerAdditionalTags(t *testing.T) {
+func TestGetAdditionalTagsFromAnnotation(t *testing.T) {
 	tagTests := []struct {
 		Annotations map[string]string
 		Tags        map[string]string
@@ -1334,7 +1334,7 @@ func TestGetLoadBalancerAdditionalTags(t *testing.T) {
 	}
 
 	for _, tagTest := range tagTests {
-		result := getLoadBalancerAdditionalTags(tagTest.Annotations)
+		result := GetAdditionalTagsFromAnnotation(tagTest.Annotations, ServiceAnnotationLoadBalancerAdditionalTags)
 		for k, v := range result {
 			if len(result) != len(tagTest.Tags) {
 				t.Errorf("incorrect expected length: %v != %v", result, tagTest.Tags)
