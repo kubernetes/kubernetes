@@ -35,8 +35,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// CustomArgs is used tby the go2idl framework to pass args specific to this
-// generator.
+// CustomArgs is used by the gengo framework to pass args specific to this generator.
 type CustomArgs struct {
 	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
 	// Skipunsafe indicates whether to generate unsafe conversions to improve the efficiency
