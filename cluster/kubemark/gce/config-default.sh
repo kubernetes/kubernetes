@@ -48,7 +48,7 @@ CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.224.0.0/11}"
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
-# Set etcd image (e.g. 3.0.17-alpha.1) and version (e.g. 3.0.17) if you need
+# Set etcd image (e.g. gcr.io/google_containers/etcd) and version (e.g. 3.1.10) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_VERSION="${TEST_ETCD_VERSION:-}"
