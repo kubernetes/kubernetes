@@ -30,7 +30,6 @@ from shlex import split
 from subprocess import check_call
 from subprocess import check_output
 from subprocess import CalledProcessError
-from time import sleep
 
 from charms import layer
 from charms.layer import snap
@@ -335,19 +334,11 @@ def idle_status(kube_api, kube_control):
 
 def master_services_down():
     """Ensure master services are up and running.
-    Try to restart any failing services once.
 
     Return: list of failing services"""
     services = ['kube-apiserver',
                 'kube-controller-manager',
                 'kube-scheduler']
-    for service in services:
-        daemon = 'snap.{}.daemon'.format(service)
-        if not host.service_running(daemon):
-            hookenv.log("Service {} was down. Starting it.".format(daemon))
-            host.service_start(daemon)
-            sleep(10)
-
     failing_services = []
     for service in services:
         daemon = 'snap.{}.daemon'.format(service)

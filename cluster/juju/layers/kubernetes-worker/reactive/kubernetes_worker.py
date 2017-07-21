@@ -22,7 +22,6 @@ from shlex import split
 from subprocess import check_call, check_output
 from subprocess import CalledProcessError
 from socket import gethostname
-from time import sleep
 
 from charms import layer
 from charms.layer import snap
@@ -262,12 +261,6 @@ def update_kubelet_status():
         'kubelet',
         'kube-proxy'
     ]
-    for service in services:
-        daemon = 'snap.{}.daemon'.format(service)
-        if not _systemctl_is_active(daemon):
-            hookenv.log("Service {} id down. Starting it.".format(daemon))
-            sleep(10)
-
     failing_services = []
     for service in services:
         daemon = 'snap.{}.daemon'.format(service)
