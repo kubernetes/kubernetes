@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/ipconfig"
+	"k8s.io/utils/exec"
 )
 
 const (

@@ -227,7 +227,7 @@ func waitForFullLogsIngestion(f *framework.Framework, config *loggingTestConfig)
 			config.IngestionTimeout, totalMissing, lostFraction*100)
 		for podIdx, missing := range missingByPod {
 			if missing != 0 {
-				framework.Logf("Still missing %d lines for pod %v", missing, config.Pods[podIdx])
+				framework.Logf("Still missing %d lines for pod %s", missing, config.Pods[podIdx].Name)
 			}
 		}
 	}

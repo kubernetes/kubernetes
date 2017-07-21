@@ -146,17 +146,17 @@ $errMsg
   "
   ## testsuite block
 
-  if [[ -e "$juDIR/junit-$suite.xml" ]]; then
+  if [[ -e "$juDIR/junit_$suite.xml" ]]; then
     # file exists. first update the failures count
-    failCount=`sed -n "s/.*testsuite.*failures=\"\([0-9]*\)\".*/\1/p" "$juDIR/junit-$suite.xml"`
+    failCount=`sed -n "s/.*testsuite.*failures=\"\([0-9]*\)\".*/\1/p" "$juDIR/junit_$suite.xml"`
     errors=$(($failCount+$errors))
-    sed -i "0,/failures=\"$failCount\"/ s/failures=\"$failCount\"/failures=\"$errors\"/" "$juDIR/junit-$suite.xml"
-    sed -i "0,/errors=\"$failCount\"/ s/errors=\"$failCount\"/errors=\"$errors\"/" "$juDIR/junit-$suite.xml"
+    sed -i "0,/failures=\"$failCount\"/ s/failures=\"$failCount\"/failures=\"$errors\"/" "$juDIR/junit_$suite.xml"
+    sed -i "0,/errors=\"$failCount\"/ s/errors=\"$failCount\"/errors=\"$errors\"/" "$juDIR/junit_$suite.xml"
 
     # file exists. Need to append to it. If we remove the testsuite end tag, we can just add it in after.
-    sed -i "s^</testsuite>^^g" $juDIR/junit-$suite.xml ## remove testSuite so we can add it later
-    sed -i "s^</testsuites>^^g" $juDIR/junit-$suite.xml
-    cat <<EOF >> "$juDIR/junit-$suite.xml"
+    sed -i "s^</testsuite>^^g" $juDIR/junit_$suite.xml ## remove testSuite so we can add it later
+    sed -i "s^</testsuites>^^g" $juDIR/junit_$suite.xml
+    cat <<EOF >> "$juDIR/junit_$suite.xml"
      $content
     </testsuite>
 </testsuites>
@@ -164,7 +164,7 @@ EOF
 
   else
     # no file exists. Adding a new file
-    cat <<EOF > "$juDIR/junit-$suite.xml"
+    cat <<EOF > "$juDIR/junit_$suite.xml"
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
     <testsuite failures="$errors" assertions="$assertions" name="$suite" tests="1" errors="$errors" time="$total">

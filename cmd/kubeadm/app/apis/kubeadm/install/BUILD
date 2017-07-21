@@ -45,6 +45,6 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/fuzzer:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/testing:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
     ],
 )

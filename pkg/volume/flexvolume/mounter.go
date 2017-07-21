@@ -19,9 +19,9 @@ package flexvolume
 import (
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/exec"
 )
 
 // FlexVolumeMounter is the disk that will be exposed by this plugin.

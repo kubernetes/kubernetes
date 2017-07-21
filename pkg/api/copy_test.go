@@ -22,20 +22,21 @@ import (
 	"reflect"
 	"testing"
 
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	"github.com/google/gofuzz"
+
+	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
+	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
-
-	"github.com/google/gofuzz"
 )
 
 func TestDeepCopyApiObjects(t *testing.T) {
-	for i := 0; i < *apitesting.FuzzIters; i++ {
+	for i := 0; i < *roundtrip.FuzzIters; i++ {
 		for _, version := range []schema.GroupVersion{testapi.Default.InternalGroupVersion(), api.Registry.GroupOrDie(api.GroupName).GroupVersion} {
-			f := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t, api.Codecs), rand.NewSource(rand.Int63()))
+			f := fuzzer.FuzzerFor(kapitesting.FuzzerFuncs, rand.NewSource(rand.Int63()), api.Codecs)
 			for kind := range api.Scheme.KnownTypes(version) {
 				doDeepCopyTest(t, version.WithKind(kind), f)
 			}
@@ -82,9 +83,9 @@ func doDeepCopyTest(t *testing.T, kind schema.GroupVersionKind, f *fuzz.Fuzzer) 
 }
 
 func TestDeepCopySingleType(t *testing.T) {
-	for i := 0; i < *apitesting.FuzzIters; i++ {
+	for i := 0; i < *roundtrip.FuzzIters; i++ {
 		for _, version := range []schema.GroupVersion{testapi.Default.InternalGroupVersion(), api.Registry.GroupOrDie(api.GroupName).GroupVersion} {
-			f := apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t, api.Codecs), rand.NewSource(rand.Int63()))
+			f := fuzzer.FuzzerFor(kapitesting.FuzzerFuncs, rand.NewSource(rand.Int63()), api.Codecs)
 			doDeepCopyTest(t, version.WithKind("Pod"), f)
 		}
 	}

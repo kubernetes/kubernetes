@@ -192,6 +192,10 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 
 	if realPath != "" {
 		// Only create the symlink when container log path is specified and log file exists.
+		// Delete possibly existing file first
+		if err = ds.os.Remove(path); err == nil {
+			glog.Warningf("Deleted previously existing symlink file: %q", path)
+		}
 		if err = ds.os.Symlink(realPath, path); err != nil {
 			return fmt.Errorf("failed to create symbolic link %q to the container log file %q for container %q: %v",
 				path, realPath, containerID, err)

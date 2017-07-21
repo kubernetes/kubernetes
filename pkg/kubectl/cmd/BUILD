@@ -97,7 +97,6 @@ go_library(
         "//pkg/kubectl/util/term:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
-        "//pkg/util/exec:go_default_library",
         "//pkg/util/i18n:go_default_library",
         "//pkg/util/interrupt:go_default_library",
         "//pkg/util/taints:go_default_library",
@@ -145,6 +144,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/portforward:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//vendor/k8s.io/client-go/transport/spdy:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 

@@ -22,6 +22,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -44,7 +45,9 @@ func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualM
 
 	vmName := string(nodeName)
 	az.operationPollRateLimiter.Accept()
+	glog.V(10).Infof("VirtualMachinesClient.Get(%s): start", vmName)
 	vm, err = az.VirtualMachinesClient.Get(az.ResourceGroup, vmName, "")
+	glog.V(10).Infof("VirtualMachinesClient.Get(%s): end", vmName)
 
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
@@ -62,7 +65,9 @@ func (az *Cloud) getRouteTable() (routeTable network.RouteTable, exists bool, er
 	var realErr error
 
 	az.operationPollRateLimiter.Accept()
+	glog.V(10).Infof("RouteTablesClient.Get(%s): start", az.RouteTableName)
 	routeTable, err = az.RouteTablesClient.Get(az.ResourceGroup, az.RouteTableName, "")
+	glog.V(10).Infof("RouteTablesClient.Get(%s): end", az.RouteTableName)
 
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
@@ -80,7 +85,9 @@ func (az *Cloud) getSecurityGroup() (sg network.SecurityGroup, exists bool, err 
 	var realErr error
 
 	az.operationPollRateLimiter.Accept()
+	glog.V(10).Infof("SecurityGroupsClient.Get(%s): start", az.SecurityGroupName)
 	sg, err = az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
+	glog.V(10).Infof("SecurityGroupsClient.Get(%s): end", az.SecurityGroupName)
 
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
@@ -98,7 +105,9 @@ func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exi
 	var realErr error
 
 	az.operationPollRateLimiter.Accept()
+	glog.V(10).Infof("LoadBalancerClient.Get(%s): start", name)
 	lb, err = az.LoadBalancerClient.Get(az.ResourceGroup, name, "")
+	glog.V(10).Infof("LoadBalancerClient.Get(%s): end", name)
 
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
@@ -116,7 +125,9 @@ func (az *Cloud) getPublicIPAddress(name string) (pip network.PublicIPAddress, e
 	var realErr error
 
 	az.operationPollRateLimiter.Accept()
+	glog.V(10).Infof("PublicIPAddressesClient.Get(%s): start", name)
 	pip, err = az.PublicIPAddressesClient.Get(az.ResourceGroup, name, "")
+	glog.V(10).Infof("PublicIPAddressesClient.Get(%s): end", name)
 
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {
@@ -134,7 +145,9 @@ func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet
 	var realErr error
 
 	az.operationPollRateLimiter.Accept()
+	glog.V(10).Infof("SubnetsClient.Get(%s): start", subnetName)
 	subnet, err = az.SubnetsClient.Get(az.ResourceGroup, virtualNetworkName, subnetName, "")
+	glog.V(10).Infof("SubnetsClient.Get(%s): end", subnetName)
 
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {

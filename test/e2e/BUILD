@@ -25,6 +25,7 @@ go_test(
         "//test/e2e/instrumentation/monitoring:go_default_library",
         "//test/e2e/kubectl:go_default_library",
         "//test/e2e/lifecycle:go_default_library",
+        "//test/e2e/lifecycle/bootstrap:go_default_library",
         "//test/e2e/metrics:go_default_library",
         "//test/e2e/scalability:go_default_library",
         "//test/e2e/scheduling:go_default_library",

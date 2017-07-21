@@ -43,7 +43,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network/cni/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	networktest "k8s.io/kubernetes/pkg/kubelet/network/testing"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 func installPluginUnderTest(t *testing.T, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName string, plugName string) {
@@ -159,10 +160,10 @@ func TestCNIPlugin(t *testing.T) {
 
 	podIP := "10.0.0.2"
 	podIPOutput := fmt.Sprintf("4: eth0    inet %s/24 scope global dynamic eth0\\       valid_lft forever preferred_lft forever", podIP)
-	fakeCmds := []utilexec.FakeCommandAction{
-		func(cmd string, args ...string) utilexec.Cmd {
-			return utilexec.InitFakeCmd(&utilexec.FakeCmd{
-				CombinedOutputScript: []utilexec.FakeCombinedOutputAction{
+	fakeCmds := []fakeexec.FakeCommandAction{
+		func(cmd string, args ...string) exec.Cmd {
+			return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
+				CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 					func() ([]byte, error) {
 						return []byte(podIPOutput), nil
 					},
@@ -171,7 +172,7 @@ func TestCNIPlugin(t *testing.T) {
 		},
 	}
 
-	fexec := &utilexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: fakeCmds,
 		LookPathFunc: func(file string) (string, error) {
 			return fmt.Sprintf("/fake-bin/%s", file), nil

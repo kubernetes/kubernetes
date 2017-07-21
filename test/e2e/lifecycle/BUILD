@@ -54,6 +54,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//test/e2e/lifecycle/bootstrap:all-srcs",
+    ],
     tags = ["automanaged"],
 )

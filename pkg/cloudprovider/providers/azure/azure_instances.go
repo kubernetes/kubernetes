@@ -41,8 +41,17 @@ func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	}
 	ip, err := az.getIPForMachine(name)
 	if err != nil {
-		glog.Errorf("error: az.NodeAddresses, az.getIPForMachine(%s), err=%v", name, err)
-		return nil, err
+		if az.CloudProviderBackoff {
+			glog.V(2).Infof("NodeAddresses(%s) backing off", name)
+			ip, err = az.GetIPForMachineWithRetry(name)
+			if err != nil {
+				glog.V(2).Infof("NodeAddresses(%s) abort backoff", name)
+				return nil, err
+			}
+		} else {
+			glog.Errorf("error: az.NodeAddresses, az.getIPForMachine(%s), err=%v", name, err)
+			return nil, err
+		}
 	}
 
 	return []v1.NodeAddress{
@@ -136,7 +145,9 @@ func (az *Cloud) listAllNodesInResourceGroup() ([]compute.VirtualMachine, error)
 	allNodes := []compute.VirtualMachine{}
 
 	az.operationPollRateLimiter.Accept()
+	glog.V(10).Infof("VirtualMachinesClient.List(%s): start", az.ResourceGroup)
 	result, err := az.VirtualMachinesClient.List(az.ResourceGroup)
+	glog.V(10).Infof("VirtualMachinesClient.List(%s): end", az.ResourceGroup)
 	if err != nil {
 		glog.Errorf("error: az.listAllNodesInResourceGroup(), az.VirtualMachinesClient.List(%s), err=%v", az.ResourceGroup, err)
 		return nil, err
@@ -148,7 +159,9 @@ func (az *Cloud) listAllNodesInResourceGroup() ([]compute.VirtualMachine, error)
 		allNodes = append(allNodes, *result.Value...)
 
 		az.operationPollRateLimiter.Accept()
+		glog.V(10).Infof("VirtualMachinesClient.ListAllNextResults(%v): start", az.ResourceGroup)
 		result, err = az.VirtualMachinesClient.ListAllNextResults(result)
+		glog.V(10).Infof("VirtualMachinesClient.ListAllNextResults(%v): end", az.ResourceGroup)
 		if err != nil {
 			glog.Errorf("error: az.listAllNodesInResourceGroup(), az.VirtualMachinesClient.ListAllNextResults(%v), err=%v", result, err)
 			return nil, err
