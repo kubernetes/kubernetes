@@ -945,35 +945,6 @@ function delete-subnetworks() {
   fi
 }
 
-# Assumes:
-#   NUM_NODES
-# Sets:
-#   MASTER_ROOT_DISK_SIZE
-function get-master-root-disk-size() {
-  if [[ "${NUM_NODES}" -le "1000" ]]; then
-    export MASTER_ROOT_DISK_SIZE="${MASTER_ROOT_DISK_SIZE:-20}"
-  elif [[ "${NUM_NODES}" -le "2000" ]]; then
-    export MASTER_ROOT_DISK_SIZE="${MASTER_ROOT_DISK_SIZE:-50}"
-  else
-    export MASTER_ROOT_DISK_SIZE="${MASTER_ROOT_DISK_SIZE:-100}"
-  fi
-}
-
-# Assumes:
-#   NUM_NODES
-# Sets:
-#   MASTER_DISK_SIZE
-function get-master-disk-size() {
-  if [[ "${NUM_NODES}" -le "1000" ]]; then
-    export MASTER_DISK_SIZE="${MASTER_DISK_SIZE:-20GB}"
-  elif [[ "${NUM_NODES}" -le "2000" ]]; then
-    export MASTER_DISK_SIZE="${MASTER_DISK_SIZE:-100GB}"
-  else
-    export MASTER_DISK_SIZE="${MASTER_DISK_SIZE:-200GB}"
-  fi
-}
-
-
 # Generates SSL certificates for etcd cluster. Uses cfssl program.
 #
 # Assumed vars:
@@ -1018,7 +989,6 @@ function create-master() {
 
   # We have to make sure the disk is created before creating the master VM, so
   # run this in the foreground.
-  get-master-disk-size
   gcloud compute disks create "${MASTER_NAME}-pd" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
@@ -1069,9 +1039,6 @@ function create-master() {
 
   create-certs "${MASTER_RESERVED_IP}"
   create-etcd-certs ${MASTER_NAME}
-
-  # Sets MASTER_ROOT_DISK_SIZE that is used by create-master-instance
-  get-master-root-disk-size
 
   create-master-instance "${MASTER_RESERVED_IP}" &
 }
@@ -1131,15 +1098,11 @@ function replicate-master() {
 
   # We have to make sure the disk is created before creating the master VM, so
   # run this in the foreground.
-  get-master-disk-size
   gcloud compute disks create "${REPLICA_NAME}-pd" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
     --type "${MASTER_DISK_TYPE}" \
     --size "${MASTER_DISK_SIZE}"
-
-  # Sets MASTER_ROOT_DISK_SIZE that is used by create-master-instance
-  get-master-root-disk-size
 
   local existing_master_replicas="$(get-all-replica-names)"
   replicate-master-instance "${EXISTING_MASTER_ZONE}" "${EXISTING_MASTER_NAME}" "${existing_master_replicas}"
