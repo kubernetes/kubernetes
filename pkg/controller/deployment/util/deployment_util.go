@@ -268,7 +268,6 @@ func SetNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *exten
 		glog.Warningf("Updating replica set revision NewRevision not int %s", err)
 		return false
 	}
-	glog.Warningf("OldRevision=%d Newrevsion=%d\n", oldRevisionInt, newRevisionInt)
 	if oldRevisionInt < newRevisionInt {
 		newRS.Annotations[RevisionAnnotation] = newRevision
 		annotationChanged = true
