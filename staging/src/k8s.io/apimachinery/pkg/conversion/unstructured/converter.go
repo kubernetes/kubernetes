@@ -32,8 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
-	"github.com/golang/glog"
 )
 
 // Converter is an interface for converting between interface{}
@@ -117,10 +115,10 @@ func (c *converterImpl) FromUnstructured(u map[string]interface{}, obj interface
 		newObj := reflect.New(t.Elem()).Interface()
 		newErr := fromUnstructuredViaJSON(u, newObj)
 		if (err != nil) != (newErr != nil) {
-			glog.Fatalf("FromUnstructured unexpected error for %v: error: %v", u, err)
+			panic(fmt.Errorf("FromUnstructured unexpected error for %v: error: %v / %v", u, err, newErr))
 		}
 		if err == nil && !apiequality.Semantic.DeepEqual(obj, newObj) {
-			glog.Fatalf("FromUnstructured mismatch for %#v, diff: %v", obj, diff.ObjectReflectDiff(obj, newObj))
+			panic(fmt.Errorf("FromUnstructured mismatch for %#v, diff: %v", obj, diff.ObjectReflectDiff(obj, newObj)))
 		}
 	}
 	return err
@@ -400,10 +398,10 @@ func (c *converterImpl) ToUnstructured(obj interface{}) (map[string]interface{},
 		newUnstr := &map[string]interface{}{}
 		newErr := toUnstructuredViaJSON(obj, newUnstr)
 		if (err != nil) != (newErr != nil) {
-			glog.Fatalf("ToUnstructured unexpected error for %v: error: %v", obj, err)
+			panic(fmt.Errorf("ToUnstructured unexpected error for %v: error: %v / %v", obj, err, newErr))
 		}
 		if err == nil && !apiequality.Semantic.DeepEqual(u, newUnstr) {
-			glog.Fatalf("ToUnstructured mismatch for %#v, diff: %v", u, diff.ObjectReflectDiff(u, newUnstr))
+			panic(fmt.Errorf("ToUnstructured mismatch for %#v, diff: %v", u, diff.ObjectReflectDiff(u, newUnstr)))
 		}
 	}
 	if err != nil {
