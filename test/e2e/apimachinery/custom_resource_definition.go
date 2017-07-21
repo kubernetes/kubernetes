@@ -20,10 +20,13 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/testserver"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
+
+var crdVersion = utilversion.MustParseSemantic("v1.7.0")
 
 var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 
@@ -31,6 +34,9 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 
 	Context("Simple CustomResourceDefinition", func() {
 		It("creating/deleting custom resource definition objects works [Conformance]", func() {
+
+			framework.SkipUnlessServerVersionGTE(crdVersion, f.ClientSet.Discovery())
+
 			config, err := framework.LoadConfig()
 			if err != nil {
 				framework.Failf("failed to load config: %v", err)
