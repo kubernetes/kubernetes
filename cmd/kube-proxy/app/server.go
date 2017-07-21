@@ -413,7 +413,7 @@ func createClients(config componentconfig.ClientConnectionConfiguration, masterO
 		return nil, nil, err
 	}
 
-	return client, eventClient, nil
+	return client, eventClient.Core(), nil
 }
 
 // NewProxyServer returns a new ProxyServer.
