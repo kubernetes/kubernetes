@@ -80,6 +80,16 @@ var (
 		Key:    algorithm.TaintNodeNotReady,
 		Effect: v1.TaintEffectNoExecute,
 	}
+
+	// TODO(resouer) move this to metav1 well_known_labels.go after #42406 get merged.
+	// TaintNodeNoSchedule would be automatically added by node controller when
+	// node runs into a unschedulable condition and removed when node becomes schedulable.
+	TaintNodeNoSchedule = "node.beta.kubernetes.io/noSchedule"
+
+	NoScheduleTaintTemplate = &v1.Taint{
+		Key:    TaintNodeNoSchedule,
+		Effect: v1.TaintEffectNoSchedule,
+	}
 )
 
 const (
@@ -93,6 +103,15 @@ const (
 	apiserverStartupGracePeriod = 10 * time.Minute
 	// The amount of time the nodecontroller should sleep between retrying NodeStatus updates
 	retrySleepTime = 20 * time.Millisecond
+	// controls how often NodeController will try to taint/untaint Node with NoSchedule based on its condition change
+	nodeTaintingPeriod = 100 * time.Millisecond
+)
+
+// Actions may happen when node condition changed
+const (
+	cleanNoScheduleTaintAction = iota
+	taintNoScheduleAction
+	noAction
 )
 
 type zoneState string
@@ -190,6 +209,9 @@ type NodeController struct {
 	// if set to true NodeController will taint Nodes with 'TaintNodeNotReady' and 'TaintNodeUnreachable'
 	// taints instead of evicting Pods itself.
 	useTaintBasedEvictions bool
+
+	// workers that are responsible for tainting nodes as NoSchedule.
+	noScheduleTainter map[string]*RateLimitedTimedQueue
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
@@ -250,6 +272,7 @@ func NewNodeController(
 		maximumGracePeriod:              5 * time.Minute,
 		zonePodEvictor:                  make(map[string]*RateLimitedTimedQueue),
 		zoneNotReadyOrUnreachableTainer: make(map[string]*RateLimitedTimedQueue),
+		noScheduleTainter:               make(map[string]*RateLimitedTimedQueue),
 		nodeStatusMap:                   make(map[string]nodeStatusData),
 		nodeMonitorGracePeriod:          nodeMonitorGracePeriod,
 		nodeMonitorPeriod:               nodeMonitorPeriod,
@@ -474,6 +497,28 @@ func (nc *NodeController) doTaintingPass() {
 	}
 }
 
+func (nc *NodeController) processNoScheduleTainting() {
+	// eviction may also taint node, we use same lock here
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
+	for k := range nc.noScheduleTainter {
+		// Function should return 'false' and a time after which it should be retried, or 'true' if it shouldn't (it succeeded).
+		nc.noScheduleTainter[k].Try(func(value TimedValue) (bool, time.Duration) {
+			node, err := nc.nodeLister.Get(value.Value)
+			if apierrors.IsNotFound(err) {
+				glog.Warningf("Node %v no longer present in nodeLister!", value.Value)
+				return true, 0
+			} else if err != nil {
+				glog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
+				// retry in 50 millisecond
+				return false, 50 * time.Millisecond
+			}
+			taintToAdd := *NoScheduleTaintTemplate
+			return swapNodeControllerTaint(nc.kubeClient, &taintToAdd, &v1.Taint{}, node), 0
+		})
+	}
+}
+
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *NodeController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
@@ -507,11 +552,13 @@ func (nc *NodeController) Run(stopCh <-chan struct{}) {
 		go wait.Until(nc.doEvictionPass, nodeEvictionPeriod, wait.NeverStop)
 	}
 
+	go wait.Until(nc.processNoScheduleTainting, nodeTaintingPeriod, wait.NeverStop)
+
 	<-stopCh
 }
 
-// addPodEvictorForNewZone checks if new zone appeared, and if so add new evictor.
-func (nc *NodeController) addPodEvictorForNewZone(node *v1.Node) {
+// addPodEvictorTainterForNewZone checks if new zone appeared, and if so add new evictor.
+func (nc *NodeController) addPodEvictorTainterForNewZone(node *v1.Node) {
 	zone := utilnode.GetZoneKey(node)
 	if _, found := nc.zoneStates[zone]; !found {
 		nc.zoneStates[zone] = stateInitial
@@ -524,10 +571,75 @@ func (nc *NodeController) addPodEvictorForNewZone(node *v1.Node) {
 				NewRateLimitedTimedQueue(
 					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, evictionRateLimiterBurst))
 		}
+
+		// Also, use the same limiter of eviction to initialize the noScheduleTainter
+		nc.noScheduleTainter[zone] = NewRateLimitedTimedQueue(
+			flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, evictionRateLimiterBurst))
+
 		// Init the metric for the new zone.
 		glog.Infof("Initializing eviction metric for zone: %v", zone)
 		EvictionsNumber.WithLabelValues(zone).Add(0)
 	}
+}
+
+// addOrRemoveNoScheduleTaintByCondition taints or removes the NoSchedule taint on this node based on its condition change.
+// returns (only used for unit test):
+// - taint action of this node
+func (nc *NodeController) addOrRemoveNoScheduleTaintByCondition(node *v1.Node) int {
+	var changedToUnSchedulable, changedToSchedulable bool
+	observedMap := map[v1.NodeConditionType]*v1.NodeCondition{}
+	_, observedMap[v1.NodeReady] = v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+	_, observedMap[v1.NodeOutOfDisk] = v1node.GetNodeCondition(&node.Status, v1.NodeOutOfDisk)
+	_, observedMap[v1.NodeNetworkUnavailable] = v1node.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+
+	// If there are saved node status, it only make sense to check conditions when some change happened.
+	if savedNodeStatus, found := nc.nodeStatusMap[node.GetName()]; found {
+		for conditionType, condition := range observedMap {
+			_, savedCondition := v1node.GetNodeCondition(&savedNodeStatus.status, conditionType)
+			if condition != nil {
+				// something changed
+				if savedCondition == nil || (condition.Status != savedCondition.Status) {
+					changedToSchedulable, changedToUnSchedulable = controller.CheckSchedulable(condition)
+					if changedToUnSchedulable {
+						break
+					}
+				}
+			}
+		}
+	} else {
+		// Otherwise, there are no saved node status, it always worth to check conditions
+		for _, condition := range observedMap {
+			if condition != nil {
+				changedToSchedulable, changedToUnSchedulable = controller.CheckSchedulable(condition)
+				if changedToUnSchedulable {
+					break
+				}
+			}
+		}
+	}
+
+	taintAction := noAction
+	if changedToSchedulable {
+		taintCleaned, err := nc.markNodeSchedulable(node)
+		if err != nil {
+			glog.Errorf("failed to mark node %v as schedulable: %v", node.Name, err)
+		}
+		if taintCleaned {
+			glog.V(2).Infof("Mark node %v as schedulable again because its condition changed to schedulable",
+				node.Name,
+			)
+		}
+		taintAction = cleanNoScheduleTaintAction
+	}
+	if changedToUnSchedulable {
+		if tainted := nc.markNodeForUnscheduleTainting(node); tainted {
+			glog.V(2).Infof("Tainting Node %v with NoSchedule taint because its condition changed to unschedulable",
+				node.Name,
+			)
+		}
+		taintAction = taintNoScheduleAction
+	}
+	return taintAction
 }
 
 // monitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
@@ -543,14 +655,15 @@ func (nc *NodeController) monitorNodeStatus() error {
 	added, deleted, newZoneRepresentatives := nc.classifyNodes(nodes)
 
 	for i := range newZoneRepresentatives {
-		nc.addPodEvictorForNewZone(newZoneRepresentatives[i])
+		nc.addPodEvictorTainterForNewZone(newZoneRepresentatives[i])
 	}
 
 	for i := range added {
 		glog.V(1).Infof("NodeController observed a new Node: %#v", added[i].Name)
 		recordNodeEvent(nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in NodeController", added[i].Name))
 		nc.knownNodeSet[added[i].Name] = added[i]
-		nc.addPodEvictorForNewZone(added[i])
+		nc.addPodEvictorTainterForNewZone(added[i])
+
 		if nc.useTaintBasedEvictions {
 			nc.markNodeAsHealthy(added[i])
 		} else {
@@ -575,6 +688,10 @@ func (nc *NodeController) monitorNodeStatus() error {
 			continue
 		}
 		node := nodeCopy.(*v1.Node)
+
+		// taint or clear NoSchedule taint based on condition change, we should do this before tryUpdateNodeStatus
+		nc.addOrRemoveNoScheduleTaintByCondition(node)
+
 		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*nodeStatusUpdateRetry, func() (bool, error) {
 			gracePeriod, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeStatus(node)
 			if err == nil {
@@ -1084,6 +1201,23 @@ func (nc *NodeController) markNodeAsHealthy(node *v1.Node) (bool, error) {
 		return false, err
 	}
 	return nc.zoneNotReadyOrUnreachableTainer[utilnode.GetZoneKey(node)].Remove(node.Name), nil
+}
+
+func (nc *NodeController) markNodeForUnscheduleTainting(node *v1.Node) bool {
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
+	return nc.noScheduleTainter[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
+}
+
+func (nc *NodeController) markNodeSchedulable(node *v1.Node) (bool, error) {
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
+	err := controller.RemoveTaintOffNode(nc.kubeClient, node.Name, NoScheduleTaintTemplate, node)
+	if err != nil {
+		glog.Errorf("Failed to remove NoSchedule taint from node %v: %v", node.Name, err)
+		return false, err
+	}
+	return nc.noScheduleTainter[utilnode.GetZoneKey(node)].Remove(node.Name), nil
 }
 
 // Default value for cluster eviction rate - we take nodeNum for consistency with ReducedQPSFunc.

@@ -113,6 +113,9 @@ type ConfigFactory struct {
 
 	// Enable equivalence class cache
 	enableEquivalenceClassCache bool
+
+	// Leave add/remove NoSchedule taint to node controller
+	enableNodeControllerTaint bool
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
@@ -130,6 +133,7 @@ func NewConfigFactory(
 	serviceInformer coreinformers.ServiceInformer,
 	hardPodAffinitySymmetricWeight int,
 	enableEquivalenceClassCache bool,
+	enableNodeControllerTaint bool,
 ) scheduler.Configurator {
 	stopEverything := make(chan struct{})
 	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
@@ -149,6 +153,7 @@ func NewConfigFactory(
 		schedulerName:                  schedulerName,
 		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
 		enableEquivalenceClassCache:    enableEquivalenceClassCache,
+		enableNodeControllerTaint:      enableNodeControllerTaint,
 	}
 
 	c.scheduledPodsHasSynced = podInformer.Informer().HasSynced
@@ -705,7 +710,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		SchedulerCache: f.schedulerCache,
 		Ecache:         f.equivalencePodCache,
 		// The scheduler only needs to consider schedulable nodes.
-		NodeLister:          &nodePredicateLister{f.nodeLister},
+		NodeLister:          &nodePredicateLister{f.nodeLister, f.enableNodeControllerTaint},
 		Algorithm:           algo,
 		Binder:              f.getBinder(extenders),
 		PodConditionUpdater: &podConditionUpdater{f.client},
@@ -722,10 +727,11 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 
 type nodePredicateLister struct {
 	corelisters.NodeLister
+	enableNodeControllerTaint bool
 }
 
 func (n *nodePredicateLister) List() ([]*v1.Node, error) {
-	return n.ListWithPredicate(getNodeConditionPredicate())
+	return n.ListWithPredicate(getNodeConditionPredicate(n.enableNodeControllerTaint))
 }
 
 func (f *ConfigFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error) {
@@ -771,7 +777,7 @@ func (f *ConfigFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		ReplicaSetLister:  f.replicaSetLister,
 		StatefulSetLister: f.statefulSetLister,
 		// All fit predicates only need to consider schedulable nodes.
-		NodeLister: &nodePredicateLister{f.nodeLister},
+		NodeLister: &nodePredicateLister{f.nodeLister, f.enableNodeControllerTaint},
 		NodeInfo:   &predicates.CachedNodeInfo{NodeLister: f.nodeLister},
 		PVInfo:     &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: f.pVLister},
 		PVCInfo:    &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: f.pVCLister},
@@ -793,23 +799,26 @@ func (f *ConfigFactory) ResponsibleForPod(pod *v1.Pod) bool {
 	return f.schedulerName == pod.Spec.SchedulerName
 }
 
-func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
+func getNodeConditionPredicate(enableNodeControllerTaint bool) corelisters.NodeConditionPredicate {
 	return func(node *v1.Node) bool {
-		for i := range node.Status.Conditions {
-			cond := &node.Status.Conditions[i]
-			// We consider the node for scheduling only when its:
-			// - NodeReady condition status is ConditionTrue,
-			// - NodeOutOfDisk condition status is ConditionFalse,
-			// - NodeNetworkUnavailable condition status is ConditionFalse.
-			if cond.Type == v1.NodeReady && cond.Status != v1.ConditionTrue {
-				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
-				return false
-			} else if cond.Type == v1.NodeOutOfDisk && cond.Status != v1.ConditionFalse {
-				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
-				return false
-			} else if cond.Type == v1.NodeNetworkUnavailable && cond.Status != v1.ConditionFalse {
-				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
-				return false
+		// NOTE(resouer): delete this when NoSchedule taint by node controller is GA
+		if !enableNodeControllerTaint {
+			for i := range node.Status.Conditions {
+				cond := &node.Status.Conditions[i]
+				// We consider the node for scheduling only when its:
+				// - NodeReady condition status is ConditionTrue,
+				// - NodeOutOfDisk condition status is ConditionFalse,
+				// - NodeNetworkUnavailable condition status is ConditionFalse.
+				if cond.Type == v1.NodeReady && cond.Status != v1.ConditionTrue {
+					glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+					return false
+				} else if cond.Type == v1.NodeOutOfDisk && cond.Status != v1.ConditionFalse {
+					glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+					return false
+				} else if cond.Type == v1.NodeNetworkUnavailable && cond.Status != v1.ConditionFalse {
+					glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+					return false
+				}
 			}
 		}
 		// Ignore nodes that are marked unschedulable

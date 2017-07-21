@@ -36,6 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/flowcontrol"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
@@ -43,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/node/testutil"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
 const (
@@ -2316,6 +2318,203 @@ func TestCheckNodeKubeletVersionParsing(t *testing.T) {
 			t.Errorf("Version %v doesn't match test expectation. Expected outdated %v got %v", n.Status.NodeInfo.KubeletVersion, ov.outdated, isOutdated)
 		} else {
 			t.Logf("Version %v outdated %v", ov.version, isOutdated)
+		}
+	}
+}
+
+func TestAddOrRemoveNoScheduleTaintByCondition(t *testing.T) {
+	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	table := []struct {
+		fakeNodeHandler     *testutil.FakeNodeHandler
+		newNodeStatus       v1.NodeStatus
+		savedNodeStatus     v1.NodeStatus
+		expectedTaintAction int
+	}{
+		// Node created recently, without saved status.
+		// Expect clean NoSchedule taint
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			expectedTaintAction: cleanNoScheduleTaintAction,
+			newNodeStatus: v1.NodeStatus{
+				NodeInfo: v1.NodeSystemInfo{
+					KubeletVersion: "v1.1.0",
+				},
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionTrue,
+					},
+				},
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+		},
+
+		// Node created recently, without saved status.
+		// Expect no action since no new node status
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			expectedTaintAction: noAction,
+		},
+		// Node created long time ago, has saved status not ready.
+		// Expect clean NoSchedule taint after condition becomes ready
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			expectedTaintAction: cleanNoScheduleTaintAction,
+			savedNodeStatus: v1.NodeStatus{
+				NodeInfo: v1.NodeSystemInfo{
+					KubeletVersion: "v1.1.0",
+				},
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionFalse,
+					},
+				},
+			},
+			newNodeStatus: v1.NodeStatus{
+				NodeInfo: v1.NodeSystemInfo{
+					KubeletVersion: "v1.1.0",
+				},
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionTrue,
+					},
+				},
+			},
+		},
+		// Node created long time ago, has saved status not ready.
+		// Expect nothing since node status does not change
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			expectedTaintAction: noAction,
+			savedNodeStatus: v1.NodeStatus{
+				NodeInfo: v1.NodeSystemInfo{
+					KubeletVersion: "v1.1.0",
+				},
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionFalse,
+					},
+				},
+			},
+			newNodeStatus: v1.NodeStatus{
+				NodeInfo: v1.NodeSystemInfo{
+					KubeletVersion: "v1.1.0",
+				},
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionFalse,
+					},
+				},
+			},
+		},
+		// Node created long time ago, has saved status not ready.
+		// Expect tainted since node status change to not ready
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			expectedTaintAction: taintNoScheduleAction,
+			savedNodeStatus: v1.NodeStatus{
+				NodeInfo: v1.NodeSystemInfo{
+					KubeletVersion: "v1.1.0",
+				},
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionTrue,
+					},
+				},
+			},
+			newNodeStatus: v1.NodeStatus{
+				NodeInfo: v1.NodeSystemInfo{
+					KubeletVersion: "v1.1.0",
+				},
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionFalse,
+					},
+				},
+			},
+		},
+	}
+	for i, item := range table {
+		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute,
+			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
+			testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
+			testNodeMonitorPeriod, nil, nil, 0, false, false)
+		nodeController.now = func() metav1.Time { return fakeNow }
+		nodeController.recorder = testutil.NewFakeRecorder()
+		nodeController.nodeStatusMap[item.fakeNodeHandler.Existing[0].Name] = nodeStatusData{
+			status: item.savedNodeStatus,
+		}
+		exitingNode := item.fakeNodeHandler.Existing[0]
+		// use the same limiter of eviction
+		nodeController.noScheduleTainter[utilnode.GetZoneKey(exitingNode)] = NewRateLimitedTimedQueue(
+			flowcontrol.NewTokenBucketRateLimiter(nodeController.evictionLimiterQPS, evictionRateLimiterBurst))
+		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
+		if err := syncNodeStore(nodeController, item.fakeNodeHandler); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		// action is needed since we can not use content of noScheduleTainter to make decision, for example. no action case
+		taintAction := nodeController.addOrRemoveNoScheduleTaintByCondition(exitingNode)
+		if taintAction != item.expectedTaintAction {
+			t.Errorf("Case[%d] expect node taint action to be %v, but got %v", i, item.expectedTaintAction, taintAction)
 		}
 	}
 }

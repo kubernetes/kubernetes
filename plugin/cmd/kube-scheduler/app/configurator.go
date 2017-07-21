@@ -32,14 +32,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 
+	clientv1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-
-	clientv1 "k8s.io/api/core/v1"
-
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
@@ -107,6 +105,7 @@ func CreateScheduler(
 		serviceInformer,
 		s.HardPodAffinitySymmetricWeight,
 		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
+		utilfeature.DefaultFeatureGate.Enabled(features.EnableNodeControllerTaint),
 	)
 
 	// Rebuild the configurator with a default Create(...) method.

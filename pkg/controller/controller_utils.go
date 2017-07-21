@@ -1002,6 +1002,29 @@ func WaitForCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs 
 	return true
 }
 
+// isSchedulable is a flight check for node readiness, disk, and network.
+func isSchedulable(cond *v1.NodeCondition) bool {
+	if (cond.Type == v1.NodeReady) && (cond.Status != v1.ConditionTrue) {
+		return false
+	} else if (cond.Type == v1.NodeOutOfDisk) && (cond.Status != v1.ConditionFalse) {
+		return false
+	} else if (cond.Type == v1.NodeNetworkUnavailable) && (cond.Status != v1.ConditionFalse) {
+		return false
+	}
+	return true
+}
+
+// CheckSchedulable calculates the result of scheduling flag by condition
+// 1. changedToSchedulable
+// 2. changedToUnSchedulable
+func CheckSchedulable(condition *v1.NodeCondition) (bool, bool) {
+	if !isSchedulable(condition) {
+		return false, true
+	} else {
+		return true, false
+	}
+}
+
 // ComputeHash returns a hash value calculated from pod template and a collisionCount to avoid hash collision
 func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int64) uint32 {
 	podTemplateSpecHasher := fnv.New32a()

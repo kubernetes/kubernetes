@@ -119,6 +119,7 @@ const (
 	// alpha: v1.8
 	//
 	// Add priority to pods. Priority affects scheduling and preemption of pods.
+
 	PodPriority utilfeature.Feature = "PodPriority"
 
 	// owner: @resouer
@@ -126,6 +127,12 @@ const (
 	//
 	// Enable equivalence class cache for scheduler.
 	EnableEquivalenceClassCache utilfeature.Feature = "EnableEquivalenceClassCache"
+
+	// owner: @resouer
+	// beta: v1.8
+	//
+	// Add/remove NoSchedule taint by node controller
+	EnableNodeControllerTaint utilfeature.Feature = "EnableNodeControllerTaint"
 )
 
 func init() {
@@ -151,6 +158,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
+	EnableNodeControllerTaint:                   {Default: true, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
