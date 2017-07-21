@@ -398,17 +398,14 @@ def send_tokens(kube_control):
 
 @when_not('kube-control.connected')
 def missing_kube_control():
-    """Inform the operator they need to add the kube-control relation.
+    """Inform the operator master is waiting for a relation to workers.
 
     If deploying via bundle this won't happen, but if operator is upgrading a
     a charm in a deployment that pre-dates the kube-control relation, it'll be
     missing.
 
     """
-    hookenv.status_set(
-        'blocked',
-        'Relate {}:kube-control kubernetes-worker:kube-control'.format(
-            hookenv.service_name()))
+    hookenv.status_set('blocked', 'Waiting for workers.')
 
 
 @when('kube-api-endpoint.available')
