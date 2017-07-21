@@ -49,7 +49,7 @@ type SchedulerServer struct {
 	// Kubeconfig is Path to kubeconfig file with authorization and master
 	// location information.
 	Kubeconfig string
-	// Dynamic conifguration for scheduler features.
+	// Dynamic configuration for scheduler features.
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
