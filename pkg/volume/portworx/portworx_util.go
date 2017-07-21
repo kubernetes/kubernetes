@@ -56,11 +56,14 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 	requestGB := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
 
 	specHandler := osdspec.NewSpecHandler()
-	spec, err := specHandler.SpecFromOpts(p.options.Parameters)
-	if err != nil {
-		glog.Errorf("Error parsing parameters for PVC: %v. Err: %v", p.options.PVC.Name, err)
-		return "", 0, nil, err
+	spec, _ := specHandler.SpecFromOpts(p.options.Parameters)
+	if spec == nil {
+		spec = specHandler.DefaultSpec()
 	}
+
+	// Pass all parameters as volume labels for Portworx server-side processing
+	spec.VolumeLabels = p.options.Parameters
+
 	spec.Size = uint64(requestGB * 1024 * 1024 * 1024)
 	source := osdapi.Source{}
 	locator := osdapi.VolumeLocator{
