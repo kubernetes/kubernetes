@@ -94,6 +94,9 @@ func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 
 		// Verify
 		host, _, _ := net.SplitHostPort(dialAddr)
+		if tlsConfig != nil && len(tlsConfig.ServerName) > 0 {
+			host = tlsConfig.ServerName
+		}
 		if err := tlsConn.VerifyHostname(host); err != nil {
 			tlsConn.Close()
 			return nil, err
