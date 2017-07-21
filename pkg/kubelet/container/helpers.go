@@ -133,6 +133,11 @@ func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVa
 	return command
 }
 
+func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (expandedSubpath string) {
+	mapping := expansion.MappingFuncFor(EnvVarsToMap(envs))
+	return expansion.Expand(mount.SubPath, mapping)
+}
+
 func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (command []string, args []string) {
 	mapping := expansion.MappingFuncFor(EnvVarsToMap(envs))
 

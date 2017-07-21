@@ -286,6 +286,13 @@ const (
 	//
 	// Extend the default scheduler to be aware of volume topology and handle PV provisioning
 	DynamicProvisioningScheduling utilfeature.Feature = "DynamicProvisioningScheduling"
+
+	// owner: @kevtaylor
+	// alpha: v1.11
+	//
+	// Allow subpath environment variable substitution
+	// Only applicable if the VolumeSubpath feature is also enabled
+	VolumeSubpathEnvExpansion utilfeature.Feature = "VolumeSubpathEnvExpansion"
 )
 
 func init() {
@@ -335,6 +342,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
 	DynamicProvisioningScheduling:               {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
