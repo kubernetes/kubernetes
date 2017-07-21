@@ -411,7 +411,6 @@ func (plugin *glusterfsPlugin) newProvisionerInternal(options volume.VolumeOptio
 type provisionerConfig struct {
 	url             string
 	user            string
-	userKey         string
 	secretNamespace string
 	secretName      string
 	secretValue     string
@@ -936,7 +935,7 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 		case "restuser":
 			cfg.user = v
 		case "restuserkey":
-			cfg.userKey = v
+			return nil, fmt.Errorf("glusterfs: option %q for volume plugin %s is deprecated, use `secretname` and `secretnamespace` for user password", k, glusterfsPluginName)
 		case "secretname":
 			cfg.secretName = v
 		case "secretnamespace":
@@ -1028,12 +1027,10 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 		cfg.user = ""
 		cfg.secretName = ""
 		cfg.secretNamespace = ""
-		cfg.userKey = ""
 		cfg.secretValue = ""
 	}
 
 	if len(cfg.secretName) != 0 || len(cfg.secretNamespace) != 0 {
-		// secretName + Namespace has precedence over userKey
 		if len(cfg.secretName) != 0 && len(cfg.secretNamespace) != 0 {
 			cfg.secretValue, err = parseSecret(cfg.secretNamespace, cfg.secretName, kubeClient)
 			if err != nil {
@@ -1042,8 +1039,6 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 		} else {
 			return nil, fmt.Errorf("StorageClass for provisioner %q must have secretNamespace and secretName either both set or both empty", glusterfsPluginName)
 		}
-	} else {
-		cfg.secretValue = cfg.userKey
 	}
 
 	if cfg.gidMin > cfg.gidMax {
