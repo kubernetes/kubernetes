@@ -6,9 +6,8 @@ metadata:
   annotations:
     scheduler.alpha.kubernetes.io/critical-pod: ''
   labels:
-    k8s-app: glbc
+    k8s-app: gcp-lb-controller
     version: v0.9.5
-    kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "GLBC"
 spec:
   terminationGracePeriodSeconds: 600
