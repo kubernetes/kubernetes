@@ -215,6 +215,14 @@
 			"Rev": "d5b7844b561a7bc640052f1b935f7b800330d7e0"
 		},
 		{
+			"ImportPath": "github.com/obeattie/tcp-failfast",
+			"Rev": "4e177a235cc8cf7c124319a8c14d3ff46df5a7db"
+		},
+		{
+			"ImportPath": "github.com/songgao/water",
+			"Rev": "99d07fc117afd4d997bc5ebca77c241644ffe24a"
+		},
+		{
 			"ImportPath": "github.com/spf13/pflag",
 			"Rev": "9ff6c6923cfffbcd502984b8e0c80539a94968b7"
 		},
@@ -237,6 +245,18 @@
 		{
 			"ImportPath": "golang.org/x/net/lex/httplex",
 			"Rev": "f2499483f923065a842d38eb4c7f1927e6fc6e6d"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "7a4fde3fda8ef580a89dbae8138c26041be14299"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/windows",
+			"Rev": "7a4fde3fda8ef580a89dbae8138c26041be14299"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/windows/registry",
+			"Rev": "7a4fde3fda8ef580a89dbae8138c26041be14299"
 		},
 		{
 			"ImportPath": "golang.org/x/text/cases",

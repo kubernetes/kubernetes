@@ -1,0 +1,8 @@
+language: go
+sudo: required
+os:
+- linux
+- osx
+go:
+- 1.8
+script: sudo -E $(which go) test -v ./...
