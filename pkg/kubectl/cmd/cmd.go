@@ -202,6 +202,7 @@ __custom_func() {
 	validResources = `Valid resource types include:
 
     * all
+    * apiservices
     * certificatesigningrequests (aka 'csr')
     * clusterrolebindings
     * clusterroles
