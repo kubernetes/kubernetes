@@ -638,7 +638,6 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 		} else {
 			helper := resource.NewHelper(o.restClient, o.nodeInfo.Mapping)
 			node.Spec.Unschedulable = desired
-			var err error
 			newData, err := json.Marshal(obj)
 			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
 			if err != nil {
