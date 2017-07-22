@@ -327,7 +327,7 @@ kube::test::version::object_to_file() {
 kube::test::version::json_object_to_file() {
   flags=$1
   file=$2
-  kubectl version $flags --output json | sed -e s/'\"'/''/g -e s/'}'/''/g -e s/'{'/''/g -e s/'clientVersion:'/'clientVersion:,'/ -e s/'serverVersion:'/'serverVersion:,'/ | tr , '\n' > "${file}"
+  kubectl version $flags --output json | sed -e s/' '/''/g -e s/'\"'/''/g -e s/'}'/''/g -e s/'{'/''/g -e s/'clientVersion:'/'clientVersion:,'/ -e s/'serverVersion:'/'serverVersion:,'/ | tr , '\n' > "${file}"
 }
 
 kube::test::version::json_client_server_object_to_file() {
