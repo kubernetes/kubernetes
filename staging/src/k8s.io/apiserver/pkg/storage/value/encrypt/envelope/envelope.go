@@ -19,12 +19,12 @@ package envelope
 
 import (
 	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 
 	"k8s.io/apiserver/pkg/storage/value"
-	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -48,13 +48,16 @@ type envelopeTransformer struct {
 
 	// cacheSize is the maximum number of DEKs that are cached.
 	cacheSize int
+
+	// baseTransformerFunc creates a new transformer for encrypting the data with the DEK.
+	baseTransformerFunc func(cipher.Block) value.Transformer
 }
 
 // NewEnvelopeTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
 // It uses envelopeService to encrypt and decrypt DEKs. Respective DEKs (in encrypted form) are prepended to
 // the data items they encrypt. A cache (of size cacheSize) is maintained to store the most recently
 // used decrypted DEKs in memory.
-func NewEnvelopeTransformer(envelopeService Service, cacheSize int) (value.Transformer, error) {
+func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransformerFunc func(cipher.Block) value.Transformer) (value.Transformer, error) {
 	if cacheSize == 0 {
 		cacheSize = defaultCacheSize
 	}
@@ -63,9 +66,10 @@ func NewEnvelopeTransformer(envelopeService Service, cacheSize int) (value.Trans
 		return nil, err
 	}
 	return &envelopeTransformer{
-		envelopeService: envelopeService,
-		transformers:    cache,
-		cacheSize:       cacheSize,
+		envelopeService:     envelopeService,
+		transformers:        cache,
+		cacheSize:           cacheSize,
+		baseTransformerFunc: baseTransformerFunc,
 	}, nil
 }
 
@@ -141,7 +145,7 @@ func (t *envelopeTransformer) addTransformer(encKey string, key []byte) (value.T
 	if err != nil {
 		return nil, err
 	}
-	transformer := aestransformer.NewCBCTransformer(block)
+	transformer := t.baseTransformerFunc(block)
 	t.transformers.Add(encKey, transformer)
 	return transformer, nil
 }

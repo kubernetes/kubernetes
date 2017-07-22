@@ -18,6 +18,7 @@ package envelope
 
 import (
 	"bytes"
+	"crypto/aes"
 	"encoding/base64"
 	"fmt"
 	"strconv"
@@ -25,6 +26,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/storage/value"
+	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 )
 
 const (
@@ -76,7 +78,7 @@ func newTestEnvelopeService() *testEnvelopeService {
 // Throw error if Envelope transformer tries to contact Envelope without hitting cache.
 func TestEnvelopeCaching(t *testing.T) {
 	envelopeService := newTestEnvelopeService()
-	envelopeTransformer, err := NewEnvelopeTransformer(envelopeService, testEnvelopeCacheSize)
+	envelopeTransformer, err := NewEnvelopeTransformer(envelopeService, testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
 	if err != nil {
 		t.Fatalf("failed to initialize envelope transformer: %v", err)
 	}
@@ -108,7 +110,7 @@ func TestEnvelopeCaching(t *testing.T) {
 
 // Makes Envelope transformer hit cache limit, throws error if it misbehaves.
 func TestEnvelopeCacheLimit(t *testing.T) {
-	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize)
+	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
 	if err != nil {
 		t.Fatalf("failed to initialize envelope transformer: %v", err)
 	}
@@ -140,4 +142,62 @@ func TestEnvelopeCacheLimit(t *testing.T) {
 			t.Fatalf("envelopeTransformer transformed data incorrectly using cache. Expected: %v, got %v", numberText, output)
 		}
 	}
+}
+
+func BenchmarkEnvelopeCBCRead(b *testing.B) {
+	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
+	if err != nil {
+		b.Fatalf("failed to initialize envelope transformer: %v", err)
+	}
+	benchmarkRead(b, envelopeTransformer, 1024)
+}
+
+func BenchmarkAESCBCRead(b *testing.B) {
+	block, err := aes.NewCipher(bytes.Repeat([]byte("a"), 32))
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	aesCBCTransformer := aestransformer.NewCBCTransformer(block)
+	benchmarkRead(b, aesCBCTransformer, 1024)
+}
+
+func BenchmarkEnvelopeGCMRead(b *testing.B) {
+	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewGCMTransformer)
+	if err != nil {
+		b.Fatalf("failed to initialize envelope transformer: %v", err)
+	}
+	benchmarkRead(b, envelopeTransformer, 1024)
+}
+
+func BenchmarkAESGCMRead(b *testing.B) {
+	block, err := aes.NewCipher(bytes.Repeat([]byte("a"), 32))
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	aesGCMTransformer := aestransformer.NewGCMTransformer(block)
+	benchmarkRead(b, aesGCMTransformer, 1024)
+}
+
+func benchmarkRead(b *testing.B, transformer value.Transformer, valueLength int) {
+	context := value.DefaultContext([]byte(testContextText))
+	v := bytes.Repeat([]byte("0123456789abcdef"), valueLength/16)
+
+	out, err := transformer.TransformToStorage(v, context)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		from, stale, err := transformer.TransformFromStorage(out, context)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if stale {
+			b.Fatalf("unexpected data: %t %q", stale, from)
+		}
+	}
+	b.StopTimer()
 }
