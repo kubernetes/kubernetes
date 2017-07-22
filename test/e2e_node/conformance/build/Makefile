@@ -64,6 +64,7 @@ endif
 	cd ${TEMP_DIR} && sed -i.back \
 	    "s|BASEIMAGE|${BASEIMAGE}|g;\
 	     s|COPY_SYSTEM_SPEC_FILE|${COPY_SYSTEM_SPEC_FILE}|g;\
+	     s|SYSTEM_SPEC_NAME|${SYSTEM_SPEC_NAME}|g;\
 	     s|SYSTEM_SPEC_FILE_PATH|${SYSTEM_SPEC_FILE_PATH}|g" Dockerfile
 
 	# Make scripts executable before they are copied into the Docker image. If we make them executable later, in another layer
