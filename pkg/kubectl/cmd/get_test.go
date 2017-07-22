@@ -142,7 +142,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	expected := []runtime.Object{cmdtesting.NewInternalType("", "", "foo")}
 	actual := tf.Printer.(*testPrinter).Objects
 	if len(actual) != len(expected) {
-		t.Fatal(actual)
+		t.Fatalf("expected: %#v, but actual: %#v", expected, actual)
 	}
 	for i, obj := range actual {
 		expectedJSON := runtime.EncodeOrDie(codec, expected[i])
@@ -158,7 +158,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(expectedMap, actualMap) {
-			t.Errorf("unexpected object: \n%#v\n%#v", expectedMap, actualMap)
+			t.Errorf("expectedMap: %#v, but actualMap: %#v", expectedMap, actualMap)
 		}
 	}
 }
