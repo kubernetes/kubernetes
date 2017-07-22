@@ -66,7 +66,7 @@ func main() {
 		glog.Fatalf("Failed to get k8s root directory: %v", err)
 	}
 	systemSpecFile := filepath.Join(rootDir, systemSpecPath, *systemSpecName+".yaml")
-	runCommand(ginkgo, *ginkgoFlags, test, "--", fmt.Sprintf("--system-spec-file=%s", systemSpecFile), *testFlags)
+	runCommand(ginkgo, *ginkgoFlags, test, "--", fmt.Sprintf("--system-spec-name=%s --system-spec-file=%s", *systemSpecName, systemSpecFile), *testFlags)
 	return
 }
 
