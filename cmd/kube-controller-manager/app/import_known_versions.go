@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clientset
+// TODO: Remove this file when namespace controller and garbage collector
+// stops using api.Registry.RESTMapper()
+package app
 
 // These imports are the API groups the client will support.
 import (
