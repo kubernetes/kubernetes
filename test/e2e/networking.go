@@ -85,6 +85,8 @@ var _ = framework.KubeDescribe("Networking", func() {
 
 		By("checking kube-proxy URLs")
 		config.GetSelfURL(ports.ProxyHealthzPort, "/healthz", "200 OK")
+		// Verify /healthz returns the proper content.
+		config.GetSelfURL(ports.ProxyHealthzPort, "/healthz", "lastUpdated")
 		config.GetSelfURL(ports.ProxyStatusPort, "/proxyMode", "iptables") // the default
 	})
 
