@@ -46,6 +46,7 @@ func TestCategoryExpansion(t *testing.T) {
 				{Resource: "statefulsets", Group: "apps"},
 				{Resource: "horizontalpodautoscalers", Group: "autoscaling"},
 				{Resource: "jobs", Group: "batch"},
+				{Resource: "cronjobs", Group: "batch"},
 				{Resource: "deployments", Group: "extensions"},
 				{Resource: "replicasets", Group: "extensions"},
 			},
