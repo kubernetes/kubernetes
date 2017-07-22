@@ -50,6 +50,7 @@ filegroup(
         "//pkg/client/listers/admissionregistration/v1alpha1:all-srcs",
         "//pkg/client/listers/apps/internalversion:all-srcs",
         "//pkg/client/listers/apps/v1beta1:all-srcs",
+        "//pkg/client/listers/apps/v1beta2:all-srcs",
         "//pkg/client/listers/authentication/internalversion:all-srcs",
         "//pkg/client/listers/authentication/v1:all-srcs",
         "//pkg/client/listers/authentication/v1beta1:all-srcs",

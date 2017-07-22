@@ -111,7 +111,7 @@ var _ = SIGDescribe("PersistentVolumes", func() {
 
 	// Testing configurations of a single a PV/PVC pair, multiple evenly paired PVs/PVCs,
 	// and multiple unevenly paired PV/PVCs
-	SIGDescribe("PersistentVolumes:NFS", func() {
+	Describe("NFS", func() {
 
 		var (
 			nfsServerPod *v1.Pod

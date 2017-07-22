@@ -22,6 +22,7 @@ import (
 	"fmt"
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1beta1 "k8s.io/api/apps/v1beta1"
+	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/api/autoscaling/v1"
 	v2alpha1 "k8s.io/api/autoscaling/v2alpha1"
 	batch_v1 "k8s.io/api/batch/v1"
@@ -80,6 +81,12 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().Deployments().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("statefulsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().StatefulSets().Informer()}, nil
+
+		// Group=Apps, Version=V1beta2
+	case v1beta2.SchemeGroupVersion.WithResource("deployments"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta2().Deployments().Informer()}, nil
+	case v1beta2.SchemeGroupVersion.WithResource("statefulsets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta2().StatefulSets().Informer()}, nil
 
 		// Group=Autoscaling, Version=V1
 	case v1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):

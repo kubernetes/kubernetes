@@ -24,7 +24,7 @@ def openapi_library(name, tags, srcs, openapi_targets=[], vendor_targets=[]):
         "--output-file-base zz_generated.openapi",
         "--output-package k8s.io/kubernetes/pkg/generated/openapi",
         "--input-dirs " + ",".join(["k8s.io/kubernetes/" + target for target in openapi_targets] + ["k8s.io/kubernetes/vendor/" + target for target in vendor_targets]),
-        "&& cp pkg/generated/openapi/zz_generated.openapi.go $(GENDIR)/pkg/generated/openapi",
+        "&& cp pkg/generated/openapi/zz_generated.openapi.go $(location :zz_generated.openapi.go)",
       ]),
       go_deps = deps,
       tools = ["//vendor/k8s.io/kube-gen/cmd/openapi-gen"],

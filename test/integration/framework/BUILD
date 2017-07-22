@@ -14,6 +14,7 @@ go_library(
         "master_utils.go",
         "perf_utils.go",
         "serializer.go",
+        "util.go",
     ],
     data = [
         "@com_coreos_etcd//:etcd",

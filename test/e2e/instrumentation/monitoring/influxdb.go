@@ -142,7 +142,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 		if err != nil {
 			return nil, err
 		}
-		psList, err := c.Apps().StatefulSets(metav1.NamespaceSystem).List(options)
+		psList, err := c.AppsV1beta1().StatefulSets(metav1.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
 		}

@@ -18,6 +18,7 @@ package rest
 
 import (
 	appsapiv1beta1 "k8s.io/api/apps/v1beta1"
+	appsapiv1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -39,6 +40,10 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(appsapiv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = appsapiv1beta1.SchemeGroupVersion
+	}
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(appsapiv1beta2.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1beta2.SchemeGroupVersion.Version] = p.v1beta2Storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.GroupMeta.GroupVersion = appsapiv1beta2.SchemeGroupVersion
 	}
 
 	return apiGroupInfo, true
@@ -63,6 +68,25 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("controllerrevisions")) {
 		historyStorage := controllerrevisionsstore.NewREST(restOptionsGetter)
 		storage["controllerrevisions"] = historyStorage
+	}
+	return storage
+}
+
+func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	version := appsapiv1beta2.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("deployments")) {
+		deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
+		storage["deployments"] = deploymentStorage.Deployment
+		storage["deployments/status"] = deploymentStorage.Status
+		storage["deployments/rollback"] = deploymentStorage.Rollback
+		storage["deployments/scale"] = deploymentStorage.Scale
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("statefulsets")) {
+		statefulsetStorage, statefulsetStatusStorage := statefulsetstore.NewREST(restOptionsGetter)
+		storage["statefulsets"] = statefulsetStorage
+		storage["statefulsets/status"] = statefulsetStatusStorage
 	}
 	return storage
 }

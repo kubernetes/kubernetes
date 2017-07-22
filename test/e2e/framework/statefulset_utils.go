@@ -79,7 +79,7 @@ func NewStatefulSetTester(c clientset.Interface) *StatefulSetTester {
 
 // GetStatefulSet gets the StatefulSet named name in namespace.
 func (s *StatefulSetTester) GetStatefulSet(namespace, name string) *apps.StatefulSet {
-	ss, err := s.c.Apps().StatefulSets(namespace).Get(name, metav1.GetOptions{})
+	ss, err := s.c.AppsV1beta1().StatefulSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		Failf("Failed to get StatefulSet %s/%s: %v", namespace, name, err)
 	}
@@ -234,12 +234,12 @@ func (s *StatefulSetTester) Restart(ss *apps.StatefulSet) {
 
 func (s *StatefulSetTester) update(ns, name string, update func(ss *apps.StatefulSet)) {
 	for i := 0; i < 3; i++ {
-		ss, err := s.c.Apps().StatefulSets(ns).Get(name, metav1.GetOptions{})
+		ss, err := s.c.AppsV1beta1().StatefulSets(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			Failf("failed to get statefulset %q: %v", name, err)
 		}
 		update(ss)
-		ss, err = s.c.Apps().StatefulSets(ns).Update(ss)
+		ss, err = s.c.AppsV1beta1().StatefulSets(ns).Update(ss)
 		if err == nil {
 			return
 		}
@@ -312,7 +312,7 @@ func (s *StatefulSetTester) waitForRunning(numStatefulPods int32, ss *apps.State
 func (s *StatefulSetTester) WaitForState(ss *apps.StatefulSet, until func(*apps.StatefulSet, *v1.PodList) (bool, error)) {
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
 		func() (bool, error) {
-			ssGet, err := s.c.Apps().StatefulSets(ss.Namespace).Get(ss.Name, metav1.GetOptions{})
+			ssGet, err := s.c.AppsV1beta1().StatefulSets(ss.Namespace).Get(ss.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -550,7 +550,7 @@ func (s *StatefulSetTester) WaitForStatusReadyReplicas(ss *apps.StatefulSet, exp
 	ns, name := ss.Namespace, ss.Name
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
 		func() (bool, error) {
-			ssGet, err := s.c.Apps().StatefulSets(ns).Get(name, metav1.GetOptions{})
+			ssGet, err := s.c.AppsV1beta1().StatefulSets(ns).Get(name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -575,7 +575,7 @@ func (s *StatefulSetTester) WaitForStatusReplicas(ss *apps.StatefulSet, expected
 	ns, name := ss.Namespace, ss.Name
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
 		func() (bool, error) {
-			ssGet, err := s.c.Apps().StatefulSets(ns).Get(name, metav1.GetOptions{})
+			ssGet, err := s.c.AppsV1beta1().StatefulSets(ns).Get(name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -613,7 +613,7 @@ func (s *StatefulSetTester) SortStatefulPods(pods *v1.PodList) {
 // DeleteAllStatefulSets deletes all StatefulSet API Objects in Namespace ns.
 func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	sst := &StatefulSetTester{c: c}
-	ssList, err := c.Apps().StatefulSets(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	ssList, err := c.AppsV1beta1().StatefulSets(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	ExpectNoError(err)
 
 	// Scale down each statefulset, then delete it completely.
@@ -628,7 +628,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		Logf("Deleting statefulset %v", ss.Name)
 		// Use OrphanDependents=false so it's deleted synchronously.
 		// We already made sure the Pods are gone inside Scale().
-		if err := c.Apps().StatefulSets(ss.Namespace).Delete(ss.Name, &metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
+		if err := c.AppsV1beta1().StatefulSets(ss.Namespace).Delete(ss.Name, &metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
 	}
@@ -812,7 +812,7 @@ func (sp statefulPodsByOrdinal) Less(i, j int) bool {
 type updateStatefulSetFunc func(*apps.StatefulSet)
 
 func UpdateStatefulSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateStatefulSetFunc) (statefulSet *apps.StatefulSet, err error) {
-	statefulSets := c.Apps().StatefulSets(namespace)
+	statefulSets := c.AppsV1beta1().StatefulSets(namespace)
 	var updateErr error
 	pollErr := wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		if statefulSet, err = statefulSets.Get(name, metav1.GetOptions{}); err != nil {

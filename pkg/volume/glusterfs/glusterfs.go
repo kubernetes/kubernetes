@@ -335,9 +335,13 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	options = append(options, "backup-volfile-servers="+dstrings.Join(addrlist[:], ":"))
 	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
 
-	// Avoid mount storm, pick a host randomly.
-	// Iterate all hosts until mount succeeds.
-	for _, ip := range addrlist {
+	// with `backup-volfile-servers` mount option in place, it is not required to
+	// iterate over all the servers in the addrlist. A mount attempt with this option
+	// will fetch all the servers mentioned in the backup-volfile-servers list.
+	// Refer backup-volfile-servers @ https://access.redhat.com/documentation/en-US/Red_Hat_Storage/3/html/Administration_Guide/sect-Native_Client.html
+
+	if (len(addrlist) > 0) && (addrlist[0] != "") {
+		ip := addrlist[0]
 		errs = b.mounter.Mount(ip+":"+b.path, dir, "glusterfs", mountOptions)
 		if errs == nil {
 			glog.Infof("glusterfs: successfully mounted %s", dir)
@@ -361,6 +365,8 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 				return nil
 			}
 		}
+	} else {
+		return fmt.Errorf("glusterfs: failed to execute mount command:[no valid ipaddress found in endpoint address list]")
 	}
 
 	// Failed mount scenario.
