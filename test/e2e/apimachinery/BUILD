@@ -24,6 +24,7 @@ go_library(
         "//pkg/client/retry:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/printers:go_default_library",
+        "//pkg/util/version:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/metrics:go_default_library",
         "//test/e2e/workload:go_default_library",
