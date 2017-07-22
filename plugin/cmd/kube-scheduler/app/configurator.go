@@ -83,7 +83,7 @@ func createClient(s *options.SchedulerServer) (*clientset.Clientset, *kubernetes
 // CreateScheduler encapsulates the entire creation of a runnable scheduler.
 func CreateScheduler(
 	s *options.SchedulerServer,
-	kubecli *clientset.Clientset,
+	kubecli clientset.Interface,
 	nodeInformer coreinformers.NodeInformer,
 	podInformer coreinformers.PodInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
