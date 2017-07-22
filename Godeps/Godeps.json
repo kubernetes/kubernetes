@@ -2380,11 +2380,11 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
-			"Rev": "f62e98d28ab7ad31d707ba837a966378465c7b57"
+			"Rev": "715f41bd7a70b5111f898b71ab484da52ee6266d"
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra/doc",
-			"Rev": "f62e98d28ab7ad31d707ba837a966378465c7b57"
+			"Rev": "715f41bd7a70b5111f898b71ab484da52ee6266d"
 		},
 		{
 			"ImportPath": "github.com/spf13/jwalterweatherman",
@@ -2392,7 +2392,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "9ff6c6923cfffbcd502984b8e0c80539a94968b7"
+			"Rev": "e57e3eeb33f795204c1ca35f56c44f83227c6e66"
 		},
 		{
 			"ImportPath": "github.com/spf13/viper",
