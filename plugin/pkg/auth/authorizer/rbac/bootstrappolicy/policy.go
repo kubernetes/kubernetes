@@ -101,7 +101,8 @@ func NodeRules() []rbac.PolicyRule {
 		rbac.NewRule("update", "patch").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
 		rbac.NewRule("update", "patch", "delete").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 
-		// TODO: restrict to the bound node as creator in the NodeRestrictions admission plugin
+		// Node can create or update Event objects.
+		// Use the NodeRestriction admission plugin to limit a node to creating/updating events from itself.
 		rbac.NewRule("create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
 
 		// TODO: restrict to pods scheduled on the bound node once field selectors are supported by list/watch authorization
