@@ -10,7 +10,10 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["manifests_test.go"],
+    srcs = [
+        "manifests_test.go",
+        "volumes_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
@@ -25,7 +28,10 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["manifests.go"],
+    srcs = [
+        "manifests.go",
+        "volumes.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
