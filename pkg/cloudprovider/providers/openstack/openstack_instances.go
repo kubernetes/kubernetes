@@ -143,6 +143,13 @@ func (i *Instances) ExternalID(name types.NodeName) (string, error) {
 
 // InstanceID returns the kubelet's cloud provider ID.
 func (os *OpenStack) InstanceID() (string, error) {
+	if len(os.localInstanceID) == 0 {
+		id, err := readInstanceID()
+		if err != nil {
+			return "", err
+		}
+		os.localInstanceID = id
+	}
 	return os.localInstanceID, nil
 }
 
