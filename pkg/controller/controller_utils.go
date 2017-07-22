@@ -44,11 +44,11 @@ import (
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/integer"
 	_ "k8s.io/kubernetes/pkg/api/install"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/validation"
 	clientretry "k8s.io/kubernetes/pkg/client/retry"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
+	taintutils "k8s.io/kubernetes/pkg/util/taints"
 
 	"github.com/golang/glog"
 )
@@ -901,7 +901,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint *v1.Ta
 		if err != nil {
 			return err
 		}
-		newNode, ok, err := v1helper.AddOrUpdateTaint(oldNode, taint)
+		newNode, ok, err := taintutils.AddOrUpdateTaint(oldNode, taint)
 		if err != nil {
 			return fmt.Errorf("Failed to update taint annotation!")
 		}
@@ -945,7 +945,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint,
 		if err != nil {
 			return err
 		}
-		newNode, ok, err := v1helper.RemoveTaint(oldNode, taint)
+		newNode, ok, err := taintutils.RemoveTaint(oldNode, taint)
 		if err != nil {
 			return fmt.Errorf("Failed to update taint annotation!")
 		}
