@@ -1239,7 +1239,7 @@ func TestConditionInvalidSelectorMissing(t *testing.T) {
 			{
 				Type:   autoscalingv1.ScalingActive,
 				Status: v1.ConditionFalse,
-				Reason: "InvalidSelector",
+				Reason: "SelectorRequired",
 			},
 		},
 	}

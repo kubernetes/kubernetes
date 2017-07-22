@@ -222,7 +222,7 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 		if len(scale.Status.Selector) == 0 && len(scale.Status.TargetSelector) == 0 {
 			errMsg := "selector is required"
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "SelectorRequired", errMsg)
-			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", "the HPA target's scale is missing a selector")
+			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "SelectorRequired", "the HPA target's scale is missing a selector")
 			return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
 		}
 
