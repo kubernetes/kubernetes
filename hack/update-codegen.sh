@@ -61,62 +61,65 @@ GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
 # update- and verify- scripts.
 ${clientgen} "$@"
 ${clientgen} -t "$@" --output-base "${KUBE_ROOT}/vendor"
-${clientgen} --clientset-name="clientset" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" "$@"
+${clientgen} --output-base "${KUBE_ROOT}/vendor" --clientset-path="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" "$@"
 # Clientgen for federation clientset.
 ${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/","batch/","autoscaling/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,extensions/Deployment,extensions/DaemonSet,api/ConfigMap,api/Event,batch/Job,autoscaling/HorizontalPodAutoscaler"   "$@"
 ${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="../../../federation/apis/federation/v1beta1","core/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="core/v1/Service,core/v1/Namespace,extensions/v1beta1/ReplicaSet,core/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,core/v1/ConfigMap,core/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
 
-listergen_kubernetes_apis=(
+listergen_internal_apis=(
 pkg/api
 $(
   cd ${KUBE_ROOT}
-  # because client-gen doesn't do policy/v1alpha1, we have to skip it too
-  find pkg/apis -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
+  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort 
 )
 )
-listergen_kubernetes_apis=(${listergen_kubernetes_apis[@]/#/k8s.io/kubernetes/})
-listergen_staging_apis=(
+listergen_internal_apis=(${listergen_internal_apis[@]/#/k8s.io/kubernetes/})
+listergen_internal_apis_csv=$(IFS=,; echo "${listergen_internal_apis[*]}")
+${listergen} --input-dirs "${listergen_internal_apis_csv}" "$@"
+
+listergen_external_apis=(
 $(
   cd ${KUBE_ROOT}/staging/src
   # because client-gen doesn't do policy/v1alpha1, we have to skip it too
   find k8s.io/api -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
 )
 )
+listergen_external_apis_csv=$(IFS=,; echo "${listergen_external_apis[*]}")
+${listergen} --output-base "${KUBE_ROOT}/vendor" --output-package "k8s.io/client-go/listers" --input-dirs "${listergen_external_apis_csv}" "$@"
 
-LISTERGEN_APIS=$(IFS=,; echo "${listergen_kubernetes_apis[*]}")
-LISTERGEN_APIS+=","
-LISTERGEN_APIS+=$(IFS=,; echo "${listergen_staging_apis[*]}")
-${listergen} --input-dirs "${LISTERGEN_APIS}" "$@"
-
-informergen_kubernetes_apis=(
+informergen_internal_apis=(
 pkg/api
 $(
   cd ${KUBE_ROOT}
-  # because client-gen doesn't do policy/v1alpha1, we have to skip it too
-  find pkg/apis -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
+  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort 
 )
 )
-informergen_kubernetes_apis=(${informergen_kubernetes_apis[@]/#/k8s.io/kubernetes/})
-informergen_staging_apis=(
-$(
-  cd ${KUBE_ROOT}/staging/src
-  # because client-gen doesn't do policy/v1alpha1, we have to skip it too
-  find k8s.io/api -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
-)
-)
-
-
-INFORMERGEN_APIS=$(IFS=,; echo "${informergen_kubernetes_apis[*]}")
-INFORMERGEN_APIS+=","
-INFORMERGEN_APIS+=$(IFS=,; echo "${informergen_staging_apis[*]}")
-
+informergen_internal_apis=(${informergen_internal_apis[@]/#/k8s.io/kubernetes/})
+informergen_internal_apis_csv=$(IFS=,; echo "${informergen_internal_apis[*]}")
 ${informergen} \
-  --input-dirs "${INFORMERGEN_APIS}" \
-  --versioned-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/clientset \
+  --input-dirs "${informergen_internal_apis_csv}" \
   --internal-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset \
   --listers-package k8s.io/kubernetes/pkg/client/listers \
   "$@"
 
+informergen_external_apis=(
+$(
+  cd ${KUBE_ROOT}/staging/src
+  # because client-gen doesn't do policy/v1alpha1, we have to skip it too
+  find k8s.io/api -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
+)
+)
+
+informergen_external_apis_csv=$(IFS=,; echo "${informergen_external_apis[*]}")
+
+${informergen} \
+  --output-base "${KUBE_ROOT}/vendor" \
+  --output-package "k8s.io/client-go/informers" \
+  --single-directory \
+  --input-dirs "${informergen_external_apis_csv}" \
+  --versioned-clientset-package k8s.io/client-go/kubernetes \
+  --listers-package k8s.io/client-go/listers \
+  "$@"
 
 # You may add additional calls of code generators like set-gen above.
 

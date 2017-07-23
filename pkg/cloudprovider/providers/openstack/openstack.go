@@ -281,18 +281,12 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 		return nil, err
 	}
 
-	id, err := readInstanceID()
-	if err != nil {
-		return nil, err
-	}
-
 	os := OpenStack{
-		provider:        provider,
-		region:          cfg.Global.Region,
-		lbOpts:          cfg.LoadBalancer,
-		bsOpts:          cfg.BlockStorage,
-		routeOpts:       cfg.Route,
-		localInstanceID: id,
+		provider:  provider,
+		region:    cfg.Global.Region,
+		lbOpts:    cfg.LoadBalancer,
+		bsOpts:    cfg.BlockStorage,
+		routeOpts: cfg.Route,
 	}
 
 	err = checkOpenStackOpts(&os)

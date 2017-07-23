@@ -71,7 +71,6 @@ go_library(
     ],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/certificates:go_default_library",
         "//pkg/apis/policy:go_default_library",

@@ -21,11 +21,9 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-
-	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
 )
 
@@ -269,34 +267,6 @@ func TolerationsTolerateTaintsWithFilter(tolerations []v1.Toleration, taints []v
 	return true
 }
 
-// DeleteTaintsByKey removes all the taints that have the same key to given taintKey
-func DeleteTaintsByKey(taints []v1.Taint, taintKey string) ([]v1.Taint, bool) {
-	newTaints := []v1.Taint{}
-	deleted := false
-	for i := range taints {
-		if taintKey == taints[i].Key {
-			deleted = true
-			continue
-		}
-		newTaints = append(newTaints, taints[i])
-	}
-	return newTaints, deleted
-}
-
-// DeleteTaint removes all the the taints that have the same key and effect to given taintToDelete.
-func DeleteTaint(taints []v1.Taint, taintToDelete *v1.Taint) ([]v1.Taint, bool) {
-	newTaints := []v1.Taint{}
-	deleted := false
-	for i := range taints {
-		if taintToDelete.MatchTaint(&taints[i]) {
-			deleted = true
-			continue
-		}
-		newTaints = append(newTaints, taints[i])
-	}
-	return newTaints, deleted
-}
-
 // Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
 func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (bool, []v1.Toleration) {
 	if len(taints) == 0 {
@@ -379,70 +349,6 @@ func PodAnnotationsFromSysctls(sysctls []v1.Sysctl) string {
 		kvs[i] = fmt.Sprintf("%s=%s", sysctls[i].Name, sysctls[i].Value)
 	}
 	return strings.Join(kvs, ",")
-}
-
-// Tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
-// false otherwise.
-func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
-	objCopy, err := api.Scheme.DeepCopy(node)
-	if err != nil {
-		return nil, false, err
-	}
-	newNode := objCopy.(*v1.Node)
-	nodeTaints := newNode.Spec.Taints
-
-	var newTaints []v1.Taint
-	updated := false
-	for i := range nodeTaints {
-		if taint.MatchTaint(&nodeTaints[i]) {
-			if helper.Semantic.DeepEqual(taint, nodeTaints[i]) {
-				return newNode, false, nil
-			}
-			newTaints = append(newTaints, *taint)
-			updated = true
-			continue
-		}
-
-		newTaints = append(newTaints, nodeTaints[i])
-	}
-
-	if !updated {
-		newTaints = append(newTaints, *taint)
-	}
-
-	newNode.Spec.Taints = newTaints
-	return newNode, true, nil
-}
-
-func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
-	for _, taint := range taints {
-		if taint.MatchTaint(taintToFind) {
-			return true
-		}
-	}
-	return false
-}
-
-// Tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
-// false otherwise.
-func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
-	objCopy, err := api.Scheme.DeepCopy(node)
-	if err != nil {
-		return nil, false, err
-	}
-	newNode := objCopy.(*v1.Node)
-	nodeTaints := newNode.Spec.Taints
-	if len(nodeTaints) == 0 {
-		return newNode, false, nil
-	}
-
-	if !TaintExists(nodeTaints, taint) {
-		return newNode, false, nil
-	}
-
-	newTaints, _ := DeleteTaint(nodeTaints, taint)
-	newNode.Spec.Taints = newTaints
-	return newNode, true, nil
 }
 
 // GetPersistentVolumeClass returns StorageClassName.

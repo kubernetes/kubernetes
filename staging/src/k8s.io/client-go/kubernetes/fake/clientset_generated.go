@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
-	kubernetes "k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	admissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
 	fakeadmissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1/fake"
 	appsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
@@ -89,7 +89,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	return &Clientset{fakePtr}
 }
 
-// Clientset implements kubernetes.Interface. Meant to be embedded into a
+// Clientset implements clientset.Interface. Meant to be embedded into a
 // struct to get a default implementation. This makes faking out just the method
 // you want to test easier.
 type Clientset struct {
@@ -100,7 +100,7 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return &fakediscovery.FakeDiscovery{Fake: &c.Fake}
 }
 
-var _ kubernetes.Interface = &Clientset{}
+var _ clientset.Interface = &Clientset{}
 
 // AdmissionregistrationV1alpha1 retrieves the AdmissionregistrationV1alpha1Client
 func (c *Clientset) AdmissionregistrationV1alpha1() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface {

@@ -19,6 +19,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//test/e2e/apimachinery:go_default_library",
+        "//test/e2e/apps:go_default_library",
         "//test/e2e/autoscaling:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/instrumentation/logging:go_default_library",
@@ -30,7 +31,6 @@ go_test(
         "//test/e2e/scalability:go_default_library",
         "//test/e2e/scheduling:go_default_library",
         "//test/e2e/storage:go_default_library",
-        "//test/e2e/workload:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
@@ -173,6 +173,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/e2e/apimachinery:all-srcs",
+        "//test/e2e/apps:all-srcs",
         "//test/e2e/autoscaling:all-srcs",
         "//test/e2e/chaosmonkey:all-srcs",
         "//test/e2e/common:all-srcs",
@@ -189,7 +190,6 @@ filegroup(
         "//test/e2e/storage:all-srcs",
         "//test/e2e/testing-manifests:all-srcs",
         "//test/e2e/upgrades:all-srcs",
-        "//test/e2e/workload:all-srcs",
     ],
     tags = ["automanaged"],
 )
