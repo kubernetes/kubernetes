@@ -510,3 +510,52 @@ func waitForReplicaSetToBeDeletedOrFail(clientset *fedclientset.Clientset, names
 		framework.Failf("Error in deleting replica set %s: %v", replicaSet, err)
 	}
 }
+
+// waitForDeploymentToBeDeletedOrFail waits for the named deployment in namespace to be deleted.
+// If the deletion fails, the enclosing test fails.
+func waitForDeploymentToBeDeletedOrFail(pollTimeout time.Duration, clientset *fedclientset.Clientset, namespace string, deployment string) {
+	err := wait.Poll(pollTimeout, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
+		_, err := clientset.Extensions().Deployments(namespace).Get(deployment, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+
+	if err != nil {
+		framework.Failf("Error in deleting deployment %s: %v", deployment, err)
+	}
+}
+
+// waitForHpaToBeDeletedOrFail waits for the named Hpa in namespace to be deleted.
+// If the deletion fails, the enclosing test fails.
+func waitForHpaToBeDeletedOrFail(pollTimeout time.Duration, clientset *fedclientset.Clientset, namespace string, hpa string) {
+	err := wait.Poll(pollTimeout, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
+		_, err := clientset.AutoscalingV1().HorizontalPodAutoscalers(namespace).Get(hpa, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+
+	if err != nil {
+		framework.Failf("Error in deleting hpa %s: %v", hpa, err)
+	}
+}
+
+// waitForPodToBeDeletedFromClusterOrFail waits for the named Pod in namespace to be deleted from
+// an individual cluster.
+// If the deletion fails, the enclosing test fails.
+func waitForPodToBeDeletedFromClusterOrFail(pollTimeout time.Duration, cluster *fedframework.Cluster, namespace string, podName string) {
+	err := wait.Poll(pollTimeout, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
+		_, err := cluster.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+
+	if err != nil {
+		framework.Failf("Error in deleting pod %q from cluster %q: %v", podName, cluster.Name, err)
+	}
+}

@@ -49,6 +49,31 @@ type Cluster struct {
 	*kubeclientset.Clientset
 }
 
+func (c *Cluster) GetNewFramework(fwBaseName, namespace string) *framework.Framework {
+	options := framework.FrameworkOptions{
+		ClientQPS:   20,
+		ClientBurst: 50,
+	}
+	f := &framework.Framework{
+		BaseName:                 fwBaseName,
+		AddonResourceConstraints: make(map[string]framework.ResourceConstraint),
+		Options:                  options,
+		ClientSet:                c.Clientset,
+		InternalClientset:        c.InternalClientSet,
+		Namespace: &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		},
+	}
+	f.SkipNamespaceCreation = true
+
+	BeforeEach(f.BeforeEach)
+	AfterEach(f.AfterEach)
+
+	return f
+}
+
 // registeredClustersFromConfig configures clientsets for registered clusters from the e2e kubeconfig
 func registeredClustersFromConfig(f *Framework) ClusterSlice {
 	contexts := f.GetUnderlyingFederatedContexts()
