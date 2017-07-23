@@ -30,6 +30,7 @@ import (
 	fedapi "k8s.io/kubernetes/federation/apis/federation"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	hpautil "k8s.io/kubernetes/federation/pkg/federation-controller/util/hpa"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/planner"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/podanalyzer"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/replicapreferences"
@@ -47,9 +48,9 @@ const (
 	ActionDelete = "delete"
 )
 
-// ReplicaSchedulingStatus contains the status of the replica type objects (rs or deployment)
-// that are being scheduled into joined clusters.
-type ReplicaSchedulingStatus struct {
+// ReplicaStatus contains the details of status fields from the cluster objects,
+// which need accumulation to update the status of the federated object.
+type ReplicaStatus struct {
 	Replicas             int32
 	UpdatedReplicas      int32
 	FullyLabeledReplicas int32
@@ -57,11 +58,18 @@ type ReplicaSchedulingStatus struct {
 	AvailableReplicas    int32
 }
 
+// ReplicaScheduleState is the result of adapter specific schedule() function,
+// which is then used to update objects into clusters.
+type ReplicaScheduleState struct {
+	isSelected bool
+	replicas   int64
+}
+
 // ReplicaSchedulingInfo wraps the information that a replica type (rs or deployment)
 // SchedulingAdapter needs to update objects per a schedule.
 type ReplicaSchedulingInfo struct {
-	Schedule map[string]int64
-	Status   ReplicaSchedulingStatus
+	ScheduleState map[string]*ReplicaScheduleState
+	Status        ReplicaStatus
 }
 
 // SchedulingAdapter defines operations for interacting with a
@@ -85,6 +93,58 @@ type replicaSchedulingAdapter struct {
 
 func (a *replicaSchedulingAdapter) IsSchedulingAdapter() bool {
 	return true
+}
+
+func isSelected(names []string, name string) bool {
+	for _, val := range names {
+		if val == name {
+			return true
+		}
+	}
+	return false
+}
+
+func isObjHpaControlled(fedObj pkgruntime.Object) (bool, error) {
+	hpaSelectedClusters, error := hpautil.GetHpaTargetClusterList(fedObj)
+	if error != nil {
+		return false, error
+	}
+
+	if hpaSelectedClusters == nil {
+		return false, nil
+	}
+	return true, nil
+}
+
+// initializeScheduleState initializes the schedule state for consumption by schedule
+// functions (schedule or simple schedule). After this initialization the state would
+// already have information, if only a subset of clusters targetted by hpa, or all clusters
+// need to be considered by the actual scheduling functions.
+// The return bool named hpaControlled tells if this object is controlled by hpa or not.
+func initializeScheduleState(fedObj pkgruntime.Object, clusterNames []string) (map[string]*ReplicaScheduleState, bool, error) {
+	initialState := make(map[string]*ReplicaScheduleState)
+	hpaControlled := false
+	hpaSelectedClusters, error := hpautil.GetHpaTargetClusterList(fedObj)
+	if error != nil {
+		return nil, hpaControlled, error
+	}
+
+	if hpaSelectedClusters != nil {
+		hpaControlled = true
+	}
+	for _, clusterName := range clusterNames {
+		replicaState := ReplicaScheduleState{
+			isSelected: false,
+			replicas:   0,
+		}
+		if hpaControlled {
+			if isSelected(hpaSelectedClusters.Names, clusterName) {
+				replicaState.isSelected = true
+			}
+		}
+		initialState[clusterName] = &replicaState
+	}
+	return initialState, hpaControlled, nil
 }
 
 func (a *replicaSchedulingAdapter) GetSchedule(obj pkgruntime.Object, key string, clusters []*federationapi.Cluster, informer fedutil.FederatedInformer) (interface{}, error) {
@@ -113,6 +173,23 @@ func (a *replicaSchedulingAdapter) GetSchedule(obj pkgruntime.Object, key string
 		}
 		return clientset.Core().Pods(metadata.GetNamespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	}
+
+	initializedState, hpaControlled, err := initializeScheduleState(obj, clusterNames)
+	if err != nil {
+		return nil, err
+	}
+
+	if hpaControlled {
+		state, err := simpleSchedule(initializedState, key, objectGetter)
+		if err != nil {
+			return nil, err
+		}
+		return &ReplicaSchedulingInfo{
+			ScheduleState: state,
+			Status:        ReplicaStatus{},
+		}, nil
+	}
+
 	currentReplicasPerCluster, estimatedCapacity, err := clustersReplicaState(clusterNames, key, objectGetter, podsGetter)
 	if err != nil {
 		return nil, err
@@ -133,20 +210,14 @@ func (a *replicaSchedulingAdapter) GetSchedule(obj pkgruntime.Object, key string
 	plnr := planner.NewPlanner(fedPref)
 
 	return &ReplicaSchedulingInfo{
-		Schedule: schedule(plnr, obj, key, clusterNames, currentReplicasPerCluster, estimatedCapacity),
-		Status:   ReplicaSchedulingStatus{},
+		ScheduleState: schedule(plnr, obj, key, clusterNames, currentReplicasPerCluster, estimatedCapacity, initializedState),
+		Status:        ReplicaStatus{},
 	}, nil
 }
 
 func (a *replicaSchedulingAdapter) ScheduleObject(cluster *federationapi.Cluster, clusterObj pkgruntime.Object, federationObjCopy pkgruntime.Object, schedulingInfo interface{}) (pkgruntime.Object, ScheduleAction, error) {
 	typedSchedulingInfo := schedulingInfo.(*ReplicaSchedulingInfo)
-	replicas, ok := typedSchedulingInfo.Schedule[cluster.Name]
-	if !ok {
-		replicas = 0
-	}
-
-	specReplicas := int32(replicas)
-	reflect.ValueOf(federationObjCopy).Elem().FieldByName("Spec").FieldByName("Replicas").Set(reflect.ValueOf(&specReplicas))
+	clusterScheduleState := typedSchedulingInfo.ScheduleState[cluster.Name]
 
 	if clusterObj != nil {
 		schedulingStatusVal := reflect.ValueOf(typedSchedulingInfo).Elem().FieldByName("Status")
@@ -162,10 +233,19 @@ func (a *replicaSchedulingAdapter) ScheduleObject(cluster *federationapi.Cluster
 			}
 		}
 	}
+
 	var action ScheduleAction = ""
-	if replicas > 0 {
+	specReplicas := int32(0)
+	// If the cluster has been selected (isSelected = true; for example by hpa)
+	// and the obj does not get any replicas, then it should create one with
+	// 0 replicas (which can then be scaled by hpa in that cluster).
+	// On the other hand we keep the action as "unassigned" if this cluster was
+	// not selected, and let the sync controller decide what to do.
+	if clusterScheduleState.isSelected {
+		specReplicas = int32(clusterScheduleState.replicas)
 		action = ActionAdd
 	}
+	reflect.ValueOf(federationObjCopy).Elem().FieldByName("Spec").FieldByName("Replicas").Set(reflect.ValueOf(&specReplicas))
 	return federationObjCopy, action, nil
 }
 
@@ -173,22 +253,48 @@ func (a *replicaSchedulingAdapter) UpdateFederatedStatus(obj pkgruntime.Object, 
 	return a.updateStatusFunc(obj, schedulingInfo)
 }
 
-func schedule(planner *planner.Planner, obj pkgruntime.Object, key string, clusterNames []string, currentReplicasPerCluster map[string]int64, estimatedCapacity map[string]int64) map[string]int64 {
+// simpleSchedule get replicas from only those clusters which are selected (by hpa scheduler).
+// This aim of this is to ensure that this controller does not update objects, which are
+// targetted by hpa.
+func simpleSchedule(scheduleState map[string]*ReplicaScheduleState, key string, objectGetter func(clusterName string, key string) (interface{}, bool, error)) (map[string]*ReplicaScheduleState, error) {
+	for clusterName, state := range scheduleState {
+		// Get and consider replicas only for those clusters which are selected by hpa.
+		if state.isSelected {
+			obj, exists, err := objectGetter(clusterName, key)
+			if err != nil {
+				return nil, err
+			}
+			if !exists {
+				continue
+			}
+			state.replicas = reflect.ValueOf(obj).Elem().FieldByName("Spec").FieldByName("Replicas").Elem().Int()
+		}
+	}
+
+	return scheduleState, nil
+}
+
+func schedule(planner *planner.Planner, obj pkgruntime.Object, key string, clusterNames []string, currentReplicasPerCluster map[string]int64, estimatedCapacity map[string]int64, initialState map[string]*ReplicaScheduleState) map[string]*ReplicaScheduleState {
 	// TODO: integrate real scheduler
 	replicas := reflect.ValueOf(obj).Elem().FieldByName("Spec").FieldByName("Replicas").Elem().Int()
 	scheduleResult, overflow := planner.Plan(replicas, clusterNames, currentReplicasPerCluster, estimatedCapacity, key)
 
 	// Ensure that all current clusters end up in the scheduling result.
-	result := make(map[string]int64)
+	// initialState, is preinitialized with all isSelected to false.
+	result := initialState
 	for clusterName := range currentReplicasPerCluster {
-		result[clusterName] = 0
+		// We consider 0 replicas equaling to no need of creating a new object.
+		// isSchedule remains false in such case.
+		result[clusterName].replicas = 0
 	}
 
 	for clusterName, replicas := range scheduleResult {
-		result[clusterName] = replicas
+		result[clusterName].isSelected = true
+		result[clusterName].replicas = replicas
 	}
 	for clusterName, replicas := range overflow {
-		result[clusterName] += replicas
+		result[clusterName].isSelected = true
+		result[clusterName].replicas += replicas
 	}
 
 	if glog.V(4) {
