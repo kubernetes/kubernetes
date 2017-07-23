@@ -17,10 +17,12 @@ limitations under the License.
 package federatedtypes
 
 import (
+	"fmt"
 	"time"
 
-	"fmt"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	"k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,6 +33,10 @@ import (
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	hpautil "k8s.io/kubernetes/federation/pkg/federation-controller/util/hpa"
+	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -165,7 +171,7 @@ func (a *HpaAdapter) NewTestObject(namespace string) pkgruntime.Object {
 		},
 		Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
-				Kind: "replicaset",
+				Kind: "ReplicaSet",
 				Name: "myrs",
 			},
 			MinReplicas:                    &min,
@@ -442,6 +448,10 @@ func (a *HpaAdapter) UpdateFederatedStatus(obj pkgruntime.Object, schedulingInfo
 		if err != nil {
 			return fmt.Errorf("Error updating hpa: %s status in federation: %v", fedHpa.Name, err)
 		}
+	}
+
+	if err := a.updateClusterListOnTargetObject(fedHpa, schedulingInfo.(*hpaSchedulingInfo).scheduleState); err != nil {
+		return fmt.Errorf("Error updating cluster list on object targetted by hpa: %s: %v", fedHpa.Name, err)
 	}
 	return nil
 }
@@ -935,4 +945,71 @@ func (a *HpaAdapter) minReplicasIncreasable(obj pkgruntime.Object) bool {
 		return true
 	}
 	return false
+}
+
+// updateClusterListOnTargetObject passes the necessary info to the target object,
+// so that the corresponding controller can act on that.
+// This is used because if an hpa is active on a federated object it is supposed
+// to control the replicas and presence/absence of target object from federated clusters.
+func (a *HpaAdapter) updateClusterListOnTargetObject(fedHpa *autoscalingv1.HorizontalPodAutoscaler, scheduleStatus map[string]*replicaNums) error {
+	if len(fedHpa.Spec.ScaleTargetRef.Kind) <= 0 || len(fedHpa.Spec.ScaleTargetRef.Name) <= 0 {
+		// nothing to do
+		glog.Infof("Fed HPA: cluster list update on target object skipped for target obj: %s, kind: %s", fedHpa.Spec.ScaleTargetRef.Name, fedHpa.Spec.ScaleTargetRef.Kind)
+		return nil
+	}
+
+	names := []string{}
+	for clusterName, replicas := range scheduleStatus {
+		if replicas != nil {
+			names = append(names, clusterName)
+		}
+	}
+	clusterNames := hpautil.ClusterNames{Names: names}
+	qualifiedKind := extensionsinternal.Kind(fedHpa.Spec.ScaleTargetRef.Kind)
+	targetObj, err := getRuntimeObjectForKind(a.client, qualifiedKind, fedHpa.Namespace, fedHpa.Spec.ScaleTargetRef.Name)
+	if errors.IsNotFound(err) {
+		// Nothing to do; the target object does not exist in federation.
+		glog.Infof("Fed HPA: cluster list update on target object skipped for target obj: %s, kind: %s. Target object missing in federation", fedHpa.Spec.ScaleTargetRef.Name, fedHpa.Spec.ScaleTargetRef.Kind)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	updatedObj := hpautil.SetHpaTargetClusterList(targetObj, clusterNames)
+	_, err = updateRuntimeObjectForKind(a.client, qualifiedKind, fedHpa.Namespace, updatedObj)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// getRuntimeObjectForKind gets the hpa targetted object from the federation control plane.
+// As of now, federation only supports "ReplicaSets" and "Deployments", which is the reason
+// this function only lists these two types.
+// TODO: update a similar info in federated hpa documentation.
+func getRuntimeObjectForKind(c federationclientset.Interface, kind schema.GroupKind, ns, name string) (pkgruntime.Object, error) {
+	switch kind {
+	case extensionsinternal.Kind("ReplicaSet"):
+		return c.ExtensionsV1beta1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+	case extensionsinternal.Kind("Deployment"):
+		return c.ExtensionsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})
+	default:
+		return nil, fmt.Errorf("Unsupported federated kind targeted by hpa: %v", kind)
+	}
+}
+
+// updateRuntimeObjectForKind updates the hpa targetted object in the federation control plane.
+// As of now, federation only supports "ReplicaSets" and "Deployments", which is the reason
+// this function only lists these two types.
+// TODO: update a similar info in federated hpa documentation.
+func updateRuntimeObjectForKind(c federationclientset.Interface, kind schema.GroupKind, ns string, obj pkgruntime.Object) (pkgruntime.Object, error) {
+	switch kind {
+	case extensionsinternal.Kind("ReplicaSet"):
+		return c.ExtensionsV1beta1().ReplicaSets(ns).Update(obj.(*v1beta1.ReplicaSet))
+	case extensionsinternal.Kind("Deployment"):
+		return c.ExtensionsV1beta1().Deployments(ns).Update(obj.(*v1beta1.Deployment))
+	default:
+		return nil, fmt.Errorf("Unsupported federated kind targeted by hpa: %v", kind)
+	}
 }
