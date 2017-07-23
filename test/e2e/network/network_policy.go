@@ -150,7 +150,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 				// Allow traffic only to one port.
 				Ingress: []networking.NetworkPolicyIngressRule{{
 					Ports: []networking.NetworkPolicyPort{{
-						Port: &intstr.IntOrString{IntVal: 81},
+						Port: &intstr.Int32OrString{IntVal: 81},
 					}},
 				}},
 			},
@@ -194,7 +194,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 				// Allow traffic only to one port.
 				Ingress: []networking.NetworkPolicyIngressRule{{
 					Ports: []networking.NetworkPolicyPort{{
-						Port: &intstr.IntOrString{IntVal: 80},
+						Port: &intstr.Int32OrString{IntVal: 80},
 					}},
 				}},
 			},
@@ -218,7 +218,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 				// Allow traffic only to one port.
 				Ingress: []networking.NetworkPolicyIngressRule{{
 					Ports: []networking.NetworkPolicyPort{{
-						Port: &intstr.IntOrString{IntVal: 81},
+						Port: &intstr.Int32OrString{IntVal: 81},
 					}},
 				}},
 			},

@@ -87,38 +87,38 @@ type Config struct {
 // two ways to customize spec for a type. If you add it here, a type will be converted to a simple type and the type
 // comment (the comment that is added before type definition) will be lost. The spec will still have the property
 // comment. The second way is to implement OpenAPIDefinitionGetter interface. That function can customize the spec (so
-// the spec does not need to be simple type,format) or can even return a simple type,format (e.g. IntOrString). For simple
+// the spec does not need to be simple type,format) or can even return a simple type,format (e.g. Int32OrString). For simple
 // type formats, the benefit of adding OpenAPIDefinitionGetter interface is to keep both type and property documentation.
 // Example:
 // type Sample struct {
 //      ...
 //      // port of the server
-//      port IntOrString
+//      port Int32OrString
 //      ...
 // }
-// // IntOrString documentation...
-// type IntOrString { ... }
+// // Int32OrString documentation...
+// type Int32OrString { ... }
 //
-// Adding IntOrString to this function:
+// Adding Int32OrString to this function:
 // "port" : {
 //           format:      "string",
 //           type:        "int-or-string",
 //           Description: "port of the server"
 // }
 //
-// Implement OpenAPIDefinitionGetter for IntOrString:
+// Implement OpenAPIDefinitionGetter for Int32OrString:
 //
 // "port" : {
-//           $Ref:    "#/definitions/IntOrString"
+//           $Ref:    "#/definitions/Int32OrString"
 //           Description: "port of the server"
 // }
 // ...
 // definitions:
 // {
-//           "IntOrString": {
+//           "Int32OrString": {
 //                     format:      "string",
 //                     type:        "int-or-string",
-//                     Description: "IntOrString documentation..."    // new
+//                     Description: "Int32OrString documentation..."    // new
 //           }
 // }
 //

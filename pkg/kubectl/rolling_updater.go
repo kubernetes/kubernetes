@@ -79,7 +79,7 @@ type RollingUpdaterConfig struct {
 	// can be scaled down further, followed by scaling up the new RC, ensuring
 	// that the total number of pods available at all times during the update is at
 	// least 70% of desired pods.
-	MaxUnavailable intstr.IntOrString
+	MaxUnavailable intstr.Int32OrString
 	// MaxSurge is the maximum number of pods that can be scheduled above the desired number of pods.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// This can not be 0 if MaxUnavailable is 0.
@@ -90,7 +90,7 @@ type RollingUpdaterConfig struct {
 	// 130% of desired pods. Once old pods have been killed, new RC can be scaled up
 	// further, ensuring that total number of pods running at any time during
 	// the update is atmost 130% of desired pods.
-	MaxSurge intstr.IntOrString
+	MaxSurge intstr.Int32OrString
 	// OnProgress is invoked if set during each scale cycle, to allow the caller to perform additional logic or
 	// abort the scale. If an error is returned the cleanup method will not be invoked. The percentage value
 	// is a synthetic "progress" calculation that represents the approximate percentage completion.

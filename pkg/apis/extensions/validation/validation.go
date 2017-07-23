@@ -178,7 +178,7 @@ var ValidateDaemonSetName = apivalidation.NameIsDNSSubdomain
 // Validates that the given name can be used as a deployment name.
 var ValidateDeploymentName = apivalidation.NameIsDNSSubdomain
 
-func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fldPath *field.Path) field.ErrorList {
+func ValidatePositiveIntOrPercent(intOrPercent intstr.Int32OrString, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch intOrPercent.Type {
 	case intstr.String:
@@ -193,32 +193,32 @@ func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fldPath *fiel
 	return allErrs
 }
 
-func getPercentValue(intOrStringValue intstr.IntOrString) (int, bool) {
-	if intOrStringValue.Type != intstr.String {
+func getPercentValue(int32OrStringValue intstr.Int32OrString) (int, bool) {
+	if int32OrStringValue.Type != intstr.String {
 		return 0, false
 	}
-	if len(validation.IsValidPercent(intOrStringValue.StrVal)) != 0 {
+	if len(validation.IsValidPercent(int32OrStringValue.StrVal)) != 0 {
 		return 0, false
 	}
-	value, _ := strconv.Atoi(intOrStringValue.StrVal[:len(intOrStringValue.StrVal)-1])
+	value, _ := strconv.Atoi(int32OrStringValue.StrVal[:len(int32OrStringValue.StrVal)-1])
 	return value, true
 }
 
-func getIntOrPercentValue(intOrStringValue intstr.IntOrString) int {
-	value, isPercent := getPercentValue(intOrStringValue)
+func getIntOrPercentValue(int32OrStringValue intstr.Int32OrString) int {
+	value, isPercent := getPercentValue(int32OrStringValue)
 	if isPercent {
 		return value
 	}
-	return intOrStringValue.IntValue()
+	return int32OrStringValue.IntValue()
 }
 
-func IsNotMoreThan100Percent(intOrStringValue intstr.IntOrString, fldPath *field.Path) field.ErrorList {
+func IsNotMoreThan100Percent(int32OrStringValue intstr.Int32OrString, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	value, isPercent := getPercentValue(intOrStringValue)
+	value, isPercent := getPercentValue(int32OrStringValue)
 	if !isPercent || value <= 100 {
 		return nil
 	}
-	allErrs = append(allErrs, field.Invalid(fldPath, intOrStringValue, "must not be greater than 100%"))
+	allErrs = append(allErrs, field.Invalid(fldPath, int32OrStringValue, "must not be greater than 100%"))
 	return allErrs
 }
 

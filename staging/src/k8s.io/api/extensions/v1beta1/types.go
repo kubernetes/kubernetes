@@ -290,7 +290,7 @@ type RollingUpdateDeployment struct {
 	// that the total number of pods available at all times during the update is at
 	// least 70% of desired pods.
 	// +optional
-	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,1,opt,name=maxUnavailable"`
+	MaxUnavailable *intstr.Int32OrString `json:"maxUnavailable,omitempty" protobuf:"bytes,1,opt,name=maxUnavailable"`
 
 	// The maximum number of pods that can be scheduled above the desired number of
 	// pods.
@@ -304,7 +304,7 @@ type RollingUpdateDeployment struct {
 	// new RC can be scaled up further, ensuring that total number of pods running
 	// at any time during the update is atmost 130% of desired pods.
 	// +optional
-	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
+	MaxSurge *intstr.Int32OrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
 }
 
 // DeploymentStatus is the most recently observed status of the Deployment.
@@ -433,7 +433,7 @@ type RollingUpdateDaemonSet struct {
 	// that at least 70% of original number of DaemonSet pods are available at
 	// all times during the update.
 	// +optional
-	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,1,opt,name=maxUnavailable"`
+	MaxUnavailable *intstr.Int32OrString `json:"maxUnavailable,omitempty" protobuf:"bytes,1,opt,name=maxUnavailable"`
 }
 
 // DaemonSetSpec is the specification of a daemon set.
@@ -756,7 +756,7 @@ type IngressBackend struct {
 	ServiceName string `json:"serviceName" protobuf:"bytes,1,opt,name=serviceName"`
 
 	// Specifies the port of the referenced service.
-	ServicePort intstr.IntOrString `json:"servicePort" protobuf:"bytes,2,opt,name=servicePort"`
+	ServicePort intstr.Int32OrString `json:"servicePort" protobuf:"bytes,2,opt,name=servicePort"`
 }
 
 // +genclient=true
@@ -1167,7 +1167,7 @@ type NetworkPolicyPort struct {
 	// If present, only traffic on the specified protocol AND port
 	// will be matched.
 	// +optional
-	Port *intstr.IntOrString `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
+	Port *intstr.Int32OrString `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
 }
 
 type NetworkPolicyPeer struct {

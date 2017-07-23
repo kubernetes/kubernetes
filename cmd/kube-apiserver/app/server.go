@@ -940,7 +940,7 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		"v1.TCPSocketAction":                          "k8s.io/kubernetes/pkg/api/v1.TCPSocketAction",
 		"v1.Binding":                                  "k8s.io/kubernetes/pkg/api/v1.Binding",
 		"v1beta1.ReplicaSetStatus":                    "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ReplicaSetStatus",
-		"intstr.IntOrString":                          "k8s.io/kubernetes/pkg/util/intstr.IntOrString",
+		"intstr.Int32OrString":                        "k8s.io/kubernetes/pkg/util/intstr.Int32OrString",
 		"v1.EndpointsList":                            "k8s.io/kubernetes/pkg/api/v1.EndpointsList",
 		"v1.Container":                                "k8s.io/kubernetes/pkg/api/v1.Container",
 		"v1alpha1.RoleList":                           "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1.RoleList",

@@ -34,7 +34,7 @@ func TestFindPort(t *testing.T) {
 	testCases := []struct {
 		name       string
 		containers []v1.Container
-		port       intstr.IntOrString
+		port       intstr.Int32OrString
 		expected   int
 		pass       bool
 	}{{

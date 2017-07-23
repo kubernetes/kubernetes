@@ -354,7 +354,7 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		"v1.PreferredSchedulingTerm":           "io.k8s.kubernetes.pkg.api.v1.PreferredSchedulingTerm",
 		"v1beta1.ClusterList":                  "io.k8s.kubernetes.federation.apis.federation.v1beta1.ClusterList",
 		"v1.KeyToPath":                         "io.k8s.kubernetes.pkg.api.v1.KeyToPath",
-		"intstr.IntOrString":                   "io.k8s.apimachinery.pkg.util.intstr.IntOrString",
+		"intstr.Int32OrString":                 "io.k8s.apimachinery.pkg.util.intstr.Int32OrString",
 		"v1beta1.ClusterSpec":                  "io.k8s.kubernetes.federation.apis.federation.v1beta1.ClusterSpec",
 		"v1.ServiceList":                       "io.k8s.kubernetes.pkg.api.v1.ServiceList",
 		"v1beta1.DeploymentStrategy":           "io.k8s.kubernetes.pkg.apis.extensions.v1beta1.DeploymentStrategy",

@@ -179,7 +179,7 @@ func (pb *prober) runProbe(p *v1.Probe, pod *v1.Pod, status v1.PodStatus, contai
 	return probe.Unknown, "", fmt.Errorf("Missing probe handler for %s:%s", format.Pod(pod), container.Name)
 }
 
-func extractPort(param intstr.IntOrString, container v1.Container) (int, error) {
+func extractPort(param intstr.Int32OrString, container v1.Container) (int, error) {
 	port := -1
 	var err error
 	switch param.Type {
@@ -193,7 +193,7 @@ func extractPort(param intstr.IntOrString, container v1.Container) (int, error) 
 			}
 		}
 	default:
-		return port, fmt.Errorf("IntOrString had no kind: %+v", param)
+		return port, fmt.Errorf("Int32OrString had no kind: %+v", param)
 	}
 	if port > 0 && port < 65536 {
 		return port, nil

@@ -317,14 +317,14 @@ var _ = Describe("Reading Utility Definitions from openAPIData", func() {
 		Expect(err).To(BeNil())
 	})
 
-	Context("for util.intstr.IntOrString", func() {
+	Context("for util.intstr.Int32OrString", func() {
 		var definition openapi.Kind
 		It("should find the definition by name", func() {
-			intOrStringName := "io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+			int32OrStringName := "io.k8s.apimachinery.pkg.util.intstr.Int32OrString"
 			var found bool
-			definition, found = instance.NameToDefinition[intOrStringName]
+			definition, found = instance.NameToDefinition[int32OrStringName]
 			Expect(found).To(BeTrue())
-			Expect(definition.Name).To(Equal(intOrStringName))
+			Expect(definition.Name).To(Equal(int32OrStringName))
 			Expect(definition.PrimitiveType).To(Equal("string"))
 		})
 	})
@@ -332,11 +332,11 @@ var _ = Describe("Reading Utility Definitions from openAPIData", func() {
 	Context("for apis.meta.v1.Time", func() {
 		var definition openapi.Kind
 		It("should find the definition by name", func() {
-			intOrStringName := "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+			int32OrStringName := "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
 			var found bool
-			definition, found = instance.NameToDefinition[intOrStringName]
+			definition, found = instance.NameToDefinition[int32OrStringName]
 			Expect(found).To(BeTrue())
-			Expect(definition.Name).To(Equal(intOrStringName))
+			Expect(definition.Name).To(Equal(int32OrStringName))
 			Expect(definition.PrimitiveType).To(Equal("string"))
 		})
 	})

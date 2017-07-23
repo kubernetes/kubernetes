@@ -87,7 +87,7 @@ type NetworkPolicyPort struct {
 	// The port on the given protocol. This can either be a numerical or named port on
 	// a pod. If this field is not provided, this matches all port names and numbers.
 	// +optional
-	Port *intstr.IntOrString
+	Port *intstr.Int32OrString
 }
 
 // NetworkPolicyPeer describes a peer to allow traffic from. Exactly one of its fields

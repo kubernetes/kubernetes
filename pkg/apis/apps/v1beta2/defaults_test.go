@@ -33,8 +33,8 @@ import (
 )
 
 func TestSetDefaultDeployment(t *testing.T) {
-	defaultIntOrString := intstr.FromString("25%")
-	differentIntOrString := intstr.FromInt(5)
+	defaultInt32OrString := intstr.FromString("25%")
+	differentInt32OrString := intstr.FromInt(5)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -57,8 +57,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: appsv1beta2.DeploymentStrategy{
 						Type: appsv1beta2.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1beta2.RollingUpdateDeployment{
-							MaxSurge:       &defaultIntOrString,
-							MaxUnavailable: &defaultIntOrString,
+							MaxSurge:       &defaultInt32OrString,
+							MaxUnavailable: &defaultInt32OrString,
 						},
 					},
 					RevisionHistoryLimit:    newInt32(2),
@@ -73,7 +73,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Replicas: newInt32(5),
 					Strategy: appsv1beta2.DeploymentStrategy{
 						RollingUpdate: &appsv1beta2.RollingUpdateDeployment{
-							MaxSurge: &differentIntOrString,
+							MaxSurge: &differentInt32OrString,
 						},
 					},
 				},
@@ -84,8 +84,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: appsv1beta2.DeploymentStrategy{
 						Type: appsv1beta2.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1beta2.RollingUpdateDeployment{
-							MaxSurge:       &differentIntOrString,
-							MaxUnavailable: &defaultIntOrString,
+							MaxSurge:       &differentInt32OrString,
+							MaxUnavailable: &defaultInt32OrString,
 						},
 					},
 					RevisionHistoryLimit:    newInt32(2),
@@ -110,8 +110,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: appsv1beta2.DeploymentStrategy{
 						Type: appsv1beta2.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1beta2.RollingUpdateDeployment{
-							MaxSurge:       &defaultIntOrString,
-							MaxUnavailable: &defaultIntOrString,
+							MaxSurge:       &defaultInt32OrString,
+							MaxUnavailable: &defaultInt32OrString,
 						},
 					},
 					RevisionHistoryLimit:    newInt32(2),
