@@ -290,7 +290,7 @@ func (r *responder) Error(err error) {
 	r.scope.err(err, r.w, r.req)
 }
 
-func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
+func ListResource(r rest.Lister, rw rest.Watcher, e rest.Exporter, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("List " + req.URL.Path)
@@ -302,7 +302,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		}
 
 		// Watches for single objects are routed to this function.
-		// Treat a name parameter the same as a field selector entry.
+		// Treat a /name parameter the same as a field selector entry.
 		hasName := true
 		_, name, err := scope.Namer.Name(req)
 		if err != nil {
