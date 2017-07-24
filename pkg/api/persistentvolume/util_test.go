@@ -46,8 +46,15 @@ func TestPVSecrets(t *testing.T) {
 		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				CephFS: &api.CephFSVolumeSource{
-					SecretRef: &api.LocalObjectReference{
+				CephFS: &api.CephFSPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.CephFS.SecretRef",
+						Namespace: "cephfs"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				CephFS: &api.CephFSPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
 						Name: "Spec.PersistentVolumeSource.CephFS.SecretRef"}}}}},
 		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
@@ -81,7 +88,6 @@ func TestPVSecrets(t *testing.T) {
 						Name:      "Spec.PersistentVolumeSource.StorageOS.SecretRef",
 						Namespace: "storageosns"}}}}},
 	}
-
 	extractedNames := sets.NewString()
 	extractedNamesWithNamespace := sets.NewString()
 	for _, pv := range pvs {
@@ -132,6 +138,7 @@ func TestPVSecrets(t *testing.T) {
 		"claimrefns/Spec.PersistentVolumeSource.AzureFile.SecretName",
 		"Spec.PersistentVolumeSource.AzureFile.SecretNamespace/Spec.PersistentVolumeSource.AzureFile.SecretName",
 		"claimrefns/Spec.PersistentVolumeSource.CephFS.SecretRef",
+		"cephfs/Spec.PersistentVolumeSource.CephFS.SecretRef",
 		"claimrefns/Spec.PersistentVolumeSource.FlexVolume.SecretRef",
 		"claimrefns/Spec.PersistentVolumeSource.RBD.SecretRef",
 		"claimrefns/Spec.PersistentVolumeSource.ScaleIO.SecretRef",
