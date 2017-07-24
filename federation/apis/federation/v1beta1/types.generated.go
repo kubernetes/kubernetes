@@ -36,7 +36,6 @@ import (
 const (
 	// ----- content types ----
 	codecSelferC_UTF81234 = 1
-	codecSelferC_RAW1234  = 0
 	// ----- value types used ----
 	codecSelferValueTypeArray1234 = 10
 	codecSelferValueTypeMap1234   = 9
@@ -49,7 +48,6 @@ const (
 )
 
 var (
-	codecSelferBitsize1234                         = uint8(reflect.TypeOf(uint(0)).Bits())
 	codecSelferOnlyMapOrArrayEncodeToStructErr1234 = errors.New(`only encoded map or array can be decoded into a struct`)
 )
 
