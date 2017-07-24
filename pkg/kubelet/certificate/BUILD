@@ -58,6 +58,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/certificate/bootstrap:all-srcs",
+    ],
     tags = ["automanaged"],
 )
