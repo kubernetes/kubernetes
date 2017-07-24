@@ -21,7 +21,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	testgroupinternalversion "k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup"
+	testgroupinternalversion "k8s.io/kube-gen/test/apis/testgroup"
 )
 
 var scheme = runtime.NewScheme()

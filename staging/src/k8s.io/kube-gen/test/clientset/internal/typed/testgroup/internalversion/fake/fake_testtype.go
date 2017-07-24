@@ -23,7 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	testgroup "k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup"
+	testgroup "k8s.io/kube-gen/test/apis/testgroup"
 )
 
 // FakeTestTypes implements TestTypeInterface

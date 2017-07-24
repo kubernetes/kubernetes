@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package test_internalclientset
+package internal
 
 import (
 	glog "github.com/golang/glog"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
-	testgroupinternalversion "k8s.io/kube-gen/cmd/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
+	testgroupinternalversion "k8s.io/kube-gen/test/clientset/internal/typed/testgroup/internalversion"
 )
 
 type Interface interface {

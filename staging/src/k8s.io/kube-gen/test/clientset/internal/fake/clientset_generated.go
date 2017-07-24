@@ -22,9 +22,9 @@ import (
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
-	clientset "k8s.io/kube-gen/cmd/client-gen/testoutput/clientset_generated/test_internalclientset"
-	testgroupinternalversion "k8s.io/kube-gen/cmd/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
-	faketestgroupinternalversion "k8s.io/kube-gen/cmd/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion/fake"
+	clientset "k8s.io/kube-gen/test/clientset/internal"
+	testgroupinternalversion "k8s.io/kube-gen/test/clientset/internal/typed/testgroup/internalversion"
+	faketestgroupinternalversion "k8s.io/kube-gen/test/clientset/internal/typed/testgroup/internalversion/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.

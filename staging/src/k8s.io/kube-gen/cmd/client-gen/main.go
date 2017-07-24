@@ -172,15 +172,15 @@ func main() {
 
 	if *test {
 		arguments.InputDirs = append(dependencies, []string{
-			"k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup",
+			"k8s.io/kube-gen/test/apis/testgroup",
 		}...)
 		arguments.CustomArgs = clientgenargs.Args{
 			Groups: []types.GroupVersions{{Group: "testgroup", Versions: []types.Version{""}}},
 			GroupVersionToInputPath: map[types.GroupVersion]string{
-				{Group: "testgroup", Version: ""}: "k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup",
+				{Group: "testgroup", Version: ""}: "k8s.io/kube-gen/test/apis/testgroup",
 			},
 			ClientsetName:       "test_internalclientset",
-			ClientsetOutputPath: "k8s.io/kube-gen/cmd/client-gen/testoutput/clientset_generated/",
+			ClientsetOutputPath: "k8s.io/kube-gen/test/clientset/internal",
 			ClientsetOnly:       false,
 			FakeClient:          true,
 			CmdArgs:             cmdArgs,

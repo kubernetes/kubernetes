@@ -772,13 +772,13 @@ staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/etcd
 staging/src/k8s.io/kube-gen/cmd/client-gen/args
 staging/src/k8s.io/kube-gen/cmd/client-gen/generators/fake
 staging/src/k8s.io/kube-gen/cmd/client-gen/generators/scheme
-staging/src/k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup
-staging/src/k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup/v1
 staging/src/k8s.io/kube-gen/cmd/client-gen/types
 staging/src/k8s.io/kube-gen/cmd/conversion-gen/generators
 staging/src/k8s.io/kube-gen/cmd/go-to-protobuf/protobuf
 staging/src/k8s.io/kube-gen/cmd/informer-gen/generators
 staging/src/k8s.io/kube-gen/cmd/lister-gen/generators
+staging/src/k8s.io/kube-gen/test/apis/testgroup
+staging/src/k8s.io/kube-gen/test/apis/testgroup/v1
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1
 staging/src/k8s.io/metrics/pkg/apis/metrics
