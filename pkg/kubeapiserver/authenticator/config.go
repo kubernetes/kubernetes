@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/keystone"
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile"
 	"k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth"
+	keystone_token "k8s.io/apiserver/plugin/pkg/authenticator/token/keystone"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	certutil "k8s.io/client-go/util/cert"
@@ -102,7 +103,13 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		hasBasicAuth = true
 	}
 	if len(config.KeystoneURL) > 0 {
-		keystoneAuth, err := newAuthenticatorFromKeystoneURL(config.KeystoneURL, config.KeystoneCAFile)
+		keystoneAuth, err := newAuthenticatorForTokenFromKeystoneURL(config.KeystoneURL, config.KeystoneCAFile)
+		if err != nil {
+			return nil, nil, err
+		}
+		authenticators = append(authenticators, keystoneAuth)
+
+		keystoneAuth, err = newAuthenticatorFromKeystoneURL(config.KeystoneURL, config.KeystoneCAFile)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -288,6 +295,16 @@ func newAuthenticatorFromKeystoneURL(keystoneURL string, keystoneCAFile string) 
 	}
 
 	return basicauth.New(keystoneAuthenticator), nil
+}
+
+// newAuthenticatorForTokenFromKeystoneURL returns an authenticator.Request or an error
+func newAuthenticatorForTokenFromKeystoneURL(keystoneURL string, keystoneCAFile string) (authenticator.Request, error) {
+	keystoneAuthenticator, err := keystone_token.NewKeystoneAuthenticator(keystoneURL, keystoneCAFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return bearertoken.New(keystoneAuthenticator), nil
 }
 
 func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration) (authenticator.Token, error) {
