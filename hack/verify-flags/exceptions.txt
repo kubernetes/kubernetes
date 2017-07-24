@@ -50,9 +50,7 @@ cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:    ca_cert_
 cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:def configure_worker_services(api_servers, dns, cluster_cidr):
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 cluster/lib/logging.sh:    local source_file=${BASH_SOURCE[$stack_skip]}
-cluster/log-dump.sh:    local -r node_name="${1}"
-cluster/log-dump.sh:  for node_name in "${node_names[@]}"; do
-cluster/log-dump.sh:readonly report_dir="${1:-_artifacts}"
+cluster/log-dump/log-dump.sh:readonly report_dir="${1:-_artifacts}"
 cluster/photon-controller/templates/salt-master.sh:  api_servers: $MASTER_NAME
 cluster/photon-controller/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
 cluster/photon-controller/util.sh:    node_ip=$(${PHOTON} vm networks "${node_id}" | grep -i $'\t'"00:0C:29" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
