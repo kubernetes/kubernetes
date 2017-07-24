@@ -58230,6 +58230,41 @@
      }
     }
    },
+   "io.k8s.api.core.v1.CephFSPersistentVolumeSource": {
+    "description": "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "monitors"
+    ],
+    "properties": {
+     "monitors": {
+      "description": "Required: Monitors is a collection of Ceph monitors More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "path": {
+      "description": "Optional: Used as the mounted root, rather than the full Ceph tree, default is /",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "type": "boolean"
+     },
+     "secretFile": {
+      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "type": "string"
+     },
+     "secretRef": {
+      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "$ref": "#/definitions/io.k8s.api.core.v1.SecretReference"
+     },
+     "user": {
+      "description": "Optional: User is the rados user name, default is admin More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.CephFSVolumeSource": {
     "description": "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
     "required": [
@@ -60465,7 +60500,7 @@
      },
      "cephfs": {
       "description": "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
-      "$ref": "#/definitions/io.k8s.api.core.v1.CephFSVolumeSource"
+      "$ref": "#/definitions/io.k8s.api.core.v1.CephFSPersistentVolumeSource"
      },
      "cinder": {
       "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
@@ -61720,6 +61755,19 @@
      "optional": {
       "description": "Specify whether the Secret or its key must be defined",
       "type": "boolean"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.SecretReference": {
+    "description": "SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace",
+    "properties": {
+     "name": {
+      "description": "Name is unique within a namespace to reference a secret resource.",
+      "type": "string"
+     },
+     "namespace": {
+      "description": "Namespace defines the space within which the secret name must be unique.",
+      "type": "string"
      }
     }
    },
