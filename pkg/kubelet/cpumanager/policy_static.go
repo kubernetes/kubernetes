@@ -48,15 +48,14 @@ func (p *staticPolicy) Name() string {
 }
 
 func (p *staticPolicy) Start(s state.State) {
-	// Build the initial shared cpuset.
-	// NB: Iteration starts at index `1` here because CPU `0` is reserved
-	//     for infrastructure processes.
-	// TODO(CD): Improve this to align with kube/system reserved resources.
-	shared := cpuset.NewCPUSet()
-	for cpuid := 1; cpuid < p.topology.NumCPUs; cpuid++ {
-		shared.Add(cpuid)
+	fullCpuset := cpuset.NewCPUSet()
+	for cpuid := 0; cpuid < p.topology.NumCPUs; cpuid++ {
+		fullCpuset.Add(cpuid)
 	}
-	s.SetDefaultCPUSet(shared)
+	// takeByTopology will filter out fullCpuset returning low-number cores
+	// i.e. NumReservedCores=2, then reserved={0,5} (HT enabled Case)
+	reserved, _ := takeByTopology(p.topology, fullCpuset, p.topology.NumReservedCores)
+	s.SetDefaultCPUSet(fullCpuset.Difference(reserved))
 }
 
 func (p *staticPolicy) RegisterContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error {

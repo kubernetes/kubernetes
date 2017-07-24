@@ -78,11 +78,12 @@ func (d CPUDetails) CPUsInCore(id int) cpuset.CPUSet {
 //Core - physical CPU, cadvisor - Core
 //Socket - socket, cadvisor - Node
 type CPUTopology struct {
-	NumCPUs        int
-	NumCores       int
-	HyperThreading bool
-	NumSockets     int
-	CPUtopoDetails CPUDetails
+	NumCPUs          int
+	NumCores         int
+	HyperThreading   bool
+	NumSockets       int
+	CPUtopoDetails   CPUDetails
+	NumReservedCores int
 }
 
 type CPUInfo struct {

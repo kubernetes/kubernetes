@@ -35,6 +35,7 @@ import (
 type kletGetter interface {
 	GetPods() []*v1.Pod
 	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
+	GetNode() (*v1.Node, error)
 }
 
 type PolicyName string
@@ -73,6 +74,10 @@ func NewManager(policyName PolicyName, cr internalapi.RuntimeService, kletGetter
 			return nil, err
 		}
 		glog.Infof("[cpumanager] detected CPU topology: %v", topo)
+
+		// Get node to figure out reserved CPUs
+		node, err := kletGetter.GetNode()
+		topo.NumReservedCores = getReserverdCpus(node.Status)
 		policy = NewStaticPolicy(topo)
 	default:
 		glog.Warningf("[cpumanager] Unknown policy (\"%s\"), falling back to \"%s\" policy (\"%s\")", policyName, PolicyNoop)
@@ -86,6 +91,13 @@ func NewManager(policyName PolicyName, cr internalapi.RuntimeService, kletGetter
 		kletGetter:        kletGetter,
 		podStatusProvider: statusProvider,
 	}, nil
+}
+
+func getReserverdCpus(nodeStatus v1.NodeStatus) int {
+	// Reserved = ceiling(Capacity) - ceiling(Allocatable)
+	cpuCapacity := nodeStatus.Capacity[v1.ResourceCPU]
+	cpuAllocatable := nodeStatus.Allocatable[v1.ResourceCPU]
+	return int(cpuCapacity.Value() - cpuAllocatable.Value())
 }
 
 type manager struct {
