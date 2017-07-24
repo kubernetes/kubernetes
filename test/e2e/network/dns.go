@@ -286,7 +286,7 @@ func reverseArray(arr []string) []string {
 	return arr
 }
 
-var _ = framework.KubeDescribe("DNS", func() {
+var _ = SIGDescribe("DNS", func() {
 	f := framework.NewDefaultFramework("dns")
 
 	It("should provide DNS for the cluster [Conformance]", func() {

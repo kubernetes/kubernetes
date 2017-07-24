@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -34,7 +33,7 @@ type dnsFederationsConfigMapTest struct {
 	isValid bool
 }
 
-var _ = framework.KubeDescribe("DNS configMap federations", func() {
+var _ = SIGDescribe("DNS configMap federations", func() {
 	t := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
 	BeforeEach(func() { t.c = t.f.ClientSet })
 
@@ -186,7 +185,7 @@ func (t *dnsNameserverTest) run() {
 		moreForeverTestTimeout)
 }
 
-var _ = framework.KubeDescribe("DNS configMap nameserver", func() {
+var _ = SIGDescribe("DNS configMap nameserver", func() {
 	t := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
 	BeforeEach(func() { t.c = t.f.ClientSet })
 
