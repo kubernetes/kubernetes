@@ -36,6 +36,7 @@ var configmapsResource = schema.GroupVersionResource{Group: "", Version: "v1", R
 
 var configmapsKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}
 
+// Get takes name of the configMap, and returns the corresponding configMap object, and an error if there is any.
 func (c *FakeConfigMaps) Get(name string, options v1.GetOptions) (result *core_v1.ConfigMap, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(configmapsResource, c.ns, name), &core_v1.ConfigMap{})
@@ -46,6 +47,7 @@ func (c *FakeConfigMaps) Get(name string, options v1.GetOptions) (result *core_v
 	return obj.(*core_v1.ConfigMap), err
 }
 
+// List takes label and field selectors, and returns the list of ConfigMaps that match those selectors.
 func (c *FakeConfigMaps) List(opts v1.ListOptions) (result *core_v1.ConfigMapList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(configmapsResource, configmapsKind, c.ns, opts), &core_v1.ConfigMapList{})
@@ -74,6 +76,7 @@ func (c *FakeConfigMaps) Watch(opts v1.ListOptions) (watch.Interface, error) {
 
 }
 
+// Create takes the representation of a configMap and creates it.  Returns the server's representation of the configMap, and an error, if there is any.
 func (c *FakeConfigMaps) Create(configMap *core_v1.ConfigMap) (result *core_v1.ConfigMap, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(configmapsResource, c.ns, configMap), &core_v1.ConfigMap{})
@@ -84,6 +87,7 @@ func (c *FakeConfigMaps) Create(configMap *core_v1.ConfigMap) (result *core_v1.C
 	return obj.(*core_v1.ConfigMap), err
 }
 
+// Update takes the representation of a configMap and updates it. Returns the server's representation of the configMap, and an error, if there is any.
 func (c *FakeConfigMaps) Update(configMap *core_v1.ConfigMap) (result *core_v1.ConfigMap, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(configmapsResource, c.ns, configMap), &core_v1.ConfigMap{})
@@ -94,6 +98,7 @@ func (c *FakeConfigMaps) Update(configMap *core_v1.ConfigMap) (result *core_v1.C
 	return obj.(*core_v1.ConfigMap), err
 }
 
+// Delete takes name of the configMap and deletes it. Returns an error if one occurs.
 func (c *FakeConfigMaps) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(configmapsResource, c.ns, name), &core_v1.ConfigMap{})
@@ -101,6 +106,7 @@ func (c *FakeConfigMaps) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeConfigMaps) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(configmapsResource, c.ns, listOptions)
 

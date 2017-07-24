@@ -36,6 +36,7 @@ var podtemplatesResource = schema.GroupVersionResource{Group: "", Version: "v1",
 
 var podtemplatesKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "PodTemplate"}
 
+// Get takes name of the podTemplate, and returns the corresponding podTemplate object, and an error if there is any.
 func (c *FakePodTemplates) Get(name string, options v1.GetOptions) (result *core_v1.PodTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(podtemplatesResource, c.ns, name), &core_v1.PodTemplate{})
@@ -46,6 +47,7 @@ func (c *FakePodTemplates) Get(name string, options v1.GetOptions) (result *core
 	return obj.(*core_v1.PodTemplate), err
 }
 
+// List takes label and field selectors, and returns the list of PodTemplates that match those selectors.
 func (c *FakePodTemplates) List(opts v1.ListOptions) (result *core_v1.PodTemplateList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(podtemplatesResource, podtemplatesKind, c.ns, opts), &core_v1.PodTemplateList{})
@@ -74,6 +76,7 @@ func (c *FakePodTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
 
 }
 
+// Create takes the representation of a podTemplate and creates it.  Returns the server's representation of the podTemplate, and an error, if there is any.
 func (c *FakePodTemplates) Create(podTemplate *core_v1.PodTemplate) (result *core_v1.PodTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(podtemplatesResource, c.ns, podTemplate), &core_v1.PodTemplate{})
@@ -84,6 +87,7 @@ func (c *FakePodTemplates) Create(podTemplate *core_v1.PodTemplate) (result *cor
 	return obj.(*core_v1.PodTemplate), err
 }
 
+// Update takes the representation of a podTemplate and updates it. Returns the server's representation of the podTemplate, and an error, if there is any.
 func (c *FakePodTemplates) Update(podTemplate *core_v1.PodTemplate) (result *core_v1.PodTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(podtemplatesResource, c.ns, podTemplate), &core_v1.PodTemplate{})
@@ -94,6 +98,7 @@ func (c *FakePodTemplates) Update(podTemplate *core_v1.PodTemplate) (result *cor
 	return obj.(*core_v1.PodTemplate), err
 }
 
+// Delete takes name of the podTemplate and deletes it. Returns an error if one occurs.
 func (c *FakePodTemplates) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(podtemplatesResource, c.ns, name), &core_v1.PodTemplate{})
@@ -101,6 +106,7 @@ func (c *FakePodTemplates) Delete(name string, options *v1.DeleteOptions) error 
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakePodTemplates) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(podtemplatesResource, c.ns, listOptions)
 

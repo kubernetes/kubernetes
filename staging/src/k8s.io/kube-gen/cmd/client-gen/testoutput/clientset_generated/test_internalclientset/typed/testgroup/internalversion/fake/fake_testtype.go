@@ -36,6 +36,7 @@ var testtypesResource = schema.GroupVersionResource{Group: "testgroup.k8s.io", V
 
 var testtypesKind = schema.GroupVersionKind{Group: "testgroup.k8s.io", Version: "", Kind: "TestType"}
 
+// Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
 func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), &testgroup.TestType{})
@@ -46,6 +47,7 @@ func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *testgro
 	return obj.(*testgroup.TestType), err
 }
 
+// List takes label and field selectors, and returns the list of TestTypes that match those selectors.
 func (c *FakeTestTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(testtypesResource, testtypesKind, c.ns, opts), &testgroup.TestTypeList{})
@@ -74,6 +76,7 @@ func (c *FakeTestTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 
 }
 
+// Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
 func (c *FakeTestTypes) Create(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), &testgroup.TestType{})
@@ -84,6 +87,7 @@ func (c *FakeTestTypes) Create(testType *testgroup.TestType) (result *testgroup.
 	return obj.(*testgroup.TestType), err
 }
 
+// Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
 func (c *FakeTestTypes) Update(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(testtypesResource, c.ns, testType), &testgroup.TestType{})
@@ -94,6 +98,8 @@ func (c *FakeTestTypes) Update(testType *testgroup.TestType) (result *testgroup.
 	return obj.(*testgroup.TestType), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeTestTypes) UpdateStatus(testType *testgroup.TestType) (*testgroup.TestType, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &testgroup.TestType{})
@@ -104,6 +110,7 @@ func (c *FakeTestTypes) UpdateStatus(testType *testgroup.TestType) (*testgroup.T
 	return obj.(*testgroup.TestType), err
 }
 
+// Delete takes name of the testType and deletes it. Returns an error if one occurs.
 func (c *FakeTestTypes) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(testtypesResource, c.ns, name), &testgroup.TestType{})
@@ -111,6 +118,7 @@ func (c *FakeTestTypes) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeTestTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(testtypesResource, c.ns, listOptions)
 

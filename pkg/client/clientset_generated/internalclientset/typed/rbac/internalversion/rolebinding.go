@@ -58,6 +58,41 @@ func newRoleBindings(c *RbacClient, namespace string) *roleBindings {
 	}
 }
 
+// Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
+func (c *roleBindings) Get(name string, options v1.GetOptions) (result *rbac.RoleBinding, err error) {
+	result = &rbac.RoleBinding{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("rolebindings").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
+func (c *roleBindings) List(opts v1.ListOptions) (result *rbac.RoleBindingList, err error) {
+	result = &rbac.RoleBindingList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("rolebindings").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested roleBindings.
+func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("rolebindings").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a roleBinding and creates it.  Returns the server's representation of the roleBinding, and an error, if there is any.
 func (c *roleBindings) Create(roleBinding *rbac.RoleBinding) (result *rbac.RoleBinding, err error) {
 	result = &rbac.RoleBinding{}
@@ -103,41 +138,6 @@ func (c *roleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
-func (c *roleBindings) Get(name string, options v1.GetOptions) (result *rbac.RoleBinding, err error) {
-	result = &rbac.RoleBinding{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("rolebindings").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
-func (c *roleBindings) List(opts v1.ListOptions) (result *rbac.RoleBindingList, err error) {
-	result = &rbac.RoleBindingList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("rolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested roleBindings.
-func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("rolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched roleBinding.

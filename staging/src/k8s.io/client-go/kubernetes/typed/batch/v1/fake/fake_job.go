@@ -36,6 +36,7 @@ var jobsResource = schema.GroupVersionResource{Group: "batch", Version: "v1", Re
 
 var jobsKind = schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}
 
+// Get takes name of the job, and returns the corresponding job object, and an error if there is any.
 func (c *FakeJobs) Get(name string, options v1.GetOptions) (result *batch_v1.Job, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(jobsResource, c.ns, name), &batch_v1.Job{})
@@ -46,6 +47,7 @@ func (c *FakeJobs) Get(name string, options v1.GetOptions) (result *batch_v1.Job
 	return obj.(*batch_v1.Job), err
 }
 
+// List takes label and field selectors, and returns the list of Jobs that match those selectors.
 func (c *FakeJobs) List(opts v1.ListOptions) (result *batch_v1.JobList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(jobsResource, jobsKind, c.ns, opts), &batch_v1.JobList{})
@@ -74,6 +76,7 @@ func (c *FakeJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 
 }
 
+// Create takes the representation of a job and creates it.  Returns the server's representation of the job, and an error, if there is any.
 func (c *FakeJobs) Create(job *batch_v1.Job) (result *batch_v1.Job, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(jobsResource, c.ns, job), &batch_v1.Job{})
@@ -84,6 +87,7 @@ func (c *FakeJobs) Create(job *batch_v1.Job) (result *batch_v1.Job, err error) {
 	return obj.(*batch_v1.Job), err
 }
 
+// Update takes the representation of a job and updates it. Returns the server's representation of the job, and an error, if there is any.
 func (c *FakeJobs) Update(job *batch_v1.Job) (result *batch_v1.Job, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(jobsResource, c.ns, job), &batch_v1.Job{})
@@ -94,6 +98,8 @@ func (c *FakeJobs) Update(job *batch_v1.Job) (result *batch_v1.Job, err error) {
 	return obj.(*batch_v1.Job), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeJobs) UpdateStatus(job *batch_v1.Job) (*batch_v1.Job, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(jobsResource, "status", c.ns, job), &batch_v1.Job{})
@@ -104,6 +110,7 @@ func (c *FakeJobs) UpdateStatus(job *batch_v1.Job) (*batch_v1.Job, error) {
 	return obj.(*batch_v1.Job), err
 }
 
+// Delete takes name of the job and deletes it. Returns an error if one occurs.
 func (c *FakeJobs) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(jobsResource, c.ns, name), &batch_v1.Job{})
@@ -111,6 +118,7 @@ func (c *FakeJobs) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(jobsResource, c.ns, listOptions)
 

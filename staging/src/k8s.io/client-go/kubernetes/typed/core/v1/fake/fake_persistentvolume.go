@@ -35,6 +35,7 @@ var persistentvolumesResource = schema.GroupVersionResource{Group: "", Version: 
 
 var persistentvolumesKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "PersistentVolume"}
 
+// Get takes name of the persistentVolume, and returns the corresponding persistentVolume object, and an error if there is any.
 func (c *FakePersistentVolumes) Get(name string, options v1.GetOptions) (result *core_v1.PersistentVolume, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(persistentvolumesResource, name), &core_v1.PersistentVolume{})
@@ -44,6 +45,7 @@ func (c *FakePersistentVolumes) Get(name string, options v1.GetOptions) (result 
 	return obj.(*core_v1.PersistentVolume), err
 }
 
+// List takes label and field selectors, and returns the list of PersistentVolumes that match those selectors.
 func (c *FakePersistentVolumes) List(opts v1.ListOptions) (result *core_v1.PersistentVolumeList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(persistentvolumesResource, persistentvolumesKind, opts), &core_v1.PersistentVolumeList{})
@@ -70,6 +72,7 @@ func (c *FakePersistentVolumes) Watch(opts v1.ListOptions) (watch.Interface, err
 		InvokesWatch(testing.NewRootWatchAction(persistentvolumesResource, opts))
 }
 
+// Create takes the representation of a persistentVolume and creates it.  Returns the server's representation of the persistentVolume, and an error, if there is any.
 func (c *FakePersistentVolumes) Create(persistentVolume *core_v1.PersistentVolume) (result *core_v1.PersistentVolume, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(persistentvolumesResource, persistentVolume), &core_v1.PersistentVolume{})
@@ -79,6 +82,7 @@ func (c *FakePersistentVolumes) Create(persistentVolume *core_v1.PersistentVolum
 	return obj.(*core_v1.PersistentVolume), err
 }
 
+// Update takes the representation of a persistentVolume and updates it. Returns the server's representation of the persistentVolume, and an error, if there is any.
 func (c *FakePersistentVolumes) Update(persistentVolume *core_v1.PersistentVolume) (result *core_v1.PersistentVolume, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(persistentvolumesResource, persistentVolume), &core_v1.PersistentVolume{})
@@ -88,6 +92,8 @@ func (c *FakePersistentVolumes) Update(persistentVolume *core_v1.PersistentVolum
 	return obj.(*core_v1.PersistentVolume), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakePersistentVolumes) UpdateStatus(persistentVolume *core_v1.PersistentVolume) (*core_v1.PersistentVolume, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateSubresourceAction(persistentvolumesResource, "status", persistentVolume), &core_v1.PersistentVolume{})
@@ -97,12 +103,14 @@ func (c *FakePersistentVolumes) UpdateStatus(persistentVolume *core_v1.Persisten
 	return obj.(*core_v1.PersistentVolume), err
 }
 
+// Delete takes name of the persistentVolume and deletes it. Returns an error if one occurs.
 func (c *FakePersistentVolumes) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(persistentvolumesResource, name), &core_v1.PersistentVolume{})
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakePersistentVolumes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(persistentvolumesResource, listOptions)
 

@@ -36,6 +36,7 @@ var poddisruptionbudgetsResource = schema.GroupVersionResource{Group: "policy", 
 
 var poddisruptionbudgetsKind = schema.GroupVersionKind{Group: "policy", Version: "v1beta1", Kind: "PodDisruptionBudget"}
 
+// Get takes name of the podDisruptionBudget, and returns the corresponding podDisruptionBudget object, and an error if there is any.
 func (c *FakePodDisruptionBudgets) Get(name string, options v1.GetOptions) (result *v1beta1.PodDisruptionBudget, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(poddisruptionbudgetsResource, c.ns, name), &v1beta1.PodDisruptionBudget{})
@@ -46,6 +47,7 @@ func (c *FakePodDisruptionBudgets) Get(name string, options v1.GetOptions) (resu
 	return obj.(*v1beta1.PodDisruptionBudget), err
 }
 
+// List takes label and field selectors, and returns the list of PodDisruptionBudgets that match those selectors.
 func (c *FakePodDisruptionBudgets) List(opts v1.ListOptions) (result *v1beta1.PodDisruptionBudgetList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(poddisruptionbudgetsResource, poddisruptionbudgetsKind, c.ns, opts), &v1beta1.PodDisruptionBudgetList{})
@@ -74,6 +76,7 @@ func (c *FakePodDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, 
 
 }
 
+// Create takes the representation of a podDisruptionBudget and creates it.  Returns the server's representation of the podDisruptionBudget, and an error, if there is any.
 func (c *FakePodDisruptionBudgets) Create(podDisruptionBudget *v1beta1.PodDisruptionBudget) (result *v1beta1.PodDisruptionBudget, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(poddisruptionbudgetsResource, c.ns, podDisruptionBudget), &v1beta1.PodDisruptionBudget{})
@@ -84,6 +87,7 @@ func (c *FakePodDisruptionBudgets) Create(podDisruptionBudget *v1beta1.PodDisrup
 	return obj.(*v1beta1.PodDisruptionBudget), err
 }
 
+// Update takes the representation of a podDisruptionBudget and updates it. Returns the server's representation of the podDisruptionBudget, and an error, if there is any.
 func (c *FakePodDisruptionBudgets) Update(podDisruptionBudget *v1beta1.PodDisruptionBudget) (result *v1beta1.PodDisruptionBudget, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(poddisruptionbudgetsResource, c.ns, podDisruptionBudget), &v1beta1.PodDisruptionBudget{})
@@ -94,6 +98,8 @@ func (c *FakePodDisruptionBudgets) Update(podDisruptionBudget *v1beta1.PodDisrup
 	return obj.(*v1beta1.PodDisruptionBudget), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakePodDisruptionBudgets) UpdateStatus(podDisruptionBudget *v1beta1.PodDisruptionBudget) (*v1beta1.PodDisruptionBudget, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(poddisruptionbudgetsResource, "status", c.ns, podDisruptionBudget), &v1beta1.PodDisruptionBudget{})
@@ -104,6 +110,7 @@ func (c *FakePodDisruptionBudgets) UpdateStatus(podDisruptionBudget *v1beta1.Pod
 	return obj.(*v1beta1.PodDisruptionBudget), err
 }
 
+// Delete takes name of the podDisruptionBudget and deletes it. Returns an error if one occurs.
 func (c *FakePodDisruptionBudgets) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(poddisruptionbudgetsResource, c.ns, name), &v1beta1.PodDisruptionBudget{})
@@ -111,6 +118,7 @@ func (c *FakePodDisruptionBudgets) Delete(name string, options *v1.DeleteOptions
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakePodDisruptionBudgets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(poddisruptionbudgetsResource, c.ns, listOptions)
 

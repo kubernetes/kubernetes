@@ -56,6 +56,38 @@ func newPriorityClasses(c *SchedulingV1alpha1Client) *priorityClasses {
 	}
 }
 
+// Get takes name of the priorityClass, and returns the corresponding priorityClass object, and an error if there is any.
+func (c *priorityClasses) Get(name string, options v1.GetOptions) (result *v1alpha1.PriorityClass, err error) {
+	result = &v1alpha1.PriorityClass{}
+	err = c.client.Get().
+		Resource("priorityclasses").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of PriorityClasses that match those selectors.
+func (c *priorityClasses) List(opts v1.ListOptions) (result *v1alpha1.PriorityClassList, err error) {
+	result = &v1alpha1.PriorityClassList{}
+	err = c.client.Get().
+		Resource("priorityclasses").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested priorityClasses.
+func (c *priorityClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Resource("priorityclasses").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a priorityClass and creates it.  Returns the server's representation of the priorityClass, and an error, if there is any.
 func (c *priorityClasses) Create(priorityClass *v1alpha1.PriorityClass) (result *v1alpha1.PriorityClass, err error) {
 	result = &v1alpha1.PriorityClass{}
@@ -97,38 +129,6 @@ func (c *priorityClasses) DeleteCollection(options *v1.DeleteOptions, listOption
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the priorityClass, and returns the corresponding priorityClass object, and an error if there is any.
-func (c *priorityClasses) Get(name string, options v1.GetOptions) (result *v1alpha1.PriorityClass, err error) {
-	result = &v1alpha1.PriorityClass{}
-	err = c.client.Get().
-		Resource("priorityclasses").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of PriorityClasses that match those selectors.
-func (c *priorityClasses) List(opts v1.ListOptions) (result *v1alpha1.PriorityClassList, err error) {
-	result = &v1alpha1.PriorityClassList{}
-	err = c.client.Get().
-		Resource("priorityclasses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested priorityClasses.
-func (c *priorityClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Resource("priorityclasses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched priorityClass.

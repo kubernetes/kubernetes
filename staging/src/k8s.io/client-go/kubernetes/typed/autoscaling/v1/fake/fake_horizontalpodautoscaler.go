@@ -36,6 +36,7 @@ var horizontalpodautoscalersResource = schema.GroupVersionResource{Group: "autos
 
 var horizontalpodautoscalersKind = schema.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscaler"}
 
+// Get takes name of the horizontalPodAutoscaler, and returns the corresponding horizontalPodAutoscaler object, and an error if there is any.
 func (c *FakeHorizontalPodAutoscalers) Get(name string, options v1.GetOptions) (result *autoscaling_v1.HorizontalPodAutoscaler, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(horizontalpodautoscalersResource, c.ns, name), &autoscaling_v1.HorizontalPodAutoscaler{})
@@ -46,6 +47,7 @@ func (c *FakeHorizontalPodAutoscalers) Get(name string, options v1.GetOptions) (
 	return obj.(*autoscaling_v1.HorizontalPodAutoscaler), err
 }
 
+// List takes label and field selectors, and returns the list of HorizontalPodAutoscalers that match those selectors.
 func (c *FakeHorizontalPodAutoscalers) List(opts v1.ListOptions) (result *autoscaling_v1.HorizontalPodAutoscalerList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(horizontalpodautoscalersResource, horizontalpodautoscalersKind, c.ns, opts), &autoscaling_v1.HorizontalPodAutoscalerList{})
@@ -74,6 +76,7 @@ func (c *FakeHorizontalPodAutoscalers) Watch(opts v1.ListOptions) (watch.Interfa
 
 }
 
+// Create takes the representation of a horizontalPodAutoscaler and creates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if there is any.
 func (c *FakeHorizontalPodAutoscalers) Create(horizontalPodAutoscaler *autoscaling_v1.HorizontalPodAutoscaler) (result *autoscaling_v1.HorizontalPodAutoscaler, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(horizontalpodautoscalersResource, c.ns, horizontalPodAutoscaler), &autoscaling_v1.HorizontalPodAutoscaler{})
@@ -84,6 +87,7 @@ func (c *FakeHorizontalPodAutoscalers) Create(horizontalPodAutoscaler *autoscali
 	return obj.(*autoscaling_v1.HorizontalPodAutoscaler), err
 }
 
+// Update takes the representation of a horizontalPodAutoscaler and updates it. Returns the server's representation of the horizontalPodAutoscaler, and an error, if there is any.
 func (c *FakeHorizontalPodAutoscalers) Update(horizontalPodAutoscaler *autoscaling_v1.HorizontalPodAutoscaler) (result *autoscaling_v1.HorizontalPodAutoscaler, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(horizontalpodautoscalersResource, c.ns, horizontalPodAutoscaler), &autoscaling_v1.HorizontalPodAutoscaler{})
@@ -94,6 +98,8 @@ func (c *FakeHorizontalPodAutoscalers) Update(horizontalPodAutoscaler *autoscali
 	return obj.(*autoscaling_v1.HorizontalPodAutoscaler), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeHorizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *autoscaling_v1.HorizontalPodAutoscaler) (*autoscaling_v1.HorizontalPodAutoscaler, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(horizontalpodautoscalersResource, "status", c.ns, horizontalPodAutoscaler), &autoscaling_v1.HorizontalPodAutoscaler{})
@@ -104,6 +110,7 @@ func (c *FakeHorizontalPodAutoscalers) UpdateStatus(horizontalPodAutoscaler *aut
 	return obj.(*autoscaling_v1.HorizontalPodAutoscaler), err
 }
 
+// Delete takes name of the horizontalPodAutoscaler and deletes it. Returns an error if one occurs.
 func (c *FakeHorizontalPodAutoscalers) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(horizontalpodautoscalersResource, c.ns, name), &autoscaling_v1.HorizontalPodAutoscaler{})
@@ -111,6 +118,7 @@ func (c *FakeHorizontalPodAutoscalers) Delete(name string, options *v1.DeleteOpt
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeHorizontalPodAutoscalers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(horizontalpodautoscalersResource, c.ns, listOptions)
 

@@ -35,46 +35,7 @@ var certificatesigningrequestsResource = schema.GroupVersionResource{Group: "cer
 
 var certificatesigningrequestsKind = schema.GroupVersionKind{Group: "certificates.k8s.io", Version: "", Kind: "CertificateSigningRequest"}
 
-func (c *FakeCertificateSigningRequests) Create(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(certificatesigningrequestsResource, certificateSigningRequest), &certificates.CertificateSigningRequest{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*certificates.CertificateSigningRequest), err
-}
-
-func (c *FakeCertificateSigningRequests) Update(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(certificatesigningrequestsResource, certificateSigningRequest), &certificates.CertificateSigningRequest{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*certificates.CertificateSigningRequest), err
-}
-
-func (c *FakeCertificateSigningRequests) UpdateStatus(certificateSigningRequest *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(certificatesigningrequestsResource, "status", certificateSigningRequest), &certificates.CertificateSigningRequest{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*certificates.CertificateSigningRequest), err
-}
-
-func (c *FakeCertificateSigningRequests) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(certificatesigningrequestsResource, name), &certificates.CertificateSigningRequest{})
-	return err
-}
-
-func (c *FakeCertificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(certificatesigningrequestsResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &certificates.CertificateSigningRequestList{})
-	return err
-}
-
+// Get takes name of the certificateSigningRequest, and returns the corresponding certificateSigningRequest object, and an error if there is any.
 func (c *FakeCertificateSigningRequests) Get(name string, options v1.GetOptions) (result *certificates.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(certificatesigningrequestsResource, name), &certificates.CertificateSigningRequest{})
@@ -84,6 +45,7 @@ func (c *FakeCertificateSigningRequests) Get(name string, options v1.GetOptions)
 	return obj.(*certificates.CertificateSigningRequest), err
 }
 
+// List takes label and field selectors, and returns the list of CertificateSigningRequests that match those selectors.
 func (c *FakeCertificateSigningRequests) List(opts v1.ListOptions) (result *certificates.CertificateSigningRequestList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(certificatesigningrequestsResource, certificatesigningrequestsKind, opts), &certificates.CertificateSigningRequestList{})
@@ -108,6 +70,52 @@ func (c *FakeCertificateSigningRequests) List(opts v1.ListOptions) (result *cert
 func (c *FakeCertificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(certificatesigningrequestsResource, opts))
+}
+
+// Create takes the representation of a certificateSigningRequest and creates it.  Returns the server's representation of the certificateSigningRequest, and an error, if there is any.
+func (c *FakeCertificateSigningRequests) Create(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(certificatesigningrequestsResource, certificateSigningRequest), &certificates.CertificateSigningRequest{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*certificates.CertificateSigningRequest), err
+}
+
+// Update takes the representation of a certificateSigningRequest and updates it. Returns the server's representation of the certificateSigningRequest, and an error, if there is any.
+func (c *FakeCertificateSigningRequests) Update(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(certificatesigningrequestsResource, certificateSigningRequest), &certificates.CertificateSigningRequest{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*certificates.CertificateSigningRequest), err
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeCertificateSigningRequests) UpdateStatus(certificateSigningRequest *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateSubresourceAction(certificatesigningrequestsResource, "status", certificateSigningRequest), &certificates.CertificateSigningRequest{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*certificates.CertificateSigningRequest), err
+}
+
+// Delete takes name of the certificateSigningRequest and deletes it. Returns an error if one occurs.
+func (c *FakeCertificateSigningRequests) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(certificatesigningrequestsResource, name), &certificates.CertificateSigningRequest{})
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeCertificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(certificatesigningrequestsResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &certificates.CertificateSigningRequestList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched certificateSigningRequest.

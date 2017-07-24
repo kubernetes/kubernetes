@@ -36,6 +36,7 @@ var eventsResource = schema.GroupVersionResource{Group: "", Version: "v1", Resou
 
 var eventsKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Event"}
 
+// Get takes name of the event, and returns the corresponding event object, and an error if there is any.
 func (c *FakeEvents) Get(name string, options v1.GetOptions) (result *core_v1.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(eventsResource, c.ns, name), &core_v1.Event{})
@@ -46,6 +47,7 @@ func (c *FakeEvents) Get(name string, options v1.GetOptions) (result *core_v1.Ev
 	return obj.(*core_v1.Event), err
 }
 
+// List takes label and field selectors, and returns the list of Events that match those selectors.
 func (c *FakeEvents) List(opts v1.ListOptions) (result *core_v1.EventList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(eventsResource, eventsKind, c.ns, opts), &core_v1.EventList{})
@@ -74,6 +76,7 @@ func (c *FakeEvents) Watch(opts v1.ListOptions) (watch.Interface, error) {
 
 }
 
+// Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
 func (c *FakeEvents) Create(event *core_v1.Event) (result *core_v1.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(eventsResource, c.ns, event), &core_v1.Event{})
@@ -84,6 +87,7 @@ func (c *FakeEvents) Create(event *core_v1.Event) (result *core_v1.Event, err er
 	return obj.(*core_v1.Event), err
 }
 
+// Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
 func (c *FakeEvents) Update(event *core_v1.Event) (result *core_v1.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(eventsResource, c.ns, event), &core_v1.Event{})
@@ -94,6 +98,7 @@ func (c *FakeEvents) Update(event *core_v1.Event) (result *core_v1.Event, err er
 	return obj.(*core_v1.Event), err
 }
 
+// Delete takes name of the event and deletes it. Returns an error if one occurs.
 func (c *FakeEvents) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(eventsResource, c.ns, name), &core_v1.Event{})
@@ -101,6 +106,7 @@ func (c *FakeEvents) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeEvents) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(eventsResource, c.ns, listOptions)
 

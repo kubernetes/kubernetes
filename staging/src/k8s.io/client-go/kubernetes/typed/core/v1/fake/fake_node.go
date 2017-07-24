@@ -35,6 +35,7 @@ var nodesResource = schema.GroupVersionResource{Group: "", Version: "v1", Resour
 
 var nodesKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Node"}
 
+// Get takes name of the node, and returns the corresponding node object, and an error if there is any.
 func (c *FakeNodes) Get(name string, options v1.GetOptions) (result *core_v1.Node, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(nodesResource, name), &core_v1.Node{})
@@ -44,6 +45,7 @@ func (c *FakeNodes) Get(name string, options v1.GetOptions) (result *core_v1.Nod
 	return obj.(*core_v1.Node), err
 }
 
+// List takes label and field selectors, and returns the list of Nodes that match those selectors.
 func (c *FakeNodes) List(opts v1.ListOptions) (result *core_v1.NodeList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(nodesResource, nodesKind, opts), &core_v1.NodeList{})
@@ -70,6 +72,7 @@ func (c *FakeNodes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		InvokesWatch(testing.NewRootWatchAction(nodesResource, opts))
 }
 
+// Create takes the representation of a node and creates it.  Returns the server's representation of the node, and an error, if there is any.
 func (c *FakeNodes) Create(node *core_v1.Node) (result *core_v1.Node, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(nodesResource, node), &core_v1.Node{})
@@ -79,6 +82,7 @@ func (c *FakeNodes) Create(node *core_v1.Node) (result *core_v1.Node, err error)
 	return obj.(*core_v1.Node), err
 }
 
+// Update takes the representation of a node and updates it. Returns the server's representation of the node, and an error, if there is any.
 func (c *FakeNodes) Update(node *core_v1.Node) (result *core_v1.Node, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(nodesResource, node), &core_v1.Node{})
@@ -88,6 +92,8 @@ func (c *FakeNodes) Update(node *core_v1.Node) (result *core_v1.Node, err error)
 	return obj.(*core_v1.Node), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeNodes) UpdateStatus(node *core_v1.Node) (*core_v1.Node, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateSubresourceAction(nodesResource, "status", node), &core_v1.Node{})
@@ -97,12 +103,14 @@ func (c *FakeNodes) UpdateStatus(node *core_v1.Node) (*core_v1.Node, error) {
 	return obj.(*core_v1.Node), err
 }
 
+// Delete takes name of the node and deletes it. Returns an error if one occurs.
 func (c *FakeNodes) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(nodesResource, name), &core_v1.Node{})
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeNodes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(nodesResource, listOptions)
 

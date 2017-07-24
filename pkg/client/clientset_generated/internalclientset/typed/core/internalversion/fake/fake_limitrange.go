@@ -36,40 +36,7 @@ var limitrangesResource = schema.GroupVersionResource{Group: "", Version: "", Re
 
 var limitrangesKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "LimitRange"}
 
-func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(limitrangesResource, c.ns, limitRange), &api.LimitRange{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.LimitRange), err
-}
-
-func (c *FakeLimitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(limitrangesResource, c.ns, limitRange), &api.LimitRange{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.LimitRange), err
-}
-
-func (c *FakeLimitRanges) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(limitrangesResource, c.ns, name), &api.LimitRange{})
-
-	return err
-}
-
-func (c *FakeLimitRanges) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(limitrangesResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &api.LimitRangeList{})
-	return err
-}
-
+// Get takes name of the limitRange, and returns the corresponding limitRange object, and an error if there is any.
 func (c *FakeLimitRanges) Get(name string, options v1.GetOptions) (result *api.LimitRange, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(limitrangesResource, c.ns, name), &api.LimitRange{})
@@ -80,6 +47,7 @@ func (c *FakeLimitRanges) Get(name string, options v1.GetOptions) (result *api.L
 	return obj.(*api.LimitRange), err
 }
 
+// List takes label and field selectors, and returns the list of LimitRanges that match those selectors.
 func (c *FakeLimitRanges) List(opts v1.ListOptions) (result *api.LimitRangeList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(limitrangesResource, limitrangesKind, c.ns, opts), &api.LimitRangeList{})
@@ -106,6 +74,44 @@ func (c *FakeLimitRanges) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(limitrangesResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a limitRange and creates it.  Returns the server's representation of the limitRange, and an error, if there is any.
+func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(limitrangesResource, c.ns, limitRange), &api.LimitRange{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.LimitRange), err
+}
+
+// Update takes the representation of a limitRange and updates it. Returns the server's representation of the limitRange, and an error, if there is any.
+func (c *FakeLimitRanges) Update(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(limitrangesResource, c.ns, limitRange), &api.LimitRange{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.LimitRange), err
+}
+
+// Delete takes name of the limitRange and deletes it. Returns an error if one occurs.
+func (c *FakeLimitRanges) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(limitrangesResource, c.ns, name), &api.LimitRange{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeLimitRanges) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(limitrangesResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &api.LimitRangeList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched limitRange.

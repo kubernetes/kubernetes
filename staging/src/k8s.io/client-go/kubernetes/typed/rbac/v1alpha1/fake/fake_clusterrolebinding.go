@@ -35,6 +35,7 @@ var clusterrolebindingsResource = schema.GroupVersionResource{Group: "rbac.autho
 
 var clusterrolebindingsKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBinding"}
 
+// Get takes name of the clusterRoleBinding, and returns the corresponding clusterRoleBinding object, and an error if there is any.
 func (c *FakeClusterRoleBindings) Get(name string, options v1.GetOptions) (result *v1alpha1.ClusterRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(clusterrolebindingsResource, name), &v1alpha1.ClusterRoleBinding{})
@@ -44,6 +45,7 @@ func (c *FakeClusterRoleBindings) Get(name string, options v1.GetOptions) (resul
 	return obj.(*v1alpha1.ClusterRoleBinding), err
 }
 
+// List takes label and field selectors, and returns the list of ClusterRoleBindings that match those selectors.
 func (c *FakeClusterRoleBindings) List(opts v1.ListOptions) (result *v1alpha1.ClusterRoleBindingList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(clusterrolebindingsResource, clusterrolebindingsKind, opts), &v1alpha1.ClusterRoleBindingList{})
@@ -70,6 +72,7 @@ func (c *FakeClusterRoleBindings) Watch(opts v1.ListOptions) (watch.Interface, e
 		InvokesWatch(testing.NewRootWatchAction(clusterrolebindingsResource, opts))
 }
 
+// Create takes the representation of a clusterRoleBinding and creates it.  Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
 func (c *FakeClusterRoleBindings) Create(clusterRoleBinding *v1alpha1.ClusterRoleBinding) (result *v1alpha1.ClusterRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(clusterrolebindingsResource, clusterRoleBinding), &v1alpha1.ClusterRoleBinding{})
@@ -79,6 +82,7 @@ func (c *FakeClusterRoleBindings) Create(clusterRoleBinding *v1alpha1.ClusterRol
 	return obj.(*v1alpha1.ClusterRoleBinding), err
 }
 
+// Update takes the representation of a clusterRoleBinding and updates it. Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
 func (c *FakeClusterRoleBindings) Update(clusterRoleBinding *v1alpha1.ClusterRoleBinding) (result *v1alpha1.ClusterRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(clusterrolebindingsResource, clusterRoleBinding), &v1alpha1.ClusterRoleBinding{})
@@ -88,12 +92,14 @@ func (c *FakeClusterRoleBindings) Update(clusterRoleBinding *v1alpha1.ClusterRol
 	return obj.(*v1alpha1.ClusterRoleBinding), err
 }
 
+// Delete takes name of the clusterRoleBinding and deletes it. Returns an error if one occurs.
 func (c *FakeClusterRoleBindings) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(clusterrolebindingsResource, name), &v1alpha1.ClusterRoleBinding{})
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeClusterRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(clusterrolebindingsResource, listOptions)
 

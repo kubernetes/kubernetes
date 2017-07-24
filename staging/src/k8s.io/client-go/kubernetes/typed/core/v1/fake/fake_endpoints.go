@@ -36,6 +36,7 @@ var endpointsResource = schema.GroupVersionResource{Group: "", Version: "v1", Re
 
 var endpointsKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Endpoints"}
 
+// Get takes name of the endpoints, and returns the corresponding endpoints object, and an error if there is any.
 func (c *FakeEndpoints) Get(name string, options v1.GetOptions) (result *core_v1.Endpoints, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(endpointsResource, c.ns, name), &core_v1.Endpoints{})
@@ -46,6 +47,7 @@ func (c *FakeEndpoints) Get(name string, options v1.GetOptions) (result *core_v1
 	return obj.(*core_v1.Endpoints), err
 }
 
+// List takes label and field selectors, and returns the list of Endpoints that match those selectors.
 func (c *FakeEndpoints) List(opts v1.ListOptions) (result *core_v1.EndpointsList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(endpointsResource, endpointsKind, c.ns, opts), &core_v1.EndpointsList{})
@@ -74,6 +76,7 @@ func (c *FakeEndpoints) Watch(opts v1.ListOptions) (watch.Interface, error) {
 
 }
 
+// Create takes the representation of a endpoints and creates it.  Returns the server's representation of the endpoints, and an error, if there is any.
 func (c *FakeEndpoints) Create(endpoints *core_v1.Endpoints) (result *core_v1.Endpoints, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(endpointsResource, c.ns, endpoints), &core_v1.Endpoints{})
@@ -84,6 +87,7 @@ func (c *FakeEndpoints) Create(endpoints *core_v1.Endpoints) (result *core_v1.En
 	return obj.(*core_v1.Endpoints), err
 }
 
+// Update takes the representation of a endpoints and updates it. Returns the server's representation of the endpoints, and an error, if there is any.
 func (c *FakeEndpoints) Update(endpoints *core_v1.Endpoints) (result *core_v1.Endpoints, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(endpointsResource, c.ns, endpoints), &core_v1.Endpoints{})
@@ -94,6 +98,7 @@ func (c *FakeEndpoints) Update(endpoints *core_v1.Endpoints) (result *core_v1.En
 	return obj.(*core_v1.Endpoints), err
 }
 
+// Delete takes name of the endpoints and deletes it. Returns an error if one occurs.
 func (c *FakeEndpoints) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(endpointsResource, c.ns, name), &core_v1.Endpoints{})
@@ -101,6 +106,7 @@ func (c *FakeEndpoints) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeEndpoints) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(endpointsResource, c.ns, listOptions)
 

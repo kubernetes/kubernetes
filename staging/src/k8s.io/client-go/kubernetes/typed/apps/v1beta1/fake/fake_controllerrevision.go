@@ -36,6 +36,7 @@ var controllerrevisionsResource = schema.GroupVersionResource{Group: "apps", Ver
 
 var controllerrevisionsKind = schema.GroupVersionKind{Group: "apps", Version: "v1beta1", Kind: "ControllerRevision"}
 
+// Get takes name of the controllerRevision, and returns the corresponding controllerRevision object, and an error if there is any.
 func (c *FakeControllerRevisions) Get(name string, options v1.GetOptions) (result *v1beta1.ControllerRevision, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(controllerrevisionsResource, c.ns, name), &v1beta1.ControllerRevision{})
@@ -46,6 +47,7 @@ func (c *FakeControllerRevisions) Get(name string, options v1.GetOptions) (resul
 	return obj.(*v1beta1.ControllerRevision), err
 }
 
+// List takes label and field selectors, and returns the list of ControllerRevisions that match those selectors.
 func (c *FakeControllerRevisions) List(opts v1.ListOptions) (result *v1beta1.ControllerRevisionList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(controllerrevisionsResource, controllerrevisionsKind, c.ns, opts), &v1beta1.ControllerRevisionList{})
@@ -74,6 +76,7 @@ func (c *FakeControllerRevisions) Watch(opts v1.ListOptions) (watch.Interface, e
 
 }
 
+// Create takes the representation of a controllerRevision and creates it.  Returns the server's representation of the controllerRevision, and an error, if there is any.
 func (c *FakeControllerRevisions) Create(controllerRevision *v1beta1.ControllerRevision) (result *v1beta1.ControllerRevision, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(controllerrevisionsResource, c.ns, controllerRevision), &v1beta1.ControllerRevision{})
@@ -84,6 +87,7 @@ func (c *FakeControllerRevisions) Create(controllerRevision *v1beta1.ControllerR
 	return obj.(*v1beta1.ControllerRevision), err
 }
 
+// Update takes the representation of a controllerRevision and updates it. Returns the server's representation of the controllerRevision, and an error, if there is any.
 func (c *FakeControllerRevisions) Update(controllerRevision *v1beta1.ControllerRevision) (result *v1beta1.ControllerRevision, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(controllerrevisionsResource, c.ns, controllerRevision), &v1beta1.ControllerRevision{})
@@ -94,6 +98,7 @@ func (c *FakeControllerRevisions) Update(controllerRevision *v1beta1.ControllerR
 	return obj.(*v1beta1.ControllerRevision), err
 }
 
+// Delete takes name of the controllerRevision and deletes it. Returns an error if one occurs.
 func (c *FakeControllerRevisions) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(controllerrevisionsResource, c.ns, name), &v1beta1.ControllerRevision{})
@@ -101,6 +106,7 @@ func (c *FakeControllerRevisions) Delete(name string, options *v1.DeleteOptions)
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeControllerRevisions) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(controllerrevisionsResource, c.ns, listOptions)
 

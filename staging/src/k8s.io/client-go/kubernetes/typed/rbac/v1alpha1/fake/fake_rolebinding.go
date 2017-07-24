@@ -36,6 +36,7 @@ var rolebindingsResource = schema.GroupVersionResource{Group: "rbac.authorizatio
 
 var rolebindingsKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBinding"}
 
+// Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
 func (c *FakeRoleBindings) Get(name string, options v1.GetOptions) (result *v1alpha1.RoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(rolebindingsResource, c.ns, name), &v1alpha1.RoleBinding{})
@@ -46,6 +47,7 @@ func (c *FakeRoleBindings) Get(name string, options v1.GetOptions) (result *v1al
 	return obj.(*v1alpha1.RoleBinding), err
 }
 
+// List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
 func (c *FakeRoleBindings) List(opts v1.ListOptions) (result *v1alpha1.RoleBindingList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(rolebindingsResource, rolebindingsKind, c.ns, opts), &v1alpha1.RoleBindingList{})
@@ -74,6 +76,7 @@ func (c *FakeRoleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
 
 }
 
+// Create takes the representation of a roleBinding and creates it.  Returns the server's representation of the roleBinding, and an error, if there is any.
 func (c *FakeRoleBindings) Create(roleBinding *v1alpha1.RoleBinding) (result *v1alpha1.RoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(rolebindingsResource, c.ns, roleBinding), &v1alpha1.RoleBinding{})
@@ -84,6 +87,7 @@ func (c *FakeRoleBindings) Create(roleBinding *v1alpha1.RoleBinding) (result *v1
 	return obj.(*v1alpha1.RoleBinding), err
 }
 
+// Update takes the representation of a roleBinding and updates it. Returns the server's representation of the roleBinding, and an error, if there is any.
 func (c *FakeRoleBindings) Update(roleBinding *v1alpha1.RoleBinding) (result *v1alpha1.RoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(rolebindingsResource, c.ns, roleBinding), &v1alpha1.RoleBinding{})
@@ -94,6 +98,7 @@ func (c *FakeRoleBindings) Update(roleBinding *v1alpha1.RoleBinding) (result *v1
 	return obj.(*v1alpha1.RoleBinding), err
 }
 
+// Delete takes name of the roleBinding and deletes it. Returns an error if one occurs.
 func (c *FakeRoleBindings) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(rolebindingsResource, c.ns, name), &v1alpha1.RoleBinding{})
@@ -101,6 +106,7 @@ func (c *FakeRoleBindings) Delete(name string, options *v1.DeleteOptions) error 
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(rolebindingsResource, c.ns, listOptions)
 

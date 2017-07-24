@@ -35,6 +35,7 @@ var initializerconfigurationsResource = schema.GroupVersionResource{Group: "admi
 
 var initializerconfigurationsKind = schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfiguration"}
 
+// Get takes name of the initializerConfiguration, and returns the corresponding initializerConfiguration object, and an error if there is any.
 func (c *FakeInitializerConfigurations) Get(name string, options v1.GetOptions) (result *v1alpha1.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(initializerconfigurationsResource, name), &v1alpha1.InitializerConfiguration{})
@@ -44,6 +45,7 @@ func (c *FakeInitializerConfigurations) Get(name string, options v1.GetOptions) 
 	return obj.(*v1alpha1.InitializerConfiguration), err
 }
 
+// List takes label and field selectors, and returns the list of InitializerConfigurations that match those selectors.
 func (c *FakeInitializerConfigurations) List(opts v1.ListOptions) (result *v1alpha1.InitializerConfigurationList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(initializerconfigurationsResource, initializerconfigurationsKind, opts), &v1alpha1.InitializerConfigurationList{})
@@ -70,6 +72,7 @@ func (c *FakeInitializerConfigurations) Watch(opts v1.ListOptions) (watch.Interf
 		InvokesWatch(testing.NewRootWatchAction(initializerconfigurationsResource, opts))
 }
 
+// Create takes the representation of a initializerConfiguration and creates it.  Returns the server's representation of the initializerConfiguration, and an error, if there is any.
 func (c *FakeInitializerConfigurations) Create(initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(initializerconfigurationsResource, initializerConfiguration), &v1alpha1.InitializerConfiguration{})
@@ -79,6 +82,7 @@ func (c *FakeInitializerConfigurations) Create(initializerConfiguration *v1alpha
 	return obj.(*v1alpha1.InitializerConfiguration), err
 }
 
+// Update takes the representation of a initializerConfiguration and updates it. Returns the server's representation of the initializerConfiguration, and an error, if there is any.
 func (c *FakeInitializerConfigurations) Update(initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(initializerconfigurationsResource, initializerConfiguration), &v1alpha1.InitializerConfiguration{})
@@ -88,12 +92,14 @@ func (c *FakeInitializerConfigurations) Update(initializerConfiguration *v1alpha
 	return obj.(*v1alpha1.InitializerConfiguration), err
 }
 
+// Delete takes name of the initializerConfiguration and deletes it. Returns an error if one occurs.
 func (c *FakeInitializerConfigurations) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(initializerconfigurationsResource, name), &v1alpha1.InitializerConfiguration{})
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeInitializerConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(initializerconfigurationsResource, listOptions)
 

@@ -36,6 +36,7 @@ var secretsResource = schema.GroupVersionResource{Group: "", Version: "v1", Reso
 
 var secretsKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"}
 
+// Get takes name of the secret, and returns the corresponding secret object, and an error if there is any.
 func (c *FakeSecrets) Get(name string, options v1.GetOptions) (result *core_v1.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(secretsResource, c.ns, name), &core_v1.Secret{})
@@ -46,6 +47,7 @@ func (c *FakeSecrets) Get(name string, options v1.GetOptions) (result *core_v1.S
 	return obj.(*core_v1.Secret), err
 }
 
+// List takes label and field selectors, and returns the list of Secrets that match those selectors.
 func (c *FakeSecrets) List(opts v1.ListOptions) (result *core_v1.SecretList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(secretsResource, secretsKind, c.ns, opts), &core_v1.SecretList{})
@@ -74,6 +76,7 @@ func (c *FakeSecrets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 
 }
 
+// Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.
 func (c *FakeSecrets) Create(secret *core_v1.Secret) (result *core_v1.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(secretsResource, c.ns, secret), &core_v1.Secret{})
@@ -84,6 +87,7 @@ func (c *FakeSecrets) Create(secret *core_v1.Secret) (result *core_v1.Secret, er
 	return obj.(*core_v1.Secret), err
 }
 
+// Update takes the representation of a secret and updates it. Returns the server's representation of the secret, and an error, if there is any.
 func (c *FakeSecrets) Update(secret *core_v1.Secret) (result *core_v1.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(secretsResource, c.ns, secret), &core_v1.Secret{})
@@ -94,6 +98,7 @@ func (c *FakeSecrets) Update(secret *core_v1.Secret) (result *core_v1.Secret, er
 	return obj.(*core_v1.Secret), err
 }
 
+// Delete takes name of the secret and deletes it. Returns an error if one occurs.
 func (c *FakeSecrets) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(secretsResource, c.ns, name), &core_v1.Secret{})
@@ -101,6 +106,7 @@ func (c *FakeSecrets) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeSecrets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(secretsResource, c.ns, listOptions)
 

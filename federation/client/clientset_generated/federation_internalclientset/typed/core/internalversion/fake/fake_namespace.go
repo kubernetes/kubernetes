@@ -35,46 +35,7 @@ var namespacesResource = schema.GroupVersionResource{Group: "", Version: "", Res
 
 var namespacesKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "Namespace"}
 
-func (c *FakeNamespaces) Create(namespace *api.Namespace) (result *api.Namespace, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(namespacesResource, namespace), &api.Namespace{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.Namespace), err
-}
-
-func (c *FakeNamespaces) Update(namespace *api.Namespace) (result *api.Namespace, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(namespacesResource, namespace), &api.Namespace{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.Namespace), err
-}
-
-func (c *FakeNamespaces) UpdateStatus(namespace *api.Namespace) (*api.Namespace, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(namespacesResource, "status", namespace), &api.Namespace{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.Namespace), err
-}
-
-func (c *FakeNamespaces) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(namespacesResource, name), &api.Namespace{})
-	return err
-}
-
-func (c *FakeNamespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(namespacesResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &api.NamespaceList{})
-	return err
-}
-
+// Get takes name of the namespace, and returns the corresponding namespace object, and an error if there is any.
 func (c *FakeNamespaces) Get(name string, options v1.GetOptions) (result *api.Namespace, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(namespacesResource, name), &api.Namespace{})
@@ -84,6 +45,7 @@ func (c *FakeNamespaces) Get(name string, options v1.GetOptions) (result *api.Na
 	return obj.(*api.Namespace), err
 }
 
+// List takes label and field selectors, and returns the list of Namespaces that match those selectors.
 func (c *FakeNamespaces) List(opts v1.ListOptions) (result *api.NamespaceList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(namespacesResource, namespacesKind, opts), &api.NamespaceList{})
@@ -108,6 +70,52 @@ func (c *FakeNamespaces) List(opts v1.ListOptions) (result *api.NamespaceList, e
 func (c *FakeNamespaces) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(namespacesResource, opts))
+}
+
+// Create takes the representation of a namespace and creates it.  Returns the server's representation of the namespace, and an error, if there is any.
+func (c *FakeNamespaces) Create(namespace *api.Namespace) (result *api.Namespace, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(namespacesResource, namespace), &api.Namespace{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.Namespace), err
+}
+
+// Update takes the representation of a namespace and updates it. Returns the server's representation of the namespace, and an error, if there is any.
+func (c *FakeNamespaces) Update(namespace *api.Namespace) (result *api.Namespace, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(namespacesResource, namespace), &api.Namespace{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.Namespace), err
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeNamespaces) UpdateStatus(namespace *api.Namespace) (*api.Namespace, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateSubresourceAction(namespacesResource, "status", namespace), &api.Namespace{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.Namespace), err
+}
+
+// Delete takes name of the namespace and deletes it. Returns an error if one occurs.
+func (c *FakeNamespaces) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(namespacesResource, name), &api.Namespace{})
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeNamespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(namespacesResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &api.NamespaceList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched namespace.

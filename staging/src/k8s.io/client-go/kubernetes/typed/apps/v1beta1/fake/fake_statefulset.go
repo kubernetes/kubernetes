@@ -36,6 +36,7 @@ var statefulsetsResource = schema.GroupVersionResource{Group: "apps", Version: "
 
 var statefulsetsKind = schema.GroupVersionKind{Group: "apps", Version: "v1beta1", Kind: "StatefulSet"}
 
+// Get takes name of the statefulSet, and returns the corresponding statefulSet object, and an error if there is any.
 func (c *FakeStatefulSets) Get(name string, options v1.GetOptions) (result *v1beta1.StatefulSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(statefulsetsResource, c.ns, name), &v1beta1.StatefulSet{})
@@ -46,6 +47,7 @@ func (c *FakeStatefulSets) Get(name string, options v1.GetOptions) (result *v1be
 	return obj.(*v1beta1.StatefulSet), err
 }
 
+// List takes label and field selectors, and returns the list of StatefulSets that match those selectors.
 func (c *FakeStatefulSets) List(opts v1.ListOptions) (result *v1beta1.StatefulSetList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(statefulsetsResource, statefulsetsKind, c.ns, opts), &v1beta1.StatefulSetList{})
@@ -74,6 +76,7 @@ func (c *FakeStatefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 
 }
 
+// Create takes the representation of a statefulSet and creates it.  Returns the server's representation of the statefulSet, and an error, if there is any.
 func (c *FakeStatefulSets) Create(statefulSet *v1beta1.StatefulSet) (result *v1beta1.StatefulSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(statefulsetsResource, c.ns, statefulSet), &v1beta1.StatefulSet{})
@@ -84,6 +87,7 @@ func (c *FakeStatefulSets) Create(statefulSet *v1beta1.StatefulSet) (result *v1b
 	return obj.(*v1beta1.StatefulSet), err
 }
 
+// Update takes the representation of a statefulSet and updates it. Returns the server's representation of the statefulSet, and an error, if there is any.
 func (c *FakeStatefulSets) Update(statefulSet *v1beta1.StatefulSet) (result *v1beta1.StatefulSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(statefulsetsResource, c.ns, statefulSet), &v1beta1.StatefulSet{})
@@ -94,6 +98,8 @@ func (c *FakeStatefulSets) Update(statefulSet *v1beta1.StatefulSet) (result *v1b
 	return obj.(*v1beta1.StatefulSet), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeStatefulSets) UpdateStatus(statefulSet *v1beta1.StatefulSet) (*v1beta1.StatefulSet, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "status", c.ns, statefulSet), &v1beta1.StatefulSet{})
@@ -104,6 +110,7 @@ func (c *FakeStatefulSets) UpdateStatus(statefulSet *v1beta1.StatefulSet) (*v1be
 	return obj.(*v1beta1.StatefulSet), err
 }
 
+// Delete takes name of the statefulSet and deletes it. Returns an error if one occurs.
 func (c *FakeStatefulSets) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(statefulsetsResource, c.ns, name), &v1beta1.StatefulSet{})
@@ -111,6 +118,7 @@ func (c *FakeStatefulSets) Delete(name string, options *v1.DeleteOptions) error 
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeStatefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(statefulsetsResource, c.ns, listOptions)
 

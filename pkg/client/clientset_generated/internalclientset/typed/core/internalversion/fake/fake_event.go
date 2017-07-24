@@ -36,40 +36,7 @@ var eventsResource = schema.GroupVersionResource{Group: "", Version: "", Resourc
 
 var eventsKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "Event"}
 
-func (c *FakeEvents) Create(event *api.Event) (result *api.Event, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(eventsResource, c.ns, event), &api.Event{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.Event), err
-}
-
-func (c *FakeEvents) Update(event *api.Event) (result *api.Event, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(eventsResource, c.ns, event), &api.Event{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.Event), err
-}
-
-func (c *FakeEvents) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(eventsResource, c.ns, name), &api.Event{})
-
-	return err
-}
-
-func (c *FakeEvents) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(eventsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &api.EventList{})
-	return err
-}
-
+// Get takes name of the event, and returns the corresponding event object, and an error if there is any.
 func (c *FakeEvents) Get(name string, options v1.GetOptions) (result *api.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(eventsResource, c.ns, name), &api.Event{})
@@ -80,6 +47,7 @@ func (c *FakeEvents) Get(name string, options v1.GetOptions) (result *api.Event,
 	return obj.(*api.Event), err
 }
 
+// List takes label and field selectors, and returns the list of Events that match those selectors.
 func (c *FakeEvents) List(opts v1.ListOptions) (result *api.EventList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(eventsResource, eventsKind, c.ns, opts), &api.EventList{})
@@ -106,6 +74,44 @@ func (c *FakeEvents) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(eventsResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
+func (c *FakeEvents) Create(event *api.Event) (result *api.Event, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(eventsResource, c.ns, event), &api.Event{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.Event), err
+}
+
+// Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
+func (c *FakeEvents) Update(event *api.Event) (result *api.Event, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(eventsResource, c.ns, event), &api.Event{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.Event), err
+}
+
+// Delete takes name of the event and deletes it. Returns an error if one occurs.
+func (c *FakeEvents) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(eventsResource, c.ns, name), &api.Event{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeEvents) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(eventsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &api.EventList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched event.

@@ -36,6 +36,7 @@ var resourcequotasResource = schema.GroupVersionResource{Group: "", Version: "v1
 
 var resourcequotasKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ResourceQuota"}
 
+// Get takes name of the resourceQuota, and returns the corresponding resourceQuota object, and an error if there is any.
 func (c *FakeResourceQuotas) Get(name string, options v1.GetOptions) (result *core_v1.ResourceQuota, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(resourcequotasResource, c.ns, name), &core_v1.ResourceQuota{})
@@ -46,6 +47,7 @@ func (c *FakeResourceQuotas) Get(name string, options v1.GetOptions) (result *co
 	return obj.(*core_v1.ResourceQuota), err
 }
 
+// List takes label and field selectors, and returns the list of ResourceQuotas that match those selectors.
 func (c *FakeResourceQuotas) List(opts v1.ListOptions) (result *core_v1.ResourceQuotaList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(resourcequotasResource, resourcequotasKind, c.ns, opts), &core_v1.ResourceQuotaList{})
@@ -74,6 +76,7 @@ func (c *FakeResourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error)
 
 }
 
+// Create takes the representation of a resourceQuota and creates it.  Returns the server's representation of the resourceQuota, and an error, if there is any.
 func (c *FakeResourceQuotas) Create(resourceQuota *core_v1.ResourceQuota) (result *core_v1.ResourceQuota, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(resourcequotasResource, c.ns, resourceQuota), &core_v1.ResourceQuota{})
@@ -84,6 +87,7 @@ func (c *FakeResourceQuotas) Create(resourceQuota *core_v1.ResourceQuota) (resul
 	return obj.(*core_v1.ResourceQuota), err
 }
 
+// Update takes the representation of a resourceQuota and updates it. Returns the server's representation of the resourceQuota, and an error, if there is any.
 func (c *FakeResourceQuotas) Update(resourceQuota *core_v1.ResourceQuota) (result *core_v1.ResourceQuota, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(resourcequotasResource, c.ns, resourceQuota), &core_v1.ResourceQuota{})
@@ -94,6 +98,8 @@ func (c *FakeResourceQuotas) Update(resourceQuota *core_v1.ResourceQuota) (resul
 	return obj.(*core_v1.ResourceQuota), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *core_v1.ResourceQuota) (*core_v1.ResourceQuota, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(resourcequotasResource, "status", c.ns, resourceQuota), &core_v1.ResourceQuota{})
@@ -104,6 +110,7 @@ func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *core_v1.ResourceQuota) 
 	return obj.(*core_v1.ResourceQuota), err
 }
 
+// Delete takes name of the resourceQuota and deletes it. Returns an error if one occurs.
 func (c *FakeResourceQuotas) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(resourcequotasResource, c.ns, name), &core_v1.ResourceQuota{})
@@ -111,6 +118,7 @@ func (c *FakeResourceQuotas) Delete(name string, options *v1.DeleteOptions) erro
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeResourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(resourcequotasResource, c.ns, listOptions)
 

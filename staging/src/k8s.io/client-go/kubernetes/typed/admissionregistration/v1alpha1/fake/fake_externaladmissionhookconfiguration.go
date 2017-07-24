@@ -35,6 +35,7 @@ var externaladmissionhookconfigurationsResource = schema.GroupVersionResource{Gr
 
 var externaladmissionhookconfigurationsKind = schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfiguration"}
 
+// Get takes name of the externalAdmissionHookConfiguration, and returns the corresponding externalAdmissionHookConfiguration object, and an error if there is any.
 func (c *FakeExternalAdmissionHookConfigurations) Get(name string, options v1.GetOptions) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(externaladmissionhookconfigurationsResource, name), &v1alpha1.ExternalAdmissionHookConfiguration{})
@@ -44,6 +45,7 @@ func (c *FakeExternalAdmissionHookConfigurations) Get(name string, options v1.Ge
 	return obj.(*v1alpha1.ExternalAdmissionHookConfiguration), err
 }
 
+// List takes label and field selectors, and returns the list of ExternalAdmissionHookConfigurations that match those selectors.
 func (c *FakeExternalAdmissionHookConfigurations) List(opts v1.ListOptions) (result *v1alpha1.ExternalAdmissionHookConfigurationList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(externaladmissionhookconfigurationsResource, externaladmissionhookconfigurationsKind, opts), &v1alpha1.ExternalAdmissionHookConfigurationList{})
@@ -70,6 +72,7 @@ func (c *FakeExternalAdmissionHookConfigurations) Watch(opts v1.ListOptions) (wa
 		InvokesWatch(testing.NewRootWatchAction(externaladmissionhookconfigurationsResource, opts))
 }
 
+// Create takes the representation of a externalAdmissionHookConfiguration and creates it.  Returns the server's representation of the externalAdmissionHookConfiguration, and an error, if there is any.
 func (c *FakeExternalAdmissionHookConfigurations) Create(externalAdmissionHookConfiguration *v1alpha1.ExternalAdmissionHookConfiguration) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(externaladmissionhookconfigurationsResource, externalAdmissionHookConfiguration), &v1alpha1.ExternalAdmissionHookConfiguration{})
@@ -79,6 +82,7 @@ func (c *FakeExternalAdmissionHookConfigurations) Create(externalAdmissionHookCo
 	return obj.(*v1alpha1.ExternalAdmissionHookConfiguration), err
 }
 
+// Update takes the representation of a externalAdmissionHookConfiguration and updates it. Returns the server's representation of the externalAdmissionHookConfiguration, and an error, if there is any.
 func (c *FakeExternalAdmissionHookConfigurations) Update(externalAdmissionHookConfiguration *v1alpha1.ExternalAdmissionHookConfiguration) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(externaladmissionhookconfigurationsResource, externalAdmissionHookConfiguration), &v1alpha1.ExternalAdmissionHookConfiguration{})
@@ -88,12 +92,14 @@ func (c *FakeExternalAdmissionHookConfigurations) Update(externalAdmissionHookCo
 	return obj.(*v1alpha1.ExternalAdmissionHookConfiguration), err
 }
 
+// Delete takes name of the externalAdmissionHookConfiguration and deletes it. Returns an error if one occurs.
 func (c *FakeExternalAdmissionHookConfigurations) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(externaladmissionhookconfigurationsResource, name), &v1alpha1.ExternalAdmissionHookConfiguration{})
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeExternalAdmissionHookConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(externaladmissionhookconfigurationsResource, listOptions)
 

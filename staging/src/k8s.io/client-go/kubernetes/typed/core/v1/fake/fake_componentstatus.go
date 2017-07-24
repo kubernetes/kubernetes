@@ -35,6 +35,7 @@ var componentstatusesResource = schema.GroupVersionResource{Group: "", Version: 
 
 var componentstatusesKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ComponentStatus"}
 
+// Get takes name of the componentStatus, and returns the corresponding componentStatus object, and an error if there is any.
 func (c *FakeComponentStatuses) Get(name string, options v1.GetOptions) (result *core_v1.ComponentStatus, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(componentstatusesResource, name), &core_v1.ComponentStatus{})
@@ -44,6 +45,7 @@ func (c *FakeComponentStatuses) Get(name string, options v1.GetOptions) (result 
 	return obj.(*core_v1.ComponentStatus), err
 }
 
+// List takes label and field selectors, and returns the list of ComponentStatuses that match those selectors.
 func (c *FakeComponentStatuses) List(opts v1.ListOptions) (result *core_v1.ComponentStatusList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(componentstatusesResource, componentstatusesKind, opts), &core_v1.ComponentStatusList{})
@@ -70,6 +72,7 @@ func (c *FakeComponentStatuses) Watch(opts v1.ListOptions) (watch.Interface, err
 		InvokesWatch(testing.NewRootWatchAction(componentstatusesResource, opts))
 }
 
+// Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
 func (c *FakeComponentStatuses) Create(componentStatus *core_v1.ComponentStatus) (result *core_v1.ComponentStatus, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(componentstatusesResource, componentStatus), &core_v1.ComponentStatus{})
@@ -79,6 +82,7 @@ func (c *FakeComponentStatuses) Create(componentStatus *core_v1.ComponentStatus)
 	return obj.(*core_v1.ComponentStatus), err
 }
 
+// Update takes the representation of a componentStatus and updates it. Returns the server's representation of the componentStatus, and an error, if there is any.
 func (c *FakeComponentStatuses) Update(componentStatus *core_v1.ComponentStatus) (result *core_v1.ComponentStatus, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(componentstatusesResource, componentStatus), &core_v1.ComponentStatus{})
@@ -88,12 +92,14 @@ func (c *FakeComponentStatuses) Update(componentStatus *core_v1.ComponentStatus)
 	return obj.(*core_v1.ComponentStatus), err
 }
 
+// Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
 func (c *FakeComponentStatuses) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(componentstatusesResource, name), &core_v1.ComponentStatus{})
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeComponentStatuses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(componentstatusesResource, listOptions)
 

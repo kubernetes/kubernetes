@@ -36,6 +36,7 @@ var replicationcontrollersResource = schema.GroupVersionResource{Group: "", Vers
 
 var replicationcontrollersKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ReplicationController"}
 
+// Get takes name of the replicationController, and returns the corresponding replicationController object, and an error if there is any.
 func (c *FakeReplicationControllers) Get(name string, options v1.GetOptions) (result *core_v1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(replicationcontrollersResource, c.ns, name), &core_v1.ReplicationController{})
@@ -46,6 +47,7 @@ func (c *FakeReplicationControllers) Get(name string, options v1.GetOptions) (re
 	return obj.(*core_v1.ReplicationController), err
 }
 
+// List takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
 func (c *FakeReplicationControllers) List(opts v1.ListOptions) (result *core_v1.ReplicationControllerList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(replicationcontrollersResource, replicationcontrollersKind, c.ns, opts), &core_v1.ReplicationControllerList{})
@@ -74,6 +76,7 @@ func (c *FakeReplicationControllers) Watch(opts v1.ListOptions) (watch.Interface
 
 }
 
+// Create takes the representation of a replicationController and creates it.  Returns the server's representation of the replicationController, and an error, if there is any.
 func (c *FakeReplicationControllers) Create(replicationController *core_v1.ReplicationController) (result *core_v1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(replicationcontrollersResource, c.ns, replicationController), &core_v1.ReplicationController{})
@@ -84,6 +87,7 @@ func (c *FakeReplicationControllers) Create(replicationController *core_v1.Repli
 	return obj.(*core_v1.ReplicationController), err
 }
 
+// Update takes the representation of a replicationController and updates it. Returns the server's representation of the replicationController, and an error, if there is any.
 func (c *FakeReplicationControllers) Update(replicationController *core_v1.ReplicationController) (result *core_v1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(replicationcontrollersResource, c.ns, replicationController), &core_v1.ReplicationController{})
@@ -94,6 +98,8 @@ func (c *FakeReplicationControllers) Update(replicationController *core_v1.Repli
 	return obj.(*core_v1.ReplicationController), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeReplicationControllers) UpdateStatus(replicationController *core_v1.ReplicationController) (*core_v1.ReplicationController, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "status", c.ns, replicationController), &core_v1.ReplicationController{})
@@ -104,6 +110,7 @@ func (c *FakeReplicationControllers) UpdateStatus(replicationController *core_v1
 	return obj.(*core_v1.ReplicationController), err
 }
 
+// Delete takes name of the replicationController and deletes it. Returns an error if one occurs.
 func (c *FakeReplicationControllers) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(replicationcontrollersResource, c.ns, name), &core_v1.ReplicationController{})
@@ -111,6 +118,7 @@ func (c *FakeReplicationControllers) Delete(name string, options *v1.DeleteOptio
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeReplicationControllers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(replicationcontrollersResource, c.ns, listOptions)
 

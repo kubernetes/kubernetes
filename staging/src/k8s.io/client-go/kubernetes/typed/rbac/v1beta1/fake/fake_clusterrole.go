@@ -35,6 +35,7 @@ var clusterrolesResource = schema.GroupVersionResource{Group: "rbac.authorizatio
 
 var clusterrolesKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "ClusterRole"}
 
+// Get takes name of the clusterRole, and returns the corresponding clusterRole object, and an error if there is any.
 func (c *FakeClusterRoles) Get(name string, options v1.GetOptions) (result *v1beta1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(clusterrolesResource, name), &v1beta1.ClusterRole{})
@@ -44,6 +45,7 @@ func (c *FakeClusterRoles) Get(name string, options v1.GetOptions) (result *v1be
 	return obj.(*v1beta1.ClusterRole), err
 }
 
+// List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
 func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *v1beta1.ClusterRoleList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(clusterrolesResource, clusterrolesKind, opts), &v1beta1.ClusterRoleList{})
@@ -70,6 +72,7 @@ func (c *FakeClusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		InvokesWatch(testing.NewRootWatchAction(clusterrolesResource, opts))
 }
 
+// Create takes the representation of a clusterRole and creates it.  Returns the server's representation of the clusterRole, and an error, if there is any.
 func (c *FakeClusterRoles) Create(clusterRole *v1beta1.ClusterRole) (result *v1beta1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), &v1beta1.ClusterRole{})
@@ -79,6 +82,7 @@ func (c *FakeClusterRoles) Create(clusterRole *v1beta1.ClusterRole) (result *v1b
 	return obj.(*v1beta1.ClusterRole), err
 }
 
+// Update takes the representation of a clusterRole and updates it. Returns the server's representation of the clusterRole, and an error, if there is any.
 func (c *FakeClusterRoles) Update(clusterRole *v1beta1.ClusterRole) (result *v1beta1.ClusterRole, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), &v1beta1.ClusterRole{})
@@ -88,12 +92,14 @@ func (c *FakeClusterRoles) Update(clusterRole *v1beta1.ClusterRole) (result *v1b
 	return obj.(*v1beta1.ClusterRole), err
 }
 
+// Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
 func (c *FakeClusterRoles) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(clusterrolesResource, name), &v1beta1.ClusterRole{})
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeClusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(clusterrolesResource, listOptions)
 

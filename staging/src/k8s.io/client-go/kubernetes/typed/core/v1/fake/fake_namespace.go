@@ -35,6 +35,7 @@ var namespacesResource = schema.GroupVersionResource{Group: "", Version: "v1", R
 
 var namespacesKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"}
 
+// Get takes name of the namespace, and returns the corresponding namespace object, and an error if there is any.
 func (c *FakeNamespaces) Get(name string, options v1.GetOptions) (result *core_v1.Namespace, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(namespacesResource, name), &core_v1.Namespace{})
@@ -44,6 +45,7 @@ func (c *FakeNamespaces) Get(name string, options v1.GetOptions) (result *core_v
 	return obj.(*core_v1.Namespace), err
 }
 
+// List takes label and field selectors, and returns the list of Namespaces that match those selectors.
 func (c *FakeNamespaces) List(opts v1.ListOptions) (result *core_v1.NamespaceList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(namespacesResource, namespacesKind, opts), &core_v1.NamespaceList{})
@@ -70,6 +72,7 @@ func (c *FakeNamespaces) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		InvokesWatch(testing.NewRootWatchAction(namespacesResource, opts))
 }
 
+// Create takes the representation of a namespace and creates it.  Returns the server's representation of the namespace, and an error, if there is any.
 func (c *FakeNamespaces) Create(namespace *core_v1.Namespace) (result *core_v1.Namespace, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(namespacesResource, namespace), &core_v1.Namespace{})
@@ -79,6 +82,7 @@ func (c *FakeNamespaces) Create(namespace *core_v1.Namespace) (result *core_v1.N
 	return obj.(*core_v1.Namespace), err
 }
 
+// Update takes the representation of a namespace and updates it. Returns the server's representation of the namespace, and an error, if there is any.
 func (c *FakeNamespaces) Update(namespace *core_v1.Namespace) (result *core_v1.Namespace, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(namespacesResource, namespace), &core_v1.Namespace{})
@@ -88,6 +92,8 @@ func (c *FakeNamespaces) Update(namespace *core_v1.Namespace) (result *core_v1.N
 	return obj.(*core_v1.Namespace), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeNamespaces) UpdateStatus(namespace *core_v1.Namespace) (*core_v1.Namespace, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateSubresourceAction(namespacesResource, "status", namespace), &core_v1.Namespace{})
@@ -97,12 +103,14 @@ func (c *FakeNamespaces) UpdateStatus(namespace *core_v1.Namespace) (*core_v1.Na
 	return obj.(*core_v1.Namespace), err
 }
 
+// Delete takes name of the namespace and deletes it. Returns an error if one occurs.
 func (c *FakeNamespaces) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(namespacesResource, name), &core_v1.Namespace{})
 	return err
 }
 
+// DeleteCollection deletes a collection of objects.
 func (c *FakeNamespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(namespacesResource, listOptions)
 
