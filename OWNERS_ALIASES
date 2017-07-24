@@ -58,14 +58,26 @@ aliases:
     - vishh
     - yifan-gu
     - yujuhong
-  sig-network-reviewers:
-    - thockin
-    - freehan
+  sig-network-approvers:
     - bowei
-    - mrhohn
-    - dcbw
-    - danwinship
     - caseydavenport
+    - danwinship
+    - dcbw
+    - dnardo
+    - freehan
+    - mrhohn
+    - nicksardo
+    - thockin
+  sig-network-reviewers:
+    - bowei
+    - caseydavenport
+    - danwinship
+    - dcbw
+    - dnardo
+    - freehan
+    - mrhohn
+    - nicksardo
+    - thockin
   sig-apps-reviewers:
     - enisoc
     - erictune
