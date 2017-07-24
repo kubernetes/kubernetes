@@ -530,6 +530,17 @@ func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeCla
 	}
 }
 
+func testVolumeClaimWithStatus(
+	name, namespace string,
+	spec api.PersistentVolumeClaimSpec,
+	status api.PersistentVolumeClaimStatus) *api.PersistentVolumeClaim {
+	return &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Spec:       spec,
+		Status:     status,
+	}
+}
+
 func testVolumeClaimStorageClass(name string, namespace string, annval string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
 	annotations := map[string]string{
 		v1.BetaStorageClassAnnotation: annval,
@@ -9074,6 +9085,68 @@ func TestValidateLimitRange(t *testing.T) {
 		}
 	}
 
+}
+
+func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
+	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	})
+	validConditionUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimPending,
+		Conditions: []api.PvcCondition{
+			api.PvcCondition{Type: api.PvcResizeStarted, Status: api.ConditionTrue},
+		},
+	})
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		oldClaim          *api.PersistentVolumeClaim
+		newClaim          *api.PersistentVolumeClaim
+		enableResize      bool
+	}{
+		"condition-update-with-disabled-feature-gate": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          validConditionUpdate,
+			enableResize:      false,
+		},
+		"condition-update-with-enabled-feature-gate": {
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validConditionUpdate,
+			enableResize:      true,
+		},
+	}
+	for name, scenario := range scenarios {
+		// ensure we have a resource version specified for updates
+		togglePVExpandFeature(scenario.enableResize, t)
+		scenario.oldClaim.ResourceVersion = "1"
+		scenario.newClaim.ResourceVersion = "1"
+		errs := ValidatePersistentVolumeClaimStatusUpdate(scenario.newClaim, scenario.oldClaim)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
 }
 
 func TestValidateResourceQuota(t *testing.T) {
