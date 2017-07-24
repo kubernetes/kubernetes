@@ -200,7 +200,7 @@ func Run(s *options.CMServer) error {
 	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
 		"kube-system",
 		"kube-controller-manager",
-		leaderElectionClient,
+		leaderElectionClient.Core(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
