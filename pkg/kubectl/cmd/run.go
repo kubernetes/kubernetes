@@ -156,6 +156,9 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 
 	// validate image name
 	imageName := cmdutil.GetFlagString(cmd, "image")
+	if imageName == "" {
+		return fmt.Errorf("--image is required")
+	}
 	validImageRef := reference.ReferenceRegexp.MatchString(imageName)
 	if !validImageRef {
 		return fmt.Errorf("Invalid image name %q: %v", imageName, reference.ErrReferenceInvalidFormat)
