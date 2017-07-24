@@ -540,7 +540,7 @@ func newCondition(conditionType batch.JobConditionType, reason, message string) 
 	}
 }
 
-// getStatus returns no of succeeded and failed pods running a job
+// getStatus returns number of succeeded and failed pods in a running job
 func getStatus(pods []*v1.Pod) (succeeded, failed int32) {
 	succeeded = int32(filterPods(pods, v1.PodSucceeded))
 	failed = int32(filterPods(pods, v1.PodFailed))
