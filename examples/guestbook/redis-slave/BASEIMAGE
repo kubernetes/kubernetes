@@ -1,0 +1,4 @@
+amd64=redis:3.2.9
+arm=arm32v6/redis:3.2.9-alpine
+arm64=arm64v8/redis:3.2.9
+ppc64le=ppc64le/redis:3.2.9
