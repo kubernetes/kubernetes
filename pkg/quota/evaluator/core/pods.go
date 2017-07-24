@@ -70,9 +70,11 @@ func listPodsByNamespaceFuncUsingClient(kubeClient clientset.Interface) generic.
 // NewPodEvaluator returns an evaluator that can evaluate pods
 // if the specified shared informer factory is not nil, evaluator may use it to support listing functions.
 func NewPodEvaluator(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Evaluator {
-	listFuncByNamespace := listPodsByNamespaceFuncUsingClient(kubeClient)
+	var listFuncByNamespace generic.ListFuncByNamespace
 	if f != nil {
 		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, v1.SchemeGroupVersion.WithResource("pods"))
+	} else {
+		listFuncByNamespace = listPodsByNamespaceFuncUsingClient(kubeClient)
 	}
 	return &podEvaluator{
 		listFuncByNamespace: listFuncByNamespace,
