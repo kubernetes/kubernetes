@@ -38,6 +38,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/retry"
+	azurecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -1325,4 +1327,30 @@ func DescribeSvc(ns string) {
 	desc, _ := RunKubectl(
 		"describe", "svc", fmt.Sprintf("--namespace=%v", ns))
 	Logf(desc)
+}
+
+// EnableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
+// setting for the supported cloud providers: GCE/GKE and Azure
+func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
+	enable = func(svc *v1.Service) {}
+	disable = func(svc *v1.Service) {}
+
+	switch TestContext.Provider {
+	case "gce", "gke":
+		enable = func(svc *v1.Service) {
+			svc.ObjectMeta.Annotations = map[string]string{gcecloud.ServiceAnnotationLoadBalancerType: string(gcecloud.LBTypeInternal)}
+		}
+		disable = func(svc *v1.Service) {
+			delete(svc.ObjectMeta.Annotations, gcecloud.ServiceAnnotationLoadBalancerType)
+		}
+	case "azure":
+		enable = func(svc *v1.Service) {
+			svc.ObjectMeta.Annotations = map[string]string{azurecloud.ServiceAnnotationLoadBalancerInternal: "true"}
+		}
+		disable = func(svc *v1.Service) {
+			svc.ObjectMeta.Annotations = map[string]string{azurecloud.ServiceAnnotationLoadBalancerInternal: "false"}
+		}
+	}
+
+	return
 }
