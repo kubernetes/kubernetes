@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -165,7 +166,10 @@ func (d *namespacedResourcesDeleter) initOpCache() {
 	// TODO(sttts): get rid of opCache and http 405 logic around it and trust discovery info
 	resources, err := d.discoverResourcesFn()
 	if err != nil {
-		glog.Fatalf("Failed to get supported resources: %v", err)
+		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
+	}
+	if len(resources) == 0 {
+		glog.Fatalf("Unable to get any supported resources from server: %v", err)
 	}
 	deletableGroupVersionResources := []schema.GroupVersionResource{}
 	for _, rl := range resources {

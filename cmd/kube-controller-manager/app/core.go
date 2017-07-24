@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -285,7 +286,10 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	gcClientset := ctx.ClientBuilder.ClientOrDie("generic-garbage-collector")
 	preferredResources, err := gcClientset.Discovery().ServerPreferredResources()
 	if err != nil {
-		return true, fmt.Errorf("failed to get supported resources from server: %v", err)
+		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
+	}
+	if len(preferredResources) == 0 {
+		return true, fmt.Errorf("unable to get any supported resources from server: %v", err)
 	}
 	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"get", "list", "watch", "patch", "update", "delete"}}, preferredResources)
 	deletableGroupVersionResources, err := discovery.GroupVersionResources(deletableResources)
