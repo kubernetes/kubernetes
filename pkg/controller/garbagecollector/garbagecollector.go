@@ -18,6 +18,7 @@ package garbagecollector
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -409,17 +410,30 @@ func (gc *GarbageCollector) processDeletingDependentsItem(item *node) error {
 
 // dependents are copies of pointers to the owner's dependents, they don't need to be locked.
 func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents []*node) error {
-	var errorsSlice []error
-	for _, dependent := range dependents {
-		// the dependent.identity.UID is used as precondition
-		patch := deleteOwnerRefPatch(dependent.identity.UID, owner.UID)
-		_, err := gc.patchObject(dependent.identity, patch)
-		// note that if the target ownerReference doesn't exist in the
-		// dependent, strategic merge patch will NOT return an error.
-		if err != nil && !errors.IsNotFound(err) {
-			errorsSlice = append(errorsSlice, fmt.Errorf("orphaning %s failed, %v", dependent.identity, err))
-		}
+	errCh := make(chan error, len(dependents))
+	wg := sync.WaitGroup{}
+	wg.Add(len(dependents))
+	for i := range dependents {
+		go func(dependent *node) {
+			defer wg.Done()
+			// the dependent.identity.UID is used as precondition
+			patch := deleteOwnerRefPatch(dependent.identity.UID, owner.UID)
+			_, err := gc.patchObject(dependent.identity, patch)
+			// note that if the target ownerReference doesn't exist in the
+			// dependent, strategic merge patch will NOT return an error.
+			if err != nil && !errors.IsNotFound(err) {
+				errCh <- fmt.Errorf("orphaning %s failed, %v", dependent.identity, err)
+			}
+		}(dependents[i])
 	}
+	wg.Wait()
+	close(errCh)
+
+	var errorsSlice []error
+	for e := range errCh {
+		errorsSlice = append(errorsSlice, e)
+	}
+
 	if len(errorsSlice) != 0 {
 		return fmt.Errorf("failed to orphan dependents of owner %s, got errors: %s", owner, utilerrors.NewAggregate(errorsSlice).Error())
 	}
