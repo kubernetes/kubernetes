@@ -51,23 +51,25 @@ func getNonOrphanOptions() *metav1.DeleteOptions {
 }
 
 var zero = int64(0)
-var deploymentLabels = map[string]string{"app": "gc-test"}
-var podTemplateSpec = v1.PodTemplateSpec{
-	ObjectMeta: metav1.ObjectMeta{
-		Labels: deploymentLabels,
-	},
-	Spec: v1.PodSpec{
-		TerminationGracePeriodSeconds: &zero,
-		Containers: []v1.Container{
-			{
-				Name:  "nginx",
-				Image: "gcr.io/google_containers/nginx-slim:0.7",
+
+func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
+	return v1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: labels,
+		},
+		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: &zero,
+			Containers: []v1.Container{
+				{
+					Name:  "nginx",
+					Image: "gcr.io/google_containers/nginx-slim:0.7",
+				},
 			},
 		},
-	},
+	}
 }
 
-func newOwnerDeployment(f *framework.Framework, deploymentName string) *v1beta1.Deployment {
+func newOwnerDeployment(f *framework.Framework, deploymentName string, labels map[string]string) *v1beta1.Deployment {
 	replicas := int32(2)
 	return &v1beta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -75,11 +77,11 @@ func newOwnerDeployment(f *framework.Framework, deploymentName string) *v1beta1.
 		},
 		Spec: v1beta1.DeploymentSpec{
 			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{MatchLabels: deploymentLabels},
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Strategy: v1beta1.DeploymentStrategy{
 				Type: v1beta1.RollingUpdateDeploymentStrategyType,
 			},
-			Template: podTemplateSpec,
+			Template: getPodTemplateSpec(labels),
 		},
 	}
 }
@@ -88,7 +90,8 @@ func getSelector() map[string]string {
 	return map[string]string{"app": "gc-test"}
 }
 
-func newOwnerRC(f *framework.Framework, name string, replicas int32) *v1.ReplicationController {
+func newOwnerRC(f *framework.Framework, name string, replicas int32, labels map[string]string) *v1.ReplicationController {
+	template := getPodTemplateSpec(labels)
 	return &v1.ReplicationController{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicationController",
@@ -100,8 +103,8 @@ func newOwnerRC(f *framework.Framework, name string, replicas int32) *v1.Replica
 		},
 		Spec: v1.ReplicationControllerSpec{
 			Replicas: &replicas,
-			Selector: map[string]string{"app": "gc-test"},
-			Template: &podTemplateSpec,
+			Selector: labels,
+			Template: &template,
 		},
 	}
 }
@@ -215,7 +218,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		rc := newOwnerRC(f, rcName, 2)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "delete_pods"}
+		rc := newOwnerRC(f, rcName, 2, uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -266,7 +271,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		rc := newOwnerRC(f, rcName, 100)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "orphan_pods"}
+		rc := newOwnerRC(f, rcName, 100, uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -332,7 +339,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		rc := newOwnerRC(f, rcName, 2)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "orphan_pods_nil_option"}
+		rc := newOwnerRC(f, rcName, 2, uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -379,7 +388,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		deployClient := clientSet.Extensions().Deployments(f.Namespace.Name)
 		rsClient := clientSet.Extensions().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
-		deployment := newOwnerDeployment(f, deploymentName)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "delete_rs"}
+		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
 		By("create the deployment")
 		createdDeployment, err := deployClient.Create(deployment)
 		if err != nil {
@@ -428,7 +439,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		deployClient := clientSet.Extensions().Deployments(f.Namespace.Name)
 		rsClient := clientSet.Extensions().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
-		deployment := newOwnerDeployment(f, deploymentName)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "orphan_rs"}
+		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
 		By("create the deployment")
 		createdDeployment, err := deployClient.Create(deployment)
 		if err != nil {
@@ -491,7 +504,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		rc := newOwnerRC(f, rcName, 100)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "delete_pods_foreground"}
+		rc := newOwnerRC(f, rcName, 100, uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -571,16 +586,18 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rc1Name := "simpletest-rc-to-be-deleted"
 		replicas := int32(100)
 		halfReplicas := int(replicas / 2)
-		rc1 := newOwnerRC(f, rc1Name, replicas)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "valid_and_pending_owners"}
+		rc1 := newOwnerRC(f, rc1Name, replicas, uniqLabels)
 		By("create the rc1")
 		rc1, err := rcClient.Create(rc1)
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
 		rc2Name := "simpletest-rc-to-stay"
-		rc2 := newOwnerRC(f, rc2Name, 0)
-		rc2.Spec.Selector = nil
-		rc2.Spec.Template.ObjectMeta.Labels = map[string]string{"another.key": "another.value"}
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels = map[string]string{"another.key": "another.value"}
+		rc2 := newOwnerRC(f, rc2Name, 0, uniqLabels)
 		By("create the rc2")
 		rc2, err = rcClient.Create(rc2)
 		if err != nil {
