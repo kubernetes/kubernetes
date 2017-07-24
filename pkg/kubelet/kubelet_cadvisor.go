@@ -76,6 +76,11 @@ func (kl *Kubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.Co
 	}
 }
 
+// GetVersionInfo returns information about the version of cAdvisor in use.
+func (kl *Kubelet) GetVersionInfo() (*cadvisorapi.VersionInfo, error) {
+	return kl.cadvisor.VersionInfo()
+}
+
 // GetCachedMachineInfo assumes that the machine info can't change without a reboot
 func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	if kl.machineInfo == nil {
