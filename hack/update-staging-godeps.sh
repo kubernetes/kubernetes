@@ -56,7 +56,9 @@ if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
 fi
 
 kube::util::ensure-temp-dir
+kube::util::ensure_single_dir_gopath
 kube::util::ensure_godep_version v79
+kube::util::ensure_no_staging_repos_in_gopath
 
 TMP_GOPATH="${KUBE_TEMP}/go"
 
