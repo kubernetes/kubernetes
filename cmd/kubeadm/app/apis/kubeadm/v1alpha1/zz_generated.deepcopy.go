@@ -194,6 +194,11 @@ func (in *NodeConfiguration) DeepCopyInto(out *NodeConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.DiscoveryTokenCACertHashes != nil {
+		in, out := &in.DiscoveryTokenCACertHashes, &out.DiscoveryTokenCACertHashes
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
