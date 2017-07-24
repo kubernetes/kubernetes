@@ -1,13 +1,13 @@
-# Kubernetes Persistent Volume Plugin For Blob and Managed Disks Samples
+# Kubernetes Persistent Volume Plugin for Blob and Managed Disks Samples
 
-This repo contains samples that works with the new Azure persistent volume plugin for Kubernetes. The plugin is expected to be in v1.8 release, and then will become part of Azure ACS 
+This repo contains samples that works with the new Azure persistent volume plugin for Kubernetes. The plugin is expected to be in v1.8 release then will become part of Azure ACS 
 
 
 ## What does the plugin do? 
 
 1. Provision PVC based on Azure Managed Disks and Blob Disks
 2. Perform consistent attach/detach/mount/unmount and format when needed for disks 
-3. Support both standard and premium storage accounts.
+3. Supports both standard and premium LRS storage accounts.
 
 ## Get Started
 
@@ -19,16 +19,16 @@ The sequence of events is generally
 3. Create a pod or a replication controller that uses the PVC
 
 ```
-# you can use the following example command to create a storage class first
+# You can use the following command to create a storage class first
 kubectl create -f storageclass-managed-hdd.json
 
-# you can use the following command to create a pvc, which will create an azure managed disk
+# You can use the following command to create a pvc, which will create an azure disk
 kubectl create -f pvc-on-managed-hdd.json
 
 # You can get more details about the created PVC by
 kubectl describe pvc {pvc-name}
 
-# you can use the following command to create a pod with specified pvc
+# You can use the following command to create a pod with specified pvc
 kubectl create -f pod-uses-managed-hdd.json
    
 ```
@@ -53,13 +53,15 @@ The entire experience is offloaded to Azure to manage disks:storage accounts. Yo
 Blob Disks works in two modes. Controlled by #kind# parameter on the storage class. 
 
 ### Dedicated (default mode)
-When *kind* parameter is set to *dedicated* K8S will use the specified storage account or create a new dedicated storage account for this new disk. If this account is created by k8s, no other disks will be allowed in the this storage account and the created account will removed when the PVC is removed (according to K8S PVC reclaim policy) 
+When *kind* parameter is set to *dedicated* K8S will create a new dedicated storage account for this new disk. No other disks will be allowed in this storage account. The account will removed when the PVC is removed (according to K8S PVC reclaim policy) 
 
-### The following storage parameter can be used to control the behaviour
+> You can still use existing VHDs, again the general rule apply use storage accounts that are part of cluster resource group
 
-1. *skuname* or *storageaccounttype* to choose the underlying Azure storage account (default is *standard_lrs* allowed values are  *standard_lrs*, *premium_lrs*, *standard_grs*, *standard_ragrs*, *standard_zrs*)
+### The following storage parameter can be used to control the behavior
+
+1. *skuname* or *storageaccounttype* to choose the underlying Azure storage account (default is *standard_lrs* allowed values are  *standard_lrs* and *premium_lrs*)
 2. *cachingmode* controls Azure caching mode when the disk is attached to a VM (default is *readwrite* allowed values are *none*, *readwrite* and *readonly*
-3. *kind* decides on disk kind (default is *dedicated* allowed values are *shared*, *dedicated* and *managed*)
+3. *kind* decides on disk kind (default is *shared* allowed values are *shared*, *dedicated* and *managed*)
 4. *fstype* the file system of this disk (default *ext4*)
 
 ### Shared
@@ -67,7 +69,7 @@ PVC: VHDs are created in a shared storage accounts in the same resource group as
 
 ```
 Rsource Group
---Storage Account: pvc{unique-hash}001 // created by K8S as it provisoned  PVC, all disks are placed in the same blob container  
+--Storage Account: pvc{unique-hash}001 // created by K8S as it provisioned PVC, all disks are placed in the same blob container  
 ---pvc-xxx-xxx-xxxx.vhd
 ---pvc-xxx-xxx-xxxx.vhd
 --Storage Account: pvc{unique-hash}002..n  
@@ -84,7 +86,7 @@ The following rules apply:
 ## Additional Notes
 The samples assumes that you have a cluster with node labeled with #disktype=blob# for VMs that are using blob disks and #disktype=managed# for VMs that are using managed disks. You can label your nodes or remove the node selector before using the files. 
 
-> You can not attach managed disks to VMs that are not using managed OS disks. This applies also the other way around no blob disks on VMS that are using managed OS disks
+> You cannot attach managed disks to VMs that are not using managed OS disks. This applies also the other way around no blob disks on VMS that are using managed OS disks
 
 To label your nodes use the following command 
 ```
