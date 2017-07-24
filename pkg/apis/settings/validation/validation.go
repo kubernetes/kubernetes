@@ -39,12 +39,13 @@ func ValidatePodPresetSpec(spec *settings.PodPresetSpec, fldPath *field.Path) fi
 
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&spec.Selector, fldPath.Child("selector"))...)
 
-	if spec.Env == nil && spec.EnvFrom == nil && spec.VolumeMounts == nil && spec.Volumes == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("volumes", "env", "envFrom", "volumeMounts"), "must specify at least one"))
+	if spec.Affinity == nil && spec.Env == nil && spec.EnvFrom == nil && spec.VolumeMounts == nil && spec.Volumes == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("affinity", "volumes", "env", "envFrom", "volumeMounts"), "must specify at least one"))
 	}
 
 	volumes, vErrs := apivalidation.ValidateVolumes(spec.Volumes, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
+	allErrs = append(allErrs, apivalidation.ValidateAffinity(spec.Affinity, fldPath.Child("affinity"))...)
 	allErrs = append(allErrs, apivalidation.ValidateEnv(spec.Env, fldPath.Child("env"))...)
 	allErrs = append(allErrs, apivalidation.ValidateEnvFrom(spec.EnvFrom, fldPath.Child("envFrom"))...)
 	allErrs = append(allErrs, apivalidation.ValidateVolumeMounts(spec.VolumeMounts, volumes, fldPath.Child("volumeMounts"))...)

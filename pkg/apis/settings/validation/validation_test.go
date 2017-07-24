@@ -144,6 +144,53 @@ func TestValidatePodPresets(t *testing.T) {
 			t.Fatalf("errors: %#v", errList.ToAggregate().Error())
 		}
 	}
+
+	p = &settings.PodPreset{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "validate-affinity",
+			Namespace: "sample",
+		},
+		Spec: settings.PodPresetSpec{
+			Selector: v1.LabelSelector{
+				MatchExpressions: []v1.LabelSelectorRequirement{
+					{
+						Key:      "security",
+						Operator: v1.LabelSelectorOpIn,
+						Values:   []string{"S2"},
+					},
+				},
+			},
+			Affinity: &api.Affinity{
+				PodAffinity: &api.PodAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+						{
+							Weight: 5,
+							PodAffinityTerm: api.PodAffinityTerm{
+								LabelSelector: &v1.LabelSelector{
+									MatchExpressions: []v1.LabelSelectorRequirement{
+										{
+											Key:      "security",
+											Operator: v1.LabelSelectorOpIn,
+											Values:   []string{"S1"},
+										},
+									},
+								},
+								TopologyKey: "region",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	errList = ValidatePodPreset(p)
+	if errList != nil {
+		if errList.ToAggregate() != nil {
+			t.Fatalf("errors: %#v", errList.ToAggregate().Error())
+		}
+	}
+
 }
 
 func TestValidatePodPresetsiVolumeMountError(t *testing.T) {
