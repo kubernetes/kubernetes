@@ -2035,8 +2035,7 @@ function test-setup() {
   detect-project
 
   if [[ ${MULTIZONE:-} == "true" && -n ${E2E_ZONES:-} ]]; then
-    for KUBE_GCE_ZONE in ${E2E_ZONES}
-    do
+    for KUBE_GCE_ZONE in ${E2E_ZONES}; do
       KUBE_GCE_ZONE="${KUBE_GCE_ZONE}" KUBE_USE_EXISTING_MASTER="${KUBE_USE_EXISTING_MASTER:-}" "${KUBE_ROOT}/cluster/kube-up.sh"
       KUBE_USE_EXISTING_MASTER="true" # For subsequent zones we use the existing master
     done
@@ -2092,15 +2091,14 @@ function test-teardown() {
     "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" \
     "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports"
   if [[ ${MULTIZONE:-} == "true" && -n ${E2E_ZONES:-} ]]; then
-      local zones=( ${E2E_ZONES} )
-      # tear them down in reverse order, finally tearing down the master too.
-      for ((zone_num=${#zones[@]}-1; zone_num>0; zone_num--))
-      do
-	  KUBE_GCE_ZONE="${zones[zone_num]}" KUBE_USE_EXISTING_MASTER="true" "${KUBE_ROOT}/cluster/kube-down.sh"
-      done
-      KUBE_GCE_ZONE="${zones[0]}" KUBE_USE_EXISTING_MASTER="false" "${KUBE_ROOT}/cluster/kube-down.sh"
+    local zones=( ${E2E_ZONES} )
+    # tear them down in reverse order, finally tearing down the master too.
+    for ((zone_num=${#zones[@]}-1; zone_num>0; zone_num--)); do
+      KUBE_GCE_ZONE="${zones[zone_num]}" KUBE_USE_EXISTING_MASTER="true" "${KUBE_ROOT}/cluster/kube-down.sh"
+    done
+    KUBE_GCE_ZONE="${zones[0]}" KUBE_USE_EXISTING_MASTER="false" "${KUBE_ROOT}/cluster/kube-down.sh"
   else
-      "${KUBE_ROOT}/cluster/kube-down.sh"
+    "${KUBE_ROOT}/cluster/kube-down.sh"
   fi
 }
 
