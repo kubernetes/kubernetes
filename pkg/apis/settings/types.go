@@ -52,6 +52,12 @@ type PodPresetSpec struct {
 	// VolumeMounts defines the collection of VolumeMount to inject into containers.
 	// +optional
 	VolumeMounts []api.VolumeMount
+	// Containers defines the collection of Container to inject into the Pod
+	// +optional
+	Containers []api.Container
+	// InitContainers defines the collection of Containers to inject into the Pods InitContainers
+	// +optional
+	InitContainers []api.Container
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -391,6 +391,169 @@ func TestMergeVolumes(t *testing.T) {
 	}
 }
 
+func TestMergeInitContainers(t *testing.T) {
+	tests := map[string]struct {
+		orig       []api.Container
+		mod        []api.Container
+		result     []api.Container
+		shouldFail bool
+	}{
+		"empty original": {
+			mod: []api.Container{
+				{Name: "container", Image: "image"},
+				{Name: "container2", Image: "image"},
+			},
+			result: []api.Container{
+				{Name: "container", Image: "image"},
+				{Name: "container2", Image: "image"},
+			},
+			shouldFail: false,
+		},
+		"good merge": {
+			orig: []api.Container{
+				{Name: "container3", Image: "image"},
+				{Name: "container4", Image: "image"},
+			},
+			mod: []api.Container{
+				{Name: "container", Image: "image"},
+				{Name: "container2", Image: "image"},
+			},
+			result: []api.Container{
+				{Name: "container3", Image: "image"},
+				{Name: "container4", Image: "image"},
+				{Name: "container", Image: "image"},
+				{Name: "container2", Image: "image"},
+			},
+			shouldFail: false,
+		},
+		"conflict": {
+			orig: []api.Container{
+				{Name: "container3", Image: "image"},
+				{Name: "container4", Image: "image"},
+			},
+			mod: []api.Container{
+				{Name: "container3", Image: "conflictedImage"},
+				{Name: "container2", Image: "image"},
+			},
+			shouldFail: true,
+		},
+		"one is exact same": {
+			orig: []api.Container{
+				{Name: "container3", Image: "image"},
+				{Name: "container4", Image: "image"},
+			},
+			mod: []api.Container{
+				{Name: "container3", Image: "image"},
+				{Name: "container2", Image: "image"},
+			},
+			result: []api.Container{
+				{Name: "container3", Image: "image"},
+				{Name: "container4", Image: "image"},
+				{Name: "container2", Image: "image"},
+			},
+			shouldFail: false,
+		},
+	}
+
+	for name, test := range tests {
+		result, err := mergeContainers("testing",
+			test.mod,
+			test.orig,
+		)
+		if test.shouldFail && err == nil {
+			t.Fatalf("expected test %q to fail but got nil", name)
+		}
+		if !test.shouldFail && err != nil {
+			t.Fatalf("test %q failed: %v", name, err)
+		}
+		if !reflect.DeepEqual(test.result, result) {
+			t.Fatalf("results were not equal for test %q: got %#v; expected: %#v", name, result, test.result)
+		}
+	}
+}
+
+func TestMergeContainers(t *testing.T) {
+	tests := map[string]struct {
+		orig       []api.Container
+		mod        []api.Container
+		result     []api.Container
+		shouldFail bool
+	}{
+		"empty original": {
+			mod: []api.Container{
+				{Name: "container", Image: "image"},
+				{Name: "container2", Image: "image"},
+			},
+			result: []api.Container{
+				{Name: "container", Image: "image"},
+				{Name: "container2", Image: "image"},
+			},
+			shouldFail: false,
+		},
+		"good merge": {
+			orig: []api.Container{
+				{Name: "container3", Image: "image"},
+				{Name: "container4", Image: "image"},
+			},
+			mod: []api.Container{
+				{Name: "container", Image: "image"},
+				{Name: "container2", Image: "image"},
+			},
+			result: []api.Container{
+				{Name: "container3", Image: "image"},
+				{Name: "container4", Image: "image"},
+				{Name: "container", Image: "image"},
+				{Name: "container2", Image: "image"},
+			},
+			shouldFail: false,
+		},
+		"conflict": {
+			orig: []api.Container{
+				{Name: "container3", Image: "image"},
+				{Name: "container4", Image: "image"},
+			},
+			mod: []api.Container{
+				{Name: "container3", Image: "conflictedImage"},
+				{Name: "container2", Image: "image"},
+			},
+			shouldFail: true,
+		},
+		"one is exact same": {
+			orig: []api.Container{
+				{Name: "container3", Image: "image"},
+				{Name: "container4", Image: "image"},
+			},
+			mod: []api.Container{
+				{Name: "container3", Image: "image"},
+				{Name: "container2", Image: "image"},
+			},
+			result: []api.Container{
+				{Name: "container3", Image: "image"},
+				{Name: "container4", Image: "image"},
+				{Name: "container2", Image: "image"},
+			},
+			shouldFail: false,
+		},
+	}
+
+	for name, test := range tests {
+		result, err := mergeContainers(
+			"testing",
+			test.mod,
+			test.orig,
+		)
+		if test.shouldFail && err == nil {
+			t.Fatalf("expected test %q to fail but got nil", name)
+		}
+		if !test.shouldFail && err != nil {
+			t.Fatalf("test %q failed: %v", name, err)
+		}
+		if !reflect.DeepEqual(test.result, result) {
+			t.Fatalf("results were not equal for test %q: got %#v; expected: %#v", name, result, test.result)
+		}
+	}
+}
+
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.  It uses
 // an authorizer that always returns true.
 func NewTestAdmission(lister settingslisters.PodPresetLister, objects ...runtime.Object) kadmission.Interface {
@@ -532,8 +695,9 @@ func TestAdmit(t *testing.T) {
 					},
 				},
 			},
-			Volumes: []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			Env:     []api.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
+			Volumes:      []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			VolumeMounts: []api.VolumeMount{{Name: "vol", MountPath: "/opt"}},
+			Env:          []api.EnvVar{{Name: "abcd", Value: "value"}, {Name: "ABC", Value: "value"}},
 			EnvFrom: []api.EnvFromSource{
 				{
 					ConfigMapRef: &api.ConfigMapEnvSource{
@@ -547,6 +711,8 @@ func TestAdmit(t *testing.T) {
 					},
 				},
 			},
+			Containers:     []api.Container{{Name: "sidecar", Image: "abc"}},
+			InitContainers: []api.Container{{Name: "initcontainer", Image: "abcd"}},
 		},
 	}
 
