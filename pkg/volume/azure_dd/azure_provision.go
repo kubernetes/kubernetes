@@ -113,7 +113,7 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 			strKind = v
 		case "cachingmode":
 			cachingMode = v1.AzureDataDiskCachingMode(v)
-		case "fstype":
+		case volume.VolumeParameterFSType:
 			fsType = strings.ToLower(v)
 		default:
 			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)

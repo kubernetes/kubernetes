@@ -158,10 +158,10 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 	return zones, nil
 }
 
-func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, err error) {
+func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, fstype string, err error) {
 	cloud, err := c.plugin.getCloudProvider()
 	if err != nil {
-		return "", 0, nil, err
+		return "", 0, nil, "", err
 	}
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -179,13 +179,15 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 			vtype = v
 		case "availability":
 			availability = v
+		case volume.VolumeParameterFSType:
+			fstype = v
 		default:
-			return "", 0, nil, fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
+			return "", 0, nil, "", fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
 		}
 	}
 	// TODO: implement PVC.Selector parsing
 	if c.options.PVC.Spec.Selector != nil {
-		return "", 0, nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Cinder")
+		return "", 0, nil, "", fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Cinder")
 	}
 
 	if availability == "" {
@@ -193,7 +195,7 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 		zones, err := getZonesFromNodes(c.plugin.host.GetKubeClient())
 		if err != nil {
 			glog.V(2).Infof("error getting zone information: %v", err)
-			return "", 0, nil, err
+			return "", 0, nil, "", err
 		}
 		// if we did not get any zones, lets leave it blank and gophercloud will
 		// use zone "nova" as default
@@ -205,7 +207,7 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 	volumeID, volumeAZ, errr := cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
 	if errr != nil {
 		glog.V(2).Infof("Error creating cinder volume: %v", errr)
-		return "", 0, nil, errr
+		return "", 0, nil, "", errr
 	}
 	glog.V(2).Infof("Successfully created cinder volume %s", volumeID)
 
@@ -213,7 +215,7 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 	volumeLabels = make(map[string]string)
 	volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
 
-	return volumeID, volSizeGB, volumeLabels, nil
+	return volumeID, volSizeGB, volumeLabels, fstype, nil
 }
 
 func probeAttachedVolume() error {

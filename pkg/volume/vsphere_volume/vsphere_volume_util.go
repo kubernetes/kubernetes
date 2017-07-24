@@ -38,7 +38,6 @@ const (
 	diskSCSIPrefix     = "wwn-0x"
 	diskformat         = "diskformat"
 	datastore          = "datastore"
-	Fstype             = "fstype"
 	StoragePolicyName  = "storagepolicyname"
 
 	HostFailuresToTolerateCapability    = "hostfailurestotolerate"
@@ -109,7 +108,7 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (volSpec 
 			volumeOptions.DiskFormat = value
 		case datastore:
 			volumeOptions.Datastore = value
-		case Fstype:
+		case volume.VolumeParameterFSType:
 			fstype = value
 			glog.V(4).Infof("Setting fstype as %q", fstype)
 		case StoragePolicyName:

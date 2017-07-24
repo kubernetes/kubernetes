@@ -102,7 +102,7 @@ func (util *PhotonDiskUtil) CreateVolume(p *photonPersistentDiskProvisioner) (pd
 		switch strings.ToLower(parameter) {
 		case "flavor":
 			volumeOptions.Flavor = value
-		case "fstype":
+		case volume.VolumeParameterFSType:
 			fstype = value
 			glog.V(4).Infof("Photon Controller Util: Setting fstype to %s", fstype)
 		default:
