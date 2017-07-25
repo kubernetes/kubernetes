@@ -534,7 +534,7 @@ type clusterObjectAccessorFunc func(clusterName string) (interface{}, bool, erro
 
 // clusterOperations returns the list of operations needed to synchronize the state of the given object to the provided clusters
 func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, selectedClusters []*federationapi.Cluster, unselectedClusters []*federationapi.Cluster, obj pkgruntime.Object, key string, schedulingInfo interface{}, accessor clusterObjectAccessorFunc) ([]util.FederatedOperation, error) {
-	operations := make([]util.FederatedOperation, 0)
+	operations := make([]util.FederatedOperation, 0, 0)
 
 	kind := adapter.Kind()
 	for _, cluster := range selectedClusters {
