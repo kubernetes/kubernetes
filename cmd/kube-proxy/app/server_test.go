@@ -287,6 +287,9 @@ iptables:
   masqueradeBit: 17
   minSyncPeriod: 10s
   syncPeriod: 60s
+ipvs:
+  minSyncPeriod: 10s
+  syncPeriod: 60s
 kind: KubeProxyConfiguration
 metricsBindAddress: "%s"
 mode: "iptables"
@@ -347,12 +350,17 @@ udpTimeoutMilliseconds: 123ms
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
 			},
+			IPVS: componentconfig.KubeProxyIPVSConfiguration{
+				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
+				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
+			},
 			MetricsBindAddress: tc.metricsBindAddress,
 			Mode:               "iptables",
-			OOMScoreAdj:        utilpointer.Int32Ptr(17),
-			PortRange:          "2-7",
-			ResourceContainer:  "/foo",
-			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
+			// TODO: IPVS
+			OOMScoreAdj:       utilpointer.Int32Ptr(17),
+			PortRange:         "2-7",
+			ResourceContainer: "/foo",
+			UDPIdleTimeout:    metav1.Duration{Duration: 123 * time.Millisecond},
 		}
 
 		options, err := NewOptions()
