@@ -25,6 +25,7 @@ import (
 const (
 	ControllerRevisionHashLabelKey = "controller-revision-hash"
 	StatefulSetRevisionLabel       = ControllerRevisionHashLabelKey
+	DeprecatedRollbackTo           = "deprecated.deployment.rollback.to"
 )
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
