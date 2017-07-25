@@ -75,7 +75,7 @@ func TestClusterScopedCRUD(t *testing.T) {
 	testSimpleCRUD(t, ns, noxuDefinition, noxuVersionClient)
 }
 
-func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, noxuVersionClient *dynamic.Client) {
+func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition, noxuVersionClient dynamic.Interface) {
 	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
 	initialList, err := noxuResourceClient.List(metav1.ListOptions{})
 	if err != nil {
@@ -501,7 +501,7 @@ func TestCrossNamespaceListWatch(t *testing.T) {
 	checkNamespacesWatchHelper(t, ns2, noxuNamespacesWatch2)
 }
 
-func createInstanceWithNamespaceHelper(t *testing.T, ns string, name string, noxuNamespacedResourceClient *dynamic.ResourceClient, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition) *unstructured.Unstructured {
+func createInstanceWithNamespaceHelper(t *testing.T, ns string, name string, noxuNamespacedResourceClient dynamic.ResourceInterface, noxuDefinition *apiextensionsv1beta1.CustomResourceDefinition) *unstructured.Unstructured {
 	createdInstance, err := instantiateCustomResource(t, testserver.NewNoxuInstance(ns, name), noxuNamespacedResourceClient, noxuDefinition)
 	if err != nil {
 		t.Fatalf("unable to create noxu Instance:%v", err)

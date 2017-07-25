@@ -28,10 +28,10 @@ import (
 type ClientPool interface {
 	// ClientForGroupVersionKind returns a client configured for the specified groupVersionResource.
 	// Resource may be empty.
-	ClientForGroupVersionResource(resource schema.GroupVersionResource) (*Client, error)
+	ClientForGroupVersionResource(resource schema.GroupVersionResource) (Interface, error)
 	// ClientForGroupVersionKind returns a client configured for the specified groupVersionKind.
 	// Kind may be empty.
-	ClientForGroupVersionKind(kind schema.GroupVersionKind) (*Client, error)
+	ClientForGroupVersionKind(kind schema.GroupVersionKind) (Interface, error)
 }
 
 // APIPathResolverFunc knows how to convert a groupVersion to its API path. The Kind field is
@@ -79,7 +79,7 @@ func NewDynamicClientPool(cfg *restclient.Config) ClientPool {
 
 // ClientForGroupVersionResource uses the provided RESTMapper to identify the appropriate resource. Resource may
 // be empty. If no matching kind is found the underlying client for that group is still returned.
-func (c *clientPoolImpl) ClientForGroupVersionResource(resource schema.GroupVersionResource) (*Client, error) {
+func (c *clientPoolImpl) ClientForGroupVersionResource(resource schema.GroupVersionResource) (Interface, error) {
 	kinds, err := c.mapper.KindsFor(resource)
 	if err != nil {
 		if meta.IsNoMatchError(err) {
@@ -92,7 +92,7 @@ func (c *clientPoolImpl) ClientForGroupVersionResource(resource schema.GroupVers
 
 // ClientForGroupVersion returns a client for the specified groupVersion, creates one if none exists. Kind
 // in the GroupVersionKind may be empty.
-func (c *clientPoolImpl) ClientForGroupVersionKind(kind schema.GroupVersionKind) (*Client, error) {
+func (c *clientPoolImpl) ClientForGroupVersionKind(kind schema.GroupVersionKind) (Interface, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
