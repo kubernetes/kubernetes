@@ -752,6 +752,53 @@ func TestStoreCustomExport(t *testing.T) {
 	}
 }
 
+func TestStoreCustomListExport(t *testing.T) {
+	podA := example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "foo",
+			Labels:    map[string]string{},
+		},
+		Spec: example.PodSpec{NodeName: "machine"},
+	}
+	podList := example.PodList{
+		Items: []example.Pod{podA},
+	}
+
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	registry.ExportStrategy = testPodExport{}
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	obj, err := registry.Export(testContext, &podList, metav1.ExportOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	exportedPodList := obj.(*example.PodList)
+	if len(exportedPodList.Items) != 1 {
+		t.Errorf("expected 1 item in list, found: %d", len(exportedPodList.Items))
+	}
+
+	exportedPod := exportedPodList.Items[0]
+	if exportedPod.Namespace != "" {
+		t.Errorf("exported pod still has a namespace: %s", exportedPod.Namespace)
+	}
+	if exportedPod.Labels["exported"] != "true" {
+		t.Errorf("expected: exported->true, found: %s", exportedPod.Labels["exported"])
+	}
+	if exportedPod.Labels["exact"] != "false" {
+		t.Errorf("expected: exact->false, found: %s", exportedPod.Labels["exact"])
+	}
+	delete(exportedPod.Labels, "exported")
+	delete(exportedPod.Labels, "exact")
+	exportObjectMeta(&podA.ObjectMeta, false)
+	podA.Spec = exportedPod.Spec
+	if !reflect.DeepEqual(&podA, &exportedPod) {
+		t.Errorf("expected:\n%v\nsaw:\n%v\n", &podA, &exportedPod)
+	}
+}
+
 func TestStoreBasicExport(t *testing.T) {
 	podA := example.Pod{
 		ObjectMeta: metav1.ObjectMeta{
