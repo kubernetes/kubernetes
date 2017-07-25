@@ -60,7 +60,6 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	ingressColumns                = []string{"NAME", "HOSTS", "ADDRESS", "PORTS", "AGE"}
 	statefulSetColumns            = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 	endpointColumns               = []string{"NAME", "ENDPOINTS", "AGE"}
 	nodeColumns                   = []string{"NAME", "STATUS", "AGE", "VERSION"}
@@ -207,8 +206,16 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(serviceColumnDefinitions, printService)
 	h.TableHandler(serviceColumnDefinitions, printServiceList)
 
-	h.Handler(ingressColumns, nil, printIngress)
-	h.Handler(ingressColumns, nil, printIngressList)
+	ingressColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Hosts", Type: "string", Description: "Hosts that incoming requests are matched against before the ingress rule"},
+		{Name: "Address", Type: "string", Description: "Address is a list containing ingress points for the load-balancer"},
+		{Name: "Ports", Type: "string", Description: "Ports of TLS configurations that open"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(ingressColumnDefinitions, printIngress)
+	h.TableHandler(ingressColumnDefinitions, printIngressList)
+
 	h.Handler(statefulSetColumns, nil, printStatefulSet)
 	h.Handler(statefulSetColumns, nil, printStatefulSetList)
 	h.Handler(endpointColumns, nil, printEndpoints)
@@ -800,43 +807,28 @@ func formatPorts(tls []extensions.IngressTLS) string {
 	return "80"
 }
 
-func printIngress(ingress *extensions.Ingress, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, ingress.Name, options.WithKind)
-
-	namespace := ingress.Namespace
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
+func printIngress(obj *extensions.Ingress, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
-
-	if _, err := fmt.Fprintf(w, "%s\t%v\t%v\t%v\t%s",
-		name,
-		formatHosts(ingress.Spec.Rules),
-		loadBalancerStatusStringer(ingress.Status.LoadBalancer, options.Wide),
-		formatPorts(ingress.Spec.TLS),
-		translateTimestamp(ingress.CreationTimestamp),
-	); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(ingress.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-
-	if _, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, ingress.Labels)); err != nil {
-		return err
-	}
-	return nil
+	hosts := formatHosts(obj.Spec.Rules)
+	address := loadBalancerStatusStringer(obj.Status.LoadBalancer, options.Wide)
+	ports := formatPorts(obj.Spec.TLS)
+	createTime := translateTimestamp(obj.CreationTimestamp)
+	row.Cells = append(row.Cells, obj.Name, hosts, address, ports, createTime)
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printIngressList(ingressList *extensions.IngressList, w io.Writer, options printers.PrintOptions) error {
-	for _, ingress := range ingressList.Items {
-		if err := printIngress(&ingress, w, options); err != nil {
-			return err
+func printIngressList(list *extensions.IngressList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printIngress(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printStatefulSet(ps *apps.StatefulSet, w io.Writer, options printers.PrintOptions) error {
