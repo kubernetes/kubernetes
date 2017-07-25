@@ -6,7 +6,7 @@
     },
     "provisioner": "kubernetes.io/azure-disk",
     "parameters": {
-        "storageaccounttype": "premium_lrs",
+        "storageaccounttype": "Premium_LRS",
         "kind" :"Managed"
     }
 }

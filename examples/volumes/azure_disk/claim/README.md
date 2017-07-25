@@ -1,6 +1,6 @@
 # Kubernetes Persistent Volume Plugin for Blob and Managed Disks Samples
 
-This repo contains samples that works with the new Azure persistent volume plugin for Kubernetes. The plugin is expected to be in v1.8 release then will become part of Azure ACS 
+This repo contains samples that works with the new Azure persistent volume plugin for Kubernetes. The plugin is expected to be in v1.7.2 release then will become part of Azure ACS 
 
 
 ## What does the plugin do? 
@@ -59,7 +59,7 @@ When *kind* parameter is set to *dedicated* K8S will create a new dedicated stor
 
 ### The following storage parameter can be used to control the behavior
 
-1. *skuname* or *storageaccounttype* to choose the underlying Azure storage account (default is *standard_lrs* allowed values are  *standard_lrs* and *premium_lrs*)
+1. *skuname* or *storageaccounttype* to choose the underlying Azure storage account (default is *Standard_LRS* allowed values are  *Standard_LRS* and *Premium_LRS*)
 2. *cachingmode* controls Azure caching mode when the disk is attached to a VM (default is *readwrite* allowed values are *none*, *readwrite* and *readonly*
 3. *kind* decides on disk kind (default is *shared* allowed values are *shared*, *dedicated* and *managed*)
 4. *fstype* the file system of this disk (default *ext4*)

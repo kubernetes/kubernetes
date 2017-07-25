@@ -6,7 +6,7 @@
     },
     "provisioner": "kubernetes.io/azure-disk",
     "parameters": {
-        "skuname": "premium_lrs",
+        "skuname": "Premium_LRS",
 		"kind": "Shared"
     }
 }
