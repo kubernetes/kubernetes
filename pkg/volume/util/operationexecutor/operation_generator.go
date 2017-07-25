@@ -115,6 +115,10 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 	volumeSpecMap := make(map[*volume.Spec]v1.UniqueVolumeName)
 	// Iterate each volume spec and put them into a map index by the pluginName
 	for _, volumeAttached := range attachedVolumes {
+		if volumeAttached.VolumeSpec == nil {
+			glog.Errorf("VerifyVolumesAreAttached.GenerateVolumesAreAttachedFunc: nil spec for volume %s", volumeAttached.VolumeName)
+			continue
+		}
 		volumePlugin, err :=
 			og.volumePluginMgr.FindPluginBySpec(volumeAttached.VolumeSpec)
 		if err != nil || volumePlugin == nil {
