@@ -52,6 +52,7 @@ go_library(
         "//federation/pkg/federation-controller/util/podanalyzer:go_default_library",
         "//federation/pkg/federation-controller/util/replicapreferences:go_default_library",
         "//pkg/api:go_default_library",
+        "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/namespace/deletion:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
