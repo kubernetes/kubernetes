@@ -1588,7 +1588,7 @@ func TestPrintPod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test5"},
 				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
 				Status: api.PodStatus{
-					Reason: "OutOfDisk",
+					Reason: "podReason",
 					Phase:  "podPhase",
 					ContainerStatuses: []api.ContainerStatus{
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
@@ -1596,7 +1596,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test5", "1/2", "OutOfDisk", 6, "<unknown>"}}},
+			[]metav1alpha1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", 6, "<unknown>"}}},
 		},
 	}
 

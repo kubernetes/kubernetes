@@ -55,19 +55,18 @@ func TestRunOnce(t *testing.T) {
 	cadvisor := &cadvisortest.Mock{}
 	cadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	cadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
-		Usage:     400 * mb,
-		Capacity:  1000 * mb,
-		Available: 600 * mb,
+		Usage:     400,
+		Capacity:  1000,
+		Available: 600,
 	}, nil)
 	cadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
-		Usage:    9 * mb,
-		Capacity: 10 * mb,
+		Usage:    9,
+		Capacity: 10,
 	}, nil)
 	fakeSecretManager := secret.NewFakeManager()
 	fakeConfigMapManager := configmap.NewFakeManager()
 	podManager := kubepod.NewBasicPodManager(
 		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager)
-	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 	fakeRuntime := &containertest.FakeRuntime{}
 	basePath, err := utiltesting.MkTmpdir("kubelet")
 	if err != nil {
@@ -82,7 +81,6 @@ func TestRunOnce(t *testing.T) {
 		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}),
 		podManager:       podManager,
 		os:               &containertest.FakeOS{},
-		diskSpaceManager: diskSpaceManager,
 		containerRuntime: fakeRuntime,
 		reasonCache:      NewReasonCache(),
 		clock:            clock.RealClock{},

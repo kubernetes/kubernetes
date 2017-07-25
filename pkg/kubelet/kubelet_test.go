@@ -213,11 +213,6 @@ func newTestKubeletWithImageList(
 	kubelet.configMapManager = configMapManager
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager, kubelet.configMapManager)
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{})
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
-	if err != nil {
-		t.Fatalf("can't initialize disk space manager: %v", err)
-	}
-	kubelet.diskSpaceManager = diskSpaceManager
 
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
@@ -735,25 +730,6 @@ func TestValidateContainerLogStatus(t *testing.T) {
 		_, err = kubelet.validateContainerLogStatus("podName", podStatus, "blah", false)
 		assert.Error(t, err, fmt.Sprintf("[case %d] invalid container name should cause an error", i))
 	}
-}
-
-// updateDiskSpacePolicy creates a new DiskSpaceManager with a new policy. This new manager along
-// with the mock FsInfo values added to Cadvisor should make the kubelet report that it has
-// sufficient disk space or it is out of disk, depending on the capacity, availability and
-// threshold values.
-func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisortest.Mock, rootCap, dockerCap, rootAvail, dockerAvail uint64, rootThreshold, dockerThreshold int) error {
-	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: rootCap * mb, Available: rootAvail * mb}
-	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: dockerCap * mb, Available: dockerAvail * mb}
-	mockCadvisor.On("ImagesFsInfo").Return(dockerimagesFsInfo, nil)
-	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
-
-	dsp := DiskSpacePolicy{DockerFreeDiskMB: rootThreshold, RootFreeDiskMB: dockerThreshold}
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
-	if err != nil {
-		return err
-	}
-	kubelet.diskSpaceManager = diskSpaceManager
-	return nil
 }
 
 func TestCreateMirrorPod(t *testing.T) {

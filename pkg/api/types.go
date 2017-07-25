@@ -2334,7 +2334,7 @@ type PodStatus struct {
 	// A human readable message indicating details about why the pod is in this state.
 	// +optional
 	Message string
-	// A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'
+	// A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'
 	// +optional
 	Reason string
 
