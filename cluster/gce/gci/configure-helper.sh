@@ -624,7 +624,13 @@ EOF
   fi
 }
 
-function create-kubelet-kubeconfig {
+# Arg 1: the IP address of the API server
+function create-kubelet-kubeconfig() {
+  local apiserver_address="${1}"
+  if [[ -z "${apiserver_address}" ]]; then
+    echo "Must provide API server address to create Kubelet kubeconfig file!"
+    exit 1
+  fi
   echo "Creating kubelet kubeconfig file"
   cat <<EOF >/var/lib/kubelet/bootstrap-kubeconfig
 apiVersion: v1
@@ -637,6 +643,7 @@ users:
 clusters:
 - name: local
   cluster:
+    server: https://${apiserver_address}
     certificate-authority: ${CA_CERT_BUNDLE_PATH}
     server: https://${KUBERNETES_MASTER_NAME}
 contexts:
@@ -657,7 +664,7 @@ function create-master-kubelet-auth {
   # set in the environment.
   if [[ -n "${KUBELET_APISERVER:-}" && -n "${KUBELET_CERT:-}" && -n "${KUBELET_KEY:-}" ]]; then
     REGISTER_MASTER_KUBELET="true"
-    create-kubelet-kubeconfig
+    create-kubelet-kubeconfig ${KUBELET_APISERVER}
   fi
 }
 
@@ -898,7 +905,6 @@ function start-kubelet {
       #flags+=" --bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
       #flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
       flags+=" --kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
-      flags+=" --require-kubeconfig"
       flags+=" --register-schedulable=false"
     else
       # Standalone mode (not widely used?)
@@ -908,7 +914,6 @@ function start-kubelet {
     flags+=" ${NODE_KUBELET_TEST_ARGS:-}"
     flags+=" --enable-debugging-handlers=true"
     flags+=" --bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
-    flags+=" --require-kubeconfig"
     flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
     if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "hairpin-veth" ]] || \
@@ -951,7 +956,7 @@ function start-kubelet {
   fi
   if [[ -n "${NODE_TAINTS:-}" ]]; then
     flags+=" --register-with-taints=${NODE_TAINTS}"
-  fi  
+  fi
   if [[ -n "${EVICTION_HARD:-}" ]]; then
     flags+=" --eviction-hard=${EVICTION_HARD}"
   fi
@@ -1875,7 +1880,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   create-master-etcd-auth
 else
   create-node-pki
-  create-kubelet-kubeconfig
+  create-kubelet-kubeconfig ${KUBERNETES_MASTER_NAME}
   create-kubeproxy-kubeconfig
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
     create-node-problem-detector-kubeconfig

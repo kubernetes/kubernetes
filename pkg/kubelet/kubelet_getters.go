@@ -189,7 +189,7 @@ func (kl *Kubelet) GetRuntime() kubecontainer.Runtime {
 
 // GetNode returns the node info for the configured node name of this Kubelet.
 func (kl *Kubelet) GetNode() (*v1.Node, error) {
-	if kl.standaloneMode {
+	if kl.kubeClient == nil {
 		return kl.initialNode()
 	}
 	return kl.nodeInfo.GetNodeInfo(string(kl.nodeName))
@@ -201,7 +201,7 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 // in which case return a manufactured nodeInfo representing a node with no pods,
 // zero capacity, and the default labels.
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
-	if !kl.standaloneMode {
+	if kl.kubeClient != nil {
 		if n, err := kl.nodeInfo.GetNodeInfo(string(kl.nodeName)); err == nil {
 			return n, nil
 		}
