@@ -331,6 +331,7 @@ host-network-sources
 host-pid-sources
 host-port-endpoints
 host-system-namespace
+hpa-scale-forbidden-window
 http-check-frequency
 http-port
 ignore-daemonsets

@@ -72,6 +72,13 @@ type ControllerManagerConfiguration struct {
 	ContentType string `json:"contentType"`
 	// ConfigurationMap determining which controllers should be enabled or disabled
 	Controllers utilflag.ConfigurationMap `json:"controllers"`
+	// HpaScaleForbiddenWindow is the duration used by federation hpa controller to
+	// determine if it can move max and/or min replicas around (or not), of a cluster local
+	// hpa object, by comparing current time with the last scaled time of that cluster local hpa.
+	// Lower value will result in faster response to scalibility conditions achieved
+	// by cluster local hpas on local replicas, but too low a value can result in thrashing.
+	// Higher values will result in slower response to scalibility conditions on local replicas.
+	HpaScaleForbiddenWindow metav1.Duration `json:"HpaScaleForbiddenWindow"`
 }
 
 // CMServer is the main context object for the controller manager.
@@ -100,6 +107,7 @@ func NewCMServer() *CMServer {
 			APIServerBurst:            30,
 			LeaderElection:            leaderelectionconfig.DefaultLeaderElectionConfiguration(),
 			Controllers:               make(utilflag.ConfigurationMap),
+			HpaScaleForbiddenWindow:   metav1.Duration{Duration: 2 * time.Minute},
 		},
 	}
 	return &s
@@ -125,6 +133,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.APIServerBurst, "federated-api-burst", s.APIServerBurst, "Burst to use while talking with federation apiserver")
 	fs.StringVar(&s.DnsProvider, "dns-provider", s.DnsProvider, "DNS provider. Valid values are: "+fmt.Sprintf("%q", dnsprovider.RegisteredDnsProviders()))
 	fs.StringVar(&s.DnsConfigFile, "dns-provider-config", s.DnsConfigFile, "Path to config file for configuring DNS provider.")
+	fs.DurationVar(&s.HpaScaleForbiddenWindow.Duration, "hpa-scale-forbidden-window", s.HpaScaleForbiddenWindow.Duration, "The time window wrt cluster local hpa lastscale time, during which federated hpa would not move the hpa max/min replicas around")
 	fs.Var(&s.Controllers, "controllers", ""+
 		"A set of key=value pairs that describe controller configuration "+
 		"to enable/disable specific controllers. Key should be the resource name (like services) and value should be true or false. "+

@@ -149,9 +149,11 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		go serviceController.Run(s.ConcurrentServiceSyncs, wait.NeverStop)
 	}
 
+	adapterSpecificArgs := make(map[string]interface{})
+	adapterSpecificArgs[federatedtypes.HpaKind] = &s.HpaScaleForbiddenWindow
 	for kind, federatedType := range federatedtypes.FederatedTypes() {
 		if controllerEnabled(s.Controllers, serverResources, federatedType.ControllerName, federatedType.RequiredResources, true) {
-			synccontroller.StartFederationSyncController(kind, federatedType.AdapterFactory, restClientCfg, stopChan, minimizeLatency)
+			synccontroller.StartFederationSyncController(kind, federatedType.AdapterFactory, restClientCfg, stopChan, minimizeLatency, adapterSpecificArgs)
 		}
 	}
 

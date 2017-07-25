@@ -62,7 +62,7 @@ type FederatedTypeAdapter interface {
 // that create instances of FederatedTypeAdapter.  Such methods should
 // be registered with RegisterAdapterFactory to ensure the type
 // adapter is discoverable.
-type AdapterFactory func(client federationclientset.Interface, config *restclient.Config) FederatedTypeAdapter
+type AdapterFactory func(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter
 
 // SetAnnotation sets the given key and value in the given object's ObjectMeta.Annotations map
 func SetAnnotation(adapter FederatedTypeAdapter, obj pkgruntime.Object, key, value string) {
