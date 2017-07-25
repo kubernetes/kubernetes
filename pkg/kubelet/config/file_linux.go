@@ -89,7 +89,7 @@ func (s *sourceFile) processEvent(e *inotify.Event) error {
 	var eventType podEventType
 	switch {
 	case (e.Mask & inotify.IN_ISDIR) > 0:
-		glog.V(1).Infof("Not recursing into manifest path %q", s.path)
+		glog.Errorf("Not recursing into manifest path %q", s.path)
 		return nil
 	case (e.Mask & inotify.IN_CREATE) > 0:
 		eventType = podAdd
@@ -111,7 +111,7 @@ func (s *sourceFile) processEvent(e *inotify.Event) error {
 	switch eventType {
 	case podAdd, podModify:
 		if pod, err := s.extractFromFile(e.Name); err != nil {
-			glog.Errorf("can't process manifest file %q: %v", e.Name, err)
+			glog.Errorf("Can't process manifest file %q: %v", e.Name, err)
 		} else {
 			return s.store.Add(pod)
 		}

@@ -73,7 +73,7 @@ func new(path string, nodeName types.NodeName, period time.Duration, updates cha
 
 func (s *sourceFile) run() {
 	if err := s.watch(); err != nil {
-		glog.Errorf("unable to read manifest path %q: %v", s.path, err)
+		glog.Errorf("Unable to read manifest path %q: %v", s.path, err)
 	}
 }
 
@@ -136,22 +136,22 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 	for _, path := range dirents {
 		statInfo, err := os.Stat(path)
 		if err != nil {
-			glog.V(1).Infof("Can't get metadata for %q: %v", path, err)
+			glog.Errorf("Can't get metadata for %q: %v", path, err)
 			continue
 		}
 
 		switch {
 		case statInfo.Mode().IsDir():
-			glog.V(1).Infof("Not recursing into manifest path %q", path)
+			glog.Errorf("Not recursing into manifest path %q", path)
 		case statInfo.Mode().IsRegular():
 			pod, err := s.extractFromFile(path)
 			if err != nil {
-				glog.V(1).Infof("Can't process manifest file %q: %v", path, err)
+				glog.Errorf("Can't process manifest file %q: %v", path, err)
 			} else {
 				pods = append(pods, pod)
 			}
 		default:
-			glog.V(1).Infof("Manifest path %q is not a directory or file: %v", path, statInfo.Mode())
+			glog.Errorf("Manifest path %q is not a directory or file: %v", path, statInfo.Mode())
 		}
 	}
 	return pods, nil
