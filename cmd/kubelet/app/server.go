@@ -499,7 +499,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 			if err != nil {
 				glog.Warningf("Failed to create API Server client for Events: %v", err)
 			}
-			eventClient = tmpClient.Core()
+			eventClient = tmpClient.CoreV1()
 
 		} else {
 			switch {

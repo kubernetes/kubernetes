@@ -272,7 +272,7 @@ func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 func waitForPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 	By("Waiting for all pods to be running")
 	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-		pods, err := cs.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: "foo=bar"})
+		pods, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: "foo=bar"})
 		if err != nil {
 			return false, err
 		}

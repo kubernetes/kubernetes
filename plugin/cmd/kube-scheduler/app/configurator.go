@@ -52,7 +52,7 @@ import (
 func createRecorder(kubecli *clientset.Clientset, s *options.SchedulerServer) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubecli.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubecli.CoreV1().RESTClient()).Events("")})
 	return eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: s.SchedulerName})
 }
 

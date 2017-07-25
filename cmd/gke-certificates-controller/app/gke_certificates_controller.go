@@ -64,7 +64,7 @@ func Run(s *GKECertificatesController) error {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 	recorder := eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "gke-certificates-controller"})
 
 	clientBuilder := controller.SimpleControllerClientBuilder{ClientConfig: kubeconfig}
