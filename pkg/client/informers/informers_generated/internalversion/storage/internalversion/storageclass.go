@@ -41,8 +41,11 @@ type storageClassInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newStorageClassInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewStorageClassInformer constructs a new informer for StorageClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewStorageClassInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.Storage().StorageClasses().List(options)
@@ -53,14 +56,16 @@ func newStorageClassInformer(client internalclientset.Interface, resyncPeriod ti
 		},
 		&storage.StorageClass{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultStorageClassInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewStorageClassInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *storageClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&storage.StorageClass{}, newStorageClassInformer)
+	return f.factory.InformerFor(&storage.StorageClass{}, defaultStorageClassInformer)
 }
 
 func (f *storageClassInformer) Lister() internalversion.StorageClassLister {

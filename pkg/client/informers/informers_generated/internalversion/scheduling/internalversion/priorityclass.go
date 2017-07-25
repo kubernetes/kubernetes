@@ -41,8 +41,11 @@ type priorityClassInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newPriorityClassInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewPriorityClassInformer constructs a new informer for PriorityClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewPriorityClassInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.Scheduling().PriorityClasses().List(options)
@@ -53,14 +56,16 @@ func newPriorityClassInformer(client internalclientset.Interface, resyncPeriod t
 		},
 		&scheduling.PriorityClass{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultPriorityClassInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewPriorityClassInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *priorityClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&scheduling.PriorityClass{}, newPriorityClassInformer)
+	return f.factory.InformerFor(&scheduling.PriorityClass{}, defaultPriorityClassInformer)
 }
 
 func (f *priorityClassInformer) Lister() internalversion.PriorityClassLister {

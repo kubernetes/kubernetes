@@ -41,8 +41,11 @@ type certificateSigningRequestInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newCertificateSigningRequestInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewCertificateSigningRequestInformer constructs a new informer for CertificateSigningRequest type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewCertificateSigningRequestInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.Certificates().CertificateSigningRequests().List(options)
@@ -53,14 +56,16 @@ func newCertificateSigningRequestInformer(client internalclientset.Interface, re
 		},
 		&certificates.CertificateSigningRequest{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultCertificateSigningRequestInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewCertificateSigningRequestInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *certificateSigningRequestInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&certificates.CertificateSigningRequest{}, newCertificateSigningRequestInformer)
+	return f.factory.InformerFor(&certificates.CertificateSigningRequest{}, defaultCertificateSigningRequestInformer)
 }
 
 func (f *certificateSigningRequestInformer) Lister() internalversion.CertificateSigningRequestLister {

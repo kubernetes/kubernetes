@@ -41,26 +41,31 @@ type podTemplateInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newPodTemplateInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewPodTemplateInformer constructs a new informer for PodTemplate type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewPodTemplateInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().PodTemplates(v1.NamespaceAll).List(options)
+				return client.Core().PodTemplates(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().PodTemplates(v1.NamespaceAll).Watch(options)
+				return client.Core().PodTemplates(namespace).Watch(options)
 			},
 		},
 		&api.PodTemplate{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultPodTemplateInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewPodTemplateInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *podTemplateInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.PodTemplate{}, newPodTemplateInformer)
+	return f.factory.InformerFor(&api.PodTemplate{}, defaultPodTemplateInformer)
 }
 
 func (f *podTemplateInformer) Lister() internalversion.PodTemplateLister {

@@ -41,8 +41,11 @@ type componentStatusInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newComponentStatusInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewComponentStatusInformer constructs a new informer for ComponentStatus type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewComponentStatusInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
 				return client.CoreV1().ComponentStatuses().List(options)
@@ -53,14 +56,16 @@ func newComponentStatusInformer(client kubernetes.Interface, resyncPeriod time.D
 		},
 		&core_v1.ComponentStatus{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultComponentStatusInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewComponentStatusInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *componentStatusInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core_v1.ComponentStatus{}, newComponentStatusInformer)
+	return f.factory.InformerFor(&core_v1.ComponentStatus{}, defaultComponentStatusInformer)
 }
 
 func (f *componentStatusInformer) Lister() v1.ComponentStatusLister {
