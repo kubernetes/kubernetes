@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"os"
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -74,6 +75,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	// Extract secret and pass it as options.
 	if err := addSecretsToOptions(extraOptions, f.spec, f.podNamespace, f.driverName, f.plugin.host); err != nil {
+		os.Remove(dir)
 		return err
 	}
 
@@ -90,6 +92,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if err != nil {
+		os.Remove(dir)
 		return err
 	}
 
