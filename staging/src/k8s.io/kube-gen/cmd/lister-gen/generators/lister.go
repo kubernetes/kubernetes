@@ -26,6 +26,8 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+
+	"k8s.io/kube-gen/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/kube-gen/cmd/client-gen/types"
 
 	"github.com/golang/glog"
@@ -115,8 +117,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		var typesToGenerate []*types.Type
 		for _, t := range p.Types {
-			// filter out types which dont have genclient=true.
-			if extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == false {
+			if !util.MustParseClientGenTags(t.SecondClosestCommentLines).GenerateClient {
 				continue
 			}
 			typesToGenerate = append(typesToGenerate, t)
@@ -154,8 +155,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				return generators
 			},
 			FilterFunc: func(c *generator.Context, t *types.Type) bool {
-				// piggy-back on types that are tagged for client-gen
-				return extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == true
+				return util.MustParseClientGenTags(t.SecondClosestCommentLines).GenerateClient
 			},
 		})
 	}
@@ -167,8 +167,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 func objectMetaForPackage(p *types.Package) (*types.Type, bool, error) {
 	generatingForPackage := false
 	for _, t := range p.Types {
-		// filter out types which dont have genclient=true.
-		if extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == false {
+		// filter out types which dont have genclient.
+		if !util.MustParseClientGenTags(t.SecondClosestCommentLines).GenerateClient {
 			continue
 		}
 		generatingForPackage = true
@@ -232,26 +232,31 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 		"objectMeta": g.objectMeta,
 	}
 
-	namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
-	if namespaced {
-		sw.Do(typeListerInterface, m)
-	} else {
+	tags, err := util.ParseClientGenTags(t.SecondClosestCommentLines)
+	if err != nil {
+		return err
+	}
+
+	if tags.NonNamespaced {
 		sw.Do(typeListerInterface_NonNamespaced, m)
+	} else {
+		sw.Do(typeListerInterface, m)
 	}
 
 	sw.Do(typeListerStruct, m)
 	sw.Do(typeListerConstructor, m)
 	sw.Do(typeLister_List, m)
 
-	if namespaced {
-		sw.Do(typeLister_NamespaceLister, m)
-		sw.Do(namespaceListerInterface, m)
-		sw.Do(namespaceListerStruct, m)
-		sw.Do(namespaceLister_List, m)
-		sw.Do(namespaceLister_Get, m)
-	} else {
+	if tags.NonNamespaced {
 		sw.Do(typeLister_NonNamespacedGet, m)
+		return sw.Error()
 	}
+
+	sw.Do(typeLister_NamespaceLister, m)
+	sw.Do(namespaceListerInterface, m)
+	sw.Do(namespaceListerStruct, m)
+	sw.Do(namespaceLister_List, m)
+	sw.Do(namespaceLister_Get, m)
 
 	return sw.Error()
 }

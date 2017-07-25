@@ -36,40 +36,7 @@ var networkpoliciesResource = schema.GroupVersionResource{Group: "extensions", V
 
 var networkpoliciesKind = schema.GroupVersionKind{Group: "extensions", Version: "", Kind: "NetworkPolicy"}
 
-func (c *FakeNetworkPolicies) Create(networkPolicy *extensions.NetworkPolicy) (result *extensions.NetworkPolicy, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(networkpoliciesResource, c.ns, networkPolicy), &extensions.NetworkPolicy{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*extensions.NetworkPolicy), err
-}
-
-func (c *FakeNetworkPolicies) Update(networkPolicy *extensions.NetworkPolicy) (result *extensions.NetworkPolicy, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(networkpoliciesResource, c.ns, networkPolicy), &extensions.NetworkPolicy{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*extensions.NetworkPolicy), err
-}
-
-func (c *FakeNetworkPolicies) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(networkpoliciesResource, c.ns, name), &extensions.NetworkPolicy{})
-
-	return err
-}
-
-func (c *FakeNetworkPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(networkpoliciesResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &extensions.NetworkPolicyList{})
-	return err
-}
-
+// Get takes name of the networkPolicy, and returns the corresponding networkPolicy object, and an error if there is any.
 func (c *FakeNetworkPolicies) Get(name string, options v1.GetOptions) (result *extensions.NetworkPolicy, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(networkpoliciesResource, c.ns, name), &extensions.NetworkPolicy{})
@@ -80,6 +47,7 @@ func (c *FakeNetworkPolicies) Get(name string, options v1.GetOptions) (result *e
 	return obj.(*extensions.NetworkPolicy), err
 }
 
+// List takes label and field selectors, and returns the list of NetworkPolicies that match those selectors.
 func (c *FakeNetworkPolicies) List(opts v1.ListOptions) (result *extensions.NetworkPolicyList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(networkpoliciesResource, networkpoliciesKind, c.ns, opts), &extensions.NetworkPolicyList{})
@@ -106,6 +74,44 @@ func (c *FakeNetworkPolicies) Watch(opts v1.ListOptions) (watch.Interface, error
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(networkpoliciesResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a networkPolicy and creates it.  Returns the server's representation of the networkPolicy, and an error, if there is any.
+func (c *FakeNetworkPolicies) Create(networkPolicy *extensions.NetworkPolicy) (result *extensions.NetworkPolicy, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(networkpoliciesResource, c.ns, networkPolicy), &extensions.NetworkPolicy{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.NetworkPolicy), err
+}
+
+// Update takes the representation of a networkPolicy and updates it. Returns the server's representation of the networkPolicy, and an error, if there is any.
+func (c *FakeNetworkPolicies) Update(networkPolicy *extensions.NetworkPolicy) (result *extensions.NetworkPolicy, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(networkpoliciesResource, c.ns, networkPolicy), &extensions.NetworkPolicy{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.NetworkPolicy), err
+}
+
+// Delete takes name of the networkPolicy and deletes it. Returns an error if one occurs.
+func (c *FakeNetworkPolicies) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(networkpoliciesResource, c.ns, name), &extensions.NetworkPolicy{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeNetworkPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(networkpoliciesResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &extensions.NetworkPolicyList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched networkPolicy.

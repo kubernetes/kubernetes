@@ -25,6 +25,8 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+
+	"k8s.io/kube-gen/cmd/client-gen/generators/util"
 )
 
 // genFakeForGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
@@ -70,18 +72,20 @@ func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io
 
 	sw.Do(groupClientTemplate, m)
 	for _, t := range g.types {
+		tags, err := util.ParseClientGenTags(t.SecondClosestCommentLines)
+		if err != nil {
+			return err
+		}
 		wrapper := map[string]interface{}{
 			"type":              t,
 			"GroupVersion":      namer.IC(g.group) + namer.IC(g.version),
 			"realClientPackage": strings.ToLower(filepath.Base(g.realClientPackage)),
 		}
-		namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
-		if namespaced {
-			sw.Do(getterImplNamespaced, wrapper)
-		} else {
+		if tags.NonNamespaced {
 			sw.Do(getterImplNonNamespaced, wrapper)
-
+			continue
 		}
+		sw.Do(getterImplNamespaced, wrapper)
 	}
 	sw.Do(getRESTClient, m)
 	return sw.Error()

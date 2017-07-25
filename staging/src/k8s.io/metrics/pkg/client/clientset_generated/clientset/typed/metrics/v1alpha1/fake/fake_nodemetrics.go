@@ -34,6 +34,7 @@ var nodemetricsesResource = schema.GroupVersionResource{Group: "metrics", Versio
 
 var nodemetricsesKind = schema.GroupVersionKind{Group: "metrics", Version: "v1alpha1", Kind: "NodeMetrics"}
 
+// Get takes name of the nodeMetrics, and returns the corresponding nodeMetrics object, and an error if there is any.
 func (c *FakeNodeMetricses) Get(name string, options v1.GetOptions) (result *v1alpha1.NodeMetrics, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(nodemetricsesResource, name), &v1alpha1.NodeMetrics{})
@@ -43,6 +44,7 @@ func (c *FakeNodeMetricses) Get(name string, options v1.GetOptions) (result *v1a
 	return obj.(*v1alpha1.NodeMetrics), err
 }
 
+// List takes label and field selectors, and returns the list of NodeMetricses that match those selectors.
 func (c *FakeNodeMetricses) List(opts v1.ListOptions) (result *v1alpha1.NodeMetricsList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(nodemetricsesResource, nodemetricsesKind, opts), &v1alpha1.NodeMetricsList{})

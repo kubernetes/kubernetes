@@ -59,6 +59,41 @@ func newTestTypes(c *TestgroupClient, namespace string) *testTypes {
 	}
 }
 
+// Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
+func (c *testTypes) Get(name string, options v1.GetOptions) (result *testgroup.TestType, err error) {
+	result = &testgroup.TestType{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("testtypes").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of TestTypes that match those selectors.
+func (c *testTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeList, err error) {
+	result = &testgroup.TestTypeList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("testtypes").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested testTypes.
+func (c *testTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("testtypes").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
 func (c *testTypes) Create(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
 	result = &testgroup.TestType{}
@@ -85,7 +120,7 @@ func (c *testTypes) Update(testType *testgroup.TestType) (result *testgroup.Test
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *testTypes) UpdateStatus(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
 	result = &testgroup.TestType{}
@@ -120,41 +155,6 @@ func (c *testTypes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *testTypes) Get(name string, options v1.GetOptions) (result *testgroup.TestType, err error) {
-	result = &testgroup.TestType{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("testtypes").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of TestTypes that match those selectors.
-func (c *testTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeList, err error) {
-	result = &testgroup.TestTypeList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("testtypes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested testTypes.
-func (c *testTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("testtypes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched testType.

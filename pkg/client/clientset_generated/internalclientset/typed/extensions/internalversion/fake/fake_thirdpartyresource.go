@@ -35,37 +35,7 @@ var thirdpartyresourcesResource = schema.GroupVersionResource{Group: "extensions
 
 var thirdpartyresourcesKind = schema.GroupVersionKind{Group: "extensions", Version: "", Kind: "ThirdPartyResource"}
 
-func (c *FakeThirdPartyResources) Create(thirdPartyResource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(thirdpartyresourcesResource, thirdPartyResource), &extensions.ThirdPartyResource{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*extensions.ThirdPartyResource), err
-}
-
-func (c *FakeThirdPartyResources) Update(thirdPartyResource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(thirdpartyresourcesResource, thirdPartyResource), &extensions.ThirdPartyResource{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*extensions.ThirdPartyResource), err
-}
-
-func (c *FakeThirdPartyResources) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(thirdpartyresourcesResource, name), &extensions.ThirdPartyResource{})
-	return err
-}
-
-func (c *FakeThirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(thirdpartyresourcesResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &extensions.ThirdPartyResourceList{})
-	return err
-}
-
+// Get takes name of the thirdPartyResource, and returns the corresponding thirdPartyResource object, and an error if there is any.
 func (c *FakeThirdPartyResources) Get(name string, options v1.GetOptions) (result *extensions.ThirdPartyResource, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(thirdpartyresourcesResource, name), &extensions.ThirdPartyResource{})
@@ -75,6 +45,7 @@ func (c *FakeThirdPartyResources) Get(name string, options v1.GetOptions) (resul
 	return obj.(*extensions.ThirdPartyResource), err
 }
 
+// List takes label and field selectors, and returns the list of ThirdPartyResources that match those selectors.
 func (c *FakeThirdPartyResources) List(opts v1.ListOptions) (result *extensions.ThirdPartyResourceList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(thirdpartyresourcesResource, thirdpartyresourcesKind, opts), &extensions.ThirdPartyResourceList{})
@@ -99,6 +70,41 @@ func (c *FakeThirdPartyResources) List(opts v1.ListOptions) (result *extensions.
 func (c *FakeThirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(thirdpartyresourcesResource, opts))
+}
+
+// Create takes the representation of a thirdPartyResource and creates it.  Returns the server's representation of the thirdPartyResource, and an error, if there is any.
+func (c *FakeThirdPartyResources) Create(thirdPartyResource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(thirdpartyresourcesResource, thirdPartyResource), &extensions.ThirdPartyResource{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.ThirdPartyResource), err
+}
+
+// Update takes the representation of a thirdPartyResource and updates it. Returns the server's representation of the thirdPartyResource, and an error, if there is any.
+func (c *FakeThirdPartyResources) Update(thirdPartyResource *extensions.ThirdPartyResource) (result *extensions.ThirdPartyResource, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(thirdpartyresourcesResource, thirdPartyResource), &extensions.ThirdPartyResource{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.ThirdPartyResource), err
+}
+
+// Delete takes name of the thirdPartyResource and deletes it. Returns an error if one occurs.
+func (c *FakeThirdPartyResources) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(thirdpartyresourcesResource, name), &extensions.ThirdPartyResource{})
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeThirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(thirdpartyresourcesResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &extensions.ThirdPartyResourceList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched thirdPartyResource.

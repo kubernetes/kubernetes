@@ -59,6 +59,41 @@ func newReplicaSets(c *ExtensionsClient, namespace string) *replicaSets {
 	}
 }
 
+// Get takes name of the replicaSet, and returns the corresponding replicaSet object, and an error if there is any.
+func (c *replicaSets) Get(name string, options v1.GetOptions) (result *extensions.ReplicaSet, err error) {
+	result = &extensions.ReplicaSet{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("replicasets").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
+func (c *replicaSets) List(opts v1.ListOptions) (result *extensions.ReplicaSetList, err error) {
+	result = &extensions.ReplicaSetList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("replicasets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested replicaSets.
+func (c *replicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("replicasets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a replicaSet and creates it.  Returns the server's representation of the replicaSet, and an error, if there is any.
 func (c *replicaSets) Create(replicaSet *extensions.ReplicaSet) (result *extensions.ReplicaSet, err error) {
 	result = &extensions.ReplicaSet{}
@@ -85,7 +120,7 @@ func (c *replicaSets) Update(replicaSet *extensions.ReplicaSet) (result *extensi
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *replicaSets) UpdateStatus(replicaSet *extensions.ReplicaSet) (result *extensions.ReplicaSet, err error) {
 	result = &extensions.ReplicaSet{}
@@ -120,41 +155,6 @@ func (c *replicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the replicaSet, and returns the corresponding replicaSet object, and an error if there is any.
-func (c *replicaSets) Get(name string, options v1.GetOptions) (result *extensions.ReplicaSet, err error) {
-	result = &extensions.ReplicaSet{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("replicasets").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
-func (c *replicaSets) List(opts v1.ListOptions) (result *extensions.ReplicaSetList, err error) {
-	result = &extensions.ReplicaSetList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("replicasets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested replicaSets.
-func (c *replicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("replicasets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched replicaSet.

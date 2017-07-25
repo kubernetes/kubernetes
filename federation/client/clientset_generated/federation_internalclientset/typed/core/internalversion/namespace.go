@@ -57,6 +57,38 @@ func newNamespaces(c *CoreClient) *namespaces {
 	}
 }
 
+// Get takes name of the namespace, and returns the corresponding namespace object, and an error if there is any.
+func (c *namespaces) Get(name string, options v1.GetOptions) (result *api.Namespace, err error) {
+	result = &api.Namespace{}
+	err = c.client.Get().
+		Resource("namespaces").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Namespaces that match those selectors.
+func (c *namespaces) List(opts v1.ListOptions) (result *api.NamespaceList, err error) {
+	result = &api.NamespaceList{}
+	err = c.client.Get().
+		Resource("namespaces").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested namespaces.
+func (c *namespaces) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Resource("namespaces").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a namespace and creates it.  Returns the server's representation of the namespace, and an error, if there is any.
 func (c *namespaces) Create(namespace *api.Namespace) (result *api.Namespace, err error) {
 	result = &api.Namespace{}
@@ -81,7 +113,7 @@ func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, er
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *namespaces) UpdateStatus(namespace *api.Namespace) (result *api.Namespace, err error) {
 	result = &api.Namespace{}
@@ -113,38 +145,6 @@ func (c *namespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the namespace, and returns the corresponding namespace object, and an error if there is any.
-func (c *namespaces) Get(name string, options v1.GetOptions) (result *api.Namespace, err error) {
-	result = &api.Namespace{}
-	err = c.client.Get().
-		Resource("namespaces").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Namespaces that match those selectors.
-func (c *namespaces) List(opts v1.ListOptions) (result *api.NamespaceList, err error) {
-	result = &api.NamespaceList{}
-	err = c.client.Get().
-		Resource("namespaces").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested namespaces.
-func (c *namespaces) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Resource("namespaces").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched namespace.

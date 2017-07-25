@@ -56,6 +56,38 @@ func newFischers(c *WardleClient) *fischers {
 	}
 }
 
+// Get takes name of the fischer, and returns the corresponding fischer object, and an error if there is any.
+func (c *fischers) Get(name string, options v1.GetOptions) (result *wardle.Fischer, err error) {
+	result = &wardle.Fischer{}
+	err = c.client.Get().
+		Resource("fischers").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Fischers that match those selectors.
+func (c *fischers) List(opts v1.ListOptions) (result *wardle.FischerList, err error) {
+	result = &wardle.FischerList{}
+	err = c.client.Get().
+		Resource("fischers").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested fischers.
+func (c *fischers) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Resource("fischers").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a fischer and creates it.  Returns the server's representation of the fischer, and an error, if there is any.
 func (c *fischers) Create(fischer *wardle.Fischer) (result *wardle.Fischer, err error) {
 	result = &wardle.Fischer{}
@@ -97,38 +129,6 @@ func (c *fischers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the fischer, and returns the corresponding fischer object, and an error if there is any.
-func (c *fischers) Get(name string, options v1.GetOptions) (result *wardle.Fischer, err error) {
-	result = &wardle.Fischer{}
-	err = c.client.Get().
-		Resource("fischers").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Fischers that match those selectors.
-func (c *fischers) List(opts v1.ListOptions) (result *wardle.FischerList, err error) {
-	result = &wardle.FischerList{}
-	err = c.client.Get().
-		Resource("fischers").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested fischers.
-func (c *fischers) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Resource("fischers").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched fischer.

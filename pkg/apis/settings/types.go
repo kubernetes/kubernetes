@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodPreset is a policy resource that defines additional runtime

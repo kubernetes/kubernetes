@@ -34,7 +34,7 @@ type FlunderSpec struct {
 type FlunderStatus struct {
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Flunder struct {
@@ -45,8 +45,8 @@ type Flunder struct {
 	Status FlunderStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Fischer struct {
@@ -57,7 +57,7 @@ type Fischer struct {
 	DisallowedFlunders []string `json:"disallowedFlunders,omitempty" protobuf:"bytes,2,rep,name=disallowedFlunders"`
 }
 
-// +nonNamespaced=true
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // FischerList is a list of Fischer objects.

@@ -56,6 +56,38 @@ func newStorageClasses(c *StorageV1Client) *storageClasses {
 	}
 }
 
+// Get takes name of the storageClass, and returns the corresponding storageClass object, and an error if there is any.
+func (c *storageClasses) Get(name string, options meta_v1.GetOptions) (result *v1.StorageClass, err error) {
+	result = &v1.StorageClass{}
+	err = c.client.Get().
+		Resource("storageclasses").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of StorageClasses that match those selectors.
+func (c *storageClasses) List(opts meta_v1.ListOptions) (result *v1.StorageClassList, err error) {
+	result = &v1.StorageClassList{}
+	err = c.client.Get().
+		Resource("storageclasses").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested storageClasses.
+func (c *storageClasses) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Resource("storageclasses").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a storageClass and creates it.  Returns the server's representation of the storageClass, and an error, if there is any.
 func (c *storageClasses) Create(storageClass *v1.StorageClass) (result *v1.StorageClass, err error) {
 	result = &v1.StorageClass{}
@@ -97,38 +129,6 @@ func (c *storageClasses) DeleteCollection(options *meta_v1.DeleteOptions, listOp
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the storageClass, and returns the corresponding storageClass object, and an error if there is any.
-func (c *storageClasses) Get(name string, options meta_v1.GetOptions) (result *v1.StorageClass, err error) {
-	result = &v1.StorageClass{}
-	err = c.client.Get().
-		Resource("storageclasses").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of StorageClasses that match those selectors.
-func (c *storageClasses) List(opts meta_v1.ListOptions) (result *v1.StorageClassList, err error) {
-	result = &v1.StorageClassList{}
-	err = c.client.Get().
-		Resource("storageclasses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested storageClasses.
-func (c *storageClasses) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Resource("storageclasses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched storageClass.

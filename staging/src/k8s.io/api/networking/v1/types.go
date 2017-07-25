@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
