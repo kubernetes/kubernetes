@@ -200,6 +200,7 @@ API_SECURE_PORT=${API_SECURE_PORT:-6443}
 API_HOST=${API_HOST:-localhost}
 API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
+EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
 
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 # By default only allow CORS for requests on localhost
@@ -512,6 +513,7 @@ function start_apiserver {
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}" \
       --feature-gates="${FEATURE_GATES}" \
+      --external-hostname="${EXTERNAL_HOSTNAME}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
       --requestheader-username-headers=X-Remote-User \
