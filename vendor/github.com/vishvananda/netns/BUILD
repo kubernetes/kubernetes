@@ -11,8 +11,13 @@ go_library(
     name = "go_default_library",
     srcs = [
         "netns.go",
-        "netns_linux.go",
-    ],
+        "netns_unspecified.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "netns_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
 )
 
