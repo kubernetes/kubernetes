@@ -353,7 +353,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 			// Give a try without `auto_unmount` mount option, because
 			// it could be that gluster fuse client is older version and
 			// mount.glusterfs is unaware of `auto_unmount`.
-			noAutoMountOptions := make([]string, len(mountOptions))
+			noAutoMountOptions := make([]string, 0, len(mountOptions))
 			for _, opt := range mountOptions {
 				if opt != "auto_unmount" {
 					noAutoMountOptions = append(noAutoMountOptions, opt)
