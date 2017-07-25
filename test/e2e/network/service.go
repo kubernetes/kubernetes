@@ -39,7 +39,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Services", func() {
+var _ = SIGDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var cs clientset.Interface
@@ -1409,7 +1409,7 @@ var _ = framework.KubeDescribe("Services", func() {
 	})
 })
 
-var _ = framework.KubeDescribe("ESIPP [Slow]", func() {
+var _ = SIGDescribe("ESIPP [Slow]", func() {
 	f := framework.NewDefaultFramework("esipp")
 	loadBalancerCreateTimeout := framework.LoadBalancerCreateTimeoutDefault
 

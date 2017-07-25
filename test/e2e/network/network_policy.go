@@ -38,7 +38,7 @@ connections from one of the clients. The test then asserts that the clients
 failed or succesfully connected as expected.
 */
 
-var _ = framework.KubeDescribe("NetworkPolicy", func() {
+var _ = SIGDescribe("NetworkPolicy", func() {
 	f := framework.NewDefaultFramework("network-policy")
 
 	It("should support a 'default-deny' policy [Feature:NetworkPolicy]", func() {
