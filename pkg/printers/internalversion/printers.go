@@ -61,7 +61,6 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	endpointColumns               = []string{"NAME", "ENDPOINTS", "AGE"}
 	nodeColumns                   = []string{"NAME", "STATUS", "AGE", "VERSION"}
 	nodeWideColumns               = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION", "CONTAINER-RUNTIME"}
 	eventColumns                  = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
@@ -227,8 +226,14 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(statefulSetColumnDefinitions, printStatefulSet)
 	h.TableHandler(statefulSetColumnDefinitions, printStatefulSetList)
 
-	h.Handler(endpointColumns, nil, printEndpoints)
-	h.Handler(endpointColumns, nil, printEndpointsList)
+	endpointColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Endpoints", Type: "string", Description: apiv1.Endpoints{}.SwaggerDoc()["subsets"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(endpointColumnDefinitions, printEndpoints)
+	h.TableHandler(endpointColumnDefinitions, printEndpointsList)
+
 	h.Handler(nodeColumns, nodeWideColumns, printNode)
 	h.Handler(nodeColumns, nodeWideColumns, printNodeList)
 	h.Handler(eventColumns, nil, printEvent)
@@ -898,33 +903,24 @@ func printDaemonSetList(list *extensions.DaemonSetList, options printers.PrintOp
 	return rows, nil
 }
 
-func printEndpoints(endpoints *api.Endpoints, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, endpoints.Name, options.WithKind)
-
-	namespace := endpoints.Namespace
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
+func printEndpoints(obj *api.Endpoints, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", name, formatEndpoints(endpoints, nil), translateTimestamp(endpoints.CreationTimestamp)); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(endpoints.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, endpoints.Labels))
-	return err
+	row.Cells = append(row.Cells, obj.Name, formatEndpoints(obj, nil), translateTimestamp(obj.CreationTimestamp))
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printEndpointsList(list *api.EndpointsList, w io.Writer, options printers.PrintOptions) error {
-	for _, item := range list.Items {
-		if err := printEndpoints(&item, w, options); err != nil {
-			return err
+func printEndpointsList(list *api.EndpointsList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printEndpoints(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printNamespace(item *api.Namespace, w io.Writer, options printers.PrintOptions) error {
