@@ -1186,7 +1186,7 @@ func (in *NetworkPolicyPort) DeepCopyInto(out *NetworkPolicyPort) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(intstr.IntOrString)
+			*out = new(intstr.Int32OrString)
 			**out = **in
 		}
 	}
@@ -1522,7 +1522,7 @@ func (in *RollingUpdateDaemonSet) DeepCopyInto(out *RollingUpdateDaemonSet) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(intstr.IntOrString)
+			*out = new(intstr.Int32OrString)
 			**out = **in
 		}
 	}
@@ -1547,7 +1547,7 @@ func (in *RollingUpdateDeployment) DeepCopyInto(out *RollingUpdateDeployment) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(intstr.IntOrString)
+			*out = new(intstr.Int32OrString)
 			**out = **in
 		}
 	}
@@ -1556,7 +1556,7 @@ func (in *RollingUpdateDeployment) DeepCopyInto(out *RollingUpdateDeployment) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(intstr.IntOrString)
+			*out = new(intstr.Int32OrString)
 			**out = **in
 		}
 	}

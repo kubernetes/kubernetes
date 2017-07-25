@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "deployment.go",
         "expansion_generated.go",
+        "replicaset.go",
         "scale.go",
         "statefulset.go",
     ],

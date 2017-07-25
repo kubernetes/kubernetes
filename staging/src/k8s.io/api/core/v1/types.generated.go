@@ -69,7 +69,7 @@ func init() {
 		var v1 pkg2_v1.Time
 		var v2 pkg5_runtime.RawExtension
 		var v3 pkg1_types.UID
-		var v4 pkg4_intstr.IntOrString
+		var v4 pkg4_intstr.Int32OrString
 		var v5 time.Time
 		_, _, _, _, _, _ = v0, v1, v2, v3, v4, v5
 	}
@@ -26395,7 +26395,7 @@ func (x *HTTPGetAction) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "port":
 			if r.TryDecodeAsNil() {
-				x.Port = pkg4_intstr.IntOrString{}
+				x.Port = pkg4_intstr.Int32OrString{}
 			} else {
 				yyv6 := &x.Port
 				yym7 := z.DecBinary()
@@ -26487,7 +26487,7 @@ func (x *HTTPGetAction) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Port = pkg4_intstr.IntOrString{}
+		x.Port = pkg4_intstr.Int32OrString{}
 	} else {
 		yyv16 := &x.Port
 		yym17 := z.DecBinary()
@@ -26749,7 +26749,7 @@ func (x *TCPSocketAction) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 		switch yys3 {
 		case "port":
 			if r.TryDecodeAsNil() {
-				x.Port = pkg4_intstr.IntOrString{}
+				x.Port = pkg4_intstr.Int32OrString{}
 			} else {
 				yyv4 := &x.Port
 				yym5 := z.DecBinary()
@@ -26800,7 +26800,7 @@ func (x *TCPSocketAction) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Port = pkg4_intstr.IntOrString{}
+		x.Port = pkg4_intstr.Int32OrString{}
 	} else {
 		yyv9 := &x.Port
 		yym10 := z.DecBinary()
@@ -44697,7 +44697,7 @@ func (x *ServicePort) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "targetPort":
 			if r.TryDecodeAsNil() {
-				x.TargetPort = pkg4_intstr.IntOrString{}
+				x.TargetPort = pkg4_intstr.Int32OrString{}
 			} else {
 				yyv9 := &x.TargetPort
 				yym10 := z.DecBinary()
@@ -44809,7 +44809,7 @@ func (x *ServicePort) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.TargetPort = pkg4_intstr.IntOrString{}
+		x.TargetPort = pkg4_intstr.Int32OrString{}
 	} else {
 		yyv19 := &x.TargetPort
 		yym20 := z.DecBinary()

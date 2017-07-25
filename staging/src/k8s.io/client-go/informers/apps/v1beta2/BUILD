@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "deployment.go",
         "interface.go",
+        "replicaset.go",
         "statefulset.go",
     ],
     tags = ["automanaged"],

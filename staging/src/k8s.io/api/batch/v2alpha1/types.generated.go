@@ -71,7 +71,7 @@ func init() {
 		var v2 pkg5_resource.Quantity
 		var v3 pkg1_v1.TypeMeta
 		var v4 pkg2_types.UID
-		var v5 pkg6_intstr.IntOrString
+		var v5 pkg6_intstr.Int32OrString
 		var v6 time.Time
 		_, _, _, _, _, _, _ = v0, v1, v2, v3, v4, v5, v6
 	}

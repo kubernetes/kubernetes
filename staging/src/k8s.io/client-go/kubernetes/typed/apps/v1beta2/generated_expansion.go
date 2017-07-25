@@ -18,6 +18,8 @@ package v1beta2
 
 type DeploymentExpansion interface{}
 
+type ReplicaSetExpansion interface{}
+
 type ScaleExpansion interface{}
 
 type StatefulSetExpansion interface{}

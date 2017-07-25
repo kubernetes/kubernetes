@@ -208,7 +208,7 @@ func (in *NetworkPolicyPort) DeepCopyInto(out *NetworkPolicyPort) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(intstr.IntOrString)
+			*out = new(intstr.Int32OrString)
 			**out = **in
 		}
 	}

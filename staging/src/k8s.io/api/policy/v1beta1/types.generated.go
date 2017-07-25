@@ -65,7 +65,7 @@ func init() {
 	if false { // reference the types, but skip this branch at build/run time
 		var v0 pkg2_v1.LabelSelector
 		var v1 pkg3_types.UID
-		var v2 pkg1_intstr.IntOrString
+		var v2 pkg1_intstr.Int32OrString
 		var v3 time.Time
 		_, _, _, _ = v0, v1, v2, v3
 	}
@@ -285,7 +285,7 @@ func (x *PodDisruptionBudgetSpec) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 				}
 			} else {
 				if x.MinAvailable == nil {
-					x.MinAvailable = new(pkg1_intstr.IntOrString)
+					x.MinAvailable = new(pkg1_intstr.Int32OrString)
 				}
 				yym5 := z.DecBinary()
 				_ = yym5
@@ -321,7 +321,7 @@ func (x *PodDisruptionBudgetSpec) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 				}
 			} else {
 				if x.MaxUnavailable == nil {
-					x.MaxUnavailable = new(pkg1_intstr.IntOrString)
+					x.MaxUnavailable = new(pkg1_intstr.Int32OrString)
 				}
 				yym9 := z.DecBinary()
 				_ = yym9
@@ -364,7 +364,7 @@ func (x *PodDisruptionBudgetSpec) codecDecodeSelfFromArray(l int, d *codec1978.D
 		}
 	} else {
 		if x.MinAvailable == nil {
-			x.MinAvailable = new(pkg1_intstr.IntOrString)
+			x.MinAvailable = new(pkg1_intstr.Int32OrString)
 		}
 		yym12 := z.DecBinary()
 		_ = yym12
@@ -420,7 +420,7 @@ func (x *PodDisruptionBudgetSpec) codecDecodeSelfFromArray(l int, d *codec1978.D
 		}
 	} else {
 		if x.MaxUnavailable == nil {
-			x.MaxUnavailable = new(pkg1_intstr.IntOrString)
+			x.MaxUnavailable = new(pkg1_intstr.Int32OrString)
 		}
 		yym16 := z.DecBinary()
 		_ = yym16

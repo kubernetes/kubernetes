@@ -1078,7 +1078,7 @@ func Convert_extensions_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in *exten
 
 func autoConvert_v1beta1_NetworkPolicyPort_To_extensions_NetworkPolicyPort(in *v1beta1.NetworkPolicyPort, out *extensions.NetworkPolicyPort, s conversion.Scope) error {
 	out.Protocol = (*api.Protocol)(unsafe.Pointer(in.Protocol))
-	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
+	out.Port = (*intstr.Int32OrString)(unsafe.Pointer(in.Port))
 	return nil
 }
 
@@ -1089,7 +1089,7 @@ func Convert_v1beta1_NetworkPolicyPort_To_extensions_NetworkPolicyPort(in *v1bet
 
 func autoConvert_extensions_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(in *extensions.NetworkPolicyPort, out *v1beta1.NetworkPolicyPort, s conversion.Scope) error {
 	out.Protocol = (*core_v1.Protocol)(unsafe.Pointer(in.Protocol))
-	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
+	out.Port = (*intstr.Int32OrString)(unsafe.Pointer(in.Port))
 	return nil
 }
 
@@ -1465,24 +1465,24 @@ func Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(in *extensions.
 }
 
 func autoConvert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in *v1beta1.RollingUpdateDaemonSet, out *extensions.RollingUpdateDaemonSet, s conversion.Scope) error {
-	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.Int32OrString vs k8s.io/apimachinery/pkg/util/intstr.Int32OrString)
 	return nil
 }
 
 func autoConvert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in *extensions.RollingUpdateDaemonSet, out *v1beta1.RollingUpdateDaemonSet, s conversion.Scope) error {
-	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.Int32OrString vs *k8s.io/apimachinery/pkg/util/intstr.Int32OrString)
 	return nil
 }
 
 func autoConvert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *v1beta1.RollingUpdateDeployment, out *extensions.RollingUpdateDeployment, s conversion.Scope) error {
-	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
-	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.Int32OrString vs k8s.io/apimachinery/pkg/util/intstr.Int32OrString)
+	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.Int32OrString vs k8s.io/apimachinery/pkg/util/intstr.Int32OrString)
 	return nil
 }
 
 func autoConvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *v1beta1.RollingUpdateDeployment, s conversion.Scope) error {
-	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
-	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.Int32OrString vs *k8s.io/apimachinery/pkg/util/intstr.Int32OrString)
+	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.Int32OrString vs *k8s.io/apimachinery/pkg/util/intstr.Int32OrString)
 	return nil
 }
 

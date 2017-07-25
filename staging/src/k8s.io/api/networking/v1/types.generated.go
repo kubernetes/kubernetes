@@ -67,7 +67,7 @@ func init() {
 		var v0 pkg3_v1.Protocol
 		var v1 pkg1_v1.TypeMeta
 		var v2 pkg2_types.UID
-		var v3 pkg4_intstr.IntOrString
+		var v3 pkg4_intstr.Int32OrString
 		var v4 time.Time
 		_, _, _, _, _ = v0, v1, v2, v3, v4
 	}
@@ -1104,7 +1104,7 @@ func (x *NetworkPolicyPort) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) 
 				}
 			} else {
 				if x.Port == nil {
-					x.Port = new(pkg4_intstr.IntOrString)
+					x.Port = new(pkg4_intstr.Int32OrString)
 				}
 				yym6 := z.DecBinary()
 				_ = yym6
@@ -1168,7 +1168,7 @@ func (x *NetworkPolicyPort) codecDecodeSelfFromArray(l int, d *codec1978.Decoder
 		}
 	} else {
 		if x.Port == nil {
-			x.Port = new(pkg4_intstr.IntOrString)
+			x.Port = new(pkg4_intstr.Int32OrString)
 		}
 		yym10 := z.DecBinary()
 		_ = yym10
