@@ -1094,10 +1094,14 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 			},
 		},
 	}
-	buff := bytes.Buffer{}
-	printIngress(&ingress, &buff, printers.PrintOptions{
-		ColumnLabels: []string{"app_name"},
-	})
+	buff := bytes.NewBuffer([]byte{})
+	table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&ingress, printers.PrintOptions{ColumnLabels: []string{"app_name"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+		t.Fatal(err)
+	}
 	output := string(buff.Bytes())
 	appName := ingress.ObjectMeta.Labels["app_name"]
 	if !strings.Contains(output, appName) {
@@ -1219,8 +1223,14 @@ func TestPrintHumanReadableService(t *testing.T) {
 
 	for _, svc := range tests {
 		for _, wide := range []bool{false, true} {
-			buff := bytes.Buffer{}
-			printService(&svc, &buff, printers.PrintOptions{Wide: wide})
+			buff := bytes.NewBuffer([]byte{})
+			table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&svc, printers.PrintOptions{Wide: wide})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+				t.Fatal(err)
+			}
 			output := string(buff.Bytes())
 			ip := svc.Spec.ClusterIP
 			if !strings.Contains(output, ip) {
@@ -2594,7 +2604,13 @@ func TestPrintService(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		printService(&test.service, buf, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.service, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
 		// We ignore time
 		if buf.String() != test.expect {
 			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
