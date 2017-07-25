@@ -41,8 +41,11 @@ type persistentVolumeInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewPersistentVolumeInformer constructs a new informer for PersistentVolume type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
 				return client.CoreV1().PersistentVolumes().List(options)
@@ -53,14 +56,16 @@ func newPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.
 		},
 		&core_v1.PersistentVolume{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewPersistentVolumeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *persistentVolumeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core_v1.PersistentVolume{}, newPersistentVolumeInformer)
+	return f.factory.InformerFor(&core_v1.PersistentVolume{}, defaultPersistentVolumeInformer)
 }
 
 func (f *persistentVolumeInformer) Lister() v1.PersistentVolumeLister {

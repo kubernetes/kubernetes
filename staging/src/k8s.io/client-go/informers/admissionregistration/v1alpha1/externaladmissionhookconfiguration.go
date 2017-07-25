@@ -41,8 +41,11 @@ type externalAdmissionHookConfigurationInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newExternalAdmissionHookConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewExternalAdmissionHookConfigurationInformer constructs a new informer for ExternalAdmissionHookConfiguration type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewExternalAdmissionHookConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.AdmissionregistrationV1alpha1().ExternalAdmissionHookConfigurations().List(options)
@@ -53,14 +56,16 @@ func newExternalAdmissionHookConfigurationInformer(client kubernetes.Interface, 
 		},
 		&admissionregistration_v1alpha1.ExternalAdmissionHookConfiguration{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultExternalAdmissionHookConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewExternalAdmissionHookConfigurationInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *externalAdmissionHookConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistration_v1alpha1.ExternalAdmissionHookConfiguration{}, newExternalAdmissionHookConfigurationInformer)
+	return f.factory.InformerFor(&admissionregistration_v1alpha1.ExternalAdmissionHookConfiguration{}, defaultExternalAdmissionHookConfigurationInformer)
 }
 
 func (f *externalAdmissionHookConfigurationInformer) Lister() v1alpha1.ExternalAdmissionHookConfigurationLister {

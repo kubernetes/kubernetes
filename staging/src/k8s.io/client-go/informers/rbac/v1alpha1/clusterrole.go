@@ -41,8 +41,11 @@ type clusterRoleInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewClusterRoleInformer constructs a new informer for ClusterRole type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.RbacV1alpha1().ClusterRoles().List(options)
@@ -53,14 +56,16 @@ func newClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Durat
 		},
 		&rbac_v1alpha1.ClusterRole{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewClusterRoleInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *clusterRoleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbac_v1alpha1.ClusterRole{}, newClusterRoleInformer)
+	return f.factory.InformerFor(&rbac_v1alpha1.ClusterRole{}, defaultClusterRoleInformer)
 }
 
 func (f *clusterRoleInformer) Lister() v1alpha1.ClusterRoleLister {

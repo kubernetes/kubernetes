@@ -41,26 +41,31 @@ type statefulSetInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newStatefulSetInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewStatefulSetInformer constructs a new informer for StatefulSet type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewStatefulSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.AppsV1beta1().StatefulSets(v1.NamespaceAll).List(options)
+				return client.AppsV1beta1().StatefulSets(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.AppsV1beta1().StatefulSets(v1.NamespaceAll).Watch(options)
+				return client.AppsV1beta1().StatefulSets(namespace).Watch(options)
 			},
 		},
 		&apps_v1beta1.StatefulSet{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultStatefulSetInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewStatefulSetInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *statefulSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apps_v1beta1.StatefulSet{}, newStatefulSetInformer)
+	return f.factory.InformerFor(&apps_v1beta1.StatefulSet{}, defaultStatefulSetInformer)
 }
 
 func (f *statefulSetInformer) Lister() v1beta1.StatefulSetLister {

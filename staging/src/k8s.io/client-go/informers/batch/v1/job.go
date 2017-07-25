@@ -41,26 +41,31 @@ type jobInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newJobInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewJobInformer constructs a new informer for Job type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewJobInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return client.BatchV1().Jobs(meta_v1.NamespaceAll).List(options)
+				return client.BatchV1().Jobs(namespace).List(options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return client.BatchV1().Jobs(meta_v1.NamespaceAll).Watch(options)
+				return client.BatchV1().Jobs(namespace).Watch(options)
 			},
 		},
 		&batch_v1.Job{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultJobInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewJobInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *jobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&batch_v1.Job{}, newJobInformer)
+	return f.factory.InformerFor(&batch_v1.Job{}, defaultJobInformer)
 }
 
 func (f *jobInformer) Lister() v1.JobLister {

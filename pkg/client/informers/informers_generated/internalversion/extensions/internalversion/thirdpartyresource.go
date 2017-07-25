@@ -41,8 +41,11 @@ type thirdPartyResourceInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newThirdPartyResourceInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewThirdPartyResourceInformer constructs a new informer for ThirdPartyResource type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewThirdPartyResourceInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.Extensions().ThirdPartyResources().List(options)
@@ -53,14 +56,16 @@ func newThirdPartyResourceInformer(client internalclientset.Interface, resyncPer
 		},
 		&extensions.ThirdPartyResource{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultThirdPartyResourceInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewThirdPartyResourceInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *thirdPartyResourceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions.ThirdPartyResource{}, newThirdPartyResourceInformer)
+	return f.factory.InformerFor(&extensions.ThirdPartyResource{}, defaultThirdPartyResourceInformer)
 }
 
 func (f *thirdPartyResourceInformer) Lister() internalversion.ThirdPartyResourceLister {
