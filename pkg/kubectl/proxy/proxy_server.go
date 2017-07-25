@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"regexp"
@@ -28,19 +27,26 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	restclient "k8s.io/client-go/rest"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/transport"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 )
 
 const (
-	DefaultHostAcceptRE   = "^localhost$,^127\\.0\\.0\\.1$,^\\[::1\\]$"
-	DefaultPathAcceptRE   = "^.*"
-	DefaultPathRejectRE   = "^/api/.*/pods/.*/exec,^/api/.*/pods/.*/attach"
+	// DefaultHostAcceptRE is the default value for which hosts to accept.
+	DefaultHostAcceptRE = "^localhost$,^127\\.0\\.0\\.1$,^\\[::1\\]$"
+	// DefaultPathAcceptRE is the default path to accept.
+	DefaultPathAcceptRE = "^.*"
+	// DefaultPathRejectRE is the default set of paths to reject.
+	DefaultPathRejectRE = "^/api/.*/pods/.*/exec,^/api/.*/pods/.*/attach"
+	// DefaultMethodRejectRE is the set of HTTP methods to reject by default.
 	DefaultMethodRejectRE = "^$"
 )
 
 var (
-	// The reverse proxy will periodically flush the io writer at this frequency.
+	// ReverseProxyFlushInterval is the frequency to flush the reverse proxy.
 	// Only matters for long poll connections like the one used to watch. With an
 	// interval of 0 the reverse proxy will buffer content sent on any connection
 	// with transfer-encoding=chunked.
@@ -63,7 +69,7 @@ type FilterServer struct {
 	delegate http.Handler
 }
 
-// Splits a comma separated list of regexps into an array of Regexp objects.
+// MakeRegexpArray splits a comma separated list of regexps into an array of Regexp objects.
 func MakeRegexpArray(str string) ([]*regexp.Regexp, error) {
 	parts := strings.Split(str, ",")
 	result := make([]*regexp.Regexp, len(parts))
@@ -77,6 +83,7 @@ func MakeRegexpArray(str string) ([]*regexp.Regexp, error) {
 	return result, nil
 }
 
+// MakeRegexpArrayOrDie creates an array of regular expression objects from a string or exits.
 func MakeRegexpArrayOrDie(str string) []*regexp.Regexp {
 	result, err := MakeRegexpArray(str)
 	if err != nil {
@@ -137,15 +144,38 @@ func (f *FilterServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	rw.Write([]byte("<h3>Unauthorized</h3>"))
 }
 
-// ProxyServer is a http.Handler which proxies Kubernetes APIs to remote API server.
-type ProxyServer struct {
+// Server is a http.Handler which proxies Kubernetes APIs to remote API server.
+type Server struct {
 	handler http.Handler
 }
 
-// NewProxyServer creates and installs a new ProxyServer.
-// It automatically registers the created ProxyServer to http.DefaultServeMux.
+type responder struct{}
+
+func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
+	glog.Errorf("Error while proxying request: %v", err)
+	http.Error(w, err.Error(), http.StatusInternalServerError)
+}
+
+// makeUpgradeTransport creates a transport that explicitly bypasses HTTP2 support
+// for proxy connections that must upgrade.
+func makeUpgradeTransport(config *rest.Config) (http.RoundTripper, error) {
+	transportConfig, err := config.TransportConfig()
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig, err := transport.TLSConfigFor(transportConfig)
+	if err != nil {
+		return nil, err
+	}
+	rt := utilnet.SetOldTransportDefaults(&http.Transport{
+		TLSClientConfig: tlsConfig,
+	})
+	return transport.HTTPWrappersForConfig(transportConfig, rt)
+}
+
+// NewServer creates and installs a new Server.
 // 'filter', if non-nil, protects requests to the api only.
-func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *restclient.Config) (*ProxyServer, error) {
+func NewServer(filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *rest.Config) (*Server, error) {
 	host := cfg.Host
 	if !strings.HasSuffix(host, "/") {
 		host = host + "/"
@@ -154,10 +184,20 @@ func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string,
 	if err != nil {
 		return nil, err
 	}
-	proxy := newProxy(target)
-	if proxy.Transport, err = restclient.TransportFor(cfg); err != nil {
+
+	responder := &responder{}
+	transport, err := rest.TransportFor(cfg)
+	if err != nil {
 		return nil, err
 	}
+	upgradeTransport, err := makeUpgradeTransport(cfg)
+	if err != nil {
+		return nil, err
+	}
+	proxy := proxy.NewUpgradeAwareHandler(target, transport, false, false, responder)
+	proxy.UpgradeTransport = upgradeTransport
+	proxy.UseRequestLocation = true
+
 	proxyServer := http.Handler(proxy)
 	if filter != nil {
 		proxyServer = filter.HandlerFor(proxyServer)
@@ -174,16 +214,16 @@ func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string,
 		// serving their working directory by default.
 		mux.Handle(staticPrefix, newFileHandler(staticPrefix, filebase))
 	}
-	return &ProxyServer{handler: mux}, nil
+	return &Server{handler: mux}, nil
 }
 
 // Listen is a simple wrapper around net.Listen.
-func (s *ProxyServer) Listen(address string, port int) (net.Listener, error) {
+func (s *Server) Listen(address string, port int) (net.Listener, error) {
 	return net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
 }
 
 // ListenUnix does net.Listen for a unix socket
-func (s *ProxyServer) ListenUnix(path string) (net.Listener, error) {
+func (s *Server) ListenUnix(path string) (net.Listener, error) {
 	// Remove any socket, stale or not, but fall through for other files
 	fi, err := os.Stat(path)
 	if err == nil && (fi.Mode()&os.ModeSocket) != 0 {
@@ -196,21 +236,12 @@ func (s *ProxyServer) ListenUnix(path string) (net.Listener, error) {
 	return l, err
 }
 
-// Serve starts the server using given listener, loops forever.
-func (s *ProxyServer) ServeOnListener(l net.Listener) error {
+// ServeOnListener starts the server using given listener, loops forever.
+func (s *Server) ServeOnListener(l net.Listener) error {
 	server := http.Server{
 		Handler: s.handler,
 	}
 	return server.Serve(l)
-}
-
-func newProxy(target *url.URL) *httputil.ReverseProxy {
-	director := func(req *http.Request) {
-		req.URL.Scheme = target.Scheme
-		req.URL.Host = target.Host
-		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
-	}
-	return &httputil.ReverseProxy{Director: director, FlushInterval: ReverseProxyFlushInterval}
 }
 
 func newFileHandler(prefix, base string) http.Handler {
