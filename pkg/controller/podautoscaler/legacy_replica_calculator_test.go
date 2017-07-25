@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -127,8 +126,8 @@ func (tc *legacyReplicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clien
 				for i := 0; i < numContainersPerPod; i++ {
 					podMetric.Containers[i] = metricsapi.ContainerMetrics{
 						Name: fmt.Sprintf("container%v", i),
-						Usage: clientv1.ResourceList{
-							clientv1.ResourceName(tc.resource.name): *resource.NewMilliQuantity(
+						Usage: v1.ResourceList{
+							v1.ResourceName(tc.resource.name): *resource.NewMilliQuantity(
 								int64(resValue),
 								resource.DecimalSI),
 						},

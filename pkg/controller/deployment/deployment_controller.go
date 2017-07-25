@@ -28,7 +28,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,7 +108,7 @@ func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, r
 	}
 	dc := &DeploymentController{
 		client:        client,
-		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "deployment-controller"}),
+		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
 	}
 	dc.rsControl = controller.RealRSControl{

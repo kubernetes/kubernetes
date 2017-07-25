@@ -21,7 +21,7 @@ import (
 	"net"
 	"time"
 
-	clientv1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -106,7 +106,7 @@ func NewHollowProxyOrDie(
 	}
 
 	// Create a Hollow Proxy instance.
-	nodeRef := &clientv1.ObjectReference{
+	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
 		UID:       types.UID(nodeName),

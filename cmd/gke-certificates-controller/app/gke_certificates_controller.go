@@ -21,7 +21,7 @@ package app
 import (
 	"time"
 
-	clientv1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -65,7 +65,7 @@ func Run(s *GKECertificatesController) error {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "gke-certificates-controller"})
+	recorder := eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "gke-certificates-controller"})
 
 	clientBuilder := controller.SimpleControllerClientBuilder{ClientConfig: kubeconfig}
 	client := clientBuilder.ClientOrDie("certificate-controller")

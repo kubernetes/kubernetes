@@ -38,7 +38,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,7 +81,7 @@ func NewCronJobController(kubeClient clientset.Interface) *CronJobController {
 		jobControl: realJobControl{KubeClient: kubeClient},
 		sjControl:  &realSJControl{KubeClient: kubeClient},
 		podControl: &realPodControl{KubeClient: kubeClient},
-		recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "cronjob-controller"}),
+		recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cronjob-controller"}),
 	}
 
 	return jm

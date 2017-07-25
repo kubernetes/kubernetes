@@ -29,7 +29,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -228,7 +227,7 @@ func newTestKubeletWithImageList(
 	kubelet.livenessManager = proberesults.NewManager()
 
 	kubelet.containerManager = cm.NewStubContainerManager()
-	fakeNodeRef := &clientv1.ObjectReference{
+	fakeNodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      testKubeletHostname,
 		UID:       types.UID(testKubeletHostname),
@@ -258,7 +257,7 @@ func newTestKubeletWithImageList(
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
 	kubelet.resourceAnalyzer = stats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.containerRuntime)
-	nodeRef := &clientv1.ObjectReference{
+	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string(kubelet.nodeName),
 		UID:       types.UID(kubelet.nodeName),

@@ -36,7 +36,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -344,7 +343,7 @@ func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubele
 		return
 	}
 	eventBroadcaster := record.NewBroadcaster()
-	kubeDeps.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: componentKubelet, Host: string(nodeName)})
+	kubeDeps.Recorder = eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: componentKubelet, Host: string(nodeName)})
 	eventBroadcaster.StartLogging(glog.V(3).Infof)
 	if kubeDeps.EventClient != nil {
 		glog.V(4).Infof("Sending events to api server.")

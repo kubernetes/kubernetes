@@ -30,7 +30,7 @@ import (
 	"strings"
 	"time"
 
-	clientv1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -369,7 +369,7 @@ type ProxyServer struct {
 	ConntrackConfiguration componentconfig.KubeProxyConntrackConfiguration
 	Conntracker            Conntracker // if nil, ignored
 	ProxyMode              string
-	NodeRef                *clientv1.ObjectReference
+	NodeRef                *v1.ObjectReference
 	CleanupAndExit         bool
 	MetricsBindAddress     string
 	EnableProfiling        bool
@@ -460,7 +460,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	// Create event recorder
 	hostname := utilnode.GetHostname(config.HostnameOverride)
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
+	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "kube-proxy", Host: hostname})
 
 	var healthzServer *healthcheck.HealthzServer
 	var healthzUpdater healthcheck.HealthzUpdater
@@ -572,7 +572,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		iptInterface.AddReloadFunc(proxier.Sync)
 	}
 
-	nodeRef := &clientv1.ObjectReference{
+	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      hostname,
 		UID:       types.UID(hostname),

@@ -26,7 +26,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	clientv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -110,7 +109,7 @@ func TestNodeDeleted(t *testing.T) {
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     &fakecloud.FakeCloud{Err: cloudprovider.InstanceNotFound},
 		nodeMonitorPeriod:         1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -190,7 +189,7 @@ func TestNodeInitialized(t *testing.T) {
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
 		nodeMonitorPeriod:         1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -261,7 +260,7 @@ func TestNodeIgnored(t *testing.T) {
 		nodeInformer:      factory.Core().V1().Nodes(),
 		cloud:             fakeCloud,
 		nodeMonitorPeriod: 5 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
@@ -338,7 +337,7 @@ func TestGCECondition(t *testing.T) {
 		nodeInformer:      factory.Core().V1().Nodes(),
 		cloud:             fakeCloud,
 		nodeMonitorPeriod: 1 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
@@ -434,7 +433,7 @@ func TestZoneInitialized(t *testing.T) {
 		nodeInformer:      factory.Core().V1().Nodes(),
 		cloud:             fakeCloud,
 		nodeMonitorPeriod: 5 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
@@ -531,7 +530,7 @@ func TestNodeAddresses(t *testing.T) {
 		cloud:                     fakeCloud,
 		nodeMonitorPeriod:         5 * time.Second,
 		nodeStatusUpdateFrequency: 1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
@@ -650,7 +649,7 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 		cloud:                     fakeCloud,
 		nodeMonitorPeriod:         5 * time.Second,
 		nodeStatusUpdateFrequency: 1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 

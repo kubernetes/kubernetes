@@ -37,7 +37,6 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -404,7 +403,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dep
 	// TODO: get the real node object of ourself,
 	// and use the real node name and UID.
 	// TODO: what is namespace for node?
-	nodeRef := &clientv1.ObjectReference{
+	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string(nodeName),
 		UID:       types.UID(nodeName),
@@ -942,7 +941,7 @@ type Kubelet struct {
 	// Indicates that the node initialization happens in an external cloud controller
 	externalCloudProvider bool
 	// Reference to this node.
-	nodeRef *clientv1.ObjectReference
+	nodeRef *v1.ObjectReference
 
 	// Container runtime.
 	containerRuntime kubecontainer.Runtime

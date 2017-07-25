@@ -25,7 +25,6 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -93,11 +92,11 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 		kubeClient: kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "job-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 		},
 		expectations: controller.NewControllerExpectations(),
 		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "job"),
-		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "job-controller"}),
+		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 	}
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{

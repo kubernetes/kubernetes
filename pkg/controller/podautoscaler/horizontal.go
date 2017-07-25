@@ -25,7 +25,6 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2alpha1"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -113,7 +112,7 @@ func NewHorizontalController(
 	broadcaster := record.NewBroadcaster()
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
-	recorder := broadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "horizontal-pod-autoscaler"})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	hpaController := &HorizontalController{
 		replicaCalc:              replicaCalc,

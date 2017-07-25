@@ -22,7 +22,6 @@ import (
 	"sync"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -64,7 +63,7 @@ type rangeAllocator struct {
 // can initialize its CIDR map. NodeList is only nil in testing.
 func NewCIDRRangeAllocator(client clientset.Interface, clusterCIDR *net.IPNet, serviceCIDR *net.IPNet, subNetMaskSize int, nodeList *v1.NodeList) (CIDRAllocator, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "cidrAllocator"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
 	eventBroadcaster.StartLogging(glog.Infof)
 	if client != nil {
 		glog.V(0).Infof("Sending events to api server.")

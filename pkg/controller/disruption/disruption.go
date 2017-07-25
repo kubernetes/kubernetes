@@ -23,7 +23,6 @@ import (
 
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -125,7 +124,7 @@ func NewDisruptionController(
 		recheckQueue: workqueue.NewNamedDelayingQueue("disruption-recheck"),
 		broadcaster:  record.NewBroadcaster(),
 	}
-	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "controllermanager"})
+	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
 
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 

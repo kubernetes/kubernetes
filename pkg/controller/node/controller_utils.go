@@ -27,7 +27,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -266,7 +265,7 @@ func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.Nod
 }
 
 func recordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
-	ref := &clientv1.ObjectReference{
+	ref := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
 		UID:       types.UID(nodeUID),
@@ -277,7 +276,7 @@ func recordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype
 }
 
 func recordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, new_status string) {
-	ref := &clientv1.ObjectReference{
+	ref := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      node.Name,
 		UID:       node.UID,
