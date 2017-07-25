@@ -4,18 +4,21 @@ go_library(
     name = "go_default_library",
     srcs = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "addr_linux.go",
-            "link_linux.go",
-            "nl_linux.go",
-            "route_linux.go",
-            "tc_linux.go",
-            "xfrm_linux.go",
-            "xfrm_policy_linux.go",
-            "xfrm_state_linux.go",
+            "constants.go",
+            "ipvs.go",
+            "netlink.go",
         ],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/Sirupsen/logrus:go_default_library",
+            "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
+            "//vendor/github.com/vishvananda/netns:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
