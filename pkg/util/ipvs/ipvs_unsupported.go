@@ -36,43 +36,43 @@ func (runner *runner) Flush() error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) EnsureServiceAddressBind(*InternalService, string) (bool, error) {
+func (runner *runner) EnsureServiceAddressBind(*FrontendService, string) (bool, error) {
 	return false, fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) UnbindServiceAddress(*InternalService, string) error {
+func (runner *runner) UnbindServiceAddress(*FrontendService, string) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) AddService(*InternalService) error {
+func (runner *runner) AddService(*FrontendService) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) UpdateService(*InternalService) error {
+func (runner *runner) UpdateService(*FrontendService) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) DeleteService(*InternalService) error {
+func (runner *runner) DeleteService(*FrontendService) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) GetService(*InternalService) (*InternalService, error) {
+func (runner *runner) GetService(*FrontendService) (*FrontendService, error) {
 	return nil, fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) GetServices() ([]*InternalService, error) {
+func (runner *runner) GetServices() ([]*FrontendService, error) {
 	return nil, fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) AddDestination(*InternalService, *InternalDestination) error {
+func (runner *runner) AddDestination(*FrontendService, *FrontendDestination) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) GetDestinations(*InternalService) ([]*InternalDestination, error) {
+func (runner *runner) GetDestinations(*FrontendService) ([]*FrontendDestination, error) {
 	return nil, fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) DeleteDestination(*InternalService, *InternalDestination) error {
+func (runner *runner) DeleteDestination(*FrontendService, *FrontendDestination) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
