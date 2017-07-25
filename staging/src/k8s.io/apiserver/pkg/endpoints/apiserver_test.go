@@ -416,13 +416,19 @@ type SimpleRESTStorage struct {
 }
 
 func (storage *SimpleRESTStorage) Export(ctx request.Context, obj runtime.Object, opts metav1.ExportOptions) (runtime.Object, error) {
-	s, ok := obj.(*genericapitesting.Simple)
-	if !ok {
+	s, isSimple := obj.(*genericapitesting.Simple)
+	l, isSimpleList := obj.(*genericapitesting.SimpleList)
+	if isSimple {
+		// Set a marker to verify the method was called
+		s.Other = "exported"
+	} else if isSimpleList {
+		for i := range l.Items {
+			l.Items[i].Other = "exported"
+		}
+	} else {
 		return nil, fmt.Errorf("unexpected object")
 	}
 
-	// Set a marker to verify the method was called
-	s.Other = "exported"
 	return obj, storage.errors["export"]
 }
 
@@ -444,13 +450,6 @@ func (storage *SimpleRESTStorage) List(ctx request.Context, options *metainterna
 		storage.requestedFieldSelector = options.FieldSelector
 	}
 	storage.requestedUninitialized = options.IncludeUninitialized
-	// TODO: reuse Export method here:
-	if options != nil && options.Export {
-		for i, _ := range result.Items {
-			result.Items[i].Other = "exported"
-		}
-
-	}
 	return result, storage.errors["list"]
 }
 

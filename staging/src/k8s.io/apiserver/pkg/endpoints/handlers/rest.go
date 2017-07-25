@@ -405,6 +405,15 @@ func ListResource(r rest.Lister, rw rest.Watcher, e rest.Exporter, scope Request
 			}
 		}
 
+		if opts.Export {
+			// TODO: parse export options in this call rather than carrying on list options
+			result, err = e.Export(ctx, result, metav1.ExportOptions{Export: opts.Export})
+			if err != nil {
+				scope.err(err, w, req)
+				return
+			}
+		}
+
 		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
