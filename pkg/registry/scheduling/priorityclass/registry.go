@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
@@ -62,7 +61,7 @@ func (s *storage) CreatePriorityClass(ctx genericapirequest.Context, pc *schedul
 }
 
 func (s *storage) UpdatePriorityClass(ctx genericapirequest.Context, pc *scheduling.PriorityClass) error {
-	_, _, err := s.Update(ctx, pc.Name, rest.DefaultUpdatedObjectInfo(pc, api.Scheme))
+	_, _, err := s.Update(ctx, pc.Name, rest.DefaultUpdatedObjectInfo(pc))
 	return err
 }
 

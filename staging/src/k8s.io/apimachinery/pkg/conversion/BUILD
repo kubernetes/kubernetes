@@ -27,11 +27,12 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "cloner.go",
         "converter.go",
         "deep_equal.go",
         "doc.go",
         "helper.go",
+        "types.go",
+        "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apimachinery/third_party/forked/golang/reflect:go_default_library"],

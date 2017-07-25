@@ -62,7 +62,6 @@ func setupProviderConfig() error {
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
 
 	case "gce", "gke":
-		var err error
 		framework.Logf("Fetching cloud provider for %q\r\n", framework.TestContext.Provider)
 		zone := framework.TestContext.CloudConfig.Zone
 		region, err := gcecloud.GetGCERegion(zone)

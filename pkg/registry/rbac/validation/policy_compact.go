@@ -17,11 +17,9 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
@@ -41,17 +39,7 @@ func CompactRules(rules []rbac.PolicyRule) ([]rbac.PolicyRule, error) {
 				existingRule.Verbs = append(existingRule.Verbs, rule.Verbs...)
 			} else {
 				// Copy the rule to accumulate matching simple resource rules into
-				objCopy, err := api.Scheme.DeepCopy(rule)
-				if err != nil {
-					// Unit tests ensure this should not ever happen
-					return nil, err
-				}
-				ruleCopy, ok := objCopy.(rbac.PolicyRule)
-				if !ok {
-					// Unit tests ensure this should not ever happen
-					return nil, fmt.Errorf("expected rbac.PolicyRule, got %#v", objCopy)
-				}
-				simpleRules[resource] = &ruleCopy
+				simpleRules[resource] = rule.DeepCopy()
 			}
 		} else {
 			compacted = append(compacted, rule)

@@ -16,6 +16,6 @@ limitations under the License.
 
 // TODO: this needs to be cross-registered as metrics.metrics.k8s.io
 
-// +k8s:deepcopy-gen=package,register
+// +k8s:deepcopy-gen=package
 
 package metrics

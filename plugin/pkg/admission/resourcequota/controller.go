@@ -320,11 +320,7 @@ func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttrib
 func copyQuotas(in []api.ResourceQuota) ([]api.ResourceQuota, error) {
 	out := make([]api.ResourceQuota, 0, len(in))
 	for _, quota := range in {
-		copied, err := api.Scheme.Copy(&quota)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, *copied.(*api.ResourceQuota))
+		out = append(out, *quota.DeepCopy())
 	}
 
 	return out, nil

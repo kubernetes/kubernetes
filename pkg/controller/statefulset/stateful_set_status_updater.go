@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	apps "k8s.io/api/apps/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -62,11 +61,7 @@ func (ssu *realStatefulSetStatusUpdater) UpdateStatefulSetStatus(
 		}
 		if updated, err := ssu.setLister.StatefulSets(set.Namespace).Get(set.Name); err == nil {
 			// make a copy so we don't mutate the shared cache
-			if copy, err := scheme.Scheme.DeepCopy(updated); err == nil {
-				set = copy.(*apps.StatefulSet)
-			} else {
-				utilruntime.HandleError(fmt.Errorf("error copying updated StatefulSet: %v", err))
-			}
+			set = updated.DeepCopy()
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error getting updated StatefulSet %s/%s from lister: %v", set.Namespace, set.Name, err))
 		}

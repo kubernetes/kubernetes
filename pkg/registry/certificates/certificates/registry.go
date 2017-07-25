@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 )
 
@@ -62,7 +61,7 @@ func (s *storage) CreateCSR(ctx genericapirequest.Context, csr *certificates.Cer
 }
 
 func (s *storage) UpdateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest) error {
-	_, _, err := s.Update(ctx, csr.Name, rest.DefaultUpdatedObjectInfo(csr, api.Scheme))
+	_, _, err := s.Update(ctx, csr.Name, rest.DefaultUpdatedObjectInfo(csr))
 	return err
 }
 
