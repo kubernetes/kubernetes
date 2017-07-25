@@ -9,17 +9,23 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "constants.go",
-        "ipvs.go",
-        "netlink.go",
-    ],
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "constants.go",
+            "ipvs.go",
+            "netlink.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
-    deps = [
-        "//vendor/github.com/Sirupsen/logrus:go_default_library",
-        "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
-        "//vendor/github.com/vishvananda/netns:go_default_library",
-    ],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/Sirupsen/logrus:go_default_library",
+            "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
+            "//vendor/github.com/vishvananda/netns:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
