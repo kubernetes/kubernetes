@@ -33,7 +33,9 @@ type ConfigMapUpgradeTest struct {
 	configMap *v1.ConfigMap
 }
 
-func (ConfigMapUpgradeTest) Name() string { return "configmap-upgrade" }
+func (ConfigMapUpgradeTest) Name() string {
+	return "configmap-upgrade [sig-storage] [sig-api-machinery]"
+}
 
 // Setup creates a ConfigMap and then verifies that a pod can consume it.
 func (t *ConfigMapUpgradeTest) Setup(f *framework.Framework) {

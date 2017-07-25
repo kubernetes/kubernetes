@@ -819,6 +819,7 @@ test/e2e/scheduling
 test/e2e/storage
 test/e2e/upgrades
 test/e2e/upgrades/apps
+test/e2e/upgrades/storage
 test/e2e_federation
 test/e2e_federation/framework
 test/e2e_federation/upgrades
