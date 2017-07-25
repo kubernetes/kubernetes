@@ -153,17 +153,14 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
 			// check for export
 			options := metav1.GetOptions{}
+			exportOptions := metav1.ExportOptions{}
 			if values := req.URL.Query(); len(values) > 0 {
-				exports := metav1.ExportOptions{}
-				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &exports); err != nil {
+				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &exportOptions); err != nil {
 					err = errors.NewBadRequest(err.Error())
 					return nil, err
 				}
-				if exports.Export {
-					if e == nil {
-						return nil, errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource))
-					}
-					return e.Export(ctx, name, exports)
+				if exportOptions.Export && e == nil {
+					return nil, errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource))
 				}
 				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &options); err != nil {
 					err = errors.NewBadRequest(err.Error())
@@ -173,7 +170,15 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 			if trace != nil {
 				trace.Step("About to Get from storage")
 			}
-			return r.Get(ctx, name, &options)
+			result, err := r.Get(ctx, name, &options)
+			if err != nil {
+				return nil, err
+			}
+
+			if exportOptions.Export {
+				return e.Export(ctx, result, exportOptions)
+			}
+			return result, err
 		})
 }
 

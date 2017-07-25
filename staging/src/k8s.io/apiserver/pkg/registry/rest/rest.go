@@ -99,9 +99,9 @@ type Lister interface {
 // instances of the type are not exportable.
 type Exporter interface {
 	// Export an object.  Fields that are not user specified (e.g. Status, ObjectMeta.ResourceVersion) are stripped out
-	// Returns the stripped object.  If 'exact' is true, fields that are specific to the cluster (e.g. namespace) are
+	// Returns the stripped object.  If 'exact' option is true, fields that are specific to the cluster (e.g. namespace) are
 	// retained, otherwise they are stripped also.
-	Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error)
+	Export(ctx genericapirequest.Context, obj runtime.Object, opts metav1.ExportOptions) (runtime.Object, error)
 }
 
 // Getter is an object that can retrieve a named RESTful resource.

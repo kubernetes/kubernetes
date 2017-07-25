@@ -415,11 +415,7 @@ type SimpleRESTStorage struct {
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
-func (storage *SimpleRESTStorage) Export(ctx request.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	obj, err := storage.Get(ctx, name, &metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
+func (storage *SimpleRESTStorage) Export(ctx request.Context, obj runtime.Object, opts metav1.ExportOptions) (runtime.Object, error) {
 	s, ok := obj.(*genericapitesting.Simple)
 	if !ok {
 		return nil, fmt.Errorf("unexpected object")
@@ -448,6 +444,7 @@ func (storage *SimpleRESTStorage) List(ctx request.Context, options *metainterna
 		storage.requestedFieldSelector = options.FieldSelector
 	}
 	storage.requestedUninitialized = options.IncludeUninitialized
+	// TODO: reuse Export method here:
 	if options != nil && options.Export {
 		for i, _ := range result.Items {
 			result.Items[i].Other = "exported"
