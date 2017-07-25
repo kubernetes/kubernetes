@@ -210,6 +210,7 @@ __custom_func() {
     * configmaps (aka 'cm')
     * controllerrevisions
     * cronjobs
+    * customresourcedefinition (aka 'crd')
     * daemonsets (aka 'ds')
     * deployments (aka 'deploy')
     * endpoints (aka 'ep')
