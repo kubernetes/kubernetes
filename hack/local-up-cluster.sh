@@ -406,7 +406,6 @@ function start_apiserver {
 
     # Admission Controllers to invoke prior to persisting objects in cluster
     ADMISSION_CONTROL=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},ResourceQuota,DefaultStorageClass,DefaultTolerationSeconds
-
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
 

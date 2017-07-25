@@ -3114,6 +3114,7 @@ func describePodDisruptionBudget(pdb *policy.PodDisruptionBudget, events *api.Ev
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pdb.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", pdb.Namespace)
 
 		if pdb.Spec.MinAvailable != nil {
 			w.Write(LEVEL_0, "Min available:\t%s\n", pdb.Spec.MinAvailable.String())

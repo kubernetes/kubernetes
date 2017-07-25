@@ -50,7 +50,7 @@ type realTimeoutFactory struct {
 	timeout time.Duration
 }
 
-// TimeoutChan returns a channel which will receive something when the watch times out,
+// TimeoutCh returns a channel which will receive something when the watch times out,
 // and a cleanup function to call when this happens.
 func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 	if w.timeout == 0 {

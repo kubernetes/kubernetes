@@ -32,8 +32,7 @@ import (
 
 func addMasterReplica(zone string) error {
 	framework.Logf(fmt.Sprintf("Adding a new master replica, zone: %s", zone))
-	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "true", "false")
-	framework.Logf("%s", v)
+	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "true", "false")
 	if err != nil {
 		return err
 	}
@@ -42,8 +41,7 @@ func addMasterReplica(zone string) error {
 
 func removeMasterReplica(zone string) error {
 	framework.Logf(fmt.Sprintf("Removing an existing master replica, zone: %s", zone))
-	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "false", "false")
-	framework.Logf("%s", v)
+	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "false", "false")
 	if err != nil {
 		return err
 	}
@@ -52,8 +50,7 @@ func removeMasterReplica(zone string) error {
 
 func addWorkerNodes(zone string) error {
 	framework.Logf(fmt.Sprintf("Adding worker nodes, zone: %s", zone))
-	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "false", "true")
-	framework.Logf("%s", v)
+	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "false", "true")
 	if err != nil {
 		return err
 	}
@@ -62,8 +59,7 @@ func addWorkerNodes(zone string) error {
 
 func removeWorkerNodes(zone string) error {
 	framework.Logf(fmt.Sprintf("Removing worker nodes, zone: %s", zone))
-	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "true", "true")
-	framework.Logf("%s", v)
+	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "true", "true")
 	if err != nil {
 		return err
 	}
@@ -82,7 +78,7 @@ func createNewRC(c clientset.Interface, ns string, name string) {
 }
 
 func findRegionForZone(zone string) string {
-	region, err := exec.Command("gcloud", "compute", "zones", "list", zone, "--quiet", "--format=[no-heading](region)").CombinedOutput()
+	region, err := exec.Command("gcloud", "compute", "zones", "list", zone, "--quiet", "--format=csv[no-heading](region)").CombinedOutput()
 	framework.ExpectNoError(err)
 	if string(region) == "" {
 		framework.Failf("Region not found; zone: %s", zone)
@@ -92,7 +88,7 @@ func findRegionForZone(zone string) string {
 
 func findZonesForRegion(region string) []string {
 	output, err := exec.Command("gcloud", "compute", "zones", "list", "--filter=region="+region,
-		"--quiet", "--format=[no-heading](name)").CombinedOutput()
+		"--quiet", "--format=csv[no-heading](name)").CombinedOutput()
 	framework.ExpectNoError(err)
 	zones := strings.Split(string(output), "\n")
 	return zones

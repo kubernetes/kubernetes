@@ -56,10 +56,14 @@ var _ volume.DeletableVolumePlugin = &rbdPlugin{}
 var _ volume.ProvisionableVolumePlugin = &rbdPlugin{}
 
 const (
-	rbdPluginName   = "kubernetes.io/rbd"
-	secretKeyName   = "key" // key name used in secret
-	rbdImageFormat1 = "1"
-	rbdImageFormat2 = "2"
+	rbdPluginName                  = "kubernetes.io/rbd"
+	secretKeyName                  = "key" // key name used in secret
+	rbdImageFormat1                = "1"
+	rbdImageFormat2                = "2"
+	rbdDefaultAdminId              = "admin"
+	rbdDefaultAdminSecretNamespace = "default"
+	rbdDefaultPool                 = "rbd"
+	rbdDefaultUserId               = rbdDefaultAdminId
 )
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
@@ -203,7 +207,7 @@ func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 		return nil, err
 	}
 	adminSecretName := ""
-	adminSecretNamespace := "default"
+	adminSecretNamespace := rbdDefaultAdminSecretNamespace
 	admin := ""
 
 	for k, v := range class.Parameters {
@@ -271,10 +275,11 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	}
 	var err error
 	adminSecretName := ""
-	adminSecretNamespace := "default"
+	adminSecretNamespace := rbdDefaultAdminSecretNamespace
 	secretName := ""
 	secret := ""
 	imageFormat := rbdImageFormat1
+	fstype := ""
 
 	for k, v := range r.options.Parameters {
 		switch dstrings.ToLower(k) {
@@ -306,6 +311,8 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 					r.imageFeatures = append(r.imageFeatures, f)
 				}
 			}
+		case volume.VolumeParameterFSType:
+			fstype = v
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, r.plugin.GetPluginName())
 		}
@@ -330,10 +337,10 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, fmt.Errorf("missing user secret name")
 	}
 	if r.adminId == "" {
-		r.adminId = "admin"
+		r.adminId = rbdDefaultAdminId
 	}
 	if r.Pool == "" {
-		r.Pool = "rbd"
+		r.Pool = rbdDefaultPool
 	}
 	if r.Id == "" {
 		r.Id = r.adminId
@@ -353,6 +360,7 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	rbd.SecretRef = new(v1.LocalObjectReference)
 	rbd.SecretRef.Name = secretName
 	rbd.RadosUser = r.Id
+	rbd.FSType = fstype
 	pv.Spec.PersistentVolumeSource.RBD = rbd
 	pv.Spec.PersistentVolumeReclaimPolicy = r.options.PersistentVolumeReclaimPolicy
 	pv.Spec.AccessModes = r.options.PVC.Spec.AccessModes

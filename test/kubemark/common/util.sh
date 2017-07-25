@@ -18,10 +18,11 @@
 function run-cmd-with-retries {
   RETRIES="${RETRIES:-3}"
   for attempt in $(seq 1 ${RETRIES}); do
+    local ret_val=0
     exec 5>&1 # Duplicate &1 to &5 for use below.
     # We don't use 'local' to declare result as then ret_val always gets value 0.
     # We use tee to output to &5 (redirected to stdout) while also storing it in the variable.
-    result=$("$@" 2>&1 | tee >(cat - >&5)) || local ret_val="$?"
+    result=$("$@" 2>&1 | tee >(cat - >&5)) || ret_val="$?"
     if [[ "${ret_val:-0}" -ne "0" ]]; then
       if [[ $(echo "${result}" | grep -c "already exists") -gt 0 ]]; then
         if [[ "${attempt}" == 1 ]]; then

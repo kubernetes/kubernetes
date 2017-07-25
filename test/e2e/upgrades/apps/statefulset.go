@@ -62,12 +62,12 @@ func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 	t.set = framework.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
 	t.service = framework.CreateStatefulSetService(ssName, labels)
 	*(t.set.Spec.Replicas) = 3
-	framework.SetStatefulSetInitializedAnnotation(t.set, "false")
+	t.tester = framework.NewStatefulSetTester(f.ClientSet)
+	t.tester.PauseNewPods(t.set)
 
 	By("Creating service " + headlessSvcName + " in namespace " + ns)
 	_, err := f.ClientSet.Core().Services(ns).Create(t.service)
 	Expect(err).NotTo(HaveOccurred())
-	t.tester = framework.NewStatefulSetTester(f.ClientSet)
 
 	By("Creating statefulset " + ssName + " in namespace " + ns)
 	*(t.set.Spec.Replicas) = 3

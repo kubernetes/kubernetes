@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package storage
 
 import (
 	"k8s.io/api/core/v1"
@@ -23,6 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 )
 
 // PersistentVolumeUpgradeTest test that a pv is available before and after a cluster upgrade.
@@ -32,7 +33,7 @@ type PersistentVolumeUpgradeTest struct {
 	pvc      *v1.PersistentVolumeClaim
 }
 
-func (PersistentVolumeUpgradeTest) Name() string { return "persistent-volume-upgrade" }
+func (PersistentVolumeUpgradeTest) Name() string { return "persistent-volume-upgrade [sig-storage]" }
 
 const (
 	pvTestFile string = "/mnt/volume1/pv_upgrade_test"
@@ -89,7 +90,7 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 
 // Test waits for the upgrade to complete, and then verifies that a pod can still consume the pv
 // and that the volume data persists.
-func (t *PersistentVolumeUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *PersistentVolumeUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
 	By("Consuming the PV after upgrade")
 	t.testPod(f, pvReadCmd)
