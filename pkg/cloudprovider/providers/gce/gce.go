@@ -215,7 +215,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 			if strings.Contains(cfg.Global.NetworkName, "/") {
 				networkURL = cfg.Global.NetworkName
 			} else {
-				networkURL = gceNetworkURL(apiEndpoint, projectID, networkName)
+				networkURL = gceNetworkURL(apiEndpoint, projectID, cfg.Global.NetworkName)
 			}
 		}
 
@@ -323,6 +323,7 @@ func CreateGCECloud(apiEndpoint, projectID, region, zone string, managedZones []
 
 	gce := &GCECloud{
 		service:                  service,
+		serviceAlpha:             serviceAlpha,
 		serviceBeta:              serviceBeta,
 		containerService:         containerService,
 		cloudkmsService:          cloudkmsService,
