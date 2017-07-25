@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	apiv1 "k8s.io/api/core/v1"
@@ -60,7 +61,6 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	statefulSetColumns            = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 	endpointColumns               = []string{"NAME", "ENDPOINTS", "AGE"}
 	nodeColumns                   = []string{"NAME", "STATUS", "AGE", "VERSION"}
 	nodeWideColumns               = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION", "CONTAINER-RUNTIME"}
@@ -216,8 +216,17 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(ingressColumnDefinitions, printIngress)
 	h.TableHandler(ingressColumnDefinitions, printIngressList)
 
-	h.Handler(statefulSetColumns, nil, printStatefulSet)
-	h.Handler(statefulSetColumns, nil, printStatefulSetList)
+	statefulSetColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Desired", Type: "string", Description: appsv1beta1.StatefulSetSpec{}.SwaggerDoc()["replicas"]},
+		{Name: "Current", Type: "string", Description: appsv1beta1.StatefulSetStatus{}.SwaggerDoc()["replicas"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
+		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
+	}
+	h.TableHandler(statefulSetColumnDefinitions, printStatefulSet)
+	h.TableHandler(statefulSetColumnDefinitions, printStatefulSetList)
+
 	h.Handler(endpointColumns, nil, printEndpoints)
 	h.Handler(endpointColumns, nil, printEndpointsList)
 	h.Handler(nodeColumns, nodeWideColumns, printNode)
@@ -831,52 +840,31 @@ func printIngressList(list *extensions.IngressList, options printers.PrintOption
 	return rows, nil
 }
 
-func printStatefulSet(ps *apps.StatefulSet, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, ps.Name, options.WithKind)
-
-	namespace := ps.Namespace
-	containers := ps.Spec.Template.Spec.Containers
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
+func printStatefulSet(obj *apps.StatefulSet, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
-	desiredReplicas := ps.Spec.Replicas
-	currentReplicas := ps.Status.Replicas
-	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s",
-		name,
-		desiredReplicas,
-		currentReplicas,
-		translateTimestamp(ps.CreationTimestamp),
-	); err != nil {
-		return err
-	}
+	desiredReplicas := obj.Spec.Replicas
+	currentReplicas := obj.Status.Replicas
+	createTime := translateTimestamp(obj.CreationTimestamp)
+	row.Cells = append(row.Cells, obj.Name, desiredReplicas, currentReplicas, createTime)
 	if options.Wide {
-		if err := layoutContainers(containers, w); err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintf(w, "\t%s", metav1.FormatLabelSelector(ps.Spec.Selector)); err != nil {
-			return err
-		}
+		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
+		row.Cells = append(row.Cells, names, images)
 	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(ps.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, ps.Labels)); err != nil {
-		return err
-	}
-
-	return nil
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printStatefulSetList(statefulSetList *apps.StatefulSetList, w io.Writer, options printers.PrintOptions) error {
-	for _, ps := range statefulSetList.Items {
-		if err := printStatefulSet(&ps, w, options); err != nil {
-			return err
+func printStatefulSetList(list *apps.StatefulSetList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printStatefulSet(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printDaemonSet(obj *extensions.DaemonSet, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
@@ -1775,7 +1763,7 @@ func printStatus(status *metav1.Status, w io.Writer, options printers.PrintOptio
 	return nil
 }
 
-// Lay out all the containers on eone line if use wide output.
+// Lay out all the containers on one line if use wide output.
 // DEPRECATED: convert to TableHandler and use layoutContainerCells
 func layoutContainers(containers []api.Container, w io.Writer) error {
 	var namesBuffer bytes.Buffer
