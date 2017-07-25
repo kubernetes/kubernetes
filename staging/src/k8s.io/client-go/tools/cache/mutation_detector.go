@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 var mutationDetectionEnabled = false
@@ -100,10 +99,7 @@ func (d *defaultCacheMutationDetector) AddObject(obj interface{}) {
 		return
 	}
 
-	copiedObj, err := scheme.Scheme.Copy(obj.(runtime.Object))
-	if err != nil {
-		return
-	}
+	copiedObj := obj.(runtime.Object).DeepCopyObject()
 
 	d.lock.Lock()
 	defer d.lock.Unlock()

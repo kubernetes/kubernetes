@@ -80,7 +80,7 @@ func (a *NamespaceAdapter) Copy(obj pkgruntime.Object) pkgruntime.Object {
 	namespace := obj.(*apiv1.Namespace)
 	return &apiv1.Namespace{
 		ObjectMeta: util.DeepCopyRelevantObjectMeta(namespace.ObjectMeta),
-		Spec:       *(util.DeepCopyApiTypeOrPanic(&namespace.Spec).(*apiv1.NamespaceSpec)),
+		Spec:       *namespace.Spec.DeepCopy(),
 	}
 }
 

@@ -21,7 +21,6 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
@@ -50,6 +49,7 @@ type RuleOwner interface {
 	SetAnnotations(map[string]string)
 	GetRules() []rbac.PolicyRule
 	SetRules([]rbac.PolicyRule)
+	DeepCopyRuleOwner() RuleOwner
 }
 
 type ReconcileRoleOptions struct {
@@ -165,11 +165,7 @@ func computeReconciledRole(existing, expected RuleOwner, removeExtraPermissions 
 	result.Protected = (existing.GetAnnotations()[rbac.AutoUpdateAnnotationKey] == "false")
 
 	// Start with a copy of the existing object
-	changedObj, err := api.Scheme.DeepCopy(existing)
-	if err != nil {
-		return nil, err
-	}
-	result.Role = changedObj.(RuleOwner)
+	result.Role = existing.DeepCopyRuleOwner()
 
 	// Merge expected annotations and labels
 	result.Role.SetAnnotations(merge(expected.GetAnnotations(), result.Role.GetAnnotations()))

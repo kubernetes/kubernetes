@@ -41,11 +41,9 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
-	"k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme"
 )
 
 type invariantFunc func(set *apps.StatefulSet, spc *fakeStatefulPodControl) error
@@ -498,22 +496,18 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 	}
 
 	updateRevision := func(cr *apps.ControllerRevision, revision int64) *apps.ControllerRevision {
-		obj, err := scheme.Scheme.DeepCopy(cr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		clone := obj.(*apps.ControllerRevision)
+		clone := cr.DeepCopy()
 		clone.Revision = revision
 		return clone
 	}
 
 	set := newStatefulSet(3)
 	rev0 := newRevisionOrDie(set, 1)
-	set1 := copySet(set)
+	set1 := set.DeepCopy()
 	set1.Spec.Template.Spec.Containers[0].Image = "foo"
 	set1.Status.CurrentRevision = rev0.Name
 	rev1 := newRevisionOrDie(set1, 2)
-	set2 := copySet(set1)
+	set2 := set1.DeepCopy()
 	set2.Spec.Template.Labels["new"] = "label"
 	set2.Status.CurrentRevision = rev0.Name
 	rev2 := newRevisionOrDie(set2, 3)
@@ -1542,22 +1536,6 @@ func (spc *fakeStatefulPodControl) SetDeleteStatefulPodError(err error, after in
 	spc.deletePodTracker.after = after
 }
 
-func copyPod(pod *v1.Pod) *v1.Pod {
-	obj, err := api.Scheme.Copy(pod)
-	if err != nil {
-		panic(err)
-	}
-	return obj.(*v1.Pod)
-}
-
-func copySet(set *apps.StatefulSet) *apps.StatefulSet {
-	obj, err := scheme.Scheme.Copy(set)
-	if err != nil {
-		panic(err)
-	}
-	return obj.(*apps.StatefulSet)
-}
-
 func (spc *fakeStatefulPodControl) setPodPending(set *apps.StatefulSet, ordinal int) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
@@ -1571,7 +1549,7 @@ func (spc *fakeStatefulPodControl) setPodPending(set *apps.StatefulSet, ordinal 
 		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
 	}
 	sort.Sort(ascendingOrdinal(pods))
-	pod := copyPod(pods[ordinal])
+	pod := pods[ordinal].DeepCopy()
 	pod.Status.Phase = v1.PodPending
 	fakeResourceVersion(pod)
 	spc.podsIndexer.Update(pod)
@@ -1591,7 +1569,7 @@ func (spc *fakeStatefulPodControl) setPodRunning(set *apps.StatefulSet, ordinal 
 		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
 	}
 	sort.Sort(ascendingOrdinal(pods))
-	pod := copyPod(pods[ordinal])
+	pod := pods[ordinal].DeepCopy()
 	pod.Status.Phase = v1.PodRunning
 	fakeResourceVersion(pod)
 	spc.podsIndexer.Update(pod)
@@ -1611,7 +1589,7 @@ func (spc *fakeStatefulPodControl) setPodReady(set *apps.StatefulSet, ordinal in
 		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
 	}
 	sort.Sort(ascendingOrdinal(pods))
-	pod := copyPod(pods[ordinal])
+	pod := pods[ordinal].DeepCopy()
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 	podutil.UpdatePodCondition(&pod.Status, &condition)
 	fakeResourceVersion(pod)

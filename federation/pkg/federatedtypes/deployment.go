@@ -27,6 +27,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 const (
@@ -83,7 +84,12 @@ func (a *DeploymentAdapter) IsExpectedType(obj interface{}) bool {
 
 func (a *DeploymentAdapter) Copy(obj pkgruntime.Object) pkgruntime.Object {
 	deployment := obj.(*extensionsv1.Deployment)
-	return fedutil.DeepCopyDeployment(deployment)
+	ret := &extensionsv1.Deployment{
+		ObjectMeta: fedutil.DeepCopyRelevantObjectMeta(deployment.ObjectMeta),
+		Spec:       *deployment.Spec.DeepCopy(),
+	}
+	delete(ret.Annotations, util.RevisionAnnotation)
+	return ret
 }
 
 func (a *DeploymentAdapter) Equivalent(obj1, obj2 pkgruntime.Object) bool {

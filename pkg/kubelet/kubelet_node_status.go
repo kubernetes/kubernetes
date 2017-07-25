@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -118,18 +117,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		return false
 	}
 
-	clonedNode, err := conversion.NewCloner().DeepCopy(existingNode)
-	if err != nil {
-		glog.Errorf("Unable to clone %q node object %#v: %v", kl.nodeName, existingNode, err)
-		return false
-	}
-
-	originalNode, ok := clonedNode.(*v1.Node)
-	if !ok || originalNode == nil {
-		glog.Errorf("Unable to cast %q node object %#v to v1.Node", kl.nodeName, clonedNode)
-		return false
-	}
-
+	originalNode := existingNode.DeepCopy()
 	if existingNode.Spec.ExternalID == node.Spec.ExternalID {
 		glog.Infof("Node %s was previously registered", kl.nodeName)
 
@@ -381,15 +369,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
 
-	clonedNode, err := conversion.NewCloner().DeepCopy(node)
-	if err != nil {
-		return fmt.Errorf("error clone node %q: %v", kl.nodeName, err)
-	}
-
-	originalNode, ok := clonedNode.(*v1.Node)
-	if !ok || originalNode == nil {
-		return fmt.Errorf("failed to cast %q node object %#v to v1.Node", kl.nodeName, clonedNode)
-	}
+	originalNode := node.DeepCopy()
 
 	kl.updatePodCIDR(node.Spec.PodCIDR)
 
