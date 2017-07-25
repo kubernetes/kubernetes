@@ -25,10 +25,10 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 	strutils "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -233,12 +233,12 @@ func (hp *hugePages) CanMount() error {
 }
 
 // SetUp creates new directory.
-func (hp *hugePages) SetUp(fsGroup *types.UnixGroupID) error {
+func (hp *hugePages) SetUp(fsGroup *int64) error {
 	return hp.SetUpAt(hp.GetPath(), fsGroup)
 }
 
 // SetUpAt creates new directory.
-func (hp *hugePages) SetUpAt(dir string, fsGroup *types.UnixGroupID) error {
+func (hp *hugePages) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := hp.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
