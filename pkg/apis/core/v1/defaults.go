@@ -39,14 +39,6 @@ func SetDefaults_ResourceList(obj *v1.ResourceList) {
 	}
 }
 
-func SetDefaults_PodExecOptions(obj *v1.PodExecOptions) {
-	obj.Stdout = true
-	obj.Stderr = true
-}
-func SetDefaults_PodAttachOptions(obj *v1.PodAttachOptions) {
-	obj.Stdout = true
-	obj.Stderr = true
-}
 func SetDefaults_ReplicationController(obj *v1.ReplicationController) {
 	var labels map[string]string
 	if obj.Spec.Template != nil {
