@@ -52,6 +52,19 @@ type KubeProxyIPTablesConfiguration struct {
 	MinSyncPeriod metav1.Duration
 }
 
+// KubeProxyIPVSConfiguration contains ipvs-related configuration
+// details for the Kubernetes proxy server.
+type KubeProxyIPVSConfiguration struct {
+	// syncPeriod is the period that ipvs rules are refreshed (e.g. '5s', '1m',
+	// '2h22m').  Must be greater than 0.
+	SyncPeriod metav1.Duration
+	// minSyncPeriod is the minimum period that ipvs rules are refreshed (e.g. '5s', '1m',
+	// '2h22m').
+	MinSyncPeriod metav1.Duration
+	// ipvs scheduler
+	Scheduler string
+}
+
 // KubeProxyConntrackConfiguration contains conntrack settings for
 // the Kubernetes proxy server.
 type KubeProxyConntrackConfiguration struct {
@@ -112,6 +125,8 @@ type KubeProxyConfiguration struct {
 	ClientConnection ClientConnectionConfiguration
 	// iptables contains iptables-related configuration options.
 	IPTables KubeProxyIPTablesConfiguration
+	// ipvs contains ipvs-related configuration options.
+	IPVS KubeProxyIPVSConfiguration
 	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
 	// the range [-1000, 1000]
 	OOMScoreAdj *int32
