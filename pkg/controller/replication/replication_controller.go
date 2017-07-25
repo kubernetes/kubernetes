@@ -44,6 +44,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 const (
@@ -631,5 +633,66 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		updatedRC.Status.AvailableReplicas != *(updatedRC.Spec.Replicas) {
 		rm.enqueueControllerAfter(updatedRC, time.Duration(updatedRC.Spec.MinReadySeconds)*time.Second)
 	}
+
+	pods, err := rm.podLister.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelectorPreValidated())
+	if err != nil {
+		return err
+	}
+	// Find rejected pods and delete them.
+	for _, pod := range pods {
+		if controller.IsPodRejected(pod) {
+			// Ignore deletion error here.
+			rm.podControl.DeletePod(pod.Namespace, pod.Name, rc)
+		}
+	}
+
+	boolPtr := func(b bool) *bool { return &b }
+	controllerRef := &metav1.OwnerReference{
+		APIVersion:         controllerKind.GroupVersion().String(),
+		Kind:               controllerKind.Kind,
+		Name:               rc.Name,
+		UID:                rc.UID,
+		BlockOwnerDeletion: boolPtr(true),
+		Controller:         boolPtr(true),
+	}
+	if pod, err := controller.GetPodFromTemplate(rc.Spec.Template, rc, controllerRef); err == nil {
+		if err = rm.validateNodeConflict(pod); err != nil {
+			return err
+		}
+	}
+
 	return manageReplicasErr
+}
+
+func (rm *ReplicationManager) validateNodeConflict(pod *v1.Pod) error {
+	if len(pod.Spec.NodeName) == 0 {
+		return nil
+	}
+
+	node, err := rm.kubeClient.Core().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	nodeInfo := schedulercache.NewNodeInfo()
+	err = nodeInfo.SetNode(node)
+	if err != nil {
+		return err
+	}
+
+	fit, reasons, err := predicates.PodSelectorMatches(pod, nil, nodeInfo)
+	if err != nil {
+		return err
+	}
+
+	if !fit {
+		switch reasons[0].(type) {
+		case *predicates.PredicateFailureError:
+			err = fmt.Errorf("%s", predicates.ErrNodeSelectorNotMatch)
+			return err
+		default:
+		}
+	}
+
+	return nil
 }
