@@ -124,23 +124,22 @@ func startRouteController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
 	}
-	// TODO demorgans
-	if ctx.Options.AllocateNodeCIDRs && ctx.Options.ConfigureCloudRoutes {
-		if ctx.Cloud == nil {
-			glog.Warning("configure-cloud-routes is set, but no cloud provider specified. Will not configure cloud provider routes.")
-			return false, nil
-		} else if routes, ok := ctx.Cloud.Routes(); !ok {
-			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
-			return false, nil
-		} else {
-			routeController := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.Options.ClusterName, clusterCIDR)
-			go routeController.Run(ctx.Stop, ctx.Options.RouteReconciliationPeriod.Duration)
-			return true, nil
-		}
-	} else {
+	if !ctx.Options.AllocateNodeCIDRs || !ctx.Options.ConfigureCloudRoutes {
 		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.Options.AllocateNodeCIDRs, ctx.Options.ConfigureCloudRoutes)
 		return false, nil
 	}
+	if ctx.Cloud == nil {
+		glog.Warning("configure-cloud-routes is set, but no cloud provider specified. Will not configure cloud provider routes.")
+		return false, nil
+	}
+	routes, ok := ctx.Cloud.Routes()
+	if !ok {
+		glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
+		return false, nil
+	}
+	routeController := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.Options.ClusterName, clusterCIDR)
+	go routeController.Run(ctx.Stop, ctx.Options.RouteReconciliationPeriod.Duration)
+	return true, nil
 }
 
 func startPersistentVolumeBinderController(ctx ControllerContext) (bool, error) {
