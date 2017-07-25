@@ -85,7 +85,6 @@ func TestStatefulSetControl(t *testing.T) {
 		{ScalesDown, simpleSetFn},
 		{ReplacesPods, largeSetFn},
 		{RecreatesFailedPod, simpleSetFn},
-		{SetsInitAnnotation, simpleSetFn},
 		{CreatePodFailure, simpleSetFn},
 		{UpdatePodFailure, simpleSetFn},
 		{UpdateSetStatusFailure, simpleSetFn},
@@ -276,59 +275,6 @@ func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invarian
 	}
 	if isCreated(pods[0]) {
 		t.Error("StatefulSet did not recreate failed Pod")
-	}
-}
-
-func SetsInitAnnotation(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
-	client := fake.NewSimpleClientset(set)
-	spc, _, ssc, stop := setupController(client)
-	defer close(stop)
-
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		t.Error(err)
-	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
-		t.Errorf("Error updating StatefulSet %s", err)
-	}
-	if err = invariants(set, spc); err != nil {
-		t.Error(err)
-	}
-	if pods, err = spc.setPodRunning(set, 0); err != nil {
-		t.Error(err)
-	}
-	if pods, err = spc.setPodReady(set, 0); err != nil {
-		t.Error(err)
-	}
-	if pods, err = spc.setPodInitStatus(set, 0, false); err != nil {
-		t.Error(err)
-	}
-	replicas := int(set.Status.Replicas)
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
-		t.Errorf("Error updating StatefulSet %s", err)
-	}
-	if err := invariants(set, spc); err != nil {
-		t.Error(err)
-	}
-	if replicas != int(set.Status.Replicas) {
-		t.Errorf("StatefulSetControl does not block on %s=false", apps.StatefulSetInitAnnotation)
-	}
-	if pods, err = spc.setPodInitStatus(set, 0, true); err != nil {
-		t.Error(err)
-	}
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
-	if err != nil {
-		t.Fatalf("Error getting updated StatefulSet: %v", err)
-	}
-	if int(set.Status.Replicas) != 3 {
-		t.Errorf("StatefulSetControl does not unblock on %s=true", apps.StatefulSetInitAnnotation)
 	}
 }
 
@@ -1668,30 +1614,6 @@ func (spc *fakeStatefulPodControl) setPodReady(set *apps.StatefulSet, ordinal in
 	pod := copyPod(pods[ordinal])
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 	podutil.UpdatePodCondition(&pod.Status, &condition)
-	fakeResourceVersion(pod)
-	spc.podsIndexer.Update(pod)
-	return spc.podsLister.Pods(set.Namespace).List(selector)
-}
-
-func (spc *fakeStatefulPodControl) setPodInitStatus(set *apps.StatefulSet, ordinal int, init bool) ([]*v1.Pod, error) {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		return nil, err
-	}
-	if 0 > ordinal || ordinal >= len(pods) {
-		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
-	}
-	sort.Sort(ascendingOrdinal(pods))
-	pod := copyPod(pods[ordinal])
-	if init {
-		pod.Annotations[apps.StatefulSetInitAnnotation] = "true"
-	} else {
-		pod.Annotations[apps.StatefulSetInitAnnotation] = "false"
-	}
 	fakeResourceVersion(pod)
 	spc.podsIndexer.Update(pod)
 	return spc.podsLister.Pods(set.Namespace).List(selector)

@@ -31,8 +31,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
-
-	"github.com/golang/glog"
 )
 
 // maxUpdateRetries is the maximum number of retries used for update conflict resolution prior to failure
@@ -191,26 +189,9 @@ func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 	pod.Spec.Subdomain = set.Spec.ServiceName
 }
 
-// isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady, and if the init
-// annotation has not explicitly disabled the Pod from being ready.
+// isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
 func isRunningAndReady(pod *v1.Pod) bool {
-	if pod.Status.Phase != v1.PodRunning {
-		return false
-	}
-	podReady := podutil.IsPodReady(pod)
-	// User may have specified a pod readiness override through a debug annotation.
-	initialized, ok := pod.Annotations[apps.StatefulSetInitAnnotation]
-	if ok {
-		if initAnnotation, err := strconv.ParseBool(initialized); err != nil {
-			glog.V(4).Infof("Failed to parse %v annotation on pod %v: %v",
-				apps.StatefulSetInitAnnotation, pod.Name, err)
-		} else if !initAnnotation {
-			glog.V(4).Infof("StatefulSet pod %v waiting on annotation %v", pod.Name,
-				apps.StatefulSetInitAnnotation)
-			podReady = initAnnotation
-		}
-	}
-	return podReady
+	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod)
 }
 
 // isCreated returns true if pod has been created and is maintained by the API server

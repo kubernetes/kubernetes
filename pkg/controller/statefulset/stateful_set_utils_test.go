@@ -213,18 +213,6 @@ func TestIsRunningAndReady(t *testing.T) {
 	if !isRunningAndReady(pod) {
 		t.Error("Pod should be running and ready")
 	}
-	pod.Annotations[apps.StatefulSetInitAnnotation] = "true"
-	if !isRunningAndReady(pod) {
-		t.Error("isRunningAndReady does not respected init annotation set to true")
-	}
-	pod.Annotations[apps.StatefulSetInitAnnotation] = "false"
-	if isRunningAndReady(pod) {
-		t.Error("isRunningAndReady does not respected init annotation set to false")
-	}
-	pod.Annotations[apps.StatefulSetInitAnnotation] = "blah"
-	if !isRunningAndReady(pod) {
-		t.Error("isRunningAndReady does not erroneous init annotation")
-	}
 }
 
 func TestAscendingOrdinal(t *testing.T) {
