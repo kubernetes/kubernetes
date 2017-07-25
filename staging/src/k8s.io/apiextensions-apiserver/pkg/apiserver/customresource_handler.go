@@ -178,6 +178,15 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	requestScope := crdInfo.requestScope
 	minRequestTimeout := 1 * time.Minute
 
+	/*
+		var temp customresource.REST
+		temp = *crdInfo.storage
+		exporter, isExporter := temp.(rest.Exporter)
+		if !isExporter {
+			exporter = nil
+		}
+	*/
+
 	switch requestInfo.Verb {
 	case "get":
 		handler := handlers.GetResource(storage, storage, requestScope)

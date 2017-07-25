@@ -211,8 +211,8 @@ func (rs *REST) Watch(ctx genericapirequest.Context, options *metainternalversio
 
 // Export returns Service stripped of cluster-specific information.
 // It implements rest.Exporter.
-func (rs *REST) Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	return rs.registry.ExportService(ctx, name, opts)
+func (rs *REST) Export(ctx genericapirequest.Context, obj runtime.Object, opts metav1.ExportOptions) (runtime.Object, error) {
+	return rs.registry.ExportService(ctx, obj, opts)
 }
 
 func (*REST) New() runtime.Object {
