@@ -23,11 +23,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	schedulinglisters "k8s.io/kubernetes/pkg/client/listers/scheduling/internalversion"
+	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
@@ -58,6 +60,8 @@ type priorityPlugin struct {
 	*admission.Handler
 	client internalclientset.Interface
 	lister schedulinglisters.PriorityClassLister
+	// globalDefaultPriority caches the value of global default priority class.
+	globalDefaultPriority *int32
 }
 
 var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&priorityPlugin{})
@@ -66,7 +70,7 @@ var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&priorityPlugin{})
 // NewPlugin creates a new priority admission plugin.
 func NewPlugin() admission.Interface {
 	return &priorityPlugin{
-		Handler: admission.NewHandler(admission.Create, admission.Update),
+		Handler: admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 	}
 }
 
@@ -95,87 +99,98 @@ var (
 	priorityClassResource = api.Resource("priorityclasses")
 )
 
-// Admit checks Pods and PriorityClasses and admits or rejects them. It also resolved the priority of pods based on their PriorityClass.
+// Admit checks Pods and PriorityClasses and admits or rejects them. It also resolves the priority of pods based on their PriorityClass.
 func (p *priorityPlugin) Admit(a admission.Attributes) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources or resources other than pods.
 	// Ignore all operations other than Create and Update.
-	if len(a.GetSubresource()) != 0 || (operation != admission.Create && operation != admission.Update) {
+	if len(a.GetSubresource()) != 0 {
 		return nil
 	}
 
 	switch a.GetResource().GroupResource() {
 	case podResource:
-		return p.admitPod(a)
+		if operation == admission.Create || operation == admission.Update {
+			return p.admitPod(a)
+		}
+		return nil
 
 	case priorityClassResource:
-		return p.admitPriorityClass(a)
+		if operation == admission.Create || operation == admission.Update {
+			return p.admitPriorityClass(a)
+		}
+		if operation == admission.Delete {
+			p.invalidateCachedDefaultPriority()
+			return nil
+		}
+		return nil
 
 	default:
 		return nil
 	}
 }
 
+// admitPod makes sure a new pod does not set spec.Priority field. It also makes sure that the PriorityClassName exists if it is provided and resolves the pod priority from the PriorityClassName.
+// Note that pod validation mechanism prevents update of a pod priority.
 func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 	operation := a.GetOperation()
 	pod, ok := a.GetObject().(*api.Pod)
 	if !ok {
-		return errors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+		return errors.NewBadRequest("resource was marked with kind Pod but was unable to be converted")
 	}
 	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
 		return nil
 	}
-	// Make sure that the user has not set `priority` at the time of pod creation.
+	// Make sure that the client has not set `priority` at the time of pod creation.
 	if operation == admission.Create && pod.Spec.Priority != nil {
-		return admission.NewForbidden(a, fmt.Errorf("The integer value of priority must not be provided in pod spec. The system populates the value from the given PriorityClass name"))
+		return admission.NewForbidden(a, fmt.Errorf("the integer value of priority must not be provided in pod spec. Priority admission controller populates the value from the given PriorityClass name"))
 	}
-	var priority int32
-	if len(pod.Spec.PriorityClassName) == 0 {
-		dpc, err := p.findDefaultPriorityClass()
-		if err != nil {
-			return fmt.Errorf("Failed to get default priority class: %v", err)
-		}
-		if dpc != nil {
-			priority = dpc.Value
-		} else {
-			priority = scheduling.DefaultPriorityWhenNoDefaultClassExists
-		}
-	} else {
-		// First try to resolve by system priority classes.
-		priority, ok = SystemPriorityClasses[pod.Spec.PriorityClassName]
-		if !ok {
-			// Now that we didn't find any system priority, try resolving by user defined priority classes.
-			pc, err := p.lister.Get(pod.Spec.PriorityClassName)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+		var priority int32
+		if len(pod.Spec.PriorityClassName) == 0 {
+			var err error
+			priority, err = p.getDefaultPriority()
 			if err != nil {
-				return fmt.Errorf("Failed to get default priority class %s: %v", pod.Spec.PriorityClassName, err)
+				return fmt.Errorf("failed to get default priority class: %v", err)
 			}
-			if pc == nil {
-				return admission.NewForbidden(a, fmt.Errorf("No PriorityClass with name %v was found", pod.Spec.PriorityClassName))
+		} else {
+			// First try to resolve by system priority classes.
+			priority, ok = SystemPriorityClasses[pod.Spec.PriorityClassName]
+			if !ok {
+				// Now that we didn't find any system priority, try resolving by user defined priority classes.
+				pc, err := p.lister.Get(pod.Spec.PriorityClassName)
+				if err != nil {
+					return fmt.Errorf("failed to get default priority class %s: %v", pod.Spec.PriorityClassName, err)
+				}
+				if pc == nil {
+					return admission.NewForbidden(a, fmt.Errorf("no PriorityClass with name %v was found", pod.Spec.PriorityClassName))
+				}
+				priority = pc.Value
 			}
-			priority = pc.Value
 		}
+		pod.Spec.Priority = &priority
 	}
-	pod.Spec.Priority = &priority
 	return nil
 }
 
+// admitPriorityClass ensures that the value field is not larger than the highest user definable priority. If the GlobalDefault is set, it ensures that there is no other PriorityClass whose GlobalDefault is set.
 func (p *priorityPlugin) admitPriorityClass(a admission.Attributes) error {
 	operation := a.GetOperation()
 	pc, ok := a.GetObject().(*scheduling.PriorityClass)
 	if !ok {
-		return errors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+		return errors.NewBadRequest("resource was marked with kind PriorityClass but was unable to be converted")
 	}
 	if pc.Value > HighestUserDefinablePriority {
-		return admission.NewForbidden(a, fmt.Errorf("Maximum allowed value of a user defined priority is %v", HighestUserDefinablePriority))
+		return admission.NewForbidden(a, fmt.Errorf("maximum allowed value of a user defined priority is %v", HighestUserDefinablePriority))
 	}
 	if _, ok := SystemPriorityClasses[pc.Name]; ok {
-		return admission.NewForbidden(a, fmt.Errorf("The name of the priority class is a reserved name for system use only: %v", pc.Name))
+		return admission.NewForbidden(a, fmt.Errorf("the name of the priority class is a reserved name for system use only: %v", pc.Name))
 	}
 	// If the new PriorityClass tries to be the default priority, make sure that no other priority class is marked as default.
 	if pc.GlobalDefault {
-		dpc, err := p.findDefaultPriorityClass()
+		dpc, err := p.getDefaultPriorityClass()
 		if err != nil {
-			return fmt.Errorf("Failed to get default priority class: %v", err)
+			return fmt.Errorf("failed to get default priority class: %v", err)
 		}
 		if dpc != nil {
 			// Throw an error if a second default priority class is being created, or an existing priority class is being marked as default, while another default already exists.
@@ -184,10 +199,12 @@ func (p *priorityPlugin) admitPriorityClass(a admission.Attributes) error {
 			}
 		}
 	}
+	// We conservatively invalidate our cache of global default priority upon any changes to any of the existing classes or creation of a new class.
+	p.invalidateCachedDefaultPriority()
 	return nil
 }
 
-func (p *priorityPlugin) findDefaultPriorityClass() (*scheduling.PriorityClass, error) {
+func (p *priorityPlugin) getDefaultPriorityClass() (*scheduling.PriorityClass, error) {
 	list, err := p.lister.List(labels.Everything())
 	if err != nil {
 		return nil, err
@@ -198,4 +215,27 @@ func (p *priorityPlugin) findDefaultPriorityClass() (*scheduling.PriorityClass, 
 		}
 	}
 	return nil, nil
+}
+
+func (p *priorityPlugin) getDefaultPriority() (int32, error) {
+	// If global default priority is cached, return it.
+	if p.globalDefaultPriority != nil {
+		return *p.globalDefaultPriority, nil
+	}
+	dpc, err := p.getDefaultPriorityClass()
+	if err != nil {
+		return 0, err
+	}
+	priority := int32(scheduling.DefaultPriorityWhenNoDefaultClassExists)
+	if dpc != nil {
+		priority = dpc.Value
+	}
+	// Cache the value.
+	p.globalDefaultPriority = &priority
+	return priority, nil
+}
+
+// invalidateCachedDefaultPriority sets global default priority to nil to indicate that it should be looked up again.
+func (p *priorityPlugin) invalidateCachedDefaultPriority() {
+	p.globalDefaultPriority = nil
 }

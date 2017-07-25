@@ -17,16 +17,19 @@ limitations under the License.
 package admission
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func addPriorityClasses(ctrl *priorityPlugin, priorityClasses []*scheduling.PriorityClass) {
@@ -155,6 +158,83 @@ func TestPriorityClassAdmission(t *testing.T) {
 	}
 }
 
+// TestDefaultPriority tests that default priority is resolved correctly.
+func TestDefaultPriority(t *testing.T) {
+	pcResource := api.Resource("priorityclasses").WithVersion("version")
+	pcKind := api.Kind("PriorityClass").WithVersion("version")
+	updatedDefaultClass1 := *defaultClass1
+	updatedDefaultClass1.GlobalDefault = false
+
+	tests := []struct {
+		name                  string
+		classesBefore         []*scheduling.PriorityClass
+		classesAfter          []*scheduling.PriorityClass
+		attributes            admission.Attributes
+		expectedDefaultBefore int32
+		expectedDefaultAfter  int32
+	}{
+		{
+			name:                  "simple resolution with a default class",
+			classesBefore:         []*scheduling.PriorityClass{defaultClass1},
+			classesAfter:          []*scheduling.PriorityClass{defaultClass1},
+			attributes:            nil,
+			expectedDefaultBefore: defaultClass1.Value,
+			expectedDefaultAfter:  defaultClass1.Value,
+		},
+		{
+			name:                  "add a default class",
+			classesBefore:         []*scheduling.PriorityClass{nondefaultClass1},
+			classesAfter:          []*scheduling.PriorityClass{nondefaultClass1, defaultClass1},
+			attributes:            admission.NewAttributesRecord(defaultClass1, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Create, nil),
+			expectedDefaultBefore: scheduling.DefaultPriorityWhenNoDefaultClassExists,
+			expectedDefaultAfter:  defaultClass1.Value,
+		},
+		{
+			name:                  "delete default priority class",
+			classesBefore:         []*scheduling.PriorityClass{defaultClass1},
+			classesAfter:          []*scheduling.PriorityClass{},
+			attributes:            admission.NewAttributesRecord(nil, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Delete, nil),
+			expectedDefaultBefore: defaultClass1.Value,
+			expectedDefaultAfter:  scheduling.DefaultPriorityWhenNoDefaultClassExists,
+		},
+		{
+			name:                  "update default class and remove its global default",
+			classesBefore:         []*scheduling.PriorityClass{defaultClass1},
+			classesAfter:          []*scheduling.PriorityClass{&updatedDefaultClass1},
+			attributes:            admission.NewAttributesRecord(&updatedDefaultClass1, defaultClass1, pcKind, "", defaultClass1.Name, pcResource, "", admission.Update, nil),
+			expectedDefaultBefore: defaultClass1.Value,
+			expectedDefaultAfter:  scheduling.DefaultPriorityWhenNoDefaultClassExists,
+		},
+	}
+
+	for _, test := range tests {
+		glog.V(4).Infof("starting test %q", test.name)
+		ctrl := NewPlugin().(*priorityPlugin)
+		addPriorityClasses(ctrl, test.classesBefore)
+		defaultPriority, err := ctrl.getDefaultPriority()
+		if err != nil {
+			t.Errorf("Test %q: unexpected error while getting default priority: %v", test.name, err)
+		}
+		if err == nil && defaultPriority != test.expectedDefaultBefore {
+			t.Errorf("Test %q: expected default priority %d, but got %d", test.name, test.expectedDefaultBefore, defaultPriority)
+		}
+		if test.attributes != nil {
+			err := ctrl.Admit(test.attributes)
+			if err != nil {
+				t.Errorf("Test %q: unexpected error received: %v", test.name, err)
+			}
+		}
+		addPriorityClasses(ctrl, test.classesAfter)
+		defaultPriority, err = ctrl.getDefaultPriority()
+		if err != nil {
+			t.Errorf("Test %q: unexpected error while getting default priority: %v", test.name, err)
+		}
+		if err == nil && defaultPriority != test.expectedDefaultAfter {
+			t.Errorf("Test %q: expected default priority %d, but got %d", test.name, test.expectedDefaultAfter, defaultPriority)
+		}
+	}
+}
+
 var intPriority = int32(1000)
 
 func TestPodAdmission(t *testing.T) {
@@ -237,7 +317,8 @@ func TestPodAdmission(t *testing.T) {
 			},
 		},
 	}
-
+	// Enable PodPriority feature gate.
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
 	tests := []struct {
 		name            string
 		existingClasses []*scheduling.PriorityClass
