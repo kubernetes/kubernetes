@@ -494,9 +494,12 @@ func (o *DrainOptions) evictPods(pods []api.Pod, policyGroupVersion string, getP
 				err = o.evictPod(pod, policyGroupVersion)
 				if err == nil {
 					break
+				} else if apierrors.IsNotFound(err) {
+					doneCh <- true
+					return
 				} else if apierrors.IsTooManyRequests(err) {
 					time.Sleep(5 * time.Second)
-				} else if !apierrors.IsNotFound(err) {
+				} else {
 					errCh <- fmt.Errorf("error when evicting pod %q: %v", pod.Name, err)
 					return
 				}
