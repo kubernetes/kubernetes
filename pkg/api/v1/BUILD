@@ -11,11 +11,11 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "builder.go",
         "conversion.go",
         "defaults.go",
         "doc.go",
         "generate.go",
+        "register.go",
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
