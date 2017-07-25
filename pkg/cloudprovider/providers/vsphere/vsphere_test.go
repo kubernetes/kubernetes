@@ -278,7 +278,7 @@ func TestGetVMName(t *testing.T) {
 	defer cancel()
 
 	// Create vSphere client
-	err = vSphereLogin(ctx, vs)
+	err = vSphereLogin(vs, ctx)
 	if err != nil {
 		t.Errorf("Failed to create vSpere client: %s", err)
 	}
