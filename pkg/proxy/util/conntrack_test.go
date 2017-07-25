@@ -18,12 +18,26 @@ package util
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 )
+
+func newFakeServiceInfo(service proxy.ServicePortName, ip net.IP, port int, protocol api.Protocol, onlyNodeLocalEndpoints bool) *ServiceInfo {
+	return &ServiceInfo{
+		SessionAffinityType:    api.ServiceAffinityNone,
+		ClusterIP:              ip,
+		Port:                   port,
+		Protocol:               protocol,
+		OnlyNodeLocalEndpoints: onlyNodeLocalEndpoints,
+	}
+}
 
 func TestExecConntrackTool(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
@@ -110,12 +124,72 @@ func TestDeleteServiceConnections(t *testing.T) {
 			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s -p udp", ip)
 			execCommand := strings.Join(fcmd.CombinedOutputLog[svcCount], " ")
 			if expectCommand != execCommand {
-				t.Errorf("Exepect comand: %s, but executed %s", expectCommand, execCommand)
+				t.Errorf("Expected command: %s, but executed %s", expectCommand, execCommand)
 			}
 			svcCount += 1
 		}
 		if svcCount != fexec.CommandCalls {
-			t.Errorf("Exepect comand executed %d times, but got %d", svcCount, fexec.CommandCalls)
+			t.Errorf("Expected command to execute %d times, but was executed only %d times", svcCount, fexec.CommandCalls)
+		}
+	}
+}
+
+func TestDeleteEndpointConnections(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
+			func() ([]byte, error) {
+				return []byte(""), fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted.")
+			},
+		},
+	}
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
+	}
+
+	serviceMap := make(map[proxy.ServicePortName]*ServiceInfo)
+	svc1 := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: "svc1"}, Port: "p80"}
+	svc2 := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: "svc2"}, Port: "p80"}
+	serviceMap[svc1] = newFakeServiceInfo(svc1, net.IPv4(10, 20, 30, 40), 80, api.ProtocolUDP, false)
+	serviceMap[svc2] = newFakeServiceInfo(svc1, net.IPv4(10, 20, 30, 41), 80, api.ProtocolTCP, false)
+
+	testCases := []EndpointServicePair{
+		{
+			Endpoint:        "10.240.0.3:80",
+			ServicePortName: svc1,
+		},
+		{
+			Endpoint:        "10.240.0.4:80",
+			ServicePortName: svc1,
+		},
+		{
+			Endpoint:        "10.240.0.5:80",
+			ServicePortName: svc2,
+		},
+	}
+
+	expectCommandExecCount := 0
+	for i := range testCases {
+		input := map[EndpointServicePair]bool{testCases[i]: true}
+		DeleteEndpointConnections(&fexec, serviceMap, input)
+		svcInfo := serviceMap[testCases[i].ServicePortName]
+		if svcInfo.Protocol == api.ProtocolUDP {
+			svcIp := svcInfo.ClusterIP.String()
+			EndpointIp := strings.Split(testCases[i].Endpoint, ":")[0]
+			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", svcIp, EndpointIp)
+			execCommand := strings.Join(fcmd.CombinedOutputLog[expectCommandExecCount], " ")
+			if expectCommand != execCommand {
+				t.Errorf("Expected command: %s, but executed %s", expectCommand, execCommand)
+			}
+			expectCommandExecCount += 1
+		}
+
+		if expectCommandExecCount != fexec.CommandCalls {
+			t.Errorf("Expected command to execute %d times, but was executed only %d times", expectCommandExecCount, fexec.CommandCalls)
 		}
 	}
 }
