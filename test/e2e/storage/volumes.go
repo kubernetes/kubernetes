@@ -421,52 +421,27 @@ var _ = SIGDescribe("Volumes", func() {
 	// GCE PD
 	////////////////////////////////////////////////////////////////////////
 	Describe("PD", func() {
-		// Flaky issue: #43977
-		It("should be mountable [Flaky]", func() {
+		var config framework.VolumeTestConfig
+
+		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
-			config := framework.VolumeTestConfig{
+			config = framework.VolumeTestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "pd",
 			}
+		})
 
-			By("creating a test gce pd volume")
-			volumeName, err := framework.CreatePDWithRetry()
-			Expect(err).NotTo(HaveOccurred())
-			defer func() {
-				// - Get NodeName from the pod spec to which the volume is mounted.
-				// - Force detach and delete.
-				pod, err := f.PodClient().Get(config.Prefix+"-client", metav1.GetOptions{})
-				Expect(err).NotTo(HaveOccurred(), "Failed getting pod %q.", config.Prefix+"-client")
-				detachAndDeletePDs(volumeName, []types.NodeName{types.NodeName(pod.Spec.NodeName)})
-			}()
-
-			defer func() {
-				if clean {
-					framework.Logf("Running volumeTestCleanup")
-					framework.VolumeTestCleanup(f, config)
-				}
-			}()
-
-			tests := []framework.VolumeTest{
-				{
-					Volume: v1.VolumeSource{
-						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-							PDName:   volumeName,
-							FSType:   "ext3",
-							ReadOnly: false,
-						},
-					},
-					File: "index.html",
-					// Randomize index.html to make sure we don't see the
-					// content from previous test runs.
-					ExpectedContent: "Hello from GCE from namespace " + volumeName,
-				},
-			}
-
-			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
-
-			fsGroup := int64(1234)
-			framework.TestVolumeClient(cs, config, &fsGroup, tests)
+		It("should be mountable with ext3", func() {
+			testGCEPD(f, config, cs, clean, "ext3")
+		})
+		It("should be mountable with ext4", func() {
+			testGCEPD(f, config, cs, clean, "ext4")
+		})
+		It("should be mountable with xfs", func() {
+			// xfs is not supported on gci
+			// and not installed by default on debian
+			framework.SkipUnlessNodeOSDistroIs("ubuntu")
+			testGCEPD(f, config, cs, clean, "xfs")
 		})
 	})
 
@@ -651,3 +626,44 @@ var _ = SIGDescribe("Volumes", func() {
 		})
 	})
 })
+
+func testGCEPD(f *framework.Framework, config framework.VolumeTestConfig, cs clientset.Interface, clean bool, fs string) {
+	By("creating a test gce pd volume")
+	volumeName, err := framework.CreatePDWithRetry()
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		// - Get NodeName from the pod spec to which the volume is mounted.
+		// - Force detach and delete.
+		pod, err := f.PodClient().Get(config.Prefix+"-client", metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred(), "Failed getting pod %q.", config.Prefix+"-client")
+		detachAndDeletePDs(volumeName, []types.NodeName{types.NodeName(pod.Spec.NodeName)})
+	}()
+
+	defer func() {
+		if clean {
+			framework.Logf("Running volumeTestCleanup")
+			framework.VolumeTestCleanup(f, config)
+		}
+	}()
+
+	tests := []framework.VolumeTest{
+		{
+			Volume: v1.VolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+					PDName:   volumeName,
+					FSType:   fs,
+					ReadOnly: false,
+				},
+			},
+			File: "index.html",
+			// Randomize index.html to make sure we don't see the
+			// content from previous test runs.
+			ExpectedContent: "Hello from GCE from namespace " + volumeName,
+		},
+	}
+
+	framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
+
+	fsGroup := int64(1234)
+	framework.TestVolumeClient(cs, config, &fsGroup, tests)
+}
