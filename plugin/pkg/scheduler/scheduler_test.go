@@ -108,18 +108,54 @@ func TestScheduler(t *testing.T) {
 	eventBroadcaster.StartLogging(t.Logf).Stop()
 	errS := errors.New("scheduler")
 	errB := errors.New("binder")
+	errA := errors.New("assumepod")
+	errF := errors.New("forgetpod")
 	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
 
 	table := []struct {
 		injectBindError  error
+		assumePodError   error
+		forgetPodError   error
 		sendPod          *v1.Pod
 		algo             algorithm.ScheduleAlgorithm
 		expectErrorPod   *v1.Pod
 		expectAssumedPod *v1.Pod
+		expectForgetPod  *v1.Pod
 		expectError      error
 		expectBind       *v1.Binding
 		eventReason      string
 	}{
+		{
+			sendPod:          podWithID("foo", ""),
+			injectBindError:  errB,
+			algo:             mockScheduler{testNode.Name, nil},
+			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
+			expectErrorPod:   podWithID("foo", testNode.Name),
+			expectForgetPod:  podWithID("foo", testNode.Name),
+			expectAssumedPod: podWithID("foo", testNode.Name),
+			eventReason:      "FailedScheduling",
+			expectError:      errB,
+		},
+		{
+			sendPod:          podWithID("foo", ""),
+			injectBindError:  errB,
+			forgetPodError:   errF,
+			algo:             mockScheduler{testNode.Name, nil},
+			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
+			expectErrorPod:   podWithID("foo", testNode.Name),
+			expectForgetPod:  podWithID("foo", testNode.Name),
+			expectAssumedPod: podWithID("foo", testNode.Name),
+			eventReason:      "FailedScheduling",
+			expectError:      errB,
+		},
+		{
+			sendPod:        podWithID("foo", ""),
+			assumePodError: errA,
+			algo:           mockScheduler{testNode.Name, nil},
+			expectErrorPod: podWithID("foo", ""),
+			eventReason:    "FailedScheduling",
+			expectError:    errA,
+		},
 		{
 			sendPod:          podWithID("foo", ""),
 			algo:             mockScheduler{testNode.Name, nil},
@@ -139,7 +175,8 @@ func TestScheduler(t *testing.T) {
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			injectBindError:  errB,
 			expectError:      errB,
-			expectErrorPod:   podWithID("foo", ""),
+			expectErrorPod:   podWithID("foo", testNode.Name),
+			expectForgetPod:  podWithID("foo", testNode.Name),
 			eventReason:      "FailedScheduling",
 		}, {
 			sendPod:     deletingPod("foo"),
@@ -151,13 +188,22 @@ func TestScheduler(t *testing.T) {
 	for i, item := range table {
 		var gotError error
 		var gotPod *v1.Pod
+		var gotForgetPod *v1.Pod
 		var gotAssumedPod *v1.Pod
 		var gotBinding *v1.Binding
 		configurator := &FakeConfigurator{
 			Config: &Config{
 				SchedulerCache: &schedulertesting.FakeCache{
-					AssumeFunc: func(pod *v1.Pod) {
+					ForgetFunc: func(pod *v1.Pod) error {
+						gotForgetPod = pod
+						return item.forgetPodError
+					},
+					AssumeFunc: func(pod *v1.Pod) error {
+						if item.assumePodError != nil {
+							return item.assumePodError
+						}
 						gotAssumedPod = pod
+						return nil
 					},
 				},
 				NodeLister: schedulertesting.FakeNodeLister(
@@ -195,6 +241,9 @@ func TestScheduler(t *testing.T) {
 		}
 		if e, a := item.expectErrorPod, gotPod; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: error pod: wanted %v, got %v", i, e, a)
+		}
+		if e, a := item.expectForgetPod, gotForgetPod; !reflect.DeepEqual(e, a) {
+			t.Errorf("%v: forget pod: wanted %v, got %v", i, e, a)
 		}
 		if e, a := item.expectError, gotError; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: error: wanted %v, got %v", i, e, a)

@@ -24,17 +24,19 @@ import (
 
 // FakeCache is used for testing
 type FakeCache struct {
-	AssumeFunc func(*v1.Pod)
+	AssumeFunc func(*v1.Pod) error
+	ForgetFunc func(*v1.Pod) error
 }
 
 func (f *FakeCache) AssumePod(pod *v1.Pod) error {
-	f.AssumeFunc(pod)
-	return nil
+	return f.AssumeFunc(pod)
 }
 
 func (f *FakeCache) FinishBinding(pod *v1.Pod) error { return nil }
 
-func (f *FakeCache) ForgetPod(pod *v1.Pod) error { return nil }
+func (f *FakeCache) ForgetPod(pod *v1.Pod) error { 
+	return f.ForgetFunc(pod)
+}
 
 func (f *FakeCache) AddPod(pod *v1.Pod) error { return nil }
 

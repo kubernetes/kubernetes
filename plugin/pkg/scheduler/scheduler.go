@@ -185,7 +185,7 @@ func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 }
 
 // assume signals to the cache that a pod is already in the cache, so that binding can be asnychronous.
-func (sched *Scheduler) assume(pod *v1.Pod, host string) error {
+func (sched *Scheduler) assume(pod *v1.Pod, host string) (*v1.Pod, error) {
 	// Optimistically assume that the binding will succeed and send it to apiserver
 	// in the background.
 	// If the binding fails, scheduler will release resources allocated to assumed pod
@@ -194,13 +194,16 @@ func (sched *Scheduler) assume(pod *v1.Pod, host string) error {
 	assumed.Spec.NodeName = host
 	if err := sched.config.SchedulerCache.AssumePod(&assumed); err != nil {
 		glog.Errorf("scheduler cache AssumePod failed: %v", err)
-		// TODO: This means that a given pod is already in cache (which means it
-		// is either assumed or already added). This is most probably result of a
-		// BUG in retrying logic. As a temporary workaround (which doesn't fully
-		// fix the problem, but should reduce its impact), we simply return here,
-		// as binding doesn't make sense anyway.
-		// This should be fixed properly though.
-		return err
+
+		sched.config.Error(pod, err)
+		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "AssumePod failed: %v", err)
+		sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+			Type:    v1.PodScheduled,
+			Status:  v1.ConditionFalse,
+			Reason:  "AssumePodFailed",
+			Message: err.Error(),
+		})
+		return nil, err
 	}
 
 	// Optimistically assume that the binding will succeed, so we need to invalidate affected
@@ -209,7 +212,7 @@ func (sched *Scheduler) assume(pod *v1.Pod, host string) error {
 	if sched.config.Ecache != nil {
 		sched.config.Ecache.InvalidateCachedPredicateItemForPodAdd(pod, host)
 	}
-	return nil
+	return &assumed, nil
 }
 
 // bind binds a pod to a given node defined in a binding object.  We expect this to run asynchronously, so we
@@ -222,7 +225,7 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	if err != nil {
 		glog.V(1).Infof("Failed to bind pod: %v/%v", assumed.Namespace, assumed.Name)
 		if err := sched.config.SchedulerCache.ForgetPod(assumed); err != nil {
-			return fmt.Errorf("scheduler cache ForgetPod failed: %v", err)
+			glog.Errorf("scheduler cache ForgetPod failed: %v", err)
 		}
 		sched.config.Error(assumed, err)
 		sched.config.Recorder.Eventf(assumed, v1.EventTypeWarning, "FailedScheduling", "Binding rejected: %v", err)
@@ -264,15 +267,15 @@ func (sched *Scheduler) scheduleOne() {
 
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
-	err = sched.assume(pod, suggestedHost)
+	assumed, err := sched.assume(pod, suggestedHost)
 	if err != nil {
 		return
 	}
 
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
-		err := sched.bind(pod, &v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, UID: pod.UID},
+		err := sched.bind(assumed, &v1.Binding{
+			ObjectMeta: metav1.ObjectMeta{Namespace: assumed.Namespace, Name: assumed.Name, UID: assumed.UID},
 			Target: v1.ObjectReference{
 				Kind: "Node",
 				Name: suggestedHost,
