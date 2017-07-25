@@ -831,7 +831,10 @@ func TestDescribePodDisruptionBudget(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "pdb1") {
+	if !strings.Contains(out, "pdb1") ||
+		!strings.Contains(out, "ns1") ||
+		!strings.Contains(out, "22") ||
+		!strings.Contains(out, "5") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
