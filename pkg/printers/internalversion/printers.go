@@ -61,8 +61,6 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	nodeColumns                   = []string{"NAME", "STATUS", "AGE", "VERSION"}
-	nodeWideColumns               = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION", "CONTAINER-RUNTIME"}
 	eventColumns                  = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
 	namespaceColumns              = []string{"NAME", "STATUS", "AGE"}
 	secretColumns                 = []string{"NAME", "TYPE", "DATA", "AGE"}
@@ -234,8 +232,22 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(endpointColumnDefinitions, printEndpoints)
 	h.TableHandler(endpointColumnDefinitions, printEndpointsList)
 
-	h.Handler(nodeColumns, nodeWideColumns, printNode)
-	h.Handler(nodeColumns, nodeWideColumns, printNodeList)
+	//nodeColumns                   = []string{"NAME", "STATUS", "AGE", "VERSION"}
+	//nodeWideColumns               = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION", "CONTAINER-RUNTIME"}
+	nodeColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Status", Type: "string", Description: "The status of the node"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Version", Type: "string", Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["kubeletVersion"]},
+		{Name: "External-IP", Type: "string", Priority: 1, Description: apiv1.NodeStatus{}.SwaggerDoc()["addresses"]},
+		{Name: "OS-Image", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["osImage"]},
+		{Name: "Kernel-Version", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["kernelVersion"]},
+		{Name: "Container-Runtime", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["containerRuntimeVersion"]},
+	}
+
+	h.TableHandler(nodeColumnDefinitions, printNode)
+	h.TableHandler(nodeColumnDefinitions, printNodeList)
+
 	h.Handler(eventColumns, nil, printEvent)
 	h.Handler(eventColumns, nil, printEventList)
 	h.Handler(namespaceColumns, nil, printNamespace)
@@ -1009,16 +1021,15 @@ func printServiceAccountList(list *api.ServiceAccountList, w io.Writer, options 
 	return nil
 }
 
-func printNode(node *api.Node, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, node.Name, options.WithKind)
-
-	if options.WithNamespace {
-		return fmt.Errorf("node is not namespaced")
+func printNode(obj *api.Node, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
+
 	conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
 	NodeAllConditions := []api.NodeConditionType{api.NodeReady}
-	for i := range node.Status.Conditions {
-		cond := node.Status.Conditions[i]
+	for i := range obj.Status.Conditions {
+		cond := obj.Status.Conditions[i]
 		conditionMap[cond.Type] = &cond
 	}
 	var status []string
@@ -1034,16 +1045,13 @@ func printNode(node *api.Node, w io.Writer, options printers.PrintOptions) error
 	if len(status) == 0 {
 		status = append(status, "Unknown")
 	}
-	if node.Spec.Unschedulable {
+	if obj.Spec.Unschedulable {
 		status = append(status, "SchedulingDisabled")
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", name, strings.Join(status, ","), translateTimestamp(node.CreationTimestamp), node.Status.NodeInfo.KubeletVersion); err != nil {
-		return err
-	}
-
+	row.Cells = append(row.Cells, obj.Name, strings.Join(status, ","), translateTimestamp(obj.CreationTimestamp), obj.Status.NodeInfo.KubeletVersion)
 	if options.Wide {
-		osImage, kernelVersion, crVersion := node.Status.NodeInfo.OSImage, node.Status.NodeInfo.KernelVersion, node.Status.NodeInfo.ContainerRuntimeVersion
+		osImage, kernelVersion, crVersion := obj.Status.NodeInfo.OSImage, obj.Status.NodeInfo.KernelVersion, obj.Status.NodeInfo.ContainerRuntimeVersion
 		if osImage == "" {
 			osImage = "<unknown>"
 		}
@@ -1053,16 +1061,10 @@ func printNode(node *api.Node, w io.Writer, options printers.PrintOptions) error
 		if crVersion == "" {
 			crVersion = "<unknown>"
 		}
-		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s\t%s", getNodeExternalIP(node), osImage, kernelVersion, crVersion); err != nil {
-			return err
-		}
+		row.Cells = append(row.Cells, getNodeExternalIP(obj), osImage, kernelVersion, crVersion)
 	}
-	// Display caller specify column labels first.
-	if _, err := fmt.Fprint(w, printers.AppendLabels(node.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, node.Labels))
-	return err
+
+	return []metav1alpha1.TableRow{row}, nil
 }
 
 // Returns first external ip of the node or "<none>" if none is found.
@@ -1076,13 +1078,16 @@ func getNodeExternalIP(node *api.Node) string {
 	return "<none>"
 }
 
-func printNodeList(list *api.NodeList, w io.Writer, options printers.PrintOptions) error {
-	for _, node := range list.Items {
-		if err := printNode(&node, w, options); err != nil {
-			return err
+func printNodeList(list *api.NodeList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printNode(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, options printers.PrintOptions) error {
