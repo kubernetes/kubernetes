@@ -63,7 +63,7 @@ import (
 // ProbeVolumePlugins collects all volume plugins into an easy to use list.
 // PluginDir specifies the directory to search for additional third party
 // volume plugins.
-func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
+func ProbeVolumePlugins() []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by the kubelet binary, not
@@ -88,7 +88,7 @@ func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
 	allPlugins = append(allPlugins, downwardapi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins(pluginDir)...)
+	//allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins(pluginDir)...)
 	allPlugins = append(allPlugins, azure_file.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, configmap.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
@@ -100,6 +100,10 @@ func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	return allPlugins
+}
+
+func GetDynamicPluginProber(pluginDir string) volume.DynamicPluginProber {
+	return flexvolume.NewFlexVolumeProber(pluginDir)
 }
 
 // ProbeNetworkPlugins collects all compiled-in plugins

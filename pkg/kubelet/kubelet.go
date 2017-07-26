@@ -218,23 +218,24 @@ type Dependencies struct {
 	Options                 []Option
 
 	// Injected Dependencies
-	Auth               server.AuthInterface
-	CAdvisorInterface  cadvisor.Interface
-	Cloud              cloudprovider.Interface
-	ContainerManager   cm.ContainerManager
-	DockerClient       libdocker.Interface
-	EventClient        v1core.EventsGetter
-	KubeClient         clientset.Interface
-	ExternalKubeClient clientgoclientset.Interface
-	Mounter            mount.Interface
-	NetworkPlugins     []network.NetworkPlugin
-	OOMAdjuster        *oom.OOMAdjuster
-	OSInterface        kubecontainer.OSInterface
-	PodConfig          *config.PodConfig
-	Recorder           record.EventRecorder
-	Writer             kubeio.Writer
-	VolumePlugins      []volume.VolumePlugin
-	TLSOptions         *server.TLSOptions
+	Auth                server.AuthInterface
+	CAdvisorInterface   cadvisor.Interface
+	Cloud               cloudprovider.Interface
+	ContainerManager    cm.ContainerManager
+	DockerClient        libdocker.Interface
+	EventClient         v1core.EventsGetter
+	KubeClient          clientset.Interface
+	ExternalKubeClient  clientgoclientset.Interface
+	Mounter             mount.Interface
+	NetworkPlugins      []network.NetworkPlugin
+	OOMAdjuster         *oom.OOMAdjuster
+	OSInterface         kubecontainer.OSInterface
+	PodConfig           *config.PodConfig
+	Recorder            record.EventRecorder
+	Writer              kubeio.Writer
+	VolumePlugins       []volume.VolumePlugin
+	DynamicPluginProber volume.DynamicPluginProber
+	TLSOptions          *server.TLSOptions
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -717,7 +718,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dep
 		kubeDeps.Recorder)
 
 	klet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, kubeDeps.VolumePlugins)
+		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
 	if err != nil {
 		return nil, err
 	}

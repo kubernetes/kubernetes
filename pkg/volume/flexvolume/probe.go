@@ -22,11 +22,18 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-// This is the primary entrypoint for volume plugins.
-func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
+type flexVolumeProber struct {
+	pluginDir string
+}
+
+func NewFlexVolumeProber(pluginDir string) volume.DynamicPluginProber {
+	return &flexVolumeProber{pluginDir: pluginDir}
+}
+
+func (prober *flexVolumeProber) Probe() []volume.VolumePlugin {
 	plugins := []volume.VolumePlugin{}
 
-	files, _ := ioutil.ReadDir(pluginDir)
+	files, _ := ioutil.ReadDir(prober.pluginDir)
 	for _, f := range files {
 		// only directories are counted as plugins
 		// and pluginDir/dirname/dirname should be an executable
@@ -34,7 +41,7 @@ func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
 		// e.g. dirname = vendor~cifs
 		// then, executable will be pluginDir/dirname/cifs
 		if f.IsDir() {
-			plugin, err := NewFlexVolumePlugin(pluginDir, f.Name())
+			plugin, err := NewFlexVolumePlugin(prober.pluginDir, f.Name())
 			if err != nil {
 				continue
 			}
