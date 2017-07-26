@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
@@ -103,9 +104,9 @@ func (t *Tester) TestNamespace() string {
 // Namespace is determined by TestNamespace()
 func (t *Tester) TestContext() genericapirequest.Context {
 	if t.clusterScope {
-		return genericapirequest.NewContext()
+		return genericapirequest.WithRequestInfo(genericapirequest.NewContext(), registry.FakeRequestInfo())
 	}
-	return genericapirequest.WithNamespace(genericapirequest.NewContext(), t.TestNamespace())
+	return genericapirequest.WithRequestInfo(genericapirequest.WithNamespace(genericapirequest.NewContext(), t.TestNamespace()), registry.FakeRequestInfo())
 }
 
 func (t *Tester) getObjectMetaOrFail(obj runtime.Object) metav1.Object {
@@ -338,6 +339,7 @@ func (t *Tester) testCreateHasMetadata(valid runtime.Object) {
 func (t *Tester) testCreateIgnoresContextNamespace(valid runtime.Object) {
 	// Ignore non-empty namespace in context
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "not-default2")
+	ctx = genericapirequest.WithRequestInfo(ctx, registry.FakeRequestInfo())
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
 	created, err := t.storage.(rest.Creater).Create(ctx, copyOrDie(valid, t.scheme), false)
@@ -357,6 +359,7 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object) {
 	// Ignore non-empty namespace in object meta
 	objectMeta.SetNamespace("not-default")
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "not-default2")
+	ctx = genericapirequest.WithRequestInfo(ctx, registry.FakeRequestInfo())
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
 	created, err := t.storage.(rest.Creater).Create(ctx, copyOrDie(valid, t.scheme), false)
@@ -1070,6 +1073,7 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 	objMeta.SetName(t.namer(5))
 
 	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar3")
+	ctx1 = genericapirequest.WithRequestInfo(ctx1, registry.FakeRequestInfo())
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx1))
 	_, err := t.storage.(rest.Creater).Create(ctx1, obj, false)
 	if err != nil {
@@ -1077,6 +1081,7 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 	}
 
 	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar4")
+	ctx2 = genericapirequest.WithRequestInfo(ctx2, registry.FakeRequestInfo())
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx2))
 	_, err = t.storage.(rest.Creater).Create(ctx2, obj, false)
 	if err != nil {
@@ -1131,7 +1136,10 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 
 func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
 	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar1")
+	ctx1 = genericapirequest.WithRequestInfo(ctx1, registry.FakeRequestInfo())
 	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar2")
+	ctx2 = genericapirequest.WithRequestInfo(ctx2, registry.FakeRequestInfo())
+
 	objMeta := t.getObjectMetaOrFail(obj)
 	objMeta.SetName(t.namer(4))
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx1))

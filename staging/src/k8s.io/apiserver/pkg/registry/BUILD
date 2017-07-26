@@ -9,6 +9,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["doc.go"],
+    srcs = [
+        "doc.go",
+        "test_helper.go",
+    ],
     tags = ["automanaged"],
+    deps = ["//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library"],
 )

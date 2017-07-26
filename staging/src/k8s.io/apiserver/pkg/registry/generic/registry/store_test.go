@@ -43,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	testhelper "k8s.io/apiserver/pkg/registry"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -160,7 +161,10 @@ func TestStoreList(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	noNamespaceContext := genericapirequest.NewContext()
+	noNamespaceContext = genericapirequest.WithRequestInfo(noNamespaceContext, testhelper.FakeRequestInfo())
 
 	table := map[string]struct {
 		in      *example.PodList
@@ -235,6 +239,7 @@ func TestStoreListResourceVersion(t *testing.T) {
 		Spec:       example.PodSpec{NodeName: "machine"},
 	}
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
 
 	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, true)
 	defer destroyFunc()
@@ -299,6 +304,8 @@ func TestStoreCreate(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 	// re-define delete strategy to have graceful delete capability
@@ -393,6 +400,8 @@ func TestStoreCreateInitialized(t *testing.T) {
 	}
 
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
@@ -496,6 +505,7 @@ func TestStoreCreateInitializedFailed(t *testing.T) {
 	}
 
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
@@ -589,6 +599,8 @@ func TestStoreUpdate(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
@@ -643,18 +655,20 @@ func TestNoOpUpdates(t *testing.T) {
 
 	var err error
 	var createResult runtime.Object
-	if createResult, err = registry.Create(genericapirequest.NewDefaultContext(), newPod(), false); err != nil {
+	testContext := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), testhelper.FakeRequestInfo())
+
+	if createResult, err = registry.Create(testContext, newPod(), false); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	createdPod, err := registry.Get(genericapirequest.NewDefaultContext(), "foo", &metav1.GetOptions{})
+	createdPod, err := registry.Get(testContext, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	var updateResult runtime.Object
 	p := newPod()
-	if updateResult, _, err = registry.Update(genericapirequest.NewDefaultContext(), p.Name, rest.DefaultUpdatedObjectInfo(p, scheme)); err != nil {
+	if updateResult, _, err = registry.Update(testContext, p.Name, rest.DefaultUpdatedObjectInfo(p, scheme)); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
@@ -663,7 +677,7 @@ func TestNoOpUpdates(t *testing.T) {
 		t.Errorf("no-op update should return a correct value, got: %#v", updateResult)
 	}
 
-	updatedPod, err := registry.Get(genericapirequest.NewDefaultContext(), "foo", &metav1.GetOptions{})
+	updatedPod, err := registry.Get(testContext, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -715,6 +729,8 @@ func TestStoreCustomExport(t *testing.T) {
 	registry.ExportStrategy = testPodExport{}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = true
 	if !updateAndVerify(t, testContext, registry, &podA) {
 		t.Errorf("Unexpected error updating podA")
@@ -759,6 +775,8 @@ func TestStoreBasicExport(t *testing.T) {
 	defer destroyFunc()
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = true
 	if !updateAndVerify(t, testContext, registry, &podA) {
 		t.Errorf("Unexpected error updating podA")
@@ -787,6 +805,8 @@ func TestStoreGet(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
@@ -808,6 +828,8 @@ func TestStoreDelete(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
@@ -846,6 +868,8 @@ func TestStoreDeleteUninitialized(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
@@ -896,6 +920,8 @@ func TestGracefulStoreCanDeleteIfExistingGracePeriodZero(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	registry.EnableGarbageCollection = false
 	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
@@ -922,6 +948,8 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	registry.EnableGarbageCollection = true
 	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
@@ -984,6 +1012,8 @@ func TestFailedInitializationStoreUpdate(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	registry.EnableGarbageCollection = true
 	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
@@ -1021,6 +1051,8 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	registry.EnableGarbageCollection = true
 	defer destroyFunc()
@@ -1319,6 +1351,8 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	registry.EnableGarbageCollection = true
 	defer destroyFunc()
@@ -1527,6 +1561,8 @@ func TestStoreDeletionPropagation(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	registry.EnableGarbageCollection = true
 	defer destroyFunc()
@@ -1594,6 +1630,8 @@ func TestStoreDeleteCollection(t *testing.T) {
 	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
@@ -1633,6 +1671,7 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 	defer destroyFunc()
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
 
 	podA := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	podB := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
@@ -1675,6 +1714,8 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	podA := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
@@ -1711,7 +1752,10 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 
 func TestStoreWatch(t *testing.T) {
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	testContext = genericapirequest.WithRequestInfo(testContext, testhelper.FakeRequestInfo())
+
 	noNamespaceContext := genericapirequest.NewContext()
+	noNamespaceContext = genericapirequest.WithRequestInfo(noNamespaceContext, testhelper.FakeRequestInfo())
 
 	table := map[string]struct {
 		selectPred storage.SelectionPredicate
@@ -1842,7 +1886,7 @@ func TestFinalizeDelete(t *testing.T) {
 	obj := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "random-uid"},
 	}
-	result, err := s.finalizeDelete(obj, false)
+	result, err := s.finalizeDelete(obj, false, s.QualifiedResource)
 	if err != nil {
 		t.Fatalf("unexpected err: %s", err)
 	}
