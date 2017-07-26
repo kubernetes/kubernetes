@@ -20,17 +20,37 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
+
+var timeoutChaosChance = float64(0.0)
+
+func init() {
+	chaosString := os.Getenv("APISERVER_CHAOS_TIMEOUT")
+	if len(chaosString) == 0 {
+		return
+	}
+
+	var err error
+	timeoutChaosChance, err = strconv.ParseFloat(chaosString, 64)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+}
 
 const globalTimeout = time.Minute
 
@@ -58,6 +78,14 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMa
 		if longRunning(req, requestInfo) {
 			return nil, nil, nil
 		}
+
+		if timeoutChaosChance != 0 && rand.Float64() < timeoutChaosChance {
+			// don't record the metric because this isn't a real timeout
+			closed := make(chan time.Time)
+			close(closed)
+			return closed, func() {}, apierrors.NewServerTimeout(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb, 0)
+		}
+
 		now := time.Now()
 		metricFn := func() {
 			metrics.MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", http.StatusInternalServerError, now)
