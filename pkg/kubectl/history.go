@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"text/tabwriter"
+	"time"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
@@ -159,9 +160,14 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 		return "", fmt.Errorf("unable to find history controlled by DaemonSet %s: %v", name, err)
 	}
 	historyInfo := make(map[int64]*appsv1beta1.ControllerRevision)
+	revisionTime := make(map[int64]string)
 	for _, history := range allHistory {
 		// TODO: for now we assume revisions don't overlap, we may need to handle it
 		historyInfo[history.Revision] = history
+
+		if !history.RevisionTime.IsZero() {
+			revisionTime[history.Revision] = history.RevisionTime.Format(time.RFC1123Z)
+		}
 	}
 
 	if len(historyInfo) == 0 {
@@ -178,7 +184,17 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 		if err != nil {
 			return "", fmt.Errorf("unable to parse history %s", history.Name)
 		}
-		return printTemplate(&dsOfHistory.Spec.Template)
+
+		templateString, err := printTemplate(&dsOfHistory.Spec.Template)
+		if err != nil {
+			return "", nil
+		}
+
+		if len(revisionTime[revision]) > 0 {
+			return "Revision Time:\t" + revisionTime[revision] + "\n" + templateString, nil
+		}
+
+		return templateString, nil
 	}
 
 	// Print an overview of all Revisions

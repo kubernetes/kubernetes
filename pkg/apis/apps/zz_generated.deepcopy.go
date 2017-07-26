@@ -82,6 +82,7 @@ func (in *ControllerRevision) DeepCopyInto(out *ControllerRevision) {
 	} else {
 		out.Data = in.Data.DeepCopyObject()
 	}
+	in.RevisionTime.DeepCopyInto(&out.RevisionTime)
 	return
 }
 

@@ -220,6 +220,10 @@ type ControllerRevision struct {
 
 	// Revision indicates the revision of the state represented by Data.
 	Revision int64
+
+	// RevisionTime records the time when revision happens.
+	// +optional
+	RevisionTime metav1.Time
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
