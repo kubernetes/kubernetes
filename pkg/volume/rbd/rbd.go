@@ -221,6 +221,9 @@ func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 		}
 	}
 
+	if admin == "" {
+		admin = rbdDefaultAdminId
+	}
 	secret, err := parsePVSecret(adminSecretNamespace, adminSecretName, plugin.host.GetKubeClient())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
