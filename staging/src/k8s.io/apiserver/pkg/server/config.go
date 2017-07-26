@@ -504,7 +504,9 @@ func installAPI(s *GenericAPIServer, c *Config) {
 			routes.DefaultMetrics{}.Install(s.Handler.NonGoRestfulMux)
 		}
 	}
-	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer)
+	if c.Version != nil {
+		routes.Version{Version: c.Version}.Install(s.Handler.NonGoRestfulMux)
+	}
 
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
