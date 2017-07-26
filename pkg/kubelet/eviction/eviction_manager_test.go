@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -205,7 +204,7 @@ func TestMemoryPressure(t *testing.T) {
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
 	imageGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
-	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -423,7 +422,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
 	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
-	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -622,7 +621,7 @@ func TestMinReclaim(t *testing.T) {
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
 	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
-	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -763,7 +762,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
 	imageGcFree := resource.MustParse("700Mi")
 	diskGC := &mockDiskGC{imageBytesFreed: imageGcFree.Value(), err: nil}
-	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -960,7 +959,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
 	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
-	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -1162,7 +1161,7 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
 	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
-	nodeRef := &clientv1.ObjectReference{
+	nodeRef := &v1.ObjectReference{
 		Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: "",
 	}
 
@@ -1295,7 +1294,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
 	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
-	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,

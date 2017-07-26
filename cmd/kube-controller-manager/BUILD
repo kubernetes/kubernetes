@@ -30,6 +30,7 @@ go_library(
         "//cmd/kube-controller-manager/app:go_default_library",
         "//cmd/kube-controller-manager/app/options:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",
+        "//pkg/util/reflector/prometheus:go_default_library",
         "//pkg/util/workqueue/prometheus:go_default_library",
         "//pkg/version/prometheus:go_default_library",
         "//pkg/version/verflag:go_default_library",

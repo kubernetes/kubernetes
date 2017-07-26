@@ -25,7 +25,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -86,7 +85,7 @@ type realImageGCManager struct {
 	recorder record.EventRecorder
 
 	// Reference to this node.
-	nodeRef *clientv1.ObjectReference
+	nodeRef *v1.ObjectReference
 
 	// Track initialization
 	initialized bool
@@ -129,7 +128,7 @@ type imageRecord struct {
 	size int64
 }
 
-func NewImageGCManager(runtime container.Runtime, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *clientv1.ObjectReference, policy ImageGCPolicy) (ImageGCManager, error) {
+func NewImageGCManager(runtime container.Runtime, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)

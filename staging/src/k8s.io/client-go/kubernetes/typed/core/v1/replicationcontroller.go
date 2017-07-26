@@ -59,6 +59,41 @@ func newReplicationControllers(c *CoreV1Client, namespace string) *replicationCo
 	}
 }
 
+// Get takes name of the replicationController, and returns the corresponding replicationController object, and an error if there is any.
+func (c *replicationControllers) Get(name string, options meta_v1.GetOptions) (result *v1.ReplicationController, err error) {
+	result = &v1.ReplicationController{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
+func (c *replicationControllers) List(opts meta_v1.ListOptions) (result *v1.ReplicationControllerList, err error) {
+	result = &v1.ReplicationControllerList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested replicationControllers.
+func (c *replicationControllers) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a replicationController and creates it.  Returns the server's representation of the replicationController, and an error, if there is any.
 func (c *replicationControllers) Create(replicationController *v1.ReplicationController) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
@@ -85,7 +120,7 @@ func (c *replicationControllers) Update(replicationController *v1.ReplicationCon
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *replicationControllers) UpdateStatus(replicationController *v1.ReplicationController) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
@@ -120,41 +155,6 @@ func (c *replicationControllers) DeleteCollection(options *meta_v1.DeleteOptions
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the replicationController, and returns the corresponding replicationController object, and an error if there is any.
-func (c *replicationControllers) Get(name string, options meta_v1.GetOptions) (result *v1.ReplicationController, err error) {
-	result = &v1.ReplicationController{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("replicationcontrollers").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
-func (c *replicationControllers) List(opts meta_v1.ListOptions) (result *v1.ReplicationControllerList, err error) {
-	result = &v1.ReplicationControllerList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("replicationcontrollers").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested replicationControllers.
-func (c *replicationControllers) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("replicationcontrollers").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched replicationController.

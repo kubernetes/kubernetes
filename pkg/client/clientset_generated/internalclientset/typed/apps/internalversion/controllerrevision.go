@@ -58,6 +58,41 @@ func newControllerRevisions(c *AppsClient, namespace string) *controllerRevision
 	}
 }
 
+// Get takes name of the controllerRevision, and returns the corresponding controllerRevision object, and an error if there is any.
+func (c *controllerRevisions) Get(name string, options v1.GetOptions) (result *apps.ControllerRevision, err error) {
+	result = &apps.ControllerRevision{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("controllerrevisions").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of ControllerRevisions that match those selectors.
+func (c *controllerRevisions) List(opts v1.ListOptions) (result *apps.ControllerRevisionList, err error) {
+	result = &apps.ControllerRevisionList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("controllerrevisions").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested controllerRevisions.
+func (c *controllerRevisions) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("controllerrevisions").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a controllerRevision and creates it.  Returns the server's representation of the controllerRevision, and an error, if there is any.
 func (c *controllerRevisions) Create(controllerRevision *apps.ControllerRevision) (result *apps.ControllerRevision, err error) {
 	result = &apps.ControllerRevision{}
@@ -103,41 +138,6 @@ func (c *controllerRevisions) DeleteCollection(options *v1.DeleteOptions, listOp
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the controllerRevision, and returns the corresponding controllerRevision object, and an error if there is any.
-func (c *controllerRevisions) Get(name string, options v1.GetOptions) (result *apps.ControllerRevision, err error) {
-	result = &apps.ControllerRevision{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("controllerrevisions").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ControllerRevisions that match those selectors.
-func (c *controllerRevisions) List(opts v1.ListOptions) (result *apps.ControllerRevisionList, err error) {
-	result = &apps.ControllerRevisionList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("controllerrevisions").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested controllerRevisions.
-func (c *controllerRevisions) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("controllerrevisions").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched controllerRevision.

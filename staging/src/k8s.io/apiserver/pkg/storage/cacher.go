@@ -196,6 +196,7 @@ type Cacher struct {
 func NewCacherFromConfig(config CacherConfig) *Cacher {
 	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
+	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
 	// Give this error when it is constructed rather than when you get the
 	// first watch item, because it's much easier to track down that way.
@@ -212,7 +213,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 		copier:      config.Copier,
 		objectType:  reflect.TypeOf(config.Type),
 		watchCache:  watchCache,
-		reflector:   cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
+		reflector:   cache.NewNamedReflector(reflectorName, listerWatcher, config.Type, watchCache, 0),
 		versioner:   config.Versioner,
 		triggerFunc: config.TriggerPublisherFunc,
 		watcherIdx:  0,

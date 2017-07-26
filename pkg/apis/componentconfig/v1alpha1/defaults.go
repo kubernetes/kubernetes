@@ -363,9 +363,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.KubeAPIBurst == 0 {
 		obj.KubeAPIBurst = 10
 	}
-	if obj.OutOfDiskTransitionFrequency == zeroDuration {
-		obj.OutOfDiskTransitionFrequency = metav1.Duration{Duration: 5 * time.Minute}
-	}
 	if string(obj.HairpinMode) == "" {
 		obj.HairpinMode = PromiscuousBridge
 	}

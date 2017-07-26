@@ -29,6 +29,7 @@ import (
 	clientgenargs "k8s.io/kube-gen/cmd/client-gen/args"
 	"k8s.io/kube-gen/cmd/client-gen/generators/fake"
 	"k8s.io/kube-gen/cmd/client-gen/generators/scheme"
+	"k8s.io/kube-gen/cmd/client-gen/generators/util"
 	"k8s.io/kube-gen/cmd/client-gen/path"
 	clientgentypes "k8s.io/kube-gen/cmd/client-gen/types"
 
@@ -169,7 +170,7 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			return extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == true
+			return util.MustParseClientGenTags(t.SecondClosestCommentLines).GenerateClient
 		},
 	}
 }
@@ -341,8 +342,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				}
 			} else {
 				// User has not specified any override for this group version.
-				// filter out types which dont have genclient=true.
-				if extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == false {
+				// filter out types which dont have genclient.
+				if tags := util.MustParseClientGenTags(t.SecondClosestCommentLines); !tags.GenerateClient {
 					continue
 				}
 			}

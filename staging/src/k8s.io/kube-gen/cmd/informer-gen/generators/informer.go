@@ -24,6 +24,8 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+
+	"k8s.io/kube-gen/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/kube-gen/cmd/client-gen/types"
 
 	"github.com/golang/glog"
@@ -69,6 +71,11 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 	clientSetInterface := c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"})
 	informerFor := "InformerFor"
 
+	tags, err := util.ParseClientGenTags(t.SecondClosestCommentLines)
+	if err != nil {
+		return err
+	}
+
 	m := map[string]interface{}{
 		"apiScheme":                       c.Universe.Type(apiScheme),
 		"cacheIndexers":                   c.Universe.Type(cacheIndexers),
@@ -84,7 +91,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"listOptions":                     c.Universe.Type(listOptions),
 		"lister":                          c.Universe.Type(types.Name{Package: listerPackage, Name: t.Name.Name + "Lister"}),
 		"namespaceAll":                    c.Universe.Type(metav1NamespaceAll),
-		"namespaced":                      !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines),
+		"namespaced":                      !tags.NonNamespaced,
 		"newLister":                       c.Universe.Function(types.Name{Package: listerPackage, Name: "New" + t.Name.Name + "Lister"}),
 		"runtimeObject":                   c.Universe.Type(runtimeObject),
 		"timeDuration":                    c.Universe.Type(timeDuration),
@@ -96,11 +103,8 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 
 	sw.Do(typeInformerInterface, m)
 	sw.Do(typeInformerStruct, m)
-	if len(g.groupVersion.Version) == 0 {
-		sw.Do(typeInformerConstructorInternal, m)
-	} else {
-		sw.Do(typeInformerConstructorVersioned, m)
-	}
+	sw.Do(typeInformerPublicConstructor, m)
+	sw.Do(typeInformerConstructor, m)
 	sw.Do(typeInformerInformer, m)
 	sw.Do(typeInformerLister, m)
 
@@ -122,49 +126,36 @@ type $.type|private$Informer struct {
 }
 `
 
-var typeInformerConstructorInternal = `
-func new$.type|public$Informer(client $.clientSetInterface|raw$, resyncPeriod $.timeDuration|raw$) $.cacheSharedIndexInformer|raw$ {
-	sharedIndexInformer := $.cacheNewSharedIndexInformer|raw$(
+var typeInformerPublicConstructor = `
+// New$.type|public$Informer constructs a new informer for $.type|public$ type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func New$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$) $.cacheSharedIndexInformer|raw$ {
+	return $.cacheNewSharedIndexInformer|raw$(
 		&$.cacheListWatch|raw${
 			ListFunc: func(options $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$$.namespaceAll|raw$$end$).List(options)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).List(options)
 			},
 			WatchFunc: func(options $.v1ListOptions|raw$) ($.watchInterface|raw$, error) {
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$$.namespaceAll|raw$$end$).Watch(options)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch(options)
 			},
 		},
 		&$.type|raw${},
 		resyncPeriod,
-		$.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$},
+		indexers,
 	)
-
-	return sharedIndexInformer
 }
 `
 
-var typeInformerConstructorVersioned = `
-func new$.type|public$Informer(client $.clientSetInterface|raw$, resyncPeriod $.timeDuration|raw$) $.cacheSharedIndexInformer|raw$ {
-	sharedIndexInformer := $.cacheNewSharedIndexInformer|raw$(
-		&$.cacheListWatch|raw${
-			ListFunc: func(options $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$$.namespaceAll|raw$$end$).List(options)
-			},
-			WatchFunc: func(options $.v1ListOptions|raw$) ($.watchInterface|raw$, error) {
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$$.namespaceAll|raw$$end$).Watch(options)
-			},
-		},
-		&$.type|raw${},
-		resyncPeriod,
-		$.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$},
-	)
-
-	return sharedIndexInformer
+var typeInformerConstructor = `
+func default$.type|public$Informer(client $.clientSetInterface|raw$, resyncPeriod $.timeDuration|raw$) $.cacheSharedIndexInformer|raw$ {
+	return New$.type|public$Informer(client, $if .namespaced$$.namespaceAll|raw$, $end$resyncPeriod, $.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$})
 }
 `
 
 var typeInformerInformer = `
 func (f *$.type|private$Informer) Informer() $.cacheSharedIndexInformer|raw$ {
-	return f.factory.$.informerFor$(&$.type|raw${}, new$.type|public$Informer)
+	return f.factory.$.informerFor$(&$.type|raw${}, default$.type|public$Informer)
 }
 `
 

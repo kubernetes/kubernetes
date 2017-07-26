@@ -59,6 +59,41 @@ func newStatefulSets(c *AppsClient, namespace string) *statefulSets {
 	}
 }
 
+// Get takes name of the statefulSet, and returns the corresponding statefulSet object, and an error if there is any.
+func (c *statefulSets) Get(name string, options v1.GetOptions) (result *apps.StatefulSet, err error) {
+	result = &apps.StatefulSet{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("statefulsets").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of StatefulSets that match those selectors.
+func (c *statefulSets) List(opts v1.ListOptions) (result *apps.StatefulSetList, err error) {
+	result = &apps.StatefulSetList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("statefulsets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested statefulSets.
+func (c *statefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("statefulsets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a statefulSet and creates it.  Returns the server's representation of the statefulSet, and an error, if there is any.
 func (c *statefulSets) Create(statefulSet *apps.StatefulSet) (result *apps.StatefulSet, err error) {
 	result = &apps.StatefulSet{}
@@ -85,7 +120,7 @@ func (c *statefulSets) Update(statefulSet *apps.StatefulSet) (result *apps.State
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *statefulSets) UpdateStatus(statefulSet *apps.StatefulSet) (result *apps.StatefulSet, err error) {
 	result = &apps.StatefulSet{}
@@ -120,41 +155,6 @@ func (c *statefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions v
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the statefulSet, and returns the corresponding statefulSet object, and an error if there is any.
-func (c *statefulSets) Get(name string, options v1.GetOptions) (result *apps.StatefulSet, err error) {
-	result = &apps.StatefulSet{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("statefulsets").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of StatefulSets that match those selectors.
-func (c *statefulSets) List(opts v1.ListOptions) (result *apps.StatefulSetList, err error) {
-	result = &apps.StatefulSetList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("statefulsets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested statefulSets.
-func (c *statefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("statefulsets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched statefulSet.

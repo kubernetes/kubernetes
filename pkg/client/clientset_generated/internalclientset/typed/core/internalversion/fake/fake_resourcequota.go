@@ -36,50 +36,7 @@ var resourcequotasResource = schema.GroupVersionResource{Group: "", Version: "",
 
 var resourcequotasKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "ResourceQuota"}
 
-func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(resourcequotasResource, c.ns, resourceQuota), &api.ResourceQuota{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.ResourceQuota), err
-}
-
-func (c *FakeResourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(resourcequotasResource, c.ns, resourceQuota), &api.ResourceQuota{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.ResourceQuota), err
-}
-
-func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(resourcequotasResource, "status", c.ns, resourceQuota), &api.ResourceQuota{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.ResourceQuota), err
-}
-
-func (c *FakeResourceQuotas) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(resourcequotasResource, c.ns, name), &api.ResourceQuota{})
-
-	return err
-}
-
-func (c *FakeResourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(resourcequotasResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &api.ResourceQuotaList{})
-	return err
-}
-
+// Get takes name of the resourceQuota, and returns the corresponding resourceQuota object, and an error if there is any.
 func (c *FakeResourceQuotas) Get(name string, options v1.GetOptions) (result *api.ResourceQuota, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(resourcequotasResource, c.ns, name), &api.ResourceQuota{})
@@ -90,6 +47,7 @@ func (c *FakeResourceQuotas) Get(name string, options v1.GetOptions) (result *ap
 	return obj.(*api.ResourceQuota), err
 }
 
+// List takes label and field selectors, and returns the list of ResourceQuotas that match those selectors.
 func (c *FakeResourceQuotas) List(opts v1.ListOptions) (result *api.ResourceQuotaList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(resourcequotasResource, resourcequotasKind, c.ns, opts), &api.ResourceQuotaList{})
@@ -116,6 +74,56 @@ func (c *FakeResourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error)
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(resourcequotasResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a resourceQuota and creates it.  Returns the server's representation of the resourceQuota, and an error, if there is any.
+func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(resourcequotasResource, c.ns, resourceQuota), &api.ResourceQuota{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.ResourceQuota), err
+}
+
+// Update takes the representation of a resourceQuota and updates it. Returns the server's representation of the resourceQuota, and an error, if there is any.
+func (c *FakeResourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(resourcequotasResource, c.ns, resourceQuota), &api.ResourceQuota{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.ResourceQuota), err
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(resourcequotasResource, "status", c.ns, resourceQuota), &api.ResourceQuota{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.ResourceQuota), err
+}
+
+// Delete takes name of the resourceQuota and deletes it. Returns an error if one occurs.
+func (c *FakeResourceQuotas) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(resourcequotasResource, c.ns, name), &api.ResourceQuota{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeResourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(resourcequotasResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &api.ResourceQuotaList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched resourceQuota.

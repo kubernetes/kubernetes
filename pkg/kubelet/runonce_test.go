@@ -24,7 +24,6 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -55,19 +54,18 @@ func TestRunOnce(t *testing.T) {
 	cadvisor := &cadvisortest.Mock{}
 	cadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
 	cadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
-		Usage:     400 * mb,
-		Capacity:  1000 * mb,
-		Available: 600 * mb,
+		Usage:     400,
+		Capacity:  1000,
+		Available: 600,
 	}, nil)
 	cadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
-		Usage:    9 * mb,
-		Capacity: 10 * mb,
+		Usage:    9,
+		Capacity: 10,
 	}, nil)
 	fakeSecretManager := secret.NewFakeManager()
 	fakeConfigMapManager := configmap.NewFakeManager()
 	podManager := kubepod.NewBasicPodManager(
 		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager)
-	diskSpaceManager, _ := newDiskSpaceManager(cadvisor, DiskSpacePolicy{})
 	fakeRuntime := &containertest.FakeRuntime{}
 	basePath, err := utiltesting.MkTmpdir("kubelet")
 	if err != nil {
@@ -82,7 +80,6 @@ func TestRunOnce(t *testing.T) {
 		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}),
 		podManager:       podManager,
 		os:               &containertest.FakeOS{},
-		diskSpaceManager: diskSpaceManager,
 		containerRuntime: fakeRuntime,
 		reasonCache:      NewReasonCache(),
 		clock:            clock.RealClock{},
@@ -117,7 +114,7 @@ func TestRunOnce(t *testing.T) {
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
 	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod, kb.containerRuntime)
-	nodeRef := &clientv1.ObjectReference{
+	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string(kb.nodeName),
 		UID:       types.UID(kb.nodeName),

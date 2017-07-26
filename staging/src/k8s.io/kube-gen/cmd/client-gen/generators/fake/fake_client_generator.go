@@ -20,12 +20,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/golang/glog"
-
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/types"
+
 	clientgenargs "k8s.io/kube-gen/cmd/client-gen/args"
 	scheme "k8s.io/kube-gen/cmd/client-gen/generators/scheme"
+	"k8s.io/kube-gen/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/kube-gen/cmd/client-gen/types"
 )
 
@@ -78,17 +78,9 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			return extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == true
+			return util.MustParseClientGenTags(t.SecondClosestCommentLines).GenerateClient
 		},
 	}
-}
-
-func extractBoolTagOrDie(key string, lines []string) bool {
-	val, err := types.ExtractSingleBoolCommentTag("+", key, false, lines)
-	if err != nil {
-		glog.Fatalf(err.Error())
-	}
-	return val
 }
 
 func PackageForClientset(customArgs clientgenargs.Args, fakeClientsetPackage string, boilerplate []byte, generatedBy string) generator.Package {

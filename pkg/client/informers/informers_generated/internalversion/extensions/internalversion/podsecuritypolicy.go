@@ -41,8 +41,11 @@ type podSecurityPolicyInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newPodSecurityPolicyInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewPodSecurityPolicyInformer constructs a new informer for PodSecurityPolicy type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewPodSecurityPolicyInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.Extensions().PodSecurityPolicies().List(options)
@@ -53,14 +56,16 @@ func newPodSecurityPolicyInformer(client internalclientset.Interface, resyncPeri
 		},
 		&extensions.PodSecurityPolicy{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultPodSecurityPolicyInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewPodSecurityPolicyInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *podSecurityPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions.PodSecurityPolicy{}, newPodSecurityPolicyInformer)
+	return f.factory.InformerFor(&extensions.PodSecurityPolicy{}, defaultPodSecurityPolicyInformer)
 }
 
 func (f *podSecurityPolicyInformer) Lister() internalversion.PodSecurityPolicyLister {

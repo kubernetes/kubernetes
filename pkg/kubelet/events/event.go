@@ -53,7 +53,6 @@ const (
 	NodeSelectorMismatching              = "NodeSelectorMismatching"
 	InsufficientFreeCPU                  = "InsufficientFreeCPU"
 	InsufficientFreeMemory               = "InsufficientFreeMemory"
-	OutOfDisk                            = "OutOfDisk"
 	HostNetworkNotSupported              = "HostNetworkNotSupported"
 	UndefinedShaper                      = "NilShaper"
 	NodeRebooted                         = "Rebooted"

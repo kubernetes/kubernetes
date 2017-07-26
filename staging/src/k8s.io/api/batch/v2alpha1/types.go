@@ -51,7 +51,7 @@ type JobTemplateSpec struct {
 	Spec batchv1.JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CronJob represents the configuration of a single cron job.

@@ -25,7 +25,6 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -93,11 +92,11 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 		kubeClient: kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "job-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 		},
 		expectations: controller.NewControllerExpectations(),
 		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "job"),
-		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "job-controller"}),
+		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 	}
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -164,7 +163,7 @@ func (jm *JobController) getPodJobs(pod *v1.Pod) []*batch.Job {
 
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
-// of the corrrect Kind.
+// of the correct Kind.
 func (jm *JobController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *batch.Job {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.

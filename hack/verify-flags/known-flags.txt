@@ -449,7 +449,6 @@ log-flush-frequency
 log-lines-total
 logexporter-gcs-path
 long-running-request-regexp
-low-diskspace-threshold-mb
 make-iptables-util-chains
 make-symlinks
 manifest-url
@@ -521,7 +520,6 @@ oidc-issuer-url
 oidc-username-claim
 only-idl
 oom-score-adj
-outofdisk-transition-frequency
 output-base
 output-directory
 output-file-base

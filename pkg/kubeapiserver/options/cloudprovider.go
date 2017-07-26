@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
 	"k8s.io/api/core/v1"
@@ -55,6 +56,8 @@ func (s *CloudProviderOptions) DefaultExternalHost(genericoptions *genericoption
 	}
 
 	if cloudprovider.IsCloudProvider(s.CloudProvider) {
+		glog.Info("--external-hostname was not specified. Trying to get it from the cloud provider.")
+
 		cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 		if err != nil {
 			return fmt.Errorf("%q cloud provider could not be initialized: %v", s.CloudProvider, err)

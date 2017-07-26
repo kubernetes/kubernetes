@@ -576,7 +576,7 @@ EOF
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 node_taints: '$(echo "${NODE_TAINTS}" | sed -e "s/'/''/g")'
 EOF
-    fi    
+    fi
     if [ -n "${EVICTION_HARD:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 eviction_hard: '$(echo "${EVICTION_HARD}" | sed -e "s/'/''/g")'
@@ -753,12 +753,16 @@ EOF
 }
 
 function salt-node-role() {
+  local -r kubelet_bootstrap_kubeconfig="/srv/salt-overlay/salt/kubelet/bootstrap-kubeconfig"
+  local -r kubelet_kubeconfig="/srv/salt-overlay/salt/kubelet/kubeconfig"
   cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-pool
   cloud: gce
   api_servers: '${KUBERNETES_MASTER_NAME}'
+  kubelet_bootstrap_kubeconfig: /var/lib/kubelet/bootstrap-kubeconfig
+  kubelet_kubeconfig: /var/lib/kubelet/kubeconfig
 EOF
 }
 

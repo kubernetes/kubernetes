@@ -15,6 +15,7 @@ go_library(
         "dns_configmap.go",
         "doc.go",
         "firewall.go",
+        "framework.go",
         "kube_proxy.go",
         "network_policy.go",
         "networking.go",

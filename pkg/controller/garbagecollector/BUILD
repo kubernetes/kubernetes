@@ -26,6 +26,7 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
         "//pkg/util/metrics:go_default_library",
+        "//pkg/util/reflector/prometheus:go_default_library",
         "//pkg/util/workqueue/prometheus:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",

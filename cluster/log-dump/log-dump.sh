@@ -17,6 +17,7 @@
 # Call this to dump all master and node logs into the folder specified in $1
 # (defaults to _artifacts). Only works if the provider supports SSH.
 
+# TODO(shyamjvs): This script should be moved to test/e2e which is where it ideally belongs.
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -282,7 +283,7 @@ function dump_nodes_with_logexporter() {
   sed -i'' -e "s@{{.EnableHollowNodeLogs}}@${enable_hollow_node_logs}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
 
   # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
-  KUBECTL="${KUBECTL:-${KUBE_ROOT}/cluster/kubectl.sh}"
+  KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
   "${KUBECTL}" create -f "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
 
   # Give some time for the pods to finish uploading logs.

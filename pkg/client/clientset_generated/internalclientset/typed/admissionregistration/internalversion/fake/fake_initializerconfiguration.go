@@ -35,37 +35,7 @@ var initializerconfigurationsResource = schema.GroupVersionResource{Group: "admi
 
 var initializerconfigurationsKind = schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "", Kind: "InitializerConfiguration"}
 
-func (c *FakeInitializerConfigurations) Create(initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(initializerconfigurationsResource, initializerConfiguration), &admissionregistration.InitializerConfiguration{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*admissionregistration.InitializerConfiguration), err
-}
-
-func (c *FakeInitializerConfigurations) Update(initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(initializerconfigurationsResource, initializerConfiguration), &admissionregistration.InitializerConfiguration{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*admissionregistration.InitializerConfiguration), err
-}
-
-func (c *FakeInitializerConfigurations) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(initializerconfigurationsResource, name), &admissionregistration.InitializerConfiguration{})
-	return err
-}
-
-func (c *FakeInitializerConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(initializerconfigurationsResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &admissionregistration.InitializerConfigurationList{})
-	return err
-}
-
+// Get takes name of the initializerConfiguration, and returns the corresponding initializerConfiguration object, and an error if there is any.
 func (c *FakeInitializerConfigurations) Get(name string, options v1.GetOptions) (result *admissionregistration.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(initializerconfigurationsResource, name), &admissionregistration.InitializerConfiguration{})
@@ -75,6 +45,7 @@ func (c *FakeInitializerConfigurations) Get(name string, options v1.GetOptions) 
 	return obj.(*admissionregistration.InitializerConfiguration), err
 }
 
+// List takes label and field selectors, and returns the list of InitializerConfigurations that match those selectors.
 func (c *FakeInitializerConfigurations) List(opts v1.ListOptions) (result *admissionregistration.InitializerConfigurationList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(initializerconfigurationsResource, initializerconfigurationsKind, opts), &admissionregistration.InitializerConfigurationList{})
@@ -99,6 +70,41 @@ func (c *FakeInitializerConfigurations) List(opts v1.ListOptions) (result *admis
 func (c *FakeInitializerConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(initializerconfigurationsResource, opts))
+}
+
+// Create takes the representation of a initializerConfiguration and creates it.  Returns the server's representation of the initializerConfiguration, and an error, if there is any.
+func (c *FakeInitializerConfigurations) Create(initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(initializerconfigurationsResource, initializerConfiguration), &admissionregistration.InitializerConfiguration{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*admissionregistration.InitializerConfiguration), err
+}
+
+// Update takes the representation of a initializerConfiguration and updates it. Returns the server's representation of the initializerConfiguration, and an error, if there is any.
+func (c *FakeInitializerConfigurations) Update(initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(initializerconfigurationsResource, initializerConfiguration), &admissionregistration.InitializerConfiguration{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*admissionregistration.InitializerConfiguration), err
+}
+
+// Delete takes name of the initializerConfiguration and deletes it. Returns an error if one occurs.
+func (c *FakeInitializerConfigurations) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(initializerconfigurationsResource, name), &admissionregistration.InitializerConfiguration{})
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeInitializerConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(initializerconfigurationsResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &admissionregistration.InitializerConfigurationList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched initializerConfiguration.

@@ -91,6 +91,13 @@ const (
 // if the Kubelet fails to start.
 func (e *E2EServices) startKubelet() (*server, error) {
 	glog.Info("Starting kubelet")
+
+	// Build kubeconfig
+	kubeconfigPath, err := createKubeconfigCWD()
+	if err != nil {
+		return nil, err
+	}
+
 	// Create pod manifest path
 	manifestPath, err := createPodManifestDirectory()
 	if err != nil {
@@ -128,7 +135,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		)
 	}
 	cmdArgs = append(cmdArgs,
-		"--api-servers", getAPIServerClientURL(),
+		"--kubeconfig", kubeconfigPath,
 		"--address", "0.0.0.0",
 		"--port", kubeletPort,
 		"--read-only-port", kubeletReadOnlyPort,
@@ -204,6 +211,52 @@ func createPodManifestDirectory() (string, error) {
 		return "", fmt.Errorf("failed to create static pod manifest directory: %v", err)
 	}
 	return path, nil
+}
+
+// createKubeconfig creates a kubeconfig file at the fully qualified `path`. The parent dirs must exist.
+func createKubeconfig(path string) error {
+	kubeconfig := []byte(`apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+clusters:
+- cluster:
+    server: ` + getAPIServerClientURL() + `
+    insecure-skip-tls-verify: true
+  name: local
+contexts:
+- context:
+    cluster: local
+    user: kubelet
+  name: local-context
+current-context: local-context`)
+
+	if err := ioutil.WriteFile(path, kubeconfig, 0666); err != nil {
+		return err
+	}
+	return nil
+}
+
+func kubeconfigCWDPath() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current working directory: %v", err)
+	}
+	return filepath.Join(cwd, "kubeconfig"), nil
+}
+
+// like createKubeconfig, but creates kubeconfig at current-working-directory/kubeconfig
+// returns a fully-qualified path to the kubeconfig file
+func createKubeconfigCWD() (string, error) {
+	kubeconfigPath, err := kubeconfigCWDPath()
+	if err != nil {
+		return "", err
+	}
+
+	if err = createKubeconfig(kubeconfigPath); err != nil {
+		return "", err
+	}
+	return kubeconfigPath, nil
 }
 
 // getCNIBinDirectory returns CNI directory.

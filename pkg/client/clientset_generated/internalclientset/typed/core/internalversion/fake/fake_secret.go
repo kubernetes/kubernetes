@@ -36,40 +36,7 @@ var secretsResource = schema.GroupVersionResource{Group: "", Version: "", Resour
 
 var secretsKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "Secret"}
 
-func (c *FakeSecrets) Create(secret *api.Secret) (result *api.Secret, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(secretsResource, c.ns, secret), &api.Secret{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.Secret), err
-}
-
-func (c *FakeSecrets) Update(secret *api.Secret) (result *api.Secret, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(secretsResource, c.ns, secret), &api.Secret{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.Secret), err
-}
-
-func (c *FakeSecrets) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(secretsResource, c.ns, name), &api.Secret{})
-
-	return err
-}
-
-func (c *FakeSecrets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(secretsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &api.SecretList{})
-	return err
-}
-
+// Get takes name of the secret, and returns the corresponding secret object, and an error if there is any.
 func (c *FakeSecrets) Get(name string, options v1.GetOptions) (result *api.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(secretsResource, c.ns, name), &api.Secret{})
@@ -80,6 +47,7 @@ func (c *FakeSecrets) Get(name string, options v1.GetOptions) (result *api.Secre
 	return obj.(*api.Secret), err
 }
 
+// List takes label and field selectors, and returns the list of Secrets that match those selectors.
 func (c *FakeSecrets) List(opts v1.ListOptions) (result *api.SecretList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(secretsResource, secretsKind, c.ns, opts), &api.SecretList{})
@@ -106,6 +74,44 @@ func (c *FakeSecrets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(secretsResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.
+func (c *FakeSecrets) Create(secret *api.Secret) (result *api.Secret, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(secretsResource, c.ns, secret), &api.Secret{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.Secret), err
+}
+
+// Update takes the representation of a secret and updates it. Returns the server's representation of the secret, and an error, if there is any.
+func (c *FakeSecrets) Update(secret *api.Secret) (result *api.Secret, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(secretsResource, c.ns, secret), &api.Secret{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.Secret), err
+}
+
+// Delete takes name of the secret and deletes it. Returns an error if one occurs.
+func (c *FakeSecrets) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(secretsResource, c.ns, name), &api.Secret{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeSecrets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(secretsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &api.SecretList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched secret.

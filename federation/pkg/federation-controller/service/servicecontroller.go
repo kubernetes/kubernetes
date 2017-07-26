@@ -25,7 +25,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -102,7 +101,7 @@ type ServiceController struct {
 func New(federationClient fedclientset.Interface) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(federationClient))
-	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: UserAgentName})
+	recorder := broadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: UserAgentName})
 
 	s := &ServiceController{
 		federationClient:      federationClient,

@@ -25,7 +25,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -68,7 +67,7 @@ type managerImpl struct {
 	// captures when a node condition was last observed based on a threshold being met
 	nodeConditionsLastObservedAt nodeConditionsObservedAt
 	// nodeRef is a reference to the node
-	nodeRef *clientv1.ObjectReference
+	nodeRef *v1.ObjectReference
 	// used to record events about the node
 	recorder record.EventRecorder
 	// used to measure usage stats on system
@@ -100,7 +99,7 @@ func NewManager(
 	imageGC ImageGC,
 	containerGC ContainerGC,
 	recorder record.EventRecorder,
-	nodeRef *clientv1.ObjectReference,
+	nodeRef *v1.ObjectReference,
 	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:           clock,

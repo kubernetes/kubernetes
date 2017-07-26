@@ -17,20 +17,8 @@ limitations under the License.
 package generators
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/gengo/types"
 )
-
-// extractBoolTagOrDie gets the comment-tags for the key and asserts that, if
-// it exists, the value is boolean.  If the tag did not exist, it returns
-// false.
-func extractBoolTagOrDie(key string, lines []string) bool {
-	val, err := types.ExtractSingleBoolCommentTag("+", key, false, lines)
-	if err != nil {
-		glog.Fatalf(err.Error())
-	}
-	return val
-}
 
 // extractTag gets the comment-tags for the key.  If the tag did not exist, it
 // returns the empty string.

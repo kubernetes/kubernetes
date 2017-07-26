@@ -24,6 +24,8 @@ import (
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/types"
+
+	"k8s.io/kube-gen/cmd/client-gen/generators/util"
 )
 
 // expansionGenerator produces a file for a expansion interfaces.
@@ -41,10 +43,10 @@ func (g *expansionGenerator) Filter(c *generator.Context, t *types.Type) bool {
 func (g *expansionGenerator) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	for _, t := range g.types {
+		tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
 		if _, err := os.Stat(filepath.Join(g.packagePath, strings.ToLower(t.Name.Name+"_expansion.go"))); os.IsNotExist(err) {
 			sw.Do(expansionInterfaceTemplate, t)
-			namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
-			if namespaced {
+			if !tags.NonNamespaced {
 				sw.Do(namespacedExpansionInterfaceTemplate, t)
 			}
 		}

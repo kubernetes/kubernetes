@@ -51,9 +51,8 @@ type KubeletFlags struct {
 	KubeConfig          flag.StringFlag
 	BootstrapKubeconfig string
 
-	// If true, an invalid KubeConfig will result in the Kubelet exiting with an error.
+	// RequireKubeConfig is deprecated! A valid KubeConfig is now required if --kubeconfig is provided.
 	RequireKubeConfig bool
-	APIServerList     []string // Deprecated -- use KubeConfig instead
 
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
@@ -97,8 +96,9 @@ func NewKubeletServer() *KubeletServer {
 	api.Scheme.Convert(versioned, &config, nil)
 	return &KubeletServer{
 		KubeletFlags: KubeletFlags{
-			KubeConfig:              flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
+			// TODO(#41161:v1.10.0): Remove the default kubeconfig path and --require-kubeconfig.
 			RequireKubeConfig:       false,
+			KubeConfig:              flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 			ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
 		},
 		KubeletConfiguration: config,
@@ -118,8 +118,10 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	f.ContainerRuntimeOptions.AddFlags(fs)
 
-	fs.Var(&f.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to connect to the API server. --api-servers will be used for the location unless --require-kubeconfig is set.")
-	fs.BoolVar(&f.RequireKubeConfig, "require-kubeconfig", f.RequireKubeConfig, "If true the Kubelet will exit if there are configuration errors, and will ignore the value of --api-servers in favor of the server defined in the kubeconfig file.")
+	fs.Var(&f.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to connect to the API server.")
+	// TODO(#41161:v1.10.0): Remove the default kubeconfig path and --require-kubeconfig.
+	fs.BoolVar(&f.RequireKubeConfig, "require-kubeconfig", f.RequireKubeConfig, "This flag is no longer necessary. It has been deprecated and will be removed in a future version.")
+	fs.MarkDeprecated("require-kubeconfig", "You no longer need to use --require-kubeconfig. This will be removed in a future version. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode unless --require-kubeconfig=true is also set. In the latter case, the legacy default kubeconfig path will be used until --require-kubeconfig is removed.")
 
 	fs.MarkDeprecated("experimental-bootstrap-kubeconfig", "Use --bootstrap-kubeconfig")
 	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "deprecated: use --bootstrap-kubeconfig")
@@ -128,14 +130,10 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 		"On success, a kubeconfig file referencing the generated client certificate and key is written to the path specified by --kubeconfig. "+
 		"The client certificate and key file will be stored in the directory pointed by --cert-dir.")
 
-	// DEPRECATED: Remove these flags at the beginning of 1.5.
-	fs.StringSliceVar(&f.APIServerList, "api-servers", []string{}, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
-	fs.MarkDeprecated("api-servers", "Use --kubeconfig instead. Will be removed in a future version.")
-
 	fs.BoolVar(&f.ReallyCrashForTesting, "really-crash-for-testing", f.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&f.ChaosChance, "chaos-chance", f.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing.")
 
-	fs.BoolVar(&f.RunOnce, "runonce", f.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api-servers, and --enable-server")
+	fs.BoolVar(&f.RunOnce, "runonce", f.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --enable-server")
 
 	fs.StringVar(&f.HostnameOverride, "hostname-override", f.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 
@@ -213,7 +211,7 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&c.HealthzPort, "healthz-port", c.HealthzPort, "The port of the localhost healthz endpoint")
 	fs.Var(componentconfig.IPVar{Val: &c.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on. (set to 0.0.0.0 for all interfaces)")
 	fs.Int32Var(&c.OOMScoreAdj, "oom-score-adj", c.OOMScoreAdj, "The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]")
-	fs.BoolVar(&c.RegisterNode, "register-node", c.RegisterNode, "Register the node with the apiserver (defaults to true if --api-servers is set)")
+	fs.BoolVar(&c.RegisterNode, "register-node", c.RegisterNode, "Register the node with the apiserver. If --kubeconfig is not provided, this flag is irrelevant, as the Kubelet won't have an apiserver to register with. Default=true.")
 	fs.StringVar(&c.ClusterDomain, "cluster-domain", c.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	fs.StringVar(&c.MasterServiceNamespace, "master-service-namespace", c.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.MarkDeprecated("master-service-namespace", "This flag will be removed in a future version.")
@@ -226,8 +224,6 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&c.ImageMinimumGCAge.Duration, "minimum-image-ttl-duration", c.ImageMinimumGCAge.Duration, "Minimum age for an unused image before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'.")
 	fs.Int32Var(&c.ImageGCHighThresholdPercent, "image-gc-high-threshold", c.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run.")
 	fs.Int32Var(&c.ImageGCLowThresholdPercent, "image-gc-low-threshold", c.ImageGCLowThresholdPercent, "The percent of disk usage before which image garbage collection is never run. Lowest disk usage to garbage collect to.")
-	fs.Int32Var(&c.LowDiskSpaceThresholdMB, "low-diskspace-threshold-mb", c.LowDiskSpaceThresholdMB, "The absolute free disk space, in MB, to maintain. When disk space falls below this threshold, new pods would be rejected.")
-	fs.MarkDeprecated("low-diskspace-threshold-mb", "Use --eviction-hard instead. Will be removed in a future version.")
 	fs.DurationVar(&c.VolumeStatsAggPeriod.Duration, "volume-stats-agg-period", c.VolumeStatsAggPeriod.Duration, "Specifies interval for kubelet to calculate and cache the volume disk usage for all pods and volumes.  To disable volume calculations, set to 0.")
 	fs.StringVar(&c.VolumePluginDir, "volume-plugin-dir", c.VolumePluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for additional third party volume plugins")
 	fs.StringVar(&c.CloudProvider, "cloud-provider", c.CloudProvider, "The provider for cloud services. By default, kubelet will attempt to auto-detect the cloud provider. Specify empty string for running with no cloud provider.")
@@ -269,8 +265,6 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&c.KubeAPIQPS, "kube-api-qps", c.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.Int32Var(&c.KubeAPIBurst, "kube-api-burst", c.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.BoolVar(&c.SerializeImagePulls, "serialize-image-pulls", c.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details.")
-	fs.DurationVar(&c.OutOfDiskTransitionFrequency.Duration, "outofdisk-transition-frequency", c.OutOfDiskTransitionFrequency.Duration, "Duration for which the kubelet has to wait before transitioning out of out-of-disk node condition status.")
-	fs.MarkDeprecated("outofdisk-transition-frequency", "Use --eviction-pressure-transition-period instead. Will be removed in a future version.")
 
 	fs.BoolVar(&c.EnableCustomMetrics, "enable-custom-metrics", c.EnableCustomMetrics, "Support for gathering custom metrics.")
 	fs.StringVar(&c.RuntimeCgroups, "runtime-cgroups", c.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")

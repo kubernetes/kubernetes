@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSet represents a set of pods with consistent identities.
@@ -199,7 +199,7 @@ type StatefulSetList struct {
 	Items []StatefulSet
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ControllerRevision implements an immutable snapshot of state data. Clients

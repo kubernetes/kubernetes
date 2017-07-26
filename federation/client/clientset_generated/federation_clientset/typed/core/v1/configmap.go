@@ -58,6 +58,41 @@ func newConfigMaps(c *CoreV1Client, namespace string) *configMaps {
 	}
 }
 
+// Get takes name of the configMap, and returns the corresponding configMap object, and an error if there is any.
+func (c *configMaps) Get(name string, options meta_v1.GetOptions) (result *v1.ConfigMap, err error) {
+	result = &v1.ConfigMap{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("configmaps").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of ConfigMaps that match those selectors.
+func (c *configMaps) List(opts meta_v1.ListOptions) (result *v1.ConfigMapList, err error) {
+	result = &v1.ConfigMapList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("configmaps").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested configMaps.
+func (c *configMaps) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("configmaps").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a configMap and creates it.  Returns the server's representation of the configMap, and an error, if there is any.
 func (c *configMaps) Create(configMap *v1.ConfigMap) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
@@ -103,41 +138,6 @@ func (c *configMaps) DeleteCollection(options *meta_v1.DeleteOptions, listOption
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the configMap, and returns the corresponding configMap object, and an error if there is any.
-func (c *configMaps) Get(name string, options meta_v1.GetOptions) (result *v1.ConfigMap, err error) {
-	result = &v1.ConfigMap{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("configmaps").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ConfigMaps that match those selectors.
-func (c *configMaps) List(opts meta_v1.ListOptions) (result *v1.ConfigMapList, err error) {
-	result = &v1.ConfigMapList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("configmaps").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested configMaps.
-func (c *configMaps) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("configmaps").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched configMap.

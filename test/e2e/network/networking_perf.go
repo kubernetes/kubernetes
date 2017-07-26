@@ -37,7 +37,7 @@ const (
 
 // Declared as Flakey since it has not been proven to run in parallel on small nodes or slow networks in CI
 // TODO jayunit100 : Retag this test according to semantics from #22401
-var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:Networking-Performance]", func() {
+var _ = SIGDescribe("Networking IPerf [Experimental] [Slow] [Feature:Networking-Performance]", func() {
 
 	f := framework.NewDefaultFramework("network-perf")
 

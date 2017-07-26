@@ -36,50 +36,7 @@ var flundersResource = schema.GroupVersionResource{Group: "wardle.k8s.io", Versi
 
 var flundersKind = schema.GroupVersionKind{Group: "wardle.k8s.io", Version: "", Kind: "Flunder"}
 
-func (c *FakeFlunders) Create(flunder *wardle.Flunder) (result *wardle.Flunder, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(flundersResource, c.ns, flunder), &wardle.Flunder{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*wardle.Flunder), err
-}
-
-func (c *FakeFlunders) Update(flunder *wardle.Flunder) (result *wardle.Flunder, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(flundersResource, c.ns, flunder), &wardle.Flunder{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*wardle.Flunder), err
-}
-
-func (c *FakeFlunders) UpdateStatus(flunder *wardle.Flunder) (*wardle.Flunder, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(flundersResource, "status", c.ns, flunder), &wardle.Flunder{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*wardle.Flunder), err
-}
-
-func (c *FakeFlunders) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(flundersResource, c.ns, name), &wardle.Flunder{})
-
-	return err
-}
-
-func (c *FakeFlunders) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(flundersResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &wardle.FlunderList{})
-	return err
-}
-
+// Get takes name of the flunder, and returns the corresponding flunder object, and an error if there is any.
 func (c *FakeFlunders) Get(name string, options v1.GetOptions) (result *wardle.Flunder, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(flundersResource, c.ns, name), &wardle.Flunder{})
@@ -90,6 +47,7 @@ func (c *FakeFlunders) Get(name string, options v1.GetOptions) (result *wardle.F
 	return obj.(*wardle.Flunder), err
 }
 
+// List takes label and field selectors, and returns the list of Flunders that match those selectors.
 func (c *FakeFlunders) List(opts v1.ListOptions) (result *wardle.FlunderList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(flundersResource, flundersKind, c.ns, opts), &wardle.FlunderList{})
@@ -116,6 +74,56 @@ func (c *FakeFlunders) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(flundersResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a flunder and creates it.  Returns the server's representation of the flunder, and an error, if there is any.
+func (c *FakeFlunders) Create(flunder *wardle.Flunder) (result *wardle.Flunder, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(flundersResource, c.ns, flunder), &wardle.Flunder{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*wardle.Flunder), err
+}
+
+// Update takes the representation of a flunder and updates it. Returns the server's representation of the flunder, and an error, if there is any.
+func (c *FakeFlunders) Update(flunder *wardle.Flunder) (result *wardle.Flunder, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(flundersResource, c.ns, flunder), &wardle.Flunder{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*wardle.Flunder), err
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeFlunders) UpdateStatus(flunder *wardle.Flunder) (*wardle.Flunder, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(flundersResource, "status", c.ns, flunder), &wardle.Flunder{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*wardle.Flunder), err
+}
+
+// Delete takes name of the flunder and deletes it. Returns an error if one occurs.
+func (c *FakeFlunders) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(flundersResource, c.ns, name), &wardle.Flunder{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeFlunders) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(flundersResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &wardle.FlunderList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched flunder.

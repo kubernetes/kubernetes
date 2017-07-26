@@ -57,6 +57,38 @@ func newPersistentVolumes(c *CoreClient) *persistentVolumes {
 	}
 }
 
+// Get takes name of the persistentVolume, and returns the corresponding persistentVolume object, and an error if there is any.
+func (c *persistentVolumes) Get(name string, options v1.GetOptions) (result *api.PersistentVolume, err error) {
+	result = &api.PersistentVolume{}
+	err = c.client.Get().
+		Resource("persistentvolumes").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of PersistentVolumes that match those selectors.
+func (c *persistentVolumes) List(opts v1.ListOptions) (result *api.PersistentVolumeList, err error) {
+	result = &api.PersistentVolumeList{}
+	err = c.client.Get().
+		Resource("persistentvolumes").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested persistentVolumes.
+func (c *persistentVolumes) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Resource("persistentvolumes").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a persistentVolume and creates it.  Returns the server's representation of the persistentVolume, and an error, if there is any.
 func (c *persistentVolumes) Create(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
@@ -81,7 +113,7 @@ func (c *persistentVolumes) Update(persistentVolume *api.PersistentVolume) (resu
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *persistentVolumes) UpdateStatus(persistentVolume *api.PersistentVolume) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
@@ -113,38 +145,6 @@ func (c *persistentVolumes) DeleteCollection(options *v1.DeleteOptions, listOpti
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the persistentVolume, and returns the corresponding persistentVolume object, and an error if there is any.
-func (c *persistentVolumes) Get(name string, options v1.GetOptions) (result *api.PersistentVolume, err error) {
-	result = &api.PersistentVolume{}
-	err = c.client.Get().
-		Resource("persistentvolumes").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of PersistentVolumes that match those selectors.
-func (c *persistentVolumes) List(opts v1.ListOptions) (result *api.PersistentVolumeList, err error) {
-	result = &api.PersistentVolumeList{}
-	err = c.client.Get().
-		Resource("persistentvolumes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested persistentVolumes.
-func (c *persistentVolumes) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Resource("persistentvolumes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched persistentVolume.

@@ -58,6 +58,41 @@ func newNetworkPolicies(c *ExtensionsClient, namespace string) *networkPolicies 
 	}
 }
 
+// Get takes name of the networkPolicy, and returns the corresponding networkPolicy object, and an error if there is any.
+func (c *networkPolicies) Get(name string, options v1.GetOptions) (result *extensions.NetworkPolicy, err error) {
+	result = &extensions.NetworkPolicy{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("networkpolicies").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of NetworkPolicies that match those selectors.
+func (c *networkPolicies) List(opts v1.ListOptions) (result *extensions.NetworkPolicyList, err error) {
+	result = &extensions.NetworkPolicyList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("networkpolicies").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested networkPolicies.
+func (c *networkPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("networkpolicies").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a networkPolicy and creates it.  Returns the server's representation of the networkPolicy, and an error, if there is any.
 func (c *networkPolicies) Create(networkPolicy *extensions.NetworkPolicy) (result *extensions.NetworkPolicy, err error) {
 	result = &extensions.NetworkPolicy{}
@@ -103,41 +138,6 @@ func (c *networkPolicies) DeleteCollection(options *v1.DeleteOptions, listOption
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the networkPolicy, and returns the corresponding networkPolicy object, and an error if there is any.
-func (c *networkPolicies) Get(name string, options v1.GetOptions) (result *extensions.NetworkPolicy, err error) {
-	result = &extensions.NetworkPolicy{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("networkpolicies").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of NetworkPolicies that match those selectors.
-func (c *networkPolicies) List(opts v1.ListOptions) (result *extensions.NetworkPolicyList, err error) {
-	result = &extensions.NetworkPolicyList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("networkpolicies").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested networkPolicies.
-func (c *networkPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("networkpolicies").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched networkPolicy.

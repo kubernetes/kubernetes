@@ -59,6 +59,41 @@ func newFlunders(c *WardleClient, namespace string) *flunders {
 	}
 }
 
+// Get takes name of the flunder, and returns the corresponding flunder object, and an error if there is any.
+func (c *flunders) Get(name string, options v1.GetOptions) (result *wardle.Flunder, err error) {
+	result = &wardle.Flunder{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("flunders").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Flunders that match those selectors.
+func (c *flunders) List(opts v1.ListOptions) (result *wardle.FlunderList, err error) {
+	result = &wardle.FlunderList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("flunders").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested flunders.
+func (c *flunders) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("flunders").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a flunder and creates it.  Returns the server's representation of the flunder, and an error, if there is any.
 func (c *flunders) Create(flunder *wardle.Flunder) (result *wardle.Flunder, err error) {
 	result = &wardle.Flunder{}
@@ -85,7 +120,7 @@ func (c *flunders) Update(flunder *wardle.Flunder) (result *wardle.Flunder, err 
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *flunders) UpdateStatus(flunder *wardle.Flunder) (result *wardle.Flunder, err error) {
 	result = &wardle.Flunder{}
@@ -120,41 +155,6 @@ func (c *flunders) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the flunder, and returns the corresponding flunder object, and an error if there is any.
-func (c *flunders) Get(name string, options v1.GetOptions) (result *wardle.Flunder, err error) {
-	result = &wardle.Flunder{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("flunders").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Flunders that match those selectors.
-func (c *flunders) List(opts v1.ListOptions) (result *wardle.FlunderList, err error) {
-	result = &wardle.FlunderList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("flunders").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested flunders.
-func (c *flunders) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("flunders").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched flunder.

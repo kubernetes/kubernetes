@@ -89,6 +89,7 @@ go_library(
         "//pkg/util/slice:go_default_library",
         "//vendor/github.com/fatih/camelcase:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",
         "//vendor/k8s.io/api/batch/v2alpha1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

@@ -39,7 +39,7 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client *dynamic.ResourceClient, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
+func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
 	createdInstance, err := client.Create(instanceToCreate)
 	if err != nil {
 		t.Logf("%#v", createdInstance)
@@ -66,7 +66,7 @@ func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unst
 	return createdInstance, nil
 }
 
-func NewNamespacedCustomResourceClient(ns string, client *dynamic.Client, definition *apiextensionsv1beta1.CustomResourceDefinition) *dynamic.ResourceClient {
+func NewNamespacedCustomResourceClient(ns string, client dynamic.Interface, definition *apiextensionsv1beta1.CustomResourceDefinition) dynamic.ResourceInterface {
 	return client.Resource(&metav1.APIResource{
 		Name:       definition.Spec.Names.Plural,
 		Namespaced: definition.Spec.Scope == apiextensionsv1beta1.NamespaceScoped,

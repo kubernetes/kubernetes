@@ -262,8 +262,22 @@ func ValidateCloudProvider(provider string, fldPath *field.Path) field.ErrorList
 }
 
 func ValidateMixedArguments(flag *pflag.FlagSet) error {
-	if flag.Changed("config") && flag.NFlag() != 1 {
-		return fmt.Errorf("can not mix '--config' with other arguments")
+	// If --config isn't set, we have nothing to validate
+	if !flag.Changed("config") {
+		return nil
+	}
+
+	mixedInvalidFlags := []string{}
+	flag.Visit(func(f *pflag.Flag) {
+		if f.Name == "config" || strings.HasPrefix(f.Name, "skip-") {
+			// "--skip-*" flags can be set with --config
+			return
+		}
+		mixedInvalidFlags = append(mixedInvalidFlags, f.Name)
+	})
+
+	if len(mixedInvalidFlags) != 0 {
+		return fmt.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
 	}
 	return nil
 }

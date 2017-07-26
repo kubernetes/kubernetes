@@ -513,6 +513,22 @@ kube::util::ensure_godep_version() {
   godep version
 }
 
+# Ensure that none of the staging repos is checked out in the GOPATH because this
+# easily confused godep.
+kube::util::ensure_no_staging_repos_in_gopath() {
+  kube::util::ensure_single_dir_gopath
+  local error=0
+  for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
+    if [ -e "${GOPATH}/src/k8s.io/${repo}" ]; then
+      echo "k8s.io/${repo} exists in GOPATH. Remove before running godep-save.sh." 1>&2
+      error=1
+    fi
+  done
+  if [ "${error}" = "1" ]; then
+    exit 1
+  fi
+}
+
 # Installs the specified go package at a particular commit.
 kube::util::go_install_from_commit() {
   local -r pkg=$1

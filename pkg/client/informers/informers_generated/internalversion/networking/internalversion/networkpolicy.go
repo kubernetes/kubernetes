@@ -41,26 +41,31 @@ type networkPolicyInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newNetworkPolicyInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewNetworkPolicyInformer constructs a new informer for NetworkPolicy type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewNetworkPolicyInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Networking().NetworkPolicies(v1.NamespaceAll).List(options)
+				return client.Networking().NetworkPolicies(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Networking().NetworkPolicies(v1.NamespaceAll).Watch(options)
+				return client.Networking().NetworkPolicies(namespace).Watch(options)
 			},
 		},
 		&networking.NetworkPolicy{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultNetworkPolicyInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewNetworkPolicyInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *networkPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&networking.NetworkPolicy{}, newNetworkPolicyInformer)
+	return f.factory.InformerFor(&networking.NetworkPolicy{}, defaultNetworkPolicyInformer)
 }
 
 func (f *networkPolicyInformer) Lister() internalversion.NetworkPolicyLister {

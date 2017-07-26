@@ -200,6 +200,7 @@ API_SECURE_PORT=${API_SECURE_PORT:-6443}
 API_HOST=${API_HOST:-localhost}
 API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
+EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
 
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 # By default only allow CORS for requests on localhost
@@ -512,6 +513,7 @@ function start_apiserver {
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}" \
       --feature-gates="${FEATURE_GATES}" \
+      --external-hostname="${EXTERNAL_HOSTNAME}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
       --requestheader-username-headers=X-Remote-User \
@@ -646,7 +648,6 @@ function start_kubelet {
         --cloud-provider="${CLOUD_PROVIDER}" \
         --cloud-config="${CLOUD_CONFIG}" \
         --address="${KUBELET_HOST}" \
-        --require-kubeconfig \
         --kubeconfig "$CERT_DIR"/kubelet.kubeconfig \
         --feature-gates="${FEATURE_GATES}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
@@ -709,7 +710,7 @@ function start_kubelet {
         -i \
         --cidfile=$KUBELET_CIDFILE \
         gcr.io/google_containers/kubelet \
-        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --pod-manifest-path="${POD_MANIFEST_PATH}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --require-kubeconfig --kubeconfig "$CERT_DIR"/kubelet.kubeconfig --api-servers="https://${API_HOST}:${API_SECURE_PORT}" --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
+        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --pod-manifest-path="${POD_MANIFEST_PATH}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --kubeconfig "$CERT_DIR"/kubelet.kubeconfig --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
     fi
 }
 

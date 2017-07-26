@@ -434,7 +434,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	out.OutOfDiskTransitionFrequency = in.OutOfDiskTransitionFrequency
 	if in.NodeLabels != nil {
 		in, out := &in.NodeLabels, &out.NodeLabels
 		*out = make(map[string]string, len(*in))

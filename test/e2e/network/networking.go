@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("Networking", func() {
+var _ = SIGDescribe("Networking", func() {
 	var svcname = "nettest"
 	f := framework.NewDefaultFramework(svcname)
 
@@ -91,7 +91,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 	})
 
 	// TODO: Remove [Slow] when this has had enough bake time to prove presubmit worthiness.
-	framework.KubeDescribe("Granular Checks: Services [Slow]", func() {
+	SIGDescribe("Granular Checks: Services [Slow]", func() {
 
 		It("should function for pod-Service: http", func() {
 			config := framework.NewNetworkingTestConfig(f)

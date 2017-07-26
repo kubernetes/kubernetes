@@ -50,8 +50,8 @@ type ScaleStatus struct {
 	TargetSelector string `json:"targetSelector,omitempty" protobuf:"bytes,3,opt,name=targetSelector"`
 }
 
-// +genclient=true
-// +noMethods=true
+// +genclient
+// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // represents a scaling request for a resource.
@@ -100,8 +100,8 @@ type CustomMetricCurrentStatusList struct {
 	Items []CustomMetricCurrentStatus `json:"items" protobuf:"bytes,1,rep,name=items"`
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
@@ -157,7 +157,7 @@ type ThirdPartyResourceData struct {
 	Data []byte `json:"data,omitempty" protobuf:"bytes,2,opt,name=data"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
@@ -524,7 +524,7 @@ type DaemonSetStatus struct {
 	CollisionCount *int64 `json:"collisionCount,omitempty" protobuf:"varint,9,opt,name=collisionCount"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DaemonSet represents the configuration of a daemon set.
@@ -590,7 +590,7 @@ type ThirdPartyResourceDataList struct {
 	Items []ThirdPartyResourceData `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Ingress is a collection of rules that allow inbound connections to reach the
@@ -759,7 +759,7 @@ type IngressBackend struct {
 	ServicePort intstr.IntOrString `json:"servicePort" protobuf:"bytes,2,opt,name=servicePort"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicaSet represents the configuration of a ReplicaSet.
@@ -886,8 +886,8 @@ type ReplicaSetCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Pod Security Policy governs the ability to make requests that affect the Security Context

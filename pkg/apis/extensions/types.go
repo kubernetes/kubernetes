@@ -60,8 +60,8 @@ type ScaleStatus struct {
 	Selector *metav1.LabelSelector
 }
 
-// +genclient=true
-// +noMethods=true
+// +genclient
+// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // represents a scaling request for a resource.
@@ -110,8 +110,8 @@ type CustomMetricCurrentStatusList struct {
 	Items []CustomMetricCurrentStatus
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
@@ -165,7 +165,7 @@ type ThirdPartyResourceData struct {
 	Data []byte
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Deployment struct {
@@ -519,7 +519,7 @@ type DaemonSetStatus struct {
 	CollisionCount *int64
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DaemonSet represents the configuration of a daemon set.
@@ -578,7 +578,7 @@ type ThirdPartyResourceDataList struct {
 	Items []ThirdPartyResourceData
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Ingress is a collection of rules that allow inbound connections to reach the
@@ -747,7 +747,7 @@ type IngressBackend struct {
 	ServicePort intstr.IntOrString
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicaSet represents the configuration of a replica set.
@@ -856,8 +856,8 @@ type ReplicaSetCondition struct {
 	Message string
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodSecurityPolicy governs the ability to make requests that affect the SecurityContext
@@ -1081,7 +1081,7 @@ type PodSecurityPolicyList struct {
 	Items []PodSecurityPolicy
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // NetworkPolicy describes what network traffic is allowed for a set of Pods

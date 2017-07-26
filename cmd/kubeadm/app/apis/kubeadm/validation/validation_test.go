@@ -286,25 +286,28 @@ func TestValidateMixedArguments(t *testing.T) {
 		args     []string
 		expected bool
 	}{
+		// Expected to succeed, --config is mixed with skip-* flags only or no other flags
 		{[]string{"--foo=bar"}, true},
 		{[]string{"--config=hello"}, true},
-		{[]string{"--foo=bar", "--config=hello"}, false},
+		{[]string{"--config=hello", "--skip-preflight-checks=true"}, true},
+		{[]string{"--config=hello", "--skip-token-print=true"}, true},
+		{[]string{"--config=hello", "--skip-preflight-checks", "--skip-token-print"}, true},
+		// Expected to fail, --config is mixed with the --foo flag
+		{[]string{"--config=hello", "--skip-preflight-checks", "--foo=bar"}, false},
+		{[]string{"--config=hello", "--foo=bar"}, false},
 	}
 
 	var cfgPath string
-	var skipPreFlight bool
 
 	for _, rt := range tests {
 		f := pflag.NewFlagSet("test", pflag.ContinueOnError)
 		if f.Parsed() {
 			t.Error("f.Parse() = true before Parse")
 		}
-		f.String("foo", "", "string value")
+		f.String("foo", "", "flag bound to config object")
+		f.Bool("skip-preflight-checks", false, "flag not bound to config object")
+		f.Bool("skip-token-print", false, "flag not bound to config object")
 		f.StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
-		f.BoolVar(
-			&skipPreFlight, "skip-preflight-checks", skipPreFlight,
-			"Skip preflight checks normally run before modifying the system",
-		)
 		if err := f.Parse(rt.args); err != nil {
 			t.Fatal(err)
 		}
@@ -312,9 +315,10 @@ func TestValidateMixedArguments(t *testing.T) {
 		actual := ValidateMixedArguments(f)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed ValidateMixedArguments:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateMixedArguments:\n\texpected: %t\n\t  actual: %t testdata: %v",
 				rt.expected,
 				(actual == nil),
+				rt.args,
 			)
 		}
 	}

@@ -58,7 +58,7 @@ func getObject(version, kind, name string) *unstructured.Unstructured {
 	}
 }
 
-func getClientServer(gv *schema.GroupVersion, h func(http.ResponseWriter, *http.Request)) (*Client, *httptest.Server, error) {
+func getClientServer(gv *schema.GroupVersion, h func(http.ResponseWriter, *http.Request)) (Interface, *httptest.Server, error) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
 	cl, err := NewClient(&restclient.Config{
 		Host:          srv.URL,

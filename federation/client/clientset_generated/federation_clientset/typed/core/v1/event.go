@@ -58,6 +58,41 @@ func newEvents(c *CoreV1Client, namespace string) *events {
 	}
 }
 
+// Get takes name of the event, and returns the corresponding event object, and an error if there is any.
+func (c *events) Get(name string, options meta_v1.GetOptions) (result *v1.Event, err error) {
+	result = &v1.Event{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("events").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Events that match those selectors.
+func (c *events) List(opts meta_v1.ListOptions) (result *v1.EventList, err error) {
+	result = &v1.EventList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("events").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested events.
+func (c *events) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("events").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
 func (c *events) Create(event *v1.Event) (result *v1.Event, err error) {
 	result = &v1.Event{}
@@ -103,41 +138,6 @@ func (c *events) DeleteCollection(options *meta_v1.DeleteOptions, listOptions me
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the event, and returns the corresponding event object, and an error if there is any.
-func (c *events) Get(name string, options meta_v1.GetOptions) (result *v1.Event, err error) {
-	result = &v1.Event{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("events").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Events that match those selectors.
-func (c *events) List(opts meta_v1.ListOptions) (result *v1.EventList, err error) {
-	result = &v1.EventList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("events").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested events.
-func (c *events) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("events").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched event.

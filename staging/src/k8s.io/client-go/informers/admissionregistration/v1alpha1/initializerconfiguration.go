@@ -41,8 +41,11 @@ type initializerConfigurationInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newInitializerConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewInitializerConfigurationInformer constructs a new informer for InitializerConfiguration type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewInitializerConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.AdmissionregistrationV1alpha1().InitializerConfigurations().List(options)
@@ -53,14 +56,16 @@ func newInitializerConfigurationInformer(client kubernetes.Interface, resyncPeri
 		},
 		&admissionregistration_v1alpha1.InitializerConfiguration{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultInitializerConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewInitializerConfigurationInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *initializerConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistration_v1alpha1.InitializerConfiguration{}, newInitializerConfigurationInformer)
+	return f.factory.InformerFor(&admissionregistration_v1alpha1.InitializerConfiguration{}, defaultInitializerConfigurationInformer)
 }
 
 func (f *initializerConfigurationInformer) Lister() v1alpha1.InitializerConfigurationLister {

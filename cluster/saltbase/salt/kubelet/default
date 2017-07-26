@@ -3,16 +3,18 @@
   {% set daemon_args = "" -%}
 {% endif -%}
 
-{% if grains.api_servers is defined -%}
-  {% set api_servers = "--api-servers=https://" + grains.api_servers -%}
-{% elif grains.apiservers is defined -%} # TODO(remove after 0.16.0): Deprecated form
-  {% set api_servers = "--api-servers=https://" + grains.apiservers -%}
-{% elif grains['roles'][0] == 'kubernetes-master' -%}
-  {% set master_ipv4 = salt['grains.get']('fqdn_ip4')[0] -%}
-  {% set api_servers = "--api-servers=https://" + master_ipv4 -%}
+
+# kubeconfig file
+{% set require_kubeconfig = "" %}
+{% if grains.kubelet_bootstrap_kubeconfig is defined -%}
+  {% set bootstrap_kubeconfig = "--bootstrap-kubeconfig=" + grains.kubelet_bootstrap_kubeconfig -%}
 {% else -%}
-  {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
-  {% set api_servers = "--api-servers=https://" + ips[0][0] -%}
+  {% set bootstrap_kubeconfig = "" -%}
+{% endif -%}
+{% if grains.kubelet_kubeconfig is defined -%}
+  {% set kubeconfig = "--kubeconfig=" + grains.kubelet_kubeconfig -%}
+{% else -%}
+  {% set kubeconfig = "" -%}
 {% endif -%}
 
 {% set master_kubelet_args = "" %}
@@ -21,14 +23,10 @@
 
 {% if grains['roles'][0] == 'kubernetes-master' -%}
   {% if grains.cloud in ['aws', 'gce', 'vagrant', 'photon-controller', 'openstack', 'azure-legacy'] -%}
-
     # Unless given a specific directive, disable registration for the kubelet
     # running on the master.
-    {% if grains.kubelet_api_servers is defined -%}
-      {% set api_servers = "--api-servers=https://" + grains.kubelet_api_servers -%}
+    {% if kubeconfig != "" -%}
       {% set master_kubelet_args = master_kubelet_args + "--register-schedulable=false" -%}
-    {% else -%}
-      {% set api_servers = "" -%}
     {% endif -%}
 
     # Disable the debugging handlers (/run and /exec) to prevent arbitrary
@@ -36,10 +34,6 @@
     # TODO(roberthbailey): Relax this constraint once the master is self-hosted.
     {% set debugging_handlers = "--enable-debugging-handlers=false" -%}
   {% endif -%}
-{% endif -%}
-
-{% if grains.cloud == 'gce' -%}
-  {% set api_servers = "--bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig --require-kubeconfig --kubeconfig=/var/lib/kubelet/kubeconfig" -%}
 {% endif -%}
 
 {% set cloud_provider = "" -%}
@@ -110,7 +104,7 @@
 {% if grains['roles'][0] == 'kubernetes-master' %}
   {% if grains.get('cbr-cidr') %}
     {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
-  {% elif api_servers == '' and pillar.get('network_provider', '').lower() == 'kubenet' %}
+  {% elif kubeconfig == "" and pillar.get('network_provider', '').lower() == 'kubenet' %}
     # Kubelet standalone mode needs a PodCIDR since there is no controller-manager
     {% set pod_cidr = "--pod-cidr=10.76.0.0/16" %}
   {% endif -%}
@@ -189,4 +183,4 @@
 {% set pki=" --cert-dir=/var/lib/kubelet/pki" -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{node_taints}} {{eviction_hard}} {{kubelet_auth}} {{pki}} {{feature_gates}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{bootstrap_kubeconfig}} {{kubeconfig}} {{require_kubeconfig}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{node_taints}} {{eviction_hard}} {{kubelet_auth}} {{pki}} {{feature_gates}} {{test_args}}"

@@ -56,6 +56,38 @@ func newInitializerConfigurations(c *AdmissionregistrationClient) *initializerCo
 	}
 }
 
+// Get takes name of the initializerConfiguration, and returns the corresponding initializerConfiguration object, and an error if there is any.
+func (c *initializerConfigurations) Get(name string, options v1.GetOptions) (result *admissionregistration.InitializerConfiguration, err error) {
+	result = &admissionregistration.InitializerConfiguration{}
+	err = c.client.Get().
+		Resource("initializerconfigurations").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of InitializerConfigurations that match those selectors.
+func (c *initializerConfigurations) List(opts v1.ListOptions) (result *admissionregistration.InitializerConfigurationList, err error) {
+	result = &admissionregistration.InitializerConfigurationList{}
+	err = c.client.Get().
+		Resource("initializerconfigurations").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested initializerConfigurations.
+func (c *initializerConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Resource("initializerconfigurations").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a initializerConfiguration and creates it.  Returns the server's representation of the initializerConfiguration, and an error, if there is any.
 func (c *initializerConfigurations) Create(initializerConfiguration *admissionregistration.InitializerConfiguration) (result *admissionregistration.InitializerConfiguration, err error) {
 	result = &admissionregistration.InitializerConfiguration{}
@@ -97,38 +129,6 @@ func (c *initializerConfigurations) DeleteCollection(options *v1.DeleteOptions, 
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the initializerConfiguration, and returns the corresponding initializerConfiguration object, and an error if there is any.
-func (c *initializerConfigurations) Get(name string, options v1.GetOptions) (result *admissionregistration.InitializerConfiguration, err error) {
-	result = &admissionregistration.InitializerConfiguration{}
-	err = c.client.Get().
-		Resource("initializerconfigurations").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of InitializerConfigurations that match those selectors.
-func (c *initializerConfigurations) List(opts v1.ListOptions) (result *admissionregistration.InitializerConfigurationList, err error) {
-	result = &admissionregistration.InitializerConfigurationList{}
-	err = c.client.Get().
-		Resource("initializerconfigurations").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested initializerConfigurations.
-func (c *initializerConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Resource("initializerconfigurations").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched initializerConfiguration.

@@ -41,8 +41,11 @@ type fischerInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newFischerInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewFischerInformer constructs a new informer for Fischer type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFischerInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.WardleV1alpha1().Fischers().List(options)
@@ -53,14 +56,16 @@ func newFischerInformer(client clientset.Interface, resyncPeriod time.Duration) 
 		},
 		&wardle_v1alpha1.Fischer{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultFischerInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFischerInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *fischerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&wardle_v1alpha1.Fischer{}, newFischerInformer)
+	return f.factory.InformerFor(&wardle_v1alpha1.Fischer{}, defaultFischerInformer)
 }
 
 func (f *fischerInformer) Lister() v1alpha1.FischerLister {

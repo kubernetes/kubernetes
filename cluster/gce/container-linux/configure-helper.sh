@@ -341,7 +341,13 @@ EOF
   fi
 }
 
-function create-kubelet-kubeconfig {
+# Arg 1: the address of the API server
+function create-kubelet-kubeconfig() {
+  local apiserver_address="${1}"
+  if [[ -z "${apiserver_address}" ]]; then
+    echo "Must provide API server address to create Kubelet kubeconfig file!"
+    exit 1
+  fi
   echo "Creating kubelet kubeconfig file"
   if [[ -z "${KUBELET_CA_CERT:-}" ]]; then
     KUBELET_CA_CERT="${CA_CERT}"
@@ -357,6 +363,7 @@ users:
 clusters:
 - name: local
   cluster:
+    server: ${apiserver_address}
     certificate-authority-data: ${KUBELET_CA_CERT}
 contexts:
 - context:
@@ -376,7 +383,7 @@ function create-master-kubelet-auth {
   # set in the environment.
   if [[ -n "${KUBELET_APISERVER:-}" && -n "${KUBELET_CERT:-}" && -n "${KUBELET_KEY:-}" ]]; then
     REGISTER_MASTER_KUBELET="true"
-    create-kubelet-kubeconfig
+    create-kubelet-kubeconfig "https://${KUBELET_APISERVER}"
   fi
 }
 
@@ -576,7 +583,7 @@ function start-kubelet {
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
     if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
-      flags+=" --api-servers=https://${KUBELET_APISERVER}"
+      flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
       flags+=" --register-schedulable=false"
     else
       # Standalone mode (not widely used?)
@@ -584,7 +591,7 @@ function start-kubelet {
     fi
   else # For nodes
     flags+=" --enable-debugging-handlers=true"
-    flags+=" --api-servers=https://${KUBERNETES_MASTER_NAME}"
+    flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
     if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "hairpin-veth" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
@@ -1282,7 +1289,7 @@ function start-kube-addons {
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
 
-    # Configure Calico based on cluster size and image type. 
+    # Configure Calico based on cluster size and image type.
     local -r ds_file="${dst_dir}/calico-policy-controller/calico-node-daemonset.yaml"
     local -r typha_dep_file="${dst_dir}/calico-policy-controller/typha-deployment.yaml"
     sed -i -e "s@__CALICO_CNI_DIR__@/opt/cni/bin@g" "${ds_file}"
@@ -1290,7 +1297,7 @@ function start-kube-addons {
     sed -i -e "s@__CALICO_TYPHA_CPU__@$(get-calico-typha-cpu)@g" "${typha_dep_file}"
     sed -i -e "s@__CALICO_TYPHA_REPLICAS__@$(get-calico-typha-replicas)@g" "${typha_dep_file}"
   else
-    # If not configured to use Calico, the set the typha replica count to 0, but only if the 
+    # If not configured to use Calico, the set the typha replica count to 0, but only if the
     # addon is present.
     local -r typha_dep_file="${dst_dir}/calico-policy-controller/typha-deployment.yaml"
     if [[ -e $typha_dep_file ]]; then
@@ -1439,7 +1446,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   create-master-kubelet-auth
   create-master-etcd-auth
 else
-  create-kubelet-kubeconfig
+  create-kubelet-kubeconfig "https://${KUBERNETES_MASTER_NAME}"
   create-kubeproxy-kubeconfig
 fi
 

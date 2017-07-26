@@ -59,6 +59,41 @@ func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 	}
 }
 
+// Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
+func (c *deployments) Get(name string, options v1.GetOptions) (result *extensions.Deployment, err error) {
+	result = &extensions.Deployment{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Deployments that match those selectors.
+func (c *deployments) List(opts v1.ListOptions) (result *extensions.DeploymentList, err error) {
+	result = &extensions.DeploymentList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("deployments").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested deployments.
+func (c *deployments) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("deployments").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
 func (c *deployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
@@ -85,7 +120,7 @@ func (c *deployments) Update(deployment *extensions.Deployment) (result *extensi
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
@@ -120,41 +155,6 @@ func (c *deployments) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
-func (c *deployments) Get(name string, options v1.GetOptions) (result *extensions.Deployment, err error) {
-	result = &extensions.Deployment{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("deployments").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Deployments that match those selectors.
-func (c *deployments) List(opts v1.ListOptions) (result *extensions.DeploymentList, err error) {
-	result = &extensions.DeploymentList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("deployments").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested deployments.
-func (c *deployments) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("deployments").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched deployment.

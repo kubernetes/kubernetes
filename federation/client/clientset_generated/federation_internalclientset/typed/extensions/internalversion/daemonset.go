@@ -59,6 +59,41 @@ func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
 	}
 }
 
+// Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
+func (c *daemonSets) Get(name string, options v1.GetOptions) (result *extensions.DaemonSet, err error) {
+	result = &extensions.DaemonSet{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("daemonsets").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of DaemonSets that match those selectors.
+func (c *daemonSets) List(opts v1.ListOptions) (result *extensions.DaemonSetList, err error) {
+	result = &extensions.DaemonSetList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("daemonsets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested daemonSets.
+func (c *daemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("daemonsets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a daemonSet and creates it.  Returns the server's representation of the daemonSet, and an error, if there is any.
 func (c *daemonSets) Create(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
@@ -85,7 +120,7 @@ func (c *daemonSets) Update(daemonSet *extensions.DaemonSet) (result *extensions
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *daemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
@@ -120,41 +155,6 @@ func (c *daemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
-func (c *daemonSets) Get(name string, options v1.GetOptions) (result *extensions.DaemonSet, err error) {
-	result = &extensions.DaemonSet{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("daemonsets").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of DaemonSets that match those selectors.
-func (c *daemonSets) List(opts v1.ListOptions) (result *extensions.DaemonSetList, err error) {
-	result = &extensions.DaemonSetList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("daemonsets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested daemonSets.
-func (c *daemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("daemonsets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched daemonSet.

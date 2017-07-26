@@ -83,6 +83,9 @@ import (
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
+
+	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
+	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 )
 
 const etcdRetryLimit = 60

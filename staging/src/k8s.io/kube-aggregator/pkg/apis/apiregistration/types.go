@@ -111,8 +111,8 @@ type APIServiceStatus struct {
 	Conditions []APIServiceCondition
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // APIService represents a server for a particular GroupVersion.

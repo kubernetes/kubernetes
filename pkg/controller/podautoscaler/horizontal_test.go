@@ -27,7 +27,6 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2alpha1"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -435,11 +434,11 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 				Containers: []metricsapi.ContainerMetrics{
 					{
 						Name: "container",
-						Usage: clientv1.ResourceList{
-							clientv1.ResourceCPU: *resource.NewMilliQuantity(
+						Usage: v1.ResourceList{
+							v1.ResourceCPU: *resource.NewMilliQuantity(
 								int64(cpu),
 								resource.DecimalSI),
-							clientv1.ResourceMemory: *resource.NewQuantity(
+							v1.ResourceMemory: *resource.NewQuantity(
 								int64(1024*1024),
 								resource.BinarySI),
 						},
@@ -471,7 +470,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 
 			for i, level := range tc.reportedLevels {
 				podMetric := cmapi.MetricValue{
-					DescribedObject: clientv1.ObjectReference{
+					DescribedObject: v1.ObjectReference{
 						Kind:      "Pod",
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: namespace,
@@ -509,7 +508,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 
 			metrics.Items = []cmapi.MetricValue{
 				{
-					DescribedObject: clientv1.ObjectReference{
+					DescribedObject: v1.ObjectReference{
 						Kind:       matchedTarget.Object.Target.Kind,
 						APIVersion: matchedTarget.Object.Target.APIVersion,
 						Name:       name,
@@ -559,7 +558,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		tc.Lock()
 		defer tc.Unlock()
 
-		obj := action.(core.CreateAction).GetObject().(*clientv1.Event)
+		obj := action.(core.CreateAction).GetObject().(*v1.Event)
 		if tc.verifyEvents {
 			switch obj.Reason {
 			case "SuccessfulRescale":

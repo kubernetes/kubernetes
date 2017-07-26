@@ -37,7 +37,6 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -190,7 +189,7 @@ type Bootstrap interface {
 }
 
 // Builder creates and initializes a Kubelet instance
-type Builder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dependencies, crOptions *options.ContainerRuntimeOptions, standaloneMode bool, hostnameOverride, nodeIP, providerID string) (Bootstrap, error)
+type Builder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dependencies, crOptions *options.ContainerRuntimeOptions, hostnameOverride, nodeIP, providerID string) (Bootstrap, error)
 
 // Dependencies is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
@@ -285,7 +284,7 @@ func getRuntimeAndImageServices(config *componentconfig.KubeletConfiguration) (i
 
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
-func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dependencies, crOptions *options.ContainerRuntimeOptions, standaloneMode bool, hostnameOverride, nodeIP, providerID string) (*Kubelet, error) {
+func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dependencies, crOptions *options.ContainerRuntimeOptions, hostnameOverride, nodeIP, providerID string) (*Kubelet, error) {
 	if kubeCfg.RootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", kubeCfg.RootDirectory)
 	}
@@ -368,11 +367,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dep
 		LowThresholdPercent:  int(kubeCfg.ImageGCLowThresholdPercent),
 	}
 
-	diskSpacePolicy := DiskSpacePolicy{
-		DockerFreeDiskMB: int(kubeCfg.LowDiskSpaceThresholdMB),
-		RootFreeDiskMB:   int(kubeCfg.LowDiskSpaceThresholdMB),
-	}
-
 	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable
 	if kubeCfg.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
 		// Do not provide kubeCfg.EnforceNodeAllocatable to eviction threshold parsing if we are not enforcing Evictions
@@ -409,17 +403,13 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dep
 	// TODO: get the real node object of ourself,
 	// and use the real node name and UID.
 	// TODO: what is namespace for node?
-	nodeRef := &clientv1.ObjectReference{
+	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string(nodeName),
 		UID:       types.UID(nodeName),
 		Namespace: "",
 	}
 
-	diskSpaceManager, err := newDiskSpaceManager(kubeDeps.CAdvisorInterface, diskSpacePolicy)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
-	}
 	containerRefManager := kubecontainer.NewRefManager()
 
 	oomWatcher := NewOOMWatcher(kubeDeps.CAdvisorInterface, kubeDeps.Recorder)
@@ -444,7 +434,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dep
 		sourcesReady:                   config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
 		registerNode:                   kubeCfg.RegisterNode,
 		registerSchedulable:            kubeCfg.RegisterSchedulable,
-		standaloneMode:                 standaloneMode,
 		clusterDomain:                  kubeCfg.ClusterDomain,
 		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
@@ -453,7 +442,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dep
 		streamingConnectionIdleTimeout: kubeCfg.StreamingConnectionIdleTimeout.Duration,
 		recorder:                       kubeDeps.Recorder,
 		cadvisor:                       kubeDeps.CAdvisorInterface,
-		diskSpaceManager:               diskSpaceManager,
 		cloud:                          kubeDeps.Cloud,
 		autoDetectCloudProvider:   (componentconfigv1alpha1.AutoDetectCloudProvider == kubeCfg.CloudProvider),
 		externalCloudProvider:     cloudprovider.IsExternal(kubeCfg.CloudProvider),
@@ -475,7 +463,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dep
 		containerManager: kubeDeps.ContainerManager,
 		nodeIP:           net.ParseIP(nodeIP),
 		clock:            clock.RealClock{},
-		outOfDiskTransitionFrequency:            kubeCfg.OutOfDiskTransitionFrequency.Duration,
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
 		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
@@ -877,9 +864,6 @@ type Kubelet struct {
 	// for internal book keeping; access only from within registerWithApiserver
 	registrationCompleted bool
 
-	// Set to true if the kubelet is in standalone mode (i.e. setup without an apiserver)
-	standaloneMode bool
-
 	// If non-empty, use this for container DNS search.
 	clusterDomain string
 
@@ -924,9 +908,6 @@ type Kubelet struct {
 	// Manager for image garbage collection.
 	imageManager images.ImageGCManager
 
-	// Diskspace manager.
-	diskSpaceManager diskSpaceManager
-
 	// Secret manager.
 	secretManager secret.Manager
 
@@ -956,7 +937,7 @@ type Kubelet struct {
 	// Indicates that the node initialization happens in an external cloud controller
 	externalCloudProvider bool
 	// Reference to this node.
-	nodeRef *clientv1.ObjectReference
+	nodeRef *v1.ObjectReference
 
 	// Container runtime.
 	containerRuntime kubecontainer.Runtime
@@ -1043,12 +1024,6 @@ type Kubelet struct {
 	// clock is an interface that provides time related functionality in a way that makes it
 	// easy to test the code.
 	clock clock.Clock
-
-	// outOfDiskTransitionFrequency specifies the amount of time the kubelet has to be actually
-	// not out of disk before it can transition the node condition status from out-of-disk to
-	// not-out-of-disk. This prevents a pod that causes out-of-disk condition from repeatedly
-	// getting rescheduled onto the node.
-	outOfDiskTransitionFrequency time.Duration
 
 	// handlers called during the tryUpdateNodeStatus cycle
 	setNodeStatusFuncs []func(*v1.Node) error
@@ -1650,27 +1625,6 @@ func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 	return nil
 }
 
-// isOutOfDisk detects if pods can't fit due to lack of disk space.
-func (kl *Kubelet) isOutOfDisk() bool {
-	// Check disk space once globally and reject or accept all new pods.
-	withinBounds, err := kl.diskSpaceManager.IsRuntimeDiskSpaceAvailable()
-	// Assume enough space in case of errors.
-	if err != nil {
-		glog.Errorf("Failed to check if disk space is available for the runtime: %v", err)
-	} else if !withinBounds {
-		return true
-	}
-
-	withinBounds, err = kl.diskSpaceManager.IsRootDiskSpaceAvailable()
-	// Assume enough space in case of errors.
-	if err != nil {
-		glog.Errorf("Failed to check if disk space is available on the root partition: %v", err)
-	} else if !withinBounds {
-		return true
-	}
-	return false
-}
-
 // rejectPod records an event about the pod with the given reason and message,
 // and updates the pod to the failed phase in the status manage.
 func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
@@ -1696,12 +1650,6 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
 			return false, result.Reason, result.Message
 		}
-	}
-	// TODO: When disk space scheduling is implemented (#11976), remove the out-of-disk check here and
-	// add the disk space predicate to predicates.GeneralPredicates.
-	if kl.isOutOfDisk() {
-		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), "predicate fails due to OutOfDisk")
-		return false, "OutOfDisk", "cannot be started due to lack of disk space."
 	}
 
 	return true, "", ""
