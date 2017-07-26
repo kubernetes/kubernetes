@@ -106,6 +106,10 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1beta1"
    },
    {
+    "path": "/apis/rbac.authorization.k8s.io/v1",
+    "description": "API at /apis/rbac.authorization.k8s.io/v1"
+   },
+   {
     "path": "/apis/rbac.authorization.k8s.io/v1alpha1",
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1"
    },
