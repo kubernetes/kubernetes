@@ -465,7 +465,7 @@ func (s *ServiceController) reconcileService(key string) reconciliationStatus {
 
 	newLBStatus := newLoadbalancerStatus()
 	newServiceIngress := ingress.NewFederatedServiceIngress()
-	operations := make([]fedutil.FederatedOperation, 0)
+	operations := make([]fedutil.FederatedOperation, 0, 0)
 	for _, cluster := range clusters {
 		// Aggregate all operations to perform on all federated clusters
 		operation, err := getOperationsToPerformOnCluster(s.federatedInformer, cluster, fedService, clusterselector.SendToCluster)

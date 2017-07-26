@@ -735,7 +735,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		glog.V(4).Infof("Found %d ready clusters across which to reconcile ingress %q", len(clusters), ingress)
 	}
 
-	operations := make([]util.FederatedOperation, 0)
+	operations := make([]util.FederatedOperation, 0, 0)
 
 	for _, cluster := range clusters {
 		baseIPName, baseIPAnnotationExists := baseIngress.ObjectMeta.Annotations[staticIPNameKeyWritable]
