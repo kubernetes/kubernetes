@@ -13,10 +13,12 @@ go_test(
     srcs = [
         "chain_test.go",
         "config_test.go",
+        "errors_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/apiserver:go_default_library",
     ],
