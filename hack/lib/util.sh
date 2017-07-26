@@ -215,6 +215,7 @@ kube::util::gen-docs() {
   # to generate. The actual binary for running federation is hyperkube.
   "${genfeddocs}" "${dest}/docs/admin/" "federation-apiserver"
   "${genfeddocs}" "${dest}/docs/admin/" "federation-controller-manager"
+  "${genfeddocs}" "${dest}/docs/admin/" "kubefed"
 
   mkdir -p "${dest}/docs/man/man1/"
   "${genman}" "${dest}/docs/man/man1/" "kube-apiserver"
