@@ -1359,14 +1359,14 @@ func podNotPending(c clientset.Interface, podName, namespace string) wait.Condit
 // to terminate or if the pod terminated with an unexpected reason.
 func waitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, namespace string) error {
 	return WaitForPodCondition(c, namespace, podName, "terminated due to deadline exceeded", PodStartTimeout, func(pod *v1.Pod) (bool, error) {
-		if pod.Status.Phase == v1.PodFailed {
-			if pod.Status.Reason == reason {
+		if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+			if reason == "" ||
+				strings.ToLower(strings.TrimSpace(pod.Status.Reason)) == strings.ToLower(strings.TrimSpace(reason)) {
 				return true, nil
 			} else {
-				return true, fmt.Errorf("Expected pod %v in namespace %v to be terminated with reason %v, got reason: %v", podName, namespace, reason, pod.Status.Reason)
+				return true, fmt.Errorf("Expected pod %q in namespace %q to be terminated with reason %q, got reason: %q", podName, namespace, reason, pod.Status.Reason)
 			}
 		}
-
 		return false, nil
 	})
 }
