@@ -11,7 +11,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "apparmor.go",
-        "audit.go",
         "kubelet.go",
         "kubelet_perf.go",
         "nodeoutofdisk.go",
