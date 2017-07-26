@@ -21,6 +21,7 @@ go_library(
         "//test/e2e/generated:go_default_library",
         "//test/e2e/scheduling:go_default_library",
         "//test/utils:go_default_library",
+        "//test/utils/image:go_default_library",
         "//vendor/github.com/elazarl/goproxy:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
