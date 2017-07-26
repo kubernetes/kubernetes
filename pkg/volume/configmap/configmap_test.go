@@ -272,7 +272,7 @@ func TestCanSupport(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	tempDir, host := newTestHost(t, nil)
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -304,7 +304,7 @@ func TestPlugin(t *testing.T) {
 	)
 
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -368,7 +368,7 @@ func TestPluginReboot(t *testing.T) {
 	)
 
 	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -424,7 +424,7 @@ func TestPluginOptional(t *testing.T) {
 	volumeSpec.VolumeSource.ConfigMap.Optional = &trueVal
 
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -499,7 +499,7 @@ func TestPluginKeysOptional(t *testing.T) {
 	volumeSpec.VolumeSource.ConfigMap.Optional = &trueVal
 
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
