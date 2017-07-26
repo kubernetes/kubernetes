@@ -21,6 +21,7 @@ import (
 	_ "net/http/pprof"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
@@ -94,6 +95,11 @@ func NewKubeletServer() *KubeletServer {
 	api.Scheme.Default(versioned)
 	config := componentconfig.KubeletConfiguration{}
 	api.Scheme.Convert(versioned, &config, nil)
+
+	config.CAdvisorStatsCacheDuration = metav1.Duration{Duration: 2 * time.Minute}
+	config.CAdvisorMaxHousekeepingInterval = metav1.Duration{Duration: 15 * time.Second}
+	config.CAdvisorAllowDynamicHousekeeping = true
+
 	return &KubeletServer{
 		KubeletFlags: KubeletFlags{
 			// TODO(#41161:v1.10.0): Remove the default kubeconfig path and --require-kubeconfig.
@@ -207,7 +213,13 @@ func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&c.MaxContainerCount, "maximum-dead-containers", c.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space. To disable, set to a negative number.")
 	fs.MarkDeprecated("maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
+
+	// cAdvisor configs
 	fs.Int32Var(&c.CAdvisorPort, "cadvisor-port", c.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
+	fs.DurationVar(&c.CAdvisorStatsCacheDuration, "cadvisor-stats-cache-duration", c.CAdvisorStatsCacheDuration, "The amount of time for cAdvisor to keep stats in memory")
+	fs.DurationVar(&c.CAdvisorMaxHousekeepingInterval, "cadvisor-max-housekeeping-interval", c.CAdvisorMaxHousekeepingInterval, "The largest interval for cAdvisor to allow between container housekeepings")
+	fs.BoolVar(&c.CAdvisorAllowDynamicHousekeeping, "cadvisor-allow-dynamic-housekeeping", true, "Whether to allow cAdvisor's housekeeping interval to be dynamic")
+
 	fs.Int32Var(&c.HealthzPort, "healthz-port", c.HealthzPort, "The port of the localhost healthz endpoint")
 	fs.Var(componentconfig.IPVar{Val: &c.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on. (set to 0.0.0.0 for all interfaces)")
 	fs.Int32Var(&c.OOMScoreAdj, "oom-score-adj", c.OOMScoreAdj, "The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]")

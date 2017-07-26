@@ -37,6 +37,7 @@ import (
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/metrics"
 	"github.com/google/cadvisor/utils/sysfs"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -49,12 +50,7 @@ type cadvisorClient struct {
 
 var _ Interface = new(cadvisorClient)
 
-// TODO(vmarmol): Make configurable.
-// The amount of time for which to keep stats in memory.
-const statsCacheDuration = 2 * time.Minute
-const maxHousekeepingInterval = 15 * time.Second
 const defaultHousekeepingInterval = 10 * time.Second
-const allowDynamicHousekeeping = true
 
 func init() {
 	// Override cAdvisor flag defaults.
@@ -96,7 +92,7 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 }
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(address string, port uint, runtime string, rootPath string) (Interface, error) {
+func New(address string, port uint, statscacheDuration, maxHousekeepingInterval metav1.Duration, allowDynamicHousekeeping bool, runtime string, rootPath string) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
 	// Create and start the cAdvisor container manager.

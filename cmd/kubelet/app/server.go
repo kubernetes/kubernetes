@@ -524,7 +524,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	}
 
 	if kubeDeps.CAdvisorInterface == nil {
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(s.Address, uint(s.CAdvisorPort), s.ContainerRuntime, s.RootDirectory)
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(s.Address, uint(s.CAdvisorPort), s.CAdvisorStatsCacheDuration, s.CAdvisorMaxHousekeepingInterval, s.CAdvisorAllowDynamicHousekeeping, s.ContainerRuntime, s.RootDirectory)
 		if err != nil {
 			return err
 		}
