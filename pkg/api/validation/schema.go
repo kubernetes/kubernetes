@@ -381,7 +381,7 @@ func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType st
 	}
 	switch fieldType {
 	case "string":
-		// Be loose about what we accept for 'string' since we use IntOrString in a couple of places
+		// Be loose about what we accept for 'string' since we use Int32OrString in a couple of places
 		_, isString := value.(string)
 		_, isNumber := value.(float64)
 		_, isInteger := value.(int)

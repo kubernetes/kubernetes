@@ -65,7 +65,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 						Ports: []networking.NetworkPolicyPort{
 							{
 								Protocol: nil,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+								Port:     &intstr.Int32OrString{Type: intstr.Int, IntVal: 80},
 							},
 							{
 								Protocol: &protocolTCP,
@@ -73,11 +73,11 @@ func TestValidateNetworkPolicy(t *testing.T) {
 							},
 							{
 								Protocol: &protocolTCP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 443},
+								Port:     &intstr.Int32OrString{Type: intstr.Int, IntVal: 443},
 							},
 							{
 								Protocol: &protocolUDP,
-								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
+								Port:     &intstr.Int32OrString{Type: intstr.String, StrVal: "dns"},
 							},
 						},
 					},
@@ -183,7 +183,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 						Ports: []networking.NetworkPolicyPort{
 							{
 								Protocol: &protocolICMP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+								Port:     &intstr.Int32OrString{Type: intstr.Int, IntVal: 80},
 							},
 						},
 					},
@@ -199,7 +199,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 						Ports: []networking.NetworkPolicyPort{
 							{
 								Protocol: &protocolTCP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 123456789},
+								Port:     &intstr.Int32OrString{Type: intstr.Int, IntVal: 123456789},
 							},
 						},
 					},
@@ -215,7 +215,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 						Ports: []networking.NetworkPolicyPort{
 							{
 								Protocol: &protocolTCP,
-								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "!@#$"},
+								Port:     &intstr.Int32OrString{Type: intstr.String, StrVal: "!@#$"},
 							},
 						},
 					},

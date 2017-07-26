@@ -71,7 +71,7 @@ func init() {
 		var v2 pkg1_v1.TypeMeta
 		var v3 pkg6_runtime.RawExtension
 		var v4 pkg2_types.UID
-		var v5 pkg5_intstr.IntOrString
+		var v5 pkg5_intstr.Int32OrString
 		var v6 time.Time
 		_, _, _, _, _, _, _ = v0, v1, v2, v3, v4, v5, v6
 	}
@@ -5403,7 +5403,7 @@ func (x *RollingUpdateDeployment) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 				}
 			} else {
 				if x.MaxUnavailable == nil {
-					x.MaxUnavailable = new(pkg5_intstr.IntOrString)
+					x.MaxUnavailable = new(pkg5_intstr.Int32OrString)
 				}
 				yym5 := z.DecBinary()
 				_ = yym5
@@ -5422,7 +5422,7 @@ func (x *RollingUpdateDeployment) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 				}
 			} else {
 				if x.MaxSurge == nil {
-					x.MaxSurge = new(pkg5_intstr.IntOrString)
+					x.MaxSurge = new(pkg5_intstr.Int32OrString)
 				}
 				yym7 := z.DecBinary()
 				_ = yym7
@@ -5465,7 +5465,7 @@ func (x *RollingUpdateDeployment) codecDecodeSelfFromArray(l int, d *codec1978.D
 		}
 	} else {
 		if x.MaxUnavailable == nil {
-			x.MaxUnavailable = new(pkg5_intstr.IntOrString)
+			x.MaxUnavailable = new(pkg5_intstr.Int32OrString)
 		}
 		yym10 := z.DecBinary()
 		_ = yym10
@@ -5494,7 +5494,7 @@ func (x *RollingUpdateDeployment) codecDecodeSelfFromArray(l int, d *codec1978.D
 		}
 	} else {
 		if x.MaxSurge == nil {
-			x.MaxSurge = new(pkg5_intstr.IntOrString)
+			x.MaxSurge = new(pkg5_intstr.Int32OrString)
 		}
 		yym12 := z.DecBinary()
 		_ = yym12

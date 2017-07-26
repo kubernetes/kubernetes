@@ -96,7 +96,7 @@ type Kind struct {
 	// semantic meaning beyond just string, integer, boolean - e.g.
 	// Fields with a PrimitiveType should follow the validation of the primitive type.
 	// io.k8s.apimachinery.pkg.apis.meta.v1.Time
-	// io.k8s.apimachinery.pkg.util.intstr.IntOrString
+	// io.k8s.apimachinery.pkg.util.intstr.Int32OrString
 	PrimitiveType string
 
 	// Extensions are openapi extensions for the object definition.
@@ -224,7 +224,7 @@ func (o *Resources) parseDefinition(name string, s *openapi_v2.Schema) Kind {
 	}
 
 	// Definition represents a primitive type - e.g.
-	// io.k8s.apimachinery.pkg.util.intstr.IntOrString
+	// io.k8s.apimachinery.pkg.util.intstr.Int32OrString
 	if o.isPrimitive(s) {
 		value.PrimitiveType = o.getTypeNameForField(s)
 	}
@@ -277,7 +277,7 @@ func (o *Resources) isMap(s *openapi_v2.Schema) bool {
 }
 
 // isPrimitive returns true if s is a primitive type
-// Note: For object references that represent primitive types - e.g. IntOrString - this will
+// Note: For object references that represent primitive types - e.g. Int32OrString - this will
 // be false, and the referenced Kind will have a non-empty "PrimitiveType".
 func (o *Resources) isPrimitive(s *openapi_v2.Schema) bool {
 	if len(s.GetProperties().GetAdditionalProperties()) > 0 {

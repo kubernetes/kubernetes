@@ -13,6 +13,7 @@ go_library(
         "doc.go",
         "fake_apps_client.go",
         "fake_deployment.go",
+        "fake_replicaset.go",
         "fake_scale.go",
         "fake_statefulset.go",
     ],

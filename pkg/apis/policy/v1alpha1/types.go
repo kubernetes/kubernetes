@@ -28,7 +28,7 @@ type PodDisruptionBudgetSpec struct {
 	// absence of the evicted pod.  So for example you can prevent all voluntary
 	// evictions by specifying "100%".
 	// +optional
-	MinAvailable intstr.IntOrString `json:"minAvailable,omitempty" protobuf:"bytes,1,opt,name=minAvailable"`
+	MinAvailable intstr.Int32OrString `json:"minAvailable,omitempty" protobuf:"bytes,1,opt,name=minAvailable"`
 
 	// Label query over pods whose evictions are managed by the disruption
 	// budget.

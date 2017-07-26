@@ -158,8 +158,8 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 }
 
 func TestSetDefaultDeployment(t *testing.T) {
-	defaultIntOrString := intstr.FromInt(1)
-	differentIntOrString := intstr.FromInt(5)
+	defaultInt32OrString := intstr.FromInt(1)
+	differentInt32OrString := intstr.FromInt(5)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -182,8 +182,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						Type: extensionsv1beta1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &extensionsv1beta1.RollingUpdateDeployment{
-							MaxSurge:       &defaultIntOrString,
-							MaxUnavailable: &defaultIntOrString,
+							MaxSurge:       &defaultInt32OrString,
+							MaxUnavailable: &defaultInt32OrString,
 						},
 					},
 					Template: defaultTemplate,
@@ -196,7 +196,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Replicas: newInt32(5),
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						RollingUpdate: &extensionsv1beta1.RollingUpdateDeployment{
-							MaxSurge: &differentIntOrString,
+							MaxSurge: &differentInt32OrString,
 						},
 					},
 				},
@@ -207,8 +207,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						Type: extensionsv1beta1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &extensionsv1beta1.RollingUpdateDeployment{
-							MaxSurge:       &differentIntOrString,
-							MaxUnavailable: &defaultIntOrString,
+							MaxSurge:       &differentInt32OrString,
+							MaxUnavailable: &defaultInt32OrString,
 						},
 					},
 					Template: defaultTemplate,
@@ -231,8 +231,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						Type: extensionsv1beta1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &extensionsv1beta1.RollingUpdateDeployment{
-							MaxSurge:       &defaultIntOrString,
-							MaxUnavailable: &defaultIntOrString,
+							MaxSurge:       &defaultInt32OrString,
+							MaxUnavailable: &defaultInt32OrString,
 						},
 					},
 					Template: defaultTemplate,

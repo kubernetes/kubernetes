@@ -39,7 +39,7 @@ func TestValidatePodDisruptionBudgetSpec(t *testing.T) {
 }
 
 func TestValidateMinAvailablePodDisruptionBudgetSpec(t *testing.T) {
-	successCases := []intstr.IntOrString{
+	successCases := []intstr.Int32OrString{
 		intstr.FromString("0%"),
 		intstr.FromString("1%"),
 		intstr.FromString("100%"),
@@ -57,7 +57,7 @@ func TestValidateMinAvailablePodDisruptionBudgetSpec(t *testing.T) {
 		}
 	}
 
-	failureCases := []intstr.IntOrString{
+	failureCases := []intstr.Int32OrString{
 		intstr.FromString("1.1%"),
 		intstr.FromString("nope"),
 		intstr.FromString("-1%"),

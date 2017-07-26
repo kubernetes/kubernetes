@@ -191,7 +191,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 		targetPortString = params["container-port"]
 	}
 	if len(targetPortString) > 0 {
-		var targetPort intstr.IntOrString
+		var targetPort intstr.Int32OrString
 		if portNum, err := strconv.Atoi(targetPortString); err != nil {
 			targetPort = intstr.FromString(targetPortString)
 		} else {
