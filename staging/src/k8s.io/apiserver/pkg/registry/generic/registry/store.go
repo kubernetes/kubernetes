@@ -1193,28 +1193,11 @@ func (e *Store) Export(ctx genericapirequest.Context, obj runtime.Object, opts m
 	} else {
 		glog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
 	}
+	glog.V(1).Infof("#### Exporting: %v", reflect.TypeOf(obj))
 
 	if e.ExportStrategy != nil {
-		// Run export logic against each item in a list:
-		if meta.IsListType(obj) {
-			items, err := meta.ExtractList(obj)
-			if err != nil {
-				return nil, err
-			}
-			for i := range items {
-				// Object meta was removed already on the list, but we need to do the same for each item within:
-				if accessor, err := meta.Accessor(items[i]); err == nil {
-					exportObjectMeta(accessor, opts.Exact)
-				} else {
-					glog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(items[i]), err)
-				}
-				err := e.ExportStrategy.Export(ctx, items[i], opts.Exact)
-				if err != nil {
-					return nil, err
-				}
-			}
-		// Run export logic for single items:
-		} else if err := e.ExportStrategy.Export(ctx, obj, opts.Exact); err != nil {
+		glog.V(1).Infof("#### Export strategy is not nil")
+		if err := e.ExportStrategy.Export(ctx, obj, opts.Exact); err != nil {
 			return nil, err
 		}
 	} else {

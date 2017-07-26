@@ -835,6 +835,47 @@ func TestStoreBasicExport(t *testing.T) {
 	}
 }
 
+func TestStoreBasicListExport(t *testing.T) {
+	podA := example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "foo",
+			Labels:    map[string]string{},
+		},
+		Spec: example.PodSpec{NodeName: "machine"},
+	}
+	podList := example.PodList{
+		Items: []example.Pod{podA},
+	}
+
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	obj, err := registry.Export(testContext, &podList, metav1.ExportOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	exportedPodList := obj.(*example.PodList)
+	if len(exportedPodList.Items) != 1 {
+		t.Errorf("expected 1 item in list, found: %d", len(exportedPodList.Items))
+	}
+
+	exportedPod := exportedPodList.Items[0]
+	if exportedPod.Namespace != "" {
+		t.Errorf("exported pod still has a namespace: %s", exportedPod.Namespace)
+	}
+	if exportedPod.Labels["prepare_create"] != "true" {
+		t.Errorf("expected: prepare_create->true, found: %s", exportedPod.Labels["prepare_create"])
+	}
+	delete(exportedPod.Labels, "prepare_create")
+	exportObjectMeta(&podA.ObjectMeta, false)
+	podA.Spec = exportedPod.Spec
+	if !reflect.DeepEqual(&podA, &exportedPod) {
+		t.Errorf("expected:\n%v\nsaw:\n%v\n", &podA, &exportedPod)
+	}
+}
+
 func TestStoreGet(t *testing.T) {
 	podA := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},

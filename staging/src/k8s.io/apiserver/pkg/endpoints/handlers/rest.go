@@ -417,12 +417,19 @@ func ListResource(r rest.Lister, rw rest.Watcher, e rest.Exporter, scope Request
 			}
 		}
 
-		if exportOptions.Export {
-			// TODO: parse export options in this call rather than carrying on list options
-			result, err = e.Export(ctx, result, exportOptions)
+		// Apply export logic to every item in list if requested:
+		if exportOptions.Export && meta.IsListType(result) {
+			items, err := meta.ExtractList(result)
 			if err != nil {
 				scope.err(err, w, req)
 				return
+			}
+			for i := range items {
+				items[i], err = e.Export(ctx, items[i], exportOptions)
+				if err != nil {
+					scope.err(err, w, req)
+					return
+				}
 			}
 		}
 
