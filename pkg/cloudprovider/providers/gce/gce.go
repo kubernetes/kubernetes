@@ -199,7 +199,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 	var nodeInstancePrefix string
 	if config != nil {
 		var cfg Config
-		if err := gcfg.ReadInto(&cfg, config); err != nil {
+		if err := gcfg.FatalOnly(gcfg.ReadInto(&cfg, config)); err != nil {
 			glog.Errorf("Couldn't read config: %v", err)
 			return nil, err
 		}
