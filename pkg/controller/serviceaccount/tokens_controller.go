@@ -87,7 +87,7 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 		maxRetries: maxRetries,
 	}
 	if cl != nil && cl.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.Core().RESTClient().GetRateLimiter())
+		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_tokens_controller", cl.Core().RESTClient().GetRateLimiter())
 	}
 
 	e.serviceAccounts = serviceAccounts.Lister()
