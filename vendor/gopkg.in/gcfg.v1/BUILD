@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "errors.go",
         "go1_2.go",
         "read.go",
         "set.go",
@@ -20,6 +21,7 @@ go_library(
         "//vendor/gopkg.in/gcfg.v1/scanner:go_default_library",
         "//vendor/gopkg.in/gcfg.v1/token:go_default_library",
         "//vendor/gopkg.in/gcfg.v1/types:go_default_library",
+        "//vendor/gopkg.in/warnings.v0:go_default_library",
     ],
 )
 
