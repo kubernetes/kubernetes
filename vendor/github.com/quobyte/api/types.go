@@ -54,3 +54,32 @@ type quota struct {
 type setQuotaRequest struct {
 	Quotas []*quota `json:"quotas,omitempty"`
 }
+
+type getTenantRequest struct {
+	TenantIDs []string `json:"tenant_id,omitempty"`
+}
+
+type GetTenantResponse struct {
+	Tenants []*TenantDomainConfiguration `json:"tenant,omitempty"`
+}
+
+type TenantDomainConfiguration struct {
+	TenantID          string                                   `json:"tenant_id,omitempty"`
+	Name              string                                   `json:"name,omitempty"`
+	RestrictToNetwork []string                                 `json:"restrict_to_network,omitempty"`
+	VolumeAccess      []*TenantDomainConfigurationVolumeAccess `json:"volume_access,omitempty"`
+}
+
+type TenantDomainConfigurationVolumeAccess struct {
+	VolumeUUID        string `json:"volume_uuid,omitempty"`
+	RestrictToNetwork string `json:"restrict_to_network,omitempty"`
+	ReadOnly          bool   `json:"read_only,omitempty"`
+}
+
+type setTenantRequest struct {
+	Tenants *TenantDomainConfiguration `json:"tenant,omitempty"`
+}
+
+type setTenantResponse struct {
+	TenantID string `json:"tenant_id,omitempty"`
+}

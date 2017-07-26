@@ -2294,7 +2294,7 @@
 		},
 		{
 			"ImportPath": "github.com/quobyte/api",
-			"Rev": "cb10db90715b14d4784465d2fa3b915dfacc0628"
+			"Rev": "5fa0b5090ab8cf71b4167e2172c17a9be812172c"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud",

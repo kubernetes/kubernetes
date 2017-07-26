@@ -80,6 +80,7 @@ func (client *QuobyteClient) GetClientList(tenant string) (GetClientListResponse
 	return response, nil
 }
 
+// SetVolumeQuota sets a Quota to the specified Volume
 func (client *QuobyteClient) SetVolumeQuota(volumeUUID string, quotaSize uint64) error {
 	request := &setQuotaRequest{
 		Quotas: []*quota{
@@ -101,4 +102,50 @@ func (client *QuobyteClient) SetVolumeQuota(volumeUUID string, quotaSize uint64)
 	}
 
 	return client.sendRequest("setQuota", request, nil)
+}
+
+// GetTenant returns the Tenant configuration for all specified tenants
+func (client *QuobyteClient) GetTenant(tenantIDs []string) (GetTenantResponse, error) {
+	request := &getTenantRequest{TenantIDs: tenantIDs}
+
+	var response GetTenantResponse
+	err := client.sendRequest("getTenant", request, &response)
+	if err != nil {
+		return response, err
+	}
+
+	return response, nil
+}
+
+// GetTenantMap returns a map that contains all tenant names and there ID's
+func (client *QuobyteClient) GetTenantMap() (map[string]string, error) {
+	result := map[string]string{}
+	response, err := client.GetTenant([]string{})
+
+	if err != nil {
+		return result, err
+	}
+
+	for _, tenant := range response.Tenants {
+		result[tenant.Name] = tenant.TenantID
+	}
+
+	return result, nil
+}
+
+// SetTenant creates a Tenant with the specified name
+func (client *QuobyteClient) SetTenant(tenantName string) (string, error) {
+	request := &setTenantRequest{
+		&TenantDomainConfiguration{
+			Name: tenantName,
+		},
+	}
+
+	var response setTenantResponse
+	err := client.sendRequest("setTenant", request, &response)
+	if err != nil {
+		return "", err
+	}
+
+	return response.TenantID, nil
 }
