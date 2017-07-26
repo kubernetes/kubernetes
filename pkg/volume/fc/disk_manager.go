@@ -79,23 +79,9 @@ func diskTearDown(manager diskManager, c fcDiskUnmounter, volPath string, mounte
 		return os.Remove(volPath)
 	}
 
-	refs, err := mount.GetMountRefs(mounter, volPath)
-	if err != nil {
-		glog.Errorf("failed to get reference count %s", volPath)
-		return err
-	}
 	if err := mounter.Unmount(volPath); err != nil {
 		glog.Errorf("failed to unmount %s", volPath)
 		return err
-	}
-	// If len(refs) is 1, then all bind mounts have been removed, and the
-	// remaining reference is the global mount. It is safe to detach.
-	if len(refs) == 1 {
-		mntPath := refs[0]
-		if err := manager.DetachDisk(c, mntPath); err != nil {
-			glog.Errorf("failed to detach disk from %s", mntPath)
-			return err
-		}
 	}
 
 	noMnt, mntErr := mounter.IsLikelyNotMountPoint(volPath)
