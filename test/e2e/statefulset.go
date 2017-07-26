@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -93,12 +92,11 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 		It("should provide basic identity", func() {
 			By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 3
-			framework.SetStatefulSetInitializedAnnotation(ss, "false")
+			sst := framework.NewStatefulSetTester(c)
+			sst.PauseNewPods(ss)
 
 			_, err := c.Apps().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
-
-			sst := framework.NewStatefulSetTester(c)
 
 			By("Saturating stateful set " + ss.Name)
 			sst.Saturate(ss)
@@ -131,7 +129,8 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 		It("should adopt matching orphans and release non-matching pods", func() {
 			By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 1
-			framework.SetStatefulSetInitializedAnnotation(ss, "false")
+			sst := framework.NewStatefulSetTester(c)
+			sst.PauseNewPods(ss)
 
 			// Replace ss with the one returned from Create() so it has the UID.
 			// Save Kind since it won't be populated in the returned ss.
@@ -139,8 +138,6 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			ss, err := c.Apps().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 			ss.Kind = kind
-
-			sst := framework.NewStatefulSetTester(c)
 
 			By("Saturating stateful set " + ss.Name)
 			sst.Saturate(ss)
@@ -215,20 +212,19 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 		It("should not deadlock when a pod's predecessor fails", func() {
 			By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 2
-			framework.SetStatefulSetInitializedAnnotation(ss, "false")
+			sst := framework.NewStatefulSetTester(c)
+			sst.PauseNewPods(ss)
 
 			_, err := c.Apps().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
-			sst := framework.NewStatefulSetTester(c)
+			sst.WaitForRunning(1, 0, ss)
 
-			sst.WaitForRunningAndReady(1, ss)
-
-			By("Marking stateful pod at index 0 as healthy.")
-			sst.SetHealthy(ss)
+			By("Resuming stateful pod at index 0.")
+			sst.ResumeNextPod(ss)
 
 			By("Waiting for stateful pod at index 1 to enter running.")
-			sst.WaitForRunningAndReady(2, ss)
+			sst.WaitForRunning(2, 1, ss)
 
 			// Now we have 1 healthy and 1 unhealthy stateful pod. Deleting the healthy stateful pod should *not*
 			// create a new stateful pod till the remaining stateful pod becomes healthy, which won't happen till
@@ -238,7 +234,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			sst.DeleteStatefulPodAtIndex(0, ss)
 
 			By("Confirming stateful pod at index 0 is recreated.")
-			sst.WaitForRunningAndReady(2, ss)
+			sst.WaitForRunning(2, 0, ss)
 
 			By("Deleting unhealthy stateful pod at index 1.")
 			sst.DeleteStatefulPodAtIndex(1, ss)
@@ -249,14 +245,11 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 
 		It("should perform rolling updates and roll backs of template modifications", func() {
 			By("Creating a new StatefulSet")
-			testProbe := &v1.Probe{Handler: v1.Handler{HTTPGet: &v1.HTTPGetAction{
-				Path: "/index.html",
-				Port: intstr.IntOrString{IntVal: 80}}}}
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
-			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
+			sst := framework.NewStatefulSetTester(c)
+			sst.SetHttpProbe(ss)
 			ss, err := c.Apps().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
-			sst := framework.NewStatefulSetTester(c)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
@@ -273,7 +266,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 						currentRevision))
 			}
 			sst.SortStatefulPods(pods)
-			sst.BreakPodProbe(ss, &pods.Items[1], testProbe)
+			sst.BreakPodHttpProbe(ss, &pods.Items[1])
 			Expect(err).NotTo(HaveOccurred())
 			ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
 			newImage := newNginxImage
@@ -295,7 +288,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			By("Updating Pods in reverse ordinal order")
 			pods = sst.GetPodList(ss)
 			sst.SortStatefulPods(pods)
-			sst.RestorePodProbe(ss, &pods.Items[1], testProbe)
+			sst.RestorePodHttpProbe(ss, &pods.Items[1])
 			ss, pods = sst.WaitForPodReady(ss, pods.Items[1].Name)
 			ss, pods = sst.WaitForRollingUpdate(ss)
 			Expect(ss.Status.CurrentRevision).To(Equal(updateRevision),
@@ -320,7 +313,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			}
 
 			By("Rolling back to a previous revision")
-			sst.BreakPodProbe(ss, &pods.Items[1], testProbe)
+			sst.BreakPodHttpProbe(ss, &pods.Items[1])
 			Expect(err).NotTo(HaveOccurred())
 			ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
 			priorRevision := currentRevision
@@ -339,7 +332,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			By("Rolling back update in reverse ordinal order")
 			pods = sst.GetPodList(ss)
 			sst.SortStatefulPods(pods)
-			sst.RestorePodProbe(ss, &pods.Items[1], testProbe)
+			sst.RestorePodHttpProbe(ss, &pods.Items[1])
 			ss, pods = sst.WaitForPodReady(ss, pods.Items[1].Name)
 			ss, pods = sst.WaitForRollingUpdate(ss)
 			Expect(ss.Status.CurrentRevision).To(Equal(priorRevision),
@@ -367,11 +360,9 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 
 		It("should perform canary updates and phased rolling updates of template modifications", func() {
 			By("Creating a new StaefulSet")
-			testProbe := &v1.Probe{Handler: v1.Handler{HTTPGet: &v1.HTTPGetAction{
-				Path: "/index.html",
-				Port: intstr.IntOrString{IntVal: 80}}}}
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
-			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
+			sst := framework.NewStatefulSetTester(c)
+			sst.SetHttpProbe(ss)
 			ss.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 				Type: apps.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
@@ -384,7 +375,6 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			}
 			ss, err := c.Apps().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
-			sst := framework.NewStatefulSetTester(c)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
@@ -579,17 +569,14 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 
 		It("should implement legacy replacement when the update strategy is OnDelete", func() {
 			By("Creating a new StatefulSet")
-			testProbe := &v1.Probe{Handler: v1.Handler{HTTPGet: &v1.HTTPGetAction{
-				Path: "/index.html",
-				Port: intstr.IntOrString{IntVal: 80}}}}
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
-			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
+			sst := framework.NewStatefulSetTester(c)
+			sst.SetHttpProbe(ss)
 			ss.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 				Type: apps.OnDeleteStatefulSetStrategyType,
 			}
 			ss, err := c.Apps().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
-			sst := framework.NewStatefulSetTester(c)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
@@ -669,27 +656,24 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Creating stateful set " + ssName + " in namespace " + ns)
-			testProbe := &v1.Probe{Handler: v1.Handler{HTTPGet: &v1.HTTPGetAction{
-				Path: "/index.html",
-				Port: intstr.IntOrString{IntVal: 80}}}}
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
-			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
+			sst := framework.NewStatefulSetTester(c)
+			sst.SetHttpProbe(ss)
 			ss, err = c.Apps().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
-			sst := framework.NewStatefulSetTester(c)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 
 			By("Confirming that stateful set scale up will halt with unhealthy stateful pod")
-			sst.BreakProbe(ss, testProbe)
+			sst.BreakHttpProbe(ss)
 			sst.WaitForRunningAndNotReady(*ss.Spec.Replicas, ss)
 			sst.WaitForStatusReadyReplicas(ss, 0)
 			sst.UpdateReplicas(ss, 3)
 			sst.ConfirmStatefulPodCount(1, ss, 10*time.Second, true)
 
 			By("Scaling up stateful set " + ssName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
-			sst.RestoreProbe(ss, testProbe)
+			sst.RestoreHttpProbe(ss)
 			sst.WaitForRunningAndReady(3, ss)
 
 			By("Verifying that stateful set " + ssName + " was scaled up in order")
@@ -713,14 +697,14 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			sst.BreakProbe(ss, testProbe)
+			sst.BreakHttpProbe(ss)
 			sst.WaitForStatusReadyReplicas(ss, 0)
 			sst.WaitForRunningAndNotReady(3, ss)
 			sst.UpdateReplicas(ss, 0)
 			sst.ConfirmStatefulPodCount(3, ss, 10*time.Second, true)
 
 			By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
-			sst.RestoreProbe(ss, testProbe)
+			sst.RestoreHttpProbe(ss)
 			sst.Scale(ss, 0)
 
 			By("Verifying that stateful set " + ssName + " was scaled down in reverse order")
@@ -743,39 +727,36 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			psLabels := klabels.Set(labels)
 
 			By("Creating stateful set " + ssName + " in namespace " + ns)
-			testProbe := &v1.Probe{Handler: v1.Handler{HTTPGet: &v1.HTTPGetAction{
-				Path: "/index.html",
-				Port: intstr.IntOrString{IntVal: 80}}}}
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			ss.Spec.PodManagementPolicy = apps.ParallelPodManagement
-			ss.Spec.Template.Spec.Containers[0].ReadinessProbe = testProbe
+			sst := framework.NewStatefulSetTester(c)
+			sst.SetHttpProbe(ss)
 			ss, err := c.Apps().StatefulSets(ns).Create(ss)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
-			sst := framework.NewStatefulSetTester(c)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 
 			By("Confirming that stateful set scale up will not halt with unhealthy stateful pod")
-			sst.BreakProbe(ss, testProbe)
+			sst.BreakHttpProbe(ss)
 			sst.WaitForRunningAndNotReady(*ss.Spec.Replicas, ss)
 			sst.WaitForStatusReadyReplicas(ss, 0)
 			sst.UpdateReplicas(ss, 3)
 			sst.ConfirmStatefulPodCount(3, ss, 10*time.Second, false)
 
 			By("Scaling up stateful set " + ssName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
-			sst.RestoreProbe(ss, testProbe)
+			sst.RestoreHttpProbe(ss)
 			sst.WaitForRunningAndReady(3, ss)
 
 			By("Scale down will not halt with unhealthy stateful pod")
-			sst.BreakProbe(ss, testProbe)
+			sst.BreakHttpProbe(ss)
 			sst.WaitForStatusReadyReplicas(ss, 0)
 			sst.WaitForRunningAndNotReady(3, ss)
 			sst.UpdateReplicas(ss, 0)
 			sst.ConfirmStatefulPodCount(0, ss, 10*time.Second, false)
 
 			By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
-			sst.RestoreProbe(ss, testProbe)
+			sst.RestoreHttpProbe(ss)
 			sst.Scale(ss, 0)
 			sst.WaitForStatusReadyReplicas(ss, 0)
 		})
