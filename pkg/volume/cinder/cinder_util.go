@@ -88,7 +88,7 @@ func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath stri
 		}
 	}
 	if notmnt {
-		err = b.blockDeviceMounter.FormatAndMount(devicePath, globalPDPath, b.fsType, options)
+		err = b.blockDeviceMounter.FormatAndMount(devicePath, globalPDPath, b.fsType, options, nil)
 		if err != nil {
 			os.Remove(globalPDPath)
 			return err

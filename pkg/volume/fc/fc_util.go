@@ -169,7 +169,7 @@ func (util *FCUtil) AttachDisk(b fcDiskMounter) (string, error) {
 		return devicePath, fmt.Errorf("fc: failed to mkdir %s, error", globalPDPath)
 	}
 
-	err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)
+	err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil, nil)
 	if err != nil {
 		return devicePath, fmt.Errorf("fc: failed to mount fc volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}

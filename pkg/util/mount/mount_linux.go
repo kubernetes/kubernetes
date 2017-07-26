@@ -331,7 +331,7 @@ func readProcMountsFrom(file io.Reader, out *[]MountPoint) (uint32, error) {
 }
 
 // formatAndMount uses unix utils to format and mount the given disk
-func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
+func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string, mountArgs []string) error {
 	options = append(options, "defaults")
 
 	// Run fsck on the disk to fix repairable issues
@@ -372,7 +372,11 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			}
 
 			if fstype == "ext4" || fstype == "ext3" {
-				args = []string{"-F", source}
+				if len(mountArgs) == 0 {
+					args = []string{"-F", source}
+				} else {
+					args = append(mountArgs, source)
+				}
 			}
 			glog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
 			cmd := mounter.Runner.Command("mkfs."+fstype, args...)
