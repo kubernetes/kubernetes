@@ -214,7 +214,7 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -260,7 +260,7 @@ func TestGetObjects(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -412,7 +412,7 @@ func TestGetSortedObjects(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -466,7 +466,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -495,7 +495,7 @@ func TestGetListObjects(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -537,7 +537,7 @@ func TestGetAllListObjects(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -566,7 +566,7 @@ func TestGetListComponentStatus(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -605,7 +605,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -714,7 +714,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -759,7 +759,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -784,7 +784,7 @@ func TestGetByFormatForcesFlag(t *testing.T) {
 
 	showAllFlag, _ := cmd.Flags().GetBool("show-all")
 	if showAllFlag {
-		t.Errorf("expected showAll to not be true when getting resource")
+		t.Error("expected showAll to not be true when getting resource")
 	}
 }
 
@@ -904,7 +904,7 @@ func TestWatchSelector(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -946,7 +946,7 @@ func TestWatchResource(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -989,7 +989,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -1031,7 +1031,7 @@ func TestWatchOnlyResource(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -1077,7 +1077,7 @@ func TestWatchOnlyList(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
