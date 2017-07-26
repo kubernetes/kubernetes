@@ -366,37 +366,7 @@ func ClusterRoles() []rbac.ClusterRole {
 	return roles
 }
 
-// ClusterRoleBindingFilter can modify and return or omit (by returning nil) a role binding
-type ClusterRoleBindingFilter func(*rbac.ClusterRoleBinding) *rbac.ClusterRoleBinding
-
-// AddClusterRoleBindingFilter adds the given filter to the list that is invoked when determing bootstrap roles to reconcile.
-func AddClusterRoleBindingFilter(filter ClusterRoleBindingFilter) {
-	clusterRoleBindingFilters = append(clusterRoleBindingFilters, filter)
-}
-
-// ClearClusterRoleBindingFilters removes any filters added using AddClusterRoleBindingFilter
-func ClearClusterRoleBindingFilters() {
-	clusterRoleBindingFilters = nil
-}
-
 const systemNodeRoleName = "system:node"
-
-var clusterRoleBindingFilters []ClusterRoleBindingFilter
-
-// OmitNodesGroupBinding is a filter that omits the deprecated binding for the system:nodes group to the system:node role.
-var OmitNodesGroupBinding = ClusterRoleBindingFilter(func(binding *rbac.ClusterRoleBinding) *rbac.ClusterRoleBinding {
-	if binding.RoleRef.Name == systemNodeRoleName {
-		subjects := []rbac.Subject{}
-		for _, subject := range binding.Subjects {
-			if subject.Kind == rbac.GroupKind && subject.Name == user.NodesGroup {
-				continue
-			}
-			subjects = append(subjects, subject)
-		}
-		binding.Subjects = subjects
-	}
-	return binding
-})
 
 // ClusterRoleBindings return default rolebindings to the default roles
 func ClusterRoleBindings() []rbac.ClusterRoleBinding {
@@ -409,27 +379,15 @@ func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 		rbac.NewClusterBinding("system:kube-dns").SAs("kube-system", "kube-dns").BindingOrDie(),
 		rbac.NewClusterBinding("system:kube-scheduler").Users(user.KubeScheduler).BindingOrDie(),
 
-		// This default system:nodes binding is deprecated in 1.7 with the availability of the Node authorizer.
-		// If an admin wants to grant the system:node role (which cannot partition Node API access), they will need to create their own clusterrolebinding.
-		// TODO: Remove the subjects from this binding in 1.8 (leave the empty binding for tightening reconciliation), and remove AddClusterRoleBindingFilter()
-		rbac.NewClusterBinding(systemNodeRoleName).Groups(user.NodesGroup).BindingOrDie(),
+		// This default binding of the system:node role to the system:nodes group is deprecated in 1.7 with the availability of the Node authorizer.
+		// This leaves the binding, but with an empty set of subjects, so that tightening reconciliation can remove the subject.
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: systemNodeRoleName},
+			RoleRef:    rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: systemNodeRoleName},
+		},
 	}
 
 	addClusterRoleBindingLabel(rolebindings)
 
-	retval := []rbac.ClusterRoleBinding{}
-	for i := range rolebindings {
-		binding := &rolebindings[i]
-		for _, filter := range clusterRoleBindingFilters {
-			binding = filter(binding)
-			if binding == nil {
-				break
-			}
-		}
-		if binding != nil {
-			retval = append(retval, *binding)
-		}
-	}
-
-	return retval
+	return rolebindings
 }
