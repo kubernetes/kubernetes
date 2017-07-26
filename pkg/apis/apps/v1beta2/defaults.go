@@ -27,6 +27,41 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
+func SetDefaults_DaemonSet(obj *appsv1beta2.DaemonSet) {
+	labels := obj.Spec.Template.Labels
+
+	// TODO: support templates defined elsewhere when we support them in the API
+	if labels != nil {
+		if obj.Spec.Selector == nil {
+			obj.Spec.Selector = &metav1.LabelSelector{
+				MatchLabels: labels,
+			}
+		}
+		if len(obj.Labels) == 0 {
+			obj.Labels = labels
+		}
+	}
+	updateStrategy := &obj.Spec.UpdateStrategy
+	if updateStrategy.Type == "" {
+		updateStrategy.Type = appsv1beta2.OnDeleteDaemonSetStrategyType
+	}
+	if updateStrategy.Type == appsv1beta2.RollingUpdateDaemonSetStrategyType {
+		if updateStrategy.RollingUpdate == nil {
+			rollingUpdate := appsv1beta2.RollingUpdateDaemonSet{}
+			updateStrategy.RollingUpdate = &rollingUpdate
+		}
+		if updateStrategy.RollingUpdate.MaxUnavailable == nil {
+			// Set default MaxUnavailable as 1 by default.
+			maxUnavailable := intstr.FromInt(1)
+			updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+		}
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = new(int32)
+		*obj.Spec.RevisionHistoryLimit = 10
+	}
+}
+
 func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 	if len(obj.Spec.PodManagementPolicy) == 0 {
 		obj.Spec.PodManagementPolicy = appsv1beta2.OrderedReadyPodManagement
