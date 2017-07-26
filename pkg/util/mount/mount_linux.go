@@ -115,13 +115,44 @@ func doMount(mounterPath string, mountCmd string, source string, target string, 
 		mountCmd = mounterPath
 	}
 
+	if systemdRunPath, err := exec.LookPath("systemd-run"); err == nil {
+		// Try to run mount via systemd-run --scope. This will escape the
+		// service where kubelet runs and any fuse daemons will be started in a
+		// specific scope. kubelet service than can be restarted without killing
+		// these fuse daemons.
+		//
+		// Complete command line (when mounterPath is not used):
+		// systemd-run --description=... --scope -- mount -t <type> <what> <where>
+		//
+		// Expected flow:
+		// * systemd-run creates a transient scope (=~ cgroup) and executes its
+		//   argument (/bin/mount) there.
+		// * mount does its job, forks a fuse daemon if necessary and finishes.
+		//   (systemd-run --scope finishes at this point, returning mount's exit
+		//   code and stdout/stderr - thats one of --scope benefits).
+		// * systemd keeps the fuse daemon running in the scope (i.e. in its own
+		//   cgroup) until the fuse daemon dies (another --scope benefit).
+		//   Kubelet service can be restarted and the fuse daemon survives.
+		// * When the fuse daemon dies (e.g. during unmount) systemd removes the
+		//   scope automatically.
+		//
+		// systemd-mount is not used because it's too new for older distros
+		// (CentOS 7, Debian Jessie).
+		mountCmd, mountArgs = addSystemdScope(systemdRunPath, target, mountCmd, mountArgs)
+	} else {
+		// No systemd-run on the host (or we failed to check it), assume kubelet
+		// does not run as a systemd service.
+		// No code here, mountCmd and mountArgs are already populated.
+	}
+
 	glog.V(4).Infof("Mounting cmd (%s) with arguments (%s)", mountCmd, mountArgs)
 	command := exec.Command(mountCmd, mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		glog.Errorf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n", err, mountCmd, source, target, fstype, options, string(output))
-		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n",
-			err, mountCmd, source, target, fstype, options, string(output))
+		args := strings.Join(mountArgs, " ")
+		glog.Errorf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n", err, mountCmd, args, string(output))
+		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n",
+			err, mountCmd, args, string(output))
 	}
 	return err
 }
@@ -143,6 +174,13 @@ func makeMountArgs(source, target, fstype string, options []string) []string {
 	mountArgs = append(mountArgs, target)
 
 	return mountArgs
+}
+
+// addSystemdScope adds "system-run --scope" to given command line
+func addSystemdScope(systemdRunPath, mountName, command string, args []string) (string, []string) {
+	descriptionArg := fmt.Sprintf("--description=Kubernetes transient mount for %s", mountName)
+	systemdRunArgs := []string{descriptionArg, "--scope", "--", command}
+	return systemdRunPath, append(systemdRunArgs, args...)
 }
 
 // Unmount unmounts the target.
