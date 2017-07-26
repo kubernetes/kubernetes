@@ -13,6 +13,7 @@ go_library(
         "daemonset.go",
         "deployment.go",
         "expansion_generated.go",
+        "replicaset.go",
         "scale.go",
         "statefulset.go",
     ],

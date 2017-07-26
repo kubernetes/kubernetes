@@ -13,6 +13,7 @@ go_library(
         "daemonset.go",
         "deployment.go",
         "interface.go",
+        "replicaset.go",
         "statefulset.go",
     ],
     tags = ["automanaged"],

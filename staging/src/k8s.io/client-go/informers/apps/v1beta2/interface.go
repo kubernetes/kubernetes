@@ -28,6 +28,8 @@ type Interface interface {
 	DaemonSets() DaemonSetInformer
 	// Deployments returns a DeploymentInformer.
 	Deployments() DeploymentInformer
+	// ReplicaSets returns a ReplicaSetInformer.
+	ReplicaSets() ReplicaSetInformer
 	// StatefulSets returns a StatefulSetInformer.
 	StatefulSets() StatefulSetInformer
 }
@@ -49,6 +51,11 @@ func (v *version) DaemonSets() DaemonSetInformer {
 // Deployments returns a DeploymentInformer.
 func (v *version) Deployments() DeploymentInformer {
 	return &deploymentInformer{factory: v.SharedInformerFactory}
+}
+
+// ReplicaSets returns a ReplicaSetInformer.
+func (v *version) ReplicaSets() ReplicaSetInformer {
+	return &replicaSetInformer{factory: v.SharedInformerFactory}
 }
 
 // StatefulSets returns a StatefulSetInformer.
