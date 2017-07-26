@@ -20,7 +20,7 @@ limitations under the License.
  * so they are skipped by default.
  */
 
-package e2e
+package node
 
 import (
 	"fmt"
@@ -59,7 +59,7 @@ func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 	return pod
 }
 
-var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", func() {
+var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 	f := framework.NewDefaultFramework("security-context")
 
 	It("should support pod.Spec.SecurityContext.SupplementalGroups", func() {

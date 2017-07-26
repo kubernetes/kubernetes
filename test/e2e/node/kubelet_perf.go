@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package node
 
 import (
 	"fmt"
@@ -191,7 +191,7 @@ func verifyCPULimits(expected framework.ContainersCPUSummary, actual framework.N
 }
 
 // Slow by design (1 hour)
-var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
+var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 	var nodeNames sets.String
 	f := framework.NewDefaultFramework("kubelet-perf")
 	var om *framework.RuntimeOperationMonitor
@@ -219,7 +219,7 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 		result := om.GetLatestRuntimeOperationErrorRate()
 		framework.Logf("runtime operation error metrics:\n%s", framework.FormatRuntimeOperationErrorRate(result))
 	})
-	framework.KubeDescribe("regular resource usage tracking", func() {
+	SIGDescribe("regular resource usage tracking", func() {
 		// We assume that the scheduler will make reasonable scheduling choices
 		// and assign ~N pods on the node.
 		// Although we want to track N pods per node, there are N + add-on pods
@@ -271,7 +271,7 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 			})
 		}
 	})
-	framework.KubeDescribe("experimental resource usage tracking [Feature:ExperimentalResourceUsageTracking]", func() {
+	SIGDescribe("experimental resource usage tracking [Feature:ExperimentalResourceUsageTracking]", func() {
 		density := []int{100}
 		for i := range density {
 			podsPerNode := density[i]

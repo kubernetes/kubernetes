@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -121,7 +122,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 
 	// Find the external addresses of the nodes the pods are running on.
 	for _, p := range pods.Items {
-		wait.Poll(pollInterval, framework.ServiceRespondingTimeout, func() (bool, error) {
+		wait.Poll(1*time.Second, framework.ServiceRespondingTimeout, func() (bool, error) {
 			address, err := framework.GetHostExternalAddress(h.client, &p)
 			if err != nil {
 				framework.Logf("%v", err)
@@ -202,7 +203,7 @@ func (s *ingManager) start(namespace string) (err error) {
 func (s *ingManager) test(path string) error {
 	url := fmt.Sprintf("%v/hostName", path)
 	httpClient := &http.Client{}
-	return wait.Poll(pollInterval, framework.ServiceRespondingTimeout, func() (bool, error) {
+	return wait.Poll(1*time.Second, framework.ServiceRespondingTimeout, func() (bool, error) {
 		body, err := framework.SimpleGET(httpClient, url, "")
 		if err != nil {
 			framework.Logf("%v\n%v\n%v", url, body, err)

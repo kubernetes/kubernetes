@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package node
 
 import (
 	"fmt"
@@ -270,7 +270,7 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 	}
 }
 
-var _ = framework.KubeDescribe("kubelet", func() {
+var _ = SIGDescribe("kubelet", func() {
 	var (
 		c  clientset.Interface
 		ns string
@@ -282,7 +282,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 		ns = f.Namespace.Name
 	})
 
-	framework.KubeDescribe("Clean up pods on node", func() {
+	SIGDescribe("Clean up pods on node", func() {
 		var (
 			numNodes        int
 			nodeNames       sets.String
@@ -383,7 +383,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 	})
 
 	// Test host cleanup when disrupting the volume environment.
-	framework.KubeDescribe("host cleanup with volume mounts [sig-storage][HostCleanup][Flaky]", func() {
+	SIGDescribe("host cleanup with volume mounts [sig-storage][HostCleanup][Flaky]", func() {
 
 		type hostCleanupTest struct {
 			itDescr string
