@@ -97,6 +97,13 @@ export KUBE_PANIC_WATCH_DECODE_ERROR
 ADMISSION_CONTROL=${ADMISSION_CONTROL:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
+# ADMISSION_CONTROL_ADD_POST is a comma separated list of admission controllers
+# to add to the (near) end of the list of default ones to start
+ADMISSION_CONTROL_ADD_POST=${ADMISSION_CONTROL_ADD_POST:-""}
+if [ "${ADMISSION_CONTROL_ADD_POST}" != "" ]; then
+    ADMISSION_CONTROL_ADD_POST=",${ADMISSION_CONTROL_ADD_POST}"
+fi
+
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
 START_MODE=${START_MODE:-"all"}
 
@@ -419,7 +426,7 @@ function start_apiserver {
     fi
 
     # Admission Controllers to invoke prior to persisting objects in cluster
-    ADMISSION_CONTROL=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota,GenericAdmissionWebhook
+    ADMISSION_CONTROL=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,${ADMISSION_CONTROL_ADD_POST}ResourceQuota,GenericAdmissionWebhook
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
 
