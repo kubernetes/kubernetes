@@ -96,3 +96,7 @@ func (adc *PersistentVolumeController) GetConfigMapFunc() func(namespace, name s
 func (ctrl *PersistentVolumeController) GetNodeLabels() (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in PersistentVolumeController")
 }
+
+func (ctrl *PersistentVolumeController) ProbeFlexVolumePlugins() []vol.VolumePlugin {
+	return nil
+}

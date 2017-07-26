@@ -35,6 +35,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
@@ -99,7 +101,8 @@ func NewAttachDetachController(
 	plugins []volume.VolumePlugin,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
-	timerConfig TimerConfig) (AttachDetachController, error) {
+	timerConfig TimerConfig,
+	config componentconfig.VolumeConfiguration) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in
@@ -126,6 +129,8 @@ func NewAttachDetachController(
 		nodesSynced: nodeInformer.Informer().HasSynced,
 		cloud:       cloud,
 	}
+
+	adc.flexVolumeProber = flexvolume.NewFlexVolumeProber(config.FlexVolumePluginDir)
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, adc); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
@@ -246,6 +251,8 @@ type attachDetachController struct {
 
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
+
+	flexVolumeProber flexvolume.FlexVolumeProber
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
@@ -505,6 +512,8 @@ func (adc *attachDetachController) processVolumesInUse(
 	}
 }
 
+var _ volume.VolumeHost = &attachDetachController{}
+
 // VolumeHost implementation
 // This is an unfortunate requirement of the current factoring of volume plugin
 // initializing code. It requires kubelet specific methods used by the mounting
@@ -587,4 +596,8 @@ func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.N
 
 func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in Attach/Detach controller")
+}
+
+func (adc *attachDetachController) ProbeFlexVolumePlugins() []volume.VolumePlugin {
+	return adc.flexVolumeProber.Probe()
 }

@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	"k8s.io/kubernetes/pkg/volume/fc"
-	"k8s.io/kubernetes/pkg/volume/flexvolume"
+	//"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/flocker"
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
 	"k8s.io/kubernetes/pkg/volume/git_repo"
@@ -88,7 +88,7 @@ func ProbeVolumePlugins(pluginDir string) []volume.VolumePlugin {
 	allPlugins = append(allPlugins, downwardapi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins(pluginDir)...)
+	//allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins(pluginDir)...)
 	allPlugins = append(allPlugins, azure_file.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, configmap.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)

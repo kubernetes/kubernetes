@@ -246,6 +246,8 @@ type VolumeHost interface {
 
 	// Returns the labels on the node
 	GetNodeLabels() (map[string]string, error)
+
+	ProbeFlexVolumePlugins() []VolumePlugin
 }
 
 // VolumePluginMgr tracks registered plugins.

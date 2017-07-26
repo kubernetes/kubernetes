@@ -23,12 +23,14 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/flexvolume"
 )
 
 // NewInitializedVolumePluginMgr returns a new instance of
@@ -41,12 +43,14 @@ func NewInitializedVolumePluginMgr(
 	kubelet *Kubelet,
 	secretManager secret.Manager,
 	configMapManager configmap.Manager,
-	plugins []volume.VolumePlugin) (*volume.VolumePluginMgr, error) {
+	plugins []volume.VolumePlugin,
+	kubeCfg *componentconfig.KubeletConfiguration) (*volume.VolumePluginMgr, error) {
 	kvh := &kubeletVolumeHost{
 		kubelet:          kubelet,
 		volumePluginMgr:  volume.VolumePluginMgr{},
 		secretManager:    secretManager,
 		configMapManager: configMapManager,
+		flexVolumeProber: flexvolume.NewFlexVolumeProber(kubeCfg.VolumePluginDir),
 	}
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, kvh); err != nil {
@@ -70,6 +74,7 @@ type kubeletVolumeHost struct {
 	volumePluginMgr  volume.VolumePluginMgr
 	secretManager    secret.Manager
 	configMapManager configmap.Manager
+	flexVolumeProber flexvolume.FlexVolumeProber
 }
 
 func (kvh *kubeletVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
@@ -155,4 +160,8 @@ func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
 	return node.Labels, nil
+}
+
+func (kvh *kubeletVolumeHost) ProbeFlexVolumePlugins() []volume.VolumePlugin {
+	return kvh.flexVolumeProber.Probe()
 }
