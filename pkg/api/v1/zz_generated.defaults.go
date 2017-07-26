@@ -142,6 +142,9 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 	if in.Spec.PersistentVolumeSource.ISCSI != nil {
 		SetDefaults_ISCSIVolumeSource(in.Spec.PersistentVolumeSource.ISCSI)
 	}
+	if in.Spec.PersistentVolumeSource.Quobyte != nil {
+		SetDefaults_QuobyteVolumeSource(in.Spec.PersistentVolumeSource.Quobyte)
+	}
 	if in.Spec.PersistentVolumeSource.AzureDisk != nil {
 		SetDefaults_AzureDiskVolumeSource(in.Spec.PersistentVolumeSource.AzureDisk)
 	}
@@ -200,6 +203,9 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		}
 		if a.VolumeSource.ConfigMap != nil {
 			SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+		}
+		if a.VolumeSource.Quobyte != nil {
+			SetDefaults_QuobyteVolumeSource(a.VolumeSource.Quobyte)
 		}
 		if a.VolumeSource.AzureDisk != nil {
 			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
@@ -352,6 +358,9 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		if a.VolumeSource.ConfigMap != nil {
 			SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
+		if a.VolumeSource.Quobyte != nil {
+			SetDefaults_QuobyteVolumeSource(a.VolumeSource.Quobyte)
+		}
 		if a.VolumeSource.AzureDisk != nil {
 			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
@@ -496,6 +505,9 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			}
 			if a.VolumeSource.ConfigMap != nil {
 				SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+			}
+			if a.VolumeSource.Quobyte != nil {
+				SetDefaults_QuobyteVolumeSource(a.VolumeSource.Quobyte)
 			}
 			if a.VolumeSource.AzureDisk != nil {
 				SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)

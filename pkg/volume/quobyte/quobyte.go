@@ -314,7 +314,6 @@ func (plugin *quobytePlugin) newDeleterInternal(spec *volume.Spec) (volume.Delet
 		return nil, err
 	}
 
-	//TODO check if tenant needed here
 	return &quobyteVolumeDeleter{
 		quobyteMounter: &quobyteMounter{
 			quobyte: &quobyte{
