@@ -61,6 +61,6 @@ func TestRoundTrip(t *testing.T) {
 	fuzzerFuncs := fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, exampleFuzzerFuncs)
 	fuzzer := fuzzer.FuzzerFor(fuzzerFuncs, rand.NewSource(seed), codecs)
 
-	roundtrip.RoundTripSpecificKindWithoutProtobuf(t, SchemeGroupVersion.WithKind("Example"), scheme, codecs, fuzzer, nil)
-	roundtrip.RoundTripSpecificKindWithoutProtobuf(t, SchemeGroupVersion.WithKind("ExampleList"), scheme, codecs, fuzzer, nil)
+	roundtrip.RoundTripSpecificKindWithoutProtobuf(t, SchemeGroupVersion.WithKind("Example"), scheme, codecs, fuzzer, &roundtrip.Exceptions{})
+	roundtrip.RoundTripSpecificKindWithoutProtobuf(t, SchemeGroupVersion.WithKind("ExampleList"), scheme, codecs, fuzzer, &roundtrip.Exceptions{})
 }

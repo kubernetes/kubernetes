@@ -24,5 +24,5 @@ import (
 )
 
 func TestRoundTripTypes(t *testing.T) {
-	roundtrip.RoundTripTestForAPIGroup(t, Install, kubeadmfuzzer.Funcs)
+	roundtrip.RoundTripTestForAPIGroup(t, Install, kubeadmfuzzer.Funcs, &roundtrip.Exceptions{})
 }
