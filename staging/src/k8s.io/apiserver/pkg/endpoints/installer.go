@@ -575,6 +575,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		routes := []*restful.RouteBuilder{}
 
+		// If there is a subresource, kind should be the parent's kind.
+		if hasSubresource {
+			fqParentKind, err := a.getResourceKind(resource, a.group.Storage[resource])
+			if err != nil {
+				return nil, err
+			}
+			kind = fqParentKind.Kind
+		}
 		switch action.Verb {
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
