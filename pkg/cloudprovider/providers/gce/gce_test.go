@@ -18,8 +18,25 @@ package gce
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
+
+func TestExtraKeyInConfig(t *testing.T) {
+	const s = `[Global]
+project-id = my-project
+unknown-key = abc
+network-name = my-network
+   `
+	reader := strings.NewReader(s)
+	config, err := readConfig(reader)
+	if err != nil {
+		t.Fatalf("Unexpected config parsing error %v", err)
+	}
+	if config.Global.ProjectID != "my-project" || config.Global.NetworkName != "my-network" {
+		t.Fatalf("Expected config values to continue to be read despite extra key-value pair.")
+	}
+}
 
 func TestGetRegion(t *testing.T) {
 	zoneName := "us-central1-b"
