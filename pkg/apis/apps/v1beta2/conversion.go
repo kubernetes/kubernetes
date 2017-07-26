@@ -43,6 +43,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_apps_StatefulSetUpdateStrategy_To_v1beta2_StatefulSetUpdateStrategy,
 		Convert_extensions_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet,
 		Convert_v1beta2_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
+		Convert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus,
+		Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus,
 		// extensions
 		// TODO: below conversions should be dropped in favor of auto-generated
 		// ones, see https://github.com/kubernetes/kubernetes/issues/39865
@@ -220,6 +222,31 @@ func Convert_apps_StatefulSetUpdateStrategy_To_v1beta2_StatefulSetUpdateStrategy
 	} else {
 		out.RollingUpdate = nil
 	}
+	return nil
+}
+
+func Convert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1beta2.StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
+	out.ObservedGeneration = new(int64)
+	*out.ObservedGeneration = in.ObservedGeneration
+	out.Replicas = in.Replicas
+	out.ReadyReplicas = in.ReadyReplicas
+	out.CurrentReplicas = in.CurrentReplicas
+	out.UpdatedReplicas = in.UpdatedReplicas
+	out.CurrentRevision = in.CurrentRevision
+	out.UpdateRevision = in.UpdateRevision
+	return nil
+}
+
+func Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in *apps.StatefulSetStatus, out *appsv1beta2.StatefulSetStatus, s conversion.Scope) error {
+	if in.ObservedGeneration != nil {
+		out.ObservedGeneration = *in.ObservedGeneration
+	}
+	out.Replicas = in.Replicas
+	out.ReadyReplicas = in.ReadyReplicas
+	out.CurrentReplicas = in.CurrentReplicas
+	out.UpdatedReplicas = in.UpdatedReplicas
+	out.CurrentRevision = in.CurrentRevision
+	out.UpdateRevision = in.UpdateRevision
 	return nil
 }
 
