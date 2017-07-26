@@ -9177,7 +9177,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 	}, api.PersistentVolumeClaimStatus{
 		Phase: api.ClaimPending,
 		Conditions: []api.PvcCondition{
-			api.PvcCondition{Type: api.PvcResizeStarted, Status: api.ConditionTrue},
+			{Type: api.PvcResizeStarted, Status: api.ConditionTrue},
 		},
 	})
 	scenarios := map[string]struct {
