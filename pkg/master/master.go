@@ -36,6 +36,7 @@ import (
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingapiv1alpha1 "k8s.io/api/scheduling/v1alpha1"
@@ -392,6 +393,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		// TODO: enable apps/v1beta2 by default before 1.8 release, after the API changes are done
 		// appsv1beta2.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
+		rbacv1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,
 		// Don't copy this pattern. We enable rbac/v1alpha1 and settings/v1laph1
 		// by default only because they were enabled in previous releases.

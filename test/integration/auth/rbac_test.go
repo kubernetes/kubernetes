@@ -162,9 +162,12 @@ func (s statusCode) String() string {
 
 // Declare a set of raw objects to use.
 var (
+	// Make a role binding with the version enabled in testapi.Rbac
+	// This assumes testapi is using rbac.authorization.k8s.io/v1beta1 or rbac.authorization.k8s.io/v1, which are identical in structure.
+	// TODO: rework or remove testapi usage to allow writing integration tests that don't depend on envvars
 	writeJobsRoleBinding = `
 {
-  "apiVersion": "rbac.authorization.k8s.io/v1beta1",
+  "apiVersion": "` + testapi.Rbac.GroupVersion().String() + `",
   "kind": "RoleBinding",
   "metadata": {
     "name": "pi"%s

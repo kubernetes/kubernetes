@@ -133,6 +133,7 @@ pkg/apis/policy/v1alpha1
 pkg/apis/policy/v1beta1
 pkg/apis/policy/validation
 pkg/apis/rbac
+pkg/apis/rbac/v1
 pkg/apis/rbac/v1beta1
 pkg/apis/rbac/validation
 pkg/apis/scheduling
@@ -523,6 +524,7 @@ staging/src/k8s.io/api/extensions/v1beta1
 staging/src/k8s.io/api/imagepolicy/v1alpha1
 staging/src/k8s.io/api/networking/v1
 staging/src/k8s.io/api/policy/v1beta1
+staging/src/k8s.io/api/rbac/v1
 staging/src/k8s.io/api/rbac/v1alpha1
 staging/src/k8s.io/api/rbac/v1beta1
 staging/src/k8s.io/api/scheduling/v1alpha1
@@ -712,6 +714,8 @@ staging/src/k8s.io/client-go/kubernetes/typed/networking/v1
 staging/src/k8s.io/client-go/kubernetes/typed/networking/v1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/policy/v1beta1
 staging/src/k8s.io/client-go/kubernetes/typed/policy/v1beta1/fake
+staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1
+staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1alpha1
 staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1alpha1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1beta1
