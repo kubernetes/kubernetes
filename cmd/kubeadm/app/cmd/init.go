@@ -231,7 +231,6 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
-
 	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddress, i.cfg.API.BindPort)
 	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, i.cfg.CertificatesDir, kubeadmconstants.KubernetesDir, i.cfg.NodeName)
 	if err != nil {
@@ -268,7 +267,6 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 5: Install and deploy all addons, and configure things as necessary
-
 	k8sVersion, err := version.ParseSemantic(i.cfg.KubernetesVersion)
 	if err != nil {
 		return fmt.Errorf("couldn't parse kubernetes version %q: %v", i.cfg.KubernetesVersion, err)
