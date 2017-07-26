@@ -376,3 +376,13 @@ func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
 		obj.Type = &typeVol
 	}
 }
+
+func SetDefaults_QuobyteVolumeSource(obj *v1.QuobyteVolumeSource) {
+	if obj.User == "" {
+		obj.User = "root"
+	}
+
+	if obj.Group == "" {
+		obj.Group = "nfsnobody"
+	}
+}

@@ -169,9 +169,10 @@ func (plugin *quobytePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, 
 			volName: spec.Name(),
 			user:    source.User,
 			group:   source.Group,
+			volume:  source.Volume,
+			tenant:  pod.ObjectMeta.Namespace,
 			mounter: mounter,
 			pod:     pod,
-			volume:  source.Volume,
 			plugin:  plugin,
 		},
 		registry:     source.Registry,
@@ -267,22 +268,16 @@ func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 // GetPath returns the path to the user specific mount of a Quobyte volume
-// Returns a path in the format ../user#group@volume
+// Returns a path in the format ../user#group#tenant@volume
 func (quobyteVolume *quobyte) GetPath() string {
-	user := quobyteVolume.user
-	if len(user) == 0 {
-		user = "root"
-	}
-
-	group := quobyteVolume.group
-	if len(group) == 0 {
-		group = "nfsnobody"
-	}
-
 	// Quobyte has only one mount in the PluginDir where all Volumes are mounted
 	// The Quobyte client does a fixed-user mapping
 	pluginDir := quobyteVolume.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
-	return path.Join(pluginDir, fmt.Sprintf("%s#%s@%s", user, group, quobyteVolume.volume))
+	return path.Join(pluginDir, fmt.Sprintf("%s#%s#%s@%s",
+		quobyteVolume.user,
+		quobyteVolume.group,
+		quobyteVolume.tenant,
+		quobyteVolume.volume))
 }
 
 type quobyteUnmounter struct {
@@ -319,6 +314,7 @@ func (plugin *quobytePlugin) newDeleterInternal(spec *volume.Spec) (volume.Delet
 		return nil, err
 	}
 
+	//TODO check if tenant needed here
 	return &quobyteVolumeDeleter{
 		quobyteMounter: &quobyteMounter{
 			quobyte: &quobyte{
@@ -365,7 +361,9 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 	}
 	provisioner.config = "BASE"
 	provisioner.tenant = "DEFAULT"
+
 	createQuota := false
+	createTenants := false
 
 	cfg, err := parseAPIConfig(provisioner.plugin, provisioner.options.Parameters)
 	if err != nil {
@@ -385,6 +383,8 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 			provisioner.config = v
 		case "createquota":
 			createQuota = gostrings.ToLower(v) == "true"
+		case "createtenants":
+			createTenants = gostrings.ToLower(v) == "true"
 		case "adminsecretname",
 			"adminsecretnamespace",
 			"quobyteapiserver":
@@ -399,10 +399,19 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 	}
 
 	// create random image name
+	provisioner.tenant = provisioner.options.PVC.ObjectMeta.Namespace
 	provisioner.volume = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
 
 	manager := &quobyteVolumeManager{
 		config: cfg,
+	}
+
+	// If the Quobyte Plugin should create Tenants ensure that the Quobyte tenant exists
+	if createTenants {
+		err := manager.ensureTenantExists(provisioner.tenant)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	vol, sizeGB, err := manager.createVolume(provisioner, createQuota)
@@ -437,9 +446,12 @@ func (deleter *quobyteVolumeDeleter) Delete() error {
 	if err != nil {
 		return err
 	}
+
+	deleter.tenant = deleter.pv.ObjectMeta.Namespace
 	manager := &quobyteVolumeManager{
 		config: cfg,
 	}
+
 	return manager.deleteVolume(deleter)
 }
 

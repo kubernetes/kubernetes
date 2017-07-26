@@ -17,6 +17,7 @@ limitations under the License.
 package quobyte
 
 import (
+	"fmt"
 	"net"
 	"path"
 	"strings"
@@ -32,20 +33,47 @@ type quobyteVolumeManager struct {
 	config *quobyteAPIConfig
 }
 
+func (manager *quobyteVolumeManager) ensureTenantExists(tenantName string) error {
+	client := manager.createQuobyteClient()
+
+	tenantMap, err := client.GetTenantMap()
+	if err != nil {
+		return err
+	}
+
+	if _, ok := tenantMap[tenantName]; ok {
+		return nil
+	}
+
+	_, err = client.SetTenant(tenantName)
+	return err
+}
+
 func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProvisioner, createQuota bool) (quobyte *v1.QuobyteVolumeSource, size int, err error) {
 	capacity := provisioner.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volumeSize := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
 	// Quobyte has the concept of Volumes which doen't have a specific size (they can grow unlimited)
 	// to simulate a size constraint we set here a Quota for logical space
+	quobyteClient := manager.createQuobyteClient()
+
+	tenantMap, err := quobyteClient.GetTenantMap()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	tenantID, ok := tenantMap[provisioner.tenant]
+	if !ok {
+		return &v1.QuobyteVolumeSource{}, volumeSize, fmt.Errorf("Missing Quobyte tenant %s", provisioner.tenant)
+	}
+
 	volumeRequest := &quobyteapi.CreateVolumeRequest{
 		Name:              provisioner.volume,
 		RootUserID:        provisioner.user,
 		RootGroupID:       provisioner.group,
-		TenantID:          provisioner.tenant,
+		TenantID:          tenantID,
 		ConfigurationName: provisioner.config,
 	}
 
-	quobyteClient := manager.createQuobyteClient()
 	volumeUUID, err := quobyteClient.CreateVolume(volumeRequest)
 	if err != nil {
 		return &v1.QuobyteVolumeSource{}, volumeSize, err
