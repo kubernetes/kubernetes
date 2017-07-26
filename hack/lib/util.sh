@@ -496,7 +496,7 @@ kube::util::ensure_clean_working_dir() {
 # Ensure that the given godep version is installed and in the path
 kube::util::ensure_godep_version() {
   GODEP_VERSION=${1:-"v79"}
-  if [[ "$(godep version)" == *"godep ${GODEP_VERSION}"* ]]; then
+  if [[ "$(godep version 2>/dev/null)" == *"godep ${GODEP_VERSION}"* ]]; then
     return
   fi
 
@@ -505,7 +505,7 @@ kube::util::ensure_godep_version() {
 
   GOPATH="${KUBE_TEMP}/go" go get -d -u github.com/tools/godep 2>/dev/null
   pushd "${KUBE_TEMP}/go/src/github.com/tools/godep" >/dev/null
-    git checkout "${GODEP_VERSION}"
+    git checkout -q "${GODEP_VERSION}"
     GOPATH="${KUBE_TEMP}/go" go install .
   popd >/dev/null
 
@@ -823,6 +823,18 @@ function kube::util::ensure-cfssl {
       exit 1
     fi
   popd > /dev/null
+}
+
+# kube::util::ensure_dockerized
+# Confirms that the script is being run inside a kube-build image
+#
+function kube::util::ensure_dockerized {
+  if [[ -f /kube-build-image ]]; then
+    return 0
+  else
+    echo "ERROR: This script is designed to be run inside a kube-build container"
+    exit 1
+  fi
 }
 
 # Some useful colors.
