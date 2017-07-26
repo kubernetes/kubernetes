@@ -23,8 +23,6 @@ import (
 )
 
 const (
-	// StatefulSetInitAnnotation if present, and set to false, indicates that a Pod's readiness should be ignored.
-	StatefulSetInitAnnotation      = "pod.alpha.kubernetes.io/initialized"
 	ControllerRevisionHashLabelKey = "controller-revision-hash"
 	StatefulSetRevisionLabel       = ControllerRevisionHashLabelKey
 )
