@@ -23,14 +23,14 @@ func (in *TableRow) DeepCopy() *TableRow {
 
 	out := new(TableRow)
 
-	if out.Cells != nil {
+	if in.Cells != nil {
 		out.Cells = make([]interface{}, len(in.Cells))
 		for i := range in.Cells {
 			out.Cells[i] = deepCopyJSON(in.Cells[i])
 		}
 	}
 
-	if out.Conditions != nil {
+	if in.Conditions != nil {
 		out.Conditions = make([]TableRowCondition, len(in.Conditions))
 		for i := range in.Conditions {
 			in.Conditions[i].DeepCopyInto(&out.Conditions[i])
