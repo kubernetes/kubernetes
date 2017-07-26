@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	versionedfake "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/federation/apis/federation"
-	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/fake"
+	federation "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -771,7 +771,7 @@ func TestDescribeCluster(t *testing.T) {
 		},
 		Status: federation.ClusterStatus{
 			Conditions: []federation.ClusterCondition{
-				{Type: federation.ClusterReady, Status: api.ConditionTrue},
+				{Type: federation.ClusterReady, Status: v1.ConditionTrue},
 			},
 		},
 	}

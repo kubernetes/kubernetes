@@ -13,6 +13,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation:go_default_library",
+        "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/apis/rbac:go_default_library",

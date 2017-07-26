@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	federationapi "k8s.io/kubernetes/federation/apis/federation"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"

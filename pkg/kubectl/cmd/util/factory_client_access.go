@@ -40,7 +40,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
