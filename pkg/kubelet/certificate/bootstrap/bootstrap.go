@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package bootstrap
 
 import (
 	"fmt"
-	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 
@@ -38,11 +37,11 @@ const (
 	defaultKubeletClientKeyFile         = "kubelet-client.key"
 )
 
-// bootstrapClientCert requests a client cert for kubelet if the kubeconfigPath file does not exist.
+// LoadClientCert requests a client cert for kubelet if the kubeconfigPath file does not exist.
 // The kubeconfig at bootstrapPath is used to request a client certificate from the API server.
 // On success, a kubeconfig file referencing the generated key and obtained certificate is written to kubeconfigPath.
 // The certificate and key file are stored in certDir.
-func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir string, nodeName types.NodeName) error {
+func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string, nodeName types.NodeName) error {
 	// Short-circuit if the kubeconfig file already exists.
 	// TODO: inspect the kubeconfig, ensure a rest client can be built from it, verify client cert expiration, etc.
 	_, err := os.Stat(kubeconfigPath)
