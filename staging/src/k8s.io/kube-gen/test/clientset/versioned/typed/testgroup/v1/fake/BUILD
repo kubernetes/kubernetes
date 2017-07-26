@@ -23,8 +23,8 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
-        "//vendor/k8s.io/kube-gen/test/apis/testgroup:go_default_library",
-        "//vendor/k8s.io/kube-gen/test/clientset/internal/typed/testgroup/internalversion:go_default_library",
+        "//vendor/k8s.io/kube-gen/test/apis/testgroup/v1:go_default_library",
+        "//vendor/k8s.io/kube-gen/test/clientset/versioned/typed/testgroup/v1:go_default_library",
     ],
 )
 

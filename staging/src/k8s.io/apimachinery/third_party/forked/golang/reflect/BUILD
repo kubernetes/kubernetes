@@ -17,10 +17,7 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "deep_equal.go",
-        "type.go",
-    ],
+    srcs = ["deep_equal.go"],
     tags = ["automanaged"],
 )
 

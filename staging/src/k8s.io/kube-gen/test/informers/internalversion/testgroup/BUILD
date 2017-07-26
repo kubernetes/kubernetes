@@ -9,14 +9,11 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["conversion.go"],
+    srcs = ["interface.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/gengo/args:go_default_library",
-        "//vendor/k8s.io/gengo/generator:go_default_library",
-        "//vendor/k8s.io/gengo/namer:go_default_library",
-        "//vendor/k8s.io/gengo/types:go_default_library",
+        "//vendor/k8s.io/kube-gen/test/informers/internalversion/internalinterfaces:go_default_library",
+        "//vendor/k8s.io/kube-gen/test/informers/internalversion/testgroup/internalversion:go_default_library",
     ],
 )
 
@@ -29,6 +26,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/kube-gen/test/informers/internalversion/testgroup/internalversion:all-srcs",
+    ],
     tags = ["automanaged"],
 )

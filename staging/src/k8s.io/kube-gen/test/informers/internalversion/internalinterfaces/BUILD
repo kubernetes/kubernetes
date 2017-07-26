@@ -9,14 +9,12 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["install.go"],
+    srcs = ["factory_interfaces.go"],
     tags = ["automanaged"],
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/kube-gen/test/apis/testgroup:go_default_library",
-        "//vendor/k8s.io/kube-gen/test/apis/testgroup/v1:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/k8s.io/kube-gen/test/clientset/internal:go_default_library",
     ],
 )
 

@@ -21,8 +21,8 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup:go_default_library",
-        "//vendor/k8s.io/kube-gen/cmd/client-gen/testoutput/clientset_generated/test_internalclientset/scheme:go_default_library",
+        "//vendor/k8s.io/kube-gen/test/apis/testgroup:go_default_library",
+        "//vendor/k8s.io/kube-gen/test/clientset/internal/scheme:go_default_library",
     ],
 )
 
@@ -37,7 +37,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/kube-gen/cmd/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion/fake:all-srcs",
+        "//staging/src/k8s.io/kube-gen/test/clientset/internal/typed/testgroup/internalversion/fake:all-srcs",
     ],
     tags = ["automanaged"],
 )

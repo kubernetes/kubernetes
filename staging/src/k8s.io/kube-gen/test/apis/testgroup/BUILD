@@ -35,8 +35,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup/install:all-srcs",
-        "//staging/src/k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup/v1:all-srcs",
+        "//staging/src/k8s.io/kube-gen/test/apis/testgroup/install:all-srcs",
+        "//staging/src/k8s.io/kube-gen/test/apis/testgroup/v1:all-srcs",
     ],
     tags = ["automanaged"],
 )

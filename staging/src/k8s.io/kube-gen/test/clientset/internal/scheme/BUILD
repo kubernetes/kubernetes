@@ -21,7 +21,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-        "//vendor/k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup/install:go_default_library",
+        "//vendor/k8s.io/kube-gen/test/apis/testgroup/install:go_default_library",
     ],
 )
 

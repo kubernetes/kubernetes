@@ -10,24 +10,18 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "clientset_generated.go",
-        "doc.go",
-        "register.go",
+        "factory.go",
+        "generic.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/client-go/discovery:go_default_library",
-        "//vendor/k8s.io/client-go/discovery/fake:go_default_library",
-        "//vendor/k8s.io/client-go/testing:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/kube-gen/test/apis/testgroup:go_default_library",
         "//vendor/k8s.io/kube-gen/test/clientset/internal:go_default_library",
-        "//vendor/k8s.io/kube-gen/test/clientset/internal/typed/testgroup/internalversion:go_default_library",
-        "//vendor/k8s.io/kube-gen/test/clientset/internal/typed/testgroup/internalversion/fake:go_default_library",
+        "//vendor/k8s.io/kube-gen/test/informers/internalversion/internalinterfaces:go_default_library",
+        "//vendor/k8s.io/kube-gen/test/informers/internalversion/testgroup:go_default_library",
     ],
 )
 
@@ -40,6 +34,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/kube-gen/test/informers/internalversion/internalinterfaces:all-srcs",
+        "//staging/src/k8s.io/kube-gen/test/informers/internalversion/testgroup:all-srcs",
+    ],
     tags = ["automanaged"],
 )
