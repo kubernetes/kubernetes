@@ -317,6 +317,18 @@ func ListResource(r rest.Lister, rw rest.Watcher, e rest.Exporter, scope Request
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
 
+		exportOptions := metav1.ExportOptions{}
+		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &exportOptions); err != nil {
+			err = errors.NewBadRequest(err.Error())
+			scope.err(err, w, req)
+			return
+		}
+		if exportOptions.Export && e == nil {
+			err = errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource))
+			scope.err(err, w, req)
+			return
+		}
+
 		opts := metainternalversion.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &opts); err != nil {
 			err = errors.NewBadRequest(err.Error())
@@ -405,9 +417,9 @@ func ListResource(r rest.Lister, rw rest.Watcher, e rest.Exporter, scope Request
 			}
 		}
 
-		if opts.Export {
+		if exportOptions.Export {
 			// TODO: parse export options in this call rather than carrying on list options
-			result, err = e.Export(ctx, result, metav1.ExportOptions{Export: opts.Export})
+			result, err = e.Export(ctx, result, exportOptions)
 			if err != nil {
 				scope.err(err, w, req)
 				return

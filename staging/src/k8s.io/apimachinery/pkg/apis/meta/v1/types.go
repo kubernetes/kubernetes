@@ -370,10 +370,6 @@ type ListOptions struct {
 	// the continue field. This field is not supported when watch is true. Clients may start a watch from
 	// the last resourceVersion value returned by the server and not miss any modifications.
 	Continue string `json:"continue,omitempty" protobuf:"bytes,8,opt,name=continue"`
-
-	// Should this value be exported.  Export strips fields that a user can not specify.
-	// +optional
-	Export bool `json:"export,omitempty" protobuf:"varint,1,opt,name=export"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
