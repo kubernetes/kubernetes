@@ -57,6 +57,13 @@ import (
 )
 
 func startServiceController(ctx ControllerContext) (bool, error) {
+	if ctx.Cloud == nil {
+		// don't return error when no cloud provider provided, just output a WARNING
+		glog.Warning("WARNING: no cloud provider provided, services of type LoadBalancer will fail." +
+			" Will not start service controller.")
+		return false, nil
+	}
+
 	serviceController, err := servicecontroller.New(
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("service-controller"),
