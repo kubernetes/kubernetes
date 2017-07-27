@@ -46,6 +46,7 @@ QUICK_PATTERNS+=(
   "verify-test-owners.sh"
 )
 
+
 EXCLUDED_CHECKS=$(ls ${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || true)
 QUICK_CHECKS=$(ls ${QUICK_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || true)
 
@@ -75,6 +76,19 @@ function run-cmd {
   fi
 }
 
+
+# Collect Failed tests in this Array , initalize it to nil
+FAILED_TESTS=()
+
+function print-failed-tests {
+  echo -e "========================"
+  echo -e "${color_red}FAILED TESTS${color_norm}"
+  echo -e "========================"
+  for t in ${FAILED_TESTS[@]}; do
+      echo -e "${color_red}${t}${color_norm}"
+  done
+}
+
 function run-checks {
   local -r pattern=$1
   local -r runner=$2
@@ -98,6 +112,7 @@ function run-checks {
     else
       echo -e "${color_red}FAILED${color_norm}   ${t}\t${elapsed}s"
       ret=1
+      FAILED_TESTS+=(${t})
     fi
   done
 }
@@ -131,6 +146,10 @@ fi
 ret=0
 run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
 run-checks "${KUBE_ROOT}/hack/verify-*.py" python
+
+if [[ ${ret} -eq 1 ]]; then
+    print-failed-tests 
+fi
 exit ${ret}
 
 # ex: ts=2 sw=2 et filetype=sh
