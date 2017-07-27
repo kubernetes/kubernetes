@@ -61,7 +61,6 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	namespaceColumns              = []string{"NAME", "STATUS", "AGE"}
 	secretColumns                 = []string{"NAME", "TYPE", "DATA", "AGE"}
 	serviceAccountColumns         = []string{"NAME", "SECRETS", "AGE"}
 	persistentVolumeColumns       = []string{"NAME", "CAPACITY", "ACCESSMODES", "RECLAIMPOLICY", "STATUS", "CLAIM", "STORAGECLASS", "REASON", "AGE"}
@@ -261,9 +260,15 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(eventColumnDefinitions, printEvent)
 	h.TableHandler(eventColumnDefinitions, printEventList)
+	//namespaceColumns              = []string{"NAME", "STATUS", "AGE"}
+	namespaceColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Status", Type: "string", Description: "The status of the namespace"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(namespaceColumnDefinitions, printNamespace)
+	h.TableHandler(namespaceColumnDefinitions, printNamespaceList)
 
-	h.Handler(namespaceColumns, nil, printNamespace)
-	h.Handler(namespaceColumns, nil, printNamespaceList)
 	h.Handler(secretColumns, nil, printSecret)
 	h.Handler(secretColumns, nil, printSecretList)
 	h.Handler(serviceAccountColumns, nil, printServiceAccount)
@@ -947,30 +952,24 @@ func printEndpointsList(list *api.EndpointsList, options printers.PrintOptions) 
 	return rows, nil
 }
 
-func printNamespace(item *api.Namespace, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, item.Name, options.WithKind)
-
-	if options.WithNamespace {
-		return fmt.Errorf("namespace is not namespaced")
+func printNamespace(obj *api.Namespace, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
-
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", name, item.Status.Phase, translateTimestamp(item.CreationTimestamp)); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(item.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, item.Labels))
-	return err
+	row.Cells = append(row.Cells, obj.Name, obj.Status.Phase, translateTimestamp(obj.CreationTimestamp))
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printNamespaceList(list *api.NamespaceList, w io.Writer, options printers.PrintOptions) error {
-	for _, item := range list.Items {
-		if err := printNamespace(&item, w, options); err != nil {
-			return err
+func printNamespaceList(list *api.NamespaceList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printNamespace(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printSecret(item *api.Secret, w io.Writer, options printers.PrintOptions) error {
