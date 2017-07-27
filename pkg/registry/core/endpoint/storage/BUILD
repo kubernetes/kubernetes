@@ -27,6 +27,9 @@ go_library(
     srcs = ["storage.go"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/storage:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/endpoint:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
