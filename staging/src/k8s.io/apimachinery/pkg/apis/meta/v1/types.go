@@ -586,6 +586,15 @@ const (
 	// Status code 504
 	StatusReasonTimeout StatusReason = "Timeout"
 
+	// StatusReasonTooManyRequests means the server experienced too many requests within a
+	// given window and that the client must wait to perform the action again. A client may
+	// always retry the request that led to this error, although the client should wait at least
+	// the number of seconds specified by the retryAfterSeconds field.
+	// Details (optional):
+	//   "retryAfterSeconds" int32 - the number of seconds before the operation should be retried
+	// Status code 429
+	StatusReasonTooManyRequests StatusReason = "TooManyRequests"
+
 	// StatusReasonBadRequest means that the request itself was invalid, because the request
 	// doesn't make any sense, for example deleting a read-only object.  This is different than
 	// StatusReasonInvalid above which indicates that the API call could possibly succeed, but the
