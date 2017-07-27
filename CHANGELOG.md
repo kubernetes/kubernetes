@@ -7425,17 +7425,17 @@ This is the first release tracked via the use of the [kubernetes/features](https
     `Replica Set`s in some or all clusters in a federation, with the
     desired replica count distributed equally or according to
     specified per-cluster weights.
-	([docs](http://kubernetes.io/docs/user-guide/federation/federated-replicasets.md))
+	([docs](http://kubernetes.io/docs/tasks/administer-federation/replicaset.md))
 	([kubernetes/features#46](https://github.com/kubernetes/features/issues/46))
   - [beta] `Federated Secrets` are created and kept consistent across all clusters in a federation.
-    ([docs](http://kubernetes.io/docs/user-guide/federation/federated-secrets.md))
+    ([docs](https://kubernetes.io/docs/tasks/administer-federation/secret.md))
     ([kubernetes/features#68](https://github.com/kubernetes/features/issues/68))
   - [beta] Federation API server gained support for events and many
     federation controllers now report important events.
     ([docs](http://kubernetes.io/docs/user-guide/federation/events))
     ([kubernetes/features#70](https://github.com/kubernetes/features/issues/70))
   - [alpha] Creating a `Federated Namespace` causes matching
-    `Namespace`s to be created and maintained in all the clusters registered with that federation. ([docs](http://kubernetes.io/docs/user-guide/federation/federated-namespaces.md)) ([kubernetes/features#69](https://github.com/kubernetes/features/issues/69))
+    `Namespace`s to be created and maintained in all the clusters registered with that federation. ([docs](https://kubernetes.io/docs/tasks/administer-federation/namespaces.md)) ([kubernetes/features#69](https://github.com/kubernetes/features/issues/69))
   - [alpha] ingress has alpha support for a single master multi zone cluster ([docs](http://kubernetes.io/docs/user-guide/ingress.md#failing-across-availability-zones)) ([kubernetes/features#52](https://github.com/kubernetes/features/issues/52))
 - **Network**
   - [alpha] Service LB now has alpha support for preserving client source IP ([docs](http://kubernetes.io/docs/user-guide/load-balancer/)) ([kubernetes/features#27](https://github.com/kubernetes/features/issues/27))
