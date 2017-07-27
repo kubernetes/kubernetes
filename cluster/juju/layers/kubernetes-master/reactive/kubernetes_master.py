@@ -329,7 +329,7 @@ def idle_status(kube_api, kube_control):
             hookenv.status_set('active', 'Kubernetes master running.')
         else:
             msg = 'Stopped services: {}'.format(','.join(failing_services))
-            hookenv.status_set('waiting', msg)
+            hookenv.status_set('blocked', msg)
 
 
 def master_services_down():
