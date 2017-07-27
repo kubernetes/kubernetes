@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
@@ -113,7 +112,11 @@ func WithMaxInFlightLimit(
 				if requestInfo.Namespace != "" {
 					scope = "namespace"
 				}
-				metrics.MonitorRequest(r, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", scope, errors.StatusTooManyRequests, 0, time.Now())
+				if requestInfo.IsResourceRequest {
+					metrics.MonitorRequest(r, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", scope, http.StatusTooManyRequests, 0, time.Now())
+				} else {
+					metrics.MonitorRequest(r, strings.ToUpper(requestInfo.Verb), "", requestInfo.Path, "", scope, http.StatusTooManyRequests, 0, time.Now())
+				}
 				tooManyRequests(r, w)
 			}
 		}
