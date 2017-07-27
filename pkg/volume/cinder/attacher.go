@@ -263,8 +263,11 @@ func (attacher *cinderDiskAttacher) GetDeviceMountPath(
 // FIXME: this method can be further pruned.
 func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	mounter := attacher.host.GetMounter()
-	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
+	glog.V(4).Infof("Checking whether %s is a mount point", deviceMountPath)
+
+	notMnt, err := mount.IsNotMountPoint(mounter, deviceMountPath)
 	if err != nil {
+		glog.Errorf("Error received when querying whether %s is a mount: %v", deviceMountPath, err)
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
 				return err
@@ -275,6 +278,8 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 		}
 	}
 
+	glog.V(4).Infof("Is %s mounted? %s", deviceMountPath, notMnt)
+
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return err
@@ -284,7 +289,9 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 	if readOnly {
 		options = append(options, "ro")
 	}
+
 	if notMnt {
+		glog.V(4).Infof("Mounting %s", deviceMountPath)
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
 		mountOptions := volume.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
@@ -293,6 +300,7 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -403,7 +411,7 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName type
 }
 
 func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	return volumeutil.UnmountMountPoint(deviceMountPath, detacher.mounter, true)
 }
 
 func (attacher *cinderDiskAttacher) nodeInstanceID(nodeName types.NodeName) (string, error) {
