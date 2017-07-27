@@ -157,6 +157,7 @@ go_test(
         "cmd_test.go",
         "cp_test.go",
         "create_clusterrole_test.go",
+        "create_clusterrolebinding_test.go",
         "create_configmap_test.go",
         "create_deployment_test.go",
         "create_namespace_test.go",
