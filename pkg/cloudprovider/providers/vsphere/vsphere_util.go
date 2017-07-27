@@ -61,6 +61,7 @@ func GetVSphere() (*VSphere, error) {
 func getVSphereConfig() *VSphereConfig {
 	var cfg VSphereConfig
 	cfg.Global.VCenterIP = os.Getenv("VSPHERE_VCENTER")
+	cfg.Global.VCenterPort = os.Getenv("VSPHERE_VCENTER_PORT")
 	cfg.Global.User = os.Getenv("VSPHERE_USER")
 	cfg.Global.Password = os.Getenv("VSPHERE_PASSWORD")
 	cfg.Global.Datacenter = os.Getenv("VSPHERE_DATACENTER")
