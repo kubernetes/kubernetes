@@ -61,7 +61,6 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	eventColumns                  = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
 	namespaceColumns              = []string{"NAME", "STATUS", "AGE"}
 	secretColumns                 = []string{"NAME", "TYPE", "DATA", "AGE"}
 	serviceAccountColumns         = []string{"NAME", "SECRETS", "AGE"}
@@ -248,8 +247,21 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(nodeColumnDefinitions, printNode)
 	h.TableHandler(nodeColumnDefinitions, printNodeList)
 
-	h.Handler(eventColumns, nil, printEvent)
-	h.Handler(eventColumns, nil, printEventList)
+	eventColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Lastseen", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["lastTimestamp"]},
+		{Name: "Firtseen", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["firstTimestamp"]},
+		{Name: "Count", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["count"]},
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Kind", Type: "string", Description: apiv1.Event{}.InvolvedObject.SwaggerDoc()["kind"]},
+		{Name: "Subobject", Type: "string", Description: apiv1.Event{}.InvolvedObject.SwaggerDoc()["fieldPath"]},
+		{Name: "Type", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["type"]},
+		{Name: "Reason", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["reason"]},
+		{Name: "Source", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["source"]},
+		{Name: "Message", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["message"]},
+	}
+	h.TableHandler(eventColumnDefinitions, printEvent)
+	h.TableHandler(eventColumnDefinitions, printEventList)
+
 	h.Handler(namespaceColumns, nil, printNamespace)
 	h.Handler(namespaceColumns, nil, printNamespaceList)
 	h.Handler(secretColumns, nil, printSecret)
@@ -1177,57 +1189,40 @@ func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, w io.Wr
 	return nil
 }
 
-func printEvent(event *api.Event, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, event.InvolvedObject.Name, options.WithKind)
-
-	namespace := event.Namespace
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
+func printEvent(obj *api.Event, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
-
 	// While watching event, we should print absolute time.
 	var FirstTimestamp, LastTimestamp string
 	if options.AbsoluteTimestamps {
-		FirstTimestamp = event.FirstTimestamp.String()
-		LastTimestamp = event.LastTimestamp.String()
+		FirstTimestamp = obj.FirstTimestamp.String()
+		LastTimestamp = obj.LastTimestamp.String()
 	} else {
-		FirstTimestamp = translateTimestamp(event.FirstTimestamp)
-		LastTimestamp = translateTimestamp(event.LastTimestamp)
+		FirstTimestamp = translateTimestamp(obj.FirstTimestamp)
+		LastTimestamp = translateTimestamp(obj.LastTimestamp)
 	}
+	row.Cells = append(row.Cells, LastTimestamp, FirstTimestamp,
+		obj.Count, obj.Name, obj.InvolvedObject.Kind,
+		obj.InvolvedObject.FieldPath, obj.Type, obj.Reason,
+		formatEventSource(obj.Source), obj.Message)
 
-	if _, err := fmt.Fprintf(
-		w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
-		LastTimestamp,
-		FirstTimestamp,
-		event.Count,
-		name,
-		event.InvolvedObject.Kind,
-		event.InvolvedObject.FieldPath,
-		event.Type,
-		event.Reason,
-		formatEventSource(event.Source),
-		event.Message,
-	); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(event.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, event.Labels))
-	return err
+	return []metav1alpha1.TableRow{row}, nil
 }
 
 // Sorts and prints the EventList in a human-friendly format.
-func printEventList(list *api.EventList, w io.Writer, options printers.PrintOptions) error {
+func printEventList(list *api.EventList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+
 	sort.Sort(events.SortableEvents(list.Items))
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		if err := printEvent(&list.Items[i], w, options); err != nil {
-			return err
+		r, err := printEvent(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printRoleBinding(roleBinding *rbac.RoleBinding, w io.Writer, options printers.PrintOptions) error {
