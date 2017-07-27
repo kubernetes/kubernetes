@@ -30,6 +30,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
     ],
 )
 

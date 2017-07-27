@@ -271,7 +271,7 @@ func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	updated := false
 	for i := range nodeTaints {
 		if taint.MatchTaint(&nodeTaints[i]) {
-			if helper.Semantic.DeepEqual(taint, nodeTaints[i]) {
+			if helper.Semantic.DeepEqual(*taint, nodeTaints[i]) {
 				return newNode, false, nil
 			}
 			newTaints = append(newTaints, *taint)
