@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package preemtion provides eviction of pods in order to enable admission
+// of critical pods. Pods are evicted in a best effort attempt to cause minimal impact.
 package preemption
 
 import (

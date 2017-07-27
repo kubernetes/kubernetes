@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package rktshim is the package that contains the shim code for rkt to be used
-// as the kubelet container runtime implementation that is integrated using the
-// Container Runtime Interface.
+// Package rktshim provides the shim code for rkt to be used as the kubelet container
+// runtime implementation that is integrated using the Container Runtime Interface.
 package rktshim
