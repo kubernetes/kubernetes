@@ -120,6 +120,7 @@ func (a *sarApprover) authorize(csr *capi.CertificateSigningRequest, rattrs auth
 	sar := &authorization.SubjectAccessReview{
 		Spec: authorization.SubjectAccessReviewSpec{
 			User:               csr.Spec.Username,
+			UID:                csr.Spec.UID,
 			Groups:             csr.Spec.Groups,
 			Extra:              extra,
 			ResourceAttributes: &rattrs,
