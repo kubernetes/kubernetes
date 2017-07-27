@@ -361,6 +361,13 @@ func TestRunValidations(t *testing.T) {
 		},
 		{
 			args:        []string{"test"},
+			expectedErr: "--image is required",
+		},
+		{
+			args: []string{"test"},
+			flags: map[string]string{
+				"image": "#",
+			},
 			expectedErr: "Invalid image name",
 		},
 		{

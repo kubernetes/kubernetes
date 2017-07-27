@@ -10,24 +10,16 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "bootstrap_test.go",
-        "server_test.go",
-    ],
+    srcs = ["server_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/componentconfig:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-    ],
+    deps = ["//pkg/apis/componentconfig:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = [
         "auth.go",
-        "bootstrap.go",
         "plugins.go",
         "server.go",
         "server_linux.go",
@@ -51,6 +43,7 @@ go_library(
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/certificate:go_default_library",
+        "//pkg/kubelet/certificate/bootstrap:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -65,7 +58,6 @@ go_library(
         "//pkg/kubelet/server:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//pkg/kubelet/util/csr:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/flock:go_default_library",
         "//pkg/util/io:go_default_library",
@@ -124,11 +116,9 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authorization/v1beta1:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
     ],

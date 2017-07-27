@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1beta2
 
+// DaemonSetListerExpansion allows custom methods to be added to
+// DaemonSetLister.
+type DaemonSetListerExpansion interface{}
+
+// DaemonSetNamespaceListerExpansion allows custom methods to be added to
+// DaemonSetNamespaceLister.
+type DaemonSetNamespaceListerExpansion interface{}
+
 // DeploymentListerExpansion allows custom methods to be added to
 // DeploymentLister.
 type DeploymentListerExpansion interface{}

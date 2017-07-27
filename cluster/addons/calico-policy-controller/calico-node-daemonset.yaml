@@ -103,7 +103,7 @@ spec:
                     {
                       "type": "portmap",
                       "capabilities": {"portMappings": true},
-                      "noSnat": true
+                      "snat": false
                     }
                   ]
                 }

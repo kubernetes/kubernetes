@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	controllerrevisionsstore "k8s.io/kubernetes/pkg/registry/apps/controllerrevision/storage"
 	statefulsetstore "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
+	daemonsetstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
 	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
 )
 
@@ -87,6 +88,11 @@ func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorag
 		statefulsetStorage, statefulsetStatusStorage := statefulsetstore.NewREST(restOptionsGetter)
 		storage["statefulsets"] = statefulsetStorage
 		storage["statefulsets/status"] = statefulsetStatusStorage
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
+		daemonSetStorage, daemonSetStatusStorage := daemonsetstore.NewREST(restOptionsGetter)
+		storage["daemonsets"] = daemonSetStorage
+		storage["daemonsets/status"] = daemonSetStatusStorage
 	}
 	return storage
 }

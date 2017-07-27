@@ -49,8 +49,8 @@ import (
 	versionedclientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	extensionsclientset "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	"k8s.io/kubernetes/federation/apis/federation"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
+	federation "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/helper"
@@ -146,6 +146,7 @@ func describerMap(c clientset.Interface) map[schema.GroupKind]printers.Describer
 		batch.Kind("CronJob"):                          &CronJobDescriber{c},
 		apps.Kind("StatefulSet"):                       &StatefulSetDescriber{c},
 		apps.Kind("Deployment"):                        &DeploymentDescriber{c, versionedClientsetForDeployment(c)},
+		apps.Kind("DaemonSet"):                         &DaemonSetDescriber{c},
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
 		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
 		policy.Kind("PodDisruptionBudget"):             &PodDisruptionBudgetDescriber{c},

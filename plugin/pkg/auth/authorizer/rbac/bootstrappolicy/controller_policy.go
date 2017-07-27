@@ -81,8 +81,8 @@ func init() {
 	addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "daemon-set-controller"},
 		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "watch").Groups(extensionsGroup).Resources("daemonsets").RuleOrDie(),
-			rbac.NewRule("update").Groups(extensionsGroup).Resources("daemonsets/status").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch").Groups(extensionsGroup, appsGroup).Resources("daemonsets").RuleOrDie(),
+			rbac.NewRule("update").Groups(extensionsGroup, appsGroup).Resources("daemonsets/status").RuleOrDie(),
 			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			rbac.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("create").Groups(legacyGroup).Resources("pods/binding").RuleOrDie(),

@@ -558,8 +558,9 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 		return nil, fmt.Errorf("error in initializing storage factory: %s", err)
 	}
 
-	// keep Deployments and NetworkPolicies in extensions for backwards compatibility, we'll have to migrate at some point, eventually
+	// keep Deployments, NetworkPolicies and Daemonsets in extensions for backwards compatibility, we'll have to migrate at some point, eventually
 	storageFactory.AddCohabitatingResources(extensions.Resource("deployments"), apps.Resource("deployments"))
+	storageFactory.AddCohabitatingResources(extensions.Resource("daemonsets"), apps.Resource("daemonsets"))
 	storageFactory.AddCohabitatingResources(extensions.Resource("networkpolicies"), networking.Resource("networkpolicies"))
 	for _, override := range s.Etcd.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")

@@ -108,6 +108,8 @@ func TestDefaulting(t *testing.T) {
 		// {Group: "kubeadm.k8s.io", Version: "v1alpha1", Kind: "NodeConfiguration"}:                 {},
 		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSet"}:                                                 {},
 		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSetList"}:                                             {},
+		{Group: "apps", Version: "v1beta2", Kind: "DaemonSet"}:                                                       {},
+		{Group: "apps", Version: "v1beta2", Kind: "DaemonSetList"}:                                                   {},
 		{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}:                                                {},
 		{Group: "extensions", Version: "v1beta1", Kind: "DeploymentList"}:                                            {},
 		{Group: "apps", Version: "v1beta1", Kind: "Deployment"}:                                                      {},

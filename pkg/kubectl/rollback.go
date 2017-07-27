@@ -57,7 +57,7 @@ func RollbackerFor(kind schema.GroupKind, c clientset.Interface) (Rollbacker, er
 	switch kind {
 	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
 		return &DeploymentRollbacker{c}, nil
-	case extensions.Kind("DaemonSet"):
+	case extensions.Kind("DaemonSet"), apps.Kind("DaemonSet"):
 		return &DaemonSetRollbacker{c}, nil
 	}
 	return nil, fmt.Errorf("no rollbacker has been implemented for %q", kind)

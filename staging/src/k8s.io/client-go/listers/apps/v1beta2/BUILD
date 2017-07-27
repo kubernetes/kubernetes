@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "daemonset.go",
         "deployment.go",
         "expansion_generated.go",
         "scale.go",

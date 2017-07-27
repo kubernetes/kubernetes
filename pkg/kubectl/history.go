@@ -58,7 +58,7 @@ func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryView
 		return &DeploymentHistoryViewer{c}, nil
 	case apps.Kind("StatefulSet"):
 		return &StatefulSetHistoryViewer{c}, nil
-	case extensions.Kind("DaemonSet"):
+	case extensions.Kind("DaemonSet"), apps.Kind("DaemonSet"):
 		return &DaemonSetHistoryViewer{c}, nil
 	}
 	return nil, fmt.Errorf("no history viewer has been implemented for %q", kind)

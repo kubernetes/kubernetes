@@ -19,7 +19,6 @@ filegroup(
         "//federation/apis/federation:all-srcs",
         "//federation/client/cache:all-srcs",
         "//federation/client/clientset_generated/federation_clientset:all-srcs",
-        "//federation/client/clientset_generated/federation_internalclientset:all-srcs",
         "//federation/cluster:all-srcs",
         "//federation/cmd/federation-apiserver:all-srcs",
         "//federation/cmd/federation-controller-manager:all-srcs",

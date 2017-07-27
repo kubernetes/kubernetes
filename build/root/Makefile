@@ -425,7 +425,7 @@ define CMD_HELP_INFO
 #   make kubectl kube-proxy
 endef
 #TODO: make EXCLUDE_TARGET auto-generated when there are other files in cmd/
-EXCLUDE_TARGET=OWNERS
+EXCLUDE_TARGET=BUILD OWNERS
 .PHONY: $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/))))
 ifeq ($(PRINT_HELP),y)
 $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))):
@@ -557,14 +557,14 @@ bazel-test-integration:
 endif
 
 ifeq ($(PRINT_HELP),y)
-define BAZEL_BUILD_HELP_INFO
+define BAZEL_RELEASE_HELP_INFO
 # Build release tars with bazel
 #
 # Example:
 # make bazel-release
 endef
 bazel-release:
-	@echo "$$BAZEL_BUILD_HELP_INFO"
+	@echo "$$BAZEL_RELEASE_HELP_INFO"
 else
 bazel-release:
 	bazel build //build/release-tars

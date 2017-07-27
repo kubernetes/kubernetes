@@ -6,6 +6,12 @@ docs/admin/kube-apiserver.md
 docs/admin/kube-controller-manager.md
 docs/admin/kube-proxy.md
 docs/admin/kube-scheduler.md
+docs/admin/kubefed.md
+docs/admin/kubefed_init.md
+docs/admin/kubefed_join.md
+docs/admin/kubefed_options.md
+docs/admin/kubefed_unjoin.md
+docs/admin/kubefed_version.md
 docs/admin/kubelet.md
 docs/man/man1/cloud-controller-manager.1
 docs/man/man1/kube-apiserver.1

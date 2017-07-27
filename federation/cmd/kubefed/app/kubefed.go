@@ -30,14 +30,17 @@ import (
 
 const (
 	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
-	defaultEtcdImage   = "gcr.io/google_containers/etcd:3.0.17"
+	DefaultEtcdImage   = "gcr.io/google_containers/etcd:3.0.17"
 )
+
+func GetDefaultServerImage() string {
+	return fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
+}
 
 func Run() error {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	defaultServerImage := fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
-	cmd := kubefed.NewKubeFedCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, defaultServerImage, defaultEtcdImage)
+	cmd := kubefed.NewKubeFedCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, GetDefaultServerImage(), DefaultEtcdImage)
 	return cmd.Execute()
 }
