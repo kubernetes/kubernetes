@@ -2385,13 +2385,13 @@ func TestPrintHPA(t *testing.T) {
 
 	buff := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		err := printHorizontalPodAutoscaler(&test.hpa, buff, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.hpa, printers.PrintOptions{})
 		if err != nil {
-			t.Errorf("expected %q, got error: %v", test.expected, err)
-			buff.Reset()
-			continue
+			t.Fatal(err)
 		}
-
+		if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
 		if buff.String() != test.expected {
 			t.Errorf("expected %q, got %q", test.expected, buff.String())
 		}

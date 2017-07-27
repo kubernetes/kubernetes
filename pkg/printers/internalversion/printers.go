@@ -27,6 +27,7 @@ import (
 	"time"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	autoscalingv2alpha1 "k8s.io/api/autoscaling/v2alpha1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	apiv1 "k8s.io/api/core/v1"
@@ -61,14 +62,12 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	roleBindingColumns            = []string{"NAME", "AGE"}
-	roleBindingWideColumns        = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
-	clusterRoleBindingColumns     = []string{"NAME", "AGE"}
-	clusterRoleBindingWideColumns = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
-	storageClassColumns           = []string{"NAME", "PROVISIONER"}
-	statusColumns                 = []string{"STATUS", "REASON", "MESSAGE"}
-
-	horizontalPodAutoscalerColumns   = []string{"NAME", "REFERENCE", "TARGETS", "MINPODS", "MAXPODS", "REPLICAS", "AGE"}
+	roleBindingColumns               = []string{"NAME", "AGE"}
+	roleBindingWideColumns           = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
+	clusterRoleBindingColumns        = []string{"NAME", "AGE"}
+	clusterRoleBindingWideColumns    = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
+	storageClassColumns              = []string{"NAME", "PROVISIONER"}
+	statusColumns                    = []string{"STATUS", "REASON", "MESSAGE"}
 	configMapColumns                 = []string{"NAME", "DATA", "AGE"}
 	podSecurityPolicyColumns         = []string{"NAME", "PRIV", "CAPS", "SELINUX", "RUNASUSER", "FSGROUP", "SUPGROUP", "READONLYROOTFS", "VOLUMES"}
 	clusterColumns                   = []string{"NAME", "STATUS", "AGE"}
@@ -333,8 +332,17 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(deploymentColumnDefinitions, printDeployment)
 	h.TableHandler(deploymentColumnDefinitions, printDeploymentList)
 
-	h.Handler(horizontalPodAutoscalerColumns, nil, printHorizontalPodAutoscaler)
-	h.Handler(horizontalPodAutoscalerColumns, nil, printHorizontalPodAutoscalerList)
+	horizontalPodAutoscalerColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Refrence", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["scaleTargetRef"]},
+		{Name: "Targets", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["metrics"]},
+		{Name: "MinPods", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["minReplicas"]},
+		{Name: "MaxPods", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["maxReplicas"]},
+		{Name: "Replicas", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerStatus{}.SwaggerDoc()["currentReplicas"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(horizontalPodAutoscalerColumnDefinitions, printHorizontalPodAutoscaler)
+	h.TableHandler(horizontalPodAutoscalerColumnDefinitions, printHorizontalPodAutoscalerList)
 	h.Handler(configMapColumns, nil, printConfigMap)
 	h.Handler(configMapColumns, nil, printConfigMapList)
 	h.Handler(podSecurityPolicyColumns, nil, printPodSecurityPolicy)
@@ -1553,52 +1561,35 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 	return ret
 }
 
-func printHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, w io.Writer, options printers.PrintOptions) error {
-	namespace := hpa.Namespace
-	name := printers.FormatResourceName(options.Kind, hpa.Name, options.WithKind)
+func printHorizontalPodAutoscaler(obj *autoscaling.HorizontalPodAutoscaler, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
 
 	reference := fmt.Sprintf("%s/%s",
-		hpa.Spec.ScaleTargetRef.Kind,
-		hpa.Spec.ScaleTargetRef.Name)
+		obj.Spec.ScaleTargetRef.Kind,
+		obj.Spec.ScaleTargetRef.Name)
 	minPods := "<unset>"
-	metrics := formatHPAMetrics(hpa.Spec.Metrics, hpa.Status.CurrentMetrics)
-	if hpa.Spec.MinReplicas != nil {
-		minPods = fmt.Sprintf("%d", *hpa.Spec.MinReplicas)
+	metrics := formatHPAMetrics(obj.Spec.Metrics, obj.Status.CurrentMetrics)
+	if obj.Spec.MinReplicas != nil {
+		minPods = fmt.Sprintf("%d", *obj.Spec.MinReplicas)
 	}
-	maxPods := hpa.Spec.MaxReplicas
-	currentReplicas := hpa.Status.CurrentReplicas
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
-	}
-
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%s",
-		name,
-		reference,
-		metrics,
-		minPods,
-		maxPods,
-		currentReplicas,
-		translateTimestamp(hpa.CreationTimestamp),
-	); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(hpa.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, hpa.Labels))
-	return err
+	maxPods := obj.Spec.MaxReplicas
+	currentReplicas := obj.Status.CurrentReplicas
+	row.Cells = append(row.Cells, obj.Name, reference, metrics, minPods, maxPods, currentReplicas, translateTimestamp(obj.CreationTimestamp))
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printHorizontalPodAutoscalerList(list *autoscaling.HorizontalPodAutoscalerList, w io.Writer, options printers.PrintOptions) error {
+func printHorizontalPodAutoscalerList(list *autoscaling.HorizontalPodAutoscalerList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		if err := printHorizontalPodAutoscaler(&list.Items[i], w, options); err != nil {
-			return err
+		r, err := printHorizontalPodAutoscaler(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printConfigMap(configMap *api.ConfigMap, w io.Writer, options printers.PrintOptions) error {
