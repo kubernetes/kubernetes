@@ -68,7 +68,6 @@ var (
 	clusterRoleBindingWideColumns    = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
 	storageClassColumns              = []string{"NAME", "PROVISIONER"}
 	statusColumns                    = []string{"STATUS", "REASON", "MESSAGE"}
-	configMapColumns                 = []string{"NAME", "DATA", "AGE"}
 	podSecurityPolicyColumns         = []string{"NAME", "PRIV", "CAPS", "SELINUX", "RUNASUSER", "FSGROUP", "SUPGROUP", "READONLYROOTFS", "VOLUMES"}
 	clusterColumns                   = []string{"NAME", "STATUS", "AGE"}
 	networkPolicyColumns             = []string{"NAME", "POD-SELECTOR", "AGE"}
@@ -343,8 +342,14 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(horizontalPodAutoscalerColumnDefinitions, printHorizontalPodAutoscaler)
 	h.TableHandler(horizontalPodAutoscalerColumnDefinitions, printHorizontalPodAutoscalerList)
-	h.Handler(configMapColumns, nil, printConfigMap)
-	h.Handler(configMapColumns, nil, printConfigMapList)
+
+	configMapColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Data", Type: "string", Description: apiv1.ConfigMap{}.SwaggerDoc()["data"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(configMapColumnDefinitions, printConfigMap)
+	h.TableHandler(configMapColumnDefinitions, printConfigMapList)
 	h.Handler(podSecurityPolicyColumns, nil, printPodSecurityPolicy)
 	h.Handler(podSecurityPolicyColumns, nil, printPodSecurityPolicyList)
 	h.Handler(clusterColumns, nil, printCluster)
@@ -1592,33 +1597,24 @@ func printHorizontalPodAutoscalerList(list *autoscaling.HorizontalPodAutoscalerL
 	return rows, nil
 }
 
-func printConfigMap(configMap *api.ConfigMap, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, configMap.Name, options.WithKind)
-
-	namespace := configMap.Namespace
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
+func printConfigMap(obj *api.ConfigMap, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%v\t%s", name, len(configMap.Data), translateTimestamp(configMap.CreationTimestamp)); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(configMap.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, configMap.Labels))
-	return err
+	row.Cells = append(row.Cells, obj.Name, len(obj.Data), translateTimestamp(obj.CreationTimestamp))
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printConfigMapList(list *api.ConfigMapList, w io.Writer, options printers.PrintOptions) error {
+func printConfigMapList(list *api.ConfigMapList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		if err := printConfigMap(&list.Items[i], w, options); err != nil {
-			return err
+		r, err := printConfigMap(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printPodSecurityPolicy(item *extensions.PodSecurityPolicy, w io.Writer, options printers.PrintOptions) error {
