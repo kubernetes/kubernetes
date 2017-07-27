@@ -61,7 +61,6 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	secretColumns                 = []string{"NAME", "TYPE", "DATA", "AGE"}
 	serviceAccountColumns         = []string{"NAME", "SECRETS", "AGE"}
 	persistentVolumeColumns       = []string{"NAME", "CAPACITY", "ACCESSMODES", "RECLAIMPOLICY", "STATUS", "CLAIM", "STORAGECLASS", "REASON", "AGE"}
 	persistentVolumeClaimColumns  = []string{"NAME", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "STORAGECLASS", "AGE"}
@@ -230,8 +229,6 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(endpointColumnDefinitions, printEndpoints)
 	h.TableHandler(endpointColumnDefinitions, printEndpointsList)
 
-	//nodeColumns                   = []string{"NAME", "STATUS", "AGE", "VERSION"}
-	//nodeWideColumns               = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION", "CONTAINER-RUNTIME"}
 	nodeColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Status", Type: "string", Description: "The status of the node"},
@@ -260,7 +257,7 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(eventColumnDefinitions, printEvent)
 	h.TableHandler(eventColumnDefinitions, printEventList)
-	//namespaceColumns              = []string{"NAME", "STATUS", "AGE"}
+
 	namespaceColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Status", Type: "string", Description: "The status of the namespace"},
@@ -269,8 +266,14 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(namespaceColumnDefinitions, printNamespace)
 	h.TableHandler(namespaceColumnDefinitions, printNamespaceList)
 
-	h.Handler(secretColumns, nil, printSecret)
-	h.Handler(secretColumns, nil, printSecretList)
+	secretColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Type", Type: "string", Description: apiv1.Secret{}.SwaggerDoc()["type"]},
+		{Name: "Data", Type: "string", Description: apiv1.Secret{}.SwaggerDoc()["data"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(secretColumnDefinitions,  printSecret)
+	h.TableHandler(secretColumnDefinitions, printSecretList)
 	h.Handler(serviceAccountColumns, nil, printServiceAccount)
 	h.Handler(serviceAccountColumns, nil, printServiceAccountList)
 	h.Handler(persistentVolumeClaimColumns, nil, printPersistentVolumeClaim)
@@ -972,34 +975,24 @@ func printNamespaceList(list *api.NamespaceList, options printers.PrintOptions) 
 	return rows, nil
 }
 
-func printSecret(item *api.Secret, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, item.Name, options.WithKind)
-
-	namespace := item.Namespace
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
+func printSecret(obj *api.Secret,options printers.PrintOptions)  ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%v\t%s", name, item.Type, len(item.Data), translateTimestamp(item.CreationTimestamp)); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(item.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, item.Labels))
-	return err
+	row.Cells = append(row.Cells, obj.Name, obj.Type, len(obj.Data),translateTimestamp(obj.CreationTimestamp))
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printSecretList(list *api.SecretList, w io.Writer, options printers.PrintOptions) error {
-	for _, item := range list.Items {
-		if err := printSecret(&item, w, options); err != nil {
-			return err
+func printSecretList(list *api.SecretList, w io.Writer, options printers.PrintOptions)  ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printSecret(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-
-	return nil
+	return rows, nil
 }
 
 func printServiceAccount(item *api.ServiceAccount, w io.Writer, options printers.PrintOptions) error {
