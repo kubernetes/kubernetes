@@ -61,7 +61,6 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	persistentVolumeColumns       = []string{"NAME", "CAPACITY", "ACCESSMODES", "RECLAIMPOLICY", "STATUS", "CLAIM", "STORAGECLASS", "REASON", "AGE"}
 	persistentVolumeClaimColumns  = []string{"NAME", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "STORAGECLASS", "AGE"}
 	componentStatusColumns        = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 	thirdPartyResourceColumns     = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
@@ -281,10 +280,24 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(serviceAccountColumnDefinitions, printServiceAccount)
 	h.TableHandler(serviceAccountColumnDefinitions, printServiceAccountList)
+
+	persistentVolumeColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Capacity", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["capacity"]},
+		{Name: "AccessModes", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["accessModes"]},
+		{Name: "ReclaimPolicy", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["persistentVolumeReclaimPolicy"]},
+		{Name: "Status", Type: "string", Description: apiv1.PersistentVolumeStatus{}.SwaggerDoc()["phase"]},
+		{Name: "Claim", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["claimRef"]},
+		{Name: "StorageClass", Type: "string", Description: "StorageClass of the pv"},
+		{Name: "Reason", Type: "string", Description: apiv1.PersistentVolumeStatus{}.SwaggerDoc()["reason"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(persistentVolumeColumnDefinitions, printPersistentVolume)
+	h.TableHandler(persistentVolumeColumnDefinitions, printPersistentVolumeList)
+
 	h.Handler(persistentVolumeClaimColumns, nil, printPersistentVolumeClaim)
 	h.Handler(persistentVolumeClaimColumns, nil, printPersistentVolumeClaimList)
-	h.Handler(persistentVolumeColumns, nil, printPersistentVolume)
-	h.Handler(persistentVolumeColumns, nil, printPersistentVolumeList)
+
 	h.Handler(componentStatusColumns, nil, printComponentStatus)
 	h.Handler(componentStatusColumns, nil, printComponentStatusList)
 	h.Handler(thirdPartyResourceColumns, nil, printThirdPartyResource)
@@ -1089,51 +1102,41 @@ func printNodeList(list *api.NodeList, options printers.PrintOptions) ([]metav1a
 	return rows, nil
 }
 
-func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, pv.Name, options.WithKind)
-
-	if options.WithNamespace {
-		return fmt.Errorf("persistentVolume is not namespaced")
+func printPersistentVolume(obj *api.PersistentVolume, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
 
 	claimRefUID := ""
-	if pv.Spec.ClaimRef != nil {
-		claimRefUID += pv.Spec.ClaimRef.Namespace
+	if obj.Spec.ClaimRef != nil {
+		claimRefUID += obj.Spec.ClaimRef.Namespace
 		claimRefUID += "/"
-		claimRefUID += pv.Spec.ClaimRef.Name
+		claimRefUID += obj.Spec.ClaimRef.Name
 	}
 
-	modesStr := helper.GetAccessModesAsString(pv.Spec.AccessModes)
-	reclaimPolicyStr := string(pv.Spec.PersistentVolumeReclaimPolicy)
+	modesStr := helper.GetAccessModesAsString(obj.Spec.AccessModes)
+	reclaimPolicyStr := string(obj.Spec.PersistentVolumeReclaimPolicy)
 
-	aQty := pv.Spec.Capacity[api.ResourceStorage]
+	aQty := obj.Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.String()
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
-		name,
-		aSize, modesStr, reclaimPolicyStr,
-		pv.Status.Phase,
-		claimRefUID,
-		helper.GetPersistentVolumeClass(pv),
-		pv.Status.Reason,
-		translateTimestamp(pv.CreationTimestamp),
-	); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(pv.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, pv.Labels))
-	return err
+	row.Cells = append(row.Cells, obj.Name, aSize, modesStr, reclaimPolicyStr,
+		obj.Status.Phase, claimRefUID, helper.GetPersistentVolumeClass(obj),
+		obj.Status.Reason,
+		translateTimestamp(obj.CreationTimestamp))
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printPersistentVolumeList(list *api.PersistentVolumeList, w io.Writer, options printers.PrintOptions) error {
-	for _, pv := range list.Items {
-		if err := printPersistentVolume(&pv, w, options); err != nil {
-			return err
+func printPersistentVolumeList(list *api.PersistentVolumeList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printPersistentVolume(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, options printers.PrintOptions) error {
