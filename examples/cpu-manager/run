@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -o nounset -o pipefail -o errexit
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+KUBECTL="$DIR/../../cluster/kubectl.sh"
+KUBECONFIG="${KUBECONFIG:-/var/run/kubernetes/admin.kubeconfig}"
+
+$KUBECTL create -f  $DIR/$1 --validate=false
