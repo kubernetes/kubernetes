@@ -300,6 +300,7 @@ gather-resource-usage
 gather-suite-metrics-at-teardown
 gce-multizone
 gce-project
+gce-region
 gce-service-account
 gce-upgrade-script
 gce-zone
