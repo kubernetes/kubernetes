@@ -31,22 +31,22 @@ const (
 	// When feature-gate for TaintBasedEvictions=true flag is enabled,
 	// TaintNodeOutOfDisk would be automatically added by node controller
 	// when node becomes out of disk, and removed when node has enough disk.
-	TaintNodeOutOfDisk = "node.alpha.kubernetes.io/outOfDisk"
+	TaintNodeOutOfDisk = "node.kubernetes.io/outOfDisk"
 
 	// When feature-gate for TaintBasedEvictions=true flag is enabled,
 	// TaintNodeMemoryPressure would be automatically added by node controller
 	// when node has memory pressure, and removed when node has enough memory.
-	TaintNodeMemoryPressure = "node.alpha.kubernetes.io/memoryPressure"
+	TaintNodeMemoryPressure = "node.kubernetes.io/memoryPressure"
 
 	// When feature-gate for TaintBasedEvictions=true flag is enabled,
 	// TaintNodeDiskPressure would be automatically added by node controller
 	// when node has disk pressure, and removed when node has enough disk.
-	TaintNodeDiskPressure = "node.alpha.kubernetes.io/diskPressure"
+	TaintNodeDiskPressure = "node.kubernetes.io/diskPressure"
 
 	// When feature-gate for TaintBasedEvictions=true flag is enabled,
 	// TaintNodeNetworkUnavailable would be automatically added by node controller
 	// when node's network is unavailable, and removed when network becomes ready.
-	TaintNodeNetworkUnavailable = "node.alpha.kubernetes.io/networkUnavailable"
+	TaintNodeNetworkUnavailable = "node.kubernetes.io/networkUnavailable"
 
 	// When kubelet is started with the "external" cloud provider, then
 	// it sets this taint on a node to mark it as unusable, until a controller
