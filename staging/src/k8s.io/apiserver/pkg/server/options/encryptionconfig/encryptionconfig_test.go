@@ -18,17 +18,26 @@ package encryptionconfig
 
 import (
 	"bytes"
+	"encoding/base64"
+	"fmt"
+	"io"
+	"os"
 	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 )
 
 const (
 	sampleText = "abcdefghijklmnopqrstuvwxyz"
 
 	sampleContextText = "0123456789"
+
+	// Modify these in all configurations if changed
+	testEnvelopeServiceConfigPath   = "testproviderconfig"
+	testEnvelopeServiceProviderName = "testprovider"
 
 	correctConfigWithIdentityFirst = `
 kind: EncryptionConfig
@@ -45,6 +54,10 @@ resources:
           secret: c2VjcmV0IGlzIHNlY3VyZQ==
         - name: key2
           secret: dGhpcyBpcyBwYXNzd29yZA==
+    - kms:
+        name: testprovider
+        configfile: testproviderconfig
+        cachesize: 10
     - aescbc:
         keys:
         - name: key1
@@ -74,6 +87,10 @@ resources:
         keys:
         - name: key1
           secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+    - kms:
+        name: testprovider
+        configfile: testproviderconfig
+        cachesize: 10
     - aescbc:
         keys:
         - name: key1
@@ -96,6 +113,10 @@ resources:
           secret: c2VjcmV0IGlzIHNlY3VyZQ==
         - name: key2
           secret: dGhpcyBpcyBwYXNzd29yZA==
+    - kms:
+        name: testprovider
+        configfile: testproviderconfig
+        cachesize: 10
     - identity: {}
     - secretbox:
         keys:
@@ -116,6 +137,40 @@ resources:
   - resources:
     - secrets
     providers:
+    - secretbox:
+        keys:
+        - name: key1
+          secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+    - aescbc:
+        keys:
+        - name: key1
+          secret: c2VjcmV0IGlzIHNlY3VyZQ==
+        - name: key2
+          secret: dGhpcyBpcyBwYXNzd29yZA==
+    - kms:
+        name: testprovider
+        configfile: testproviderconfig
+        cachesize: 10
+    - identity: {}
+    - aesgcm:
+        keys:
+        - name: key1
+          secret: c2VjcmV0IGlzIHNlY3VyZQ==
+        - name: key2
+          secret: dGhpcyBpcyBwYXNzd29yZA==
+`
+
+	correctConfigWithKMSFirst = `
+kind: EncryptionConfig
+apiVersion: v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: testprovider
+        configfile: testproviderconfig
+        cachesize: 10
     - secretbox:
         keys:
         - name: key1
@@ -165,11 +220,42 @@ resources:
 `
 )
 
-func TestEncryptionProviderConfigCorrect(t *testing.T) {
-	// Creates two transformers with different ordering of identity and AES transformers.
-	// Transforms data using one of them, and tries to untransform using both of them.
-	// Repeats this for both the possible combinations.
+// testEnvelopeService is a mock envelope service which can be used to simulate remote Envelope services
+// for testing of the envelope transformer with other transformers.
+type testEnvelopeService struct {
+	disabled bool
+}
 
+func (t *testEnvelopeService) Decrypt(data string) ([]byte, error) {
+	if t.disabled {
+		return nil, fmt.Errorf("Envelope service was disabled")
+	}
+	return base64.StdEncoding.DecodeString(data)
+}
+
+func (t *testEnvelopeService) Encrypt(data []byte) (string, error) {
+	if t.disabled {
+		return "", fmt.Errorf("Envelope service was disabled")
+	}
+	return base64.StdEncoding.EncodeToString(data), nil
+}
+
+func (t *testEnvelopeService) SetDisabledStatus(status bool) {
+	t.disabled = status
+}
+
+var _ envelope.Service = &testEnvelopeService{}
+
+func TestEncryptionProviderConfigCorrect(t *testing.T) {
+	os.OpenFile(testEnvelopeServiceConfigPath, os.O_CREATE, 0666)
+	defer os.Remove(testEnvelopeServiceConfigPath)
+	KMSPluginRegistry.Register(testEnvelopeServiceProviderName, func(config io.Reader) (envelope.Service, error) {
+		return &testEnvelopeService{}, nil
+	})
+
+	// Creates compound/prefix transformers with different ordering of available transformers.
+	// Transforms data using one of them, and tries to untransform using the others.
+	// Repeats this for all possible combinations.
 	identityFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithIdentityFirst))
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithIdentityFirst)
@@ -190,11 +276,17 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithSecretboxFirst)
 	}
 
+	kmsFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithKMSFirst))
+	if err != nil {
+		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSFirst)
+	}
+
 	// Pick the transformer for any of the returned resources.
 	identityFirstTransformer := identityFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 	aesGcmFirstTransformer := aesGcmFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 	aesCbcFirstTransformer := aesCbcFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 	secretboxFirstTransformer := secretboxFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
+	kmsFirstTransformer := kmsFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 
 	context := value.DefaultContext([]byte(sampleContextText))
 	originalText := []byte(sampleText)
@@ -207,6 +299,7 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 		{aesCbcFirstTransformer, "aesCbcFirst"},
 		{secretboxFirstTransformer, "secretboxFirst"},
 		{identityFirstTransformer, "identityFirst"},
+		{kmsFirstTransformer, "kmsFirst"},
 	}
 
 	for _, testCase := range transformers {

@@ -36,5 +36,6 @@ go_test(
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope:go_default_library",
     ],
 )
