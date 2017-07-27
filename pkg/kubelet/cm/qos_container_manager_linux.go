@@ -127,7 +127,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 	m.activePods = activePods
 
 	// update qos cgroup tiers on startup and in periodic intervals
-	// to ensure desired state is in synch with actual state.
+	// to ensure desired state is in sync with actual state.
 	go wait.Until(func() {
 		err := m.UpdateCgroups()
 		if err != nil {
