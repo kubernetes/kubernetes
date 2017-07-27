@@ -1542,11 +1542,14 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		return err
 	}
 
-	// Wait for volumes to attach/mount
-	if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
-		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
-		return err
+	// Volume manager will not mount volumes for terminated pods
+	if !kl.podIsTerminated(pod) {
+		// Wait for volumes to attach/mount
+		if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
+			glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
+			return err
+		}
 	}
 
 	// Fetch the pull secrets for the pod
