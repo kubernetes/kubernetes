@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
+	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit"
 	"k8s.io/kubernetes/plugin/pkg/admission/exec"
 	"k8s.io/kubernetes/plugin/pkg/admission/gc"
 	"k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
@@ -59,6 +60,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	antiaffinity.Register(plugins)
 	defaulttolerationseconds.Register(plugins)
 	deny.Register(plugins)
+	eventratelimit.Register(plugins)
 	exec.Register(plugins)
 	gc.Register(plugins)
 	imagepolicy.Register(plugins)
