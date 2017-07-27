@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -92,8 +93,8 @@ const (
 	// volumeConfigName is the configmap passed to bootstrapper and provisioner
 	volumeConfigName = "local-volume-config"
 	// bootstrapper and provisioner images used for e2e tests
-	bootstrapperImageName = "quay.io/external_storage/local-volume-provisioner-bootstrap:v1.0.0"
-	provisionerImageName  = "quay.io/external_storage/local-volume-provisioner:v1.0.0"
+	bootstrapperImageName = "quay.io/external_storage/local-volume-provisioner-bootstrap:v1.0.1"
+	provisionerImageName  = "quay.io/external_storage/local-volume-provisioner:v1.0.1"
 	// provisioner daemonSetName name, must match the one defined in bootstrapper
 	daemonSetName = "local-volume-provisioner"
 	// provisioner node/pv cluster role binding, must match the one defined in bootstrapper
@@ -102,6 +103,10 @@ const (
 	// A sample request size
 	testRequestSize = "10Mi"
 )
+
+// Common selinux labels
+var selinuxLabel = &v1.SELinuxOptions{
+	Level: "s0:c0,c1"}
 
 var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [Serial]", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-test")
@@ -264,7 +269,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 
 		It("should create and recreate local persistent volume", func() {
 			By("Creating bootstrapper pod to start provisioner daemonset")
-			createBootstrapperPod(config)
+			createBootstrapperJob(config)
 			kind := schema.GroupKind{Group: "extensions", Kind: "DaemonSet"}
 			framework.WaitForControlledPodsRunning(config.client, config.ns, daemonSetName, kind)
 
@@ -273,7 +278,6 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			mkdirCmd := fmt.Sprintf("mkdir %v -m 777", volumePath)
 			err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, config.node0)
 			Expect(err).NotTo(HaveOccurred())
-
 			By("Waiting for a PersitentVolume to be created")
 			oldPV, err := waitForLocalPersistentVolume(config.client, volumePath)
 			Expect(err).NotTo(HaveOccurred())
@@ -490,7 +494,6 @@ func makeLocalPVConfig(config *localTestConfig, volume *localTestVolume) framewo
 func createLocalPVCPV(config *localTestConfig, volume *localTestVolume) {
 	pvcConfig := makeLocalPVCConfig(config)
 	pvConfig := makeLocalPVConfig(config, volume)
-
 	var err error
 	volume.pv, volume.pvc, err = framework.CreatePVPVC(config.client, pvConfig, pvcConfig, config.ns, true)
 	framework.ExpectNoError(err)
@@ -498,11 +501,21 @@ func createLocalPVCPV(config *localTestConfig, volume *localTestVolume) {
 }
 
 func makeLocalPod(config *localTestConfig, volume *localTestVolume, cmd string) *v1.Pod {
-	return framework.MakePod(config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, cmd)
+	return framework.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, cmd, false, false, selinuxLabel)
+}
+
+// createSecPod should be used when Pod requires non default SELinux labels
+func createSecPod(config *localTestConfig, volume *localTestVolume, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions) (*v1.Pod, error) {
+	pod, err := framework.CreateSecPod(config.client, config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", hostIPC, hostPID, seLinuxLabel)
+	podNodeName, podNodeNameErr := podNodeName(config, pod)
+	Expect(podNodeNameErr).NotTo(HaveOccurred())
+	framework.Logf("Security Context POD %q created on Node %q", pod.Name, podNodeName)
+	Expect(podNodeName).To(Equal(config.node0.Name))
+	return pod, err
 }
 
 func createLocalPod(config *localTestConfig, volume *localTestVolume) (*v1.Pod, error) {
-	return framework.CreatePod(config.client, config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "")
+	return framework.CreateSecPod(config.client, config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", false, false, selinuxLabel)
 }
 
 func createAndMountTmpfsLocalVolume(config *localTestConfig, dir string) {
@@ -669,43 +682,47 @@ func createVolumeConfigMap(config *localTestConfig) {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func createBootstrapperPod(config *localTestConfig) {
-	pod := &v1.Pod{
+func createBootstrapperJob(config *localTestConfig) {
+	bootJob := &batchv1.Job{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
+			Kind:       "Job",
+			APIVersion: "batch/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "local-volume-tester-",
 		},
-		Spec: v1.PodSpec{
-			RestartPolicy:      v1.RestartPolicyNever,
-			ServiceAccountName: testServiceAccount,
-			Containers: []v1.Container{
-				{
-					Name:  "volume-tester",
-					Image: bootstrapperImageName,
-					Env: []v1.EnvVar{
+		Spec: batchv1.JobSpec{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					RestartPolicy:      v1.RestartPolicyNever,
+					ServiceAccountName: testServiceAccount,
+					Containers: []v1.Container{
 						{
-							Name: "MY_NAMESPACE",
-							ValueFrom: &v1.EnvVarSource{
-								FieldRef: &v1.ObjectFieldSelector{
-									FieldPath: "metadata.namespace",
+							Name:  "volume-tester",
+							Image: bootstrapperImageName,
+							Env: []v1.EnvVar{
+								{
+									Name: "MY_NAMESPACE",
+									ValueFrom: &v1.EnvVarSource{
+										FieldRef: &v1.ObjectFieldSelector{
+											FieldPath: "metadata.namespace",
+										},
+									},
 								},
 							},
+							Args: []string{
+								fmt.Sprintf("--image=%v", provisionerImageName),
+								fmt.Sprintf("--volume-config=%v", volumeConfigName),
+							},
 						},
-					},
-					Args: []string{
-						fmt.Sprintf("--image=%v", provisionerImageName),
-						fmt.Sprintf("--volume-config=%v", volumeConfigName),
 					},
 				},
 			},
 		},
 	}
-	pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
+	job, err := config.client.Batch().Jobs(config.ns).Create(bootJob)
 	Expect(err).NotTo(HaveOccurred())
-	err = framework.WaitForPodSuccessInNamespace(config.client, pod.Name, pod.Namespace)
+	err = framework.WaitForJobFinish(config.client, config.ns, job.Name, 1)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -735,6 +752,7 @@ func newLocalClaim(config *localTestConfig) *v1.PersistentVolumeClaim {
 // waitForLocalPersistentVolume waits a local persistent volume with 'volumePath' to be available.
 func waitForLocalPersistentVolume(c clientset.Interface, volumePath string) (*v1.PersistentVolume, error) {
 	var pv *v1.PersistentVolume
+
 	for start := time.Now(); time.Since(start) < 10*time.Minute && pv == nil; time.Sleep(5 * time.Second) {
 		pvs, err := c.Core().PersistentVolumes().List(metav1.ListOptions{})
 		if err != nil {
