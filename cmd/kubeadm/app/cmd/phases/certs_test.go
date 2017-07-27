@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/renstrom/dedent"
@@ -144,7 +145,7 @@ func TestSubCmdApiServerFlags(t *testing.T) {
 	if err != nil {
 		t.Errorf("couldn't get the hostname: %v", err)
 	}
-	for i, name := range []string{hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.mycluster.local"} {
+	for i, name := range []string{strings.ToLower(hostname), "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.mycluster.local"} {
 		if APIserverCert.DNSNames[i] != name {
 			t.Errorf("APIserverCert.DNSNames[%d] is %s instead of %s", i, APIserverCert.DNSNames[i], name)
 		}
