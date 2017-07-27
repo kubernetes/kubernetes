@@ -11,7 +11,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "daemoncontroller.go",
+        "daemon_controller.go",
         "doc.go",
         "update.go",
     ],
@@ -61,7 +61,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "daemoncontroller_test.go",
+        "daemon_controller_test.go",
         "update_test.go",
     ],
     library = ":go_default_library",

@@ -57,7 +57,7 @@ go_library(
         "controller_utils.go",
         "doc.go",
         "metrics.go",
-        "nodecontroller.go",
+        "node_controller.go",
         "range_allocator.go",
         "rate_limited_queue.go",
         "taint_controller.go",
