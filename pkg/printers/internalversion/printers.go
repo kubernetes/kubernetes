@@ -61,7 +61,6 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	thirdPartyResourceColumns     = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 	roleBindingColumns            = []string{"NAME", "AGE"}
 	roleBindingWideColumns        = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
 	clusterRoleBindingColumns     = []string{"NAME", "AGE"}
@@ -70,8 +69,6 @@ var (
 	statusColumns                 = []string{"STATUS", "REASON", "MESSAGE"}
 
 	horizontalPodAutoscalerColumns   = []string{"NAME", "REFERENCE", "TARGETS", "MINPODS", "MAXPODS", "REPLICAS", "AGE"}
-	deploymentColumns                = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
-	deploymentWideColumns            = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 	configMapColumns                 = []string{"NAME", "DATA", "AGE"}
 	podSecurityPolicyColumns         = []string{"NAME", "PRIV", "CAPS", "SELINUX", "RUNASUSER", "FSGROUP", "SUPGROUP", "READONLYROOTFS", "VOLUMES"}
 	clusterColumns                   = []string{"NAME", "STATUS", "AGE"}
@@ -313,10 +310,29 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(componentStatusColumnDefinitions, printComponentStatus)
 	h.TableHandler(componentStatusColumnDefinitions, printComponentStatusList)
 
-	h.Handler(thirdPartyResourceColumns, nil, printThirdPartyResource)
-	h.Handler(thirdPartyResourceColumns, nil, printThirdPartyResourceList)
-	h.Handler(deploymentColumns, deploymentWideColumns, printDeployment)
-	h.Handler(deploymentColumns, deploymentWideColumns, printDeploymentList)
+	thirdPartyResourceColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Description", Type: "string", Description: extensionsv1beta1.ThirdPartyResource{}.SwaggerDoc()["description"]},
+		{Name: "version(s)", Type: "string", Description: extensionsv1beta1.ThirdPartyResource{}.SwaggerDoc()["versions"]},
+	}
+
+	h.TableHandler(thirdPartyResourceColumnDefinitions, printThirdPartyResource)
+	h.TableHandler(thirdPartyResourceColumnDefinitions, printThirdPartyResourceList)
+
+	deploymentColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Desired", Type: "string", Description: extensionsv1beta1.DeploymentSpec{}.SwaggerDoc()["replicas"]},
+		{Name: "Current", Type: "string", Description: extensionsv1beta1.DeploymentStatus{}.SwaggerDoc()["replicas"]},
+		{Name: "Up-to-date", Type: "string", Description: extensionsv1beta1.DeploymentStatus{}.SwaggerDoc()["updatedReplicas"]},
+		{Name: "Available", Type: "string", Description: extensionsv1beta1.DeploymentStatus{}.SwaggerDoc()["availableReplicas"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
+		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
+		{Name: "Selector", Type: "string", Priority: 1, Description: extensionsv1beta1.DeploymentSpec{}.SwaggerDoc()["selector"]},
+	}
+	h.TableHandler(deploymentColumnDefinitions, printDeployment)
+	h.TableHandler(deploymentColumnDefinitions, printDeploymentList)
+
 	h.Handler(horizontalPodAutoscalerColumns, nil, printHorizontalPodAutoscaler)
 	h.Handler(horizontalPodAutoscalerColumns, nil, printHorizontalPodAutoscalerList)
 	h.Handler(configMapColumns, nil, printConfigMap)
@@ -1408,29 +1424,31 @@ func printComponentStatusList(list *api.ComponentStatusList, options printers.Pr
 	return rows, nil
 }
 
-func printThirdPartyResource(rsrc *extensions.ThirdPartyResource, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, rsrc.Name, options.WithKind)
+func printThirdPartyResource(obj *extensions.ThirdPartyResource, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
 
-	versions := make([]string, len(rsrc.Versions))
-	for ix := range rsrc.Versions {
-		version := &rsrc.Versions[ix]
+	versions := make([]string, len(obj.Versions))
+	for ix := range obj.Versions {
+		version := &obj.Versions[ix]
 		versions[ix] = fmt.Sprintf("%s", version.Name)
 	}
 	versionsString := strings.Join(versions, ",")
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", name, rsrc.Description, versionsString); err != nil {
-		return err
-	}
-	return nil
+	row.Cells = append(row.Cells, obj.Name, obj.Description, versionsString)
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printThirdPartyResourceList(list *extensions.ThirdPartyResourceList, w io.Writer, options printers.PrintOptions) error {
-	for _, item := range list.Items {
-		if err := printThirdPartyResource(&item, w, options); err != nil {
-			return err
+func printThirdPartyResourceList(list *extensions.ThirdPartyResourceList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printThirdPartyResource(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-
-	return nil
+	return rows, nil
 }
 
 func truncate(str string, maxLen int) string {
@@ -1440,53 +1458,39 @@ func truncate(str string, maxLen int) string {
 	return str
 }
 
-func printDeployment(deployment *extensions.Deployment, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, deployment.Name, options.WithKind)
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", deployment.Namespace); err != nil {
-			return err
-		}
+func printDeployment(obj *extensions.Deployment, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
-
-	desiredReplicas := deployment.Spec.Replicas
-	currentReplicas := deployment.Status.Replicas
-	updatedReplicas := deployment.Status.UpdatedReplicas
-	availableReplicas := deployment.Status.AvailableReplicas
-	age := translateTimestamp(deployment.CreationTimestamp)
-	containers := deployment.Spec.Template.Spec.Containers
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	desiredReplicas := obj.Spec.Replicas
+	currentReplicas := obj.Status.Replicas
+	updatedReplicas := obj.Status.UpdatedReplicas
+	availableReplicas := obj.Status.AvailableReplicas
+	age := translateTimestamp(obj.CreationTimestamp)
+	containers := obj.Spec.Template.Spec.Containers
+	selector, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector)
 	if err != nil {
 		// this shouldn't happen if LabelSelector passed validation
-		return err
+		return nil, err
 	}
-
-	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%s", name, desiredReplicas, currentReplicas, updatedReplicas, availableReplicas, age); err != nil {
-		return err
-	}
+	row.Cells = append(row.Cells, obj.Name, desiredReplicas, currentReplicas, updatedReplicas, availableReplicas, age)
 	if options.Wide {
-		if err := layoutContainers(containers, w); err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintf(w, "\t%s", selector.String()); err != nil {
-			return err
-		}
+		containers, images := layoutContainerCells(containers)
+		row.Cells = append(row.Cells, containers, images, selector.String())
 	}
-
-	if _, err := fmt.Fprint(w, printers.AppendLabels(deployment.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err = fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, deployment.Labels))
-	return err
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printDeploymentList(list *extensions.DeploymentList, w io.Writer, options printers.PrintOptions) error {
-	for _, item := range list.Items {
-		if err := printDeployment(&item, w, options); err != nil {
-			return err
+func printDeploymentList(list *extensions.DeploymentList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printDeployment(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.MetricStatus) string {
