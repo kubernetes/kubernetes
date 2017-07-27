@@ -152,7 +152,7 @@ func TestScheduler(t *testing.T) {
 			sendPod:        podWithID("foo", ""),
 			assumePodError: errA,
 			algo:           mockScheduler{testNode.Name, nil},
-			expectErrorPod: podWithID("foo", ""),
+			expectErrorPod: podWithID("foo", testNode.Name),
 			eventReason:    "FailedScheduling",
 			expectError:    errA,
 		},
