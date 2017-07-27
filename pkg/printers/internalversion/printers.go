@@ -61,7 +61,6 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	componentStatusColumns        = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 	thirdPartyResourceColumns     = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 	roleBindingColumns            = []string{"NAME", "AGE"}
 	roleBindingWideColumns        = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
@@ -305,8 +304,15 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(persistentVolumeClaimColumnDefinitions, printPersistentVolumeClaim)
 	h.TableHandler(persistentVolumeClaimColumnDefinitions, printPersistentVolumeClaimList)
 
-	h.Handler(componentStatusColumns, nil, printComponentStatus)
-	h.Handler(componentStatusColumns, nil, printComponentStatusList)
+	componentStatusColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Status", Type: "string", Description: "Status of the component conditions"},
+		{Name: "Message", Type: "string", Description: "Message of the component conditions"},
+		{Name: "Error", Type: "string", Description: "Error of the component conditions"},
+	}
+	h.TableHandler(componentStatusColumnDefinitions, printComponentStatus)
+	h.TableHandler(componentStatusColumnDefinitions, printComponentStatusList)
+
 	h.Handler(thirdPartyResourceColumns, nil, printThirdPartyResource)
 	h.Handler(thirdPartyResourceColumns, nil, printThirdPartyResourceList)
 	h.Handler(deploymentColumns, deploymentWideColumns, printDeployment)
@@ -1200,7 +1206,6 @@ func printEvent(obj *api.Event, options printers.PrintOptions) ([]metav1alpha1.T
 
 // Sorts and prints the EventList in a human-friendly format.
 func printEventList(list *api.EventList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
-
 	sort.Sort(events.SortableEvents(list.Items))
 	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
@@ -1368,16 +1373,14 @@ func printCertificateSigningRequestList(list *certificates.CertificateSigningReq
 	return nil
 }
 
-func printComponentStatus(item *api.ComponentStatus, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, item.Name, options.WithKind)
-
-	if options.WithNamespace {
-		return fmt.Errorf("componentStatus is not namespaced")
+func printComponentStatus(obj *api.ComponentStatus, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
 	status := "Unknown"
 	message := ""
 	error := ""
-	for _, condition := range item.Conditions {
+	for _, condition := range obj.Conditions {
 		if condition.Type == api.ComponentHealthy {
 			if condition.Status == api.ConditionTrue {
 				status = "Healthy"
@@ -1389,25 +1392,20 @@ func printComponentStatus(item *api.ComponentStatus, w io.Writer, options printe
 			break
 		}
 	}
-
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s", name, status, message, error); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(item.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, item.Labels))
-	return err
+	row.Cells = append(row.Cells, obj.Name, status, message, error)
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printComponentStatusList(list *api.ComponentStatusList, w io.Writer, options printers.PrintOptions) error {
-	for _, item := range list.Items {
-		if err := printComponentStatus(&item, w, options); err != nil {
-			return err
+func printComponentStatusList(list *api.ComponentStatusList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printComponentStatus(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-
-	return nil
+	return rows, nil
 }
 
 func printThirdPartyResource(rsrc *extensions.ThirdPartyResource, w io.Writer, options printers.PrintOptions) error {
