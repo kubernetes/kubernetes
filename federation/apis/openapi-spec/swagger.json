@@ -12769,7 +12769,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.ReplicaSetCondition": {
-    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "description": "ReplicaSetCondition describes the state of a replicaset at a certain point.",
     "required": [
      "type",
      "status"
@@ -12792,7 +12792,7 @@
       "type": "string"
      },
      "type": {
-      "description": "Type of replica set condition.",
+      "description": "Type of replicaset condition.",
       "type": "string"
      }
     }
@@ -12845,7 +12845,7 @@
       "format": "int32"
      },
      "selector": {
-      "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+      "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replicaset. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
      },
      "template": {
@@ -12861,12 +12861,12 @@
     ],
     "properties": {
      "availableReplicas": {
-      "description": "The number of available replicas (ready for at least minReadySeconds) for this replica set.",
+      "description": "The number of available replicas (ready for at least minReadySeconds) for this replicaset.",
       "type": "integer",
       "format": "int32"
      },
      "conditions": {
-      "description": "Represents the latest available observations of a replica set's current state.",
+      "description": "Represents the latest available observations of a replicaset's current state.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSetCondition"
@@ -12885,7 +12885,7 @@
       "format": "int64"
      },
      "readyReplicas": {
-      "description": "The number of ready replicas for this replica set.",
+      "description": "The number of ready replicas for this replicaset.",
       "type": "integer",
       "format": "int32"
      },

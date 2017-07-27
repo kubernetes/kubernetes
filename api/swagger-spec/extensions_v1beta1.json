@@ -9606,7 +9606,7 @@
      },
      "selector": {
       "$ref": "v1.LabelSelector",
-      "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors"
+      "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replicaset. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors"
      },
      "template": {
       "$ref": "v1.PodTemplateSpec",
@@ -9634,12 +9634,12 @@
      "readyReplicas": {
       "type": "integer",
       "format": "int32",
-      "description": "The number of ready replicas for this replica set."
+      "description": "The number of ready replicas for this replicaset."
      },
      "availableReplicas": {
       "type": "integer",
       "format": "int32",
-      "description": "The number of available replicas (ready for at least minReadySeconds) for this replica set."
+      "description": "The number of available replicas (ready for at least minReadySeconds) for this replicaset."
      },
      "observedGeneration": {
       "type": "integer",
@@ -9651,13 +9651,13 @@
       "items": {
        "$ref": "v1beta1.ReplicaSetCondition"
       },
-      "description": "Represents the latest available observations of a replica set's current state."
+      "description": "Represents the latest available observations of a replicaset's current state."
      }
     }
    },
    "v1beta1.ReplicaSetCondition": {
     "id": "v1beta1.ReplicaSetCondition",
-    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "description": "ReplicaSetCondition describes the state of a replicaset at a certain point.",
     "required": [
      "type",
      "status"
@@ -9665,7 +9665,7 @@
     "properties": {
      "type": {
       "type": "string",
-      "description": "Type of replica set condition."
+      "description": "Type of replicaset condition."
      },
      "status": {
       "type": "string",
