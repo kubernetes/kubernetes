@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
 )
@@ -38,6 +39,7 @@ const (
 	aesCBCTransformerPrefixV1    = "k8s:enc:aescbc:v1:"
 	aesGCMTransformerPrefixV1    = "k8s:enc:aesgcm:v1:"
 	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1:"
+	kmsTransformerPrefixV1       = "k8s:enc:kms:v1:"
 )
 
 // GetTransformerOverrides returns the transformer overrides by reading and parsing the encryption provider configuration file
@@ -141,6 +143,27 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 				Transformer: identity.NewEncryptCheckTransformer(),
 				Prefix:      []byte{},
 			}
+			found = true
+		}
+
+		if provider.KMS != nil {
+			if found == true {
+				return nil, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
+			}
+
+			f, err := os.Open(provider.KMS.ConfigFile)
+			if err != nil {
+				return nil, fmt.Errorf("error opening KMS provider configuration file %q: %v", provider.KMS.ConfigFile, err)
+			}
+			defer f.Close()
+			envelopeService, pluginFound, err := KMSPluginRegistry.getPlugin(provider.KMS.Name, f)
+			if err != nil {
+				return nil, fmt.Errorf("could not configure KMS plugin %q, %v", provider.KMS.Name, err)
+			}
+			if pluginFound == false {
+				return nil, fmt.Errorf("KMS plugin %q not found", provider.KMS.Name)
+			}
+			transformer, err = getEnvelopePrefixTransformer(provider.KMS, envelopeService)
 			found = true
 		}
 
@@ -257,4 +280,17 @@ func GetSecretboxPrefixTransformer(config *SecretboxConfig) (value.PrefixTransfo
 		Prefix:      []byte(secretboxTransformerPrefixV1),
 	}
 	return result, nil
+}
+
+// getEnvelopePrefixTransformer returns a prefix transformer from the provided config.
+// envelopeService is used as the root of trust.
+func getEnvelopePrefixTransformer(config *KMSConfig, envelopeService envelope.Service) (value.PrefixTransformer, error) {
+	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, config.CacheSize, aestransformer.NewCBCTransformer)
+	if err != nil {
+		return value.PrefixTransformer{}, err
+	}
+	return value.PrefixTransformer{
+		Transformer: envelopeTransformer,
+		Prefix:      []byte(kmsTransformerPrefixV1 + config.Name + ":"),
+	}, nil
 }
