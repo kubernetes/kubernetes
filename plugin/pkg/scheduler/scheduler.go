@@ -195,12 +195,14 @@ func (sched *Scheduler) assume(pod *v1.Pod, host string) (*v1.Pod, error) {
 	if err := sched.config.SchedulerCache.AssumePod(&assumed); err != nil {
 		glog.Errorf("scheduler cache AssumePod failed: %v", err)
 
+		// This is most probably result of a BUG in retrying logic.
+		// We report an error here so that pod scheduling can be retried.
 		sched.config.Error(pod, err)
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "AssumePod failed: %v", err)
 		sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
 			Type:    v1.PodScheduled,
 			Status:  v1.ConditionFalse,
-			Reason:  "AssumePodFailed",
+			Reason:  "SchedulerError",
 			Message: err.Error(),
 		})
 		return nil, err
