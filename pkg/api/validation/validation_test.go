@@ -5128,31 +5128,6 @@ func TestValidatePodWithDisabledAffinityInAnnotations(t *testing.T) {
 				},
 			}),
 		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: validPodSpec(&api.Affinity{
-				PodAntiAffinity: &api.PodAntiAffinity{
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{
-							Weight: 10,
-							PodAffinityTerm: api.PodAffinityTerm{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "key2",
-											Operator: metav1.LabelSelectorOpNotIn,
-											Values:   []string{"value1", "value2"},
-										},
-									},
-								},
-								Namespaces:  []string{"ns"},
-								TopologyKey: "",
-							},
-						},
-					},
-				},
-			}),
-		},
 	}
 
 	for _, v := range errorCases {
