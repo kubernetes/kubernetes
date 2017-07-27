@@ -202,6 +202,10 @@ func (t *Tester) createObject(ctx genericapirequest.Context, obj runtime.Object)
 
 func (t *Tester) setObjectsForList(objects []runtime.Object) []runtime.Object {
 	key := t.storage.KeyRootFunc(t.tester.TestContext())
+	if _, err := t.storage.DeleteCollection(t.tester.TestContext(), nil, nil); err != nil {
+		t.tester.Errorf("unable to clear collection: %v", err)
+		return nil
+	}
 	if err := storagetesting.CreateObjList(key, t.storage.Storage, objects); err != nil {
 		t.tester.Errorf("unexpected error: %v", err)
 		return nil
