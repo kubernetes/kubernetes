@@ -34,6 +34,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
@@ -60,15 +61,6 @@ import (
 )
 
 const loadBalancerWidth = 16
-
-// NOTE: When adding a new resource type here, please update the list
-// pkg/kubectl/cmd/get.go to reflect the new resource type.
-var (
-	storageClassColumns       = []string{"NAME", "PROVISIONER"}
-	statusColumns             = []string{"STATUS", "REASON", "MESSAGE"}
-	podPresetColumns          = []string{"NAME", "AGE"}
-	controllerRevisionColumns = []string{"NAME", "CONTROLLER", "REVISION", "AGE"}
-)
 
 // AddHandlers adds print handlers for default Kubernetes types dealing with internal versions.
 // TODO: handle errors from Handler
@@ -361,7 +353,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	clusterColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Status", Description: "Status of the cluster"},
+		{Name: "Status", Type: "string", Description: "Status of the cluster"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	h.TableHandler(clusterColumnDefinitions, printCluster)
@@ -369,7 +361,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	networkPolicyColumnDefinitioins := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Pod-Selector", Description: extensionsv1beta1.NetworkPolicySpec{}.SwaggerDoc()["podSelector"]},
+		{Name: "Pod-Selector", Type: "string", Description: extensionsv1beta1.NetworkPolicySpec{}.SwaggerDoc()["podSelector"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	h.TableHandler(networkPolicyColumnDefinitioins, printExtensionsNetworkPolicy)
@@ -402,17 +394,36 @@ func AddHandlers(h printers.PrintHandler) {
 	certificateSigningRequestColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-		{Name: "Requestor", Description: certificatesv1beta1.CertificateSigningRequestSpec{}.SwaggerDoc()["request"]},
-		{Name: "Condition", Description: certificatesv1beta1.CertificateSigningRequestStatus{}.SwaggerDoc()["conditions"]},
+		{Name: "Requestor", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestSpec{}.SwaggerDoc()["request"]},
+		{Name: "Condition", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestStatus{}.SwaggerDoc()["conditions"]},
 	}
 	h.TableHandler(certificateSigningRequestColumnDefinitions, printCertificateSigningRequest)
 	h.TableHandler(certificateSigningRequestColumnDefinitions, printCertificateSigningRequestList)
 
-	h.Handler(storageClassColumns, nil, printStorageClass)
-	h.Handler(storageClassColumns, nil, printStorageClassList)
-	h.Handler(statusColumns, nil, printStatus)
-	h.Handler(controllerRevisionColumns, nil, printControllerRevision)
-	h.Handler(controllerRevisionColumns, nil, printControllerRevisionList)
+	storageClassColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Provisioner", Type: "string", Description: storagev1.StorageClass{}.SwaggerDoc()["provisioner"]},
+	}
+
+	h.TableHandler(storageClassColumnDefinitions, printStorageClass)
+	h.TableHandler(storageClassColumnDefinitions, printStorageClassList)
+
+	statusColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Status", Type: "string", Description: metav1.Status{}.SwaggerDoc()["status"]},
+		{Name: "Reason", Type: "string", Description: metav1.Status{}.SwaggerDoc()["reason"]},
+		{Name: "Message", Type: "string", Description: metav1.Status{}.SwaggerDoc()["Message"]},
+	}
+
+	h.TableHandler(statusColumnDefinitions, printStatus)
+
+	controllerRevisionColumnDefinition := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Controller", Type: "string", Description: "Controller of the object"},
+		{Name: "Revision", Type: "string", Description: appsv1beta1.ControllerRevision{}.SwaggerDoc()["revision"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevision)
+	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevisionList)
 
 	AddDefaultHandlers(h)
 }
@@ -1672,46 +1683,40 @@ func printNetworkPolicyList(list *networking.NetworkPolicyList, options printers
 	return rows, nil
 }
 
-func printStorageClass(sc *storage.StorageClass, w io.Writer, options printers.PrintOptions) error {
-	name := sc.Name
-
-	if options.WithNamespace {
-		return fmt.Errorf("storageclass is not namespaced")
+func printStorageClass(obj *storage.StorageClass, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
 
-	if storageutil.IsDefaultAnnotation(sc.ObjectMeta) {
+	name := obj.Name
+	if storageutil.IsDefaultAnnotation(obj.ObjectMeta) {
 		name += " (default)"
 	}
-	provtype := sc.Provisioner
+	provtype := obj.Provisioner
+	row.Cells = append(row.Cells, name, provtype)
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t", name, provtype); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(sc.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, sc.Labels)); err != nil {
-		return err
-	}
-
-	return nil
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printStorageClassList(scList *storage.StorageClassList, w io.Writer, options printers.PrintOptions) error {
-	for _, sc := range scList.Items {
-		if err := printStorageClass(&sc, w, options); err != nil {
-			return err
+func printStorageClassList(list *storage.StorageClassList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printStorageClass(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
-func printStatus(status *metav1.Status, w io.Writer, options printers.PrintOptions) error {
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", status.Status, status.Reason, status.Message); err != nil {
-		return err
+func printStatus(obj *metav1.Status, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
+	row.Cells = append(row.Cells, obj.Status, obj.Reason, obj.Message)
 
-	return nil
+	return []metav1alpha1.TableRow{row}, nil
 }
 
 // Lay out all the containers on one line if use wide output.
@@ -1760,38 +1765,31 @@ func formatEventSource(es api.EventSource) string {
 	return strings.Join(EventSourceString, ", ")
 }
 
-func printControllerRevision(history *apps.ControllerRevision, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, history.Name, options.WithKind)
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", history.Namespace); err != nil {
-			return err
-		}
+func printControllerRevision(obj *apps.ControllerRevision, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
 
-	controllerRef := controller.GetControllerOf(history)
+	controllerRef := controller.GetControllerOf(obj)
 	controllerName := "<none>"
 	if controllerRef != nil {
 		withKind := true
 		controllerName = printers.FormatResourceName(controllerRef.Kind, controllerRef.Name, withKind)
 	}
-	revision := history.Revision
-	age := translateTimestamp(history.CreationTimestamp)
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s", name, controllerName, revision, age); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(history.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, history.Labels))
-	return err
+	revision := obj.Revision
+	age := translateTimestamp(obj.CreationTimestamp)
+	row.Cells = append(row.Cells, obj.Name, controllerName, revision, age)
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printControllerRevisionList(list *apps.ControllerRevisionList, w io.Writer, options printers.PrintOptions) error {
-	for _, item := range list.Items {
-		if err := printControllerRevision(&item, w, options); err != nil {
-			return err
+func printControllerRevisionList(list *apps.ControllerRevisionList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printControllerRevision(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
