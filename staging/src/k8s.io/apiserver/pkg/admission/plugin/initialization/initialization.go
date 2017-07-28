@@ -97,7 +97,7 @@ func (i *initializer) ValidateInitialization() error {
 
 // SetExternalKubeClientSet implements the WantsExternalKubeClientSet interface.
 func (i *initializer) SetExternalKubeClientSet(client clientset.Interface) {
-	i.config = configuration.NewInitializerConfigurationManager(client.Admissionregistration().InitializerConfigurations())
+	i.config = configuration.NewInitializerConfigurationManager(client.AdmissionregistrationV1alpha1().InitializerConfigurations())
 }
 
 // SetAuthorizer implements the WantsAuthorizer interface.
