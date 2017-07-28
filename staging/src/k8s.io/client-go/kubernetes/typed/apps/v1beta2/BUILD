@@ -15,6 +15,7 @@ go_library(
         "deployment.go",
         "doc.go",
         "generated_expansion.go",
+        "replicaset.go",
         "scale.go",
         "statefulset.go",
     ],

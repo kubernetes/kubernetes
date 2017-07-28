@@ -57,6 +57,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&StatefulSetList{},
 		&ControllerRevision{},
 		&ControllerRevisionList{},
+		&extensions.ReplicaSet{},
+		&extensions.ReplicaSetList{},
 	)
 	return nil
 }

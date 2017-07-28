@@ -29,6 +29,7 @@ import (
 	statefulsetstore "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
 	daemonsetstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
 	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
+	replicasetstore "k8s.io/kubernetes/pkg/registry/extensions/replicaset/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -93,6 +94,12 @@ func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorag
 		daemonSetStorage, daemonSetStatusStorage := daemonsetstore.NewREST(restOptionsGetter)
 		storage["daemonsets"] = daemonSetStorage
 		storage["daemonsets/status"] = daemonSetStatusStorage
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("replicasets")) {
+		replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter)
+		storage["replicasets"] = replicaSetStorage.ReplicaSet
+		storage["replicasets/status"] = replicaSetStorage.Status
+		storage["replicasets/scale"] = replicaSetStorage.Scale
 	}
 	return storage
 }
