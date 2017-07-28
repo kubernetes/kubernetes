@@ -49,6 +49,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "audit.go",
         "certificates.go",
         "dashboard.go",
         "e2e.go",

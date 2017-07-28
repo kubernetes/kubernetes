@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package e2e
 
 import (
 	"bufio"
@@ -29,7 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Advanced Audit [Feature:Audit]", func() {
+var _ = framework.KubeDescribe("Advanced Audit [Feature:Audit]", func() {
 	f := framework.NewDefaultFramework("audit")
 
 	It("should audit API calls", func() {
