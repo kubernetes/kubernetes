@@ -49,7 +49,6 @@ go_test(
         "//plugin/pkg/admission/noderestriction:go_default_library",
         "//plugin/pkg/auth/authenticator/token/bootstrap:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
-        "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//test/e2e/lifecycle/bootstrap:go_default_library",
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",

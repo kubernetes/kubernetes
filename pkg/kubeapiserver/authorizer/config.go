@@ -115,9 +115,6 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, error) {
 			nodeAuthorizer := node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 			authorizers = append(authorizers, nodeAuthorizer)
 
-			// Don't bind system:nodes to the system:node role
-			bootstrappolicy.AddClusterRoleBindingFilter(bootstrappolicy.OmitNodesGroupBinding)
-
 		case modes.ModeAlwaysAllow:
 			authorizers = append(authorizers, authorizerfactory.NewAlwaysAllowAuthorizer())
 		case modes.ModeAlwaysDeny:

@@ -38,7 +38,6 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -79,7 +78,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer bootstrappolicy.ClearClusterRoleBindingFilters()
 
 	// Set up NodeRestriction admission
 	nodeRestrictionAdmission := noderestriction.NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
