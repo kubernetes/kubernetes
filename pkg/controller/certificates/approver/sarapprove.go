@@ -90,10 +90,15 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 		return fmt.Errorf("unable to parse csr %q: %v", csr.Name, err)
 	}
 
+	tried := []string{}
+
 	for _, r := range a.recognizers {
 		if !r.recognize(csr, x509cr) {
 			continue
 		}
+
+		tried = append(tried, r.permission.Subresource)
+
 		approved, err := a.authorize(csr, r.permission)
 		if err != nil {
 			return err
@@ -107,6 +112,11 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 			return nil
 		}
 	}
+
+	if len(tried) != 0 {
+		return fmt.Errorf("recognized csr %q as %v but subject access review was not approved", csr.Name, tried)
+	}
+
 	return nil
 }
 
