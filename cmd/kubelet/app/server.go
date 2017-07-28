@@ -996,7 +996,12 @@ func parseResourceList(m componentconfig.ConfigurationMap) (v1.ResourceList, err
 			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
 			}
-			rl[v1.ResourceName(k)] = q
+			// storage specified in configuration map is mapped to ResourceStorageScratch API
+			if v1.ResourceName(k) == v1.ResourceStorage {
+				rl[v1.ResourceStorageScratch] = q
+			} else {
+				rl[v1.ResourceName(k)] = q
+			}
 		default:
 			return nil, fmt.Errorf("cannot reserve %q resource", k)
 		}

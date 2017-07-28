@@ -53,7 +53,7 @@ type Config struct {
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
 type Manager interface {
 	// Start starts the control loop to monitor eviction thresholds at specified interval.
-	Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, nodeProvider NodeProvider, monitoringInterval time.Duration)
+	Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, capacityProvider CapacityProvider, monitoringInterval time.Duration)
 
 	// IsUnderMemoryPressure returns true if the node is under memory pressure.
 	IsUnderMemoryPressure() bool
@@ -68,10 +68,12 @@ type DiskInfoProvider interface {
 	HasDedicatedImageFs() (bool, error)
 }
 
-// NodeProvider is responsible for providing the node api object describing this node
-type NodeProvider interface {
-	// GetNode returns the node info for this node
-	GetNode() (*v1.Node, error)
+// CapacityProvider is responsible for providing the resource capacity and reservation information
+type CapacityProvider interface {
+	// GetCapacity returns the amount of compute resources tracked by container manager available on the node.
+	GetCapacity() v1.ResourceList
+	// GetNodeAllocatable returns the amount of compute resources that have to be reserved from scheduling.
+	GetNodeAllocatableReservation() v1.ResourceList
 }
 
 // ImageGC is responsible for performing garbage collection of unused images.

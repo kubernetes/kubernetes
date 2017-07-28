@@ -80,6 +80,7 @@ func (r *Resource) ResourceList() v1.ResourceList {
 		v1.ResourceMemory:         *resource.NewQuantity(r.Memory, resource.BinarySI),
 		v1.ResourceNvidiaGPU:      *resource.NewQuantity(r.NvidiaGPU, resource.DecimalSI),
 		v1.ResourceStorageOverlay: *resource.NewQuantity(r.StorageOverlay, resource.BinarySI),
+		v1.ResourceStorageScratch: *resource.NewQuantity(r.StorageScratch, resource.BinarySI),
 	}
 	for rName, rQuant := range r.OpaqueIntResources {
 		result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
@@ -407,7 +408,7 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			n.allocatableResource.NvidiaGPU = rQuant.Value()
 		case v1.ResourcePods:
 			n.allowedPodNumber = int(rQuant.Value())
-		case v1.ResourceStorage:
+		case v1.ResourceStorageScratch:
 			n.allocatableResource.StorageScratch = rQuant.Value()
 		case v1.ResourceStorageOverlay:
 			n.allocatableResource.StorageOverlay = rQuant.Value()
