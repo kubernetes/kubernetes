@@ -103,7 +103,7 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 	r := &Reflector{
 		name: name,
 		// we need this to be unique per process (some names are still the same)but obvious who it belongs to
-		metrics:       newReflectorMetrics(makeValidPromethusMetricName(fmt.Sprintf("reflector_"+name+"_%07d", rand.Intn(1000000)))),
+		metrics:       newReflectorMetrics("reflector_" + name),
 		listerWatcher: lw,
 		store:         store,
 		expectedType:  reflect.TypeOf(expectedType),
@@ -112,11 +112,6 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 		clock:         &clock.RealClock{},
 	}
 	return r
-}
-
-func makeValidPromethusMetricName(in string) string {
-	// this isn't perfect, but it removes our common characters
-	return strings.NewReplacer("/", "_", ".", "_", "-", "_").Replace(in)
 }
 
 // internalPackages are packages that ignored when creating a default reflector name. These packages are in the common
