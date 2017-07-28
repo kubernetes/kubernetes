@@ -162,6 +162,7 @@ var metricsFactory = struct {
 	metricsProvider: noopMetricsProvider{},
 }
 
+// newQueueMetrics constructs a queue metrics with the given (optional) name.
 func newQueueMetrics(name string) queueMetrics {
 	var ret *defaultQueueMetrics
 	if len(name) == 0 {
