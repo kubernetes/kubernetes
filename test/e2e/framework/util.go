@@ -473,7 +473,7 @@ func logPodStates(pods []v1.Pod) {
 // errorBadPodsStates create error message of basic info of bad pods for debugging.
 func errorBadPodsStates(badPods []v1.Pod, desiredPods int, ns, desiredState string, timeout time.Duration) string {
 	errStr := fmt.Sprintf("%d / %d pods in namespace %q are NOT in %s state in %v\n", len(badPods), desiredPods, ns, desiredState, timeout)
-	// Pirnt bad pods info only if there are fewer than 10 bad pods
+	// Print bad pods info only if there are fewer than 10 bad pods
 	if len(badPods) > 10 {
 		return errStr + "There are too many bad pods. Please check log for details."
 	}
@@ -486,7 +486,7 @@ func errorBadPodsStates(badPods []v1.Pod, desiredPods int, ns, desiredState stri
 		if badPod.DeletionGracePeriodSeconds != nil {
 			grace = fmt.Sprintf("%ds", *badPod.DeletionGracePeriodSeconds)
 		}
-		podInfo := fmt.Sprintf("%s\t%s\t%s\t%s\t%s",
+		podInfo := fmt.Sprintf("%s\t%s\t%s\t%s\t%+v",
 			badPod.ObjectMeta.Name, badPod.Spec.NodeName, badPod.Status.Phase, grace, badPod.Status.Conditions)
 		fmt.Fprintln(w, podInfo)
 	}
@@ -776,28 +776,28 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 }
 
 func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
-	Logf("Waiting up to %[1]v for pod %[2]s status to be %[3]s", timeout, podName, desc)
+	Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
 		pod, err := c.Core().Pods(ns).Get(podName, metav1.GetOptions{})
 		if err != nil {
 			if apierrs.IsNotFound(err) {
-				Logf("Pod %q in namespace %q disappeared. Error: %v", podName, ns, err)
+				Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
 				return err
 			}
-			// Aligning this text makes it much more readable
-			Logf("Get pod %[1]s in namespace '%[2]s' failed, ignoring for %[3]v. Error: %[4]v",
-				podName, ns, Poll, err)
+			Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, Poll, err)
 			continue
 		}
-		done, err := condition(pod)
-		if done {
+		// log now so that current pod info is reported before calling `condition()`
+		Logf("Pod %q: Phase=%q, Reason=%q, readiness=%t. Elapsed: %v",
+			podName, pod.Status.Phase, pod.Status.Reason, testutil.PodReady(pod), time.Since(start))
+		if done, err := condition(pod); done {
+			if err == nil {
+				Logf("Pod %q satisfied condition %q", podName, desc)
+			}
 			return err
 		}
-		Logf("Waiting for pod %[1]s in namespace '%[2]s' status to be '%[3]s'"+
-			"(found phase: %[4]q, readiness: %[5]t) (%[6]v elapsed)",
-			podName, ns, desc, pod.Status.Phase, testutil.PodReady(pod), time.Since(start))
 	}
-	return fmt.Errorf("gave up waiting for pod '%s' to be '%s' after %v", podName, desc, timeout)
+	return fmt.Errorf("Gave up after waiting %v for pod %q to be %q", timeout, podName, desc)
 }
 
 // WaitForMatchPodsCondition finds match pods based on the input ListOptions.
@@ -1378,7 +1378,6 @@ func waitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 				return true, fmt.Errorf("Expected pod %v in namespace %v to be terminated with reason %v, got reason: %v", podName, namespace, reason, pod.Status.Reason)
 			}
 		}
-
 		return false, nil
 	})
 }
