@@ -49,8 +49,8 @@ func Validate(spec SysSpec, validators []Validator) (error, error) {
 	return errors.NewAggregate(warns), errors.NewAggregate(errs)
 }
 
-// ValidateDefault uses all default validators to validate the system and writes to stdout.
-func ValidateDefault(runtime string) (error, error) {
+// ValidateSpec uses all default validators to validate the system and writes to stdout.
+func ValidateSpec(spec SysSpec, runtime string) (error, error) {
 	// OS-level validators.
 	var osValidators = []Validator{
 		&OSValidator{Reporter: DefaultReporter},
@@ -68,5 +68,5 @@ func ValidateDefault(runtime string) (error, error) {
 	case "docker":
 		validators = append(validators, dockerValidators...)
 	}
-	return Validate(DefaultSysSpec, validators)
+	return Validate(spec, validators)
 }
