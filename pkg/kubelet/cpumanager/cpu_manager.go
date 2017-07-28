@@ -25,7 +25,6 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topology"
@@ -36,6 +35,10 @@ type kletGetter interface {
 	GetPods() []*v1.Pod
 	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
 	GetNode() (*v1.Node, error)
+}
+
+type runtimeService interface {
+	UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error
 }
 
 type policyName string
@@ -66,7 +69,7 @@ type manager struct {
 
 	// containerRuntime is the container runtime service interface needed
 	// to make UpdateContainerResources() calls against the containers.
-	containerRuntime internalapi.RuntimeService
+	containerRuntime runtimeService
 
 	// podLister provides a method for listing all the pods on the node
 	// so all the containers can be updated in the reconciliation loop.
@@ -80,7 +83,7 @@ type manager struct {
 var _ Manager = &manager{}
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(cpuPolicyName string, cr internalapi.RuntimeService, kletGetter kletGetter, statusProvider status.PodStatusProvider) (Manager, error) {
+func NewManager(cpuPolicyName string, cr runtimeService, kletGetter kletGetter, statusProvider status.PodStatusProvider) (Manager, error) {
 	var policy Policy
 
 	switch policyName(cpuPolicyName) {
@@ -99,7 +102,7 @@ func NewManager(cpuPolicyName string, cr internalapi.RuntimeService, kletGetter 
 
 		// Get node to figure out reserved CPUs
 		node, err := kletGetter.GetNode()
-		topo.NumReservedCores = getReserverdCpus(node.Status)
+		topo.NumReservedCores = getReservedCPUs(node.Status)
 		policy = NewStaticPolicy(topo)
 	default:
 		glog.Warningf("[cpumanager] Unknown policy (\"%s\"), falling back to \"%s\" policy (\"%s\")", cpuPolicyName, PolicyNoop)
@@ -115,7 +118,7 @@ func NewManager(cpuPolicyName string, cr internalapi.RuntimeService, kletGetter 
 	}, nil
 }
 
-func getReserverdCpus(nodeStatus v1.NodeStatus) int {
+func getReservedCPUs(nodeStatus v1.NodeStatus) int {
 	// Reserved = ceiling(Capacity) - ceiling(Allocatable)
 	cpuCapacity := nodeStatus.Capacity[v1.ResourceCPU]
 	cpuAllocatable := nodeStatus.Allocatable[v1.ResourceCPU]
