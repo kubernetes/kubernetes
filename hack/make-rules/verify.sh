@@ -46,7 +46,6 @@ QUICK_PATTERNS+=(
   "verify-test-owners.sh"
 )
 
-
 EXCLUDED_CHECKS=$(ls ${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || true)
 QUICK_CHECKS=$(ls ${QUICK_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || true)
 
@@ -75,7 +74,6 @@ function run-cmd {
     "$@"
   fi
 }
-
 
 # Collect Failed tests in this Array , initalize it to nil
 FAILED_TESTS=()
