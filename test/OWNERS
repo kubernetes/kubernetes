@@ -4,10 +4,8 @@ reviewers:
   - enisoc
   - erictune
   - fabianofranz # for test/e2e/kubectl.go
-  - fejta
   - foxish # for test/e2e/network-partition.go
   - gmarek
-  - ixdy
   - janetkuo
   - kow3ns # for test/e2e/statefulset.go
   - krousey
@@ -17,12 +15,10 @@ reviewers:
   - mikedanese
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
-  - rmmh
   - saad-ali
   - smarterclayton
   - soltysh
-  - spiffxp
-  - spxtr
+  - sig-testing-reviewers
   - sttts
   - zmerlynn
 approvers:
@@ -32,10 +28,8 @@ approvers:
   - eparis
   - erictune
   - fabianofranz # for test/e2e/kubectl.go
-  - fejta
   - foxish # for test/e2e/network-partition.go
   - gmarek
-  - ixdy
   - janetkuo
   - kow3ns # for test/e2e/statefulset.go
   - krousey
@@ -46,9 +40,8 @@ approvers:
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
+  - sig-testing-approvers
   - smarterclayton
   - soltysh
-  - spiffxp
-  - spxtr
   - sttts
   - zmerlynn
