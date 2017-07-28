@@ -30,6 +30,7 @@ import (
 	autoscalingv2alpha1 "k8s.io/api/autoscaling/v2alpha1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
@@ -63,11 +64,10 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	storageClassColumns              = []string{"NAME", "PROVISIONER"}
-	statusColumns                    = []string{"STATUS", "REASON", "MESSAGE"}
-	certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
-	podPresetColumns                 = []string{"NAME", "AGE"}
-	controllerRevisionColumns        = []string{"NAME", "CONTROLLER", "REVISION", "AGE"}
+	storageClassColumns       = []string{"NAME", "PROVISIONER"}
+	statusColumns             = []string{"STATUS", "REASON", "MESSAGE"}
+	podPresetColumns          = []string{"NAME", "AGE"}
+	controllerRevisionColumns = []string{"NAME", "CONTROLLER", "REVISION", "AGE"}
 )
 
 // AddHandlers adds print handlers for default Kubernetes types dealing with internal versions.
@@ -398,8 +398,16 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(clusterRoleBindingsColumnDefinitions, printClusterRoleBinding)
 	h.TableHandler(clusterRoleBindingsColumnDefinitions, printClusterRoleBindingList)
-	h.Handler(certificateSigningRequestColumns, nil, printCertificateSigningRequest)
-	h.Handler(certificateSigningRequestColumns, nil, printCertificateSigningRequestList)
+
+	certificateSigningRequestColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Requestor", Description: certificatesv1beta1.CertificateSigningRequestSpec{}.SwaggerDoc()["request"]},
+		{Name: "Condition", Description: certificatesv1beta1.CertificateSigningRequestStatus{}.SwaggerDoc()["conditions"]},
+	}
+	h.TableHandler(certificateSigningRequestColumnDefinitions, printCertificateSigningRequest)
+	h.TableHandler(certificateSigningRequestColumnDefinitions, printCertificateSigningRequestList)
+
 	h.Handler(storageClassColumns, nil, printStorageClass)
 	h.Handler(storageClassColumns, nil, printStorageClassList)
 	h.Handler(statusColumns, nil, printStatus)
@@ -1336,29 +1344,16 @@ func printClusterRoleBindingList(list *rbac.ClusterRoleBindingList, options prin
 	return rows, nil
 }
 
-func printCertificateSigningRequest(csr *certificates.CertificateSigningRequest, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, csr.Name, options.WithKind)
-	meta := csr.ObjectMeta
-
-	status, err := extractCSRStatus(csr)
+func printCertificateSigningRequest(obj *certificates.CertificateSigningRequest, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	status, err := extractCSRStatus(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	if _, err := fmt.Fprintf(
-		w, "%s\t%s\t%s\t%s",
-		name,
-		translateTimestamp(meta.CreationTimestamp),
-		csr.Spec.Username,
-		status,
-	); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(meta.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err = fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, meta.Labels))
-	return err
+	row.Cells = append(row.Cells, obj.Name, translateTimestamp(obj.CreationTimestamp), obj.Spec.Username, status)
+	return []metav1alpha1.TableRow{row}, nil
 }
 
 func extractCSRStatus(csr *certificates.CertificateSigningRequest) (string, error) {
@@ -1388,13 +1383,16 @@ func extractCSRStatus(csr *certificates.CertificateSigningRequest) (string, erro
 	return status, nil
 }
 
-func printCertificateSigningRequestList(list *certificates.CertificateSigningRequestList, w io.Writer, options printers.PrintOptions) error {
+func printCertificateSigningRequestList(list *certificates.CertificateSigningRequestList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		if err := printCertificateSigningRequest(&list.Items[i], w, options); err != nil {
-			return err
+		r, err := printCertificateSigningRequest(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printComponentStatus(obj *api.ComponentStatus, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
