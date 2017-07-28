@@ -59,6 +59,7 @@ const (
 	FrontProxyClientCertCommonName     = "front-proxy-client" //used as subject.commonname attribute (CN)
 
 	AdminKubeConfigFileName             = "admin.conf"
+	KubeletBootstrapKubeConfigFileName  = "bootstrap-kubelet.conf"
 	KubeletKubeConfigFileName           = "kubelet.conf"
 	ControllerManagerKubeConfigFileName = "controller-manager.conf"
 	SchedulerKubeConfigFileName         = "scheduler.conf"
