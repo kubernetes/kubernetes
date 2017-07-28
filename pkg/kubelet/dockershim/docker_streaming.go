@@ -159,8 +159,8 @@ func attachContainer(client libdocker.Interface, containerID string, stdin io.Re
 	return client.AttachToContainer(containerID, opts, sopts)
 }
 
-func portForward(client libdocker.Interface, podInfraContainerID string, port int32, stream io.ReadWriteCloser) error {
-	container, err := client.InspectContainer(podInfraContainerID)
+func portForward(client libdocker.Interface, podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+	container, err := client.InspectContainer(podSandboxID)
 	if err != nil {
 		return err
 	}

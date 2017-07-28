@@ -63,16 +63,13 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
-	// TODO: rename podInfraContainerID to sandboxID
-	SetUpPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID, annotations map[string]string) error
+	SetUpPod(namespace string, name string, podSandboxID kubecontainer.ContainerID, annotations map[string]string) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
-	// TODO: rename podInfraContainerID to sandboxID
-	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
+	TearDownPod(namespace string, name string, podSandboxID kubecontainer.ContainerID) error
 
 	// GetPodNetworkStatus is the method called to obtain the ipv4 or ipv6 addresses of the container
-	// TODO: rename podInfraContainerID to sandboxID
-	GetPodNetworkStatus(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (*PodNetworkStatus, error)
+	GetPodNetworkStatus(namespace string, name string, podSandboxID kubecontainer.ContainerID) (*PodNetworkStatus, error)
 
 	// Status returns error if the network plugin is in error state
 	Status() error
@@ -136,7 +133,7 @@ type Host interface {
 }
 
 // NamespaceGetter is an interface to retrieve namespace information for a given
-// sandboxID. Typically implemented by runtime shims that are closely coupled to
+// podSandboxID. Typically implemented by runtime shims that are closely coupled to
 // CNI plugin wrappers like kubenet.
 type NamespaceGetter interface {
 	// GetNetNS returns network namespace information for the given containerID.
@@ -146,7 +143,7 @@ type NamespaceGetter interface {
 }
 
 // PortMappingGetter is an interface to retrieve port mapping information for a given
-// sandboxID. Typically implemented by runtime shims that are closely coupled to
+// podSandboxID. Typically implemented by runtime shims that are closely coupled to
 // CNI plugin wrappers like kubenet.
 type PortMappingGetter interface {
 	// GetPodPortMappings returns sandbox port mappings information.
