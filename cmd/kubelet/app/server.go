@@ -647,7 +647,7 @@ func updateTransport(clientConfig *restclient.Config, clientCertificateManager c
 		}
 		return cert, nil
 	}
-	clientConfig.Transport = utilnet.SetTransportDefaults(&http.Transport{
+	clientConfig.Transport, err = clientCertificateManager.NewRotationRoundTripper(utilnet.SetTransportDefaults(&http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
@@ -656,7 +656,10 @@ func updateTransport(clientConfig *restclient.Config, clientCertificateManager c
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).Dial,
-	})
+	}))
+	if err != nil {
+		return err
+	}
 	clientConfig.CertData = nil
 	clientConfig.KeyData = nil
 	clientConfig.CertFile = ""
