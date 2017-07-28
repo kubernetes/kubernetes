@@ -1097,7 +1097,7 @@ func printSecret(obj *api.Secret, options printers.PrintOptions) ([]metav1alpha1
 	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printSecretList(list *api.SecretList, w io.Writer, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+func printSecretList(list *api.SecretList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
 	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printSecret(&list.Items[i], options)
