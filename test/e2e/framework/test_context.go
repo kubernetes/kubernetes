@@ -135,6 +135,10 @@ type NodeTestContextType struct {
 	KubeletConfig componentconfig.KubeletConfiguration
 	// ImageDescription is the description of the image on which the test is running.
 	ImageDescription string
+	// SystemSpecName is the name of the system spec (e.g., gke) that's used in
+	// the node e2e test. If empty, the default one (system.DefaultSpec) is
+	// used. The system specs are in test/e2e_node/system/specs/.
+	SystemSpecName string
 }
 
 type CloudConfig struct {
@@ -256,6 +260,7 @@ func RegisterNodeFlags() {
 	flag.BoolVar(&TestContext.NodeConformance, "conformance", false, "If true, the test suite will not start kubelet, and fetch system log (kernel, docker, kubelet log etc.) to the report directory.")
 	flag.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 	flag.StringVar(&TestContext.ImageDescription, "image-description", "", "The description of the image which the test will be running on.")
+	flag.StringVar(&TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
 }
 
 // ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.
