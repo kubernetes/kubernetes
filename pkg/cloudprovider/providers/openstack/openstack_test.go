@@ -557,9 +557,14 @@ func TestInstanceIDFromProviderID(t *testing.T) {
 		fail       bool
 	}{
 		{
-			providerID: "openstack://7b9cf879-7146-417c-abfd-cb4272f0c935",
+			providerID: ProviderName + "://" + "/" + "7b9cf879-7146-417c-abfd-cb4272f0c935",
 			instanceID: "7b9cf879-7146-417c-abfd-cb4272f0c935",
 			fail:       false,
+		},
+		{
+			providerID: "openstack://7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "",
+			fail:       true,
 		},
 		{
 			providerID: "7b9cf879-7146-417c-abfd-cb4272f0c935",
@@ -567,7 +572,7 @@ func TestInstanceIDFromProviderID(t *testing.T) {
 			fail:       true,
 		},
 		{
-			providerID: "other-provider://7b9cf879-7146-417c-abfd-cb4272f0c935",
+			providerID: "other-provider:///7b9cf879-7146-417c-abfd-cb4272f0c935",
 			instanceID: "",
 			fail:       true,
 		},
