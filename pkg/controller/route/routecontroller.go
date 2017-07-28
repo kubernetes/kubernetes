@@ -32,8 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -58,6 +61,8 @@ type RouteController struct {
 	clusterCIDR      *net.IPNet
 	nodeLister       corelisters.NodeLister
 	nodeListerSynced cache.InformerSynced
+	broadcaster      record.EventBroadcaster
+	recorder         record.EventRecorder
 }
 
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDR *net.IPNet) *RouteController {
@@ -69,6 +74,9 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 		glog.Fatal("RouteController: Must specify clusterCIDR.")
 	}
 
+	eventBroadcaster := record.NewBroadcaster()
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
+
 	rc := &RouteController{
 		routes:           routes,
 		kubeClient:       kubeClient,
@@ -76,6 +84,8 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 		clusterCIDR:      clusterCIDR,
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
+		broadcaster:      eventBroadcaster,
+		recorder:         recorder,
 	}
 
 	return rc
@@ -89,6 +99,10 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 
 	if !controller.WaitForCacheSync("route", stopCh, rc.nodeListerSynced) {
 		return
+	}
+
+	if rc.broadcaster != nil {
+		rc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(rc.kubeClient.Core().RESTClient()).Events("")})
 	}
 
 	// TODO: If we do just the full Resync every 5 minutes (default value)
@@ -160,7 +174,18 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 
 					rc.updateNetworkingCondition(nodeName, err == nil)
 					if err != nil {
-						glog.Errorf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, nodeName, time.Now().Sub(startTime), err)
+						msg := fmt.Sprintf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, nodeName, time.Now().Sub(startTime), err)
+						if rc.recorder != nil {
+							rc.recorder.Eventf(
+								&v1.ObjectReference{
+									Kind:      "Node",
+									Name:      string(nodeName),
+									UID:       types.UID(nodeName),
+									Namespace: "",
+								}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
+						}
+						glog.Error(msg)
+
 					} else {
 						glog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
 						return
