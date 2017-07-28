@@ -57,7 +57,10 @@ func main() {
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		panic(err)
 	}
-	defer apiextensionsclientset.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(crd.Name, nil)
+
+	if crd != nil {
+		defer apiextensionsclientset.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(crd.Name, nil)
+	}
 
 	// make a new config for our extension's API group, using the first config as a baseline
 	exampleClient, exampleScheme, err := exampleclient.NewClient(config)
