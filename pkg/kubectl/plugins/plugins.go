@@ -36,6 +36,7 @@ type Description struct {
 	LongDesc  string    `json:"longDesc,omitempty"`
 	Example   string    `json:"example,omitempty"`
 	Command   string    `json:"command"`
+	ProxyAPI  bool      `json:"proxyAPI,omitempty"`
 	Tree      []*Plugin `json:"tree,omitempty"`
 }
 
