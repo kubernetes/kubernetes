@@ -29,6 +29,11 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/builder"
 )
 
+const (
+	localCOSMounterPath = "cluster/gce/gci/mounter/mounter"
+	systemSpecPath      = "test/e2e_node/system/specs"
+)
+
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
 type NodeE2ERemote struct{}
 
@@ -37,10 +42,8 @@ func InitNodeE2ERemote() TestSuite {
 	return &NodeE2ERemote{}
 }
 
-const localCOSMounterPath = "cluster/gce/gci/mounter/mounter"
-
 // SetupTestPackage sets up the test package with binaries k8s required for node e2e tests
-func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
+func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	// Build the executables
 	if err := builder.BuildGo(); err != nil {
 		return fmt.Errorf("failed to build the depedencies: %v", err)
@@ -49,7 +52,12 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
 	// Make sure we can find the newly built binaries
 	buildOutputDir, err := builder.GetK8sBuildOutputDir()
 	if err != nil {
-		return fmt.Errorf("failed to locate kubernetes build output directory %v", err)
+		return fmt.Errorf("failed to locate kubernetes build output directory: %v", err)
+	}
+
+	rootDir, err := builder.GetK8sRootDir()
+	if err != nil {
+		return fmt.Errorf("failed to locate kubernetes root directory: %v", err)
 	}
 
 	// Copy binaries
@@ -62,6 +70,18 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
 		out, err := exec.Command("cp", source, filepath.Join(tardir, bin)).CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("failed to copy %q: %v Output: %q", bin, err, out)
+		}
+	}
+
+	if systemSpecName != "" {
+		// Copy system spec file
+		source := filepath.Join(rootDir, systemSpecPath, systemSpecName+".yaml")
+		if _, err := os.Stat(source); err != nil {
+			return fmt.Errorf("failed to locate system spec %q: %v", source, err)
+		}
+		out, err := exec.Command("cp", source, tardir).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to copy system spec %q: %v, output: %q", source, err, out)
 		}
 	}
 
@@ -134,7 +154,7 @@ func updateCOSMounterPath(args, host, workspace string) (string, error) {
 }
 
 // RunTest runs test on the node.
-func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testArgs, ginkgoArgs string, timeout time.Duration) (string, error) {
+func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testArgs, ginkgoArgs string, systemSpecName string, timeout time.Duration) (string, error) {
 	// Install the cni plugin.
 	if err := installCNI(host, workspace); err != nil {
 		return "", err
@@ -153,12 +173,17 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testA
 		return "", err
 	}
 
+	systemSpecFile := ""
+	if systemSpecName != "" {
+		systemSpecFile = systemSpecName + ".yaml"
+	}
+
 	// Run the tests
 	glog.V(2).Infof("Starting tests on %q", host)
 	cmd := getSSHCommand(" && ",
 		fmt.Sprintf("cd %s", workspace),
-		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s %s",
-			timeout.Seconds(), ginkgoArgs, host, results, junitFilePrefix, testArgs),
+		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-file=%s --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s %s",
+			timeout.Seconds(), ginkgoArgs, systemSpecFile, host, results, junitFilePrefix, testArgs),
 	)
 	return SSH(host, "sh", "-c", cmd)
 }

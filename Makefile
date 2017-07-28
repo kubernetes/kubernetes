@@ -233,6 +233,11 @@ define TEST_E2E_NODE_HELP_INFO
 #  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
 #  RUNTIME: Container runtime to use (eg. docker, rkt, remote).
 #    Defaults to "docker".
+#  SYSTEM_SPEC_NAME: The name of the system spec to be used for validating the
+#    image in the node conformance test. The specs are located at
+#    test/e2e_node/system/specs/. For example, "SYSTEM_SPEC_NAME=gke" will use
+#    the spec at test/e2e_node/system/specs/gke.yaml. If unspecified, the
+#    default built-in spec (system.DefaultSpec) will be used.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container

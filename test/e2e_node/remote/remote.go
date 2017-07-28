@@ -34,7 +34,7 @@ var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test resu
 
 const archiveName = "e2e_node_test.tar.gz"
 
-func CreateTestArchive(suite TestSuite) (string, error) {
+func CreateTestArchive(suite TestSuite, systemSpecName string) (string, error) {
 	glog.V(2).Infof("Building archive...")
 	tardir, err := ioutil.TempDir("", "node-e2e-archive")
 	if err != nil {
@@ -43,7 +43,7 @@ func CreateTestArchive(suite TestSuite) (string, error) {
 	defer os.RemoveAll(tardir)
 
 	// Call the suite function to setup the test package.
-	err = suite.SetupTestPackage(tardir)
+	err = suite.SetupTestPackage(tardir, systemSpecName)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup test package %q: %v", tardir, err)
 	}
@@ -63,7 +63,7 @@ func CreateTestArchive(suite TestSuite) (string, error) {
 
 // Returns the command output, whether the exit was ok, and any errors
 // TODO(random-liu): junitFilePrefix is not prefix actually, the file name is junit-junitFilePrefix.xml. Change the variable name.
-func RunRemote(suite TestSuite, archive string, host string, cleanup bool, junitFilePrefix string, testArgs string, ginkgoArgs string) (string, bool, error) {
+func RunRemote(suite TestSuite, archive string, host string, cleanup bool, junitFilePrefix string, testArgs string, ginkgoArgs string, systemSpecName string) (string, bool, error) {
 	// Create the temp staging directory
 	glog.V(2).Infof("Staging test binaries on %q", host)
 	workspace := fmt.Sprintf("/tmp/node-e2e-%s", getTimestamp())
@@ -108,7 +108,7 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, junit
 	}
 
 	glog.V(2).Infof("Running test on %q", host)
-	output, err := suite.RunTest(host, workspace, resultDir, junitFilePrefix, testArgs, ginkgoArgs, *testTimeoutSeconds)
+	output, err := suite.RunTest(host, workspace, resultDir, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, *testTimeoutSeconds)
 
 	aggErrs := []error{}
 	// Do not log the output here, let the caller deal with the test output.
