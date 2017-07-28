@@ -32,6 +32,7 @@ import (
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
@@ -62,13 +63,8 @@ const loadBalancerWidth = 16
 // NOTE: When adding a new resource type here, please update the list
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var (
-	roleBindingColumns               = []string{"NAME", "AGE"}
-	roleBindingWideColumns           = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
-	clusterRoleBindingColumns        = []string{"NAME", "AGE"}
-	clusterRoleBindingWideColumns    = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
 	storageClassColumns              = []string{"NAME", "PROVISIONER"}
 	statusColumns                    = []string{"STATUS", "REASON", "MESSAGE"}
-	networkPolicyColumns             = []string{"NAME", "POD-SELECTOR", "AGE"}
 	certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
 	podPresetColumns                 = []string{"NAME", "AGE"}
 	controllerRevisionColumns        = []string{"NAME", "CONTROLLER", "REVISION", "AGE"}
@@ -362,7 +358,7 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicy)
 	h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicyList)
-	
+
 	clusterColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Status", Description: "Status of the cluster"},
@@ -371,14 +367,37 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(clusterColumnDefinitions, printCluster)
 	h.TableHandler(clusterColumnDefinitions, printClusterList)
 
-	h.Handler(networkPolicyColumns, nil, printExtensionsNetworkPolicy)
-	h.Handler(networkPolicyColumns, nil, printExtensionsNetworkPolicyList)
-	h.Handler(networkPolicyColumns, nil, printNetworkPolicy)
-	h.Handler(networkPolicyColumns, nil, printNetworkPolicyList)
-	h.Handler(roleBindingColumns, roleBindingWideColumns, printRoleBinding)
-	h.Handler(roleBindingColumns, roleBindingWideColumns, printRoleBindingList)
-	h.Handler(clusterRoleBindingColumns, clusterRoleBindingWideColumns, printClusterRoleBinding)
-	h.Handler(clusterRoleBindingColumns, clusterRoleBindingWideColumns, printClusterRoleBindingList)
+	networkPolicyColumnDefinitioins := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Pod-Selector", Description: extensionsv1beta1.NetworkPolicySpec{}.SwaggerDoc()["podSelector"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(networkPolicyColumnDefinitioins, printExtensionsNetworkPolicy)
+	h.TableHandler(networkPolicyColumnDefinitioins, printExtensionsNetworkPolicyList)
+	h.TableHandler(networkPolicyColumnDefinitioins, printNetworkPolicy)
+	h.TableHandler(networkPolicyColumnDefinitioins, printNetworkPolicyList)
+
+	roleBindingsColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Role", Type: "string", Priority: 1, Description: rbacv1beta1.RoleBinding{}.SwaggerDoc()["roleRef"]},
+		{Name: "Users", Type: "string", Priority: 1, Description: "Users in the roleBinding"},
+		{Name: "Groups", Type: "string", Priority: 1, Description: "Gruops in the roleBinding"},
+		{Name: "ServiceAccounts", Type: "string", Priority: 1, Description: "ServiceAccounts in the roleBinding"},
+	}
+	h.TableHandler(roleBindingsColumnDefinitions, printRoleBinding)
+	h.TableHandler(roleBindingsColumnDefinitions, printRoleBindingList)
+
+	clusterRoleBindingsColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Role", Type: "string", Priority: 1, Description: rbacv1beta1.ClusterRoleBinding{}.SwaggerDoc()["roleRef"]},
+		{Name: "Users", Type: "string", Priority: 1, Description: "Users in the roleBinding"},
+		{Name: "Groups", Type: "string", Priority: 1, Description: "Gruops in the roleBinding"},
+		{Name: "ServiceAccounts", Type: "string", Priority: 1, Description: "ServiceAccounts in the roleBinding"},
+	}
+	h.TableHandler(clusterRoleBindingsColumnDefinitions, printClusterRoleBinding)
+	h.TableHandler(clusterRoleBindingsColumnDefinitions, printClusterRoleBindingList)
 	h.Handler(certificateSigningRequestColumns, nil, printCertificateSigningRequest)
 	h.Handler(certificateSigningRequestColumns, nil, printCertificateSigningRequestList)
 	h.Handler(storageClassColumns, nil, printStorageClass)
@@ -1263,98 +1282,58 @@ func printEventList(list *api.EventList, options printers.PrintOptions) ([]metav
 	return rows, nil
 }
 
-func printRoleBinding(roleBinding *rbac.RoleBinding, w io.Writer, options printers.PrintOptions) error {
-	meta := roleBinding.ObjectMeta
-	name := printers.FormatResourceName(options.Kind, meta.Name, options.WithKind)
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", meta.Namespace); err != nil {
-			return err
-		}
+func printRoleBinding(obj *rbac.RoleBinding, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
 
-	if _, err := fmt.Fprintf(
-		w, "%s\t%s",
-		name,
-		translateTimestamp(meta.CreationTimestamp),
-	); err != nil {
-		return err
-	}
-
+	row.Cells = append(row.Cells, obj.Name, translateTimestamp(obj.CreationTimestamp))
 	if options.Wide {
-		roleRef := fmt.Sprintf("%s/%s", roleBinding.RoleRef.Kind, roleBinding.RoleRef.Name)
-		users, groups, sas, _ := rbac.SubjectsStrings(roleBinding.Subjects)
-		if _, err := fmt.Fprintf(w, "\t%s\t%v\t%v\t%v",
-			roleRef,
-			strings.Join(users, ", "),
-			strings.Join(groups, ", "),
-			strings.Join(sas, ", "),
-		); err != nil {
-			return err
-		}
+		roleRef := fmt.Sprintf("%s/%s", obj.RoleRef.Kind, obj.RoleRef.Name)
+		users, groups, sas, _ := rbac.SubjectsStrings(obj.Subjects)
+		row.Cells = append(row.Cells, roleRef, strings.Join(users, ", "), strings.Join(groups, ", "), strings.Join(sas, ", "))
 	}
-
-	if _, err := fmt.Fprint(w, printers.AppendLabels(meta.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, meta.Labels))
-	return err
+	return []metav1alpha1.TableRow{row}, nil
 }
 
 // Prints the RoleBinding in a human-friendly format.
-func printRoleBindingList(list *rbac.RoleBindingList, w io.Writer, options printers.PrintOptions) error {
+func printRoleBindingList(list *rbac.RoleBindingList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		if err := printRoleBinding(&list.Items[i], w, options); err != nil {
-			return err
+		r, err := printRoleBinding(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
-func printClusterRoleBinding(clusterRoleBinding *rbac.ClusterRoleBinding, w io.Writer, options printers.PrintOptions) error {
-	meta := clusterRoleBinding.ObjectMeta
-	name := printers.FormatResourceName(options.Kind, meta.Name, options.WithKind)
-
-	if options.WithNamespace {
-		return fmt.Errorf("clusterRoleBinding is not namespaced")
+func printClusterRoleBinding(obj *rbac.ClusterRoleBinding, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
 
-	if _, err := fmt.Fprintf(
-		w, "%s\t%s",
-		name,
-		translateTimestamp(meta.CreationTimestamp),
-	); err != nil {
-		return err
-	}
-
+	row.Cells = append(row.Cells, obj.Name, translateTimestamp(obj.CreationTimestamp))
 	if options.Wide {
-		roleRef := clusterRoleBinding.RoleRef.Name
-		users, groups, sas, _ := rbac.SubjectsStrings(clusterRoleBinding.Subjects)
-		if _, err := fmt.Fprintf(w, "\t%s\t%v\t%v\t%v",
-			roleRef,
-			strings.Join(users, ", "),
-			strings.Join(groups, ", "),
-			strings.Join(sas, ", "),
-		); err != nil {
-			return err
-		}
+		roleRef := fmt.Sprintf("%s/%s", obj.RoleRef.Kind, obj.RoleRef.Name)
+		users, groups, sas, _ := rbac.SubjectsStrings(obj.Subjects)
+		row.Cells = append(row.Cells, roleRef, strings.Join(users, ", "), strings.Join(groups, ", "), strings.Join(sas, ", "))
 	}
-
-	if _, err := fmt.Fprint(w, printers.AppendLabels(meta.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, meta.Labels))
-	return err
+	return []metav1alpha1.TableRow{row}, nil
 }
 
 // Prints the ClusterRoleBinding in a human-friendly format.
-func printClusterRoleBindingList(list *rbac.ClusterRoleBindingList, w io.Writer, options printers.PrintOptions) error {
+func printClusterRoleBindingList(list *rbac.ClusterRoleBindingList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		if err := printClusterRoleBinding(&list.Items[i], w, options); err != nil {
-			return err
+		r, err := printClusterRoleBinding(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printCertificateSigningRequest(csr *certificates.CertificateSigningRequest, w io.Writer, options printers.PrintOptions) error {
@@ -1655,62 +1634,44 @@ func printPodSecurityPolicyList(list *extensions.PodSecurityPolicyList, options 
 	return rows, nil
 }
 
-func printExtensionsNetworkPolicy(networkPolicy *extensions.NetworkPolicy, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, networkPolicy.Name, options.WithKind)
-
-	namespace := networkPolicy.Namespace
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
+func printExtensionsNetworkPolicy(obj *extensions.NetworkPolicy, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%v\t%s", name, metav1.FormatLabelSelector(&networkPolicy.Spec.PodSelector), translateTimestamp(networkPolicy.CreationTimestamp)); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(networkPolicy.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, networkPolicy.Labels))
-	return err
+	row.Cells = append(row.Cells, obj.Name, metav1.FormatLabelSelector(&obj.Spec.PodSelector), translateTimestamp(obj.CreationTimestamp))
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printExtensionsNetworkPolicyList(list *extensions.NetworkPolicyList, w io.Writer, options printers.PrintOptions) error {
+func printExtensionsNetworkPolicyList(list *extensions.NetworkPolicyList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		if err := printExtensionsNetworkPolicy(&list.Items[i], w, options); err != nil {
-			return err
+		r, err := printExtensionsNetworkPolicy(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
-func printNetworkPolicy(networkPolicy *networking.NetworkPolicy, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, networkPolicy.Name, options.WithKind)
-
-	namespace := networkPolicy.Namespace
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
-			return err
-		}
+func printNetworkPolicy(obj *networking.NetworkPolicy, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%v\t%s", name, metav1.FormatLabelSelector(&networkPolicy.Spec.PodSelector), translateTimestamp(networkPolicy.CreationTimestamp)); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, printers.AppendLabels(networkPolicy.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, networkPolicy.Labels))
-	return err
+	row.Cells = append(row.Cells, obj.Name, metav1.FormatLabelSelector(&obj.Spec.PodSelector), translateTimestamp(obj.CreationTimestamp))
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printNetworkPolicyList(list *networking.NetworkPolicyList, w io.Writer, options printers.PrintOptions) error {
+func printNetworkPolicyList(list *networking.NetworkPolicyList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		if err := printNetworkPolicy(&list.Items[i], w, options); err != nil {
-			return err
+		r, err := printNetworkPolicy(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printStorageClass(sc *storage.StorageClass, w io.Writer, options printers.PrintOptions) error {
