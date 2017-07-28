@@ -18,7 +18,6 @@ package openapi
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,14 +25,12 @@ import (
 	"path/filepath"
 
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 
 	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/version"
 )
-
-func init() {
-	registerBinaryEncodingTypes()
-}
 
 const openapiFileName = "openapi_cache"
 
@@ -61,12 +58,12 @@ func NewCachingOpenAPIClient(client discovery.OpenAPISchemaInterface, version, c
 // It will first attempt to read the spec from a local cache
 // If it cannot read a local cache, it will read the file
 // using the client and then write the cache.
-func (c *CachingOpenAPIClient) OpenAPIData() (*Resources, error) {
+func (c *CachingOpenAPIClient) OpenAPIData() (Resources, error) {
 	// Try to use the cached version
 	if c.useCache() {
 		doc, err := c.readOpenAPICache()
 		if err == nil {
-			return doc, nil
+			return NewOpenAPIData(doc)
 		}
 	}
 
@@ -85,7 +82,7 @@ func (c *CachingOpenAPIClient) OpenAPIData() (*Resources, error) {
 
 	// Try to cache the openapi spec
 	if c.useCache() {
-		err = c.writeToCache(oa)
+		err = c.writeToCache(s)
 		if err != nil {
 			// Just log an message, no need to fail the command since we got the data we need
 			glog.V(2).Infof("Unable to cache openapi spec %v", err)
@@ -102,7 +99,7 @@ func (c *CachingOpenAPIClient) useCache() bool {
 }
 
 // readOpenAPICache tries to read the openapi spec from the local file cache
-func (c *CachingOpenAPIClient) readOpenAPICache() (*Resources, error) {
+func (c *CachingOpenAPIClient) readOpenAPICache() (*openapi_v2.Document, error) {
 	// Get the filename to read
 	filename := c.openAPICacheFilename()
 
@@ -112,38 +109,18 @@ func (c *CachingOpenAPIClient) readOpenAPICache() (*Resources, error) {
 		return nil, err
 	}
 
-	// Decode the openapi spec
-	s, err := c.decodeSpec(data)
-
-	return s, err
-}
-
-// decodeSpec binary decodes the openapi spec
-func (c *CachingOpenAPIClient) decodeSpec(data []byte) (*Resources, error) {
-	b := bytes.NewBuffer(data)
-	d := gob.NewDecoder(b)
-	parsed := &Resources{}
-	err := d.Decode(parsed)
-	return parsed, err
-}
-
-// encodeSpec binary encodes the openapi spec
-func (c *CachingOpenAPIClient) encodeSpec(parsed *Resources) ([]byte, error) {
-	b := &bytes.Buffer{}
-	e := gob.NewEncoder(b)
-	err := e.Encode(parsed)
-	return b.Bytes(), err
-
+	doc := &openapi_v2.Document{}
+	return doc, proto.Unmarshal(data, doc)
 }
 
 // writeToCache tries to write the openapi spec to the local file cache.
 // writes the data to a new tempfile, and then links the cache file and the tempfile
-func (c *CachingOpenAPIClient) writeToCache(parsed *Resources) error {
+func (c *CachingOpenAPIClient) writeToCache(doc *openapi_v2.Document) error {
 	// Get the constant filename used to read the cache.
 	cacheFile := c.openAPICacheFilename()
 
 	// Binary encode the spec.  This is 10x as fast as using json encoding.  (60ms vs 600ms)
-	b, err := c.encodeSpec(parsed)
+	b, err := proto.Marshal(doc)
 	if err != nil {
 		return fmt.Errorf("Could not binary encode openapi spec: %v", err)
 	}
@@ -183,10 +160,4 @@ func linkFiles(old, new string) error {
 		return err
 	}
 	return nil
-}
-
-// registerBinaryEncodingTypes registers the types so they can be binary encoded by gob
-func registerBinaryEncodingTypes() {
-	gob.Register(map[interface{}]interface{}{})
-	gob.Register([]interface{}{})
 }
