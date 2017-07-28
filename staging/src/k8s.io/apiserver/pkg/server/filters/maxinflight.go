@@ -18,11 +18,15 @@ package filters
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
@@ -31,6 +35,22 @@ import (
 
 	"github.com/golang/glog"
 )
+
+var maxInFlightChaosChance = float64(0.0)
+
+func init() {
+	chaosString := os.Getenv("APISERVER_CHAOS_MAX_IN_FLIGHT")
+	if len(chaosString) == 0 {
+		return
+	}
+
+	var err error
+	maxInFlightChaosChance, err = strconv.ParseFloat(chaosString, 64)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+}
 
 // Constant for the retry-after interval on rate limiting.
 // TODO: maybe make this dynamic? or user-adjustable?
@@ -91,27 +111,34 @@ func WithMaxInFlightLimit(
 
 		if c == nil {
 			handler.ServeHTTP(w, r)
-		} else {
+			return
+		}
 
-			select {
-			case c <- true:
-				defer func() { <-c }()
-				handler.ServeHTTP(w, r)
+		if maxInFlightChaosChance != 0 && rand.Float64() < maxInFlightChaosChance {
+			// don't record the metric because this isn't a real rejection and don't special-case anyone because
+			// we're seeing what the code does on 429s
+			tooManyRequests(r, w)
+			return
+		}
 
-			default:
-				// at this point we're about to return a 429, BUT not all actors should be rate limited.  A system:master is so powerful
-				// that he should always get an answer.  It's a super-admin or a loopback connection.
-				if currUser, ok := apirequest.UserFrom(ctx); ok {
-					for _, group := range currUser.GetGroups() {
-						if group == user.SystemPrivilegedGroup {
-							handler.ServeHTTP(w, r)
-							return
-						}
+		select {
+		case c <- true:
+			defer func() { <-c }()
+			handler.ServeHTTP(w, r)
+
+		default:
+			// at this point we're about to return a 429, BUT not all actors should be rate limited.  A system:master is so powerful
+			// that he should always get an answer.  It's a super-admin or a loopback connection.
+			if currUser, ok := apirequest.UserFrom(ctx); ok {
+				for _, group := range currUser.GetGroups() {
+					if group == user.SystemPrivilegedGroup {
+						handler.ServeHTTP(w, r)
+						return
 					}
 				}
-				metrics.MonitorRequest(r, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", errors.StatusTooManyRequests, time.Now())
-				tooManyRequests(r, w)
 			}
+			metrics.MonitorRequest(r, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", errors.StatusTooManyRequests, time.Now())
+			tooManyRequests(r, w)
 		}
 	})
 }
