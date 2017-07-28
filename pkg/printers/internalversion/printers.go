@@ -68,7 +68,6 @@ var (
 	clusterRoleBindingWideColumns    = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
 	storageClassColumns              = []string{"NAME", "PROVISIONER"}
 	statusColumns                    = []string{"STATUS", "REASON", "MESSAGE"}
-	podSecurityPolicyColumns         = []string{"NAME", "PRIV", "CAPS", "SELINUX", "RUNASUSER", "FSGROUP", "SUPGROUP", "READONLYROOTFS", "VOLUMES"}
 	clusterColumns                   = []string{"NAME", "STATUS", "AGE"}
 	networkPolicyColumns             = []string{"NAME", "POD-SELECTOR", "AGE"}
 	certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
@@ -350,8 +349,20 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(configMapColumnDefinitions, printConfigMap)
 	h.TableHandler(configMapColumnDefinitions, printConfigMapList)
-	h.Handler(podSecurityPolicyColumns, nil, printPodSecurityPolicy)
-	h.Handler(podSecurityPolicyColumns, nil, printPodSecurityPolicyList)
+
+	podSecurityPolicyColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Data", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["privileged"]},
+		{Name: "Caps", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["allowedCapabilities"]},
+		{Name: "Selinux", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["seLinux"]},
+		{Name: "RunAsUser", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["runAsUser"]},
+		{Name: "FsGroup", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["fsGroup"]},
+		{Name: "SupGroup", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["supplementalGroups"]},
+		{Name: "ReadOnlyRootFs", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["readOnlyRootFilesystem"]},
+		{Name: "Volumes", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["volumes"]},
+	}
+	h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicy)
+	h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicyList)
 	h.Handler(clusterColumns, nil, printCluster)
 	h.Handler(clusterColumns, nil, printClusterList)
 	h.Handler(networkPolicyColumns, nil, printExtensionsNetworkPolicy)
@@ -1617,23 +1628,26 @@ func printConfigMapList(list *api.ConfigMapList, options printers.PrintOptions) 
 	return rows, nil
 }
 
-func printPodSecurityPolicy(item *extensions.PodSecurityPolicy, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, item.Name, options.WithKind)
-
-	_, err := fmt.Fprintf(w, "%s\t%t\t%v\t%s\t%s\t%s\t%s\t%t\t%v\n", name, item.Spec.Privileged,
-		item.Spec.AllowedCapabilities, item.Spec.SELinux.Rule,
-		item.Spec.RunAsUser.Rule, item.Spec.FSGroup.Rule, item.Spec.SupplementalGroups.Rule, item.Spec.ReadOnlyRootFilesystem, item.Spec.Volumes)
-	return err
+func printPodSecurityPolicy(obj *extensions.PodSecurityPolicy, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Privileged,
+		obj.Spec.AllowedCapabilities, obj.Spec.SELinux.Rule,
+		obj.Spec.RunAsUser.Rule, obj.Spec.FSGroup.Rule, obj.Spec.SupplementalGroups.Rule, obj.Spec.ReadOnlyRootFilesystem, obj.Spec.Volumes)
+	return []metav1alpha1.TableRow{row}, nil
 }
 
-func printPodSecurityPolicyList(list *extensions.PodSecurityPolicyList, w io.Writer, options printers.PrintOptions) error {
-	for _, item := range list.Items {
-		if err := printPodSecurityPolicy(&item, w, options); err != nil {
-			return err
+func printPodSecurityPolicyList(list *extensions.PodSecurityPolicyList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printPodSecurityPolicy(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-
-	return nil
+	return rows, nil
 }
 
 func printExtensionsNetworkPolicy(networkPolicy *extensions.NetworkPolicy, w io.Writer, options printers.PrintOptions) error {
