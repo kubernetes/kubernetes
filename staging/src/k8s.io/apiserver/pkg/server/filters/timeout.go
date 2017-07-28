@@ -60,7 +60,11 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMa
 		}
 		now := time.Now()
 		metricFn := func() {
-			metrics.MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", http.StatusInternalServerError, now)
+			scope := "cluster"
+			if requestInfo.Namespace != "" {
+				scope = "namespace"
+			}
+			metrics.MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", scope, http.StatusInternalServerError, 0, now)
 		}
 		return time.After(globalTimeout), metricFn, apierrors.NewServerTimeout(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb, 0)
 	}

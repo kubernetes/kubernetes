@@ -109,7 +109,11 @@ func WithMaxInFlightLimit(
 						}
 					}
 				}
-				metrics.MonitorRequest(r, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", errors.StatusTooManyRequests, time.Now())
+				scope := "cluster"
+				if requestInfo.Namespace != "" {
+					scope = "namespace"
+				}
+				metrics.MonitorRequest(r, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", scope, errors.StatusTooManyRequests, 0, time.Now())
 				tooManyRequests(r, w)
 			}
 		}
