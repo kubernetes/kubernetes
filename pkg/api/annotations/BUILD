@@ -12,11 +12,6 @@ go_library(
     srcs = [
         "annotations.go",
         "doc.go",
-        "json.go",
-        "range.go",
-        "semver.go",
-        "sort.go",
-        "sql.go",
     ],
     tags = ["automanaged"],
 )
