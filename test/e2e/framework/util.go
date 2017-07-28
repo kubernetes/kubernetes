@@ -607,7 +607,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 			replicaOk += rc.Status.ReadyReplicas
 		}
 
-		rsList, err := c.Extensions().ReplicaSets(ns).List(metav1.ListOptions{})
+		rsList, err := c.ExtensionsV1beta1().ReplicaSets(ns).List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error getting replication sets in namespace %q: %v", ns, err)
 			if IsRetryableAPIError(err) {
@@ -2812,13 +2812,13 @@ func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, n
 	case api.Kind("ReplicationController"):
 		return c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
-		return c.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+		return c.ExtensionsV1beta1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
-		return c.Extensions().Deployments(ns).Get(name, metav1.GetOptions{})
+		return c.ExtensionsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("DaemonSet"):
-		return c.Extensions().DaemonSets(ns).Get(name, metav1.GetOptions{})
+		return c.ExtensionsV1beta1().DaemonSets(ns).Get(name, metav1.GetOptions{})
 	case batchinternal.Kind("Job"):
-		return c.Batch().Jobs(ns).Get(name, metav1.GetOptions{})
+		return c.BatchV1().Jobs(ns).Get(name, metav1.GetOptions{})
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting runtime object: %v", kind)
 	}
@@ -2829,13 +2829,13 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, ns, name strin
 	case api.Kind("ReplicationController"):
 		return c.CoreV1().ReplicationControllers(ns).Delete(name, deleteOption)
 	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
-		return c.Extensions().ReplicaSets(ns).Delete(name, deleteOption)
+		return c.ExtensionsV1beta1().ReplicaSets(ns).Delete(name, deleteOption)
 	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
-		return c.Extensions().Deployments(ns).Delete(name, deleteOption)
+		return c.ExtensionsV1beta1().Deployments(ns).Delete(name, deleteOption)
 	case extensionsinternal.Kind("DaemonSet"):
-		return c.Extensions().DaemonSets(ns).Delete(name, deleteOption)
+		return c.ExtensionsV1beta1().DaemonSets(ns).Delete(name, deleteOption)
 	case batchinternal.Kind("Job"):
-		return c.Batch().Jobs(ns).Delete(name, deleteOption)
+		return c.BatchV1().Jobs(ns).Delete(name, deleteOption)
 	default:
 		return fmt.Errorf("Unsupported kind when deleting: %v", kind)
 	}
@@ -4112,7 +4112,7 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 
 // getIngressAddress returns the ips/hostnames associated with the Ingress.
 func getIngressAddress(client clientset.Interface, ns, name string) ([]string, error) {
-	ing, err := client.Extensions().Ingresses(ns).Get(name, metav1.GetOptions{})
+	ing, err := client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

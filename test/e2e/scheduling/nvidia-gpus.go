@@ -177,7 +177,7 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 		ds, err := framework.DsFromManifest(dsYamlUrl)
 		Expect(err).NotTo(HaveOccurred())
 		ds.Namespace = f.Namespace.Name
-		_, err = f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Create(ds)
+		_, err = f.ClientSet.ExtensionsV1beta1().DaemonSets(f.Namespace.Name).Create(ds)
 		framework.ExpectNoError(err, "failed to create daemonset")
 		framework.Logf("Successfully created daemonset to install Nvidia drivers. Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
 		// Wait for Nvidia GPUs to be available on nodes

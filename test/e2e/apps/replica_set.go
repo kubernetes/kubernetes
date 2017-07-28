@@ -111,7 +111,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	framework.Logf("Creating ReplicaSet %s", name)
 	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image)
 	newRS.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
-	_, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(newRS)
+	_, err := f.ClientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).Create(newRS)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Check that pods for the new RS were created.
@@ -187,14 +187,14 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 
 	By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", name))
 	rs := newRS(name, 3, map[string]string{"name": name}, NginxImageName, NginxImage)
-	rs, err = c.Extensions().ReplicaSets(namespace).Create(rs)
+	rs, err = c.ExtensionsV1beta1().ReplicaSets(namespace).Create(rs)
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Checking replica set %q has the desired failure condition set", name))
 	generation := rs.Generation
 	conditions := rs.Status.Conditions
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err = c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{})
+		rs, err = c.ExtensionsV1beta1().ReplicaSets(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -224,7 +224,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 	generation = rs.Generation
 	conditions = rs.Status.Conditions
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err = c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{})
+		rs, err = c.ExtensionsV1beta1().ReplicaSets(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -267,7 +267,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 	replicas := int32(1)
 	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, NginxImageName)
 	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
-	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(rsSt)
+	rs, err := f.ClientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).Create(rsSt)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Then the orphan pod is adopted")

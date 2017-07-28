@@ -315,7 +315,7 @@ func (config *DeploymentConfig) create() error {
 
 	config.applyTo(&deployment.Spec.Template)
 
-	_, err := config.Client.Extensions().Deployments(config.Namespace).Create(deployment)
+	_, err := config.Client.ExtensionsV1beta1().Deployments(config.Namespace).Create(deployment)
 	if err != nil {
 		return fmt.Errorf("Error creating deployment: %v", err)
 	}
@@ -382,7 +382,7 @@ func (config *ReplicaSetConfig) create() error {
 
 	config.applyTo(&rs.Spec.Template)
 
-	_, err := config.Client.Extensions().ReplicaSets(config.Namespace).Create(rs)
+	_, err := config.Client.ExtensionsV1beta1().ReplicaSets(config.Namespace).Create(rs)
 	if err != nil {
 		return fmt.Errorf("Error creating replica set: %v", err)
 	}
@@ -445,7 +445,7 @@ func (config *JobConfig) create() error {
 
 	config.applyTo(&job.Spec.Template)
 
-	_, err := config.Client.Batch().Jobs(config.Namespace).Create(job)
+	_, err := config.Client.BatchV1().Jobs(config.Namespace).Create(job)
 	if err != nil {
 		return fmt.Errorf("Error creating job: %v", err)
 	}
@@ -1232,7 +1232,7 @@ func (config *DaemonConfig) Run() error {
 		},
 	}
 
-	_, err := config.Client.Extensions().DaemonSets(config.Namespace).Create(daemon)
+	_, err := config.Client.ExtensionsV1beta1().DaemonSets(config.Namespace).Create(daemon)
 	if err != nil {
 		return fmt.Errorf("Error creating DaemonSet %v: %v", config.Name, err)
 	}

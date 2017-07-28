@@ -113,7 +113,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 	for _, rcLabel := range rcLabels {
 		selector := labels.Set{"k8s-app": rcLabel}.AsSelector()
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		deploymentList, err := c.Extensions().Deployments(metav1.NamespaceSystem).List(options)
+		deploymentList, err := c.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
 		}

@@ -153,7 +153,7 @@ func (a *GenericAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 
 // WantsExternalKubeClientSet defines a function which sets external ClientSet for admission plugins that need it
 func (a *GenericAdmissionWebhook) SetExternalKubeClientSet(client clientset.Interface) {
-	a.hookSource = configuration.NewExternalAdmissionHookConfigurationManager(client.Admissionregistration().ExternalAdmissionHookConfigurations())
+	a.hookSource = configuration.NewExternalAdmissionHookConfigurationManager(client.AdmissionregistrationV1alpha1().ExternalAdmissionHookConfigurations())
 }
 
 // ValidateInitialization implements the InitializationValidator interface.

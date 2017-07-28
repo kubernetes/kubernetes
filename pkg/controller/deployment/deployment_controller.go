@@ -587,7 +587,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
 		if d.Status.ObservedGeneration < d.Generation {
 			d.Status.ObservedGeneration = d.Generation
-			dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d)
+			dc.client.ExtensionsV1beta1().Deployments(d.Namespace).UpdateStatus(d)
 		}
 		return nil
 	}
