@@ -68,6 +68,10 @@ type VolumeOptions struct {
 	Parameters map[string]string
 }
 
+type DynamicPluginProber interface {
+	Probe() []VolumePlugin
+}
+
 // VolumePlugin is an interface to volume plugins that can be used on a
 // kubernetes node (e.g. by kubelet) to instantiate and manage volumes.
 type VolumePlugin interface {
@@ -252,6 +256,7 @@ type VolumeHost interface {
 type VolumePluginMgr struct {
 	mutex   sync.Mutex
 	plugins map[string]VolumePlugin
+	prober  DynamicPluginProber
 	Host    VolumeHost
 }
 
@@ -347,11 +352,18 @@ func NewSpecFromPersistentVolume(pv *v1.PersistentVolume, readOnly bool) *Spec {
 // InitPlugins initializes each plugin.  All plugins must have unique names.
 // This must be called exactly once before any New* methods are called on any
 // plugins.
-func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) error {
+func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPluginProber, host VolumeHost) error {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
 	pm.Host = host
+
+	if prober == nil {
+		pm.prober = &dummyPluginProber{}
+	} else {
+		pm.prober = prober
+	}
+
 	if pm.plugins == nil {
 		pm.plugins = map[string]VolumePlugin{}
 	}
@@ -607,5 +619,11 @@ func ValidateRecyclerPodTemplate(pod *v1.Pod) error {
 	if len(pod.Spec.Volumes) < 1 {
 		return fmt.Errorf("does not contain any volume(s)")
 	}
+	return nil
+}
+
+type dummyPluginProber struct{}
+
+func (*dummyPluginProber) Probe() []VolumePlugin {
 	return nil
 }
