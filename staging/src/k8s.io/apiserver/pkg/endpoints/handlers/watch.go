@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/wsstream"
 
@@ -62,7 +63,9 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatch handles serving requests to the server
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, w http.ResponseWriter, timeout time.Duration) {
+func serveWatch(watcher watch.Interface, e rest.Exporter, scope RequestScope, req *http.Request, w http.ResponseWriter,
+	timeout time.Duration, exportOptions metav1.ExportOptions) {
+
 	// negotiate for the stream serializer
 	serializer, err := negotiation.NegotiateOutputStreamSerializer(req, scope.Serializer)
 	if err != nil {
@@ -97,8 +100,10 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 	}
 
 	server := &WatchServer{
-		Watching: watcher,
-		Scope:    scope,
+		Watching:      watcher,
+		Exporter:      e,
+		ExportOptions: exportOptions,
+		Scope:         scope,
 
 		UseTextFraming:  useTextFraming,
 		MediaType:       mediaType,
@@ -119,8 +124,10 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
 type WatchServer struct {
-	Watching watch.Interface
-	Scope    RequestScope
+	Watching      watch.Interface
+	Exporter      rest.Exporter
+	ExportOptions metav1.ExportOptions
+	Scope         RequestScope
 
 	// true if websocket messages should use text framing (as opposed to binary framing)
 	UseTextFraming bool
@@ -173,6 +180,9 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	e := streaming.NewEncoder(framer, s.Encoder)
 
+	ctx := s.Scope.ContextFunc(req)
+	// TODO: ? ctx = request.WithNamespace(ctx, namespace)
+
 	// ensure the connection times out
 	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
 	defer cleanup()
@@ -202,6 +212,14 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			obj := event.Object
 			s.Fixup(obj)
+			if s.ExportOptions.Export && s.Exporter != nil {
+				var err error
+				obj, err = s.Exporter.Export(ctx, event.Object, s.ExportOptions)
+				if err != nil {
+					utilruntime.HandleError(fmt.Errorf("unable to export watch object: %v (%#v)", err, event.Object))
+				}
+			}
+
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
@@ -269,6 +287,15 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			}
 			obj := event.Object
 			s.Fixup(obj)
+			if s.ExportOptions.Export && s.Exporter != nil {
+				var err error
+				// TODO: Passing nil for context here as there is no request from which to create one:
+				// ctx *may* be completely unused in all exporters?
+				obj, err = s.Exporter.Export(nil, event.Object, s.ExportOptions)
+				if err != nil {
+					utilruntime.HandleError(fmt.Errorf("unable to export watch object: %v (%#v)", err, event.Object))
+				}
+			}
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))

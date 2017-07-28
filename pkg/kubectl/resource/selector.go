@@ -26,6 +26,8 @@ import (
 )
 
 // Selector is a Visitor for resources that match a label selector.
+// TODO: Export here is represented as a flat bool, which means we're likely ignoring "exact". To better future proof
+// we should switch all of this infra to use ExportOptions.
 type Selector struct {
 	Client               RESTClient
 	Mapping              *meta.RESTMapping
@@ -83,7 +85,7 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 }
 
 func (r *Selector) Watch(resourceVersion string) (watch.Interface, error) {
-	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, resourceVersion, r.ResourceMapping().GroupVersionKind.GroupVersion().String(), r.Selector)
+	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, resourceVersion, r.ResourceMapping().GroupVersionKind.GroupVersion().String(), r.Selector, r.Export)
 }
 
 // ResourceMapping returns the mapping for this resource and implements ResourceMapping

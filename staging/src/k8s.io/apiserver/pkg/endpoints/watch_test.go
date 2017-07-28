@@ -626,6 +626,67 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	}
 }
 
+func TestWatchExport(t *testing.T) {
+	watcher := watch.NewFake()
+	timeoutCh := make(chan time.Time)
+	done := make(chan struct{})
+
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	if !ok || info.StreamSerializer == nil {
+		t.Fatal(info)
+	}
+	serializer := info.StreamSerializer
+
+	// Setup a new watchserver
+	watchServer := &handlers.WatchServer{
+		Watching: watcher,
+
+		MediaType:       "testcase/json",
+		Framer:          serializer.Framer,
+		Encoder:         newCodec,
+		EmbeddedEncoder: newCodec,
+
+		Fixup:          func(obj runtime.Object) {},
+		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+	}
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		watchServer.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	// Setup a client
+	dest, _ := url.Parse(s.URL)
+	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple?export=true"
+	dest.RawQuery = "watch=true"
+
+	req, _ := http.NewRequest("GET", dest.String(), nil)
+	client := http.Client{}
+	resp, err := client.Do(req)
+	watcher.Add(&apitesting.Simple{TypeMeta: metav1.TypeMeta{APIVersion: newGroupVersion.String()}})
+
+	// Make sure we can actually watch an endpoint
+	decoder := json.NewDecoder(resp.Body)
+	var got metav1.WatchEvent
+	err = decoder.Decode(&got)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	objectCodec := codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
+
+	var itemOut apitesting.Simple
+	err = runtime.DecodeInto(objectCodec, got.Object.Raw, &itemOut)
+	if err != nil {
+		t.Fatalf("Decode error: %v", err)
+	}
+	if itemOut.Other != "exported" {
+		t.Errorf("Expected: exported, saw: %s", itemOut.Other)
+	}
+	// Close the timeout channel to shut down the WatchServer:
+	close(timeoutCh)
+
+}
 // BenchmarkWatchHTTP measures the cost of serving a watch.
 func BenchmarkWatchHTTP(b *testing.B) {
 	items := benchmarkItems(b)

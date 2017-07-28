@@ -1193,10 +1193,8 @@ func (e *Store) Export(ctx genericapirequest.Context, obj runtime.Object, opts m
 	} else {
 		glog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
 	}
-	glog.V(1).Infof("#### Exporting: %v", reflect.TypeOf(obj))
 
 	if e.ExportStrategy != nil {
-		glog.V(1).Infof("#### Export strategy is not nil")
 		if err := e.ExportStrategy.Export(ctx, obj, opts.Exact); err != nil {
 			return nil, err
 		}
