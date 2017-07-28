@@ -1,5 +1,6 @@
 approvers:
 - jsafrane
+- anguslees
 reviewers:
 - anguslees
 - justinsb
@@ -11,7 +12,6 @@ reviewers:
 - derekwaynecarr
 - pmorie
 - saad-ali
-- justinsb
 - jsafrane
 - rootfs
 - jingxu97

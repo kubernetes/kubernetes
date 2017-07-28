@@ -274,7 +274,7 @@ function dump_nodes_with_logexporter() {
   local -r service_account_credentials="$(cat ${GOOGLE_APPLICATION_CREDENTIALS} | base64 | tr -d '\n')"
   local -r cloud_provider="${KUBERNETES_PROVIDER}"
   local -r enable_hollow_node_logs="${ENABLE_HOLLOW_NODE_LOGS:-false}"
-  local -r logexport_timeout_seconds="$(( 30 + NUM_NODES / 10 ))"
+  local -r logexport_sleep_seconds="$(( 90 + NUM_NODES / 10 ))"
 
   # Fill in the parameters in the logexporter daemonset template.
   sed -i'' -e "s@{{.ServiceAccountCredentials}}@${service_account_credentials}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
