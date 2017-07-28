@@ -17,9 +17,29 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+)
+
+const (
+	FederationClusterNameLabel = "federation.beta.kubernetes.io/cluster-name"
+)
+
+var (
+	FederationControlPlaneLabels = labels.Set{
+		FederationClusterNameLabel: "",
+	}
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
+}
+
+func SetDefaults_Cluster(obj *Cluster) {
+	if obj.Labels == nil {
+		obj.Labels = map[string]string{}
+	}
+	if _, ok := obj.Labels[FederationClusterNameLabel]; !ok {
+		obj.Labels[FederationClusterNameLabel] = obj.Name
+	}
 }

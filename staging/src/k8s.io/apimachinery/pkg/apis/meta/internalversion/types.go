@@ -48,6 +48,9 @@ type ListOptions struct {
 	ResourceVersion string
 	// Timeout for the list/watch call.
 	TimeoutSeconds *int64
+
+	// Used in federation, selects clusters to list the objects in
+	ClusterSelector labels.Selector
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	kubeadmfuzzer "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/fuzzer"
+	federationfuzzer "k8s.io/kubernetes/federation/apis/federation/fuzzer"
 	"k8s.io/kubernetes/pkg/api"
 	corefuzzer "k8s.io/kubernetes/pkg/api/fuzzer"
 	admissionregistrationfuzzer "k8s.io/kubernetes/pkg/apis/admissionregistration/fuzzer"
@@ -104,4 +105,5 @@ var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
 	admissionregistrationfuzzer.Funcs,
 	storagefuzzer.Funcs,
 	networkingfuzzer.Funcs,
+	federationfuzzer.Funcs,
 )

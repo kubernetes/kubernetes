@@ -335,6 +335,11 @@ type ListOptions struct {
 	// Timeout for the list/watch call.
 	// +optional
 	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" protobuf:"varint,5,opt,name=timeoutSeconds"`
+
+	// Used in federation only, selects clusters to list the objects in
+	// Defaults to federation control plane.
+	// +optional
+	ClusterSelector string `json:"clusterSelector,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -361,6 +366,11 @@ type GetOptions struct {
 	// If true, partially initialized resources are included in the response.
 	// +optional
 	IncludeUninitialized bool `json:"includeUninitialized,omitempty" protobuf:"varint,2,opt,name=includeUninitialized"`
+
+	// Used in federation only, selects name of the cluster to get the object
+	// Defaults to federation control plane.
+	// +optional
+	ClusterName string `json:"clusterName,omitempty"`
 }
 
 // DeletionPropagation decides if a deletion will propagate to the dependents of
