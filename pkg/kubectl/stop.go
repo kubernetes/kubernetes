@@ -323,14 +323,16 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	if err != nil {
 		return err
 	}
+
 	if timeout == 0 {
 		numReplicas := ss.Spec.Replicas
-
-		// BUG: this timeout is never used.
+		// See discussion of this behavior here:
+		// https://github.com/kubernetes/kubernetes/pull/46468#discussion_r118589512
 		timeout = Timeout + time.Duration(10*numReplicas)*time.Second
 	}
+
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
-	waitForStatefulSet := NewRetryParams(reaper.pollInterval, reaper.timeout)
+	waitForStatefulSet := NewRetryParams(reaper.pollInterval, timeout)
 	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForStatefulSet); err != nil {
 		return err
 	}
