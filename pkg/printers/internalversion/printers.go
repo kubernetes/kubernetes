@@ -68,7 +68,6 @@ var (
 	clusterRoleBindingWideColumns    = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
 	storageClassColumns              = []string{"NAME", "PROVISIONER"}
 	statusColumns                    = []string{"STATUS", "REASON", "MESSAGE"}
-	clusterColumns                   = []string{"NAME", "STATUS", "AGE"}
 	networkPolicyColumns             = []string{"NAME", "POD-SELECTOR", "AGE"}
 	certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
 	podPresetColumns                 = []string{"NAME", "AGE"}
@@ -363,8 +362,15 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicy)
 	h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicyList)
-	h.Handler(clusterColumns, nil, printCluster)
-	h.Handler(clusterColumns, nil, printClusterList)
+	
+	clusterColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Status", Description: "Status of the cluster"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(clusterColumnDefinitions, printCluster)
+	h.TableHandler(clusterColumnDefinitions, printClusterList)
+
 	h.Handler(networkPolicyColumns, nil, printExtensionsNetworkPolicy)
 	h.Handler(networkPolicyColumns, nil, printExtensionsNetworkPolicyList)
 	h.Handler(networkPolicyColumns, nil, printNetworkPolicy)
@@ -694,11 +700,13 @@ func printReplicaSetList(list *extensions.ReplicaSetList, options printers.Print
 	return rows, nil
 }
 
-func printCluster(c *federation.Cluster, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, c.Name, options.WithKind)
+func printCluster(obj *federation.Cluster, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
 
 	var statuses []string
-	for _, condition := range c.Status.Conditions {
+	for _, condition := range obj.Status.Conditions {
 		if condition.Status == api.ConditionTrue {
 			statuses = append(statuses, string(condition.Type))
 		} else {
@@ -708,23 +716,20 @@ func printCluster(c *federation.Cluster, w io.Writer, options printers.PrintOpti
 	if len(statuses) == 0 {
 		statuses = append(statuses, "Unknown")
 	}
-
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n",
-		name,
-		strings.Join(statuses, ","),
-		translateTimestamp(c.CreationTimestamp),
-	); err != nil {
-		return err
-	}
-	return nil
+	row.Cells = append(row.Cells, obj.Name, strings.Join(statuses, ","), translateTimestamp(obj.CreationTimestamp))
+	return []metav1alpha1.TableRow{row}, nil
 }
-func printClusterList(list *federation.ClusterList, w io.Writer, options printers.PrintOptions) error {
-	for _, rs := range list.Items {
-		if err := printCluster(&rs, w, options); err != nil {
-			return err
+
+func printClusterList(list *federation.ClusterList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printCluster(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func printJob(obj *batch.Job, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
