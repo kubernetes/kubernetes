@@ -14,6 +14,7 @@ go_test(
     srcs = [
         "extender_test.go",
         "main_test.go",
+        "predicates_test.go",
         "priorities_test.go",
         "scheduler_test.go",
     ],
@@ -37,6 +38,7 @@ go_test(
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
