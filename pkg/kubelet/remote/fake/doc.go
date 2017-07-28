@@ -1,5 +1,3 @@
-// +build !freebsd,!linux,!windows,!darwin
-
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -16,18 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
-
-import (
-	"fmt"
-	"net"
-	"time"
-)
-
-func CreateListener(endpoint string) (net.Listener, error) {
-	return nil, fmt.Errorf("CreateListener is unsupported in this build")
-}
-
-func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
-	return "", nil, fmt.Errorf("GetAddressAndDialer is unsupported in this build")
-}
+// Package fake containers a fake gRPC implementation of internalapi.RuntimeService
+// and internalapi.ImageManagerService.
+package fake

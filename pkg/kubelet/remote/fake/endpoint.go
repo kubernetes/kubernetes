@@ -1,4 +1,4 @@
-// +build !freebsd,!linux,!windows,!darwin
+// +build !windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -16,18 +16,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package fake
 
-import (
-	"fmt"
-	"net"
-	"time"
+const (
+	defaultUnixEndpoint = "unix:///tmp/kubelet_remote.sock"
 )
 
-func CreateListener(endpoint string) (net.Listener, error) {
-	return nil, fmt.Errorf("CreateListener is unsupported in this build")
-}
-
-func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
-	return "", nil, fmt.Errorf("GetAddressAndDialer is unsupported in this build")
+// GenerateEndpoint generates a new unix socket server of grpc server.
+func GenerateEndpoint() (string, error) {
+	return defaultUnixEndpoint, nil
 }
