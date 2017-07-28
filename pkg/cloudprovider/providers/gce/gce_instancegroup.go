@@ -31,20 +31,14 @@ func newInstanceGroupMetricContext(request string, zone string) *metricContext {
 
 // CreateInstanceGroup creates an instance group with the given
 // instances. It is the callers responsibility to add named ports.
-func (gce *GCECloud) CreateInstanceGroup(name string, zone string) (*compute.InstanceGroup, error) {
+func (gce *GCECloud) CreateInstanceGroup(ig *compute.InstanceGroup, zone string) error {
 	mc := newInstanceGroupMetricContext("create", zone)
-	op, err := gce.service.InstanceGroups.Insert(
-		gce.projectID, zone, &compute.InstanceGroup{Name: name}).Do()
+	op, err := gce.service.InstanceGroups.Insert(gce.projectID, zone, ig).Do()
 	if err != nil {
-		mc.Observe(err)
-		return nil, err
+		return mc.Observe(err)
 	}
 
-	if err = gce.waitForZoneOp(op, zone, mc); err != nil {
-		return nil, err
-	}
-
-	return gce.GetInstanceGroup(name, zone)
+	return gce.waitForZoneOp(op, zone, mc)
 }
 
 // DeleteInstanceGroup deletes an instance group.

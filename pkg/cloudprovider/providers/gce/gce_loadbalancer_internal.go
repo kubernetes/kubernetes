@@ -376,7 +376,12 @@ func (gce *GCECloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.
 	gceNodes := sets.NewString()
 	if ig == nil {
 		glog.V(2).Infof("ensureInternalInstanceGroup(%v, %v): creating instance group", name, zone)
-		ig, err = gce.CreateInstanceGroup(name, zone)
+		newIG := &compute.InstanceGroup{Name: name}
+		if err = gce.CreateInstanceGroup(newIG, zone); err != nil {
+			return "", err
+		}
+
+		ig, err = gce.GetInstanceGroup(name, zone)
 		if err != nil {
 			return "", err
 		}

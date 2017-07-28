@@ -37,34 +37,24 @@ func (gce *GCECloud) GetUrlMap(name string) (*compute.UrlMap, error) {
 	return v, mc.Observe(err)
 }
 
-// CreateUrlMap creates an url map, using the given backend service as the default service.
-func (gce *GCECloud) CreateUrlMap(backend *compute.BackendService, name string) (*compute.UrlMap, error) {
-	urlMap := &compute.UrlMap{
-		Name:           name,
-		DefaultService: backend.SelfLink,
-	}
+// CreateUrlMap creates a url map
+func (gce *GCECloud) CreateUrlMap(urlMap *compute.UrlMap) error {
 	mc := newUrlMapMetricContext("create")
 	op, err := gce.service.UrlMaps.Insert(gce.projectID, urlMap).Do()
 	if err != nil {
-		return nil, mc.Observe(err)
+		return mc.Observe(err)
 	}
-	if err = gce.waitForGlobalOp(op, mc); err != nil {
-		return nil, err
-	}
-	return gce.GetUrlMap(name)
+	return gce.waitForGlobalOp(op, mc)
 }
 
-// UpdateUrlMap applies the given UrlMap as an update, and returns the new UrlMap.
-func (gce *GCECloud) UpdateUrlMap(urlMap *compute.UrlMap) (*compute.UrlMap, error) {
+// UpdateUrlMap applies the given UrlMap as an update
+func (gce *GCECloud) UpdateUrlMap(urlMap *compute.UrlMap) error {
 	mc := newUrlMapMetricContext("update")
 	op, err := gce.service.UrlMaps.Update(gce.projectID, urlMap.Name, urlMap).Do()
 	if err != nil {
-		return nil, mc.Observe(err)
+		return mc.Observe(err)
 	}
-	if err = gce.waitForGlobalOp(op, mc); err != nil {
-		return nil, err
-	}
-	return gce.service.UrlMaps.Get(gce.projectID, urlMap.Name).Do()
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // DeleteUrlMap deletes a url map by name.
