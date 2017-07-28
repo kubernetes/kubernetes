@@ -14,6 +14,7 @@ go_library(
         "doc.go",
         "gce.go",
         "gce_addresses.go",
+        "gce_addresses_fakes.go",
         "gce_annotations.go",
         "gce_backendservice.go",
         "gce_cert.go",
@@ -25,6 +26,7 @@ go_library(
         "gce_healthchecks.go",
         "gce_instancegroup.go",
         "gce_instances.go",
+        "gce_interfaces.go",
         "gce_loadbalancer.go",
         "gce_loadbalancer_external.go",
         "gce_loadbalancer_internal.go",
@@ -81,6 +83,7 @@ go_test(
     srcs = [
         "gce_disks_test.go",
         "gce_healthchecks_test.go",
+        "gce_loadbalancer_external_test.go",
         "gce_test.go",
     ],
     library = ":go_default_library",
