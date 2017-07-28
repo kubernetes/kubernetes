@@ -462,13 +462,20 @@ func IsUnexpectedObjectError(err error) bool {
 }
 
 // SuggestsClientDelay returns true if this error suggests a client delay as well as the
-// suggested seconds to wait, or false if the error does not imply a wait.
+// suggested seconds to wait, or false if the error does not imply a wait. It does not
+// address whether the error *should* be retried, since some errors (like a 3xx) may
+// request delay without retry.
 func SuggestsClientDelay(err error) (int, bool) {
 	switch t := err.(type) {
 	case APIStatus:
 		if t.Status().Details != nil {
 			switch t.Status().Reason {
-			case metav1.StatusReasonServerTimeout, metav1.StatusReasonTimeout:
+			// this StatusReason explicitly requests the caller to delay the action
+			case metav1.StatusReasonServerTimeout:
+				return int(t.Status().Details.RetryAfterSeconds), true
+			}
+			// If the client requests that we retry after a certain number of seconds
+			if t.Status().Details.RetryAfterSeconds > 0 {
 				return int(t.Status().Details.RetryAfterSeconds), true
 			}
 		}

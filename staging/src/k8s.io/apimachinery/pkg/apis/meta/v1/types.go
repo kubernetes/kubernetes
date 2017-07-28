@@ -481,7 +481,9 @@ type StatusDetails struct {
 	// failure. Not all StatusReasons may provide detailed causes.
 	// +optional
 	Causes []StatusCause `json:"causes,omitempty" protobuf:"bytes,4,rep,name=causes"`
-	// If specified, the time in seconds before the operation should be retried.
+	// If specified, the time in seconds before the operation should be retried. Some errors may indicate
+	// the client must take an alternate action - for those errors this field may indicate how long to wait
+	// before taking the alternate action.
 	// +optional
 	RetryAfterSeconds int32 `json:"retryAfterSeconds,omitempty" protobuf:"varint,5,opt,name=retryAfterSeconds"`
 }
