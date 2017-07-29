@@ -127,6 +127,7 @@ type SharedInformerFactory interface {
 	Autoscaling() autoscaling.Interface
 	Batch() batch.Interface
 	Certificates() certificates.Interface
+	CoreV1() corev1.Interface
 	Core() core.Interface
 	Extensions() extensions.Interface
 	Networking() networking.Interface
@@ -155,6 +156,10 @@ func (f *sharedInformerFactory) Batch() batch.Interface {
 
 func (f *sharedInformerFactory) Certificates() certificates.Interface {
 	return certificates.New(f)
+}
+
+func (f *sharedInformerFactory) CoreV1() corev1.Interface {
+	return corev1.New(f)
 }
 
 func (f *sharedInformerFactory) Core() core.Interface {

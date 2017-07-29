@@ -93,6 +93,11 @@ func (c *Clientset) Admissionregistration() admissionregistrationinternalversion
 	return &fakeadmissionregistrationinternalversion.FakeAdmissionregistration{Fake: &c.Fake}
 }
 
+// CoreV1 retrieves the CoreV1Client
+func (c *Clientset) CoreV1() corev1internalversion.CoreV1Interface {
+	return &fakecorev1internalversion.FakeCoreV1{Fake: &c.Fake}
+}
+
 // Core retrieves the CoreClient
 func (c *Clientset) Core() coreinternalversion.CoreInterface {
 	return &fakecoreinternalversion.FakeCore{Fake: &c.Fake}

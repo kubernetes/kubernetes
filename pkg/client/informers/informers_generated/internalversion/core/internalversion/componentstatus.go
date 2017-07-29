@@ -48,10 +48,10 @@ func NewComponentStatusInformer(client internalclientset.Interface, resyncPeriod
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().ComponentStatuses().List(options)
+				return client.CoreV1().ComponentStatuses().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().ComponentStatuses().Watch(options)
+				return client.CoreV1().ComponentStatuses().Watch(options)
 			},
 		},
 		&api.ComponentStatus{},

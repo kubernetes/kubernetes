@@ -202,13 +202,13 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
+						return targetClient.CoreV1().ConfigMaps(uidConfigMapNamespace).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
 					},
 					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(options) // as above
+						return targetClient.CoreV1().ConfigMaps(uidConfigMapNamespace).Watch(options) // as above
 					},
 				},
 				&v1.ConfigMap{},
@@ -267,14 +267,14 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			configMap := obj.(*v1.ConfigMap)
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Internal error: Incorrectly attempting to create ConfigMap: %q", configMapName)
-			_, err := client.Core().ConfigMaps(configMap.Namespace).Create(configMap)
+			_, err := client.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			configMap := obj.(*v1.ConfigMap)
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.V(4).Infof("Attempting to update ConfigMap: %v", configMap)
-			_, err := client.Core().ConfigMaps(configMap.Namespace).Update(configMap)
+			_, err := client.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
 			if err == nil {
 				glog.V(4).Infof("Successfully updated ConfigMap %q %v", configMapName, configMap)
 			} else {
@@ -286,7 +286,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			configMap := obj.(*v1.ConfigMap)
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Internal error: Incorrectly attempting to delete ConfigMap: %q", configMapName)
-			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
+			err := client.CoreV1().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
 			return err
 		})
 

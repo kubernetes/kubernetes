@@ -48,10 +48,10 @@ func NewConfigMapInformer(client internalclientset.Interface, namespace string, 
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().ConfigMaps(namespace).List(options)
+				return client.CoreV1().ConfigMaps(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().ConfigMaps(namespace).Watch(options)
+				return client.CoreV1().ConfigMaps(namespace).Watch(options)
 			},
 		},
 		&api.ConfigMap{},

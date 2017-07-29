@@ -119,10 +119,10 @@ func New(federationClient fedclientset.Interface) *ServiceController {
 	serviceIndexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
-				return s.federationClient.Core().Services(metav1.NamespaceAll).List(options)
+				return s.federationClient.CoreV1().Services(metav1.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return s.federationClient.Core().Services(metav1.NamespaceAll).Watch(options)
+				return s.federationClient.CoreV1().Services(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.Service{},
@@ -144,10 +144,10 @@ func New(federationClient fedclientset.Interface) *ServiceController {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
-					return targetClient.Core().Services(metav1.NamespaceAll).List(options)
+					return targetClient.CoreV1().Services(metav1.NamespaceAll).List(options)
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return targetClient.Core().Services(metav1.NamespaceAll).Watch(options)
+					return targetClient.CoreV1().Services(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.Service{},
@@ -167,18 +167,18 @@ func New(federationClient fedclientset.Interface) *ServiceController {
 	s.federatedUpdater = fedutil.NewFederatedUpdater(s.federatedInformer, "service", updateTimeout, s.eventRecorder,
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			svc := obj.(*v1.Service)
-			_, err := client.Core().Services(svc.Namespace).Create(svc)
+			_, err := client.CoreV1().Services(svc.Namespace).Create(svc)
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			svc := obj.(*v1.Service)
-			_, err := client.Core().Services(svc.Namespace).Update(svc)
+			_, err := client.CoreV1().Services(svc.Namespace).Update(svc)
 			return err
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			svc := obj.(*v1.Service)
 			orphanDependents := false
-			err := client.Core().Services(svc.Namespace).Delete(svc.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
+			err := client.CoreV1().Services(svc.Namespace).Delete(svc.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
 			return err
 		})
 
@@ -228,7 +228,7 @@ func New(federationClient fedclientset.Interface) *ServiceController {
 // Assumes that the given object is a service.
 func (s *ServiceController) updateService(obj pkgruntime.Object) (pkgruntime.Object, error) {
 	service := obj.(*v1.Service)
-	return s.federationClient.Core().Services(service.Namespace).Update(service)
+	return s.federationClient.CoreV1().Services(service.Namespace).Update(service)
 }
 
 // Run starts informers, delay deliverers and workers. Workers continuously watch for events which could
@@ -317,7 +317,7 @@ func (s *ServiceController) delete(service *v1.Service) error {
 		return err
 	}
 
-	err = s.federationClient.Core().Services(service.Namespace).Delete(service.Name, nil)
+	err = s.federationClient.CoreV1().Services(service.Namespace).Delete(service.Name, nil)
 	if err != nil {
 		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
 		// This is expected when we are processing an update as a result of service finalizer deletion.
@@ -689,7 +689,7 @@ func (s *ServiceController) updateFederatedService(fedService *v1.Service, newLB
 
 	if needUpdate {
 		var err error
-		fedService, err = s.federationClient.Core().Services(fedService.Namespace).UpdateStatus(fedService)
+		fedService, err = s.federationClient.CoreV1().Services(fedService.Namespace).UpdateStatus(fedService)
 		if err != nil {
 			runtime.HandleError(fmt.Errorf("Error updating the federation service object %s: %v", key, err))
 			return err

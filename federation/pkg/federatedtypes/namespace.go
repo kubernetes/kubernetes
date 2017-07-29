@@ -54,7 +54,7 @@ func NewNamespaceAdapter(client federationclientset.Interface, config *restclien
 	dynamicClientPool := dynamic.NewDynamicClientPool(config)
 	discoverResourcesFunc := client.Discovery().ServerPreferredNamespacedResources
 	deleter := deletion.NewNamespacedResourcesDeleter(
-		client.Core().Namespaces(),
+		client.CoreV1().Namespaces(),
 		dynamicClientPool,
 		nil,
 		discoverResourcesFunc,

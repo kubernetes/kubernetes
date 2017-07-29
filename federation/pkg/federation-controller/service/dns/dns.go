@@ -103,10 +103,10 @@ func NewServiceDNSController(client fedclientset.Interface, dnsProvider, dnsProv
 	serviceIndexer, d.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
-				return client.Core().Services(metav1.NamespaceAll).List(options)
+				return client.CoreV1().Services(metav1.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return client.Core().Services(metav1.NamespaceAll).Watch(options)
+				return client.CoreV1().Services(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.Service{},

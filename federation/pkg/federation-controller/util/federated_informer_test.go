@@ -82,10 +82,10 @@ func TestFederatedInformer(t *testing.T) {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return clientset.Core().Services(metav1.NamespaceAll).List(options)
+					return clientset.CoreV1().Services(metav1.NamespaceAll).List(options)
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Services(metav1.NamespaceAll).Watch(options)
+					return clientset.CoreV1().Services(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&apiv1.Service{},

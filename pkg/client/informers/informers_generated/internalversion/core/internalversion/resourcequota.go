@@ -48,10 +48,10 @@ func NewResourceQuotaInformer(client internalclientset.Interface, namespace stri
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().ResourceQuotas(namespace).List(options)
+				return client.CoreV1().ResourceQuotas(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().ResourceQuotas(namespace).Watch(options)
+				return client.CoreV1().ResourceQuotas(namespace).Watch(options)
 			},
 		},
 		&api.ResourceQuota{},

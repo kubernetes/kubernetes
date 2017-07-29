@@ -149,14 +149,14 @@ func (c *admissionController) publishEvent(a admission.Attributes, msg string) {
 		Type: "Warning",
 	}
 
-	if _, err := c.client.Core().Events(a.GetNamespace()).Create(event); err != nil {
+	if _, err := c.client.CoreV1().Events(a.GetNamespace()).Create(event); err != nil {
 		runtime.HandleError(err)
 		return
 	}
 }
 
 func (c *admissionController) policyExists() (bool, error) {
-	lst, err := c.client.Core().ConfigMaps(policyConfigMapNamespace).List(metav1.ListOptions{})
+	lst, err := c.client.CoreV1().ConfigMaps(policyConfigMapNamespace).List(metav1.ListOptions{})
 	if err != nil {
 		return true, err
 	}

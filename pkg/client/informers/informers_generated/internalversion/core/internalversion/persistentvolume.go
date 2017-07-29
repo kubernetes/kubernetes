@@ -48,10 +48,10 @@ func NewPersistentVolumeInformer(client internalclientset.Interface, resyncPerio
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().PersistentVolumes().List(options)
+				return client.CoreV1().PersistentVolumes().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().PersistentVolumes().Watch(options)
+				return client.CoreV1().PersistentVolumes().Watch(options)
 			},
 		},
 		&api.PersistentVolume{},
