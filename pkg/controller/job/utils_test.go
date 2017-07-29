@@ -46,4 +46,21 @@ func TestIsJobFinished(t *testing.T) {
 	if IsJobFinished(job) {
 		t.Error("Job was not expected to be finished")
 	}
+
+	job.Status.Conditions[0].Type = batch.JobFailed
+
+	job.Status.Conditions[0].Status = v1.ConditionTrue
+	if !IsJobFinished(job) {
+		t.Error("Job was expected to be finished")
+	}
+
+	job.Status.Conditions[0].Status = v1.ConditionFalse
+	if IsJobFinished(job) {
+		t.Error("Job was not expected to be finished")
+	}
+
+	job.Status.Conditions[0].Status = v1.ConditionUnknown
+	if IsJobFinished(job) {
+		t.Error("Job was not expected to be finished")
+	}
 }
