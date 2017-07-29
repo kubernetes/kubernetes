@@ -137,6 +137,10 @@ type Join struct {
 func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
 	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
 
+	if cfg.NodeName == "" {
+		cfg.NodeName = nodeutil.GetHostname("")
+	}
+
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
