@@ -211,8 +211,8 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, junitFilePrefix, testA
 	glog.V(2).Infof("Starting tests on %q", host)
 	cmd := getSSHCommand(" && ",
 		fmt.Sprintf("cd %s", workspace),
-		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-file=%s --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s %s",
-			timeout.Seconds(), ginkgoArgs, systemSpecFile, host, results, junitFilePrefix, testArgs),
+		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s %s",
+			timeout.Seconds(), ginkgoArgs, systemSpecName, systemSpecFile, host, results, junitFilePrefix, testArgs),
 	)
 	return SSH(host, "sh", "-c", cmd)
 }
