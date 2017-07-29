@@ -79,7 +79,7 @@ func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroy
 	)
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
 
 	sched, err := scheduler.NewFromConfigurator(schedulerConfigurator, func(conf *scheduler.Config) {
 		conf.Recorder = eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "scheduler"})
