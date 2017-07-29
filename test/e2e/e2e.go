@@ -65,9 +65,13 @@ func setupProviderConfig() error {
 		var err error
 		framework.Logf("Fetching cloud provider for %q\r\n", framework.TestContext.Provider)
 		zone := framework.TestContext.CloudConfig.Zone
-		region, err := gcecloud.GetGCERegion(zone)
-		if err != nil {
-			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
+		region := framework.TestContext.CloudConfig.Region
+
+		if region == "" {
+			region, err = gcecloud.GetGCERegion(zone)
+			if err != nil {
+				return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
+			}
 		}
 		managedZones := []string{} // Manage all zones in the region
 		if !framework.TestContext.CloudConfig.MultiZone {

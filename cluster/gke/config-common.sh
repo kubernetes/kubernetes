@@ -18,7 +18,13 @@
 # Specifically, the following environment variables are assumed:
 # - CLUSTER_NAME  (the name of the cluster)
 
-ZONE="${ZONE:-us-central1-f}"
+if [ ! -z "${REGION:-}" ] && [ ! -z "${ZONE:-}" ]; then
+  echo "Only one of REGION and ZONE can be set." >&2
+  exit 1
+fi
+if [ -z "${REGION:-}" ]; then
+  ZONE="${ZONE:-us-central1-f}"
+fi
 NUM_NODES="${NUM_NODES:-3}"
 ADDITIONAL_ZONES="${ADDITIONAL_ZONES:-}"
 CLUSTER_API_VERSION="${CLUSTER_API_VERSION:-}"

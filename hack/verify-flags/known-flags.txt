@@ -303,6 +303,7 @@ gather-suite-metrics-at-teardown
 gce-api-endpoint
 gce-multizone
 gce-project
+gce-region
 gce-service-account
 gce-upgrade-script
 gce-zone
