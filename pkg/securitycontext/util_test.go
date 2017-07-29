@@ -17,161 +17,141 @@ limitations under the License.
 package securitycontext
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestParseSELinuxOptions(t *testing.T) {
-	cases := []struct {
-		name     string
-		input    string
-		expected *v1.SELinuxOptions
+func TestInternalDetermineEffectiveSecurityContext(t *testing.T) {
+	privileged := true
+	readOnlyRootFilesystem := false
+	runAsUser := int64(1)
+	runAsRoot := true
+	runAsNonRoot := true
+
+	tests := map[string]struct {
+		pod       *v1.Pod
+		expect    *v1.SecurityContext
 	}{
-		{
-			name:  "simple",
-			input: "user_t:role_t:type_t:s0",
-			expected: &v1.SELinuxOptions{
-				User:  "user_t",
-				Role:  "role_t",
-				Type:  "type_t",
-				Level: "s0",
+		// pod has PodSecurityContext, container has SecurityContext and need privileged
+		"test1": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "ctr",
+							Image:           "image",
+							ImagePullPolicy: "IfNotPresent",
+							SecurityContext: &v1.SecurityContext{
+								Privileged:             &privileged,
+								ReadOnlyRootFilesystem: &readOnlyRootFilesystem,
+								Capabilities: &v1.Capabilities{
+									Add:  []v1.Capability{"foo"},
+									Drop: []v1.Capability{"bar"},
+								},
+								SELinuxOptions: &v1.SELinuxOptions{
+									User:  "container_user",
+									Role:  "container_role",
+									Type:  "container_type",
+									Level: "container_level",
+								},
+								RunAsUser:    &runAsUser,
+								RunAsNonRoot: &runAsRoot,
+							},
+						},
+					},
+					SecurityContext: &v1.PodSecurityContext{
+						SELinuxOptions: &v1.SELinuxOptions{
+							User:  "pod_user",
+							Role:  "pod_role",
+							Type:  "pod_type",
+							Level: "pod_level",
+						},
+						RunAsUser:    &runAsUser,
+						RunAsNonRoot: &runAsNonRoot,
+					},
+				},
+			},
+			expect: &v1.SecurityContext{
+				Privileged:             &privileged,
+				ReadOnlyRootFilesystem: &readOnlyRootFilesystem,
+				Capabilities: &v1.Capabilities{
+					Add:  []v1.Capability{"foo"},
+					Drop: []v1.Capability{"bar"},
+				},
+				SELinuxOptions: &v1.SELinuxOptions{
+					User:  "container_user",
+					Role:  "container_role",
+					Type:  "container_type",
+					Level: "container_level",
+				},
+				RunAsUser:    &runAsUser,
+				RunAsNonRoot: &runAsRoot,
 			},
 		},
-		{
-			name:  "simple + categories",
-			input: "user_t:role_t:type_t:s0:c0",
-			expected: &v1.SELinuxOptions{
-				User:  "user_t",
-				Role:  "role_t",
-				Type:  "type_t",
-				Level: "s0:c0",
+		// pod has PodSecurityContext, container has SecurityContext and need no privileged
+		"test2": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "ctr",
+							Image:           "image",
+							ImagePullPolicy: "IfNotPresent",
+							SecurityContext: &v1.SecurityContext{
+								ReadOnlyRootFilesystem: &readOnlyRootFilesystem,
+								Capabilities: &v1.Capabilities{
+									Add:  []v1.Capability{"foo"},
+									Drop: []v1.Capability{"bar"},
+								},
+								SELinuxOptions: &v1.SELinuxOptions{
+									User:  "container_user",
+									Role:  "container_role",
+									Type:  "container_type",
+									Level: "container_level",
+								},
+							},
+						},
+					},
+					SecurityContext: &v1.PodSecurityContext{
+						SELinuxOptions: &v1.SELinuxOptions{
+							User:  "pod_user",
+							Role:  "pod_role",
+							Type:  "pod_type",
+							Level: "pod_level",
+						},
+						RunAsUser:    &runAsUser,
+						RunAsNonRoot: &runAsNonRoot,
+					},
+				},
+			},
+			expect: &v1.SecurityContext{
+				Privileged: nil,
+				ReadOnlyRootFilesystem: &readOnlyRootFilesystem,
+				Capabilities: &v1.Capabilities{
+					Add:  []v1.Capability{"foo"},
+					Drop: []v1.Capability{"bar"},
+				},
+				SELinuxOptions: &v1.SELinuxOptions{
+					User:  "container_user",
+					Role:  "container_role",
+					Type:  "container_type",
+					Level: "container_level",
+				},
+				RunAsUser:    &runAsUser,
+				RunAsNonRoot: &runAsNonRoot,
 			},
 		},
-		{
-			name:  "not enough fields",
-			input: "type_t:s0:c0",
-		},
-	}
-
-	for _, tc := range cases {
-		result, err := ParseSELinuxOptions(tc.input)
-
-		if err != nil {
-			if tc.expected == nil {
-				continue
-			} else {
-				t.Errorf("%v: unexpected error: %v", tc.name, err)
-			}
-		}
-
-		compareContexts(tc.name, tc.expected, result, t)
-	}
-}
-
-func compareContexts(name string, ex, ac *v1.SELinuxOptions, t *testing.T) {
-	if e, a := ex.User, ac.User; e != a {
-		t.Errorf("%v: expected user: %v, got: %v", name, e, a)
-	}
-	if e, a := ex.Role, ac.Role; e != a {
-		t.Errorf("%v: expected role: %v, got: %v", name, e, a)
-	}
-	if e, a := ex.Type, ac.Type; e != a {
-		t.Errorf("%v: expected type: %v, got: %v", name, e, a)
-	}
-	if e, a := ex.Level, ac.Level; e != a {
-		t.Errorf("%v: expected level: %v, got: %v", name, e, a)
-	}
-}
-
-func containerWithUser(ptr *int64) *v1.Container {
-	return &v1.Container{SecurityContext: &v1.SecurityContext{RunAsUser: ptr}}
-}
-
-func TestHaRootUID(t *testing.T) {
-	nonRoot := int64(1)
-	root := int64(0)
-
-	tests := map[string]struct {
-		container *v1.Container
-		expect    bool
-	}{
-		"nil sc": {
-			container: &v1.Container{SecurityContext: nil},
-		},
-		"nil runAsuser": {
-			container: containerWithUser(nil),
-		},
-		"runAsUser non-root": {
-			container: containerWithUser(&nonRoot),
-		},
-		"runAsUser root": {
-			container: containerWithUser(&root),
-			expect:    true,
-		},
 	}
 
 	for k, v := range tests {
-		actual := HasRootUID(v.container)
-		if actual != v.expect {
-			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
-		}
-	}
-}
-
-func TestHasRunAsUser(t *testing.T) {
-	runAsUser := int64(0)
-
-	tests := map[string]struct {
-		container *v1.Container
-		expect    bool
-	}{
-		"nil sc": {
-			container: &v1.Container{SecurityContext: nil},
-		},
-		"nil runAsUser": {
-			container: containerWithUser(nil),
-		},
-		"valid runAsUser": {
-			container: containerWithUser(&runAsUser),
-			expect:    true,
-		},
-	}
-
-	for k, v := range tests {
-		actual := HasRunAsUser(v.container)
-		if actual != v.expect {
-			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
-		}
-	}
-}
-
-func TestHasRootRunAsUser(t *testing.T) {
-	nonRoot := int64(1)
-	root := int64(0)
-
-	tests := map[string]struct {
-		container *v1.Container
-		expect    bool
-	}{
-		"nil sc": {
-			container: &v1.Container{SecurityContext: nil},
-		},
-		"nil runAsuser": {
-			container: containerWithUser(nil),
-		},
-		"runAsUser non-root": {
-			container: containerWithUser(&nonRoot),
-		},
-		"runAsUser root": {
-			container: containerWithUser(&root),
-			expect:    true,
-		},
-	}
-
-	for k, v := range tests {
-		actual := HasRootRunAsUser(v.container)
-		if actual != v.expect {
+		containers := v.pod.Spec.Containers
+		actual := DetermineEffectiveSecurityContext(v.pod, &containers[0])
+		if !reflect.DeepEqual(actual, v.expect) {
 			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
 		}
 	}

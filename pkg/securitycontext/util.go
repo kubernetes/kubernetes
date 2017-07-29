@@ -17,9 +17,6 @@ limitations under the License.
 package securitycontext
 
 import (
-	"fmt"
-	"strings"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -34,59 +31,6 @@ func HasPrivilegedRequest(container *v1.Container) bool {
 		return false
 	}
 	return *container.SecurityContext.Privileged
-}
-
-// HasCapabilitiesRequest returns true if Adds or Drops are defined in the security context
-// capabilities, taking into account nils
-func HasCapabilitiesRequest(container *v1.Container) bool {
-	if container.SecurityContext == nil {
-		return false
-	}
-	if container.SecurityContext.Capabilities == nil {
-		return false
-	}
-	return len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0
-}
-
-const expectedSELinuxFields = 4
-
-// ParseSELinuxOptions parses a string containing a full SELinux context
-// (user, role, type, and level) into an SELinuxOptions object.  If the
-// context is malformed, an error is returned.
-func ParseSELinuxOptions(context string) (*v1.SELinuxOptions, error) {
-	fields := strings.SplitN(context, ":", expectedSELinuxFields)
-
-	if len(fields) != expectedSELinuxFields {
-		return nil, fmt.Errorf("expected %v fields in selinux; got %v (context: %v)", expectedSELinuxFields, len(fields), context)
-	}
-
-	return &v1.SELinuxOptions{
-		User:  fields[0],
-		Role:  fields[1],
-		Type:  fields[2],
-		Level: fields[3],
-	}, nil
-}
-
-// HasNonRootUID returns true if the runAsUser is set and is greater than 0.
-func HasRootUID(container *v1.Container) bool {
-	if container.SecurityContext == nil {
-		return false
-	}
-	if container.SecurityContext.RunAsUser == nil {
-		return false
-	}
-	return *container.SecurityContext.RunAsUser == 0
-}
-
-// HasRunAsUser determines if the sc's runAsUser field is set.
-func HasRunAsUser(container *v1.Container) bool {
-	return container.SecurityContext != nil && container.SecurityContext.RunAsUser != nil
-}
-
-// HasRootRunAsUser returns true if the run as user is set and it is set to 0.
-func HasRootRunAsUser(container *v1.Container) bool {
-	return HasRunAsUser(container) && HasRootUID(container)
 }
 
 func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1.SecurityContext {
@@ -104,7 +48,9 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 	}
 
 	if containerSc.SELinuxOptions != nil {
-		effectiveSc.SELinuxOptions = new(v1.SELinuxOptions)
+		if effectiveSc.SELinuxOptions == nil {
+			effectiveSc.SELinuxOptions = new(v1.SELinuxOptions)
+		}
 		*effectiveSc.SELinuxOptions = *containerSc.SELinuxOptions
 	}
 
@@ -119,12 +65,16 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 	}
 
 	if containerSc.RunAsUser != nil {
-		effectiveSc.RunAsUser = new(int64)
+		if effectiveSc.RunAsUser == nil {
+			effectiveSc.RunAsUser = new(int64)
+		}
 		*effectiveSc.RunAsUser = *containerSc.RunAsUser
 	}
 
 	if containerSc.RunAsNonRoot != nil {
-		effectiveSc.RunAsNonRoot = new(bool)
+		if effectiveSc.RunAsNonRoot == nil {
+			effectiveSc.RunAsNonRoot = new(bool)
+		}
 		*effectiveSc.RunAsNonRoot = *containerSc.RunAsNonRoot
 	}
 
@@ -176,7 +126,9 @@ func InternalDetermineEffectiveSecurityContext(pod *api.Pod, container *api.Cont
 	}
 
 	if containerSc.SELinuxOptions != nil {
-		effectiveSc.SELinuxOptions = new(api.SELinuxOptions)
+		if effectiveSc.SELinuxOptions == nil {
+			effectiveSc.SELinuxOptions = new(api.SELinuxOptions)
+		}
 		*effectiveSc.SELinuxOptions = *containerSc.SELinuxOptions
 	}
 
@@ -191,12 +143,16 @@ func InternalDetermineEffectiveSecurityContext(pod *api.Pod, container *api.Cont
 	}
 
 	if containerSc.RunAsUser != nil {
-		effectiveSc.RunAsUser = new(int64)
+		if effectiveSc.RunAsUser == nil {
+			effectiveSc.RunAsUser = new(int64)
+		}
 		*effectiveSc.RunAsUser = *containerSc.RunAsUser
 	}
 
 	if containerSc.RunAsNonRoot != nil {
-		effectiveSc.RunAsNonRoot = new(bool)
+		if effectiveSc.RunAsNonRoot == nil {
+			effectiveSc.RunAsNonRoot = new(bool)
+		}
 		*effectiveSc.RunAsNonRoot = *containerSc.RunAsNonRoot
 	}
 
