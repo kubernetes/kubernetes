@@ -27,7 +27,7 @@ import (
 
 var _ = Describe("Getting the Resources", func() {
 	var client *fakeOpenAPIClient
-	var expectedData *openapi.Resources
+	var expectedData openapi.Resources
 	var instance openapi.Getter
 
 	BeforeEach(func() {
@@ -47,12 +47,12 @@ var _ = Describe("Getting the Resources", func() {
 
 			result, err := instance.Get()
 			Expect(err).To(BeNil())
-			expectEqual(result, expectedData)
+			Expect(result).To(Equal(expectedData))
 			Expect(client.calls).To(Equal(1))
 
 			result, err = instance.Get()
 			Expect(err).To(BeNil())
-			expectEqual(result, expectedData)
+			Expect(result).To(Equal(expectedData))
 			// No additional client calls expected
 			Expect(client.calls).To(Equal(1))
 		})

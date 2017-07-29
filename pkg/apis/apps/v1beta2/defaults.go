@@ -151,3 +151,23 @@ func SetDefaults_Deployment(obj *appsv1beta2.Deployment) {
 		*obj.Spec.ProgressDeadlineSeconds = 600
 	}
 }
+
+func SetDefaults_ReplicaSet(obj *appsv1beta2.ReplicaSet) {
+	labels := obj.Spec.Template.Labels
+
+	// TODO: support templates defined elsewhere when we support them in the API
+	if labels != nil {
+		if obj.Spec.Selector == nil {
+			obj.Spec.Selector = &metav1.LabelSelector{
+				MatchLabels: labels,
+			}
+		}
+		if len(obj.Labels) == 0 {
+			obj.Labels = labels
+		}
+	}
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = new(int32)
+		*obj.Spec.Replicas = 1
+	}
+}

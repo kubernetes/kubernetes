@@ -18,7 +18,6 @@ cmd/kubeadm/app/discovery
 cmd/kubeadm/app/discovery/file
 cmd/kubeadm/app/discovery/token
 cmd/kubeadm/app/images
-cmd/kubeadm/app/node
 cmd/kubeadm/app/phases/addons
 cmd/kubeadm/app/phases/certs/pkiutil
 cmd/kubeadm/app/phases/token
@@ -657,7 +656,6 @@ staging/src/k8s.io/apiserver/pkg/server/healthz
 staging/src/k8s.io/apiserver/pkg/server/httplog
 staging/src/k8s.io/apiserver/pkg/server/openapi
 staging/src/k8s.io/apiserver/pkg/server/options
-staging/src/k8s.io/apiserver/pkg/server/options/encryptionconfig
 staging/src/k8s.io/apiserver/pkg/server/routes/data/swagger
 staging/src/k8s.io/apiserver/pkg/server/storage
 staging/src/k8s.io/apiserver/pkg/storage

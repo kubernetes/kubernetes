@@ -387,7 +387,7 @@ func TestTransform(t *testing.T) {
 			t.Errorf("[%d] unexpected error during Transform: %v", i, err)
 		}
 		if result.Empty() != tc.isEmpty {
-			t.Errorf("[%d] expected empty: %t, got: %t", i, tc.isEmpty, result.Empty)
+			t.Errorf("[%d] expected empty: %t, got: %t", i, tc.isEmpty, result.Empty())
 		}
 		if result.String() != tc.result {
 			t.Errorf("[%d] unexpected result: %s", i, result.String())

@@ -34,6 +34,14 @@ type DeploymentListerExpansion interface{}
 // DeploymentNamespaceLister.
 type DeploymentNamespaceListerExpansion interface{}
 
+// ReplicaSetListerExpansion allows custom methods to be added to
+// ReplicaSetLister.
+type ReplicaSetListerExpansion interface{}
+
+// ReplicaSetNamespaceListerExpansion allows custom methods to be added to
+// ReplicaSetNamespaceLister.
+type ReplicaSetNamespaceListerExpansion interface{}
+
 // ScaleListerExpansion allows custom methods to be added to
 // ScaleLister.
 type ScaleListerExpansion interface{}

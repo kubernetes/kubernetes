@@ -27,6 +27,7 @@ type AppsV1beta2Interface interface {
 	RESTClient() rest.Interface
 	DaemonSetsGetter
 	DeploymentsGetter
+	ReplicaSetsGetter
 	ScalesGetter
 	StatefulSetsGetter
 }
@@ -42,6 +43,10 @@ func (c *AppsV1beta2Client) DaemonSets(namespace string) DaemonSetInterface {
 
 func (c *AppsV1beta2Client) Deployments(namespace string) DeploymentInterface {
 	return newDeployments(c, namespace)
+}
+
+func (c *AppsV1beta2Client) ReplicaSets(namespace string) ReplicaSetInterface {
+	return newReplicaSets(c, namespace)
 }
 
 func (c *AppsV1beta2Client) Scales(namespace string) ScaleInterface {

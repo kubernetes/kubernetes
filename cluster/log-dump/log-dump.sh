@@ -311,6 +311,7 @@ function dump_nodes_with_logexporter() {
   failed_nodes=()
   for node in "${NODE_NAMES[@]}"; do
     if [[ ! "${pods_and_nodes}" =~ "${node}" ]]; then
+      echo "Logexporter pod wasn't found on node ${node}"
       failed_nodes+=("${node}")
     fi
   done
@@ -323,8 +324,9 @@ function dump_nodes_with_logexporter() {
     pod="${logexporter_pods[$index]}"
     node="${logexporter_nodes[$index]}"
     # TODO(shyamjvs): Use a /status endpoint on the pod instead of checking its logs if that's faster.
-    pod_success_log=$(${KUBECTL} get logs ${pod} -n logexporter 2>&1 | grep "Logs successfully uploaded") || true
+    pod_success_log=$(${KUBECTL} logs ${pod} -n logexporter 2>&1 | grep "Logs successfully uploaded") || true
     if [[ -z "${pod_success_log}" ]]; then
+      echo "Logexporter pod didn't succeed on node ${node}"
       failed_nodes+=("${node}")
     fi
   done

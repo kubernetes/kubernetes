@@ -821,6 +821,14 @@ func TestSplitProviderID(t *testing.T) {
 	}
 }
 
+func TestMetadataURLGeneration(t *testing.T) {
+	metadata := NewInstanceMetadata()
+	fullPath := metadata.makeMetadataURL("some/path")
+	if fullPath != "http://169.254.169.254/metadata/some/path" {
+		t.Errorf("Expected http://169.254.169.254/metadata/some/path saw %s", fullPath)
+	}
+}
+
 func TestMetadataParsing(t *testing.T) {
 	data := `
 {
@@ -866,10 +874,12 @@ func TestMetadataParsing(t *testing.T) {
 	}))
 	defer server.Close()
 
-	SetMetadataURLForTesting(server.URL)
+	metadata := &InstanceMetadata{
+		baseURL: server.URL,
+	}
 
 	networkJSON := NetworkMetadata{}
-	if err := QueryMetadataJSON("/some/path", &networkJSON); err != nil {
+	if err := metadata.QueryMetadataJSON("/some/path", &networkJSON); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 

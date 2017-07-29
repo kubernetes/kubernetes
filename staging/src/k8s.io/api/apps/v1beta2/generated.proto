@@ -340,6 +340,124 @@ message DeploymentStrategy {
 }
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
+// ReplicaSet represents the configuration of a ReplicaSet.
+message ReplicaSet {
+  // If the Labels of a ReplicaSet are empty, they are defaulted to
+  // be the same as the Pod(s) that the ReplicaSet manages.
+  // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec defines the specification of the desired behavior of the ReplicaSet.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // +optional
+  optional ReplicaSetSpec spec = 2;
+
+  // Status is the most recently observed status of the ReplicaSet.
+  // This data may be out of date by some window of time.
+  // Populated by the system.
+  // Read-only.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // +optional
+  optional ReplicaSetStatus status = 3;
+}
+
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
+// ReplicaSetCondition describes the state of a replica set at a certain point.
+message ReplicaSetCondition {
+  // Type of replica set condition.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // The last time the condition transitioned from one status to another.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+
+  // The reason for the condition's last transition.
+  // +optional
+  optional string reason = 4;
+
+  // A human readable message indicating details about the transition.
+  // +optional
+  optional string message = 5;
+}
+
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
+// ReplicaSetList is a collection of ReplicaSets.
+message ReplicaSetList {
+  // Standard list metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // List of ReplicaSets.
+  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller
+  repeated ReplicaSet items = 2;
+}
+
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
+// ReplicaSetSpec is the specification of a ReplicaSet.
+message ReplicaSetSpec {
+  // Replicas is the number of desired replicas.
+  // This is a pointer to distinguish between explicit zero and unspecified.
+  // Defaults to 1.
+  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
+  // +optional
+  optional int32 replicas = 1;
+
+  // Minimum number of seconds for which a newly created pod should be ready
+  // without any of its container crashing, for it to be considered available.
+  // Defaults to 0 (pod will be considered available as soon as it is ready)
+  // +optional
+  optional int32 minReadySeconds = 4;
+
+  // Selector is a label query over pods that should match the replica count.
+  // If the selector is empty, it is defaulted to the labels present on the pod template.
+  // Label keys and values that must match in order to be controlled by this replica set.
+  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
+
+  // Template is the object that describes the pod that will be created if
+  // insufficient replicas are detected.
+  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
+  // +optional
+  optional k8s.io.api.core.v1.PodTemplateSpec template = 3;
+}
+
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
+// ReplicaSetStatus represents the current status of a ReplicaSet.
+message ReplicaSetStatus {
+  // Replicas is the most recently oberved number of replicas.
+  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
+  optional int32 replicas = 1;
+
+  // The number of pods that have labels matching the labels of the pod template of the replicaset.
+  // +optional
+  optional int32 fullyLabeledReplicas = 2;
+
+  // The number of ready replicas for this replica set.
+  // +optional
+  optional int32 readyReplicas = 4;
+
+  // The number of available replicas (ready for at least minReadySeconds) for this replica set.
+  // +optional
+  optional int32 availableReplicas = 5;
+
+  // ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
+  // +optional
+  optional int64 observedGeneration = 3;
+
+  // Represents the latest available observations of a replica set's current state.
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated ReplicaSetCondition conditions = 6;
+}
+
+// WIP: This is not ready to be used and we plan to make breaking changes to it.
 message RollbackConfig {
   // The revision to rollback to. If set to 0, rollback to the last revision.
   // +optional

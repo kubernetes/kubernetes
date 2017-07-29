@@ -243,7 +243,7 @@ type TestFactory struct {
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
-	OpenAPISchemaFunc                func() (*openapi.Resources, error)
+	OpenAPISchemaFunc                func() (openapi.Resources, error)
 }
 
 type FakeFactory struct {
@@ -418,8 +418,8 @@ func (f *FakeFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclar
 	return nil, nil
 }
 
-func (f *FakeFactory) OpenAPISchema(cacheDir string) (*openapi.Resources, error) {
-	return &openapi.Resources{}, nil
+func (f *FakeFactory) OpenAPISchema(cacheDir string) (openapi.Resources, error) {
+	return nil, nil
 }
 
 func (f *FakeFactory) DefaultNamespace() (string, bool, error) {
@@ -756,11 +756,11 @@ func (f *fakeAPIFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDec
 	return nil, nil
 }
 
-func (f *fakeAPIFactory) OpenAPISchema(cacheDir string) (*openapi.Resources, error) {
+func (f *fakeAPIFactory) OpenAPISchema(cacheDir string) (openapi.Resources, error) {
 	if f.tf.OpenAPISchemaFunc != nil {
 		return f.tf.OpenAPISchemaFunc()
 	}
-	return &openapi.Resources{}, nil
+	return nil, nil
 }
 
 func NewAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.NegotiatedSerializer) {

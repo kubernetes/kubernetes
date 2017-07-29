@@ -157,6 +157,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		DockerClient:       dockerClient,
 		KubeClient:         nil,
 		ExternalKubeClient: nil,
+		EventClient:        nil,
 		Mounter:            mounter,
 		NetworkPlugins:     ProbeNetworkPlugins(s.NetworkPluginDir, s.CNIConfDir, s.CNIBinDir),
 		OOMAdjuster:        oom.NewOOMAdjuster(),
@@ -513,7 +514,9 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 
 		kubeDeps.KubeClient = kubeClient
 		kubeDeps.ExternalKubeClient = externalKubeClient
-		kubeDeps.EventClient = eventClient
+		if eventClient != nil {
+			kubeDeps.EventClient = eventClient
+		}
 	}
 
 	if kubeDeps.Auth == nil {

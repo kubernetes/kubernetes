@@ -14,6 +14,7 @@ go_library(
         "fake_apps_client.go",
         "fake_daemonset.go",
         "fake_deployment.go",
+        "fake_replicaset.go",
         "fake_scale.go",
         "fake_statefulset.go",
     ],

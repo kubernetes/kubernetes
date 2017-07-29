@@ -145,7 +145,7 @@ func TestRoundTrip(t *testing.T) {
 		context value.Context
 		t       value.Transformer
 	}{
-		{name: "GCM 16 byte key", t: NewSecretboxTransformer(key1)},
+		{name: "Secretbox 32 byte key", t: NewSecretboxTransformer(key1)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -32,12 +32,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
-	kubeadmnode "k8s.io/kubernetes/cmd/kubeadm/app/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/api"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 var (
@@ -178,20 +176,7 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	hostname := nodeutil.GetHostname(j.cfg.NodeName)
-
-	client, err := kubeconfigutil.KubeConfigToClientSet(cfg)
-	if err != nil {
-		return err
-	}
-	if err := kubeadmnode.ValidateAPIServer(client); err != nil {
-		return err
-	}
-	if err := kubeadmnode.PerformTLSBootstrap(cfg, hostname); err != nil {
-		return err
-	}
-
-	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
+	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)
 	if err := kubeconfigutil.WriteToDisk(kubeconfigFile, cfg); err != nil {
 		return err
 	}

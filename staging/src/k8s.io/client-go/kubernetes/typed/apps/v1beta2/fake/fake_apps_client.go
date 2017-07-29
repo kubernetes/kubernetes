@@ -34,6 +34,10 @@ func (c *FakeAppsV1beta2) Deployments(namespace string) v1beta2.DeploymentInterf
 	return &FakeDeployments{c, namespace}
 }
 
+func (c *FakeAppsV1beta2) ReplicaSets(namespace string) v1beta2.ReplicaSetInterface {
+	return &FakeReplicaSets{c, namespace}
+}
+
 func (c *FakeAppsV1beta2) Scales(namespace string) v1beta2.ScaleInterface {
 	return &FakeScales{c, namespace}
 }

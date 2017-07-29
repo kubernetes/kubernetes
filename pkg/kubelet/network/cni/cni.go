@@ -280,8 +280,8 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
-func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (cnitypes.Result, error) {
-	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
+func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string) (cnitypes.Result, error) {
+	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath)
 	if err != nil {
 		glog.Errorf("Error adding network when building cni runtime conf: %v", err)
 		return nil, err
@@ -298,8 +298,8 @@ func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string
 	return res, nil
 }
 
-func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) error {
-	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
+func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string) error {
+	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath)
 	if err != nil {
 		glog.Errorf("Error deleting network when building cni runtime conf: %v", err)
 		return err
@@ -315,25 +315,25 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 	return nil
 }
 
-func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*libcni.RuntimeConf, error) {
+func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string, podSandboxID kubecontainer.ContainerID, podNetnsPath string) (*libcni.RuntimeConf, error) {
 	glog.V(4).Infof("Got netns path %v", podNetnsPath)
 	glog.V(4).Infof("Using netns path %v", podNs)
 
 	rt := &libcni.RuntimeConf{
-		ContainerID: podInfraContainerID.ID,
+		ContainerID: podSandboxID.ID,
 		NetNS:       podNetnsPath,
 		IfName:      network.DefaultInterfaceName,
 		Args: [][2]string{
 			{"IgnoreUnknown", "1"},
 			{"K8S_POD_NAMESPACE", podNs},
 			{"K8S_POD_NAME", podName},
-			{"K8S_POD_INFRA_CONTAINER_ID", podInfraContainerID.ID},
+			{"K8S_POD_INFRA_CONTAINER_ID", podSandboxID.ID},
 		},
 	}
 
 	// port mappings are a cni capability-based args, rather than parameters
 	// to a specific plugin
-	portMappings, err := plugin.host.GetPodPortMappings(podInfraContainerID.ID)
+	portMappings, err := plugin.host.GetPodPortMappings(podSandboxID.ID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve port mappings: %v", err)
 	}

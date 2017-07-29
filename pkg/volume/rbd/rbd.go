@@ -66,6 +66,10 @@ const (
 	rbdDefaultUserId               = rbdDefaultAdminId
 )
 
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(rbdPluginName), volName)
+}
+
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	return nil
@@ -148,14 +152,15 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 
 	return &rbdMounter{
 		rbd: &rbd{
-			podUID:   podUID,
-			volName:  spec.Name(),
-			Image:    source.RBDImage,
-			Pool:     pool,
-			ReadOnly: readOnly,
-			manager:  manager,
-			mounter:  &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
-			plugin:   plugin,
+			podUID:          podUID,
+			volName:         spec.Name(),
+			Image:           source.RBDImage,
+			Pool:            pool,
+			ReadOnly:        readOnly,
+			manager:         manager,
+			mounter:         &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
 		Mon:          source.CephMonitors,
 		Id:           id,
@@ -175,11 +180,12 @@ func (plugin *rbdPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 	return &rbdUnmounter{
 		rbdMounter: &rbdMounter{
 			rbd: &rbd{
-				podUID:  podUID,
-				volName: volName,
-				manager: manager,
-				mounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
-				plugin:  plugin,
+				podUID:          podUID,
+				volName:         volName,
+				manager:         manager,
+				mounter:         &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+				plugin:          plugin,
+				MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 			},
 			Mon: make([]string, 0),
 		},
@@ -381,8 +387,7 @@ type rbdVolumeDeleter struct {
 }
 
 func (r *rbdVolumeDeleter) GetPath() string {
-	name := rbdPluginName
-	return r.plugin.host.GetPodVolumeDir(r.podUID, strings.EscapeQualifiedNameForDisk(name), r.volName)
+	return getPath(r.podUID, r.volName, r.plugin.host)
 }
 
 func (r *rbdVolumeDeleter) Delete() error {
@@ -399,13 +404,12 @@ type rbd struct {
 	mounter  *mount.SafeFormatAndMount
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 func (rbd *rbd) GetPath() string {
-	name := rbdPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return rbd.plugin.host.GetPodVolumeDir(rbd.podUID, strings.EscapeQualifiedNameForDisk(name), rbd.volName)
+	return getPath(rbd.podUID, rbd.volName, rbd.plugin.host)
 }
 
 type rbdMounter struct {

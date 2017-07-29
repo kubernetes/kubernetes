@@ -535,7 +535,11 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		By("wait for the rc to be deleted")
 		// default client QPS is 20, deleting each pod requires 2 requests, so 30s should be enough
-		if err := wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+		// TODO: 30s is enough assuming immediate processing of dependents following
+		// owner deletion, but in practice there can be a long delay between owner
+		// deletion and dependent deletion processing. For now, increase the timeout
+		// and investigate the processing delay.
+		if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 			_, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(metav1.ListOptions{})

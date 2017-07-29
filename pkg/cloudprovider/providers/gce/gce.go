@@ -198,11 +198,11 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 	var nodeTags []string
 	var nodeInstancePrefix string
 	if config != nil {
-		var cfg Config
-		if err := gcfg.ReadInto(&cfg, config); err != nil {
-			glog.Errorf("Couldn't read config: %v", err)
+		cfg, err := readConfig(config)
+		if err != nil {
 			return nil, err
 		}
+
 		glog.Infof("Using GCE provider config %+v", cfg)
 		if cfg.Global.ApiEndpoint != "" {
 			apiEndpoint = cfg.Global.ApiEndpoint
@@ -215,7 +215,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 			if strings.Contains(cfg.Global.NetworkName, "/") {
 				networkURL = cfg.Global.NetworkName
 			} else {
-				networkURL = gceNetworkURL(apiEndpoint, projectID, networkName)
+				networkURL = gceNetworkURL(apiEndpoint, projectID, cfg.Global.NetworkName)
 			}
 		}
 
@@ -239,6 +239,15 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 
 	return CreateGCECloud(apiEndpoint, projectID, region, zone, managedZones, networkURL, subnetworkURL,
 		nodeTags, nodeInstancePrefix, tokenSource, true /* useMetadataServer */)
+}
+
+func readConfig(reader io.Reader) (*Config, error) {
+	cfg := &Config{}
+	if err := gcfg.FatalOnly(gcfg.ReadInto(cfg, reader)); err != nil {
+		glog.Errorf("Couldn't read config: %v", err)
+		return nil, err
+	}
+	return cfg, nil
 }
 
 // Creates a GCECloud object using the specified parameters.
@@ -323,6 +332,7 @@ func CreateGCECloud(apiEndpoint, projectID, region, zone string, managedZones []
 
 	gce := &GCECloud{
 		service:                  service,
+		serviceAlpha:             serviceAlpha,
 		serviceBeta:              serviceBeta,
 		containerService:         containerService,
 		cloudkmsService:          cloudkmsService,

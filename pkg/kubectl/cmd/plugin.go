@@ -114,6 +114,10 @@ func NewCmdForPlugin(f cmdutil.Factory, plugin *plugins.Plugin, runner plugins.P
 		},
 	}
 
+	for _, flag := range plugin.Flags {
+		cmd.Flags().StringP(flag.Name, flag.Shorthand, flag.DefValue, flag.Desc)
+	}
+
 	for _, childPlugin := range plugin.Tree {
 		cmd.AddCommand(NewCmdForPlugin(f, childPlugin, runner, in, out, errout))
 	}
@@ -126,10 +130,14 @@ type flagsPluginEnvProvider struct {
 }
 
 func (p *flagsPluginEnvProvider) Env() (plugins.EnvList, error) {
-	prefix := "KUBECTL_PLUGINS_GLOBAL_FLAG_"
+	globalPrefix := "KUBECTL_PLUGINS_GLOBAL_FLAG_"
 	env := plugins.EnvList{}
-	p.cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		env = append(env, plugins.FlagToEnv(flag, prefix))
+	p.cmd.InheritedFlags().VisitAll(func(flag *pflag.Flag) {
+		env = append(env, plugins.FlagToEnv(flag, globalPrefix))
+	})
+	localPrefix := "KUBECTL_PLUGINS_LOCAL_FLAG_"
+	p.cmd.LocalFlags().VisitAll(func(flag *pflag.Flag) {
+		env = append(env, plugins.FlagToEnv(flag, localPrefix))
 	})
 	return env, nil
 }

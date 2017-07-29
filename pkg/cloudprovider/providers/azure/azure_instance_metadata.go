@@ -22,14 +22,7 @@ import (
 	"net/http"
 )
 
-// This is just for tests injection
-var metadataURL = "http://169.254.169.254/metadata"
-
-// SetMetadataURLForTesting is used to modify the URL used for
-// accessing the metadata server. Should only be used for testing!
-func SetMetadataURLForTesting(url string) {
-	metadataURL = url
-}
+const metadataURL = "http://169.254.169.254/metadata/"
 
 // NetworkMetadata contains metadata about an instance's network
 type NetworkMetadata struct {
@@ -61,9 +54,26 @@ type Subnet struct {
 	Prefix  string `json:"prefix"`
 }
 
+// InstanceMetadata represents access to the Azure instance metadata server.
+type InstanceMetadata struct {
+	baseURL string
+}
+
+// NewInstanceMetadata creates an instance of the InstanceMetadata accessor object.
+func NewInstanceMetadata() *InstanceMetadata {
+	return &InstanceMetadata{
+		baseURL: metadataURL,
+	}
+}
+
+// makeMetadataURL makes a complete metadata URL from the given path.
+func (i *InstanceMetadata) makeMetadataURL(path string) string {
+	return i.baseURL + path
+}
+
 // QueryMetadataJSON queries the metadata server and populates the passed in object
-func QueryMetadataJSON(path string, obj interface{}) error {
-	data, err := queryMetadataBytes(path, "json")
+func (i *InstanceMetadata) QueryMetadataJSON(path string, obj interface{}) error {
+	data, err := i.queryMetadataBytes(path, "json")
 	if err != nil {
 		return err
 	}
@@ -71,18 +81,18 @@ func QueryMetadataJSON(path string, obj interface{}) error {
 }
 
 // QueryMetadataText queries the metadata server and returns the corresponding text
-func QueryMetadataText(path string) (string, error) {
-	data, err := queryMetadataBytes(path, "text")
+func (i *InstanceMetadata) QueryMetadataText(path string) (string, error) {
+	data, err := i.queryMetadataBytes(path, "text")
 	if err != nil {
 		return "", err
 	}
 	return string(data), err
 }
 
-func queryMetadataBytes(path, format string) ([]byte, error) {
+func (i *InstanceMetadata) queryMetadataBytes(path, format string) ([]byte, error) {
 	client := &http.Client{}
 
-	req, err := http.NewRequest("GET", metadataURL+path, nil)
+	req, err := http.NewRequest("GET", i.makeMetadataURL(path), nil)
 	if err != nil {
 		return nil, err
 	}

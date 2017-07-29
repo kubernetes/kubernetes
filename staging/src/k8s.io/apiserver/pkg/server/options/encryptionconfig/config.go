@@ -68,11 +68,11 @@ func ParseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 		return nil, fmt.Errorf("error while parsing file: %v", err)
 	}
 
-	if config.Kind != "EncryptionConfig" && config.Kind != "" {
-		return nil, fmt.Errorf("invalid configuration kind %q provided", config.Kind)
-	}
 	if config.Kind == "" {
 		return nil, fmt.Errorf("invalid configuration file, missing Kind")
+	}
+	if config.Kind != "EncryptionConfig" {
+		return nil, fmt.Errorf("invalid configuration kind %q provided", config.Kind)
 	}
 	// TODO config.APIVersion is unchecked
 
@@ -100,7 +100,7 @@ func ParseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 	return result, nil
 }
 
-// GetPrefixTransformer constructs and returns the appropriate prefix transformers for the passed resource using its configuration
+// GetPrefixTransformers constructs and returns the appropriate prefix transformers for the passed resource using its configuration
 func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, error) {
 	var result []value.PrefixTransformer
 	for _, provider := range config.Providers {
@@ -150,13 +150,13 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 		result = append(result, transformer)
 
 		if found == false {
-			return result, fmt.Errorf("invalid provider configuration provided")
+			return result, fmt.Errorf("invalid provider configuration: at least one provider must be specified")
 		}
 	}
 	return result, nil
 }
 
-// BlockTransformerFunc taske an AES cipher block and returns a value transformer.
+// BlockTransformerFunc takes an AES cipher block and returns a value transformer.
 type BlockTransformerFunc func(cipher.Block) value.Transformer
 
 // GetAESPrefixTransformer returns a prefix transformer from the provided configuration.
@@ -233,7 +233,7 @@ func GetSecretboxPrefixTransformer(config *SecretboxConfig) (value.PrefixTransfo
 		}
 
 		if len(key) != 32 {
-			return result, fmt.Errorf("expected key size 32 for aes-cbc provider, got %v", len(key))
+			return result, fmt.Errorf("expected key size 32 for secretbox provider, got %v", len(key))
 		}
 
 		keyArray := [32]byte{}
