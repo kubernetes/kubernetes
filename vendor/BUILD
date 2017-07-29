@@ -891,6 +891,7 @@ go_library(
     name = "github.com/blang/semver",
     srcs = [
         "github.com/blang/semver/json.go",
+        "github.com/blang/semver/range.go",
         "github.com/blang/semver/semver.go",
         "github.com/blang/semver/sort.go",
         "github.com/blang/semver/sql.go",
