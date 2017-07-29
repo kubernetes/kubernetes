@@ -1647,7 +1647,7 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" delete bars test --cascade=false
 
   # Make sure it's gone
-  kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::wait_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Test that we can create single item via apply
   kubectl "${kube_flags[@]}" apply -f hack/testdata/TPR/foo.yaml
