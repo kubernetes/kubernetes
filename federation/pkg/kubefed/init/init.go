@@ -443,7 +443,7 @@ func createNamespace(clientset client.Interface, federationName, namespace strin
 		return ns, nil
 	}
 
-	return clientset.Core().Namespaces().Create(ns)
+	return clientset.CoreV1().Namespaces().Create(ns)
 }
 
 func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcName, federationName, apiserverAdvertiseAddress string, apiserverServiceType v1.ServiceType, dryRun bool) (*api.Service, []string, []string, error) {
@@ -473,7 +473,7 @@ func createService(cmdOut io.Writer, clientset client.Interface, namespace, svcN
 	}
 
 	var err error
-	svc, err = clientset.Core().Services(namespace).Create(svc)
+	svc, err = clientset.CoreV1().Services(namespace).Create(svc)
 
 	ips := []string{}
 	hostnames := []string{}
@@ -498,7 +498,7 @@ func getClusterNodeIPs(clientset client.Interface) ([]string, error) {
 		api.NodeExternalIP,
 		api.NodeInternalIP,
 	}
-	nodeList, err := clientset.Core().Nodes().List(metav1.ListOptions{})
+	nodeList, err := clientset.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -528,7 +528,7 @@ func waitForLoadBalancerAddress(cmdOut io.Writer, clientset client.Interface, sv
 
 	err := wait.PollImmediateInfinite(lbAddrRetryInterval, func() (bool, error) {
 		fmt.Fprint(cmdOut, ".")
-		pollSvc, err := clientset.Core().Services(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+		pollSvc, err := clientset.CoreV1().Services(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -678,7 +678,7 @@ func createPVC(clientset client.Interface, namespace, svcName, federationName, e
 		return pvc, nil
 	}
 
-	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
+	return clientset.CoreV1().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
 func createAPIServer(clientset client.Interface, namespace, name, federationName, serverImage, etcdImage, advertiseAddress, credentialsName string, hasHTTPBasicAuthFile, hasTokenAuthFile bool, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
@@ -816,7 +816,7 @@ func createControllerManagerSA(clientset client.Interface, namespace, federation
 	if dryRun {
 		return sa, nil
 	}
-	return clientset.Core().ServiceAccounts(namespace).Create(sa)
+	return clientset.CoreV1().ServiceAccounts(namespace).Create(sa)
 }
 
 func createRoleBindings(clientset client.Interface, namespace, saName, federationName string, dryRun bool) (*rbac.Role, *rbac.RoleBinding, error) {
