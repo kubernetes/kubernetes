@@ -7,3 +7,7 @@ build --workspace_status_command hack/print-workspace-status.sh
 
 # Make /tmp hermetic
 build --sandbox_tmpfs_path=/tmp
+
+# Ensure that Bazel never runs as root, which can cause unit tests to fail.
+# This flag requires Bazel 0.5.0+
+build --sandbox_fake_username
