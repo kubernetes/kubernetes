@@ -597,3 +597,66 @@ func TestNameConflict(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGarbageCollector(t *testing.T) {
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	ns := "not-the-default"
+	curletDefinition := testserver.NewCurletCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	curletVersionClient, err := testserver.CreateNewCustomResourceDefinition(curletDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	curletResourceClient := NewNamespacedCustomResourceClient(ns, curletVersionClient, curletDefinition)
+	createdCurletInstance, err := instantiateCustomResource(t, testserver.NewCurletInstance(ns, "foo"), curletResourceClient, curletDefinition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	curletUID := createdCurletInstance.GetUID()
+
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
+	noxuInstance := testserver.NewNoxuInstance(ns, "bar")
+
+	// foo is an owner of bar
+	noxuInstance.SetOwnerReferences([]metav1.OwnerReference{
+		{
+			Kind:       "Curlet",
+			Name:       "foo",
+			APIVersion: "mygroup.example.com/v1beta1",
+			UID:        curletUID,
+		},
+	})
+
+	_, err = instantiateCustomResource(t, noxuInstance, noxuResourceClient, noxuDefinition)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// delete foo
+	if err = curletResourceClient.Delete("foo", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// bar should also get deleted
+	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := noxuResourceClient.Get("bar", metav1.GetOptions{})
+		if err != nil {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
