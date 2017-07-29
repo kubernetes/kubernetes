@@ -46,6 +46,9 @@ type StorageClass struct {
 	// 512, with a cumulative max size of 256K
 	// +optional
 	Parameters map[string]string
+
+	// +optional
+	AllowVolumeExpand bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
