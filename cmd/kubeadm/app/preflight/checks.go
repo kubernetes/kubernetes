@@ -599,7 +599,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 	checks := []Checker{
 		SystemVerificationCheck{},
 		IsRootCheck{},
-		HostnameCheck{},
+		HostnameCheck{cfg.NodeName},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		PortOpenCheck{port: 10250},
