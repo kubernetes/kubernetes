@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	testhelper "k8s.io/apiserver/pkg/registry"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -92,6 +93,8 @@ func TestGet(t *testing.T) {
 	defer destroyFunc()
 
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
+
 	key := "/controllers/test/foo"
 	if err := si.Create(ctx, key, &validController, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -111,6 +114,7 @@ func TestUpdate(t *testing.T) {
 	defer destroyFunc()
 
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
 	key := "/controllers/test/foo"
 	if err := si.Create(ctx, key, &validController, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)

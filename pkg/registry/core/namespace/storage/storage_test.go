@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	testhelper "k8s.io/apiserver/pkg/registry"
 	"k8s.io/apiserver/pkg/registry/generic"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/api"
@@ -67,6 +68,7 @@ func TestCreateSetsFields(t *testing.T) {
 	defer storage.store.DestroyFunc()
 	namespace := validNewNamespace()
 	ctx := genericapirequest.NewContext()
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
 	_, err := storage.Create(ctx, namespace, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -168,6 +170,7 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 	defer storage.store.DestroyFunc()
 	key := "namespaces/foo"
 	ctx := genericapirequest.NewContext()
+	ctx = genericapirequest.WithRequestInfo(ctx, testhelper.FakeRequestInfo())
 	now := metav1.Now()
 	namespace := &api.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
