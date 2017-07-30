@@ -2415,6 +2415,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 				SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
 					Rule: extensions.SupplementalGroupsStrategyRunAsAny,
 				},
+				AllowedHostPaths: []string{
+					"/foo/bar",
+					"/baz/",
+				},
 			},
 		}
 	}
@@ -2492,6 +2496,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidSeccompAllowed := validPSP()
 	invalidSeccompAllowed.Annotations = map[string]string{
 		seccomp.AllowedProfilesAnnotationKey: "docker/default,not-good",
+	}
+
+	invalidAllowedHostPathBacksteps := validPSP()
+	invalidAllowedHostPathBacksteps.Spec.AllowedHostPaths = []string{
+		"/dont/allow/backsteps/..",
 	}
 
 	type testCase struct {
@@ -2599,6 +2608,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			psp:         invalidSeccompAllowed,
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "must be a valid seccomp profile",
+		},
+		"invalid allowed host path with backsteps": {
+			psp:         invalidAllowedHostPathBacksteps,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must not contain '..'",
 		},
 	}
 
