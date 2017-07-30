@@ -47,6 +47,7 @@ func autoConvert_v1beta1_StorageClass_To_storage_StorageClass(in *v1beta1.Storag
 	out.ObjectMeta = in.ObjectMeta
 	out.Provisioner = in.Provisioner
 	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
+	out.AllowVolumeExpand = in.AllowVolumeExpand
 	return nil
 }
 
@@ -59,6 +60,7 @@ func autoConvert_storage_StorageClass_To_v1beta1_StorageClass(in *storage.Storag
 	out.ObjectMeta = in.ObjectMeta
 	out.Provisioner = in.Provisioner
 	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
+	out.AllowVolumeExpand = in.AllowVolumeExpand
 	return nil
 }
 
