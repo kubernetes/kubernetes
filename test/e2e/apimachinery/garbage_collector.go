@@ -22,11 +22,17 @@ import (
 
 	"k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/testserver"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/metrics"
@@ -739,6 +745,108 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}); err != nil {
 			framework.Logf("pods are %#v", pods.Items)
 			framework.Failf("failed to wait for all pods to be deleted: %v", err)
+		}
+	})
+
+	It("should support cascading deletion of custom resources", func() {
+		config, err := framework.LoadConfig()
+		if err != nil {
+			framework.Failf("failed to load config: %v", err)
+		}
+
+		apiExtensionClient, err := apiextensionsclientset.NewForConfig(config)
+		if err != nil {
+			framework.Failf("failed to initialize apiExtensionClient: %v", err)
+		}
+
+		// Create a random custom resource definition and ensure it's available for
+		// use.
+		definition := apiextensionstestserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+		defer func() {
+			err = apiextensionstestserver.DeleteCustomResourceDefinition(definition, apiExtensionClient)
+			if err != nil && !errors.IsNotFound(err) {
+				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
+			}
+		}()
+		client, err := apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, f.ClientPool)
+		if err != nil {
+			framework.Failf("failed to create CustomResourceDefinition: %v", err)
+		}
+
+		// Get a client for the custom resource.
+		resourceClient := client.Resource(&metav1.APIResource{
+			Name:       definition.Spec.Names.Plural,
+			Namespaced: false,
+		}, api.NamespaceNone)
+		apiVersion := definition.Spec.Group + "/" + definition.Spec.Version
+
+		// Create a custom owner resource.
+		ownerName := names.SimpleNameGenerator.GenerateName("owner")
+		owner := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": apiVersion,
+				"kind":       definition.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": ownerName,
+				},
+			},
+		}
+		persistedOwner, err := resourceClient.Create(owner)
+		if err != nil {
+			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
+		}
+		framework.Logf("created owner resource %q", ownerName)
+
+		// Create a custom dependent resource.
+		dependentName := names.SimpleNameGenerator.GenerateName("dependent")
+		dependent := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": apiVersion,
+				"kind":       definition.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": dependentName,
+					"ownerReferences": []map[string]string{
+						{
+							"uid":        string(persistedOwner.GetUID()),
+							"apiVersion": apiVersion,
+							"kind":       definition.Spec.Names.Kind,
+							"name":       ownerName,
+						},
+					},
+				},
+			},
+		}
+		persistedDependent, err := resourceClient.Create(dependent)
+		if err != nil {
+			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
+		}
+		framework.Logf("created dependent resource %q", dependentName)
+
+		// Delete the owner.
+		background := metav1.DeletePropagationBackground
+		err = resourceClient.Delete(ownerName, &metav1.DeleteOptions{PropagationPolicy: &background})
+		if err != nil {
+			framework.Failf("failed to delete owner resource %q: %v", ownerName, err)
+		}
+
+		// Ensure the dependent is deleted.
+		if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+			_, err := resourceClient.Get(dependentName, metav1.GetOptions{})
+			return errors.IsNotFound(err), nil
+		}); err != nil {
+			framework.Logf("owner: %#v", persistedOwner)
+			framework.Logf("dependent: %#v", persistedDependent)
+			framework.Failf("failed waiting for dependent resource %q to be deleted", dependentName)
+		}
+
+		// Ensure the owner is deleted.
+		_, err = resourceClient.Get(ownerName, metav1.GetOptions{})
+		if err == nil {
+			framework.Failf("expected owner resource %q to be deleted", ownerName)
+		} else {
+			if !errors.IsNotFound(err) {
+				framework.Failf("unexpected error getting owner resource %q: %v", ownerName, err)
+			}
 		}
 	})
 })

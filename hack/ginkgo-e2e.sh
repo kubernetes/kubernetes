@@ -136,6 +136,7 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --provider="${KUBERNETES_PROVIDER}" \
   --gce-project="${PROJECT:-}" \
   --gce-zone="${ZONE:-}" \
+  --gce-region="${REGION:-}" \
   --gce-multizone="${MULTIZONE:-false}" \
   --gke-cluster="${CLUSTER_NAME:-}" \
   --kube-master="${KUBE_MASTER:-}" \

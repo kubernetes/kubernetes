@@ -120,7 +120,7 @@ func main() {
 	}
 	ns := got.Name
 	defer func(ns string) {
-		if err := client.Core().Namespaces().Delete(ns, nil); err != nil {
+		if err := client.CoreV1().Namespaces().Delete(ns, nil); err != nil {
 			glog.Warningf("Failed to delete namespace ns: %e", ns, err)
 		} else {
 			// wait until the namespace disappears

@@ -134,6 +134,14 @@ func (n *node) blockingDependents() []*node {
 	return ret
 }
 
+// String renders node as a string using fmt. Acquires a read lock to ensure the
+// reflective dump of dependents doesn't race with any concurrent writes.
+func (n *node) String() string {
+	n.dependentsLock.RLock()
+	defer n.dependentsLock.RUnlock()
+	return fmt.Sprintf("%#v", n)
+}
+
 type concurrentUIDToNode struct {
 	uidToNodeLock sync.RWMutex
 	uidToNode     map[types.UID]*node

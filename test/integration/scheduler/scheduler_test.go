@@ -83,7 +83,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
-	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	defer clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
 	// Pre-register some predicate and priority functions
@@ -113,10 +113,10 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	}
 
 	policyConfigMap.APIVersion = testapi.Groups[v1.GroupName].GroupVersion().String()
-	clientSet.Core().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
+	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
 	ss := options.NewSchedulerServer()
 	ss.HardPodAffinitySymmetricWeight = v1.DefaultHardPodAffinitySymmetricWeight
 	ss.PolicyConfigMapName = configPolicyName
@@ -161,12 +161,12 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
-	defer clientSet.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	defer clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
 
 	ss := options.NewSchedulerServer()
 	ss.PolicyConfigMapName = "non-existent-config"
@@ -362,7 +362,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	}
 
 	for i, mod := range nodeModifications {
-		unSchedNode, err := context.clientSet.Core().Nodes().Create(node)
+		unSchedNode, err := context.clientSet.CoreV1().Nodes().Create(node)
 		if err != nil {
 			t.Fatalf("Failed to create node: %v", err)
 		}
@@ -447,7 +447,7 @@ func TestMultiScheduler(t *testing.T) {
 			},
 		},
 	}
-	context.clientSet.Core().Nodes().Create(node)
+	context.clientSet.CoreV1().Nodes().Create(node)
 
 	// 3. create 3 pods for testing
 	testPod, err := createPausePodWithResource(context.clientSet, "pod-without-scheduler-name", context.ns.Name, nil)

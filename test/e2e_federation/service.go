@@ -325,7 +325,7 @@ func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, cluste
 	By(fmt.Sprintf("Waiting for service %s to be created in all underlying clusters", serviceName))
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 		for _, cluster := range clusters {
-			_, err := cluster.Core().Services(nsName).Get(serviceName, metav1.GetOptions{})
+			_, err := cluster.CoreV1().Services(nsName).Get(serviceName, metav1.GetOptions{})
 			if err != nil {
 				if !errors.IsNotFound(err) {
 					return false, err
@@ -346,7 +346,7 @@ func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, cluste
 	shouldExist := orphanDependents == nil || *orphanDependents == true
 	for _, cluster := range clusters {
 		clusterName := cluster.Name
-		_, err := cluster.Core().Services(nsName).Get(serviceName, metav1.GetOptions{})
+		_, err := cluster.CoreV1().Services(nsName).Get(serviceName, metav1.GetOptions{})
 		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for service %s in cluster %s, expected service to exist", serviceName, clusterName))
 		} else if !shouldExist && !errors.IsNotFound(err) {
