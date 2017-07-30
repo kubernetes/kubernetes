@@ -34,7 +34,7 @@ func (f *FakeCache) AssumePod(pod *v1.Pod) error {
 
 func (f *FakeCache) FinishBinding(pod *v1.Pod) error { return nil }
 
-func (f *FakeCache) ForgetPod(pod *v1.Pod) error { 
+func (f *FakeCache) ForgetPod(pod *v1.Pod) error {
 	return f.ForgetFunc(pod)
 }
 
