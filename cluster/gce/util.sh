@@ -1008,6 +1008,14 @@ function create-master() {
       --size "${CLUSTER_REGISTRY_DISK_SIZE}" &
   fi
 
+ # Create disk for influxdb if enabled
+ if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]]; then
+   gcloud compute disks create "${INSTANCE_PREFIX}-influxdb-pd" \
+     --project "${PROJECT}" \
+     --zone "${ZONE}" \
+     --size "10GiB" &
+ fi
+
   # Create rule for accessing and securing etcd servers.
   if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
     gcloud compute firewall-rules create "${MASTER_NAME}-etcd" \
@@ -1680,6 +1688,7 @@ function kube-down() {
 
     # Delete persistent disk for influx-db.
     if gcloud compute disks describe "${INSTANCE_PREFIX}"-influxdb-pd --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
+      echo Deleting persistent disk "${INSTANCE_PREFIX}"-influxdb-pd
       gcloud compute disks delete \
         --project "${PROJECT}" \
         --quiet \
@@ -1843,6 +1852,11 @@ function check-resources() {
 
   if gcloud compute disks describe --project "${PROJECT}" "${CLUSTER_REGISTRY_DISK}" --zone "${ZONE}" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Persistent disk ${CLUSTER_REGISTRY_DISK}"
+    return 1
+  fi
+
+  if gcloud compute disks describe --project "${PROJECT}" "${INSTANCE_PREFIX}-influxdb-pd" --zone "${ZONE}" &>/dev/null; then
+    KUBE_RESOURCE_FOUND="Persistent disk ${INSTANCE_PREFIX}-influxdb-pd"
     return 1
   fi
 
