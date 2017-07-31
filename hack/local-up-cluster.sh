@@ -76,8 +76,7 @@ ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
 ENABLE_APISERVER_BASIC_AUDIT=${ENABLE_APISERVER_BASIC_AUDIT:-false}
 
 # RBAC Mode options
-ENABLE_RBAC=${ENABLE_RBAC:-true}
-AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-""}
+AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-"Node,RBAC"}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
 
@@ -434,13 +433,7 @@ function start_apiserver {
     fi
 
     authorizer_arg=""
-    if [[ "${ENABLE_RBAC}" = true ]]; then
-      authorizer_arg="--authorization-mode=RBAC "
-    fi
     if [[ -n "${AUTHORIZATION_MODE}" ]]; then
-      if [[ "${ENABLE_RBAC}" = true ]]; then
-        warning "AUTHORIZATION_MODE=$AUTHORIZATION_MODE overrode ENABLE_RBAC=true"
-      fi
       authorizer_arg="--authorization-mode=${AUTHORIZATION_MODE} "
     fi
     priv_arg=""
@@ -902,7 +895,7 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
     esac
 fi
 
-if [[ -n "${PSP_ADMISSION}" && ("${ENABLE_RBAC}" = true || "${AUTHORIZATION_MODE}" = *RBAC* ) ]]; then
+if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
   create_psp_policy
 fi
 
