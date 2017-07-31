@@ -198,6 +198,7 @@ API_SECURE_PORT=${API_SECURE_PORT:-6443}
 # WARNING: For DNS to work on most setups you should export API_HOST as the docker0 ip address,
 API_HOST=${API_HOST:-localhost}
 API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
+ADVERTISE_ADDRESS=${ADVERTISE_ADDRESS:-""}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
 EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
 
@@ -450,6 +451,9 @@ function start_apiserver {
     advertise_address=""
     if [[ "${API_HOST_IP}" != "127.0.0.1" ]]; then
         advertise_address="--advertise_address=${API_HOST_IP}"
+    fi
+    if [[ "${ADVERTISE_ADDRESS}" != "" ]] ; then
+        advertise_address="--advertise_address=${ADVERTISE_ADDRESS}"
     fi
 
     # Create CA signers
