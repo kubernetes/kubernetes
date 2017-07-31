@@ -61,6 +61,9 @@ var (
 		# Start a single instance of hazelcast and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
 		kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
 
+		# Start a single instance of hazelcast and set labels "app=hazelcast" and "env=prod" in the container.
+		kubectl run hazelcast --image=nginx --labels="app=hazelcast,env=prod"
+
 		# Start a replicated instance of nginx.
 		kubectl run nginx --image=nginx --replicas=5
 
@@ -127,7 +130,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("serviceaccount", "", "Service account to set in the pod spec")
 	cmd.Flags().String("port", "", i18n.T("The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."))
 	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
-	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s).")
+	cmd.Flags().StringP("labels", "l", "", "Comma separated labels to apply to the pod(s). Will override previous values.")
 	cmd.Flags().BoolP("stdin", "i", false, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
 	cmd.Flags().BoolP("tty", "t", false, "Allocated a TTY for each container in the pod.")
 	cmd.Flags().Bool("attach", false, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true. With '--restart=Never' the exit code of the container process is returned.")
