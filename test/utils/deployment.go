@@ -175,8 +175,8 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 			logf(reason)
 			return false, nil
 		}
-		if deployment.Spec.Template.Spec.Containers[0].Image != image {
-			reason = fmt.Sprintf("Deployment %q doesn't have the required image set", deployment.Name)
+		if !containsImage(deployment.Spec.Template.Spec.Containers, image) {
+			reason = fmt.Sprintf("Deployment %q doesn't have the required image %s set", deployment.Name, image)
 			logf(reason)
 			return false, nil
 		}
@@ -185,8 +185,8 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 			logf(reason)
 			return false, nil
 		}
-		if newRS.Spec.Template.Spec.Containers[0].Image != image {
-			reason = fmt.Sprintf("New replica set %q doesn't have the required image set", newRS.Name)
+		if !containsImage(newRS.Spec.Template.Spec.Containers, image) {
+			reason = fmt.Sprintf("New replica set %q doesn't have the required image %s.", newRS.Name, image)
 			logf(reason)
 			return false, nil
 		}
@@ -203,4 +203,13 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 		return fmt.Errorf("error waiting for deployment %q (got %s / %s) and new replica set %q (got %s / %s) revision and image to match expectation (expected %s / %s): %v", deploymentName, deployment.Annotations[deploymentutil.RevisionAnnotation], deployment.Spec.Template.Spec.Containers[0].Image, newRS.Name, newRS.Annotations[deploymentutil.RevisionAnnotation], newRS.Spec.Template.Spec.Containers[0].Image, revision, image, err)
 	}
 	return nil
+}
+
+func containsImage(containers []v1.Container, imageName string) bool {
+	for _, container := range containers {
+		if container.Image == imageName {
+			return true
+		}
+	}
+	return false
 }
