@@ -1766,7 +1766,9 @@ func ValidateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, fldPath
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be unique"))
 		}
 		if !path.IsAbs(mnt.MountPath) {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be an absolute path"))
+			if runtime.GOOS != "windows" {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be an absolute path"))
+			}
 		}
 		mountpoints.Insert(mnt.MountPath)
 		if len(mnt.SubPath) > 0 {

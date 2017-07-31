@@ -19,6 +19,7 @@ package azure_file
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -208,15 +209,56 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if accountName, accountKey, err = b.util.GetAzureCredentials(b.plugin.host, b.pod.Namespace, b.secretName); err != nil {
 		return err
 	}
-	os.MkdirAll(dir, 0700)
 
-	source := fmt.Sprintf("//%s.file.%s/%s", accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), b.shareName)
-	// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
-	options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=0700,file_mode=0700", accountName, accountKey)}
-	if b.readOnly {
-		options = append(options, "ro")
+	/*
+		if runtime.GOOS == "windows" {
+			source := fmt.Sprintf("\\\\%s.file.%s\\%s", accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), b.shareName)
+			mountCmd := "net"
+			mountArgs := []string{"use", "*", source, fmt.Sprintf("/u:AZURE\\%s", accountName), accountKey, "/p:yes"}
+			fmt.Printf("Mounting cmd (%s) with arguments (%s)\n", mountCmd, mountArgs)
+			output, err := exec.Command(mountCmd, mountArgs...).CombinedOutput()
+			if err != nil {
+				fmt.Printf("Mount failed: %v\nMounting command: %s\n", err, mountCmd)
+			} else {
+				fmt.Printf("Mount succeeded, output: %s", output)
+
+				parent := "c:\\mnt"
+				dir := "c:\\mnt\\test"
+				err := os.MkdirAll(parent, 0700)
+				if err != nil {
+					fmt.Printf("mkdir failed: %v\nmkdir command: %s\n", err, mountCmd)
+				} else {
+					fmt.Printf("mkdir succeeded\n")
+				}
+
+				output, err := exec.Command("cmd", "/c", "mklink", "/D", dir, source).CombinedOutput()
+				if err != nil {
+					fmt.Printf("mklink failed: %v\n", err)
+				} else {
+					fmt.Printf("mklink succeeded, output: %s", output)
+				}
+			}
+			return nil
+		}
+	*/
+
+	mountOptions := []string{}
+	source := ""
+
+	if runtime.GOOS == "windows" {
+		source = fmt.Sprintf("\\\\%s.file.%s\\%s", accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), b.shareName)
+		mountOptions = []string{"use", "*", source, fmt.Sprintf("/u:AZURE\\%s", accountName), accountKey, "/p:yes"}
+	} else {
+		os.MkdirAll(dir, 0700)
+		source = fmt.Sprintf("//%s.file.%s/%s", accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), b.shareName)
+		// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
+		options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=0700,file_mode=0700", accountName, accountKey)}
+		if b.readOnly {
+			options = append(options, "ro")
+		}
+		mountOptions = volume.JoinMountOptions(b.mountOptions, options)
 	}
-	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+
 	err = b.mounter.Mount(source, dir, "cifs", mountOptions)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)

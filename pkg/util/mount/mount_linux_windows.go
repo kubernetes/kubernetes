@@ -1,4 +1,4 @@
-// +build !linux,!windows
+// +build windows
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -18,24 +18,57 @@ limitations under the License.
 
 package mount
 
+import (
+	"os"
+	"os/exec"
+	"strings"
+
+	"github.com/golang/glog"
+)
+
 type Mounter struct {
 	mounterPath string
 }
 
-// New returns a mount.Interface for the current system.
-// It provides options to override the default mounter behavior.
-// mounterPath allows using an alternative to `/bin/mount` for mounting.
-func New(mounterPath string) Interface {
-	return &Mounter{
-		mounterPath: mounterPath,
-	}
-}
-
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
+	glog.Infof("Empty mount source (%s), target (%s), fstype (%s), options (%s)\n", source, target, fstype, options)
+	if source == "tmpfs" || len(target) < 3 {
+		glog.Infof("Skip mounting source (%s), target (%s)\n, with arguments (%s)", source, target, options)
+		return nil
+	}
+
+	if !strings.HasPrefix(target, "c:") && !strings.HasPrefix(target, "C:") {
+		target = "c:" + target
+	}
+	parentDir := getWindowsParentDir(target)
+	err := os.MkdirAll(parentDir, 0700)
+	if err != nil {
+		glog.Infof("mkdir(%s) failed: %v\n", parentDir, err)
+		return err
+	}
+	glog.Infof("mkdir(%s) succeeded.\n", parentDir)
+
+	mountCmd := "net"
+	glog.Infof("Mounting cmd (%s) with arguments (%s), source (%s), target (%s)\n", mountCmd, options, source, target)
+	output, err := exec.Command(mountCmd, options...).CombinedOutput()
+	if err != nil {
+		glog.Infof("Mount failed: %v\nMounting command: %s\n", err, mountCmd)
+		return err
+	}
+	glog.Infof("Mount succeeded, output: %s", output)
+
+	output, err = exec.Command("cmd", "/c", "mklink", "/D", target, source).CombinedOutput()
+	if err != nil {
+		glog.Infof("mklink failed: %v\n", err)
+	} else {
+		glog.Infof("mklink succeeded, output: %s", output)
+	}
+
 	return nil
 }
 
 func (mounter *Mounter) Unmount(target string) error {
+	glog.Infof("Empty Unmount target (%s)\n", target)
 	return nil
 }
 
@@ -73,4 +106,12 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
 	return true, nil
+}
+
+func getWindowsParentDir(path string) string {
+	index := strings.LastIndex(path, "\\")
+	if index != -1 {
+		return path[:index]
+	}
+	return ""
 }
