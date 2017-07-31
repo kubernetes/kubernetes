@@ -24,6 +24,7 @@ set -o pipefail
 
 readonly report_dir="${1:-_artifacts}"
 readonly gcs_artifacts_dir="${2:-}"
+readonly logexporter_namespace="${3:-logexporter}"
 
 # In order to more trivially extend log-dump for custom deployments,
 # check for a function named log_dump_custom_get_instances. If it's
@@ -277,6 +278,7 @@ function dump_nodes_with_logexporter() {
   local -r logexport_sleep_seconds="$(( 90 + NUM_NODES / 10 ))"
 
   # Fill in the parameters in the logexporter daemonset template.
+  sed -i'' -e "s@{{.LogexporterNamespace}}@${logexporter_namespace}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
   sed -i'' -e "s@{{.ServiceAccountCredentials}}@${service_account_credentials}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
   sed -i'' -e "s@{{.CloudProvider}}@${cloud_provider}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
   sed -i'' -e "s@{{.GCSPath}}@${gcs_artifacts_dir}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
@@ -289,52 +291,39 @@ function dump_nodes_with_logexporter() {
   # Give some time for the pods to finish uploading logs.
   sleep "${logexport_sleep_seconds}"
 
-  # List the logexporter pods created and their corresponding nodes.
-  pods_and_nodes=()
-  for retry in {1..5}; do
-    pods_and_nodes=$(${KUBECTL} get pods -n logexporter -o=custom-columns=NAME:.metadata.name,NODE:.spec.nodeName | tail -n +2)
-    if [[ -n "${pods_and_nodes}" ]]; then
-      echo -e "List of logexporter pods found:\n${pods_and_nodes}"
+  # List registry of marker files (of nodes whose logexporter succeeded) from GCS.
+  local nodes_succeeded
+  for retry in {1..10}; do
+    if nodes_succeeded=$(gsutil ls ${gcs_artifacts_dir}/logexported-nodes-registry); then
+      echo "Successfully listed marker files for successful nodes"
       break
-    fi
-    if [[ "${retry}" == 5 ]]; then
-      echo "Failed to list any logexporter pods after multiple retries.. falling back to logdump for nodes through SSH"
-      "${KUBECTL}" delete namespace logexporter
-      dump_nodes "${NODE_NAMES[@]}"
-      return
+    else
+      echo "Attempt ${retry} failed to list marker files for succeessful nodes"
+      if [[ "${retry}" == 10 ]]; then
+        echo "Final attempt to list marker files failed.. falling back to logdump through SSH"
+        "${KUBECTL}" delete namespace "${logexporter_namespace}"
+        dump_nodes "${NODE_NAMES[@]}"
+        return
+      fi
+      sleep 2
     fi
   done
 
-  # Collect names of nodes we didn't find a logexporter pod on.
-  # Note: This step is O(#nodes^2) as we check if each node is present in the list of nodes running logexporter.
-  # Making it linear would add code complexity without much benefit (as it just takes < 1s for 5k nodes anyway).
+  # Collect names of nodes which didn't run logexporter successfully.
+  # Note: This step is O(#nodes^2) as we check if each node is present in the list of succeeded nodes.
+  # Making it linear would add code complexity without much benefit (as it just takes ~1s for 5k nodes).
   failed_nodes=()
   for node in "${NODE_NAMES[@]}"; do
-    if [[ ! "${pods_and_nodes}" =~ "${node}" ]]; then
-      echo "Logexporter pod wasn't found on node ${node}"
-      failed_nodes+=("${node}")
-    fi
-  done
-
-  # Collect names of nodes whose logexporter pod didn't succeed.
-  # TODO(shyamjvs): Parallelize the for loop below to make it faster (if needed).
-  logexporter_pods=( $(echo "${pods_and_nodes}" | awk '{print $1}') )
-  logexporter_nodes=( $(echo "${pods_and_nodes}" | awk '{print $2}') )
-  for index in "${!logexporter_pods[@]}"; do
-    pod="${logexporter_pods[$index]}"
-    node="${logexporter_nodes[$index]}"
-    # TODO(shyamjvs): Use a /status endpoint on the pod instead of checking its logs if that's faster.
-    pod_success_log=$(${KUBECTL} logs ${pod} -n logexporter 2>&1 | grep "Logs successfully uploaded") || true
-    if [[ -z "${pod_success_log}" ]]; then
-      echo "Logexporter pod didn't succeed on node ${node}"
+    if [[ ! "${nodes_succeeded}" =~ "${node}" ]]; then
+      echo "Logexporter didn't succeed on node ${node}. Queuing it for logdump through SSH."
       failed_nodes+=("${node}")
     fi
   done
 
   # Delete the logexporter resources and dump logs for the failed nodes (if any) through SSH.
-  "${KUBECTL}" delete namespace logexporter
+  "${KUBECTL}" delete namespace "${logexporter_namespace}"
   if [[ "${#failed_nodes[@]}" != 0 ]]; then
-    echo -e "Dumping logs through SSH for nodes logexporter failed to succeed on:\n${failed_nodes[@]}"
+    echo -e "Dumping logs through SSH for the following nodes:\n${failed_nodes[@]}"
     dump_nodes "${failed_nodes[@]}"
   fi
 }

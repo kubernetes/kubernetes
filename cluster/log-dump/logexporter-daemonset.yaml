@@ -9,13 +9,13 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-    name: logexporter
+    name: {{.LogexporterNamespace}}
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: google-service-account
-  namespace: logexporter
+  namespace: {{.LogexporterNamespace}}
 type: Opaque
 data:
   service-account.json: {{.ServiceAccountCredentials}}
@@ -24,7 +24,7 @@ apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: logexporter
-  namespace: logexporter
+  namespace: {{.LogexporterNamespace}}
 spec:
   template:
     metadata:
@@ -33,7 +33,7 @@ spec:
     spec:
       containers:
       - name: logexporter-test
-        image: gcr.io/google-containers/logexporter:v0.1.0
+        image: gcr.io/google-containers/logexporter:v0.1.1
         env:
         - name: NODE_NAME
           valueFrom:
