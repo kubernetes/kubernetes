@@ -69,8 +69,9 @@ func (eventStrategy) AllowCreateOnUpdate() bool {
 }
 
 func (eventStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	event := obj.(*api.Event)
-	return validation.ValidateEvent(event)
+	oldEvent := old.(*api.Event)
+	newEvent := obj.(*api.Event)
+	return validation.ValidateEventUpdate(oldEvent, newEvent)
 }
 
 func (eventStrategy) AllowUnconditionalUpdate() bool {
