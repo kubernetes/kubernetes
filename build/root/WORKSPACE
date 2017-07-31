@@ -43,7 +43,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_repositories")
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories", "docker_pull")
 
 go_repositories(
-    go_version = "1.8.3",
+    go_version = "1.9rc1",
 )
 
 docker_repositories()
