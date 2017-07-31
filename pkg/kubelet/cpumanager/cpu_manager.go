@@ -38,8 +38,9 @@ type kletGetter interface {
 	GetNode() (*v1.Node, error)
 }
 
-type PolicyName string
+type policyName string
 
+// Manager interface provides methods for kubelet to manage pod cpus
 type Manager interface {
 	Start()
 
@@ -58,10 +59,31 @@ type Manager interface {
 	State() state.Reader
 }
 
-func NewManager(policyName PolicyName, cr internalapi.RuntimeService, kletGetter kletGetter, statusProvider status.PodStatusProvider) (Manager, error) {
+type manager struct {
+	sync.Mutex
+	policy Policy
+	state  state.State
+
+	// containerRuntime is the container runtime service interface needed
+	// to make UpdateContainerResources() calls against the containers.
+	containerRuntime internalapi.RuntimeService
+
+	// podLister provides a method for listing all the pods on the node
+	// so all the containers can be updated in the reconciliation loop.
+	kletGetter kletGetter
+
+	// podStatusProvider provides a method for obtaining pod statuses
+	// and the containerID of their containers
+	podStatusProvider status.PodStatusProvider
+}
+
+var _ Manager = &manager{}
+
+// NewManager creates new cpu manager based on provided policy
+func NewManager(cpuPolicyName string, cr internalapi.RuntimeService, kletGetter kletGetter, statusProvider status.PodStatusProvider) (Manager, error) {
 	var policy Policy
 
-	switch policyName {
+	switch policyName(cpuPolicyName) {
 	case PolicyNoop:
 		policy = NewNoopPolicy()
 	case PolicyStatic:
@@ -80,7 +102,7 @@ func NewManager(policyName PolicyName, cr internalapi.RuntimeService, kletGetter
 		topo.NumReservedCores = getReserverdCpus(node.Status)
 		policy = NewStaticPolicy(topo)
 	default:
-		glog.Warningf("[cpumanager] Unknown policy (\"%s\"), falling back to \"%s\" policy (\"%s\")", policyName, PolicyNoop)
+		glog.Warningf("[cpumanager] Unknown policy (\"%s\"), falling back to \"%s\" policy (\"%s\")", cpuPolicyName, PolicyNoop)
 		policy = NewNoopPolicy()
 	}
 
@@ -98,24 +120,6 @@ func getReserverdCpus(nodeStatus v1.NodeStatus) int {
 	cpuCapacity := nodeStatus.Capacity[v1.ResourceCPU]
 	cpuAllocatable := nodeStatus.Allocatable[v1.ResourceCPU]
 	return int(cpuCapacity.Value() - cpuAllocatable.Value())
-}
-
-type manager struct {
-	sync.Mutex
-	policy Policy
-	state  state.State
-
-	// containerRuntime is the container runtime service interface needed
-	// to make UpdateContainerResources() calls against the containers.
-	containerRuntime internalapi.RuntimeService
-
-	// podLister provides a method for listing all the pods on the node
-	// so all the containers can be updated in the reconciliation loop.
-	kletGetter kletGetter
-
-	// podStatusProvider provides a method for obtaining pod statuses
-	// and the containerID of their containers
-	podStatusProvider status.PodStatusProvider
 }
 
 func (m *manager) Start() {

@@ -28,7 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
-const PolicyStatic PolicyName = "static"
+// PolicyStatic name of static policy
+const PolicyStatic policyName = "static"
+
+var _ Policy = &staticPolicy{}
 
 type staticPolicy struct {
 	topology *topology.CPUTopology
@@ -187,8 +190,8 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 			jSocketScore := topo.CPUtopoDetails.CPUsInSocket(j).Intersection(result).Size()
 
 			// Compute the number of available CPUs on the same core as i and j.
-			iCoreScore := topoDetails.CPUsInCore(topoDetails[i].CoreId).Size()
-			jCoreScore := topoDetails.CPUsInCore(topoDetails[j].CoreId).Size()
+			iCoreScore := topoDetails.CPUsInCore(topoDetails[i].CoreID).Size()
+			jCoreScore := topoDetails.CPUsInCore(topoDetails[j].CoreID).Size()
 
 			return iSocketScore > jSocketScore || iCoreScore < jCoreScore
 		})

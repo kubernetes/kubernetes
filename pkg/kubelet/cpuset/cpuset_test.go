@@ -52,7 +52,7 @@ func TestCPUSetIsEmpty(t *testing.T) {
 	for _, c := range testCases {
 		actual := c.cpuset.IsEmpty()
 		if actual != c.expected {
-			t.Fatalf("expected: %d, actual: %d, cpuset: [%v]", c.expected, actual, c.cpuset)
+			t.Fatalf("expected: %t, IsEmpty() returned: %t, cpuset: [%v]", c.expected, actual, c.cpuset)
 		}
 	}
 }

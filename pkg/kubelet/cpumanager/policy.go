@@ -21,6 +21,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/state"
 )
 
+// Policy interface used by cpu manager, shall implement logic for cpu to pod
+// assignment
 type Policy interface {
 	Name() string
 	Start(s state.State)

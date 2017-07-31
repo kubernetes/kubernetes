@@ -49,6 +49,7 @@ func (m *fakeManager) State() state.Reader {
 	return m.state
 }
 
+// NewFakeManager creates empty/fake cpu manager
 func NewFakeManager() Manager {
 	return &fakeManager{
 		state: state.NewMemoryState(),

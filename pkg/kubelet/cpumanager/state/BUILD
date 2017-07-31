@@ -23,7 +23,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/kubelet/cpumanager/topo:go_default_library",
         "//pkg/kubelet/cpuset:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],

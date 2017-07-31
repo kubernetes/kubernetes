@@ -20,19 +20,21 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
+// Reader interface used to read current cpu/pod assignment state
 type Reader interface {
 	GetCPUSet(containerID string) (cpuset.CPUSet, bool)
 	GetDefaultCPUSet() cpuset.CPUSet
 	GetCPUSetOrDefault(containerID string) cpuset.CPUSet
 }
 
-type Writer interface {
+type writer interface {
 	SetCPUSet(containerID string, cpuset cpuset.CPUSet)
 	SetDefaultCPUSet(cpuset cpuset.CPUSet)
 	Delete(containerID string)
 }
 
+// State interface provides methods for tracking and setting cpu/pod assignment
 type State interface {
 	Reader
-	Writer
+	writer
 }

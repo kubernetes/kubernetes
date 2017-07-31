@@ -23,13 +23,13 @@ import (
 )
 
 // CpuAllocatable must be <= CpuCapacity
-func prepareCpuNodeStatus(CpuCapacity, CpuAllocatable string) v1.NodeStatus {
+func prepareCPUNodeStatus(CPUCapacity, CPUAllocatable string) v1.NodeStatus {
 	nodestatus := v1.NodeStatus{
 		Capacity:    make(v1.ResourceList, 1),
 		Allocatable: make(v1.ResourceList, 1),
 	}
-	cpucap, _ := resource.ParseQuantity(CpuCapacity)
-	cpuall, _ := resource.ParseQuantity(CpuAllocatable)
+	cpucap, _ := resource.ParseQuantity(CPUCapacity)
+	cpuall, _ := resource.ParseQuantity(CPUAllocatable)
 
 	nodestatus.Capacity[v1.ResourceCPU] = cpucap
 	nodestatus.Allocatable[v1.ResourceCPU] = cpuall
@@ -37,7 +37,7 @@ func prepareCpuNodeStatus(CpuCapacity, CpuAllocatable string) v1.NodeStatus {
 }
 
 func TestGetReservedCpus(t *testing.T) {
-	var reservedCpuTests = []struct {
+	var reservedCPUTests = []struct {
 		cpuCapacity     string
 		cpuAllocatable  string
 		expReservedCpus int
@@ -49,8 +49,8 @@ func TestGetReservedCpus(t *testing.T) {
 		{cpuCapacity: "8000m", cpuAllocatable: "900m", expReservedCpus: 7},
 	}
 
-	for idx, test := range reservedCpuTests {
-		tmpNodeStaus := prepareCpuNodeStatus(test.cpuCapacity, test.cpuAllocatable)
+	for idx, test := range reservedCPUTests {
+		tmpNodeStaus := prepareCPUNodeStatus(test.cpuCapacity, test.cpuAllocatable)
 		gotReservedCpus := getReserverdCpus(tmpNodeStaus)
 		if test.expReservedCpus != gotReservedCpus {
 			t.Errorf("(Case %d) Expected reserved cpus %d, got %d",

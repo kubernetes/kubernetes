@@ -23,11 +23,30 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
-type CPUDetails map[int]CPUInfo
+type cpuDetails map[int]CPUInfo
 
-// Returns a new CPUDetails object with only `cpus` remaining.
-func (d CPUDetails) KeepOnly(cpus cpuset.CPUSet) CPUDetails {
-	result := CPUDetails{}
+// CPUTopology contains details of node cpu, where :
+// CPU  - logical CPU, cadvisor - thread
+// Core - physical CPU, cadvisor - Core
+// Socket - socket, cadvisor - Node
+type CPUTopology struct {
+	NumCPUs          int
+	NumCores         int
+	HyperThreading   bool
+	NumSockets       int
+	CPUtopoDetails   cpuDetails
+	NumReservedCores int
+}
+
+// CPUInfo holds information on where cpu is
+type CPUInfo struct {
+	SocketID int
+	CoreID   int
+}
+
+// Returns a new cpuDetails object with only `cpus` remaining.
+func (d cpuDetails) KeepOnly(cpus cpuset.CPUSet) cpuDetails {
+	result := cpuDetails{}
 	for cpu, info := range d {
 		if cpus.Contains(cpu) {
 			result[cpu] = info
@@ -36,68 +55,52 @@ func (d CPUDetails) KeepOnly(cpus cpuset.CPUSet) CPUDetails {
 	return result
 }
 
-func (d CPUDetails) Sockets() cpuset.CPUSet {
+func (d cpuDetails) Sockets() cpuset.CPUSet {
 	result := cpuset.NewCPUSet()
 	for _, info := range d {
-		result.Add(info.SocketId)
+		result.Add(info.SocketID)
 	}
 	return result
 }
 
-func (d CPUDetails) CPUsInSocket(id int) cpuset.CPUSet {
+func (d cpuDetails) CPUsInSocket(id int) cpuset.CPUSet {
 	result := cpuset.NewCPUSet()
 	for cpu, info := range d {
-		if info.SocketId == id {
+		if info.SocketID == id {
 			result.Add(cpu)
 		}
 	}
 	return result
 }
 
-func (d CPUDetails) CoresInSocket(id int) cpuset.CPUSet {
+func (d cpuDetails) CoresInSocket(id int) cpuset.CPUSet {
 	result := cpuset.NewCPUSet()
 	for _, info := range d {
-		if info.SocketId == id {
-			result.Add(info.CoreId)
+		if info.SocketID == id {
+			result.Add(info.CoreID)
 		}
 	}
 	return result
 }
 
-func (d CPUDetails) CPUsInCore(id int) cpuset.CPUSet {
+func (d cpuDetails) CPUsInCore(id int) cpuset.CPUSet {
 	result := cpuset.NewCPUSet()
 	for cpu, info := range d {
-		if info.CoreId == id {
+		if info.CoreID == id {
 			result.Add(cpu)
 		}
 	}
 	return result
 }
 
-//CPU  - logical CPU, cadvisor - thread
-//Core - physical CPU, cadvisor - Core
-//Socket - socket, cadvisor - Node
-type CPUTopology struct {
-	NumCPUs          int
-	NumCores         int
-	HyperThreading   bool
-	NumSockets       int
-	CPUtopoDetails   CPUDetails
-	NumReservedCores int
-}
-
-type CPUInfo struct {
-	SocketId int
-	CoreId   int
-}
-
+// Discover returns CPUTopology based on cadvisor node info
 func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 
 	if machineInfo.NumCores == 0 {
 		return nil, fmt.Errorf("could not detect number of cpus")
 	}
 
-	CPUtopoDetails := CPUDetails{}
+	CPUtopoDetails := cpuDetails{}
 
 	numCPUs := machineInfo.NumCores
 	htEnabled := false
@@ -107,8 +110,8 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 		for _, core := range socket.Cores {
 			for _, cpu := range core.Threads {
 				CPUtopoDetails[cpu] = CPUInfo{
-					CoreId:   core.Id,
-					SocketId: socket.Id,
+					CoreID:   core.Id,
+					SocketID: socket.Id,
 				}
 				// a little bit naive
 				if !htEnabled && len(core.Threads) != 1 {

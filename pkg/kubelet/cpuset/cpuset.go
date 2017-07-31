@@ -22,13 +22,14 @@ import (
 	"github.com/golang/glog"
 	"reflect"
 	"sort"
-	. "strconv"
+	"strconv"
 	"strings"
 )
 
 // CPUSet is a set-like data structure for CPU IDs.
 type CPUSet map[int]struct{}
 
+// NewCPUSet return CPUSet based on provided cpu id's
 func NewCPUSet(cpus ...int) CPUSet {
 	res := CPUSet{}
 	for _, c := range cpus {
@@ -185,7 +186,7 @@ func (s CPUSet) String() string {
 	var result bytes.Buffer
 	for _, r := range ranges {
 		if r.start == r.end {
-			result.WriteString(Itoa(r.start))
+			result.WriteString(strconv.Itoa(r.start))
 		} else {
 			result.WriteString(fmt.Sprintf("%d-%d", r.start, r.end))
 		}
@@ -194,7 +195,7 @@ func (s CPUSet) String() string {
 	return strings.TrimRight(result.String(), ",")
 }
 
-// MustParseCPUSet constructs a new CPU set from a Linux CPU list formatted
+// MustParse CPUSet constructs a new CPU set from a Linux CPU list formatted
 // string. Unlike Parse, it does not return an error but rather panics if the
 // input cannot be used to construct a CPU set.
 func MustParse(s string) CPUSet {
@@ -205,7 +206,7 @@ func MustParse(s string) CPUSet {
 	return res
 }
 
-// ParseCPUSet constructs a new CPU set from a Linux CPU list formatted string.
+// Parse CPUSet constructs a new CPU set from a Linux CPU list formatted string.
 //
 // See: http://man7.org/linux/man-pages/man7/cpuset.7.html#FORMATS
 func Parse(s string) (CPUSet, error) {
@@ -224,18 +225,18 @@ func Parse(s string) (CPUSet, error) {
 		boundaries := strings.Split(r, "-")
 		if len(boundaries) == 1 {
 			// Handle ranges that consist of only one element like "34".
-			elem, err := Atoi(boundaries[0])
+			elem, err := strconv.Atoi(boundaries[0])
 			if err != nil {
 				return nil, err
 			}
 			result.Add(elem)
 		} else if len(boundaries) == 2 {
 			// Handle multi-element rnages like "0-5".
-			start, err := Atoi(boundaries[0])
+			start, err := strconv.Atoi(boundaries[0])
 			if err != nil {
 				return nil, err
 			}
-			end, err := Atoi(boundaries[1])
+			end, err := strconv.Atoi(boundaries[1])
 			if err != nil {
 				return nil, err
 			}
@@ -249,7 +250,7 @@ func Parse(s string) (CPUSet, error) {
 	return result, nil
 }
 
-// Returns a copy of this CPU set.
+// Clone returns a copy of this CPU set.
 func (s CPUSet) Clone() CPUSet {
 	res := NewCPUSet()
 	for k, v := range s {

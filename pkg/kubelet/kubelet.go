@@ -623,7 +623,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 
 		klet.cpuManager, err = cpumanager.NewManager(
-			cpumanager.PolicyName(kubeCfg.CPUManagerPolicy),
+			kubeCfg.CPUManagerPolicy,
 			runtimeService, // runtime service
 			klet,           // kubelet getter interface
 			klet.statusManager)

@@ -26,6 +26,9 @@ type stateMemory struct {
 	defaultCPUSet cpuset.CPUSet
 }
 
+var _ State = &stateMemory{}
+
+// NewMemoryState creates new State for keeping track of cpu/pod assignment
 func NewMemoryState() State {
 	glog.Infof("[cpumanager] initializing new in-memory state store")
 	return &stateMemory{
