@@ -20,7 +20,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"time"
 
 	"github.com/golang/glog"
 
@@ -117,7 +116,7 @@ func main() {
 		glog.Fatal(err)
 	}
 
-	factory := informers.NewSharedInformerFactory(clientset, time.Hour*24)
+	factory := informers.NewSharedInformerFactory(clientset, 0)
 	controller := NewPodLoggingController(factory)
 	stop := make(chan struct{})
 	defer close(stop)
