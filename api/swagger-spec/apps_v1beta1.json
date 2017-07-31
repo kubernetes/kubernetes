@@ -6039,6 +6039,39 @@
      "capacity": {
       "type": "object",
       "description": "Represents the actual resources of the underlying volume."
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PvcCondition"
+      }
+     }
+    }
+   },
+   "v1.PvcCondition": {
+    "id": "v1.PvcCondition",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "lastProbeTime": {
+      "type": "string"
+     },
+     "lastTransitionTime": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
      }
     }
    },

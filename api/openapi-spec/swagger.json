@@ -56127,6 +56127,15 @@
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
      },
+     "conditions": {
+      "description": "Current service state of PVC",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.PvcCondition"
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
+     },
      "phase": {
       "description": "Phase represents the current phase of PersistentVolumeClaim.",
       "type": "string"
@@ -56889,6 +56898,37 @@
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.VolumeProjection"
       }
+     }
+    }
+   },
+   "io.k8s.api.core.v1.PvcCondition": {
+    "description": "PvcCondition contails details about state of pvc",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "description": "Last time we probed the condition.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "lastTransitionTime": {
+      "description": "Last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "message": {
+      "description": "Human-readable message indicating details about last transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "Unique, one-word, CamelCase reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string"
      }
     }
    },
