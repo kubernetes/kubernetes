@@ -131,7 +131,7 @@ func (m *manager) Start() {
 	if m.policy.Name() == string(PolicyNoop) {
 		return
 	}
-	go wait.Until(m.reconcileState, time.Second, wait.NeverStop)
+	go wait.Until(func() { m.reconcileState() }, time.Second, wait.NeverStop)
 }
 
 func (m *manager) RegisterContainer(p *v1.Pod, c *v1.Container, containerID string) error {
@@ -173,27 +173,39 @@ func (m *manager) State() state.Reader {
 	return m.state
 }
 
-func (m *manager) reconcileState() {
+type reconciledContainer struct {
+	podName       string
+	containerName string
+	containerID   string
+}
+
+func (m *manager) reconcileState() (success []reconciledContainer, failure []reconciledContainer) {
 	m.Lock()
 	defer m.Unlock()
+
+	success = []reconciledContainer{}
+	failure = []reconciledContainer{}
 
 	for _, pod := range m.kletGetter.GetPods() {
 		for _, container := range pod.Spec.Containers {
 			status, ok := m.podStatusProvider.GetPodStatus(pod.UID)
 			if !ok {
 				glog.Warningf("[cpumanager] reconcileState: skipping pod; status not found (pod: %s, container: %s)", pod.Name, container.Name)
+				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
 				break
 			}
 
 			containerID, err := findContainerIDByName(&status, container.Name)
 			if err != nil {
 				glog.Warningf("[cpumanager] reconcileState: skipping container; ID not found in status (pod: %s, container: %s, error: %v)", pod.Name, container.Name, err)
+				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
 				continue
 			}
 
 			cset := m.state.GetCPUSetOrDefault(containerID)
 			if cset.IsEmpty() {
 				glog.Infof("[cpumanager] reconcileState: skipping container; assigned cpuset is empty (pod: %s, container: %s)", pod.Name, container.Name)
+				failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
 				continue
 			}
 
@@ -205,9 +217,13 @@ func (m *manager) reconcileState() {
 				})
 			if err != nil {
 				glog.Errorf("[cpumanager] reconcileState: failed to update container (pod: %s, container: %s, container id: %s, cpuset: \"%v\", error: %v)", pod.Name, container.Name, containerID, cset, err)
+				failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
+				continue
 			}
+			success = append(success, reconciledContainer{pod.Name, container.Name, containerID})
 		}
 	}
+	return success, failure
 }
 
 func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {

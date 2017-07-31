@@ -17,12 +17,8 @@ limitations under the License.
 package cpumanager
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"os"
 	"reflect"
-	"strings"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/api/core/v1"
@@ -158,28 +154,6 @@ func prepareCPUNodeStatus(CPUCapacity, CPUAllocatable string) v1.NodeStatus {
 	return nodestatus
 }
 
-func getStderr(f func()) (string, error) {
-	origStderr := os.Stderr
-	r, w, err := os.Pipe()
-	if err != nil {
-		return "", err
-	}
-
-	os.Stderr = w
-	outChan := make(chan string)
-	go func() {
-		var buff bytes.Buffer
-		io.Copy(&buff, r)
-		outChan <- buff.String()
-	}()
-
-	f()
-
-	w.Close()
-	os.Stderr = origStderr
-	return <-outChan, nil
-}
-
 func TestCPUManagerRegister(t *testing.T) {
 	testCases := []struct {
 		description string
@@ -270,14 +244,14 @@ func TestCPUManagerUnRegister(t *testing.T) {
 
 func TestReconcileState(t *testing.T) {
 	testCases := []struct {
-		description     string
-		klgPods         []*v1.Pod
-		pspPS           v1.PodStatus
-		pspFound        bool
-		stAssignments   map[string]cpuset.CPUSet
-		stDefaultCPUSet cpuset.CPUSet
-		updateErr       error
-		expOut          string
+		description               string
+		klgPods                   []*v1.Pod
+		pspPS                     v1.PodStatus
+		pspFound                  bool
+		stAssignments             map[string]cpuset.CPUSet
+		stDefaultCPUSet           cpuset.CPUSet
+		updateErr                 error
+		expectFailedContainerName string
 	}{
 		{
 			description: "cpu manager reconclie - no error",
@@ -308,9 +282,9 @@ func TestReconcileState(t *testing.T) {
 			stAssignments: map[string]cpuset.CPUSet{
 				"fakeID": cpuset.NewCPUSet(1, 2),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(3, 4, 5, 6, 7),
-			updateErr:       nil,
-			expOut:          "",
+			stDefaultCPUSet:           cpuset.NewCPUSet(3, 4, 5, 6, 7),
+			updateErr:                 nil,
+			expectFailedContainerName: "",
 		},
 		{
 			description: "cpu manager reconclie - pod status not found",
@@ -329,12 +303,12 @@ func TestReconcileState(t *testing.T) {
 					},
 				},
 			},
-			pspPS:           v1.PodStatus{},
-			pspFound:        false,
-			stAssignments:   map[string]cpuset.CPUSet{},
-			stDefaultCPUSet: cpuset.NewCPUSet(),
-			updateErr:       nil,
-			expOut:          fmt.Sprintf("[cpumanager] reconcileState: skipping pod; status not found (pod: fakePodName, container: fakeName)"),
+			pspPS:                     v1.PodStatus{},
+			pspFound:                  false,
+			stAssignments:             map[string]cpuset.CPUSet{},
+			stDefaultCPUSet:           cpuset.NewCPUSet(),
+			updateErr:                 nil,
+			expectFailedContainerName: "fakeName",
 		},
 		{
 			description: "cpu manager reconclie - container id not found",
@@ -361,12 +335,11 @@ func TestReconcileState(t *testing.T) {
 					},
 				},
 			},
-			pspFound:        true,
-			stAssignments:   map[string]cpuset.CPUSet{},
-			stDefaultCPUSet: cpuset.NewCPUSet(),
-			updateErr:       nil,
-			expOut: fmt.Sprintf("[cpumanager] reconcileState: skipping container; ID not found in status (pod: fakePodName, container: fakeName, error: %v)",
-				fmt.Sprintf("[cpumanager] unable to find ID for container with name fakeName in pod status (it may not be running)")),
+			pspFound:                  true,
+			stAssignments:             map[string]cpuset.CPUSet{},
+			stDefaultCPUSet:           cpuset.NewCPUSet(),
+			updateErr:                 nil,
+			expectFailedContainerName: "fakeName",
 		},
 		{
 			description: "cpu manager reconclie - cpuset is empty",
@@ -397,9 +370,9 @@ func TestReconcileState(t *testing.T) {
 			stAssignments: map[string]cpuset.CPUSet{
 				"fakeID": cpuset.NewCPUSet(),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
-			updateErr:       nil,
-			expOut:          fmt.Sprintf("[cpumanager] reconcileState: skipping container; assigned cpuset is empty (pod: fakePodName, container: fakeName)"),
+			stDefaultCPUSet:           cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+			updateErr:                 nil,
+			expectFailedContainerName: "fakeName",
 		},
 		{
 			description: "cpu manager reconclie - container update error",
@@ -430,10 +403,9 @@ func TestReconcileState(t *testing.T) {
 			stAssignments: map[string]cpuset.CPUSet{
 				"fakeID": cpuset.NewCPUSet(1, 2),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(3, 4, 5, 6, 7),
-			updateErr:       fmt.Errorf("fake container update error"),
-			expOut: fmt.Sprintf("[cpumanager] reconcileState: failed to update container (pod: fakePodName, container: fakeName, container id: fakeID, cpuset: \"1-2\", error: %v)",
-				fmt.Sprintf("fake container update error")),
+			stDefaultCPUSet:           cpuset.NewCPUSet(3, 4, 5, 6, 7),
+			updateErr:                 fmt.Errorf("fake container update error"),
+			expectFailedContainerName: "fakeName",
 		},
 	}
 
@@ -458,14 +430,20 @@ func TestReconcileState(t *testing.T) {
 			},
 		}
 
-		out, err := getStderr(func() { mgr.reconcileState() })
-		if err != nil {
-			t.Errorf("CPU Manger Reconcile() error. output capture error")
-		}
+		_, failure := mgr.reconcileState()
 
-		if !strings.HasSuffix(strings.TrimSpace(out), testCase.expOut) {
-			t.Errorf("CPU Manager Reconcile() error (%v). expected out: %v but got: %v",
-				testCase.description, testCase.expOut, out)
+		if testCase.expectFailedContainerName != "" {
+			// Search failed reconciled containers for the supplied name.
+			foundFailedContainer := false
+			for _, reconciled := range failure {
+				if reconciled.containerName == testCase.expectFailedContainerName {
+					foundFailedContainer = true
+					break
+				}
+			}
+			if !foundFailedContainer {
+				t.Errorf("Expected reconciliation failure for container: %s", testCase.expectFailedContainerName)
+			}
 		}
 	}
 }
