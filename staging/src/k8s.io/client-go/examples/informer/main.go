@@ -23,7 +23,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -54,22 +53,30 @@ func (c *PodLoggingController) Run(stopCh chan struct{}) error {
 }
 
 func (c *PodLoggingController) podAdd(obj interface{}) {
-	pod := obj.(*v1.Pod)
-	glog.Infof("POD CREATED: %s/%s", pod.Namespace, pod.Name)
+	key, err := cache.MetaNamespaceKeyFunc(obj)
+	if err == nil {
+		glog.Infof("POD CREATED. %q", key)
+	} else {
+		glog.Error(err)
+	}
 }
 
 func (c *PodLoggingController) podUpdate(old, new interface{}) {
-	oldPod := old.(*v1.Pod)
-	newPod := new.(*v1.Pod)
-	glog.Infof(
-		"POD UPDATED. %s/%s %s",
-		oldPod.Namespace, oldPod.Name, newPod.Status.Phase,
-	)
+	key, err := cache.MetaNamespaceKeyFunc(new)
+	if err == nil {
+		glog.Infof("POD UPDATED. %q", key)
+	} else {
+		glog.Error(err)
+	}
 }
 
 func (c *PodLoggingController) podDelete(obj interface{}) {
-	pod := obj.(*v1.Pod)
-	glog.Infof("POD DELETED: %s/%s", pod.Namespace, pod.Name)
+	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	if err == nil {
+		glog.Infof("POD DELETED: %q", key)
+	} else {
+		glog.Error(err)
+	}
 }
 
 // NewPodLoggingController creates a PodLoggingController

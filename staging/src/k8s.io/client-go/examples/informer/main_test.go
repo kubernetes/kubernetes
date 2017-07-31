@@ -17,93 +17,89 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
 	"math/rand"
+	"reflect"
 	"testing"
+	"testing/quick"
 	"time"
 
-	"github.com/golang/glog"
-
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/api"
+	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
-func podForTest() *v1.Pod {
-	p := &v1.Pod{}
-	p.SetName(fmt.Sprintf("%d", rand.Int()))
-	p.SetNamespace(v1.NamespaceDefault)
-	return p
+func podForTest(r *rand.Rand) *v1.Pod {
+	apiObjectFuzzer := fuzzer.FuzzerFor(
+		kapitesting.FuzzerFuncs,
+		r,
+		api.Codecs,
+	)
+	var p v1.Pod
+	apiObjectFuzzer.Fuzz(&p)
+	p.Spec.InitContainers = nil
+	p.Status.InitContainerStatuses = nil
+	return &p
 }
 
 func TestMain(t *testing.T) {
-	pod1 := podForTest()
-	pod2 := podForTest()
-	pod3 := podForTest()
-	type testCase struct {
-		description       string
-		initial           []runtime.Object
-		add               []runtime.Object
-		update            []runtime.Object
-		delete            []runtime.Object
-		expectedLineCount int64
-	}
-	testCases := []testCase{
-		{
-			description:       "Single initial pod",
-			initial:           []runtime.Object{pod1},
-			expectedLineCount: 1,
-		},
-		{
-			description:       "Multiple initial pods",
-			initial:           []runtime.Object{pod1, pod2},
-			expectedLineCount: 2,
-		},
-		{
-			description:       "Pod added later",
-			initial:           []runtime.Object{pod1, pod2},
-			add:               []runtime.Object{pod3},
-			expectedLineCount: 3,
-		},
+	clientset := fake.NewSimpleClientset()
+	fakeWatch := watch.NewFake()
+	clientset.PrependWatchReactor(
+		"pods",
+		clienttesting.DefaultWatchReactor(fakeWatch, nil),
+	)
+	factory := informers.NewSharedInformerFactory(clientset, 0)
+	c := NewPodLoggingController(factory)
+
+	stop := make(chan struct{})
+	defer close(stop)
+
+	err := c.Run(stop)
+	if err != nil {
+		t.Error(err)
 	}
 
-	for _, tc := range testCases {
-		t.Run(
-			tc.description,
-			func(t *testing.T) {
-				initialLineCount := glog.Stats.Info.Lines()
-				clientset := fake.NewSimpleClientset(tc.initial...)
-				fakeWatch := watch.NewFake()
-				clientset.PrependWatchReactor(
-					"pods",
-					clienttesting.DefaultWatchReactor(fakeWatch, nil),
-				)
-				factory := informers.NewSharedInformerFactory(clientset, 0)
-				c := NewPodLoggingController(factory)
+	f := func(p *v1.Pod) bool {
+		// initialLineCount := glog.Stats.Info.Lines()
+		// for _, pod := range tc.initial {
+		//	fakeWatch.Delete(pod)
+		// }
+		// <-time.After(1 * time.Second)
+		// actualLineCount := glog.Stats.Info.Lines() - initialLineCount
+		// if tc.expectedLineCount != actualLineCount {
+		//	t.Errorf(
+		//		"Line count mismatch. Expected %d. Got %d",
+		//		tc.expectedLineCount,
+		//		actualLineCount,
+		//	)
+		// }
+		fakeWatch.Add(p)
+		// key, err := cache.MetaNamespaceKeyFunc(p)
+		// if err == nil {
+		//	t.Log(key)
+		// } else {
+		//	t.Error(err)
+		// }
+		return true
+	}
 
-				stop := make(chan struct{})
-				defer close(stop)
-
-				err := c.Run(stop)
-				if err != nil {
-					t.Error(err)
-				}
-				for _, podToAdd := range tc.add {
-					fakeWatch.Add(podToAdd)
-				}
-				<-time.After(1 * time.Second)
-				actualLineCount := glog.Stats.Info.Lines() - initialLineCount
-				if tc.expectedLineCount != actualLineCount {
-					t.Errorf(
-						"Line count mismatch. Expected %d. Got %d",
-						tc.expectedLineCount,
-						actualLineCount,
-					)
-				}
+	err = quick.Check(
+		f,
+		&quick.Config{
+			MaxCount: 1000,
+			Values: func(values []reflect.Value, r *rand.Rand) {
+				p := podForTest(r)
+				values[0] = reflect.ValueOf(p)
 			},
-		)
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
+	time.Sleep(time.Second)
 }
