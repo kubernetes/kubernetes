@@ -112,7 +112,6 @@ items:
     resources:
     - cronjobs
     - jobs
-    - scheduledjobs
     verbs:
     - create
     - delete
@@ -294,7 +293,6 @@ items:
     resources:
     - cronjobs
     - jobs
-    - scheduledjobs
     verbs:
     - create
     - delete
@@ -957,7 +955,6 @@ items:
     resources:
     - cronjobs
     - jobs
-    - scheduledjobs
     verbs:
     - get
     - list
