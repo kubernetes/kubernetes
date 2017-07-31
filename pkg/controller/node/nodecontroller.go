@@ -434,7 +434,7 @@ func (nc *NodeController) doEvictionPass() {
 	}
 }
 
-func (nc *NodeController) doTaintingPass() {
+func (nc *NodeController) doNoExecuteTaintingPass() {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	for k := range nc.zoneNoExecuteTainer {
@@ -498,7 +498,7 @@ func (nc *NodeController) Run(stopCh <-chan struct{}) {
 	if nc.useTaintBasedEvictions {
 		// Handling taint based evictions. Because we don't want a dedicated logic in TaintManager for NC-originated
 		// taints and we normally don't rate limit evictions caused by taints, we need to rate limit adding taints.
-		go wait.Until(nc.doTaintingPass, nodeEvictionPeriod, wait.NeverStop)
+		go wait.Until(nc.doNoExecuteTaintingPass, nodeEvictionPeriod, wait.NeverStop)
 	} else {
 		// Managing eviction of nodes:
 		// When we delete pods off a node, if the node was not empty at the time we then
