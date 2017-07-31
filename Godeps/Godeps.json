@@ -832,6 +832,10 @@
 			"Rev": "511bcaf42ccd42c38aba7427b6673277bf19e2a1"
 		},
 		{
+			"ImportPath": "github.com/decker502/dnspod-go",
+			"Rev": "f33a2c6040fc2550a631de7b3a53bddccdcd73fb"
+		},
+		{
 			"ImportPath": "github.com/dgrijalva/jwt-go",
 			"Comment": "v3.0.0-4-g01aeca5",
 			"Rev": "01aeca54ebda6e0fbfafd0a524d234159c05ec20"

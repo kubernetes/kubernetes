@@ -13,6 +13,7 @@ go_library(
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//federation/apis/federation:go_default_library",
         "//federation/pkg/dnsprovider/providers/coredns:go_default_library",
+        "//federation/pkg/dnsprovider/providers/dnspod:go_default_library",
         "//federation/pkg/kubefed/util:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",

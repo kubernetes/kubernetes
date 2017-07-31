@@ -44,6 +44,7 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/dnspod"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -972,6 +973,12 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 			if err != nil {
 				return nil, err
 			}
+		} else if dnsProvider == util.FedDNSProviderDnspod {
+			var err error
+			dep, err = addDnspodServerAnnotation(dep, dnsZoneName, dnsProviderConfig)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -1200,5 +1207,17 @@ func addCoreDNSServerAnnotation(deployment *extensions.Deployment, dnsZoneName, 
 	deployment.Annotations[util.FedDNSZoneName] = dnsZoneName
 	deployment.Annotations[util.FedNameServer] = cfg.Global.CoreDNSEndpoints
 	deployment.Annotations[util.FedDNSProvider] = util.FedDNSProviderCoreDNS
+	return deployment, nil
+}
+
+func addDnspodServerAnnotation(deployment *extensions.Deployment, dnsZoneName, dnsProviderConfig string) (*extensions.Deployment, error) {
+	var cfg dnspod.Config
+	if err := gcfg.ReadFileInto(&cfg, dnsProviderConfig); err != nil {
+		return nil, err
+	}
+
+	deployment.Annotations[util.FedDNSZoneName] = dnsZoneName
+	//deployment.Annotations[util.FedNameServer] = cfg.Global.DnspodEndpoints
+	deployment.Annotations[util.FedDNSProvider] = util.FedDNSProviderDnspod
 	return deployment, nil
 }

@@ -45,6 +45,7 @@ federation/pkg/dnsprovider/providers/aws/route53
 federation/pkg/dnsprovider/providers/aws/route53/stubs
 federation/pkg/dnsprovider/providers/coredns
 federation/pkg/dnsprovider/providers/coredns/stubs
+federation/pkg/dnsprovider/providers/dnspod
 federation/pkg/dnsprovider/providers/google/clouddns
 federation/pkg/dnsprovider/providers/google/clouddns/internal
 federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces

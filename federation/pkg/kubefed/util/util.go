@@ -55,6 +55,7 @@ const (
 	FedNameServer         = "nameserver"
 	FedDNSProvider        = "dns-provider"
 	FedDNSProviderCoreDNS = "coredns"
+	FedDNSProviderDnspod  = "dnspod"
 	KubeDnsStubDomains    = "stubDomains"
 
 	// DefaultFederationSystemNamespace is the namespace in which

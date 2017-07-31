@@ -500,7 +500,7 @@ func populateStubDomainsIfRequired(configMap *api.ConfigMap, annotations map[str
 	dnsZoneName := annotations[util.FedDNSZoneName]
 	nameServer := annotations[util.FedNameServer]
 
-	if dnsProvider != util.FedDNSProviderCoreDNS || dnsZoneName == "" || nameServer == "" {
+	if (dnsProvider != util.FedDNSProviderCoreDNS && dnsProvider != util.FedDNSProviderDnspod) || dnsZoneName == "" || nameServer == "" {
 		return configMap
 	}
 	configMap.Data[util.KubeDnsStubDomains] = fmt.Sprintf(`{"%s":["%s"]}`, dnsZoneName, nameServer)

@@ -39,6 +39,7 @@ filegroup(
         ":package-srcs",
         "//federation/pkg/dnsprovider/providers/aws/route53:all-srcs",
         "//federation/pkg/dnsprovider/providers/coredns:all-srcs",
+        "//federation/pkg/dnsprovider/providers/dnspod:all-srcs",
         "//federation/pkg/dnsprovider/providers/google/clouddns:all-srcs",
         "//federation/pkg/dnsprovider/rrstype:all-srcs",
         "//federation/pkg/dnsprovider/tests:all-srcs",

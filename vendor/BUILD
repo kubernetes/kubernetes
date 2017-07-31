@@ -120,6 +120,7 @@ filegroup(
         "//vendor/github.com/cpuguy83/go-md2man/md2man:all-srcs",
         "//vendor/github.com/davecgh/go-spew/spew:all-srcs",
         "//vendor/github.com/daviddengcn/go-colortext:all-srcs",
+        "//vendor/github.com/decker502/dnspod-go:all-srcs",
         "//vendor/github.com/dgrijalva/jwt-go:all-srcs",
         "//vendor/github.com/docker/distribution/digest:all-srcs",
         "//vendor/github.com/docker/distribution/reference:all-srcs",
