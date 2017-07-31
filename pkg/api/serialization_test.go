@@ -47,6 +47,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	k8s_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -213,6 +215,11 @@ func TestRoundTripTypes(t *testing.T) {
 			{Group: componentconfig.GroupName, Version: runtime.APIVersionInternal, Kind: "KubeletConfiguration"}:       true,
 			{Group: componentconfig.GroupName, Version: runtime.APIVersionInternal, Kind: "KubeProxyConfiguration"}:     true,
 			{Group: componentconfig.GroupName, Version: runtime.APIVersionInternal, Kind: "KubeSchedulerConfiguration"}: true,
+		},
+		Unrelated: map[roundtrip.UnrelatedKinds]bool{
+			{"Scale", apps.GroupName, autoscaling.GroupName}:       true,
+			{"Scale", apps.GroupName, extensions.GroupName}:        true,
+			{"Scale", autoscaling.GroupName, extensions.GroupName}: true,
 		},
 	}
 
