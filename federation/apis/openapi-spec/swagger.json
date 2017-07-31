@@ -10573,6 +10573,10 @@
       "description": "HTTPGet specifies the http request to perform.",
       "$ref": "#/definitions/io.k8s.api.core.v1.HTTPGetAction"
      },
+     "retryPolicy": {
+      "description": "Retrypolicy picks a value from three values (Always, OnFail, Never) as a retry strategy. Always as strategy will retry until timeout no matter what happen. OnFailure means first time failure and will retry until the timeout or retry until success. Never is native logic, only run once",
+      "type": "string"
+     },
      "tcpSocket": {
       "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
       "$ref": "#/definitions/io.k8s.api.core.v1.TCPSocketAction"
@@ -11298,6 +11302,10 @@
       "description": "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
       "type": "integer",
       "format": "int32"
+     },
+     "retryPolicy": {
+      "description": "Retrypolicy picks a value from three values (Always, OnFail, Never) as a retry strategy. Always as strategy will retry until timeout no matter what happen. OnFailure means first time failure and will retry until the timeout or retry until success. Never is native logic, only run once",
+      "type": "string"
      },
      "successThreshold": {
       "description": "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness. Minimum value is 1.",

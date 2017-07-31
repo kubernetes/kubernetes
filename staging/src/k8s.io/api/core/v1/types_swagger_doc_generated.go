@@ -632,10 +632,11 @@ func (HTTPHeader) SwaggerDoc() map[string]string {
 }
 
 var map_Handler = map[string]string{
-	"":          "Handler defines a specific action that should be taken",
-	"exec":      "One and only one of the following should be specified. Exec specifies the action to take.",
-	"httpGet":   "HTTPGet specifies the http request to perform.",
-	"tcpSocket": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
+	"":            "Handler defines a specific action that should be taken",
+	"exec":        "One and only one of the following should be specified. Exec specifies the action to take.",
+	"httpGet":     "HTTPGet specifies the http request to perform.",
+	"tcpSocket":   "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
+	"retryPolicy": "Retrypolicy picks a value from three values (Always, OnFail, Never) as a retry strategy. Always as strategy will retry until timeout no matter what happen. OnFailure means first time failure and will retry until the timeout or retry until success. Never is native logic, only run once",
 }
 
 func (Handler) SwaggerDoc() map[string]string {

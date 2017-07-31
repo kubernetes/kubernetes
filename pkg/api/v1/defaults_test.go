@@ -1266,6 +1266,7 @@ func TestSetDefaultProbe(t *testing.T) {
 		PeriodSeconds:       10,
 		SuccessThreshold:    1,
 		FailureThreshold:    3,
+		Handler:             v1.Handler{RetryPolicy: v1.RetryPolicyNever},
 	}
 
 	pod := &v1.Pod{

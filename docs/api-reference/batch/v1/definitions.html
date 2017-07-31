@@ -2852,6 +2852,13 @@ When an object is created, the system will populate this list with the current s
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">retryPolicy</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Retrypolicy picks a value from three values (Always, OnFail, Never) as a retry strategy. Always as strategy will retry until timeout no matter what happen. OnFailure means first time failure and will retry until the timeout or retry until success. Never is native logic, only run once</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">initialDelaySeconds</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Number of seconds after the container has started before liveness probes are initiated. More info: <a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes">https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -3433,6 +3440,13 @@ When an object is created, the system will populate this list with the current s
 <td class="tableblock halign-left valign-top"><p class="tableblock">TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_tcpsocketaction">v1.TCPSocketAction</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">retryPolicy</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Retrypolicy picks a value from three values (Always, OnFail, Never) as a retry strategy. Always as strategy will retry until timeout no matter what happen. OnFailure means first time failure and will retry until the timeout or retry until success. Never is native logic, only run once</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>

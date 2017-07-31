@@ -89,6 +89,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					Exec: &v1.ExecAction{
 						Command: []string{"sh", "-c", "curl http://" + targetIP + ":8080/echo?msg=poststart"},
 					},
+					RetryPolicy: v1.RetryPolicyNever,
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-poststart-exec-hook", "gcr.io/google_containers/hostexec:1.2", lifecycle)
@@ -100,6 +101,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					Exec: &v1.ExecAction{
 						Command: []string{"sh", "-c", "curl http://" + targetIP + ":8080/echo?msg=prestop"},
 					},
+					RetryPolicy: v1.RetryPolicyNever,
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-prestop-exec-hook", "gcr.io/google_containers/hostexec:1.2", lifecycle)
@@ -113,6 +115,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 						Host: targetIP,
 						Port: intstr.FromInt(8080),
 					},
+					RetryPolicy: v1.RetryPolicyNever,
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-poststart-http-hook", framework.GetPauseImageNameForHostArch(), lifecycle)
@@ -126,6 +129,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 						Host: targetIP,
 						Port: intstr.FromInt(8080),
 					},
+					RetryPolicy: v1.RetryPolicyNever,
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-prestop-http-hook", framework.GetPauseImageNameForHostArch(), lifecycle)

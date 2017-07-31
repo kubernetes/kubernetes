@@ -1893,6 +1893,17 @@ func validateHandler(handler *api.Handler, fldPath *field.Path) field.ErrorList 
 			allErrors = append(allErrors, validateTCPSocketAction(handler.TCPSocket, fldPath.Child("tcpSocket"))...)
 		}
 	}
+
+	switch handler.RetryPolicy {
+	case api.RetryPolicyAlways, api.RetryPolicyNever, api.RetryPolicyOnFailure:
+		break
+	case "":
+		allErrors = append(allErrors, field.Required(fldPath, ""))
+	default:
+		validValues := []string{string(api.RetryPolicyAlways), string(api.RetryPolicyNever), string(api.RetryPolicyOnFailure)}
+		allErrors = append(allErrors, field.NotSupported(fldPath, handler.RetryPolicy, validValues))
+	}
+
 	if numHandlers == 0 {
 		allErrors = append(allErrors, field.Required(fldPath, "must specify a handler type"))
 	}
