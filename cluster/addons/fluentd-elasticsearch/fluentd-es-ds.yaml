@@ -30,7 +30,7 @@ spec:
           - '-c'
           - '/usr/sbin/td-agent $FLUENTD_ARGS'
         env:
-        - name: FLUENTD_AGRS
+        - name: FLUENTD_ARGS
           value: -q
         resources:
           limits:
