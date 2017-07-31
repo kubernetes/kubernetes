@@ -20,6 +20,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/state"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 type fakeManager struct {
@@ -47,6 +48,15 @@ func (m *fakeManager) UnregisterContainer(containerID string) error {
 
 func (m *fakeManager) State() state.Reader {
 	return m.state
+}
+
+func (m *fakeManager) IsUnderCPUPressure() bool {
+	return false
+}
+
+// Required for lifecycle.PodAdmitHandler interface
+func (m *fakeManager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	return lifecycle.PodAdmitResult{Admit: true}
 }
 
 // NewFakeManager creates empty/fake cpu manager

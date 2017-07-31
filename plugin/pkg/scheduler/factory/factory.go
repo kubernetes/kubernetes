@@ -570,6 +570,9 @@ func (c *ConfigFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 			if oldConditions[v1.NodeDiskPressure] != newConditions[v1.NodeDiskPressure] {
 				invalidPredicates.Insert("CheckNodeDiskPressure")
 			}
+			if oldConditions[v1.NodeCPUPressure] != newConditions[v1.NodeCPUPressure] {
+				invalidPredicates.Insert("CheckNodeCPUPressure")
+			}
 		}
 		c.equivalencePodCache.InvalidateCachedPredicateItem(newNode.GetName(), invalidPredicates)
 	}

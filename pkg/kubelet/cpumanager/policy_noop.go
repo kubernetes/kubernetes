@@ -51,3 +51,7 @@ func (p *noopPolicy) UnregisterContainer(s state.State, containerID string) erro
 	glog.Infof("[cpumanager] noop policy: UnregisterContainer [%s]", containerID)
 	return nil
 }
+
+func (p *noopPolicy) IsUnderPressure() bool {
+	return false
+}

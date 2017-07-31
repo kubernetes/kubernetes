@@ -35,7 +35,12 @@ var _ Policy = &staticPolicy{}
 
 type staticPolicy struct {
 	topology *topology.CPUTopology
+	// underPressure is true when the shared CPU pool is empty
+	underPressure bool
 }
+
+// Ensure staticPolicy implements Policy interface
+var _ Policy = &staticPolicy{}
 
 // NewStaticPolicy returns a cupset manager policy that does not change
 // CPU assignments for exclusively pinned guaranteed containers after
@@ -96,6 +101,10 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int) (cpuset.CPUSet, 
 	}
 	// Remove allocated CPUs from the shared CPUSet.
 	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result))
+	if s.GetDefaultCPUSet().IsEmpty() {
+		glog.Infof("[cpumanager] shared CPU pool is empty")
+		p.underPressure = true
+	}
 
 	glog.Infof("[cpumanager] allocateCPUs: returning \"%v\"", result)
 	return result, nil
@@ -210,6 +219,10 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 func (p *staticPolicy) releaseCPUs(s state.State, release cpuset.CPUSet) {
 	// mutate the shared pool, adding supplied cpus
 	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(release))
+	if p.underPressure == true && !s.GetDefaultCPUSet().IsEmpty() {
+		glog.Infof("[cpumanager] shared CPU pool is not empty")
+		p.underPressure = false
+	}
 }
 
 func guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {
@@ -225,4 +238,8 @@ func guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {
 	// Per the language spec, `int` is guaranteed to be at least 32 bits wide.
 	// https://golang.org/ref/spec#Numeric_types
 	return int(cpuQuantity.Value())
+}
+
+func (p *staticPolicy) IsUnderPressure() bool {
+	return p.underPressure
 }

@@ -24,6 +24,7 @@ import (
 // Policy interface used by cpu manager, shall implement logic for cpu to pod
 // assignment
 type Policy interface {
+	IsUnderPressure() bool
 	Name() string
 	Start(s state.State)
 	RegisterContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error

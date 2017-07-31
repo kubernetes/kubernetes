@@ -885,6 +885,64 @@ func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
 	}
 }
 
+// setNodeCPUPressureCondition for the node.
+// TODO: this needs to move somewhere centralized...
+func (kl *Kubelet) setNodeCPUPressureCondition(node *v1.Node) {
+	currentTime := metav1.NewTime(kl.clock.Now())
+	var condition *v1.NodeCondition
+
+	// Check if NodeCPUPressure condition already exists and if it does, just pick it up for update.
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Type == v1.NodeCPUPressure {
+			condition = &node.Status.Conditions[i]
+		}
+	}
+
+	newCondition := false
+	// If the NodeCPUPressure condition doesn't exist, create one
+	if condition == nil {
+		condition = &v1.NodeCondition{
+			Type:   v1.NodeCPUPressure,
+			Status: v1.ConditionUnknown,
+		}
+		// cannot be appended to node.Status.Conditions here because it gets
+		// copied to the slice. So if we append to the slice here none of the
+		// updates we make below are reflected in the slice.
+		newCondition = true
+	}
+
+	// Update the heartbeat time
+	condition.LastHeartbeatTime = currentTime
+
+	// Note: The conditions below take care of the case when a new NodeCPUPressure condition is
+	// created and as well as the case when the condition already exists. When a new condition
+	// is created its status is set to v1.ConditionUnknown which matches either
+	// condition.Status != v1.ConditionTrue or
+	// condition.Status != v1.ConditionFalse in the conditions below depending on whether
+	// the kubelet is under cpu pressure or not.
+	if kl.cpuManager.IsUnderCPUPressure() {
+		if condition.Status != v1.ConditionTrue {
+			condition.Status = v1.ConditionTrue
+			condition.Reason = "KubeletHasCPUPressure"
+			condition.Message = "kubelet has CPU pressure"
+			condition.LastTransitionTime = currentTime
+			kl.recordNodeStatusEvent(v1.EventTypeNormal, "NodeHasCPUPressure")
+		}
+	} else {
+		if condition.Status != v1.ConditionFalse {
+			condition.Status = v1.ConditionFalse
+			condition.Reason = "KubeletHasNoCPUPressure"
+			condition.Message = "kubelet has no CPU pressure"
+			condition.LastTransitionTime = currentTime
+			kl.recordNodeStatusEvent(v1.EventTypeNormal, "NodeHasNoCPUPressure")
+		}
+	}
+
+	if newCondition {
+		node.Status.Conditions = append(node.Status.Conditions, *condition)
+	}
+}
+
 // Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
 // TODO: why is this a package var?
 var oldNodeUnschedulable bool
@@ -938,6 +996,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		withoutError(kl.setNodeOODCondition),
 		withoutError(kl.setNodeMemoryPressureCondition),
 		withoutError(kl.setNodeDiskPressureCondition),
+		withoutError(kl.setNodeCPUPressureCondition),
 		withoutError(kl.setNodeReadyCondition),
 		withoutError(kl.setNodeVolumesInUseStatus),
 		withoutError(kl.recordNodeSchedulableEvent),

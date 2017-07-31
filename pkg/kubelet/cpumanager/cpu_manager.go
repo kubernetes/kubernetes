@@ -30,6 +30,7 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topology"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
@@ -62,6 +63,10 @@ type Manager interface {
 	UnregisterContainer(containerID string) error
 
 	State() state.Reader
+
+	IsUnderCPUPressure() bool
+
+	lifecycle.PodAdmitHandler
 }
 
 type manager struct {
@@ -85,7 +90,7 @@ type manager struct {
 var _ Manager = &manager{}
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(cpuPolicyName string, cr runtimeService, kletGetter kletGetter, statusProvider status.PodStatusProvider, capacityProvider eviction.CapacityProvider) (Manager, error) {
+func NewManager(cpuPolicyName string, cr runtimeService, kletGetter kletGetter, statusProvider status.PodStatusProvider, capacityProvider eviction.CapacityProvider) (Manager, lifecycle.PodAdmitHandler, error) {
 	var policy Policy
 
 	switch policyName(cpuPolicyName) {
@@ -94,11 +99,11 @@ func NewManager(cpuPolicyName string, cr runtimeService, kletGetter kletGetter, 
 	case PolicyStatic:
 		machineInfo, err := kletGetter.GetCachedMachineInfo()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		topo, err := topology.Discover(machineInfo)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		glog.Infof("[cpumanager] detected CPU topology: %v", topo)
 
@@ -115,17 +120,18 @@ func NewManager(cpuPolicyName string, cr runtimeService, kletGetter kletGetter, 
 		policy = NewNoopPolicy()
 	}
 
-	return &manager{
+	manager := &manager{
 		policy:            policy,
 		state:             state.NewMemoryState(),
 		containerRuntime:  cr,
 		kletGetter:        kletGetter,
 		podStatusProvider: statusProvider,
-	}, nil
+	}
+	return manager, manager, nil
 }
 
 func (m *manager) Start() {
-	glog.Infof("[cpumanger] starting (policy: \"%s\")", m.policy.Name())
+	glog.Infof("[cpumanger] starting with %s policy", m.policy.Name())
 	m.policy.Start(m.state)
 	if m.policy.Name() == string(PolicyNoop) {
 		return
@@ -233,4 +239,37 @@ func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("[cpumanager] unable to find ID for container with name %v in pod status (it may not be running)", name)
+}
+
+func (m *manager) IsUnderCPUPressure() bool {
+	return m.policy.IsUnderPressure()
+}
+
+// Admit rejects a pod if its not safe to admit for node stability.
+// Required for lifecycle.PodAdmitHandler interface
+func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	if !m.policy.IsUnderPressure() {
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
+
+	admit := true
+	containers := attrs.Pod.Spec.Containers
+	for _, c := range containers {
+		cpu := c.Resources.Requests.Cpu()
+		if cpu == nil || cpu.Value() == 0 {
+			admit = false
+			break
+		}
+	}
+	if admit {
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
+
+	// reject pods with no CPU requests when under CPU pressure
+	glog.Warningf("Failed to admit pod without CPU resource request %s - node is experiencing CPU pressure", attrs.Pod)
+	return lifecycle.PodAdmitResult{
+		Admit:   false,
+		Reason:  "InsufficientCPU",
+		Message: "Node is experiencing CPU Pressure",
+	}
 }

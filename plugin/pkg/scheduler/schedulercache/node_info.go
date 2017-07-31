@@ -55,6 +55,7 @@ type NodeInfo struct {
 	// Cached conditions of node for faster lookup.
 	memoryPressureCondition v1.ConditionStatus
 	diskPressureCondition   v1.ConditionStatus
+	cpuPressureCondition    v1.ConditionStatus
 
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
@@ -230,6 +231,13 @@ func (n *NodeInfo) DiskPressureCondition() v1.ConditionStatus {
 	return n.diskPressureCondition
 }
 
+func (n *NodeInfo) CPUPressureCondition() v1.ConditionStatus {
+	if n == nil {
+		return v1.ConditionUnknown
+	}
+	return n.cpuPressureCondition
+}
+
 // RequestedResource returns aggregated resource request of pods on this node.
 func (n *NodeInfo) RequestedResource() Resource {
 	if n == nil {
@@ -263,6 +271,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		taintsErr:               n.taintsErr,
 		memoryPressureCondition: n.memoryPressureCondition,
 		diskPressureCondition:   n.diskPressureCondition,
+		cpuPressureCondition:    n.cpuPressureCondition,
 		usedPorts:               make(map[int]bool),
 		generation:              n.generation,
 	}
@@ -431,6 +440,8 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			n.memoryPressureCondition = cond.Status
 		case v1.NodeDiskPressure:
 			n.diskPressureCondition = cond.Status
+		case v1.NodeCPUPressure:
+			n.cpuPressureCondition = cond.Status
 		default:
 			// We ignore other conditions.
 		}
@@ -450,6 +461,7 @@ func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 	n.taints, n.taintsErr = nil, nil
 	n.memoryPressureCondition = v1.ConditionUnknown
 	n.diskPressureCondition = v1.ConditionUnknown
+	n.cpuPressureCondition = v1.ConditionUnknown
 	n.generation++
 	return nil
 }

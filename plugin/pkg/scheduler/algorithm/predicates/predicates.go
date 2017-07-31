@@ -1301,6 +1301,16 @@ func CheckNodeDiskPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *sch
 	return true, nil, nil
 }
 
+// CheckNodeCPUPressurePredicate checks if a pod can be scheduled on a node
+// reporting CPU pressure condition.
+func CheckNodeCPUPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	// check if node is under CPU preasure
+	if nodeInfo.CPUPressureCondition() == v1.ConditionTrue {
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnderCPUPressure}, nil
+	}
+	return true, nil, nil
+}
+
 type VolumeNodeChecker struct {
 	pvInfo  PersistentVolumeInfo
 	pvcInfo PersistentVolumeClaimInfo

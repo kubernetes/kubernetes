@@ -19,6 +19,7 @@ package cpumanager
 import (
 	"fmt"
 	"reflect"
+	"testing"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/api/core/v1"
@@ -28,7 +29,6 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cpuset"
-	"testing"
 )
 
 type mockState struct {
@@ -65,7 +65,8 @@ func (s *mockState) Delete(containerID string) {
 }
 
 type mockPolicy struct {
-	err error
+	err           error
+	underPressure bool
 }
 
 func (p *mockPolicy) Name() string {
@@ -81,6 +82,10 @@ func (p *mockPolicy) RegisterContainer(s state.State, pod *v1.Pod, container *v1
 
 func (p *mockPolicy) UnregisterContainer(s state.State, containerID string) error {
 	return p.err
+}
+
+func (p *mockPolicy) IsUnderPressure() bool {
+	return p.underPressure
 }
 
 type mockRuntimeService struct {

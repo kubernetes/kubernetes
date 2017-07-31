@@ -622,16 +622,18 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			return nil, err
 		}
 
-		klet.cpuManager, err = cpumanager.NewManager(
+		cpuManager, cpuManagerAdmitHandler, err := cpumanager.NewManager(
 			kubeCfg.CPUManagerPolicy,
 			runtimeService, // runtime service
 			klet,           // kubelet getter interface
 			klet.statusManager,
 			klet.containerManager)
 		if err != nil {
-			glog.Infof("[cpumanager] cpu manager instantiation yielded error: %v", err)
+			glog.Infof("[cpumanager] failed to initialized cpu manager: %v", err)
 			return nil, err
 		}
+		klet.cpuManager = cpuManager
+		klet.admitHandlers.AddPodAdmitHandler(cpuManagerAdmitHandler)
 
 		runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
