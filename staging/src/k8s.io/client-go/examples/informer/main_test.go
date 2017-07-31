@@ -25,15 +25,17 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/pkg/api/v1"
+	clienttesting "k8s.io/client-go/testing"
 )
 
 func podForTest() *v1.Pod {
 	p := &v1.Pod{}
 	p.SetName(fmt.Sprintf("%d", rand.Int()))
-	p.SetNamespace(fmt.Sprintf("%d", rand.Int()))
+	p.SetNamespace(v1.NamespaceDefault)
 	return p
 }
 
@@ -74,10 +76,12 @@ func TestMain(t *testing.T) {
 			func(t *testing.T) {
 				initialLineCount := glog.Stats.Info.Lines()
 				clientset := fake.NewSimpleClientset(tc.initial...)
-				factory := informers.NewSharedInformerFactory(
-					clientset,
-					time.Hour*24,
+				fakeWatch := watch.NewFake()
+				clientset.PrependWatchReactor(
+					"pods",
+					clienttesting.DefaultWatchReactor(fakeWatch, nil),
 				)
+				factory := informers.NewSharedInformerFactory(clientset, 0)
 				c := NewPodLoggingController(factory)
 
 				stop := make(chan struct{})
@@ -88,17 +92,10 @@ func TestMain(t *testing.T) {
 					t.Error(err)
 				}
 				for _, podToAdd := range tc.add {
-					// Type conversion + type assertion? Is this the only way?
-					p := interface{}(podToAdd).(*v1.Pod)
-					// XXX: I expected this to trigger the
-					// cache.ResourceEventHandlerFuncs but it doesn't.
-					_, err = clientset.Core().Pods(p.Namespace).Create(p)
-					if err != nil {
-						t.Error(err)
-					}
+					fakeWatch.Add(podToAdd)
 				}
+				<-time.After(1 * time.Second)
 				actualLineCount := glog.Stats.Info.Lines() - initialLineCount
-
 				if tc.expectedLineCount != actualLineCount {
 					t.Errorf(
 						"Line count mismatch. Expected %d. Got %d",
