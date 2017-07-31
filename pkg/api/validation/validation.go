@@ -734,28 +734,28 @@ func validateHugePagesVolumeSource(hugePages *api.HugePagesVolumeSource, fldPath
 	allErrs := field.ErrorList{}
 
 	// TODO(pprokop): add support for other PageSizes
-	if hugePages.PageSize != "2M" {
+	if hugePages.PageSize != "" && hugePages.PageSize != "2M" {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("pageSize"), hugePages.PageSize, "Not supported page size"))
 	}
+
 	maxSize, err := resource.ParseQuantity(hugePages.MaxSize)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSize"), hugePages.MaxSize, "Not a valid quantity"))
-	} else {
-		if maxSize.ScaledValue(resource.Mega) < 2 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSize"), hugePages.MaxSize, "MaxSize is lower than pageSize"))
-		}
+	} else if maxSize.ScaledValue(resource.Mega) < 2 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSize"), hugePages.MaxSize, "MaxSize is lower than pageSize"))
 	}
-	minSize, err := resource.ParseQuantity(hugePages.MinSize)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("minSize"), hugePages.MinSize, "Not a valid quantity"))
-	} else {
-		if minSize.ScaledValue(resource.Mega) < 2 {
+
+	if hugePages.MinSize != "" {
+		minSize, err := resource.ParseQuantity(hugePages.MinSize)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("minSize"), hugePages.MinSize, "Not a valid quantity"))
+		} else if minSize.ScaledValue(resource.Mega) < 2 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("minSize"), hugePages.MinSize, "MaxSize is lower than pageSize"))
-		}
-		if minSize.ScaledValue(resource.Mega) > maxSize.ScaledValue(resource.Mega) {
+		} else if minSize.ScaledValue(resource.Mega) > maxSize.ScaledValue(resource.Mega) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("minSize"), hugePages.MinSize, "MinSize is bigger than maxSize"))
 		}
 	}
+
 	return allErrs
 }
 
