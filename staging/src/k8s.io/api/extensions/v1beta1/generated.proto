@@ -723,6 +723,16 @@ message PodSecurityPolicySpec {
   // will not be forced to.
   // +optional
   optional bool readOnlyRootFilesystem = 14;
+
+  // DefaultAllowPrivilegeEscalation controls the default setting for whether a
+  // process can gain more privileges than it's parent process.
+  // +optional
+  optional bool defaultAllowPrivilegeEscalation = 15;
+
+  // AllowPrivilegeEscalation determines if a pod can request to allow
+  // privilege escalation.
+  // +optional
+  optional bool allowPrivilegeEscalation = 16;
 }
 
 // ReplicaSet represents the configuration of a ReplicaSet.

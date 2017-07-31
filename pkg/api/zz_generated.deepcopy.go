@@ -5260,6 +5260,15 @@ func (in *SecurityContext) DeepCopyInto(out *SecurityContext) {
 			**out = **in
 		}
 	}
+	if in.AllowPrivilegeEscalation != nil {
+		in, out := &in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	return
 }
 

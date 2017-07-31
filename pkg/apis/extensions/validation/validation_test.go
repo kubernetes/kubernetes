@@ -2494,6 +2494,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		seccomp.AllowedProfilesAnnotationKey: "docker/default,not-good",
 	}
 
+	invalidDefaultAllowPrivilegeEscalation := validPSP()
+	pe := true
+	invalidDefaultAllowPrivilegeEscalation.Spec.DefaultAllowPrivilegeEscalation = &pe
+
 	type testCase struct {
 		psp         *extensions.PodSecurityPolicy
 		errorType   field.ErrorType
@@ -2600,6 +2604,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "must be a valid seccomp profile",
 		},
+		"invalid defaultAllowPrivilegeEscalation": {
+			psp:         invalidDefaultAllowPrivilegeEscalation,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "Cannot set DefaultAllowPrivilegeEscalation to true without also setting AllowPrivilegeEscalation to true",
+		},
 	}
 
 	for k, v := range errorCases {
@@ -2674,6 +2683,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		seccomp.AllowedProfilesAnnotationKey: "docker/default,unconfined,localhost/foo",
 	}
 
+	validDefaultAllowPrivilegeEscalation := validPSP()
+	pe = true
+	validDefaultAllowPrivilegeEscalation.Spec.DefaultAllowPrivilegeEscalation = &pe
+	validDefaultAllowPrivilegeEscalation.Spec.AllowPrivilegeEscalation = true
+
 	successCases := map[string]struct {
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -2700,6 +2714,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"valid seccomp annotations": {
 			psp: validSeccomp,
+		},
+		"valid defaultAllowPrivilegeEscalation as true": {
+			psp: validDefaultAllowPrivilegeEscalation,
 		},
 	}
 
