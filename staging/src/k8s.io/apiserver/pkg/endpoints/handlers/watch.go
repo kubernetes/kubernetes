@@ -289,9 +289,10 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			s.Fixup(obj)
 			if s.ExportOptions.Export && s.Exporter != nil {
 				var err error
-				// TODO: Passing nil for context here as there is no request from which to create one:
-				// ctx *may* be completely unused in all exporters?
-				obj, err = s.Exporter.Export(nil, event.Object, s.ExportOptions)
+				// TODO: Passing an empty context here as none exists, is this ok?
+				// Context is used only rarely in some
+				ctx := request.NewContext()
+				obj, err = s.Exporter.Export(ctx, event.Object, s.ExportOptions)
 				if err != nil {
 					utilruntime.HandleError(fmt.Errorf("unable to export watch object: %v (%#v)", err, event.Object))
 				}
