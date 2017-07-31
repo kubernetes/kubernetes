@@ -240,6 +240,9 @@ type attachedVolume struct {
 	// devicePath contains the path on the node where the volume is attached for
 	// attachable volumes
 	devicePath string
+
+	// isAttached denotes whether the volume attaching process has successfuly finished
+	isAttached bool
 }
 
 // The mountedPod object represents a pod for which the kubelet volume manager
@@ -272,9 +275,14 @@ type mountedPod struct {
 	volumeGidValue string
 }
 
+func (asw *actualStateOfWorld) MarkVolumeAsBeingAttached(
+	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName) error {
+	return asw.addVolume(volumeName, volumeSpec, "" /* devicePath */, false /* isAttached */)
+}
+
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
 	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName, devicePath string) error {
-	return asw.addVolume(volumeName, volumeSpec, devicePath)
+	return asw.addVolume(volumeName, volumeSpec, devicePath, true /* isAttached */)
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsDetached(
@@ -329,7 +337,7 @@ func (asw *actualStateOfWorld) MarkDeviceAsUnmounted(
 // volume plugin can support the given volumeSpec or more than one plugin can
 // support it, an error is returned.
 func (asw *actualStateOfWorld) addVolume(
-	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, devicePath string) error {
+	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, devicePath string, isAttached bool) error {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -367,10 +375,12 @@ func (asw *actualStateOfWorld) addVolume(
 			pluginIsAttachable: pluginIsAttachable,
 			globallyMounted:    false,
 			devicePath:         devicePath,
+			isAttached:         isAttached,
 		}
 	} else {
 		// If volume object already exists, update the fields such as device path
 		volumeObj.devicePath = devicePath
+		volumeObj.isAttached = isAttached
 		glog.V(2).Infof("Volume %q is already added to attachedVolume list, update device path %q",
 			volumeName,
 			devicePath)
