@@ -10,23 +10,24 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "cadvisor.go",
-        "influxdb.go",
-        "stackdriver.go",
+        "log_provider.go",
+        "logging_agent.go",
+        "logging_pod.go",
+        "misc.go",
+        "types.go",
+        "wait.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//test/e2e/common:go_default_library",
+        "//pkg/api:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/instrumentation/common:go_default_library",
-        "//vendor/github.com/influxdata/influxdb/client/v2:go_default_library",
-        "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/golang.org/x/oauth2/google:go_default_library",
-        "//vendor/google.golang.org/api/monitoring/v3:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/util/integer:go_default_library",
     ],
 )
 

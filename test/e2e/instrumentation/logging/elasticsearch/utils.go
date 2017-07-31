@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logging
+package elasticsearch
 
 import (
 	"encoding/json"
@@ -26,31 +26,35 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 )
 
 const (
 	// esRetryTimeout is how long to keep retrying requesting elasticsearch for status information.
 	esRetryTimeout = 5 * time.Minute
+
 	// esRetryDelay is how much time to wait between two attempts to send a request to elasticsearch
 	esRetryDelay = 5 * time.Second
+
+	// searchPageSize is how many entries to search for in Elasticsearch.
+	searchPageSize = 1000
 )
 
-type esLogsProvider struct {
+var _ utils.LogProvider = &esLogProvider{}
+
+type esLogProvider struct {
 	Framework *framework.Framework
 }
 
-func newEsLogsProvider(f *framework.Framework) (*esLogsProvider, error) {
-	return &esLogsProvider{Framework: f}, nil
+func newEsLogProvider(f *framework.Framework) (*esLogProvider, error) {
+	return &esLogProvider{Framework: f}, nil
 }
 
 // Ensures that elasticsearch is running and ready to serve requests
-func (logsProvider *esLogsProvider) Init() error {
-	f := logsProvider.Framework
+func (p *esLogProvider) Init() error {
+	f := p.Framework
 	// Check for the existence of the Elasticsearch service.
-	By("Checking the Elasticsearch service exists.")
+	framework.Logf("Checking the Elasticsearch service exists.")
 	s := f.ClientSet.Core().Services(api.NamespaceSystem)
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
@@ -61,20 +65,26 @@ func (logsProvider *esLogsProvider) Init() error {
 		}
 		framework.Logf("Attempt to check for the existence of the Elasticsearch service failed after %v", time.Since(start))
 	}
-	Expect(err).NotTo(HaveOccurred())
+	if err != nil {
+		return err
+	}
 
 	// Wait for the Elasticsearch pods to enter the running state.
-	By("Checking to make sure the Elasticsearch pods are running")
+	framework.Logf("Checking to make sure the Elasticsearch pods are running")
 	labelSelector := fields.SelectorFromSet(fields.Set(map[string]string{"k8s-app": "elasticsearch-logging"})).String()
 	options := meta_v1.ListOptions{LabelSelector: labelSelector}
 	pods, err := f.ClientSet.Core().Pods(api.NamespaceSystem).List(options)
-	Expect(err).NotTo(HaveOccurred())
+	if err != nil {
+		return err
+	}
 	for _, pod := range pods.Items {
 		err = framework.WaitForPodRunningInNamespace(f.ClientSet, &pod)
-		Expect(err).NotTo(HaveOccurred())
+		if err != nil {
+			return err
+		}
 	}
 
-	By("Checking to make sure we are talking to an Elasticsearch service.")
+	framework.Logf("Checking to make sure we are talking to an Elasticsearch service.")
 	// Perform a few checks to make sure this looks like an Elasticsearch cluster.
 	var statusCode int
 	err = nil
@@ -102,14 +112,16 @@ func (logsProvider *esLogsProvider) Init() error {
 		}
 		break
 	}
-	Expect(err).NotTo(HaveOccurred())
+	if err != nil {
+		return err
+	}
 	if int(statusCode) != 200 {
 		framework.Failf("Elasticsearch cluster has a bad status: %v", statusCode)
 	}
 
 	// Now assume we really are talking to an Elasticsearch instance.
 	// Check the cluster health.
-	By("Checking health of Elasticsearch service.")
+	framework.Logf("Checking health of Elasticsearch service.")
 	healthy := false
 	for start := time.Now(); time.Since(start) < esRetryTimeout; time.Sleep(esRetryDelay) {
 		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.Core().RESTClient().Get())
@@ -153,12 +165,12 @@ func (logsProvider *esLogsProvider) Init() error {
 	return nil
 }
 
-func (logsProvider *esLogsProvider) Cleanup() {
+func (p *esLogProvider) Cleanup() {
 	// Nothing to do
 }
 
-func (logsProvider *esLogsProvider) ReadEntries(pod *loggingPod) []logEntry {
-	f := logsProvider.Framework
+func (p *esLogProvider) ReadEntries(name string) []utils.LogEntry {
+	f := p.Framework
 
 	proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.Core().RESTClient().Get())
 	if errProxy != nil {
@@ -166,7 +178,7 @@ func (logsProvider *esLogsProvider) ReadEntries(pod *loggingPod) []logEntry {
 		return nil
 	}
 
-	query := fmt.Sprintf("kubernetes.pod_name:%s AND kubernetes.namespace_name:%s", pod.Name, f.Namespace.Name)
+	query := fmt.Sprintf("kubernetes.pod_name:%s AND kubernetes.namespace_name:%s", name, f.Namespace.Name)
 	framework.Logf("Sending a search request to Elasticsearch with the following query: %s", query)
 
 	// Ask Elasticsearch to return all the log lines that were tagged with the
@@ -176,7 +188,7 @@ func (logsProvider *esLogsProvider) ReadEntries(pod *loggingPod) []logEntry {
 		Suffix("_search").
 		Param("q", query).
 		// Ask for more in case we included some unrelated records in our query
-		Param("size", strconv.Itoa(pod.ExpectedLinesNumber*10)).
+		Param("size", strconv.Itoa(searchPageSize)).
 		DoRaw()
 	if err != nil {
 		framework.Logf("Failed to make proxy call to elasticsearch-logging: %v", err)
@@ -202,7 +214,7 @@ func (logsProvider *esLogsProvider) ReadEntries(pod *loggingPod) []logEntry {
 		return nil
 	}
 
-	entries := []logEntry{}
+	entries := []utils.LogEntry{}
 	// Iterate over the hits and populate the observed array.
 	for _, e := range h {
 		l, ok := e.(map[string]interface{})
@@ -218,17 +230,23 @@ func (logsProvider *esLogsProvider) ReadEntries(pod *loggingPod) []logEntry {
 		}
 
 		msg, ok := source["log"].(string)
-		if !ok {
-			framework.Logf("Log not of the expected type: %T", source["log"])
+		if ok {
+			entries = append(entries, utils.LogEntry{TextPayload: msg})
 			continue
 		}
 
-		entries = append(entries, logEntry{Payload: msg})
+		obj, ok := source["log"].(map[string]interface{})
+		if ok {
+			entries = append(entries, utils.LogEntry{JSONPayload: obj})
+			continue
+		}
+
+		framework.Logf("Log is of unknown type, got %v, want string or object in field 'log'", source)
 	}
 
 	return entries
 }
 
-func (logsProvider *esLogsProvider) FluentdApplicationName() string {
+func (p *esLogProvider) LoggingAgentName() string {
 	return "fluentd-es"
 }

@@ -14,55 +14,48 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logging
+package elasticsearch
 
 import (
-	"fmt"
 	"time"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/instrumentation"
+	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
+	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var _ = instrumentation.SIGDescribe("Cluster level logging using Elasticsearch [Feature:Elasticsearch]", func() {
 	f := framework.NewDefaultFramework("es-logging")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// TODO: For now assume we are only testing cluster logging with Elasticsearch
 		// on GCE. Once we are sure that Elasticsearch cluster level logging
 		// works for other providers we should widen this scope of this test.
 		framework.SkipUnlessProviderIs("gce")
 	})
 
-	It("should check that logs from containers are ingested into Elasticsearch", func() {
-		podName := "synthlogger"
-		esLogsProvider, err := newEsLogsProvider(f)
+	ginkgo.It("should check that logs from containers are ingested into Elasticsearch", func() {
+		ingestionInterval := 10 * time.Second
+		ingestionTimeout := 10 * time.Minute
+
+		p, err := newEsLogProvider(f)
 		framework.ExpectNoError(err, "Failed to create Elasticsearch logs provider")
 
-		err = esLogsProvider.Init()
-		defer esLogsProvider.Cleanup()
+		err = p.Init()
+		defer p.Cleanup()
 		framework.ExpectNoError(err, "Failed to init Elasticsearch logs provider")
 
-		err = ensureSingleFluentdOnEachNode(f, esLogsProvider.FluentdApplicationName())
+		err = utils.EnsureLoggingAgentDeployment(f, p.LoggingAgentName())
 		framework.ExpectNoError(err, "Fluentd deployed incorrectly")
 
-		By("Running synthetic logger")
-		pod := startNewLoggingPod(f, podName, "", 10*60, 10*time.Minute)
-		defer f.PodClient().Delete(podName, &meta_v1.DeleteOptions{})
-		err = framework.WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
-		framework.ExpectNoError(err, fmt.Sprintf("Should've successfully waited for pod %s to be running", podName))
+		pod, err := utils.StartAndReturnSelf(utils.NewRepeatingLoggingPod("synthlogger", "test"), f)
+		framework.ExpectNoError(err, "Failed to start a pod")
 
-		By("Waiting for logs to ingest")
-		config := &loggingTestConfig{
-			LogsProvider:              esLogsProvider,
-			Pods:                      []*loggingPod{pod},
-			IngestionTimeout:          10 * time.Minute,
-			MaxAllowedLostFraction:    0,
-			MaxAllowedFluentdRestarts: 0,
-		}
-		framework.ExpectNoError(waitForSomeLogs(f, config), "Failed to ingest logs")
+		ginkgo.By("Waiting for logs to ingest")
+		c := utils.NewLogChecker(p, utils.UntilFirstEntry, utils.JustTimeout, pod.Name())
+		err = utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
+		framework.ExpectNoError(err)
 	})
 })

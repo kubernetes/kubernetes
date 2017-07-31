@@ -14,10 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package instrumentation
+package utils
 
-import "github.com/onsi/ginkgo"
+import (
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/framework"
+)
 
-func SIGDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-instrumentation] "+text, body)
+// GetNodeIds returns the list of node names and panics in case of failure.
+func GetNodeIds(cs clientset.Interface) []string {
+	nodes := framework.GetReadySchedulableNodesOrDie(cs)
+	nodeIds := []string{}
+	for _, n := range nodes.Items {
+		nodeIds = append(nodeIds, n.Spec.ExternalID)
+	}
+	return nodeIds
 }
