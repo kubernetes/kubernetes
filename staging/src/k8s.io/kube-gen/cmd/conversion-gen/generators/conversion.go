@@ -329,6 +329,12 @@ func (e equalMemoryTypes) Skip(a, b *types.Type) {
 }
 
 func (e equalMemoryTypes) Equal(a, b *types.Type) bool {
+	// alreadyVisitedTypes holds all the types that have already been checked in the structural type recursion.
+	alreadyVisitedTypes := make(map[*types.Type]bool)
+	return e.cachingEqual(a, b, alreadyVisitedTypes)
+}
+
+func (e equalMemoryTypes) cachingEqual(a, b *types.Type, alreadyVisitedTypes map[*types.Type]bool) bool {
 	if a == b {
 		return true
 	}
@@ -338,18 +344,24 @@ func (e equalMemoryTypes) Equal(a, b *types.Type) bool {
 	if equal, ok := e[conversionPair{b, a}]; ok {
 		return equal
 	}
-	result := e.equal(a, b)
+	result := e.equal(a, b, alreadyVisitedTypes)
 	e[conversionPair{a, b}] = result
 	e[conversionPair{b, a}] = result
 	return result
 }
 
-func (e equalMemoryTypes) equal(a, b *types.Type) bool {
+func (e equalMemoryTypes) equal(a, b *types.Type, alreadyVisitedTypes map[*types.Type]bool) bool {
 	in, out := unwrapAlias(a), unwrapAlias(b)
 	switch {
 	case in == out:
 		return true
 	case in.Kind == out.Kind:
+		// if the type exists already, return early to avoid recursion
+		if alreadyVisitedTypes[in] {
+			return true
+		}
+		alreadyVisitedTypes[in] = true
+
 		switch in.Kind {
 		case types.Struct:
 			if len(in.Members) != len(out.Members) {
@@ -357,17 +369,17 @@ func (e equalMemoryTypes) equal(a, b *types.Type) bool {
 			}
 			for i, inMember := range in.Members {
 				outMember := out.Members[i]
-				if !e.Equal(inMember.Type, outMember.Type) {
+				if !e.cachingEqual(inMember.Type, outMember.Type, alreadyVisitedTypes) {
 					return false
 				}
 			}
 			return true
 		case types.Pointer:
-			return e.Equal(in.Elem, out.Elem)
+			return e.cachingEqual(in.Elem, out.Elem, alreadyVisitedTypes)
 		case types.Map:
-			return e.Equal(in.Key, out.Key) && e.Equal(in.Elem, out.Elem)
+			return e.cachingEqual(in.Key, out.Key, alreadyVisitedTypes) && e.cachingEqual(in.Elem, out.Elem, alreadyVisitedTypes)
 		case types.Slice:
-			return e.Equal(in.Elem, out.Elem)
+			return e.cachingEqual(in.Elem, out.Elem, alreadyVisitedTypes)
 		case types.Interface:
 			// TODO: determine whether the interfaces are actually equivalent - for now, they must have the
 			// same type.
