@@ -113,11 +113,7 @@ function download-or-bust {
 function is-preloaded {
   local -r key=$1
   local -r value=$2
-  if [[ -f ${KUBE_HOME}/preload_info ]] && (grep "${key}" "${KUBE_HOME}/preload_info" | grep "${value}" > /dev/null 2>&1);then
-    echo 0
-  else
-    echo 1
-  fi
+  grep -qs "${key},${value}" "${KUBE_HOME}/preload_info"
 }
 
 function split-commas {
@@ -127,8 +123,7 @@ function split-commas {
 function install-gci-mounter-tools {
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
   local -r mounter_tar_sha="8003b798cf33c7f91320cd6ee5cec4fa22244571"
-  preload=$(is-preloaded "mounter" "${mounter_tar_sha}")
-  if [[ preload -eq 0 ]]; then
+  if is-preloaded "mounter" "${mounter_tar_sha}"; then
     echo "mounter is preloaded."
     return
   fi
@@ -156,8 +151,7 @@ function install-node-problem-detector {
       local -r npd_sha1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
   fi
 
-  preload=$(is-preloaded "node-problem-detector" "${npd_sha1}")
-  if [[ preload -eq 0 ]]; then
+  if is-preloaded "node-problem-detector" "${npd_sha1}"; then
     echo "node-problem-detector is preloaded."
     return
   fi
@@ -179,8 +173,7 @@ function install-cni-binaries {
   #TODO(andyzheng0831): We should make the cni version number as a k8s env variable.
   local -r cni_tar="cni-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff.tar.gz"
   local -r cni_sha1="1d9788b0f5420e1a219aad2cb8681823fc515e7c"
-  preload=$(is-preloaded "${cni_tar}" "${cni_sha1}")
-  if [[ preload -eq 0 ]]; then
+  if is-preloaded "${cni_tar}" "${cni_sha1}"; then
     echo "${cni_tar} is preloaded."
     return
   fi
@@ -209,8 +202,7 @@ function install-kube-manifests {
     local -r manifests_tar_hash=$(cat "${manifests_tar}.sha1")
   fi
 
-  preload=$(is-preloaded "${manifests_tar}" "${manifests_tar_hash}")
-  if [[ preload -eq 0 ]]; then
+  if is-preloaded "${manifests_tar}" "${manifests_tar_hash}"; then
     echo "${manifests_tar} is preloaded."
     return
   fi
@@ -283,16 +275,15 @@ function install-kube-binary-config {
     local -r server_binary_tar_hash=$(cat "${server_binary_tar}.sha1")
   fi
 
-  preload=$(is-preloaded "${server_binary_tar}" "${server_binary_tar_hash}")
-  if [[ preload -eq 0 ]]; then
+  if is-preloaded "${server_binary_tar}" "${server_binary_tar_hash}"; then
     echo "${server_binary_tar} is preloaded."
   else
     echo "Downloading binary release tar"
     download-or-bust "${server_binary_tar_hash}" "${server_binary_tar_urls[@]}"
     tar xzf "${KUBE_HOME}/${server_binary_tar}" -C "${KUBE_HOME}" --overwrite
     # Copy docker_tag and image files to ${KUBE_HOME}/kube-docker-files.
-    src_dir="${KUBE_HOME}/kubernetes/server/bin"
-    dst_dir="${KUBE_HOME}/kube-docker-files"
+    local -r src_dir="${KUBE_HOME}/kubernetes/server/bin"
+    local dst_dir="${KUBE_HOME}/kube-docker-files"
     mkdir -p "${dst_dir}"
     cp "${src_dir}/"*.docker_tag "${dst_dir}"
     if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
