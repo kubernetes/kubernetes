@@ -542,13 +542,12 @@ func (plugin *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAll
 // - Adapt the range of the table to the current range of the SC.
 //
 func (plugin *glusterfsPlugin) getGidTable(className string, min int, max int) (*MinMaxAllocator, error) {
-	var err error
 	plugin.gidTableLock.Lock()
 	gidTable, ok := plugin.gidTable[className]
 	plugin.gidTableLock.Unlock()
 
 	if ok {
-		err = gidTable.SetRange(min, max)
+		err := gidTable.SetRange(min, max)
 		if err != nil {
 			return nil, err
 		}
@@ -607,7 +606,6 @@ func (d *glusterfsVolumeDeleter) getGid() (int, bool, error) {
 }
 
 func (d *glusterfsVolumeDeleter) Delete() error {
-	var err error
 	glog.V(2).Infof("glusterfs: delete volume: %s ", d.glusterfsMounter.path)
 	volumeName := d.glusterfsMounter.path
 	volumeID := dstrings.TrimPrefix(volumeName, volPrefix)
@@ -681,7 +679,6 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
 	}
 
-	var err error
 	if p.options.PVC.Spec.Selector != nil {
 		glog.V(4).Infof("glusterfs: not able to parse your claim Selector")
 		return nil, fmt.Errorf("glusterfs: not able to parse your claim Selector")
@@ -921,7 +918,6 @@ func getClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string,
 func parseClassParameters(params map[string]string, kubeClient clientset.Interface) (*provisionerConfig, error) {
 	var cfg provisionerConfig
 	var err error
-
 	cfg.gidMin = defaultGidMin
 	cfg.gidMax = defaultGidMax
 
