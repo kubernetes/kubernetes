@@ -43,7 +43,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy,
 		// extensions
 		// TODO: below conversions should be dropped in favor of auto-generated
-		// ones, see https://github.com/kubernetes/kubernetextensionsssues/39865
+		// ones, see https://github.com/kubernetes/kubernetes/issues/39865
 		Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus,
 		Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
 		Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec,
