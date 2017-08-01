@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
@@ -24,6 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+)
+
+var (
+	invalidTargets = []string{
+		"DaemonSet",
+	}
 )
 
 func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
@@ -66,6 +73,12 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 	if len(ref.Kind) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
 	} else {
+		for _, target := range invalidTargets {
+			if ref.Kind == target {
+				msg := fmt.Sprint("This kind can not be used as auto scaling target")
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
+			}
+		}
 		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Kind) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
 		}
