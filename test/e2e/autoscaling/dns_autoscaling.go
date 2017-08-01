@@ -41,7 +41,7 @@ const (
 	DNSAutoscalerLabelName = "kube-dns-autoscaler"
 )
 
-var _ = framework.KubeDescribe("DNS horizontal autoscaling", func() {
+var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	f := framework.NewDefaultFramework("dns-autoscaling")
 	var c clientset.Interface
 	var previousParams map[string]string
