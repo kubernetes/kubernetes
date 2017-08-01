@@ -29,7 +29,7 @@ import (
 	examplecontroller "k8s.io/apiextensions-apiserver/examples/client-go/controller"
 )
 
-func TestClientGoCustomResourceExample(t *testing.T) {
+func SkipTestClientGoCustomResourceExample(t *testing.T) {
 	t.Logf("Creating apiextensions apiserver")
 	config, err := testserver.DefaultServerConfig()
 	if err != nil {
