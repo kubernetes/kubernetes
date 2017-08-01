@@ -626,7 +626,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			kubeCfg.CPUManagerPolicy,
 			runtimeService, // runtime service
 			klet,           // kubelet getter interface
-			klet.statusManager)
+			klet.statusManager,
+			klet.containerManager)
 		if err != nil {
 			glog.Infof("[cpumanager] cpu manager instantiation yielded error: %v", err)
 			return nil, err

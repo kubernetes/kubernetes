@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
+
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/api/core/v1"
@@ -83,7 +85,7 @@ type manager struct {
 var _ Manager = &manager{}
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(cpuPolicyName string, cr runtimeService, kletGetter kletGetter, statusProvider status.PodStatusProvider) (Manager, error) {
+func NewManager(cpuPolicyName string, cr runtimeService, kletGetter kletGetter, statusProvider status.PodStatusProvider, capacityProvider eviction.CapacityProvider) (Manager, error) {
 	var policy Policy
 
 	switch policyName(cpuPolicyName) {
@@ -100,9 +102,13 @@ func NewManager(cpuPolicyName string, cr runtimeService, kletGetter kletGetter, 
 		}
 		glog.Infof("[cpumanager] detected CPU topology: %v", topo)
 
-		// Get node to figure out reserved CPUs
-		node, err := kletGetter.GetNode()
-		topo.NumReservedCores = getReservedCPUs(node.Status)
+		resources := capacityProvider.GetNodeAllocatableReservation()
+		cpuResource, ok := resources[v1.ResourceCPU]
+		if ok {
+			reservedCores := int(cpuResource.Value())
+			glog.Infof("[cpumanager] reserving %v cores due to kube/system reserved", reservedCores)
+			topo.NumReservedCores = reservedCores
+		}
 		policy = NewStaticPolicy(topo)
 	default:
 		glog.Warningf("[cpumanager] Unknown policy (\"%s\"), falling back to \"%s\" policy (\"%s\")", cpuPolicyName, PolicyNoop)
@@ -116,13 +122,6 @@ func NewManager(cpuPolicyName string, cr runtimeService, kletGetter kletGetter, 
 		kletGetter:        kletGetter,
 		podStatusProvider: statusProvider,
 	}, nil
-}
-
-func getReservedCPUs(nodeStatus v1.NodeStatus) int {
-	// Reserved = ceiling(Capacity) - ceiling(Allocatable)
-	cpuCapacity := nodeStatus.Capacity[v1.ResourceCPU]
-	cpuAllocatable := nodeStatus.Allocatable[v1.ResourceCPU]
-	return int(cpuCapacity.Value() - cpuAllocatable.Value())
 }
 
 func (m *manager) Start() {
