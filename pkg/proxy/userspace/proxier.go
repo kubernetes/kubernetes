@@ -61,7 +61,7 @@ type ServiceInfo struct {
 	nodePort            int
 	loadBalancerStatus  api.LoadBalancerStatus
 	sessionAffinityType api.ServiceAffinity
-	stickyMaxAgeMinutes int
+	stickyMaxAgeSeconds int
 	// Deprecated, but required for back-compat (including e2e)
 	externalIPs []string
 }
@@ -378,15 +378,13 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 		return nil, err
 	}
 	si := &ServiceInfo{
-		Timeout:       timeout,
-		ActiveClients: newClientCache(),
-
+		Timeout:             timeout,
+		ActiveClients:       newClientCache(),
 		isAliveAtomic:       1,
 		proxyPort:           portNum,
 		protocol:            protocol,
 		socket:              sock,
 		sessionAffinityType: api.ServiceAffinityNone, // default
-		stickyMaxAgeMinutes: 180,                     // TODO: parameterize this in the API.
 	}
 	proxier.setServiceInfo(service, si)
 
@@ -450,12 +448,17 @@ func (proxier *Proxier) mergeService(service *api.Service) sets.String {
 		info.loadBalancerStatus = *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 		info.nodePort = int(servicePort.NodePort)
 		info.sessionAffinityType = service.Spec.SessionAffinity
+		// Set session affinity timeout value when sessionAffinity==ClientIP
+		if service.Spec.SessionAffinity == api.ServiceAffinityClientIP {
+			info.stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
+		}
+
 		glog.V(4).Infof("info: %#v", info)
 
 		if err := proxier.openPortal(serviceName, info); err != nil {
 			glog.Errorf("Failed to open portal for %q: %v", serviceName, err)
 		}
-		proxier.loadBalancer.NewService(serviceName, info.sessionAffinityType, info.stickyMaxAgeMinutes)
+		proxier.loadBalancer.NewService(serviceName, info.sessionAffinityType, info.stickyMaxAgeSeconds)
 	}
 
 	return existingPorts
