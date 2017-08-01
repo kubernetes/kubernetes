@@ -4,7 +4,7 @@ set -o nounset -o pipefail -o errexit
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 KUBECTL="$DIR/../../cluster/kubectl.sh"
-KUBECONFIG="${KUBECONFIG:-/var/run/kubernetes/admin.kubeconfig}"
+export KUBECONFIG="${KUBECONFIG:-/var/run/kubernetes/admin.kubeconfig}"
 
 $KUBECTL get pods -o json | \
   jq -r '.items[] | "\(.metadata.name) http://\(.status.podIP)"'
