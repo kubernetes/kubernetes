@@ -10262,6 +10262,10 @@
      "involvedObject"
     ],
     "properties": {
+     "action": {
+      "description": "What Origin did/failed to do.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.EventAction"
+     },
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
       "type": "string"
@@ -10270,6 +10274,10 @@
       "description": "The number of times this event has occurred.",
       "type": "integer",
       "format": "int32"
+     },
+     "eventTime": {
+      "description": "Time when this Event was first observed.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime"
      },
      "firstTimestamp": {
       "description": "The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)",
@@ -10295,8 +10303,27 @@
       "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
      },
+     "object": {
+      "description": "On what Origin acted upon.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference"
+     },
+     "origin": {
+      "description": "Component that generated the Event.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.EventSource"
+     },
      "reason": {
       "description": "This should be a short, machine understandable string that gives the reason for the transition into the object's current status.",
+      "type": "string"
+     },
+     "secondaryObject": {
+      "description": "Optional secondary Object for more complex actions.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference"
+     },
+     "series": {
+      "description": "Data about the Event series this event represents or nil if it's a singleton Event.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.EventSeries"
+     },
+     "severity": {
       "type": "string"
      },
      "source": {
@@ -10315,6 +10342,16 @@
       "kind": "Event"
      }
     ]
+   },
+   "io.k8s.api.core.v1.EventAction": {
+    "properties": {
+     "action": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
+     }
+    }
    },
    "io.k8s.api.core.v1.EventList": {
     "description": "EventList is a list of events.",
@@ -10350,6 +10387,31 @@
      }
     ]
    },
+   "io.k8s.api.core.v1.EventSeries": {
+    "properties": {
+     "count": {
+      "description": "Number of occurrences in this series up to the last heartbeat time",
+      "type": "integer",
+      "format": "int32"
+     },
+     "heartbeatTime": {
+      "description": "Time when last update for this series was sent",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime"
+     },
+     "lastObservedTime": {
+      "description": "Time of the last occurence observed",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime"
+     },
+     "state": {
+      "description": "State of this Series: Ongoing or Finished",
+      "type": "string"
+     },
+     "uid": {
+      "description": "UID for this event series",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.EventSource": {
     "description": "EventSource contains information for an event.",
     "properties": {
@@ -10359,6 +10421,10 @@
      },
      "host": {
       "description": "Node name on which the event is generated.",
+      "type": "string"
+     },
+     "id": {
+      "description": "Identifies the component emitting the Event",
       "type": "string"
      }
     }
@@ -13461,6 +13527,10 @@
       "type": "string"
      }
     }
+   },
+   "io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime": {
+    "type": "string",
+    "format": "date-time"
    },
    "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta": {
     "description": "ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.",

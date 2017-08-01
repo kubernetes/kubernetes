@@ -18044,6 +18044,33 @@
      "type": {
       "type": "string",
       "description": "Type of this event (Normal, Warning), new types could be added in the future"
+     },
+     "eventTime": {
+      "type": "string",
+      "description": "Time when this Event was first observed."
+     },
+     "series": {
+      "$ref": "v1.EventSeries",
+      "description": "Data about the Event series this event represents or nil if it's a singleton Event."
+     },
+     "origin": {
+      "$ref": "v1.EventSource",
+      "description": "Component that generated the Event."
+     },
+     "action": {
+      "$ref": "v1.EventAction",
+      "description": "What Origin did/failed to do."
+     },
+     "object": {
+      "$ref": "v1.ObjectReference",
+      "description": "On what Origin acted upon."
+     },
+     "secondaryObject": {
+      "$ref": "v1.ObjectReference",
+      "description": "Optional secondary Object for more complex actions."
+     },
+     "severity": {
+      "type": "string"
      }
     }
    },
@@ -18058,6 +18085,47 @@
      "host": {
       "type": "string",
       "description": "Node name on which the event is generated."
+     },
+     "id": {
+      "type": "string",
+      "description": "Identifies the component emitting the Event"
+     }
+    }
+   },
+   "v1.EventSeries": {
+    "id": "v1.EventSeries",
+    "properties": {
+     "uid": {
+      "type": "string",
+      "description": "UID for this event series"
+     },
+     "count": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Number of occurrences in this series up to the last heartbeat time"
+     },
+     "heartbeatTime": {
+      "type": "string",
+      "description": "Time when last update for this series was sent"
+     },
+     "lastObservedTime": {
+      "type": "string",
+      "description": "Time of the last occurence observed"
+     },
+     "state": {
+      "type": "string",
+      "description": "State of this Series: Ongoing or Finished"
+     }
+    }
+   },
+   "v1.EventAction": {
+    "id": "v1.EventAction",
+    "properties": {
+     "action": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
      }
     }
    },

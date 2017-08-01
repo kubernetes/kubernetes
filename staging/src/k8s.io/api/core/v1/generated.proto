@@ -975,6 +975,39 @@ message Event {
   // Type of this event (Normal, Warning), new types could be added in the future
   // +optional
   optional string type = 9;
+
+  // Time when this Event was first observed.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime eventTime = 10;
+
+  // Data about the Event series this event represents or nil if it's a singleton Event.
+  // +optional
+  optional EventSeries series = 11;
+
+  // Component that generated the Event.
+  // +optional
+  optional EventSource origin = 12;
+
+  // What Origin did/failed to do.
+  // +optional
+  optional EventAction action = 13;
+
+  // On what Origin acted upon.
+  // +optional
+  optional ObjectReference object = 14;
+
+  // Optional secondary Object for more complex actions.
+  // +optional
+  optional ObjectReference secondaryObject = 15;
+
+  // +optional
+  optional string severity = 16;
+}
+
+message EventAction {
+  optional string action = 1;
+
+  optional string reason = 2;
 }
 
 // EventList is a list of events.
@@ -988,6 +1021,23 @@ message EventList {
   repeated Event items = 2;
 }
 
+message EventSeries {
+  // UID for this event series
+  optional string uid = 1;
+
+  // Number of occurrences in this series up to the last heartbeat time
+  optional int32 count = 2;
+
+  // Time when last update for this series was sent
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime heartbeatTime = 3;
+
+  // Time of the last occurence observed
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 4;
+
+  // State of this Series: Ongoing or Finished
+  optional string state = 5;
+}
+
 // EventSource contains information for an event.
 message EventSource {
   // Component from which the event is generated.
@@ -997,6 +1047,10 @@ message EventSource {
   // Node name on which the event is generated.
   // +optional
   optional string host = 2;
+
+  // Identifies the component emitting the Event
+  // +optional
+  optional string id = 3;
 }
 
 // ExecAction describes a "run in container" action.

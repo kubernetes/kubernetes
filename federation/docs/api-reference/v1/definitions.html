@@ -1018,6 +1018,55 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">eventTime</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Time when this Event was first observed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">series</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Data about the Event series this event represents or nil if it&#8217;s a singleton Event.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_eventseries">v1.EventSeries</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">origin</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Component that generated the Event.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_eventsource">v1.EventSource</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">action</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">What Origin did/failed to do.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_eventaction">v1.EventAction</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">On what Origin acted upon.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectreference">v1.ObjectReference</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">secondaryObject</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional secondary Object for more complex actions.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectreference">v1.ObjectReference</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">severity</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -1376,6 +1425,103 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_deletionpropagation">v1.DeletionPropagation</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_eventseries">v1.EventSeries</h3>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">uid</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UID for this event series</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">count</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Number of occurrences in this series up to the last heartbeat time</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">heartbeatTime</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Time when last update for this series was sent</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">lastObservedTime</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Time of the last occurence observed</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">state</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">State of this Series: Ongoing or Finished</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_eventaction">v1.EventAction</h3>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">action</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">reason</p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -2263,6 +2409,13 @@ When an object is created, the system will populate this list with the current s
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">host</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Node name on which the event is generated.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">id</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Identifies the component emitting the Event</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
