@@ -24,6 +24,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -55,6 +56,12 @@ type Manager interface {
 	// certificate manager, as well as the associated certificate and key data
 	// in PEM format.
 	Current() *tls.Certificate
+	// NewRotationRoundTripper creates a http.RoundTripper that uses the settings
+	// from the template Transport. The underlying transport will be replaced on
+	// each certificate rotation so that the properties of the certificate that
+	// change (CN, expiration, etc) will be reflected in the communications to the
+	// peer.
+	NewRotationRoundTripper(template *http.Transport) (http.RoundTripper, error)
 }
 
 // Config is the set of configuration parameters available for a new Manager.
@@ -128,6 +135,7 @@ type manager struct {
 	cert                     *tls.Certificate
 	rotationDeadline         time.Time
 	forceRotation            bool
+	certVersion              int
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -320,6 +328,7 @@ func (m *manager) updateCached(cert *tls.Certificate) {
 	m.certAccessLock.Lock()
 	defer m.certAccessLock.Unlock()
 	m.cert = cert
+	m.certVersion++
 }
 
 func (m *manager) generateCSR() (csrPEM []byte, keyPEM []byte, err error) {
@@ -340,6 +349,23 @@ func (m *manager) generateCSR() (csrPEM []byte, keyPEM []byte, err error) {
 		return nil, nil, fmt.Errorf("unable to create a csr from the private key: %v", err)
 	}
 	return csrPEM, keyPEM, nil
+}
+
+// NewRotationRoundTripper creates a http.RoundTripper that uses the settings
+// from the template Transport. The underlying transport will be replaced on
+// each certificate rotation so that the properties of the certificate that
+// change (CN, expiration, etc) will be reflected in the communications to the
+// peer.
+func (m *manager) NewRotationRoundTripper(template *http.Transport) (http.RoundTripper, error) {
+	return newRotationRoundTripper(m, template)
+}
+
+// sameVersion checks that the passed in version matches the version of the
+// certificate that is currently in use.
+func (m *manager) sameVersion(expected int) bool {
+	m.certAccessLock.RLock()
+	defer m.certAccessLock.RUnlock()
+	return expected == m.certVersion
 }
 
 // requestCertificate will create a certificate signing request using the PEM

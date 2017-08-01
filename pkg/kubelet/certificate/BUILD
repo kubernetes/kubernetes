@@ -14,6 +14,7 @@ go_library(
         "certificate_manager.go",
         "certificate_store.go",
         "kubelet.go",
+        "roundtripper.go",
     ],
     tags = ["automanaged"],
     deps = [
