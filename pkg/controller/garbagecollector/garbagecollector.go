@@ -390,9 +390,10 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 	switch {
 	case len(solid) != 0:
 		glog.V(2).Infof("object %s has at least one existing owner: %#v, will not garbage collect", solid, item.identity)
-		if len(dangling) != 0 || len(waitingForDependentsDeletion) != 0 {
-			glog.V(2).Infof("remove dangling references %#v and waiting references %#v for object %s", dangling, waitingForDependentsDeletion, item.identity)
+		if len(dangling) == 0 && len(waitingForDependentsDeletion) == 0 {
+			return nil
 		}
+		glog.V(2).Infof("remove dangling references %#v and waiting references %#v for object %s", dangling, waitingForDependentsDeletion, item.identity)
 		// waitingForDependentsDeletion needs to be deleted from the
 		// ownerReferences, otherwise the referenced objects will be stuck with
 		// the FinalizerDeletingDependents and never get deleted.
