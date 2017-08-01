@@ -12,22 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all image push clean
+SRCS = nnp
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
+SRC_DIR = $(notdir $(shell pwd))
+export
 
-TAG = 1.2
-PREFIX = gcr.io/google_containers
+bin:
+	../image-util.sh bin $(SRCS)
 
-
-all: push
-
-nnp: nnp.c
-	gcc -static -o $@ $@.c
-
-image: nnp
-	docker build --pull -t $(PREFIX)/nonewprivs:$(TAG) .
-
-push: image
-	gcloud docker -- push $(PREFIX)/nonewprivs:$(TAG)
-
-clean:
-	rm -f nnp
+.PHONY: bin
