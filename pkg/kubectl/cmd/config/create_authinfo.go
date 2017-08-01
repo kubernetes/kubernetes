@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/util/prompt"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -41,13 +42,18 @@ type createAuthInfoOptions struct {
 	clientCertificate flag.StringFlag
 	clientKey         flag.StringFlag
 	token             flag.StringFlag
+	promptToken       bool
 	username          flag.StringFlag
+	promptUsername    bool
 	password          flag.StringFlag
+	promptPassword    bool
 	embedCertData     flag.Tristate
 	authProvider      flag.StringFlag
 
 	authProviderArgs         map[string]string
 	authProviderArgsToRemove []string
+
+	in io.Reader
 }
 
 const (
@@ -80,6 +86,12 @@ var (
 		# Set basic auth for the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --username=admin --password=uXFGweU9l35qcif
 
+		# Prompt username and password input for the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --prompt-username --prompt-password
+
+		# Prompt token input for the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --prompt-token
+
 		# Embed client certificate data in the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true
 
@@ -93,8 +105,8 @@ var (
 		kubectl config set-credentials cluster-admin --auth-provider=oidc --auth-provider-arg=client-secret-`)
 )
 
-func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &createAuthInfoOptions{configAccess: configAccess}
+func NewCmdConfigSetAuthInfo(in io.Reader, out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &createAuthInfoOptions{configAccess: configAccess, in: in}
 	return newCmdConfigSetAuthInfo(out, options)
 }
 
@@ -120,9 +132,12 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 	cmd.Flags().Var(&options.clientKey, clientcmd.FlagKeyFile, "Path to "+clientcmd.FlagKeyFile+" file for the user entry in kubeconfig")
 	cmd.MarkFlagFilename(clientcmd.FlagKeyFile)
 	cmd.Flags().Var(&options.token, clientcmd.FlagBearerToken, clientcmd.FlagBearerToken+" for the user entry in kubeconfig")
+	cmd.Flags().BoolVar(&options.promptToken, "prompt-token", false, "prompt user for token")
 	cmd.Flags().Var(&options.username, clientcmd.FlagUsername, clientcmd.FlagUsername+" for the user entry in kubeconfig")
+	cmd.Flags().BoolVar(&options.promptUsername, "prompt-username", false, "prompt user for username")
 	cmd.Flags().Var(&options.password, clientcmd.FlagPassword, clientcmd.FlagPassword+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.authProvider, flagAuthProvider, "Auth provider for the user entry in kubeconfig")
+	cmd.Flags().BoolVar(&options.promptPassword, "prompt-password", false, "prompt user for password")
 	cmd.Flags().StringSlice(flagAuthProviderArg, nil, "'key=value' arguments for the auth provider")
 	f := cmd.Flags().VarPF(&options.embedCertData, clientcmd.FlagEmbedCerts, "", "Embed client cert/key for the user entry in kubeconfig")
 	f.NoOptDefVal = "true"
@@ -131,7 +146,14 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 }
 
 func (o createAuthInfoOptions) run() error {
-	err := o.validate()
+	var err error
+
+	err = o.checkPrompts()
+	if err != nil {
+		return err
+	}
+
+	err = o.validate()
 	if err != nil {
 		return err
 	}
@@ -292,6 +314,38 @@ func (o createAuthInfoOptions) validate() error {
 				return fmt.Errorf("error reading %s data from %s: %v", clientcmd.FlagKeyFile, keyPath, err)
 			}
 		}
+	}
+
+	return nil
+}
+
+func (o *createAuthInfoOptions) checkPrompts() (err error) {
+	var result string
+
+	prompter := prompt.NewPrompter(o.in)
+
+	if o.promptUsername {
+		result, err = prompter.Prompt("Username", prompt.ShowEcho, prompt.DontMask)
+		if err != nil {
+			return err
+		}
+		o.username.Set(result)
+	}
+
+	if o.promptPassword {
+		result, err = prompter.Prompt("Password", prompt.DontShowEcho, prompt.Mask)
+		if err != nil {
+			return err
+		}
+		o.password.Set(result)
+	}
+
+	if o.promptToken {
+		result, err = prompter.Prompt("Token", prompt.DontShowEcho, prompt.DontMask)
+		if err != nil {
+			return err
+		}
+		o.token.Set(result)
 	}
 
 	return nil
